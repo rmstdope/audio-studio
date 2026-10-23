@@ -19,10 +19,11 @@ export interface Candidate {
   matched: string[]
 }
 
-const WORD = /[\p{L}\p{N}'’]+/gu
+/** A word: letters and digits, with apostrophes only inside it (`grandma's`, not `'wise'`). */
+const WORD = /[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*/gu
 
 function words(text: string): string[] {
-  return text.toLowerCase().match(WORD) ?? []
+  return text.toLowerCase().replaceAll('’', "'").match(WORD) ?? []
 }
 
 /** Keywords in lower case, once each, without ones that have no words (they would match anything). */
@@ -41,7 +42,8 @@ export function hasWords(keyword: string): boolean {
  * results are pooled and ranked here (as RetroQuest's `fish_tts.py voices search` does).
  */
 export function searchTerms(keywords: string[]): string[] {
-  const phrases = clean(keywords)
+  // A one-letter term would bring up most of the library and rank nothing.
+  const phrases = clean(keywords).filter((phrase) => phrase.length > 1)
   const single = phrases.flatMap(words).filter((word) => word.length > 1)
   return [...new Set([...phrases, ...single])]
 }

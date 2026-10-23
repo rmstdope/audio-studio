@@ -220,6 +220,11 @@ plus an optional phrase that replaces the project's standard one). A speaker in 
 entry in `cast.json` shows as **Uncast**. The UI shows, for each character, which parts it appears
 in and how many lines it has in each, because recasting it makes its lines stale in all of them.
 
+Pronunciations apply in the order the file lists them, with one limit: JavaScript puts integer-like
+keys (`"10"`) first when it reads the file, so the studio applies those first, where RetroQuest's
+Python tooling keeps file order. The studio refuses to rewrite a cast where this would change the
+order (an integer-like key among others); a longer key such as `"Act 10"` keeps its place.
+
 RetroQuest today has `tts/act1/cast.json`; switching over moves it to `tts/cast.json` once (only Act I
 is cast so far, so there is nothing to merge).
 

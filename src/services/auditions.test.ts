@@ -163,6 +163,15 @@ describe('setKeywords', () => {
     )
   })
 
+  it('writes a cast whose numeric pronunciation could not move', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: {}, pronounce: { '1': 'one' } },
+    })
+    const result = await setKeywords(join(root, 'audio-studio.json'), 'tilda', ['chatty'])
+    expect(result).toEqual({ ok: true })
+  })
+
   it('refuses to rewrite a cast whose pronunciations would change order', async () => {
     const root = tempRepo({
       ...files,

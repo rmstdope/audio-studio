@@ -53,10 +53,14 @@ export function useCandidates(characterId: string) {
   })
 }
 
-/** Saves a character's audition keywords, then searches again with them. */
+/**
+ * Saves a character's audition keywords, then searches again with them. Saves for one character
+ * run one after another, so a quick second edit is never overtaken by the first.
+ */
 export function useSetKeywords(characterId: string) {
   const client = useQueryClient()
   return useMutation({
+    scope: { id: `keywords-${characterId}` },
     mutationFn: async (keywords: string[]) => {
       const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
         method: 'PATCH',

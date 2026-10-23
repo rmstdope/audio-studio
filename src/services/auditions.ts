@@ -102,13 +102,17 @@ export function setKeywords(
   }))
 }
 
-/** Writes in progress per cast file, so changes made at once are applied one after the other. */
+/**
+ * Writes in progress per project (one server serves one project, with one cast file), so changes
+ * made at once are applied one after the other. Every cast writer must go through
+ * `updateCharacter`.
+ */
 const castWrites = new Map<string, Promise<unknown>>()
 
 /**
  * Changes one character's entry in the cast and writes the cast back, in its own layout, leaving
  * everything else as it was. The character must be in the project (in the cast or speaking in a
- * part); a speaker not in the cast yet gets an entry. Changes to one cast file are applied one at
+ * part); a speaker not in the cast yet gets an entry. Changes to a project's cast are applied one at
  * a time, each on what the one before wrote.
  */
 function updateCharacter(
@@ -147,8 +151,11 @@ async function writeCharacter(
   const raw = json.status === 'missing' ? { speakers: {}, pronounce: {} } : json.value
   const parsed = CastSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, problems: problemsFrom(path, parsed.error) }
-  const reordered = Object.keys(parsed.data.pronounce).filter((k) => INTEGER_LIKE.test(k))
-  if (reordered.length) {
+  // Only `pronounce` is checked: it is the one place where order matters. With a single entry
+  // nothing can move; with more, parsing has already lost the file's order, so refuse.
+  const keys = Object.keys(parsed.data.pronounce)
+  const reordered = keys.filter((k) => INTEGER_LIKE.test(k))
+  if (reordered.length && keys.length > 1) {
     return {
       ok: false,
       problems: [
@@ -156,9 +163,10 @@ async function writeCharacter(
           file: path,
           path: 'pronounce',
           message:
-            `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move first ` +
-            'if the studio wrote this file, changing the order pronunciations apply in; ' +
-            'edit the file by hand, or write the number another way (e.g. "Ten")',
+            `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move to the ` +
+            'top if the studio wrote this file, changing the order pronunciations apply in. ' +
+            'Make the key longer, e.g. "Act 10" or "10 " (any key that is not a plain number ' +
+            'keeps its place), or edit the file by hand.',
         },
       ],
     }

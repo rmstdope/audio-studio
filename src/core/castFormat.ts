@@ -1,5 +1,3 @@
-import type { Cast } from './resources'
-
 /** Lines longer than this are broken up: the pronunciation table goes one entry per line. */
 const LINE_LIMIT = 100
 
@@ -8,7 +6,7 @@ const LINE_LIMIT = 100
  * values inline, so a change to one character is a one-line diff. Top-level fields stay in their
  * order, and none is added.
  */
-export function formatCast(cast: Cast | Record<string, unknown>): string {
+export function formatCast(cast: Record<string, unknown>): string {
   const sections = Object.entries(cast).map(([key, value]) => {
     const prefix = `  ${JSON.stringify(key)}: `
     if (key === 'speakers' && isRecord(value)) return prefix + block(value, 2)

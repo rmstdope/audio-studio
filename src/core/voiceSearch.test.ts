@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { rankVoices, searchTerms, type Voice } from './voiceSearch'
+import { hasWords, rankVoices, searchTerms, type Voice } from './voiceSearch'
 
 function voice(id: string, overrides: Partial<Voice> = {}): Voice {
   return {
@@ -29,7 +29,32 @@ describe('searchTerms', () => {
 
 describe('searchTerms, skipping what cannot match', () => {
   it('drops keywords without letters or digits, and one-letter words', () => {
-    expect(searchTerms(['-', 'grandma’s voice'])).toEqual(['grandma’s voice', 'grandma’s', 'voice'])
+    expect(searchTerms(['-', 'grandma’s voice'])).toEqual(['grandma’s voice', "grandma's", 'voice'])
+  })
+})
+
+describe('words in quotes and apostrophes', () => {
+  it('matches words inside quotes, curly or straight', () => {
+    const ranked = rankVoices(
+      [voice('a', { title: '‘Wise’ elder' }), voice('b', { title: "'Old Man' narrator" })],
+      ['wise', 'old man'],
+      new Set(),
+    )
+    expect(ranked.map((c) => [c.voice.id, c.matched])).toEqual([
+      ['a', ['wise']],
+      ['b', ['old man']],
+    ])
+  })
+
+  it('treats both apostrophes alike', () => {
+    const ranked = rankVoices([voice('a', { title: 'Grandma’s voice' })], ["grandma's"], new Set())
+    expect(ranked.map((c) => c.voice.id)).toEqual(['a'])
+  })
+
+  it('does not count apostrophes alone as words', () => {
+    expect(hasWords("'")).toBe(false)
+    expect(hasWords('’')).toBe(false)
+    expect(searchTerms(["'", 'a', 'warm'])).toEqual(['warm'])
   })
 })
 

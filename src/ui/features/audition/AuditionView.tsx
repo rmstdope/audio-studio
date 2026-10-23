@@ -3,8 +3,10 @@ import type { ProjectSummary } from '../../../core/summary'
 import type { Candidate, Voice } from '../../../core/voiceSearch'
 import { useCandidates, useSetKeywords } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
+import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { compact, plural, shortTitle, tintFor, voiceLabel } from '../../format'
+import { addKeyword } from '../../keywords'
 import { routeHref } from '../../route'
 
 /**
@@ -159,10 +161,8 @@ function KeywordsEditor({ characterId, keywords }: { characterId: string; keywor
 
   const add = (event: FormEvent) => {
     event.preventDefault()
-    const word = draft.trim()
-    const known = current.some((k) => k.toLowerCase() === word.toLowerCase())
-    if (!word || known) return setDraft('')
-    save.mutate([...current, word])
+    const next = addKeyword(current, draft)
+    if (next) save.mutate(next)
     setDraft('')
   }
 
@@ -202,7 +202,7 @@ function KeywordsEditor({ characterId, keywords }: { characterId: string; keywor
         Saved in the cast. Each keyword is searched, and voices are ranked by how many they match.
       </span>
       {save.data && !save.data.ok && 'problems' in save.data && (
-        <span className="adopt-error">The cast file has problems; fix them first.</span>
+        <Problems title="The keywords could not be saved" problems={save.data.problems} />
       )}
       {save.isError && <span className="adopt-error">{save.error.message}</span>}
     </form>
