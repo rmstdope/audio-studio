@@ -5,6 +5,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query'
+import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
@@ -178,6 +179,38 @@ export function useSetStyle(characterId: string) {
         client.invalidateQueries({ queryKey: ['project'] }),
         refreshAudition(client, characterId),
       ])
+    },
+  })
+}
+
+/**
+ * Saves the whole pronunciation table; `was` is the table shown, so a page that is out of date is
+ * refused instead of overwriting someone's change. Every part's lines follow it.
+ */
+export function useSetPronunciations() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'pronounce' },
+    mutationFn: async (change: { table: Pronunciation[]; was: Pronunciation[] }) => {
+      const response = await fetch('/api/pronounce', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(change),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the pronunciations answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    onSuccess: async (saved) => {
+      // Refused or not, the page shows the file's table again: a refusal may mean it changed.
+      if (saved.ok) {
+        void client.invalidateQueries({ queryKey: ['part'] })
+        void client.invalidateQueries({ queryKey: ['plan'] })
+        void client.invalidateQueries({ queryKey: ['candidates'] })
+      }
+      // The panel shows the saved table once the project has it.
+      await client.invalidateQueries({ queryKey: ['project'] })
     },
   })
 }

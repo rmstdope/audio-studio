@@ -18,7 +18,8 @@ Each take is checked with Whisper, and recorded again (up to three times) until 
 words are heard; the manifest gets real word timings. A line never heard well enough shows as
 weak: retake it from its row, or from Generate when asked. Clips recorded before the studio (or
 unchecked) can be measured with Whisper without new audio. A character's style is edited on its
-audition page, and a line's own cue by clicking it in the lines table (step 6.1).
+audition page, a line's own cue by clicking it in the lines table, and the pronunciation table on
+All characters (steps 6.1 and 6.2).
 
 Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`), and checking
 takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads

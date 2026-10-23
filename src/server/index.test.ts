@@ -180,6 +180,24 @@ describe('server', () => {
     expect(cast.speakers.narrator.style).toBe('[grave]')
   })
 
+  it('saves the pronunciation table, from the studio’s own page only', async () => {
+    const patch = (body: unknown, origin = server.url.origin) =>
+      fetch(url('/api/pronounce'), {
+        method: 'PATCH',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    const table = { table: [['Eldoria', 'El-door-ia']], was: [] }
+    expect((await patch(table, 'https://evil.example')).status).toBe(403)
+    expect((await patch({ table: 'Eldoria' })).status).toBe(400)
+    expect((await patch({ table: [['', 'El-door-ia']], was: [] })).status).toBe(409)
+    expect((await patch(table)).status).toBe(200)
+    const project = await (await fetch(url('/api/project'))).json()
+    expect(project.summary.pronounce).toEqual([['Eldoria', 'El-door-ia']])
+    expect((await patch(table)).status).toBe(409)
+    expect((await patch({ table: [], was: [['Eldoria', 'El-door-ia']] })).status).toBe(200)
+  })
+
   it('saves a line’s cue, from the studio’s own page only', async () => {
     const patch = (key: string, body: unknown, origin = server.url.origin) =>
       fetch(url(`/api/parts/act1/cues/${key}`), {

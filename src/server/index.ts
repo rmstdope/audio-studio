@@ -3,6 +3,7 @@ import {
   findCandidates,
   setKeywords,
   setPhrase,
+  setPronunciations,
   setStyle,
   type FishFactory,
 } from '../services/auditions'
@@ -64,6 +65,10 @@ const CharacterBody = z.union([
   z.object({ phrase: z.string().max(10_000).nullable() }).strict(),
   z.object({ style: z.string().max(1_000) }).strict(),
 ])
+
+/** The whole pronunciation table, and the one the page showed (to refuse a stale page). */
+const Table = z.array(z.tuple([z.string().max(1_000), z.string().max(1_000)])).max(2_000)
+const PronounceBody = z.object({ table: Table, was: Table }).strict()
 
 /** A line's own cue; empty to go back to the character's style. */
 const CueBody = z.object({ cue: z.string().max(1_000) }).strict()
@@ -312,6 +317,17 @@ export function startServer({
           }
           const { id } = request.params
           const result = await changeCharacter(id, body.data)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/pronounce': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = PronounceBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { table, was }' }, { status: 400 })
+          }
+          const result = await setPronunciations(projectFile, body.data.table, body.data.was)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

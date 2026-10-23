@@ -14,4 +14,13 @@ describe('CastSchema', () => {
       },
     ])
   })
+
+  it('reports a __proto__ pronunciation instead of losing it', () => {
+    const result = CastSchema.safeParse(JSON.parse('{"speakers":{},"pronounce":{"__proto__":"x"}}'))
+    if (result.success) throw new Error('expected __proto__ to be refused')
+    expect(problemsFrom('tts/cast.json', result.error)[0]).toMatchObject({
+      path: 'pronounce',
+      message: expect.stringContaining('__proto__'),
+    })
+  })
 })

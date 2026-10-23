@@ -1356,3 +1356,75 @@ a.btn {
   display: flex;
   gap: 6px;
 }
+
+.pronounce {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.pronounce-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px 24px;
+}
+.pronounce-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pronounce-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pronounce-rows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.pronounce-rows input {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 7px 10px;
+}
+.pronounce-actions {
+  display: flex;
+  gap: 4px;
+}
+.pronounce-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.pronounce-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+}
+.pronounce-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pronounce-foot .spacer {
+  flex: 1;
+}
+@media (max-width: 640px) {
+  .pronounce-rows li {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .pronounce-actions {
+    grid-column: 1 / -1;
+  }
+}
