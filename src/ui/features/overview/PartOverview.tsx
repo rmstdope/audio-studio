@@ -1,7 +1,7 @@
 import type { LineStatus } from '../../../core/planner'
 import type { PartSummary, ProjectSummary } from '../../../core/summary'
 import type { PartDetail } from '../../../services/workspace'
-import { useAdopt, useJob, usePart, useRefreshDialog } from '../../api'
+import { useAdopt, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
 import { CharacterCard } from '../../components/CharacterCard'
 import { AlertIcon, ListIcon } from '../../components/icons'
@@ -18,9 +18,6 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
   const loaded = detail.data?.ok ? detail.data.part : null
   const toRecord = loaded ? loaded.counts.missing + loaded.counts.stale : 0
   const refresh = useRefreshDialog(part.id)
-  // A job reads the dialog as it records: refreshing under it would fail its lines.
-  const job = useJob(part.id).data
-  const jobRunning = job?.status === 'running' || job?.status === 'cancelling'
 
   return (
     <>
@@ -38,15 +35,11 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
               <button
                 className="btn"
                 type="button"
-                disabled={refresh.isPending || jobRunning}
-                title={
-                  jobRunning
-                    ? 'Waits for the generation running for this part'
-                    : 'Runs the project’s refreshDialog command to extract this dialog from the game'
-                }
-                onClick={() => refresh.mutate()}
+                disabled={refresh.pending}
+                title="Runs the project’s refreshDialog command to extract this dialog from the game"
+                onClick={refresh.start}
               >
-                {refresh.isPending ? 'Refreshing dialog…' : 'Refresh dialog'}
+                {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
               </button>
             )}
             {hasDialog && (
@@ -62,11 +55,11 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
           </div>
         )}
       </header>
-      {(refresh.data || refresh.isError) && (
+      {refresh.outcome && (
         <RefreshOutcome
-          result={refresh.data ?? null}
-          error={refresh.error?.message ?? null}
-          onClose={() => refresh.reset()}
+          result={refresh.outcome.result}
+          error={refresh.outcome.error}
+          onClose={refresh.dismiss}
         />
       )}
 

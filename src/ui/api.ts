@@ -1,8 +1,11 @@
 import {
   keepPreviousData,
+  useIsMutating,
   useMutation,
+  useMutationState,
   useQuery,
   useQueryClient,
+  type MutationState,
   type QueryClient,
 } from '@tanstack/react-query'
 import type { Pronunciation } from '../core/pronounce'
@@ -230,14 +233,16 @@ export function useSetPronunciations() {
 }
 
 /**
- * Runs the project's refreshDialog command for a part. Afterwards everything read from the dialog
- * is loaded again: the project, the part, its plans, and what git sees.
+ * Refreshing a part's dialog: `start` runs the project's refreshDialog command, `pending` says
+ * whether it runs, `outcome` is the last one's result until dismissed. The state lives in the
+ * mutation cache under the part's key, so leaving the page and coming back during a refresh still
+ * shows it running. Afterwards everything read from the dialog is loaded again.
  */
 export function useRefreshDialog(partId: string) {
   const client = useQueryClient()
-  return useMutation({
-    // Keyed by part, so a refresh's state never carries over to another part's page.
-    mutationKey: ['refresh', partId],
+  const mutationKey = ['refresh', partId]
+  const mutation = useMutation({
+    mutationKey,
     scope: { id: `refresh-${partId}` },
     mutationFn: async () => {
       const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/refresh`, {
@@ -257,6 +262,22 @@ export function useRefreshDialog(partId: string) {
       ])
     },
   })
+  const pending = useIsMutating({ mutationKey }) > 0
+  const last = useMutationState({
+    filters: { mutationKey },
+    select: (m) => m.state as MutationState<NonNullable<RefreshResult>, Error>,
+  }).at(-1)
+  const [dismissed, setDismissed] = useState<number | null>(null)
+  const settled = last && last.status !== 'pending' && last.status !== 'idle'
+  return {
+    start: () => mutation.mutate(),
+    pending,
+    outcome:
+      settled && last.submittedAt !== dismissed
+        ? { result: last.data ?? null, error: last.error?.message ?? null }
+        : null,
+    dismiss: () => setDismissed(last?.submittedAt ?? null),
+  }
 }
 
 /** Saves a line's own cue (empty to go back to the character's style), then reloads the part. */

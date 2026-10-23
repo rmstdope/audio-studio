@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { refreshDialog } from './refresh'
+import { isRefreshing, refreshDialog, stopRefreshes } from './refresh'
 
 const before = [
   { key: 'a', speaker: 'mira', text: 'Hello.' },
@@ -56,15 +56,47 @@ describe('refreshDialog', () => {
   })
 
   it('stops a command that takes too long, children included', async () => {
-    const root = tempRepo(project('(sleep 30); true'))
-    const started = Date.now()
+    const root = tempRepo(project('(sleep 1; echo late > marker.txt); true'))
     const result = await refreshDialog(join(root, 'audio-studio.json'), 'act1', { timeoutMs: 300 })
-    expect(Date.now() - started).toBeLessThan(5000)
     expect(result).toMatchObject({
       ok: false,
       reason: 'failed',
       message: expect.stringContaining('longer than'),
     })
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(existsSync(join(root, 'marker.txt'))).toBe(false)
+  })
+
+  it('names a signal from outside rather than calling it a timeout', async () => {
+    const root = tempRepo(project('kill -9 $$'))
+    expect(await refreshDialog(join(root, 'audio-studio.json'), 'act1')).toMatchObject({
+      ok: false,
+      message: 'The command was stopped by SIGKILL.',
+    })
+  })
+
+  it('judges by the command, not by what it left running in the background', async () => {
+    const root = tempRepo(project(`sleep 30 & printf '%s' '${after}' > tts/{part}/script.json`))
+    const started = Date.now()
+    const result = await refreshDialog(join(root, 'audio-studio.json'), 'act1', {
+      timeoutMs: 20_000,
+    })
+    expect(result).toMatchObject({ ok: true, lines: 2 })
+    expect(Date.now() - started).toBeLessThan(10_000)
+  })
+
+  it('says while a part is refreshing, and stops every refresh when the studio stops', async () => {
+    const root = tempRepo(project('(sleep 1; echo late > marker.txt); true'))
+    const projectFile = join(root, 'audio-studio.json')
+    const running = refreshDialog(projectFile, 'act1')
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(isRefreshing(projectFile, 'act1')).toBe(true)
+    expect(isRefreshing(projectFile, 'act2')).toBe(false)
+    stopRefreshes()
+    expect(await running).toMatchObject({ ok: false, reason: 'failed' })
+    expect(isRefreshing(projectFile, 'act1')).toBe(false)
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(existsSync(join(root, 'marker.txt'))).toBe(false)
   })
 
   it('runs one refresh of a part at a time', async () => {

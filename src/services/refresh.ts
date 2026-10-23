@@ -10,7 +10,7 @@ import { openProject, type ProjectFailure } from './workspace'
 export type RefreshResult =
   /** `diff` is null when the dialog could not be read before, so what changed is not known. */
   | { ok: true; lines: number; diff: DialogDiff | null; output: string }
-  | { ok: false; reason: 'none'; message: string }
+  | { ok: false; reason: 'none' | 'busy'; message: string }
   | { ok: false; reason: 'failed'; message: string; output: string }
   | { ok: false; problems: Problem[]; output: string }
   | ProjectFailure
@@ -35,7 +35,66 @@ export function refreshDialog(
   partId: string,
   { timeoutMs = TIMEOUT_MS }: { timeoutMs?: number } = {},
 ): Promise<RefreshResult> {
-  return refreshes.run(`${projectFile}\n${partId}`, () => refresh(projectFile, partId, timeoutMs))
+  const key = partKey(projectFile, partId)
+  // Counted from the click, so a generation is refused while one waits in line too.
+  active.set(key, (active.get(key) ?? 0) + 1)
+  return refreshes
+    .run(key, () => refresh(projectFile, partId, timeoutMs))
+    .finally(() => {
+      const left = (active.get(key) ?? 1) - 1
+      if (left) active.set(key, left)
+      else active.delete(key)
+    })
+}
+
+/** Refreshes asked for and not finished, per part: a generation waits for none of them. */
+const active = new Map<string, number>()
+
+function partKey(projectFile: string, partId: string): string {
+  return `${projectFile}\n${partId}`
+}
+
+/** Whether a refresh of the part is running or waiting to run. */
+export function isRefreshing(projectFile: string, partId: string): boolean {
+  return active.has(partKey(projectFile, partId))
+}
+
+/** The process groups of the commands running now, so they can be stopped with the studio. */
+const running = new Set<number>()
+
+/**
+ * Stops every refresh command running now, with everything it started. The commands run in their
+ * own process group, so they would not get the terminal's Ctrl-C: the studio stops them itself
+ * when it exits.
+ */
+export function stopRefreshes(): void {
+  for (const pid of running) killGroup(pid)
+}
+
+function killGroup(pid: number): void {
+  try {
+    process.kill(-pid, 'SIGKILL')
+  } catch {
+    // Already gone.
+  }
+}
+
+let stopsWithStudio = false
+
+/** Makes sure the running commands are stopped when the studio exits or is interrupted. */
+function stopWithStudio(): void {
+  if (stopsWithStudio) return
+  stopsWithStudio = true
+  process.once('exit', stopRefreshes)
+  for (const [signal, code] of [
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ] as const) {
+    process.once(signal, () => {
+      stopRefreshes()
+      process.exit(code)
+    })
+  }
 }
 
 async function refresh(
@@ -81,44 +140,57 @@ async function readLines(root: string, path: string): Promise<Line[] | 'invalid'
   return read === 'missing' ? [] : read
 }
 
+/** How long the output may stay open after the command itself has ended (a background helper). */
+const GRACE_MS = 1500
+
 /**
  * Runs a command with the shell in `cwd`, in its own process group so that a timeout stops
  * everything it started (the game's `npx` and `node` too, which would otherwise keep the output
- * open): whether it worked, and the end of what it said.
+ * open): whether it worked, and the end of what it said. It is judged by the shell's exit: what it
+ * leaves running in the background gets a moment to finish its output, then is stopped.
  */
 async function shell(
   command: string,
   cwd: string,
   timeoutMs: number,
 ): Promise<{ ok: true; output: string } | { ok: false; message: string; output: string }> {
+  stopWithStudio()
   const child = Bun.spawn(['sh', '-c', command], {
     cwd,
     stdout: 'pipe',
     stderr: 'pipe',
     detached: true,
   })
+  running.add(child.pid)
   let timedOut = false
+  let ended = false
   const timer = setTimeout(() => {
+    if (ended) return
     timedOut = true
-    try {
-      process.kill(-child.pid, 'SIGKILL')
-    } catch {
-      // Already gone.
-    }
+    killGroup(child.pid)
   }, timeoutMs)
-  const [out, err, code] = await Promise.all([
-    tail(child.stdout),
-    tail(child.stderr),
-    child.exited,
-  ]).finally(() => clearTimeout(timer))
-  const output = [out.trim(), err.trim()].filter(Boolean).join('\n').slice(-OUTPUT_LIMIT)
-  if (code === 0 && !timedOut) return { ok: true, output }
-  const message = timedOut
-    ? `The command took longer than ${minutes(timeoutMs)} and was stopped.`
-    : child.signalCode
-      ? `The command was stopped by ${child.signalCode}.`
-      : `The command failed (exit code ${code}).`
-  return { ok: false, message, output }
+  const exit = child.exited.then((code) => {
+    ended = true
+    clearTimeout(timer)
+    setTimeout(() => killGroup(child.pid), GRACE_MS).unref()
+    return code
+  })
+  try {
+    const [out, err, code] = await Promise.all([tail(child.stdout), tail(child.stderr), exit])
+    const output = [out.trim(), err.trim()].filter(Boolean).join('\n').slice(-OUTPUT_LIMIT)
+    if (code === 0 && !timedOut) return { ok: true, output }
+    const message = timedOut
+      ? `The command took longer than ${minutes(timeoutMs)} and was stopped.`
+      : child.signalCode
+        ? `The command was stopped by ${child.signalCode}.`
+        : `The command failed (exit code ${code}).`
+    return { ok: false, message, output }
+  } finally {
+    clearTimeout(timer)
+    // Whatever happened (a stream error too), nothing of it is left running.
+    killGroup(child.pid)
+    running.delete(child.pid)
+  }
 }
 
 /** The end of a stream's text, at most OUTPUT_LIMIT characters, however much it says. */
