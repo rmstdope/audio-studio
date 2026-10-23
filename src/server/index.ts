@@ -13,7 +13,7 @@ import { planGeneration } from '../core/generation'
 import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
-import { setCue } from '../services/cues'
+import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { measureLine, recordLine, removeOrphans } from '../services/narration'
@@ -71,6 +71,9 @@ const CharacterBody = z.union([
 /** The whole pronunciation table, and the one the page showed (to refuse a stale page). */
 const Table = z.array(z.tuple([z.string().max(1_000), z.string().max(1_000)])).max(2_000)
 const PronounceBody = z.object({ table: Table, was: Table }).strict()
+
+/** Where an orphaned cue goes: a line key, or null to remove it. */
+const MoveCueBody = z.object({ to: z.string().min(1).max(200).nullable() }).strict()
 
 /** A line's own cue; empty to go back to the character's style. */
 const CueBody = z.object({ cue: z.string().max(1_000) }).strict()
@@ -339,6 +342,16 @@ export function startServer({
             return Response.json({ ok: false, reason: 'busy', message }, { status: 409 })
           }
           const result = await refreshDialog(projectFile, request.params.part)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/cues/:key/move': {
+        POST: fromOwnPage(async (request) => {
+          const body = MoveCueBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { to }' }, { status: 400 })
+          const { part, key } = request.params
+          const result = await moveCue(projectFile, part, key, body.data.to)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

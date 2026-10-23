@@ -110,7 +110,14 @@ describe('planPart', () => {
       }),
     )
     expect(state.orphans).toEqual([{ key: 'old', speaker: 'mira', file: 'old.mp3' }])
-    expect(state.orphanCues).toEqual(['gone'])
+    expect(state.orphanCues).toEqual([{ key: 'gone', cue: '[soft]' }])
+  })
+})
+
+describe('planPart, orphaned cues', () => {
+  it('lists them in the cues file’s order, as the user sees it there', () => {
+    const state = planPart(input({ cues: { zz: '[a]', n1: '[warm]', gone: '[b]' } }))
+    expect(state.orphanCues.map((c) => c.key)).toEqual(['zz', 'gone'])
   })
 })
 

@@ -433,6 +433,7 @@ GET    /api/parts/:part/clips/:file              a clip from the part's clips fo
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
+POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
 GET    /api/parts/:part/plan?speaker=&weak=1     scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
@@ -526,7 +527,7 @@ Small, independently useful increments:
       line's own cue in the lines table, saved in the part's cues file (its order kept, written
       with two-space indent, a cleared cue removed; a number-like key refused, as JavaScript would
       move it). Affected lines show as stale. Orphaned cues (their line's key changed with its
-      wording) are shown and re-keyed with Refresh dialog (6.4).
+      wording) are shown and re-keyed on the part's overview (6.4.2).
    2. **Pronunciations** (built): the table edited on All characters as a whole (add, change,
       reorder, remove) and saved at once, refused if the file changed since editing began.
       Nothing is trimmed (spaces anchor an entry: `"Al "`), an empty said form leaves the words
@@ -546,8 +547,11 @@ Small, independently useful increments:
          timeout, the studio exiting (also on Ctrl-C) and the end of the command itself stop
          everything it started. A refresh and a generation of the same part refuse each other,
          on the server.
-      2. **Orphaned cues**: show the cues it leaves without a line, and move each to its line's
-         new key or remove it.
+      2. **Orphaned cues** (built): a part's overview lists the cues whose line left the dialog,
+         with their text; each is given to a line (in its place in the cues file; lines without a
+         clip offered first, since a reworded line has none yet, and suggested when it is the only
+         one; numbered as in the dialog) or removed. Listed in the cues file's order. A line with its own
+         cue is not offered over.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data
    as one made by `narrate.py`, then retire `narrate.py` and `fish_tts.py`.

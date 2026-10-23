@@ -197,6 +197,23 @@ describe('server', () => {
     ).toBe(404)
   })
 
+  it('moves or removes an orphaned cue, from the studio’s own page only', async () => {
+    writeFileSync(join(root, 'tts/act1/cues.json'), '{\n  "gone": "[sad]"\n}\n')
+    const move = (to: string | null, origin = server.url.origin) =>
+      fetch(url('/api/parts/act1/cues/gone/move'), {
+        method: 'POST',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify({ to }),
+      })
+    expect((await move('a', 'https://evil.example')).status).toBe(403)
+    const part = await (await fetch(url('/api/parts/act1'))).json()
+    expect(part.part.orphanCues).toEqual([{ key: 'gone', cue: '[sad]' }])
+    expect((await move('a')).status).toBe(200)
+    expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe('{\n  "a": "[sad]"\n}\n')
+    expect((await move(null)).status).toBe(404)
+    writeFileSync(join(root, 'tts/act1/cues.json'), '{}\n')
+  })
+
   it('says what git sees of the project, here no repository', async () => {
     const body = await (await fetch(url('/api/changes'))).json()
     expect(body).toMatchObject({ ok: false, reason: 'no-git' })

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { loadPart } from './workspace'
-import { setCue } from './cues'
+import { moveCue, setCue } from './cues'
 
 const files = {
   'audio-studio.json': projectJson(),
@@ -114,5 +114,52 @@ describe('setCue', () => {
     const projectFile = join(root, 'audio-studio.json')
     expect(await setCue(projectFile, 'act9', 'a', '[x]')).toBeNull()
     expect(await setCue(projectFile, 'act1', 'nope', '[x]')).toBeNull()
+  })
+})
+
+describe('moveCue', () => {
+  const withOrphan = {
+    ...files,
+    'tts/act1/cues.json': '{\n  "zz": "[old]",\n  "gone": "[sad]",\n  "b": "[x]"\n}\n',
+  }
+
+  it('gives an orphaned cue to a line, in its place in the file', async () => {
+    const root = tempRepo(withOrphan)
+    expect(await moveCue(join(root, 'audio-studio.json'), 'act1', 'gone', 'a')).toEqual({
+      ok: true,
+    })
+    expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe(
+      '{\n  "zz": "[old]",\n  "a": "[sad]",\n  "b": "[x]"\n}\n',
+    )
+  })
+
+  it('removes an orphaned cue', async () => {
+    const root = tempRepo(withOrphan)
+    expect(await moveCue(join(root, 'audio-studio.json'), 'act1', 'gone', null)).toEqual({
+      ok: true,
+    })
+    expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe(
+      '{\n  "zz": "[old]",\n  "b": "[x]"\n}\n',
+    )
+  })
+
+  it('refuses a line that already has its own cue, and a cue that is not orphaned', async () => {
+    const root = tempRepo(withOrphan)
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await moveCue(projectFile, 'act1', 'gone', 'b')).toMatchObject({
+      ok: false,
+      problems: [{ path: 'b' }],
+    })
+    expect(await moveCue(projectFile, 'act1', 'b', 'a')).toMatchObject({
+      ok: false,
+      problems: [{ path: 'b' }],
+    })
+  })
+
+  it('knows no unknown cue or line', async () => {
+    const root = tempRepo(withOrphan)
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await moveCue(projectFile, 'act1', 'nope', 'a')).toBeNull()
+    expect(await moveCue(projectFile, 'act1', 'gone', 'nope')).toBeNull()
   })
 })
