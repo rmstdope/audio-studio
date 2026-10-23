@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
 import { writeWav } from '../core/wav'
-import { ffmpegEncoder } from './audio'
+import { createFfmpegEncoder, ffmpegEncoder } from './audio'
 
 const hasFfmpeg = Bun.which('ffmpeg') !== null
 
@@ -31,6 +31,20 @@ describe.skipIf(!hasFfmpeg)('ffmpegEncoder', () => {
     const failing = ffmpegEncoder(big, join(root, 'k3.mp3'), { bitrate: 'zzz', channels: 1 })
     await expect(failing).rejects.toThrow('ffmpeg could not encode')
     await expect(failing).rejects.not.toThrow('EPIPE')
+  })
+
+  it('stops an encode that takes too long, keeping no file', async () => {
+    const root = tempRepo({})
+    const big = writeWav({
+      format: { channels: 1, sampleRate: 16000, bitsPerSample: 16 },
+      data: new Uint8Array(20_000_000),
+    })
+    const file = join(root, 'k4.mp3')
+    const slow = createFfmpegEncoder({ timeoutMs: 1 })
+    await expect(slow(big, file, { bitrate: '64k', channels: 1 })).rejects.toThrow(
+      'took longer than',
+    )
+    expect(existsSync(file)).toBe(false)
   })
 
   it('fails on audio it cannot read, keeping no file', async () => {

@@ -22,10 +22,17 @@ export const GAP_SECONDS = 0.25
 /** A recorded line, or why it was not recorded. Null for an unknown part or line. */
 export type RecordResult =
   | { ok: true; key: string; duration: number }
-  | { ok: false; reason: 'uncast' | 'no-key' | 'fish' | 'audio' | 'encode'; message: string }
+  | {
+      ok: false
+      reason: 'uncast' | 'no-key' | 'fish' | 'audio' | 'encode' | 'write'
+      message: string
+    }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
+
+/** Recordings in progress, by project, part and line. */
+const recordings = new Map<string, Promise<RecordResult>>()
 
 /** How lines are recorded: the encoder (ffmpeg unless replaced, in tests) and the Fish limiter. */
 export interface RecordOptions {
@@ -37,9 +44,10 @@ export interface RecordOptions {
  * Records one line: its text in sentence-sized pieces, each spoken by Fish in the speaker's voice
  * with its cue (the draft model), joined with a short pause, encoded as the project's output; then
  * the clip's manifest entry (with the words spread over it until clips are transcribed) and its
- * lock entry are written. The clip, manifest and lock change only together: nothing is written
- * unless the clip was made and both files could be read. At most
- * `quality.parallel` lines are recorded at once, and a line already being recorded is not
+ * lock entry are written. Nothing is written unless the clip was made and the manifest and lock
+ * could be read; the clip, then the manifest, then the lock are written last of all, so a failure
+ * part-way leaves the line stale or untracked, never passing as up to date. At most
+ * `quality.parallel` lines are spoken by Fish at once, and a line already being recorded is not
  * recorded twice.
  */
 export async function recordLine(
@@ -74,26 +82,42 @@ export async function recordLine(
     }
   }
 
-  return limiter.run(`${projectFile}\n${partId}\n${key}`, narration.quality.parallel, async () => {
-    let clip: { wav: Uint8Array; seconds: number }
-    const pieces: Uint8Array[] = []
+  // The same line asked for again while it is being recorded shares that recording.
+  const id = `${projectFile}\n${partId}\n${key}`
+  const running = recordings.get(id)
+  if (running) return running
+  const recording = record()
+  recordings.set(id, recording)
+  const forget = () => recordings.delete(id)
+  recording.then(forget, forget)
+  return recording
+
+  async function record(): Promise<RecordResult> {
+    if (!inputs || !fish || !read || !read.ok || !line) return null
+    // Only speaking holds a Fish slot; joining, encoding and writing do not.
+    let pieces: Uint8Array[]
     try {
-      for (const chunk of chunkText(line.text, narration.quality.chunkLimit)) {
-        pieces.push(
-          await fish.tts({
-            text: spokenText(chunk, inputs.cue, cast.pronounce),
-            voice: inputs.voice,
-            model: inputs.model,
-            temperature: narration.tts.temperature,
-            topP: narration.tts.topP,
-            speed: narration.tts.speed,
-            format: 'wav',
-          }),
-        )
-      }
+      pieces = await limiter.run(`line\n${id}`, narration.quality.parallel, async () => {
+        const spoken: Uint8Array[] = []
+        for (const chunk of chunkText(line.text, narration.quality.chunkLimit)) {
+          spoken.push(
+            await fish.tts({
+              text: spokenText(chunk, inputs.cue, cast.pronounce),
+              voice: inputs.voice,
+              model: inputs.model,
+              temperature: narration.tts.temperature,
+              topP: narration.tts.topP,
+              speed: narration.tts.speed,
+              format: 'wav',
+            }),
+          )
+        }
+        return spoken
+      })
     } catch (error) {
       return { ok: false, reason: 'fish', message: messageOf(error) }
     }
+    let clip: { wav: Uint8Array; seconds: number }
     try {
       clip = joinWavs(pieces, GAP_SECONDS)
     } catch (error) {
@@ -104,51 +128,58 @@ export async function recordLine(
       }
     }
 
-    // Encoded beside the clip under a hidden name (never served, never a stray clip), and only
-    // moved into place once the manifest and lock can be written too.
+    // Encoded beside the clip under a hidden name (never served, never a stray clip), and moved
+    // into place only in the part's turn, once the manifest and lock could be read.
     const file = `${key}.mp3`
-    const target = resolveInRoot(root, join(read.paths.clipsPath, file))
-    const temporary = resolveInRoot(root, join(read.paths.clipsPath, `.${key}.${randomUUID()}.mp3`))
+    const paths = read.paths
+    const target = resolveInRoot(root, join(paths.clipsPath, file))
+    const temporary = resolveInRoot(root, join(paths.clipsPath, `.${key}.${randomUUID()}.mp3`))
     try {
       await encode(clip.wav, temporary, narration.output)
     } catch (error) {
-      await rm(temporary, { force: true })
+      await rm(temporary, { force: true }).catch(() => {})
       return { ok: false, reason: 'encode', message: messageOf(error) }
     }
 
     const duration = Math.round(clip.seconds * 1000) / 1000
     const { fp, parts } = fingerprint(inputs)
-    const problems = await inPartTurn(projectFile, partId, async () => {
-      // Read again in the part's turn: other lines may have been written meanwhile.
-      const found: Problem[] = []
-      const manifest = await manifestNow(root, read.paths.manifestPath, found)
-      const lock = await lockNow(root, read.paths.lockPath, found)
-      if (!manifest || !lock) {
-        await rm(temporary, { force: true })
-        return found
-      }
-      await rename(temporary, target)
-      manifest[key] = {
-        file,
-        speaker: line.speaker,
-        duration,
-        words: spreadWords(line.text, duration),
-      }
-      lock[key] = {
-        fp,
-        voice: inputs.voice,
-        model: inputs.model,
-        parts,
-        takes: 1,
-        at: new Date().toISOString(),
-      }
-      await writeAtomic(root, read.paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
-      await writeAtomic(root, read.paths.lockPath, formatEntriesPerLine(lock))
-      return []
-    })
-    if (problems.length) return { ok: false, problems }
-    return { ok: true, key, duration }
-  })
+    try {
+      const problems = await inPartTurn(projectFile, partId, async () => {
+        // Read again in the part's turn: other lines may have been written meanwhile.
+        const found: Problem[] = []
+        const manifest = await manifestNow(root, paths.manifestPath, found)
+        const lock = await lockNow(root, paths.lockPath, found)
+        if (!manifest || !lock) return found
+        manifest[key] = {
+          file,
+          speaker: line.speaker,
+          duration,
+          words: spreadWords(line.text, duration),
+        }
+        lock[key] = {
+          fp,
+          voice: inputs.voice,
+          model: inputs.model,
+          parts,
+          takes: 1,
+          at: new Date().toISOString(),
+        }
+        // The lock last: if anything fails before it, the line shows as stale (its old lock entry)
+        // or untracked (none), never as up to date.
+        await rename(temporary, target)
+        await writeAtomic(root, paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
+        await writeAtomic(root, paths.lockPath, formatEntriesPerLine(lock))
+        return []
+      })
+      if (problems.length) return { ok: false, problems }
+      return { ok: true, key, duration }
+    } catch (error) {
+      return { ok: false, reason: 'write', message: messageOf(error) }
+    } finally {
+      // Gone already once renamed; otherwise never left behind.
+      await rm(temporary, { force: true }).catch(() => {})
+    }
+  }
 }
 
 /** The part's manifest as it is now: empty if there is none, null (with the problem added) if broken. */

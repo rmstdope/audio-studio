@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
-import { formatEntriesPerLine, listFiles, writeAtomic } from './files'
+import { formatEntriesPerLine, listFiles, readJson, writeAtomic } from './files'
 
 describe('formatEntriesPerLine', () => {
   it('writes one sorted entry per line, as valid JSON', () => {
@@ -54,5 +54,13 @@ describe('writeAtomic, when the write fails', () => {
     const root = tempRepo({ 'taken/x': 'a folder where the file should go' })
     await expect(writeAtomic(root, 'taken', '{}')).rejects.toThrow()
     expect(readdirSync(root)).toEqual(['taken'])
+  })
+})
+
+describe('readJson, unreadable', () => {
+  it('reports a path that is a folder as invalid, not as a crash', async () => {
+    const root = tempRepo({ 'folder/x': 'x' })
+    const read = await readJson(join(root, 'folder'))
+    expect(read.status).toBe('invalid')
   })
 })

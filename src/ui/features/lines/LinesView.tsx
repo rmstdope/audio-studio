@@ -68,11 +68,13 @@ export function LinesView({ part }: { part: PartSummary }) {
       <>
         {header}
         <section className="panel muted">
-          {part.dialog !== 'ok'
-            ? 'This part has no dialog yet.'
-            : detail.isError
-              ? `Could not load the part: ${detail.error.message}`
-              : 'Checking clips…'}
+          {part.dialog === 'invalid'
+            ? 'The dialog file could not be read: see the part’s overview for what is wrong.'
+            : part.dialog !== 'ok'
+              ? 'This part has no dialog yet.'
+              : detail.isError
+                ? `Could not load the part: ${detail.error.message}`
+                : 'Checking clips…'}
         </section>
       </>
     )
