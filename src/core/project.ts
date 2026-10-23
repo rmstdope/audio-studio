@@ -74,6 +74,8 @@ const NarrationSchema = z
         codec: z.literal('mp3').default('mp3'),
         bitrate: z.string().default('64k'),
         channels: z.union([z.literal(1), z.literal(2)]).default(1),
+        /** Loudness each new clip is levelled to (integrated LUFS, as RetroQuest's level.py). */
+        lufs: z.number().min(-70).max(0).nullable().default(null),
       })
       .prefault({}),
     quality: z

@@ -173,7 +173,7 @@ an id and a title.
     "refreshDialog": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-{part}.ts",
     "models": { "audition": "s2.1-pro-free", "draft": "s2.1-pro-free", "final": "s2.1-pro-free" },
     "tts": { "temperature": 0.7, "topP": 0.7, "speed": 1.0 },
-    "output": { "codec": "mp3", "bitrate": "64k", "channels": 1 },
+    "output": { "codec": "mp3", "bitrate": "64k", "channels": 1, "lufs": -16 },
     "quality": {
       "minHeard": 0.9,
       "takes": 3,
@@ -553,9 +553,18 @@ Small, independently useful increments:
          clip offered first, since a reworded line has none yet, and suggested when it is the only
          one; numbered as in the dialog) or removed. Listed in the cues file's order. A line with its own
          cue is not offered over.
-7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
-   `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data
-   as one made by `narrate.py`, then retire `narrate.py` and `fish_tts.py`.
+7. **RetroQuest switch-over**. RetroQuest's narration moved on meanwhile (Acts II–IV recorded with
+   `narrate.py`, clips levelled to −16 LUFS by `level.py`, a cast per act, `extract-act.ts`), so:
+   1. **Parity** (built): measured clips are transcribed from their decoded WAV, as
+      `narrate.py --retime` does; on Act I the manifest is byte-identical to its.
+   2. **Loudness** (built): `output.lufs` levels each new clip as `level.py` does, command for
+      command (`pyFixed` formats numbers as Python does); clips come out byte-identical. Not in
+      the fingerprint: changing the target does not make clips stale.
+   3. **The switch**: in RetroQuest, one shared `tts/cast.json` from the four act casts (the
+      grandmother's recast everywhere; the mother's Act III style as cues on her Act III lines),
+      `audio-studio.json` for all four acts with the new extractor, every act's clips adopted,
+      `.audio-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
+      (`level.py` stays for the music).
 8. **Later: paid models**: allow paid models per stage, Final generation (§8.4), costs in plans and
    auditions.
 
