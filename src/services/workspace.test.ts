@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { adoptPart, findProjectFile, loadPart, loadProject } from './workspace'
+import {
+  adoptPart,
+  clipFile,
+  findProjectFile,
+  loadPart,
+  loadProject,
+  projectFileProblem,
+} from './workspace'
 
 const script = [
   { key: 'a', speaker: 'narrator', text: 'Once.' },
@@ -173,5 +180,86 @@ describe('adoptPart', () => {
       'tts/act1/narration.lock.json',
     )
     expect(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8')).toBe('{ broken')
+  })
+})
+
+describe('review fixes', () => {
+  const files = {
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': script,
+    'audio/act1/manifest.json': { a: { file: 'a.mp3' }, b: { file: 'b.mp3' } },
+    'audio/act1/a.mp3': 'audio',
+  }
+
+  it('keeps fields it does not know on existing lock entries when adopting', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } } },
+      'audio/act1/b.mp3': 'audio',
+      'tts/act1/narration.lock.json': {
+        a: {
+          fp: 'x',
+          voice: 'v1',
+          model: 's2.1-pro-free',
+          parts: { cue: '', text: '', said: '', settings: '' },
+          at: 'then',
+          future: 42,
+        },
+      },
+    })
+    const result = await adoptPart(join(root, 'audio-studio.json'), 'act1')
+    expect(result).toMatchObject({ ok: true, adopted: 1 })
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(lock.a.future).toBe(42)
+  })
+
+  it('gives the project’s quality bar with the part', async () => {
+    const root = tempRepo(files)
+    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    expect(result?.ok && result.part.minHeard).toBe(0.9)
+  })
+
+  it('reports a dialog that uses a key twice', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': [...script, { key: 'a', speaker: 'mira', text: 'Again.' }],
+    })
+    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    expect(result?.ok && result.part.problems.map((p) => [p.file, p.message])).toEqual([
+      ['tts/act1/script.json', 'line keys must be unique; used more than once: a'],
+    ])
+  })
+
+  it('names the project file it was given in its problems', async () => {
+    const root = tempRepo({ 'studio.json': { name: '' } })
+    const result = await loadProject(join(root, 'studio.json'))
+    expect(!result.ok && [result.file, result.problems[0]!.file]).toEqual([
+      'studio.json',
+      'studio.json',
+    ])
+  })
+
+  it('serves only plain files from the clips folder', async () => {
+    const root = tempRepo({ ...files, 'audio/act1/sub.d/x': 'x', 'outside.txt': 'secret' })
+    symlinkSync(join(root, 'outside.txt'), join(root, 'audio/act1/link.mp3'))
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await clipFile(projectFile, 'act1', 'a.mp3')).toBe(join(root, 'audio/act1/a.mp3'))
+    expect(await clipFile(projectFile, 'act1', 'sub.d')).toBeNull()
+    expect(await clipFile(projectFile, 'act1', 'link.mp3')).toBeNull()
+  })
+})
+
+describe('projectFileProblem', () => {
+  it('accepts a file, and explains a missing file or a folder', () => {
+    const root = tempRepo({ 'audio-studio.json': projectJson() })
+    expect(projectFileProblem(join(root, 'audio-studio.json'))).toBeNull()
+    expect(projectFileProblem(join(root, 'nope.json'))).toContain('does not exist')
+    expect(projectFileProblem(root)).toContain('is a folder')
+  })
+
+  it('does not take a folder named like the project file for one', () => {
+    const root = tempRepo({ 'audio-studio.json/x': 'x' })
+    expect(findProjectFile(root)).not.toBe(join(root, 'audio-studio.json'))
   })
 })

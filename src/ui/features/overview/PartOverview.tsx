@@ -86,7 +86,7 @@ function StatusPanel({ part }: { part: PartDetail }) {
         {part.orphans.length > 0 && (
           <div className="stat">
             <span>
-              <span className="dot" style={{ background: '#5e6575' }} /> Orphaned clips
+              <span className="dot" style={{ background: 'var(--status-orphan)' }} /> Orphaned clips
             </span>
             <strong>{part.orphans.length}</strong>
           </div>

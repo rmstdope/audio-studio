@@ -37,3 +37,14 @@ describe('listFiles', () => {
     expect(await listFiles(join(root, 'nowhere'))).toEqual(new Set())
   })
 })
+
+describe('writeAtomic, twice at once', () => {
+  it('leaves one complete write and no temporary files', async () => {
+    const root = tempRepo({})
+    const a = 'a'.repeat(200_000)
+    const b = 'b'.repeat(200_000)
+    await Promise.all([writeAtomic(root, 'x.json', a), writeAtomic(root, 'x.json', b)])
+    expect([a, b]).toContain(readFileSync(join(root, 'x.json'), 'utf8'))
+    expect(readdirSync(root)).toEqual(['x.json'])
+  })
+})

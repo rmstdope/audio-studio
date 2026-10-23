@@ -61,8 +61,11 @@ retroquest/                      ← user runs `audio-studio` here
 2. It validates the project file and every resource it points to, then starts a Bun HTTP server on
    `127.0.0.1` (random free port, or `--port`) and opens the browser on it.
 3. The UI talks to the server over a small JSON API, and gets live job progress over a WebSocket.
-4. Every write is checked against an allow-list: only files and folders the project file names, and
-   only inside the project root.
+4. The studio writes only to paths the project file names, and every path goes through
+   `resolveInRoot`, which refuses anything outside the project root. Clips are served only when
+   they are plain files in the part's clips folder (no folders, no symbolic links).
+5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
+   rebinding), and takes changes (POST) only from its own page (the Origin header).
 
 Installed once from this repo with `bun link` (later `bun add -g`), then run in any consumer.
 
@@ -104,8 +107,8 @@ audio-studio/
 │   │   ├── voiceSearch.ts       keyword search + local ranking (port of fish_tts.py search)
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
 │   │   ├── audio.ts             join WAVs, encode MP3, measure duration, peaks
-│   │   ├── store.ts             read/write resources atomically, write allow-list,
-│   │   │                        stable diff-friendly JSON formatting
+│   │   ├── files.ts             read resources, write atomically, diff-friendly JSON
+│   │   ├── workspace.ts         find the project, load it and its parts, adopt clips
 │   │   ├── git.ts               `git status --porcelain` for the project's paths
 │   │   └── jobs.ts              job queue, concurrency, cancel, progress events
 │   ├── server/
@@ -372,12 +375,15 @@ generation while the script and cast still change) and `final` (the recording th
 
 ---
 
-## 9. Server API (sketch)
+## 9. Server API
+
+Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's status),
+`POST /api/parts/:part/adopt` and `GET /api/parts/:part/clips/:file`. The rest is the plan:
 
 ```
 GET    /api/project                              project, parts, credit
-GET    /api/parts/:part                          characters, status counts
-GET    /api/parts/:part/lines?speaker=&status=   lines with status and reason
+GET    /api/parts/:part                          the part, every line with its status and reason
+GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue
@@ -392,13 +398,13 @@ POST   /api/auditions/:character/verdicts        keep/drop per candidate, next r
 POST   /api/auditions/:character/cast            write the chosen voice to cast.json
 POST   /api/jobs                                 run a plan
 DELETE /api/jobs/:id                             cancel
-GET    /api/audio/*                              serve clips and cached audition audio
+GET    /api/auditions/:character/takes/:file     cached audition audio
 GET    /api/changes                              git status of project paths
 WS     /api/events                               job progress, file changes
 ```
 
-The server also watches the resource files, so an edit made in the editor (or a `git checkout`)
-shows up in the UI without a restart.
+Planned (step 6): the server watches the resource files, so an edit made in the editor (or a
+`git checkout`) shows up in the UI at once. Until then the UI reloads when its window regains focus.
 
 ---
 
@@ -408,7 +414,7 @@ shows up in the UI without a restart.
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
 - Missing tools (`ffmpeg`, `uv`) and a missing API key are checked at start and shown as a setup
   checklist.
-- Writes outside the allow-list throw. Deleting clips (orphans) always needs confirmation.
+- Writes outside the project root throw. Deleting clips (orphans) always needs confirmation.
 - Fish errors (rate limit, no credit, voice removed) mark the line as failed with the reason; the
   rest of the job carries on.
 - The studio never runs `git add`, `commit` or `push`.

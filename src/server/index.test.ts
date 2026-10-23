@@ -51,10 +51,29 @@ describe('server', () => {
     expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
   })
 
+  it('refuses requests for another host name (DNS rebinding)', async () => {
+    const response = await fetch(url('/api/project'), {
+      headers: { host: `evil.example:${server.port}` },
+    })
+    expect(response.status).toBe(403)
+  })
+
+  it('accepts localhost as well as 127.0.0.1', async () => {
+    const response = await fetch(url('/api/project'), {
+      headers: { host: `localhost:${server.port}` },
+    })
+    expect(response.status).toBe(200)
+  })
+
   it('adopts a part’s clips', async () => {
     const response = await post('/api/parts/act1/adopt')
     expect(await response.json()).toMatchObject({ ok: true, adopted: 1 })
     expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(true)
+  })
+
+  it('accepts changes from the page opened as localhost too', async () => {
+    const response = await post('/api/parts/act1/adopt', `http://localhost:${server.port}`)
+    expect(response.status).toBe(200)
   })
 
   it('serves the UI', async () => {

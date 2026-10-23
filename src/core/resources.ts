@@ -7,8 +7,18 @@ export const LineSchema = z.object({
   text: z.string(),
 })
 
-/** A part's dialog resource (RetroQuest: `tts/<act>/script.json`). Read only. */
-export const DialogSchema = z.array(LineSchema)
+/** A part's dialog resource (RetroQuest: `tts/<act>/script.json`). Read only. Keys are unique. */
+export const DialogSchema = z.array(LineSchema).superRefine((lines, context) => {
+  const seen = new Set<string>()
+  const twice = new Set<string>()
+  for (const { key } of lines) (seen.has(key) ? twice : seen).add(key)
+  if (twice.size) {
+    context.addIssue({
+      code: 'custom',
+      message: `line keys must be unique; used more than once: ${[...twice].join(', ')}`,
+    })
+  }
+})
 
 /**
  * One character in the project-wide cast. Unknown fields are kept, so writing the cast back
@@ -29,7 +39,7 @@ export const CharacterSchema = z.looseObject({
 /** The character resource: every character by name, and how words are said. */
 export const CastSchema = z.looseObject({
   speakers: z.record(z.string(), CharacterSchema).default({}),
-  pronounce: z.record(z.string(), z.string()).default({}),
+  pronounce: z.record(z.string().min(1), z.string()).default({}),
 })
 
 /** A part's delivery cues: line key → a cue that replaces the character's style for that line. */
@@ -45,8 +55,11 @@ export const ManifestEntrySchema = z.looseObject({
 /** The game's clip manifest (RetroQuest: `web/public/audio/narration/<act>/manifest.json`). */
 export const ManifestSchema = z.record(z.string(), ManifestEntrySchema)
 
-/** What a clip was made from: its fingerprint, voice and model, and short hashes of the rest. */
-export const LockEntrySchema = z.object({
+/**
+ * What a clip was made from: its fingerprint, voice and model, and short hashes of the rest.
+ * Unknown fields are kept, so rewriting the lock never drops what a newer version put there.
+ */
+export const LockEntrySchema = z.looseObject({
   fp: z.string(),
   voice: z.string(),
   model: z.string(),

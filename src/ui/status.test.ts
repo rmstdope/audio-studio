@@ -32,19 +32,19 @@ describe('reasonCounts', () => {
 
 describe('statusDetail', () => {
   it('names the reasons of a stale line', () => {
-    expect(statusDetail(line({ status: 'stale', reasons: ['voice', 'pronunciation'] }))).toBe(
+    expect(statusDetail(line({ status: 'stale', reasons: ['voice', 'pronunciation'] }), 0.9)).toBe(
       'voice changed, pronunciation changed',
     )
   })
 
-  it('gives the heard share of a weak line', () => {
-    expect(statusDetail(line({ status: 'weak', heard: 0.84 }))).toBe(
-      'best take heard 84%, below 90%',
+  it('gives the heard share of a weak line against the project’s bar', () => {
+    expect(statusDetail(line({ status: 'weak', heard: 0.93 }), 0.95)).toBe(
+      'best take heard 93%, below 95%',
     )
   })
 
   it('names the speaker of an uncast line', () => {
-    expect(statusDetail(line({ status: 'uncast' }))).toBe('mira has no voice yet')
+    expect(statusDetail(line({ status: 'uncast' }), 0.9)).toBe('mira has no voice yet')
   })
 })
 

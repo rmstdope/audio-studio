@@ -25,7 +25,20 @@ describe('saidText', () => {
   })
 })
 
+describe('saidText, as Python’s str.replace does it', () => {
+  it('takes $ in a pronunciation literally', () => {
+    expect(saidText('Pay the toll', { toll: 'fee of $$5 $& more' })).toBe(
+      'Pay the fee of $$5 $& more',
+    )
+  })
+})
+
 describe('chunkText', () => {
+  it('counts characters, not UTF-16 units, like Python’s len', () => {
+    const text = 'A😀😀😀. B.'
+    expect(chunkText(text, 10)).toEqual([text])
+  })
+
   it('keeps short lines whole', () => {
     expect(chunkText('A storm. Then quiet.', 400)).toEqual(['A storm. Then quiet.'])
   })

@@ -158,7 +158,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                       <span className="line-text">{line.text}</span>
                       {line.status !== 'ok' && (
                         <span className="line-detail" style={{ color: STATUS[line.status].color }}>
-                          {statusDetail(line)}
+                          {statusDetail(line, loaded.minHeard)}
                         </span>
                       )}
                     </div>

@@ -29,7 +29,8 @@ describe('plural', () => {
 })
 
 describe('tintFor', () => {
-  it('is stable for an id', () => {
+  it('is stable for an id, and uses the stylesheet’s tint tokens', () => {
     expect(tintFor('mira')).toEqual(tintFor('mira'))
+    expect(tintFor('mira').background).toMatch(/^var\(--tint-[1-6]-bg\)$/)
   })
 })

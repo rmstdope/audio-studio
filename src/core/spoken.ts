@@ -10,7 +10,8 @@ export function spokenText(text: string, cue: string, pronounce: Record<string, 
 /** The line as it is said: checklist bullets read as a list, and the cast's pronunciations applied. */
 export function saidText(text: string, pronounce: Record<string, string>): string {
   let said = text.replace(/:\s*\*\s+/g, ': ').replace(/\s+\*\s+/g, ', ')
-  for (const [written, sayAs] of Object.entries(pronounce)) said = said.replaceAll(written, sayAs)
+  // split/join, not replaceAll: a `$` in the replacement must stay literal, as in Python.
+  for (const [written, sayAs] of Object.entries(pronounce)) said = said.split(written).join(sayAs)
   return said
 }
 
@@ -19,15 +20,20 @@ export function saidText(text: string, pronounce: Record<string, string>): strin
  * sentence longer than `limit` stays whole. (Ported from `narrate.py`, `chunk_text`.)
  */
 export function chunkText(text: string, limit: number): string[] {
-  if (text.length <= limit) return [text]
+  if (length(text) <= limit) return [text]
   const chunks: string[] = []
   for (const sentence of text.split(/(?<=[.!?…])\s+/)) {
     const last = chunks.at(-1)
-    if (last !== undefined && last.length + 1 + sentence.length <= limit) {
+    if (last !== undefined && length(last) + 1 + length(sentence) <= limit) {
       chunks[chunks.length - 1] = `${last} ${sentence}`
     } else {
       chunks.push(sentence)
     }
   }
   return chunks
+}
+
+/** Length in characters (code points), as Python's `len` counts, not UTF-16 units. */
+function length(text: string): number {
+  return [...text].length
 }

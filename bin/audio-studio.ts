@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util'
 import { resolve } from 'node:path'
 import { PROJECT_FILE } from '../src/core/project'
 import { startServer } from '../src/server/index'
-import { findProjectFile } from '../src/services/workspace'
+import { findProjectFile, projectFileProblem } from '../src/services/workspace'
 
 const HELP = `audio-studio: cast and record a game's narration.
 
@@ -48,8 +48,9 @@ if (!projectFile) {
   )
   process.exit(1)
 }
-if (!(await Bun.file(projectFile).exists())) {
-  console.error(`${projectFile} does not exist.`)
+const problem = projectFileProblem(projectFile)
+if (problem) {
+  console.error(problem)
   process.exit(1)
 }
 

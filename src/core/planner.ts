@@ -85,7 +85,7 @@ export function planPart(input: PlanInput): PartState {
       key: line.key,
       speaker: line.speaker,
       text: line.text,
-      cue: cues[line.key] ?? character?.style ?? '',
+      cue: inputs?.cue ?? cues[line.key] ?? character?.style ?? '',
       status,
       reasons,
       heard: file ? (entry?.heard ?? null) : null,
@@ -111,18 +111,19 @@ export function planPart(input: PlanInput): PartState {
  * the studio are not re-recorded just because nothing says what they were made from.
  */
 export function adoptUntracked(input: PlanInput, now: string): { lock: Lock; adopted: number } {
-  const { lines, cast, cues, manifest, files, narration } = input
+  const { lines, cast, cues, narration } = input
+  const untracked = new Set(
+    planPart(input)
+      .lines.filter((line) => line.status === 'untracked')
+      .map((line) => line.key),
+  )
   const lock: Lock = { ...input.lock }
-  let adopted = 0
   for (const line of lines) {
-    if (lock[line.key]) continue
-    const clip = manifest[line.key]
-    if (!clip || !files.has(clip.file)) continue
-    const inputs = clipInputs(line, cast.speakers[line.speaker], cues, cast.pronounce, narration)
-    if (!inputs) continue
+    if (!untracked.has(line.key)) continue
+    // An untracked line has a voice, so it has inputs.
+    const inputs = clipInputs(line, cast.speakers[line.speaker], cues, cast.pronounce, narration)!
     const { fp, parts } = fingerprint(inputs)
     lock[line.key] = { fp, voice: inputs.voice, model: inputs.model, parts, adopted: true, at: now }
-    adopted++
   }
-  return { lock, adopted }
+  return { lock, adopted: untracked.size }
 }

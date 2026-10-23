@@ -1,4 +1,5 @@
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { z } from 'zod'
 import { resolveInRoot } from '../core/paths'
@@ -61,14 +62,20 @@ export async function listFiles(folder: string): Promise<Set<string>> {
 
 /**
  * Writes `text` to `path` (relative to `root`) through a temporary file and a rename, so a crash
- * never leaves a half-written file. Creates the folder if needed.
+ * never leaves a half-written file. Each write has its own temporary file, so two writes at once
+ * cannot mix. Creates the folder if needed.
  */
 export async function writeAtomic(root: string, path: string, text: string): Promise<void> {
   const file = resolveInRoot(root, path)
   await mkdir(dirname(file), { recursive: true })
-  const temporary = `${file}.${process.pid}.tmp`
-  await writeFile(temporary, text)
-  await rename(temporary, file)
+  const temporary = `${file}.${randomUUID()}.tmp`
+  try {
+    await writeFile(temporary, text)
+    await rename(temporary, file)
+  } catch (error) {
+    await rm(temporary, { force: true })
+    throw error
+  }
 }
 
 /**

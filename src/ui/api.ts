@@ -7,11 +7,11 @@ async function getJson<T>(path: string): Promise<T> {
   return (await response.json()) as T
 }
 
+/** POSTs to `path`. A 409 is an answer (the request was refused for a reason given in the body). */
 async function postJson<T>(path: string): Promise<T> {
   const response = await fetch(path, { method: 'POST' })
-  if (response.status >= 500 || response.status === 403 || response.status === 404) {
+  if (!response.ok && response.status !== 409)
     throw new Error(`${path} answered ${response.status}`)
-  }
   return (await response.json()) as T
 }
 

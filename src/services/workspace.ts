@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { statSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import { adoptUntracked, planPart, type PartState, type PlanInput } from '../core/planner'
 import {
@@ -27,10 +27,20 @@ export function findProjectFile(start: string): string | null {
   let dir = start
   for (;;) {
     const candidate = join(dir, PROJECT_FILE)
-    if (existsSync(candidate)) return candidate
+    if (isFile(candidate)) return candidate
     const parent = dirname(dir)
     if (parent === dir) return null
     dir = parent
+  }
+}
+
+/** Why `path` cannot be used as a project file, or null if it can. */
+export function projectFileProblem(path: string): string | null {
+  try {
+    if (statSync(path).isDirectory()) return `${path} is a folder, not a project file.`
+    return null
+  } catch {
+    return `${path} does not exist.`
   }
 }
 
@@ -71,6 +81,8 @@ export interface PartDetail extends PartState {
   dialogPath: string
   clipsPath: string
   lockPath: string
+  /** The share of words a take must be heard at to count as good (the project's `minHeard`). */
+  minHeard: number
   problems: Problem[]
 }
 
@@ -82,16 +94,14 @@ export async function loadPart(projectFile: string, partId: string): Promise<Par
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
   const { project, part, input, dialog, problems } = read
-  const paths = project.narration.paths
   return {
     ok: true,
     part: {
       id: part.id,
       title: part.title,
       dialog: dialog.status,
-      dialogPath: partPathFor(paths.dialog, part.id),
-      clipsPath: partPathFor(paths.clips, part.id),
-      lockPath: partPathFor(paths.lock, part.id),
+      ...read.paths,
+      minHeard: project.narration.quality.minHeard,
       problems,
       ...planPart(input),
     },
@@ -119,28 +129,44 @@ export async function adoptPart(
   if (!read || !read.ok) return read
   if (read.problems.length) return { ok: false, problems: read.problems }
   const { lock, adopted } = adoptUntracked(read.input, now.toISOString())
-  const lockPath = partPathFor(read.project.narration.paths.lock, partId)
+  const { lockPath } = read.paths
   if (adopted) await writeAtomic(dirname(projectFile), lockPath, formatEntriesPerLine(lock))
   return { ok: true, adopted, lockPath }
 }
 
-/** The absolute path of a clip in a part's clips folder, or null if the part or file is unknown. */
+/**
+ * The absolute path of a clip in a part's clips folder, or null if the part is unknown or the
+ * name is not a plain file there. Folders and symbolic links are never served, as the planner
+ * never counts them as clips either.
+ */
 export async function clipFile(
   projectFile: string,
   partId: string,
   file: string,
 ): Promise<string | null> {
-  if (!/^[\w.-]+$/.test(file) || file.startsWith('.')) return null
   const opened = await openProject(projectFile)
   if (!opened.ok) return null
   const { narration } = opened.project
   if (!narration.parts.some((p) => p.id === partId)) return null
-  const path = resolveInRoot(dirname(projectFile), partPathFor(narration.paths.clips, partId))
-  const full = join(path, file)
-  return existsSync(full) ? full : null
+  const folder = resolveInRoot(dirname(projectFile), partPathFor(narration.paths.clips, partId))
+  return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
 
-async function readPart(projectFile: string, partId: string) {
+/** Everything read about a part, for planning it or acting on it. */
+interface PartRead {
+  ok: true
+  project: Project
+  part: Part
+  dialog: DialogState
+  input: PlanInput
+  paths: { dialogPath: string; clipsPath: string; lockPath: string }
+  problems: Problem[]
+}
+
+async function readPart(
+  projectFile: string,
+  partId: string,
+): Promise<PartRead | ProjectFailure | null> {
   const root = dirname(projectFile)
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -149,36 +175,48 @@ async function readPart(projectFile: string, partId: string) {
   if (!part) return null
 
   const problems: Problem[] = []
-  const paths = project.narration.paths
+  const templates = project.narration.paths
   const at = (template: string) => partPathFor(template, part.id)
-  const orEmpty = <T>(value: T | 'missing' | 'invalid', empty: T): T =>
-    value === 'missing' || value === 'invalid' ? empty : value
 
   const dialog = await readDialog(root, project, part, problems)
   const cast = await readCast(root, project, problems)
-  const cues = orEmpty(await readResource(root, at(paths.cues), CuesSchema, problems), {})
-  const lock = orEmpty(await readResource(root, at(paths.lock), LockSchema, problems), {})
-  const manifest = orEmpty(
-    await readResource(root, at(paths.manifest), ManifestSchema, problems),
-    {},
+  const cues = usable(await readResource(root, at(templates.cues), CuesSchema, problems))
+  const lock = usable(await readResource(root, at(templates.lock), LockSchema, problems))
+  const manifest = usable(
+    await readResource(root, at(templates.manifest), ManifestSchema, problems),
   )
-  const files = await listFiles(resolveInRoot(root, at(paths.clips)))
+  const files = await listFiles(resolveInRoot(root, at(templates.clips)))
 
-  const input: PlanInput = {
-    lines: dialog.status === 'ok' ? dialog.lines : [],
-    cast: cast ?? { speakers: {}, pronounce: {} },
-    cues,
-    lock,
-    manifest,
-    files,
-    narration: project.narration,
+  return {
+    ok: true,
+    project,
+    part,
+    dialog,
+    input: {
+      lines: dialog.status === 'ok' ? dialog.lines : [],
+      cast: cast ?? { speakers: {}, pronounce: {} },
+      cues: cues ?? {},
+      lock: lock ?? {},
+      manifest: manifest ?? {},
+      files,
+      narration: project.narration,
+    },
+    paths: {
+      dialogPath: at(templates.dialog),
+      clipsPath: at(templates.clips),
+      lockPath: at(templates.lock),
+    },
+    problems,
   }
-  return { ok: true as const, project, part, dialog, input, problems }
+}
+
+/** A resource read's value, or null when there is no file or it is broken (already a problem). */
+function usable<T>(read: T | 'missing' | 'invalid'): T | null {
+  return read === 'missing' || read === 'invalid' ? null : read
 }
 
 async function readCast(root: string, project: Project, problems: Problem[]): Promise<Cast | null> {
-  const cast = await readResource(root, project.narration.characters, CastSchema, problems)
-  return cast === 'missing' || cast === 'invalid' ? null : cast
+  return usable(await readResource(root, project.narration.characters, CastSchema, problems))
 }
 
 async function readDialog(
@@ -196,7 +234,7 @@ async function openProject(
   projectFile: string,
 ): Promise<{ ok: true; project: Project } | ProjectFailure> {
   const root = dirname(projectFile)
-  const file = PROJECT_FILE
+  const file = basename(projectFile)
   const json = await readJson(projectFile)
   if (json.status === 'missing') {
     return { ok: false, file, problems: [{ file, path: '', message: 'the file is gone' }] }
@@ -232,4 +270,12 @@ function projectPaths(project: Project): [string, string][] {
     }
   }
   return paths
+}
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile()
+  } catch {
+    return false
+  }
 }

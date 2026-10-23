@@ -1,14 +1,18 @@
 import type { StaleReason } from '../core/fingerprint'
 import type { LineState, LineStatus } from '../core/planner'
 
-/** How each status looks: its name, and the colour of its dot, pill and bar segment. */
+/** How each status looks: its name, and the colour tokens of its dot, pill and bar segment. */
 export const STATUS: Record<LineStatus, { label: string; color: string; bg: string }> = {
-  ok: { label: 'Up to date', color: '#3ddc97', bg: '#10291f' },
-  weak: { label: 'Weak', color: '#ff94a8', bg: '#2e1720' },
-  stale: { label: 'Stale', color: '#ffc24b', bg: '#2d2412' },
-  missing: { label: 'Missing', color: '#8fb5ff', bg: '#142033' },
-  untracked: { label: 'Untracked', color: '#b8bfcc', bg: '#1d2029' },
-  uncast: { label: 'Uncast', color: '#ff9a6b', bg: '#2a1b12' },
+  ok: { label: 'Up to date', color: 'var(--status-ok)', bg: 'var(--status-ok-bg)' },
+  weak: { label: 'Weak', color: 'var(--status-weak)', bg: 'var(--status-weak-bg)' },
+  stale: { label: 'Stale', color: 'var(--status-stale)', bg: 'var(--status-stale-bg)' },
+  missing: { label: 'Missing', color: 'var(--status-missing)', bg: 'var(--status-missing-bg)' },
+  untracked: {
+    label: 'Untracked',
+    color: 'var(--status-untracked)',
+    bg: 'var(--status-untracked-bg)',
+  },
+  uncast: { label: 'Uncast', color: 'var(--status-uncast)', bg: 'var(--status-uncast-bg)' },
 }
 
 /** Why a clip is stale, as a phrase. */
@@ -31,7 +35,7 @@ export function reasonCounts(lines: LineState[]): [StaleReason, number][] {
 }
 
 /** One line of explanation for a line's status. */
-export function statusDetail(line: LineState, minHeard = 0.9): string {
+export function statusDetail(line: LineState, minHeard: number): string {
   switch (line.status) {
     case 'stale':
       return line.reasons.map((r) => REASON[r]).join(', ')
