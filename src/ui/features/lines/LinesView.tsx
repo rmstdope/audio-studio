@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
-import { clipUrl, usePart } from '../../api'
+import { clipUrl, usePart, useRecordLines } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
@@ -13,6 +13,9 @@ import { STATUS, percent, seconds, statusDetail } from '../../status'
 
 type Filter = 'all' | 'attention' | LineStatus | 'orphans'
 
+/** Lines a Record button is offered for: no clip, a clip made from other inputs, or a weak take. */
+const RECORDABLE = new Set<LineStatus>(['missing', 'stale', 'weak'])
+
 /** Lines that need something done: everything but up to date. */
 const needsAttention = (line: LineState) => line.status !== 'ok'
 
@@ -20,6 +23,7 @@ const needsAttention = (line: LineState) => line.status !== 'ok'
 export function LinesView({ part }: { part: PartSummary }) {
   const detail = usePart(part.id, part.dialog === 'ok')
   const { playing, toggle } = useClipPlayer()
+  const recorder = useRecordLines(part.id)
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
   const [search, setSearch] = useState('')
@@ -68,6 +72,9 @@ export function LinesView({ part }: { part: PartSummary }) {
   }
 
   const attention = loaded.lines.filter(needsAttention).length
+  const toRecord = lines.filter(
+    (line) => RECORDABLE.has(line.status) && !recorder.recording.has(line.key),
+  )
   const tabs: { id: Filter; label: string; count: number; status?: LineStatus }[] = [
     { id: 'attention', label: 'Needs attention', count: attention },
     ...(Object.keys(STATUS) as LineStatus[])
@@ -127,6 +134,22 @@ export function LinesView({ part }: { part: PartSummary }) {
         </div>
       </div>
 
+      {toRecord.length > 0 && filter !== 'orphans' && (
+        <div className="record-bar">
+          <span className="muted">
+            Recording uses the draft model ({loaded.draftModel}). Word timings are spread evenly
+            until clips are transcribed.
+          </span>
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => toRecord.forEach((line) => void recorder.record(line.key))}
+          >
+            Record {plural(toRecord.length, 'line')} shown
+          </button>
+        </div>
+      )}
+
       {filter === 'orphans' ? (
         <OrphanTable part={loaded.id} orphans={loaded.orphans} playing={playing} toggle={toggle} />
       ) : (
@@ -139,8 +162,8 @@ export function LinesView({ part }: { part: PartSummary }) {
                 <th style={{ width: 220 }}>Delivery</th>
                 <th style={{ width: 70 }}>Length</th>
                 <th style={{ width: 70 }}>Heard</th>
-                <th style={{ width: 56 }}>
-                  <span className="sr-only">Play</span>
+                <th style={{ width: 140 }}>
+                  <span className="sr-only">Play and record</span>
                 </th>
               </tr>
             </thead>
@@ -169,15 +192,30 @@ export function LinesView({ part }: { part: PartSummary }) {
                   <td className="mono num">{seconds(line.duration)}</td>
                   <td className="mono num">{percent(line.heard)}</td>
                   <td>
-                    {line.file && (
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        aria-label={playing === line.key ? 'Stop' : `Play ${line.key}`}
-                        onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
-                      >
-                        {playing === line.key ? <PauseIcon /> : <PlayIcon />}
-                      </button>
+                    <div className="row-actions">
+                      {line.file && (
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          aria-label={playing === line.key ? 'Stop' : `Play ${line.key}`}
+                          onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
+                        >
+                          {playing === line.key ? <PauseIcon /> : <PlayIcon />}
+                        </button>
+                      )}
+                      {RECORDABLE.has(line.status) && (
+                        <button
+                          type="button"
+                          className="btn row-record"
+                          disabled={recorder.recording.has(line.key)}
+                          onClick={() => void recorder.record(line.key)}
+                        >
+                          {recorder.recording.has(line.key) ? 'Recording…' : 'Record'}
+                        </button>
+                      )}
+                    </div>
+                    {recorder.errors[line.key] && (
+                      <span className="adopt-error row-error">{recorder.errors[line.key]}</span>
                     )}
                   </td>
                 </tr>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
+import type { RecordResult } from '../services/narration'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { AuditionTakesResult, TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
@@ -268,6 +269,48 @@ export function useCast(characterId: string) {
 /** The URL of a recorded audition take. */
 export function takeUrl(key: string): string {
   return `/api/takes/${key}.mp3`
+}
+
+/**
+ * Records lines of a part: `record(key)` asks the server to record the line, then reloads the
+ * part so its status shows. `recording` holds the lines in progress, `errors` what went wrong.
+ */
+export function useRecordLines(partId: string) {
+  const client = useQueryClient()
+  const [recording, setRecording] = useState<Set<string>>(new Set())
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const record = useCallback(
+    async (key: string) => {
+      setRecording((now) => new Set(now).add(key))
+      setErrors(({ [key]: _gone, ...rest }) => rest)
+      try {
+        const path = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/record`
+        const response = await fetch(path, { method: 'POST' })
+        if (!response.ok && response.status !== 409) {
+          throw new Error(`recording answered ${response.status}`)
+        }
+        const result = (await response.json()) as NonNullable<RecordResult>
+        if (!result.ok) {
+          const message = 'message' in result ? result.message : 'the part’s files need fixing'
+          setErrors((now) => ({ ...now, [key]: message }))
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setErrors((now) => ({ ...now, [key]: message }))
+      } finally {
+        setRecording((now) => {
+          const next = new Set(now)
+          next.delete(key)
+          return next
+        })
+        void client.invalidateQueries({ queryKey: ['part', partId] })
+      }
+    },
+    [partId, client],
+  )
+
+  return { record, recording, errors }
 }
 
 /** The URL of a clip in a part. */

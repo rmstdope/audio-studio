@@ -101,8 +101,11 @@ export interface PartDetail extends PartState {
   dialogPath: string
   clipsPath: string
   lockPath: string
+  manifestPath: string
   /** The share of words a take must be heard at to count as good (the project's `minHeard`). */
   minHeard: number
+  /** The model lines are recorded with (the project's draft stage). */
+  draftModel: string
   problems: Problem[]
 }
 
@@ -122,6 +125,7 @@ export async function loadPart(projectFile: string, partId: string): Promise<Par
       dialog: dialog.status,
       ...read.paths,
       minHeard: project.narration.quality.minHeard,
+      draftModel: project.narration.models.draft,
       problems,
       ...planPart(input),
     },
@@ -173,17 +177,18 @@ export async function clipFile(
 }
 
 /** Everything read about a part, for planning it or acting on it. */
-interface PartRead {
+export interface PartRead {
   ok: true
   project: Project
   part: Part
   dialog: DialogState
   input: PlanInput
-  paths: { dialogPath: string; clipsPath: string; lockPath: string }
+  paths: { dialogPath: string; clipsPath: string; lockPath: string; manifestPath: string }
   problems: Problem[]
 }
 
-async function readPart(
+/** A part's files, read and validated, or why the project file cannot be used; null for an unknown part. */
+export async function readPart(
   projectFile: string,
   partId: string,
 ): Promise<PartRead | ProjectFailure | null> {
@@ -225,6 +230,7 @@ async function readPart(
       dialogPath: at(templates.dialog),
       clipsPath: at(templates.clips),
       lockPath: at(templates.lock),
+      manifestPath: at(templates.manifest),
     },
     problems,
   }
