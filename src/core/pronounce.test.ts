@@ -32,6 +32,10 @@ describe('pronounceProblem', () => {
     expect(pronounceProblem([['um, ', '']])).toBeNull()
   })
 
+  it('refuses a written form of spaces only, which would change every line', () => {
+    expect(pronounceProblem([[' ', '']])).toContain('only spaces')
+  })
+
   it('takes each written form once, spaces counting', () => {
     expect(
       pronounceProblem([

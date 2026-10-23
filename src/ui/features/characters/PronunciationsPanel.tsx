@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { pronounceProblem, sameTable, spaceNote, type Pronunciation } from '../../../core/pronounce'
+import {
+  cleanPronunciations,
+  pronounceProblem,
+  sameTable,
+  spaceNote,
+  type Pronunciation,
+} from '../../../core/pronounce'
 import { useSetPronunciations } from '../../api'
 import { Problems } from '../../components/Problems'
 import { plural } from '../../format'
@@ -28,12 +34,12 @@ export function PronunciationsPanel({
   const save = useSetPronunciations()
   const [draft, setDraft] = useState<PronounceDraft | null>(null)
   const rows = draft?.rows ?? startDraft(table).rows
-  const edited = draft ? tableOf(draft) : table
+  const edited = cleanPronunciations(draft ? tableOf(draft) : table)
   const changed = draft !== null && !sameTable(edited, draft.base)
   // Someone changed the file since editing began: saving would be refused.
   const moved = draft !== null && !sameTable(draft.base, table)
-  // A problem in the table as the file has it, shown before anyone presses Save.
-  const fileProblem = draft ? null : pronounceProblem(table)
+  // A problem in the table being edited (or, before editing, the file's), shown before Save.
+  const tableProblem = pronounceProblem(edited)
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
 
   const edit = (change: (draft: PronounceDraft) => PronounceDraft) => {
@@ -57,72 +63,80 @@ export function PronunciationsPanel({
           count, so “Al ” is not in “Alice”. Saved in <span className="mono">{castPath}</span>.
         </span>
       </div>
-      {rows.length > 0 && (
-        <ol className="pronounce-rows">
-          {rows.map(({ id, entry: [written, said] }, i) => {
-            const note = [spaceNote(written), spaceNote(said)]
-            return (
-              <li key={id}>
-                <input
-                  className="mono"
-                  aria-label={`Written, entry ${i + 1}`}
-                  placeholder="Written"
-                  value={written}
-                  onChange={(e) => edit((d) => editRow(d, i, 0, e.target.value))}
-                />
-                <span className="muted" aria-hidden="true">
-                  →
-                </span>
-                <input
-                  className="mono"
-                  aria-label={`Said, entry ${i + 1}`}
-                  placeholder="Said (empty: left out)"
-                  value={said}
-                  onChange={(e) => edit((d) => editRow(d, i, 1, e.target.value))}
-                />
-                <div className="pronounce-actions">
-                  <button
-                    className="btn"
-                    type="button"
-                    aria-label={`Move entry ${i + 1} up`}
-                    disabled={i === 0}
-                    onClick={() => edit((d) => moveRow(d, i, -1))}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    className="btn"
-                    type="button"
-                    aria-label={`Move entry ${i + 1} down`}
-                    disabled={i === rows.length - 1}
-                    onClick={() => edit((d) => moveRow(d, i, 1))}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    className="btn"
-                    type="button"
-                    aria-label={`Remove entry ${i + 1}`}
-                    onClick={() => edit((d) => removeRow(d, i))}
-                  >
-                    Remove
-                  </button>
-                </div>
-                {(note[0] || note[1]) && (
-                  <span className="muted pronounce-note">
-                    {[note[0] && `Written ${note[0]}`, note[1] && `said ${note[1]}`]
-                      .filter(Boolean)
-                      .join('; ')}
-                    .
+      {/* Edits wait while a save is under way, so none is dropped when it lands. */}
+      <fieldset className="pronounce-fields" disabled={save.isPending}>
+        {rows.length > 0 && (
+          <ol className="pronounce-rows">
+            {rows.map(({ id, entry: [written, said] }, i) => {
+              const note = [spaceNote(written), spaceNote(said)]
+              return (
+                <li key={id}>
+                  <input
+                    className="mono"
+                    aria-label={`Written, entry ${i + 1}`}
+                    placeholder="Written"
+                    value={written}
+                    onChange={(e) => edit((d) => editRow(d, i, 0, e.target.value))}
+                  />
+                  <span className="muted" aria-hidden="true">
+                    →
                   </span>
-                )}
-              </li>
-            )
-          })}
-        </ol>
-      )}
+                  <input
+                    className="mono"
+                    aria-label={`Said, entry ${i + 1}`}
+                    placeholder="Said (empty: left out)"
+                    value={said}
+                    onChange={(e) => edit((d) => editRow(d, i, 1, e.target.value))}
+                  />
+                  <div className="pronounce-actions">
+                    <button
+                      className="btn"
+                      type="button"
+                      aria-label={`Move entry ${i + 1} up`}
+                      disabled={i === 0}
+                      onClick={() => edit((d) => moveRow(d, i, -1))}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      className="btn"
+                      type="button"
+                      aria-label={`Move entry ${i + 1} down`}
+                      disabled={i === rows.length - 1}
+                      onClick={() => edit((d) => moveRow(d, i, 1))}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      className="btn"
+                      type="button"
+                      aria-label={`Remove entry ${i + 1}`}
+                      onClick={() => edit((d) => removeRow(d, i))}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {(note[0] || note[1]) && (
+                    <span className="muted pronounce-note">
+                      {[note[0] && `Written ${note[0]}`, note[1] && `said ${note[1]}`]
+                        .filter(Boolean)
+                        .join('; ')}
+                      .
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </fieldset>
       <div className="pronounce-foot">
-        <button className="btn" type="button" onClick={() => edit(addRow)}>
+        <button
+          className="btn"
+          type="button"
+          disabled={save.isPending}
+          onClick={() => edit(addRow)}
+        >
           Add entry
         </button>
         <span className="spacer" />
@@ -134,7 +148,7 @@ export function PronunciationsPanel({
         <button
           className="btn btn-primary"
           type="button"
-          disabled={!changed || moved || save.isPending}
+          disabled={!changed || moved || tableProblem !== null || save.isPending}
           onClick={() =>
             save.mutate(
               { table: edited, was: draft!.base },
@@ -157,10 +171,10 @@ export function PronunciationsPanel({
           </span>
         )
       )}
-      {fileProblem && (
+      {tableProblem && (
         <Problems
           title="The table needs a change"
-          problems={[{ file: castPath, path: 'pronounce', message: fileProblem }]}
+          problems={[{ file: castPath, path: 'pronounce', message: tableProblem }]}
         />
       )}
       {problems.length > 0 && (

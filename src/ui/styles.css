@@ -1402,6 +1402,12 @@ a.btn {
   display: flex;
   gap: 4px;
 }
+.pronounce-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
 .pronounce-note {
   grid-column: 1 / -1;
   font-size: 12px;

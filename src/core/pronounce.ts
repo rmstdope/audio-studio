@@ -14,7 +14,7 @@ export function cleanPronunciations(table: Pronunciation[]): Pronunciation[] {
 
 /**
  * Why a pronunciation table cannot be saved, or null: every entry needs the words it replaces (an
- * empty said form leaves them out, as narrate.py does), each written form once, no
+ * empty said form leaves them out, as narrate.py does) and not only spaces, each written form once, no
  * `__proto__` (JavaScript cannot keep it as a key), and no number-like written form among
  * others (JavaScript would apply it first, where the file lists it later).
  */
@@ -22,6 +22,7 @@ export function pronounceProblem(table: Pronunciation[]): string | null {
   const seen = new Set<string>()
   for (const [written, said] of table) {
     if (!written) return `a pronunciation of “${said}” needs the words it replaces`
+    if (!written.trim()) return 'a pronunciation of only spaces would change every line'
     if (written === '__proto__') return '“__proto__” cannot be a pronunciation in JavaScript'
     if (seen.has(written)) return `“${written}” twice in the table`
     seen.add(written)
