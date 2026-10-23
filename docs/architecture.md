@@ -63,7 +63,11 @@ retroquest/                      ← user runs `audio-studio` here
 3. The UI talks to the server over a small JSON API, and gets live job progress over a WebSocket.
 4. The studio writes only to paths the project file names, and every path goes through
    `resolveInRoot`, which refuses anything outside the project root. Clips are served only when
-   they are plain files in the part's clips folder (no folders, no symbolic links).
+   they are plain files in the part's clips folder (no folders, no symbolic links). The one
+   exception is **Refresh dialog**: it runs the project's own `refreshDialog` command (the game's
+   code, named in its project file) in the project root, only when the user clicks it on the
+   studio's page; what that command writes is the game's business, and the studio does not check
+   it beyond reading the dialog again.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 

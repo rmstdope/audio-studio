@@ -58,6 +58,9 @@ bundle breaks.
   nothing outside the project root. Clips are the one exception to `writeAtomic`: the encoder
   writes a hidden temporary file in the clips folder (through `resolveInRoot`), renamed into place
   only together with the manifest and lock update.
+- The one exception is the project's own `refreshDialog` command (the game's code, named in its
+  project file): it runs in the project root only when the user clicks Refresh dialog on the
+  studio's page, and writes what the game writes. The studio runs nothing else of the consumer's.
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
 - The game reads `manifest.json`: keep its format exactly. The studio's own state goes in the lock

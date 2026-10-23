@@ -55,6 +55,43 @@ describe('refreshDialog', () => {
     })
   })
 
+  it('stops a command that takes too long, children included', async () => {
+    const root = tempRepo(project('(sleep 30); true'))
+    const started = Date.now()
+    const result = await refreshDialog(join(root, 'audio-studio.json'), 'act1', { timeoutMs: 300 })
+    expect(Date.now() - started).toBeLessThan(5000)
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'failed',
+      message: expect.stringContaining('longer than'),
+    })
+  })
+
+  it('runs one refresh of a part at a time', async () => {
+    const root = tempRepo(project('echo start >> runs.txt; sleep 0.2; echo end >> runs.txt'))
+    const projectFile = join(root, 'audio-studio.json')
+    await Promise.all([refreshDialog(projectFile, 'act1'), refreshDialog(projectFile, 'act1')])
+    expect(readFileSync(join(root, 'runs.txt'), 'utf8')).toBe('start\nend\nstart\nend\n')
+  })
+
+  it('keeps only the end of a long output', async () => {
+    const root = tempRepo(project('seq 1 100000; exit 1'))
+    const result = await refreshDialog(join(root, 'audio-studio.json'), 'act1')
+    if (result?.ok !== false || !('output' in result)) throw new Error('expected a failure')
+    expect(result.output.length).toBeLessThanOrEqual(4000)
+    expect(result.output.endsWith('100000')).toBe(true)
+  })
+
+  it('does not guess what changed when the dialog could not be read before', async () => {
+    const files = project(`printf '%s' '${after}' > tts/{part}/script.json`)
+    const root = tempRepo({ ...files, 'tts/act1/script.json': '{ broken' })
+    expect(await refreshDialog(join(root, 'audio-studio.json'), 'act1')).toMatchObject({
+      ok: true,
+      lines: 2,
+      diff: null,
+    })
+  })
+
   it('says when the project has no refresh command', async () => {
     const root = tempRepo(project())
     expect(await refreshDialog(join(root, 'audio-studio.json'), 'act1')).toMatchObject({

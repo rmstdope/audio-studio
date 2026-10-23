@@ -236,6 +236,8 @@ export function useSetPronunciations() {
 export function useRefreshDialog(partId: string) {
   const client = useQueryClient()
   return useMutation({
+    // Keyed by part, so a refresh's state never carries over to another part's page.
+    mutationKey: ['refresh', partId],
     scope: { id: `refresh-${partId}` },
     mutationFn: async () => {
       const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/refresh`, {

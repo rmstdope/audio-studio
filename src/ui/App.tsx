@@ -74,7 +74,7 @@ export function App() {
         ) : route.view === 'lines' ? (
           <LinesView key={part.id} part={part} />
         ) : (
-          <PartOverview summary={summary} part={part} />
+          <PartOverview key={part.id} summary={summary} part={part} />
         )}
       </main>
     </div>
