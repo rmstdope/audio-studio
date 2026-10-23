@@ -51,7 +51,10 @@ export function useAdopt(partId: string) {
   return useMutation({
     mutationFn: () =>
       postJson<NonNullable<AdoptResult>>(`/api/parts/${encodeURIComponent(partId)}/adopt`),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['part', partId] }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      return client.invalidateQueries({ queryKey: ['part', partId] })
+    },
   })
 }
 
@@ -303,6 +306,7 @@ export function useRecordLines(partId: string) {
         setErrors((now) => ({ ...now, [key]: message }))
       } finally {
         // The line stays "recording" until its new status is shown, so it is never offered twice.
+        void client.invalidateQueries({ queryKey: ['plan', partId] })
         await client.invalidateQueries({ queryKey: ['part', partId] })
         setRecording((now) => {
           const next = new Set(now)
@@ -348,7 +352,8 @@ export function useJob(partId: string) {
       )
       const before = client.getQueryData<JobState | null>(['job', partId])
       // Keep the lines' statuses current while the job runs, and once more when it ends.
-      if (job && (job.status !== 'done' || before?.status !== 'done')) {
+      const running = job && (job.status === 'running' || job.status === 'cancelling')
+      if (job && (running || before?.status !== job.status)) {
         void client.invalidateQueries({ queryKey: ['part', partId] })
         void client.invalidateQueries({ queryKey: ['plan', partId] })
       }
@@ -365,7 +370,7 @@ export function useJob(partId: string) {
 export function useJobActions(partId: string) {
   const client = useQueryClient()
   const start = useMutation({
-    mutationFn: async (options: { speaker: string | null; removeOrphans: boolean }) => {
+    mutationFn: async (options: { speaker: string | null; keys: string[]; orphans: string[] }) => {
       const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/jobs`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

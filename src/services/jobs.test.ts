@@ -116,3 +116,94 @@ describe('jobs', () => {
     expect('id' in jobs.start(slow)).toBe(true)
   })
 })
+
+describe('jobs, edge cases', () => {
+  const base = {
+    part: 'act1',
+    speaker: null,
+    orphans: [] as string[],
+    parallel: 1,
+    removeOrphans: async () => 0,
+  }
+
+  it('lists a line whose recording throws, is gone, or has problems', async () => {
+    const jobs = createJobs()
+    const job = jobs.start({
+      ...base,
+      keys: ['a', 'b', 'c'],
+      record: async (key) => {
+        if (key === 'a') throw new Error('crashed')
+        if (key === 'b') return null
+        return { ok: false, problems: [{ file: 'f.json', path: '', message: 'broken' }] }
+      },
+    })
+    if ('error' in job) throw new Error(job.error)
+    const done = await finished(() => jobs.get(job.id))
+    expect(done.failed).toEqual([
+      { key: 'a', message: 'crashed' },
+      { key: 'b', message: 'the line is no longer in the dialog' },
+      { key: 'c', message: 'f.json: broken' },
+    ])
+  })
+
+  it('ignores a cancel once every line is done, and reports orphan trouble apart', async () => {
+    const jobs = createJobs()
+    let release = () => {}
+    const job = jobs.start({
+      ...base,
+      keys: ['a'],
+      orphans: ['old'],
+      record: async (key) => ({ ok: true, key, duration: 1 }),
+      removeOrphans: async () => {
+        await new Promise<void>((r) => (release = r))
+        throw new Error('locked')
+      },
+    })
+    if ('error' in job) throw new Error(job.error)
+    await tick(20)
+    expect(jobs.cancel(job.id)?.status).toBe('running')
+    release()
+    const done = await finished(() => jobs.get(job.id))
+    expect(done).toMatchObject({ status: 'done', failed: [], orphanError: 'locked' })
+  })
+
+  it('counts a line skipped as no longer needed as done, not failed', async () => {
+    const jobs = createJobs()
+    const job = jobs.start({
+      ...base,
+      keys: ['a'],
+      record: async (key) => ({ ok: true, key, skipped: true }),
+    })
+    if ('error' in job) throw new Error(job.error)
+    const done = await finished(() => jobs.get(job.id))
+    expect(done).toMatchObject({ done: 1, skipped: 1, failed: [] })
+  })
+})
+
+describe('jobs, cancel with every line under way', () => {
+  it('cancels while the last lines record, and removes no orphans', async () => {
+    const jobs = createJobs()
+    let removeCalled = false
+    const job = jobs.start({
+      part: 'act1',
+      speaker: null,
+      keys: ['a', 'b'],
+      orphans: ['o'],
+      parallel: 2,
+      record: async (key) => {
+        await tick(30)
+        return { ok: true, key, duration: 1 }
+      },
+      removeOrphans: async () => {
+        removeCalled = true
+        return 1
+      },
+    })
+    if ('error' in job) throw new Error(job.error)
+    await tick(5)
+    expect(jobs.cancel(job.id)?.status).toBe('cancelling')
+    const done = await finished(() => jobs.get(job.id))
+    expect(done).toMatchObject({ status: 'cancelled', done: 2 })
+    expect(removeCalled).toBe(false)
+  })
+})

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { StaleReason } from '../../../core/fingerprint'
 import { displayName } from '../../../core/summary'
 import { useJob, useJobActions, usePlan } from '../../api'
@@ -15,12 +15,24 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
   const job = useJob(partId)
   const { start, cancel } = useJobActions(partId)
   const [removeOrphans, setRemoveOrphans] = useState(false)
-  const [dismissed, setDismissed] = useState<string | null>(null)
+  // A finished job is shown only if it was started here, until it is closed.
+  const [shownJob, setShownJob] = useState<string | null>(null)
 
   const current = job.data ?? null
   const running = current && (current.status === 'running' || current.status === 'cancelling')
 
-  if (current && (running || dismissed !== current.id)) {
+  // A job seen running stays on screen until closed, so its result and failures are always seen,
+  // even after leaving the page and coming back while it ran.
+  const runningId = running ? current.id : null
+  useEffect(() => {
+    if (runningId) setShownJob(runningId)
+  }, [runningId])
+
+  // The orphan box only ever confirms the orphans shown: a different set clears it.
+  const orphanSet = plan.data?.ok ? plan.data.plan.orphans.join('\n') : ''
+  useEffect(() => setRemoveOrphans(false), [orphanSet])
+
+  if (current && (running || shownJob === current.id)) {
     const progress = current.total ? (current.done / current.total) * 100 : 100
     return (
       <section className="panel generate" aria-label="Generation">
@@ -44,13 +56,15 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
             <button
               className="btn"
               type="button"
-              disabled={current.status === 'cancelling' || cancel.isPending}
+              disabled={
+                current.status === 'cancelling' || current.removingOrphans || cancel.isPending
+              }
               onClick={() => cancel.mutate(current.id)}
             >
               {current.status === 'cancelling' ? 'Finishing lines under way…' : 'Cancel'}
             </button>
           ) : (
-            <button className="btn" type="button" onClick={() => setDismissed(current.id)}>
+            <button className="btn" type="button" onClick={() => setShownJob(null)}>
               Close
             </button>
           )}
@@ -63,13 +77,15 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
         )}
         {!running && (
           <span className="muted">
-            {plural(
-              current.done - current.failed.filter((f) => f.key !== 'orphans').length,
-              'line',
-            )}{' '}
-            recorded
+            {plural(current.done - current.failed.length - current.skipped, 'line')} recorded
+            {current.skipped ? ` · ${current.skipped} already up to date` : ''}
             {current.removed ? ` · ${plural(current.removed, 'orphaned clip')} removed` : ''}
             {current.status === 'cancelled' ? ' · the rest were left as they were' : ''}
+          </span>
+        )}
+        {current.orphanError && (
+          <span className="adopt-error">
+            The orphaned clips could not be removed: {current.orphanError}
           </span>
         )}
         {current.failed.length > 0 && (
@@ -111,7 +127,17 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
           className="btn btn-primary"
           type="button"
           disabled={nothing || start.isPending}
-          onClick={() => start.mutate({ speaker, removeOrphans })}
+          onClick={() =>
+            start.mutate(
+              { speaker, keys: p.keys, orphans: removeOrphans ? p.orphans : [] },
+              {
+                onSuccess: (started) => {
+                  setShownJob(started.id)
+                  setRemoveOrphans(false)
+                },
+              },
+            )
+          }
         >
           {start.isPending ? 'Starting…' : 'Generate'}
         </button>
@@ -143,8 +169,8 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
       )}
       <span className="muted plan-facts">
         {p.model} · {formatBytes(p.bytes)} of text ·{' '}
-        {p.cost ? `about $${p.cost.toFixed(2)}` : 'free'} · files are written in place; commit them
-        when you are happy
+        {p.cost === null ? 'price unknown' : p.cost ? `about $${p.cost.toFixed(2)}` : 'free'} ·
+        files are written in place; commit them when you are happy
       </span>
       {start.isError && <span className="adopt-error">{start.error.message}</span>}
     </section>

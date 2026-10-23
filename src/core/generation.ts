@@ -23,8 +23,8 @@ export interface GenerationPlan {
   /** UTF-8 bytes of text sent to Fish (cues included), which paid models charge for. */
   bytes: number
   model: string
-  /** Estimated cost in US dollars; 0 on the free model. */
-  cost: number
+  /** Estimated cost in US dollars; 0 on the free model; null for a model whose price is unknown. */
+  cost: number | null
 }
 
 const encoder = new TextEncoder()
@@ -35,7 +35,16 @@ const encoder = new TextEncoder()
  */
 export function planGeneration(
   state: { lines: LineState[]; orphans: Orphan[] },
-  { model, speaker }: { model: string; speaker?: string },
+  {
+    model,
+    speaker,
+    sent = (line) => [line.cue ? `${line.cue} ${line.text}` : line.text],
+  }: {
+    model: string
+    speaker?: string
+    /** The texts sent to Fish for a line (its pieces, with cue and pronunciations). */
+    sent?: (line: LineState) => string[]
+  },
 ): GenerationPlan {
   const inScope = (who: string | null) => !speaker || who === speaker
   const lines = state.lines.filter((line) => inScope(line.speaker))
@@ -45,9 +54,10 @@ export function planGeneration(
     for (const reason of line.reasons) stale[reason] = (stale[reason] ?? 0) + 1
   }
   const bytes = toRecord.reduce(
-    (sum, line) => sum + encoder.encode(line.cue ? `${line.cue} ${line.text}` : line.text).length,
+    (sum, line) => sum + sent(line).reduce((s, text) => s + encoder.encode(text).length, 0),
     0,
   )
+  const price = PRICE_PER_MILLION_BYTES[model]
   return {
     keys: toRecord.map((line) => line.key),
     missing: toRecord.filter((line) => line.status === 'missing').length,
@@ -56,6 +66,6 @@ export function planGeneration(
     orphans: state.orphans.filter((o) => inScope(o.speaker)).map((o) => o.key),
     bytes,
     model,
-    cost: (bytes / 1_000_000) * (PRICE_PER_MILLION_BYTES[model] ?? 0),
+    cost: price === undefined ? null : (bytes / 1_000_000) * price,
   }
 }

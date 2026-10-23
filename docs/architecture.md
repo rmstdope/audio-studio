@@ -348,9 +348,13 @@ each part.
 
 ### 8.2 Generate narration
 
-1. The user picks a scope: the whole part, one character, a selection of lines, or the weak ones.
+1. The user picks a scope: the whole part or one character (built), a selection of lines or the weak
+   ones (later).
 2. The planner shows the plan: N to record, M to re-record (by reason), K orphans to remove, the
-   bytes of text, the cost for the model (free model: $0), and the account credit. Lines are
+   bytes of text as sent, the cost for the model (free model: $0; "price unknown" for a model not in
+   the price list), and later the account credit. The page sends the lines and orphans it showed;
+   the server does only those that are still in its own fresh plan, and a line recorded meanwhile
+   is skipped. Lines are
    recorded with `models.draft`.
 3. **Generate** queues one job per line. For each line:
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
@@ -484,12 +488,10 @@ Small, independently useful increments:
    1. **Record a line**: TTS per chunk (WAV, the draft model), joined with a 0.25 s pause, encoded
       with ffmpeg; the manifest (written exactly as Python's `json.dumps(indent=1)`, so untouched
       entries keep their bytes) and the lock updated. Word timings are spread evenly over the clip
-      until step 5 transcribes it. A _Record_ button per line on the lines page, and _Record N lines
-      shown_, which asks first above ten lines. There is no plan step yet (the draft model is free);
-      4.2 adds it.
+      until step 5 transcribes it. A _Record_ button per line on the lines page.
    2. **Generate a part**: a plan for a scope (the part, a character), run as a job with progress and
       cancel, orphaned clips removed after confirmation.
-5. **Quality**: Whisper worker, alignment, takes, weak lines and retakes, orphan removal.
+5. **Quality**: Whisper worker, alignment, takes, weak lines and retakes, re-timing clips.
 6. **Editing**: style, cue and pronunciation editing; Changes panel; Refresh dialog.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data

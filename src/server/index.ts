@@ -3,6 +3,8 @@ import { findCandidates, setKeywords, setPhrase, type FishFactory } from '../ser
 import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { planGeneration } from '../core/generation'
+import { planPart } from '../core/planner'
+import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
@@ -19,7 +21,7 @@ import {
   type SessionResult,
 } from '../services/sessions'
 import { fishFromEnv, type FishClient } from '../services/fish'
-import { adoptPart, clipFile, loadPart, loadProject, openProject } from '../services/workspace'
+import { adoptPart, clipFile, loadPart, loadProject, readPart } from '../services/workspace'
 import index from '../ui/index.html'
 
 /** How to start the studio's server. */
@@ -41,10 +43,17 @@ const CharacterBody = z.union([
   z.object({ phrase: z.string().max(10_000).nullable() }).strict(),
 ])
 
-const JobBody = z.object({
-  speaker: z.string().min(1).nullable(),
-  removeOrphans: z.boolean(),
-})
+/**
+ * A generation to start: the scope, and the lines and orphans the page showed. Only those, and
+ * only as far as they are still in the server's own fresh plan, are recorded or removed.
+ */
+const JobBody = z
+  .object({
+    speaker: z.string().min(1).max(200).nullable(),
+    keys: z.array(z.string()).max(100_000),
+    orphans: z.array(z.string()).max(100_000),
+  })
+  .strict()
 
 const VerdictBody = z.object({
   voice: z.string().regex(/^[\w-]{1,64}$/),
@@ -103,14 +112,18 @@ export function startServer({
 
   /** What generating a part (or one speaker in it) would do, or why it can't be planned. */
   async function planFor(part: string, speaker?: string) {
-    const loaded = await loadPart(projectFile, part)
-    if (!loaded) return null
-    if (!loaded.ok) return loaded
-    if (loaded.part.problems.length) return { ok: false as const, problems: loaded.part.problems }
-    const opened = await openProject(projectFile)
-    if (!opened.ok) return opened
-    const { narration } = opened.project
-    const plan = planGeneration(loaded.part, { model: narration.models.draft, speaker })
+    const read = await readPart(projectFile, part)
+    if (!read) return null
+    if (!read.ok) return read
+    if (read.problems.length) return { ok: false as const, problems: read.problems }
+    const { narration } = read.project
+    const { pronounce } = read.input.cast
+    const plan = planGeneration(planPart(read.input), {
+      model: narration.models.draft,
+      speaker,
+      // What is sent: each piece of a line with its cue and the cast's pronunciations.
+      sent: (line) => spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
+    })
     return { ok: true as const, plan, parallel: narration.quality.parallel }
   }
 
@@ -178,25 +191,32 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const body = JobBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
-            return Response.json({ error: 'expected { speaker, removeOrphans }' }, { status: 400 })
+            return Response.json({ error: 'expected { speaker, keys, orphans }' }, { status: 400 })
           }
           const { part } = request.params
           const planned = await planFor(part, body.data.speaker ?? undefined)
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const { plan, parallel } = planned
-          const orphans = body.data.removeOrphans ? plan.orphans : []
-          if (!plan.keys.length && !orphans.length) {
+          const shownKeys = new Set(body.data.keys)
+          const shownOrphans = new Set(body.data.orphans)
+          const keys = plan.keys.filter((key) => shownKeys.has(key))
+          const orphans = plan.orphans.filter((key) => shownOrphans.has(key))
+          if (!keys.length && !orphans.length) {
             return Response.json({ error: 'There is nothing to generate.' }, { status: 409 })
           }
           const job = jobs.start({
             part,
             speaker: body.data.speaker,
-            keys: plan.keys,
+            keys,
             orphans,
             parallel,
             record: (key) =>
-              recordLine(projectFile, part, key, fishFor, { encode, limiter: fishWork }),
+              recordLine(projectFile, part, key, fishFor, {
+                encode,
+                limiter: fishWork,
+                onlyIfNeeded: true,
+              }),
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys),
           })
           return Response.json(job, { status: 'error' in job ? 409 : 200 })

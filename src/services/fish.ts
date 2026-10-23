@@ -90,16 +90,41 @@ function toVoice(api: z.infer<typeof ApiVoiceSchema>): Voice {
  */
 export function createFishClient(
   apiKey: string,
-  { fetch = globalThis.fetch, baseUrl = 'https://api.fish.audio' } = {},
+  {
+    fetch = globalThis.fetch,
+    baseUrl = 'https://api.fish.audio',
+    timeoutMs = 120_000,
+  }: { fetch?: typeof globalThis.fetch; baseUrl?: string; timeoutMs?: number } = {},
 ): FishClient {
+  /** A request that gives up after `timeoutMs`, saying so, so a stuck request never blocks a job. */
+  async function timed<T>(request: () => Promise<T>): Promise<T> {
+    try {
+      return await request()
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.name === 'TimeoutError' || error.name === 'AbortError')
+      ) {
+        throw new Error(`Fish Audio did not answer within ${timeoutMs / 1000} s`)
+      }
+      throw error
+    }
+  }
+
   async function get(path: string, params: Record<string, string | number | undefined> = {}) {
     const url = new URL(path, baseUrl)
     for (const [name, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') url.searchParams.set(name, String(value))
     }
-    const response = await fetch(url, { headers: { authorization: `Bearer ${apiKey}` } })
-    if (!response.ok) throw new FishError(response.status, await errorMessage(response))
-    return response.json()
+    // The whole request, the body read included, is timed: a body that stalls gives up too.
+    return timed(async () => {
+      const response = await fetch(url, {
+        headers: { authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      if (!response.ok) throw new FishError(response.status, await errorMessage(response))
+      return (await response.json()) as unknown
+    })
   }
 
   return {
@@ -118,25 +143,28 @@ export function createFishClient(
       return toVoice(ApiVoiceSchema.parse(await get(`/model/${encodeURIComponent(id)}`)))
     },
     async tts({ text, voice, model, temperature, topP, speed, format = 'mp3' }) {
-      const response = await fetch(new URL('/v1/tts', baseUrl), {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          'content-type': 'application/json',
-          model,
-        },
-        body: JSON.stringify({
-          text,
-          reference_id: voice,
-          format,
-          latency: 'normal',
-          temperature,
-          top_p: topP,
-          prosody: { speed, volume: 0 },
-        }),
+      return timed(async () => {
+        const response = await fetch(new URL('/v1/tts', baseUrl), {
+          signal: AbortSignal.timeout(timeoutMs),
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+            model,
+          },
+          body: JSON.stringify({
+            text,
+            reference_id: voice,
+            format,
+            latency: 'normal',
+            temperature,
+            top_p: topP,
+            prosody: { speed, volume: 0 },
+          }),
+        })
+        if (!response.ok) throw new FishError(response.status, await errorMessage(response))
+        return new Uint8Array(await response.arrayBuffer())
       })
-      if (!response.ok) throw new FishError(response.status, await errorMessage(response))
-      return new Uint8Array(await response.arrayBuffer())
     },
   }
 }
