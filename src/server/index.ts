@@ -6,7 +6,7 @@ import { planGeneration } from '../core/generation'
 import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
-import { recordLine, removeOrphans } from '../services/narration'
+import { measureLine, recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { nextRound, setVerdict } from '../core/audition'
 import {
@@ -63,6 +63,8 @@ const CharacterBody = z.union([
  */
 const JobBody = z
   .object({
+    /** Record lines (default), or measure clips with Whisper without new audio. */
+    kind: z.enum(['record', 'measure']).default('record'),
     speaker: z.string().min(1).max(200).nullable(),
     keys: z.array(z.string()).max(100_000),
     orphans: z.array(z.string()).max(100_000),
@@ -131,7 +133,7 @@ export function startServer({
   }
 
   /** What generating a part (or one speaker in it) would do, or why it can't be planned. */
-  async function planFor(part: string, speaker?: string) {
+  async function planFor(part: string, speaker?: string, includeWeak = false) {
     const read = await readPart(projectFile, part)
     if (!read) return null
     if (!read.ok) return read
@@ -145,6 +147,7 @@ export function startServer({
       sent: (line) => spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
       takes: narration.quality.transcriber === 'none' ? 1 : narration.quality.takes,
       checked: narration.quality.transcriber !== 'none',
+      includeWeak,
     })
     return { ok: true as const, plan, parallel: narration.quality.parallel }
   }
@@ -205,8 +208,9 @@ export function startServer({
       },
       '/api/parts/:part/plan': {
         GET: guard(async (request) => {
-          const speaker = new URL(request.url).searchParams.get('speaker') || undefined
-          const plan = await planFor(request.params.part, speaker)
+          const query = new URL(request.url).searchParams
+          const speaker = query.get('speaker') || undefined
+          const plan = await planFor(request.params.part, speaker, query.get('weak') === '1')
           return plan ? Response.json(plan) : notFound()
         }),
       },
@@ -217,30 +221,35 @@ export function startServer({
             return Response.json({ error: 'expected { speaker, keys, orphans }' }, { status: 400 })
           }
           const { part } = request.params
-          const planned = await planFor(part, body.data.speaker ?? undefined)
+          // Weak lines are in the fresh plan, so a retake the page showed is kept.
+          const planned = await planFor(part, body.data.speaker ?? undefined, true)
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const { plan, parallel } = planned
           const shownKeys = new Set(body.data.keys)
           const shownOrphans = new Set(body.data.orphans)
-          const keys = plan.keys.filter((key) => shownKeys.has(key))
-          const orphans = plan.orphans.filter((key) => shownOrphans.has(key))
+          const measuring = body.data.kind === 'measure'
+          const keys = (measuring ? plan.unmeasured : plan.keys).filter((key) => shownKeys.has(key))
+          const orphans = measuring ? [] : plan.orphans.filter((key) => shownOrphans.has(key))
           if (!keys.length && !orphans.length) {
-            return Response.json({ error: 'There is nothing to generate.' }, { status: 409 })
+            return Response.json({ error: 'There is nothing to do.' }, { status: 409 })
           }
           const job = jobs.start({
+            kind: body.data.kind,
             part,
             speaker: body.data.speaker,
             keys,
             orphans,
             parallel,
             record: async (key) =>
-              recordLine(projectFile, part, key, fishFor, {
-                encode,
-                limiter: fishWork,
-                onlyIfNeeded: true,
-                transcriber: await transcriberFor(),
-              }),
+              measuring
+                ? measureLine(projectFile, part, key, { transcriber: await transcriberFor() })
+                : recordLine(projectFile, part, key, fishFor, {
+                    encode,
+                    limiter: fishWork,
+                    onlyIfNeeded: true,
+                    transcriber: await transcriberFor(),
+                  }),
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys),
           })
           return Response.json(job, { status: 'error' in job ? 409 : 200 })

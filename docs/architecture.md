@@ -506,9 +506,10 @@ Small, independently useful increments:
       `quality.takes` takes per line until one is heard at `minHeard`, keeping the best: real
       word timings in the manifest, the heard share and takes in the lock. `quality.transcriber:
 "none"` records one unchecked take, as before.
-   2. **Weak lines and re-timing**: retake weak lines from the plan; re-measure word timings of
-      existing clips without new audio (narrate.py `--retime`), which also gives adopted clips a
-      heard share.
+   2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when
+      asked; clips never checked (adopted from narrate.py, or recorded unchecked) measured
+      without new audio (narrate.py `--retime`): length from the decoded clip, word timings and
+      heard share from Whisper, so a poorly heard clip shows as weak.
 6. **Editing**: style, cue and pronunciation editing; Changes panel; Refresh dialog.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data

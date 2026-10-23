@@ -7,11 +7,13 @@ import { plural } from '../../format'
 import { REASON } from '../../status'
 
 /**
- * Generating a part, or one character in it: the plan (what would be recorded and why, the
- * orphans, the model and its cost), then the job's progress with Cancel, then what it did.
+ * Generating a part, or one character in it: the plan (what would be recorded and why, weak lines
+ * to retake if asked, the orphans, the model and its cost), then the job's progress with Cancel,
+ * then what it did. Clips never checked by Whisper can be measured instead, without new audio.
  */
 export function GeneratePanel({ partId, speaker }: { partId: string; speaker: string | null }) {
-  const plan = usePlan(partId, speaker)
+  const [retakeWeak, setRetakeWeak] = useState(false)
+  const plan = usePlan(partId, speaker, retakeWeak)
   const job = useJob(partId)
   const { start, cancel } = useJobActions(partId)
   const [removeOrphans, setRemoveOrphans] = useState(false)
@@ -34,6 +36,7 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
 
   if (current && (running || shownJob === current.id)) {
     const progress = current.total ? (current.done / current.total) * 100 : 100
+    const measuring = current.kind === 'measure'
     return (
       <section className="panel generate" aria-label="Generation">
         <div className="generate-head">
@@ -42,13 +45,15 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
               {running
                 ? current.status === 'cancelling'
                   ? 'Cancelling'
-                  : 'Generating'
+                  : measuring
+                    ? 'Measuring'
+                    : 'Generating'
                 : current.status === 'cancelled'
                   ? 'Cancelled'
                   : 'Done'}
             </span>
             <strong>
-              {current.done} of {plural(current.total, 'line')}
+              {current.done} of {plural(current.total, measuring ? 'clip' : 'line')}
               {current.speaker ? ` · ${displayName(current.speaker)}` : ''}
             </strong>
           </div>
@@ -73,12 +78,18 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
           <span style={{ width: `${progress}%` }} />
         </div>
         {running && current.recording.length > 0 && (
-          <span className="muted">Recording {current.recording.join(', ')}</span>
+          <span className="muted">
+            {measuring ? 'Measuring' : 'Recording'} {current.recording.join(', ')}
+          </span>
         )}
         {!running && (
           <span className="muted">
-            {plural(current.done - current.failed.length - current.skipped, 'line')} recorded
-            {current.skipped ? ` · ${current.skipped} already up to date` : ''}
+            {measuring
+              ? `${plural(current.done - current.failed.length - current.skipped, 'clip')} measured`
+              : `${plural(current.done - current.failed.length - current.skipped, 'line')} recorded`}
+            {current.skipped
+              ? ` · ${current.skipped} ${measuring ? 'recorded again meanwhile' : 'already up to date'}`
+              : ''}
             {current.removed ? ` · ${plural(current.removed, 'orphaned clip')} removed` : ''}
             {current.status === 'cancelled' ? ' · the rest were left as they were' : ''}
           </span>
@@ -129,7 +140,7 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
           disabled={nothing || start.isPending}
           onClick={() =>
             start.mutate(
-              { speaker, keys: p.keys, orphans: removeOrphans ? p.orphans : [] },
+              { kind: 'record', speaker, keys: p.keys, orphans: removeOrphans ? p.orphans : [] },
               {
                 onSuccess: (started) => {
                   setShownJob(started.id)
@@ -151,6 +162,37 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
             </li>
           ))}
         </ul>
+      )}
+      {p.weak.length > 0 && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={retakeWeak}
+            onChange={(e) => setRetakeWeak(e.target.checked)}
+          />
+          Also retake {plural(p.weak.length, 'weak line')} (Whisper heard too few of their words)
+        </label>
+      )}
+      {p.checked && p.unmeasured.length > 0 && (
+        <div className="measure">
+          <span className="muted">
+            {plural(p.unmeasured.length, 'clip')} never checked by Whisper. Measuring finds their
+            word timings and weak lines, without new audio.
+          </span>
+          <button
+            className="btn"
+            type="button"
+            disabled={start.isPending}
+            onClick={() =>
+              start.mutate(
+                { kind: 'measure', speaker, keys: p.unmeasured, orphans: [] },
+                { onSuccess: (started) => setShownJob(started.id) },
+              )
+            }
+          >
+            Measure {plural(p.unmeasured.length, 'clip')}
+          </button>
+        </div>
       )}
       {p.uncast.length > 0 && (
         <span className="cast-note">

@@ -15,7 +15,8 @@ saying the audition phrase in the character's style, and runs keep/drop rounds u
 left, which it writes to the cast. It records narration: line by line, or a whole part (or one
 character) as a job with a plan, progress and Cancel, removing orphaned clips when asked (step 4).
 Each take is checked with Whisper, and recorded again (up to three times) until enough of its
-words are heard; the manifest gets real word timings. Retaking weak lines comes next.
+words are heard; the manifest gets real word timings. A line never heard well enough shows as weak; retake it from its row or from Generate. Clips
+recorded before the studio (or unchecked) can be measured with Whisper without new audio.
 
 Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`), and checking
 takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads
