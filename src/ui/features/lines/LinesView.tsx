@@ -13,8 +13,14 @@ import { STATUS, percent, seconds, statusDetail } from '../../status'
 
 type Filter = 'all' | 'attention' | LineStatus | 'orphans'
 
-/** Lines a Record button is offered for: no clip, a clip made from other inputs, or a weak take. */
-const RECORDABLE = new Set<LineStatus>(['missing', 'stale', 'weak'])
+/**
+ * Lines a Record button is offered for: no clip, or a clip made from other inputs. Weak takes get
+ * one once recordings are checked (step 5); until then a new take could not be judged better.
+ */
+const RECORDABLE = new Set<LineStatus>(['missing', 'stale'])
+
+/** Recording more lines than this at once asks first. */
+const CONFIRM_ABOVE = 10
 
 /** Lines that need something done: everything but up to date. */
 const needsAttention = (line: LineState) => line.status !== 'ok'
@@ -24,6 +30,7 @@ export function LinesView({ part }: { part: PartSummary }) {
   const detail = usePart(part.id, part.dialog === 'ok')
   const { playing, toggle } = useClipPlayer()
   const recorder = useRecordLines(part.id)
+  const [confirming, setConfirming] = useState(false)
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
   const [search, setSearch] = useState('')
@@ -140,13 +147,38 @@ export function LinesView({ part }: { part: PartSummary }) {
             Recording uses the draft model ({loaded.draftModel}). Word timings are spread evenly
             until clips are transcribed.
           </span>
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={() => toRecord.forEach((line) => void recorder.record(line.key))}
-          >
-            Record {plural(toRecord.length, 'line')} shown
-          </button>
+          {confirming ? (
+            <span className="confirm">
+              <span>
+                Record {plural(toRecord.length, 'line')} on {loaded.draftModel}?
+              </span>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={() => {
+                  setConfirming(false)
+                  toRecord.forEach((line) => void recorder.record(line.key))
+                }}
+              >
+                Yes, record them
+              </button>
+              <button className="btn btn-ghost" type="button" onClick={() => setConfirming(false)}>
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() =>
+                toRecord.length > CONFIRM_ABOVE
+                  ? setConfirming(true)
+                  : toRecord.forEach((line) => void recorder.record(line.key))
+              }
+            >
+              Record {plural(toRecord.length, 'line')} shown
+            </button>
+          )}
         </div>
       )}
 

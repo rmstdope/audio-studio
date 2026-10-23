@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { spreadWords } from '../core/align'
 import { clipInputs, fingerprint } from '../core/fingerprint'
@@ -11,7 +13,7 @@ import type { FishFactory } from './auditions'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { formatEntriesPerLine, readResource, writeAtomic } from './files'
 import type { Limiter } from './limit'
-import { createSerial } from './serial'
+import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
 
 /** Seconds of silence between the pieces of a long line (as in RetroQuest's narrate.py). */
@@ -20,7 +22,7 @@ export const GAP_SECONDS = 0.25
 /** A recorded line, or why it was not recorded. Null for an unknown part or line. */
 export type RecordResult =
   | { ok: true; key: string; duration: number }
-  | { ok: false; reason: 'uncast' | 'no-key' | 'fish' | 'encode'; message: string }
+  | { ok: false; reason: 'uncast' | 'no-key' | 'fish' | 'audio' | 'encode'; message: string }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
@@ -31,14 +33,12 @@ export interface RecordOptions {
   limiter: Limiter
 }
 
-/** Writes to a part's manifest and lock, one at a time. */
-const partWrites = createSerial()
-
 /**
  * Records one line: its text in sentence-sized pieces, each spoken by Fish in the speaker's voice
  * with its cue (the draft model), joined with a short pause, encoded as the project's output; then
  * the clip's manifest entry (with the words spread over it until clips are transcribed) and its
- * lock entry are written. Nothing is written unless the whole clip was made. At most
+ * lock entry are written. The clip, manifest and lock change only together: nothing is written
+ * unless the clip was made and both files could be read. At most
  * `quality.parallel` lines are recorded at once, and a line already being recorded is not
  * recorded twice.
  */
@@ -76,8 +76,8 @@ export async function recordLine(
 
   return limiter.run(`${projectFile}\n${partId}\n${key}`, narration.quality.parallel, async () => {
     let clip: { wav: Uint8Array; seconds: number }
+    const pieces: Uint8Array[] = []
     try {
-      const pieces: Uint8Array[] = []
       for (const chunk of chunkText(line.text, narration.quality.chunkLimit)) {
         pieces.push(
           await fish.tts({
@@ -91,30 +91,43 @@ export async function recordLine(
           }),
         )
       }
-      clip = joinWavs(pieces, GAP_SECONDS)
     } catch (error) {
       return { ok: false, reason: 'fish', message: messageOf(error) }
     }
-
-    const file = `${key}.mp3`
     try {
-      await encode(
-        clip.wav,
-        join(resolveInRoot(root, read.paths.clipsPath), file),
-        narration.output,
-      )
+      clip = joinWavs(pieces, GAP_SECONDS)
     } catch (error) {
+      return {
+        ok: false,
+        reason: 'audio',
+        message: `Fish sent audio that could not be joined: ${messageOf(error)}`,
+      }
+    }
+
+    // Encoded beside the clip under a hidden name (never served, never a stray clip), and only
+    // moved into place once the manifest and lock can be written too.
+    const file = `${key}.mp3`
+    const target = resolveInRoot(root, join(read.paths.clipsPath, file))
+    const temporary = resolveInRoot(root, join(read.paths.clipsPath, `.${key}.${randomUUID()}.mp3`))
+    try {
+      await encode(clip.wav, temporary, narration.output)
+    } catch (error) {
+      await rm(temporary, { force: true })
       return { ok: false, reason: 'encode', message: messageOf(error) }
     }
 
     const duration = Math.round(clip.seconds * 1000) / 1000
     const { fp, parts } = fingerprint(inputs)
-    const problems = await partWrites.run(`${projectFile}\n${partId}`, async () => {
-      // Read again inside the queue: other lines may have been written meanwhile.
+    const problems = await inPartTurn(projectFile, partId, async () => {
+      // Read again in the part's turn: other lines may have been written meanwhile.
       const found: Problem[] = []
       const manifest = await manifestNow(root, read.paths.manifestPath, found)
       const lock = await lockNow(root, read.paths.lockPath, found)
-      if (!manifest || !lock) return found
+      if (!manifest || !lock) {
+        await rm(temporary, { force: true })
+        return found
+      }
+      await rename(temporary, target)
       manifest[key] = {
         file,
         speaker: line.speaker,

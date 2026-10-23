@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { joinWavs, readWav } from './wav'
 
 /** A 16-bit mono WAV of `frames` frames at `rate`, optionally with a streaming placeholder length. */
-function wav(frames: number, rate = 1000, placeholder = false): Uint8Array {
+function wav(frames: number, rate = 1000, placeholder = false, tag = 1): Uint8Array {
   const data = frames * 2
   const bytes = new Uint8Array(44 + data)
   const view = new DataView(bytes.buffer)
@@ -13,7 +13,7 @@ function wav(frames: number, rate = 1000, placeholder = false): Uint8Array {
   text(8, 'WAVE')
   text(12, 'fmt ')
   view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)
+  view.setUint16(20, tag, true)
   view.setUint16(22, 1, true)
   view.setUint32(24, rate, true)
   view.setUint32(28, rate * 2, true)
@@ -48,5 +48,31 @@ describe('joinWavs', () => {
 
   it('refuses pieces of different formats', () => {
     expect(() => joinWavs([wav(10, 1000), wav(10, 2000)], 0.1)).toThrow('format')
+  })
+})
+
+describe('readWav, other shapes', () => {
+  it('skips chunks before the audio, odd-sized ones included', () => {
+    const plain = wav(10)
+    const extra = new Uint8Array(
+      [...'LIST'].map((c) => c.charCodeAt(0)).concat([3, 0, 0, 0, 1, 2, 3, 0]),
+    )
+    const bytes = new Uint8Array(plain.length + extra.length)
+    bytes.set(plain.subarray(0, 36))
+    bytes.set(extra, 36)
+    bytes.set(plain.subarray(36), 36 + extra.length)
+    expect(readWav(bytes).data.length).toBe(20)
+  })
+
+  it('keeps whole frames of a stream cut mid-frame', () => {
+    const cut = wav(10, 1000, true).subarray(0, 44 + 7)
+    expect(readWav(cut).data.length).toBe(6)
+  })
+
+  it('refuses audio that is not plain PCM, or has no channels', () => {
+    expect(() => readWav(wav(10, 1000, false, 3))).toThrow('unsupported WAV')
+    const none = wav(10)
+    new DataView(none.buffer).setUint16(22, 0, true)
+    expect(() => readWav(none)).toThrow('unsupported WAV')
   })
 })

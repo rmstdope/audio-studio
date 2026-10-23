@@ -2,7 +2,8 @@
  * JSON as Python's `json.dumps(value, indent=1)` writes it, so a file a Python tool wrote (the
  * game's narration manifest) is rewritten without changing lines nobody touched: one-space
  * indents, non-ASCII escaped as `\uXXXX`, and every number written as a float (`0.0`), since the
- * manifest's numbers are all floats.
+ * manifest's numbers are all floats. Numbers match Python's for 0.0001 ≤ |n| < 1e16 (the
+ * manifest's seconds, rounded to milliseconds); outside that range Python switches to exponents.
  */
 export function pythonJson(value: unknown, indent = 0): string {
   if (value === null) return 'null'

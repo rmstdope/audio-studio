@@ -1,6 +1,5 @@
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { randomUUID } from 'node:crypto'
 
 /** How clips are encoded (the project's `output`). */
 export interface EncodeOptions {
@@ -11,13 +10,15 @@ export interface EncodeOptions {
 /** Encodes a WAV into an MP3 file. Behind a type, so tests need no ffmpeg. */
 export type Encoder = (wav: Uint8Array, file: string, options: EncodeOptions) => Promise<void>
 
+/** An encode taking longer than this is stopped. */
+const ENCODE_TIMEOUT_MS = 120_000
+
 /**
- * Encodes with ffmpeg (as RetroQuest's narrate.py does), into a temporary file renamed into place,
- * so a failed or cancelled encode never leaves a broken clip.
+ * Encodes with ffmpeg (as RetroQuest's narrate.py does) into `file`. On failure nothing is left
+ * at `file`, and the error is ffmpeg's own, even when it stops reading its input early.
  */
 export const ffmpegEncoder: Encoder = async (wav, file, { bitrate, channels }) => {
   await mkdir(dirname(file), { recursive: true })
-  const temporary = `${file}.${randomUUID()}.tmp.mp3`
   let child
   try {
     child = Bun.spawn(
@@ -34,24 +35,25 @@ export const ffmpegEncoder: Encoder = async (wav, file, { bitrate, channels }) =
         String(channels),
         '-b:a',
         bitrate,
-        temporary,
+        file,
       ],
-      { stdin: 'pipe', stdout: 'ignore', stderr: 'pipe' },
+      { stdin: 'pipe', stdout: 'ignore', stderr: 'pipe', timeout: ENCODE_TIMEOUT_MS },
     )
   } catch {
     throw new Error('ffmpeg is needed to encode clips: install it (e.g. brew install ffmpeg)')
   }
+  const stderr = new Response(child.stderr).text()
   try {
     child.stdin.write(wav)
     await child.stdin.end()
-    const code = await child.exited
-    if (code !== 0) {
-      const message = (await new Response(child.stderr).text()).trim()
-      throw new Error(`ffmpeg could not encode the clip: ${message || `exit code ${code}`}`)
-    }
-    await rename(temporary, file)
-  } catch (error) {
-    await rm(temporary, { force: true }).catch(() => {})
-    throw error
+  } catch {
+    // ffmpeg stopped reading (it failed early): its exit code and message say why.
+  }
+  const [code, message] = await Promise.all([child.exited, stderr])
+  if (code !== 0) {
+    await rm(file, { force: true })
+    const why =
+      message.trim() || (child.signalCode ? `stopped (${child.signalCode})` : `exit code ${code}`)
+    throw new Error(`ffmpeg could not encode the clip: ${why}`)
   }
 }

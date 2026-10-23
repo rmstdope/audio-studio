@@ -69,6 +69,9 @@ if (state.audioStudioStarted) {
 } else {
   state.audioStudioStarted = true
   console.log(`Audio Studio: ${projectFile}`)
+  if (!Bun.which('ffmpeg')) {
+    console.warn('Note: ffmpeg is not installed; recording lines needs it (brew install ffmpeg).')
+  }
   console.log(`Open ${server.url}  (Ctrl+C to stop)${values.dev ? '  · reloading on changes' : ''}`)
   if (!values['no-open']) openBrowser(server.url.href)
 }

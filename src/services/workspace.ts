@@ -21,6 +21,7 @@ import {
 } from '../core/resources'
 import { summarize, type DialogState, type ProjectSummary } from '../core/summary'
 import { formatEntriesPerLine, listFiles, readJson, readResource, writeAtomic } from './files'
+import { inPartTurn } from './partFiles'
 
 /** The project file in `start` or the nearest directory above it that has one; null if none. */
 export function findProjectFile(start: string): string | null {
@@ -149,13 +150,16 @@ export async function adoptPart(
   partId: string,
   now: Date = new Date(),
 ): Promise<AdoptResult> {
-  const read = await readPart(projectFile, partId)
-  if (!read || !read.ok) return read
-  if (read.problems.length) return { ok: false, problems: read.problems }
-  const { lock, adopted } = adoptUntracked(read.input, now.toISOString())
-  const { lockPath } = read.paths
-  if (adopted) await writeAtomic(dirname(projectFile), lockPath, formatEntriesPerLine(lock))
-  return { ok: true, adopted, lockPath }
+  // In the part's turn, reading the part afresh: a line recorded meanwhile keeps its lock entry.
+  return inPartTurn(projectFile, partId, async () => {
+    const read = await readPart(projectFile, partId)
+    if (!read || !read.ok) return read
+    if (read.problems.length) return { ok: false, problems: read.problems }
+    const { lock, adopted } = adoptUntracked(read.input, now.toISOString())
+    const { lockPath } = read.paths
+    if (adopted) await writeAtomic(dirname(projectFile), lockPath, formatEntriesPerLine(lock))
+    return { ok: true, adopted, lockPath }
+  })
 }
 
 /**

@@ -438,7 +438,8 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 - An invalid project file or resource opens the UI on an error page that names the file, the path
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
 - Missing tools (`ffmpeg`, `uv`) and a missing API key are checked at start and shown as a setup
-  checklist.
+  checklist. So far: the CLI warns when ffmpeg is missing, and recording says so; the checklist in
+  the UI comes later.
 - Writes outside the project root throw. Deleting clips (orphans) always needs confirmation.
 - Fish errors (rate limit, no credit, voice removed) mark the line as failed with the reason; the
   rest of the job carries on.
@@ -477,7 +478,9 @@ Small, independently useful increments:
    1. **Record a line**: TTS per chunk (WAV, the draft model), joined with a 0.25 s pause, encoded
       with ffmpeg; the manifest (written exactly as Python's `json.dumps(indent=1)`, so untouched
       entries keep their bytes) and the lock updated. Word timings are spread evenly over the clip
-      until step 5 transcribes it. A _Record_ button per line on the lines page.
+      until step 5 transcribes it. A _Record_ button per line on the lines page, and _Record N lines
+      shown_, which asks first above ten lines. There is no plan step yet (the draft model is free);
+      4.2 adds it.
    2. **Generate a part**: a plan for a scope (the part, a character), run as a job with progress and
       cancel, orphaned clips removed after confirmation.
 5. **Quality**: Whisper worker, alignment, takes, weak lines and retakes, orphan removal.

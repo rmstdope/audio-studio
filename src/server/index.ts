@@ -89,10 +89,8 @@ export function startServer({
     return Response.json(view, { status: view.ok ? 200 : 409 })
   }
 
-  /** Audition takes being recorded: a few at a time, each once. */
-  const takes = createLimiter()
-  /** Lines being recorded: a few at a time, each once. */
-  const lines = createLimiter()
+  /** Fish TTS requests (audition takes and lines alike): `quality.parallel` at a time, each once. */
+  const fishWork = createLimiter()
 
   /** Only requests addressed to the studio itself reach `handler`. */
   const guard =
@@ -115,6 +113,8 @@ export function startServer({
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port,
+    // Recording a line or a batch of takes can take well over Bun's default 10 s; never cut it off.
+    idleTimeout: 0,
     development: development ? { hmr: true, console: true } : false,
     routes: {
       '/': index,
@@ -139,7 +139,7 @@ export function startServer({
           const { part, key } = request.params
           const result = await recordLine(projectFile, part, key, fishFor, {
             encode,
-            limiter: lines,
+            limiter: fishWork,
           })
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -174,7 +174,7 @@ export function startServer({
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { id } = request.params
-          const result = await recordTake(projectFile, id, body.data.voice, fishFor, takes)
+          const result = await recordTake(projectFile, id, body.data.voice, fishFor, fishWork)
           if (!result) return notFound()
           return Response.json(result, { status: 'problems' in result ? 409 : 200 })
         }),

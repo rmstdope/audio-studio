@@ -2,7 +2,8 @@ import { z } from 'zod'
 
 /** One voiced line of a part's dialog: the game's stable key, who says it, and the words. */
 export const LineSchema = z.object({
-  key: z.string().min(1),
+  // The key names the line's clip file (`<key>.mp3`), so it may only hold safe file-name characters.
+  key: z.string().regex(/^[A-Za-z0-9_-]+$/, 'a line key may only hold letters, digits, - and _'),
   speaker: z.string().min(1),
   text: z.string(),
 })

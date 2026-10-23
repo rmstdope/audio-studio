@@ -55,7 +55,9 @@ bundle breaks.
 ## Rules for the consumer repository
 
 - Read and write only the files the project file names, through `resolveInRoot` and `writeAtomic`;
-  nothing outside the project root.
+  nothing outside the project root. Clips are the one exception to `writeAtomic`: the encoder
+  writes a hidden temporary file in the clips folder (through `resolveInRoot`), renamed into place
+  only together with the manifest and lock update.
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
 - The game reads `manifest.json`: keep its format exactly. The studio's own state goes in the lock

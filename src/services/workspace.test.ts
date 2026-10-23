@@ -220,6 +220,15 @@ describe('review fixes', () => {
     expect(result?.ok && result.part.minHeard).toBe(0.9)
   })
 
+  it('reports a dialog key that could not be a file name', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': [{ key: '../../x', speaker: 'narrator', text: 'Escape.' }],
+    })
+    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    expect(result?.ok && result.part.problems.map((p) => p.path)).toEqual(['[0].key'])
+  })
+
   it('reports a dialog that uses a key twice', async () => {
     const root = tempRepo({
       ...files,

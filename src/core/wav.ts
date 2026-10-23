@@ -31,10 +31,26 @@ export function readWav(bytes: Uint8Array): Wav {
     const size = view.getUint32(at + 4, true)
     const body = at + 8
     if (id === 'fmt ') {
+      // Plain integer PCM only (tag 1, or the extensible tag with a PCM subformat): anything else
+      // would be joined and encoded as noise.
+      const tag = view.getUint16(body, true)
+      const pcm =
+        tag === 1 || (tag === 0xfffe && size >= 26 && view.getUint16(body + 24, true) === 1)
       format = {
         channels: view.getUint16(body + 2, true),
         sampleRate: view.getUint32(body + 4, true),
         bitsPerSample: view.getUint16(body + 14, true),
+      }
+      if (
+        !pcm ||
+        !format.channels ||
+        !format.sampleRate ||
+        format.bitsPerSample % 8 ||
+        !format.bitsPerSample
+      ) {
+        throw new Error(
+          `unsupported WAV audio (format ${tag}, ${format.bitsPerSample}-bit, ${format.channels} channels)`,
+        )
       }
     } else if (id === 'data') {
       if (!format) throw new Error('not a WAV file: audio before its format')
@@ -90,7 +106,8 @@ export function joinWavs(
     f.bitsPerSample === format.bitsPerSample
   if (!read.every((r) => same(r.format))) throw new Error('the pieces are in different formats')
   const frame = (format.bitsPerSample / 8) * format.channels
-  const gap = new Uint8Array(Math.round(gapSeconds * format.sampleRate) * frame)
+  // Whole frames, rounded down as Python's int() does in narrate.py.
+  const gap = new Uint8Array(Math.floor(gapSeconds * format.sampleRate) * frame)
   const parts = read.flatMap((r, i) => (i ? [gap, r.data] : [r.data]))
   const data = new Uint8Array(parts.reduce((sum, p) => sum + p.length, 0))
   let at = 0

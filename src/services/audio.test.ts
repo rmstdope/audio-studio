@@ -22,6 +22,17 @@ describe.skipIf(!hasFfmpeg)('ffmpegEncoder', () => {
     expect(readdirSync(join(root, 'clips'))).toEqual(['k1.mp3'])
   })
 
+  it('reports ffmpeg’s own error when it stops reading early', async () => {
+    const root = tempRepo({})
+    const big = writeWav({
+      format: { channels: 1, sampleRate: 16000, bitsPerSample: 16 },
+      data: new Uint8Array(20_000_000),
+    })
+    const failing = ffmpegEncoder(big, join(root, 'k3.mp3'), { bitrate: 'zzz', channels: 1 })
+    await expect(failing).rejects.toThrow('ffmpeg could not encode')
+    await expect(failing).rejects.not.toThrow('EPIPE')
+  })
+
   it('fails on audio it cannot read, keeping no file', async () => {
     const root = tempRepo({})
     const file = join(root, 'k2.mp3')

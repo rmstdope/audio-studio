@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
@@ -8,7 +8,7 @@ import type { Encoder } from './audio'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
 import { recordLine } from './narration'
-import { loadPart } from './workspace'
+import { adoptPart, loadPart } from './workspace'
 
 /** A WAV of `seconds` of silence at 1000 Hz. */
 function silence(seconds: number): Uint8Array {
@@ -129,6 +129,42 @@ describe('recordLine', () => {
     const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
     expect(Object.keys(manifest).sort()).toEqual(['k1', 'k4', 'old'])
     expect(Object.keys(lock).sort()).toEqual(['k1', 'k4'])
+  })
+
+  it('records a line asked for twice at once only once', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const limiter = createLimiter()
+    const projectFile = join(root, 'audio-studio.json')
+    const once = () =>
+      recordLine(projectFile, 'act1', 'k1', async () => fish, { encode: keepWav, limiter })
+    await Promise.all([once(), once()])
+    expect(requests).toHaveLength(1)
+  })
+
+  it('keeps a recording’s lock entry when an adopt runs at the same time', async () => {
+    const root = tempRepo({
+      ...files,
+      'audio/act1/manifest.json': { k4: { file: 'k4.mp3', speaker: 'mira' } },
+      'audio/act1/k4.mp3': 'old clip',
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    await Promise.all([record(root, 'k1', fakeFish().fish), adoptPart(projectFile, 'act1')])
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(Object.keys(lock).sort()).toEqual(['k1', 'k4'])
+    expect(lock.k1.takes).toBe(1)
+  })
+
+  it('leaves the old clip in place when the manifest turns out broken, and no stray file', async () => {
+    const root = tempRepo({ ...files, 'audio/act1/k1.mp3': 'old clip' })
+    const breakManifest: Encoder = async (wav, file, options) => {
+      await keepWav(wav, file, options)
+      writeFileSync(join(root, 'audio/act1/manifest.json'), '{ broken')
+    }
+    const result = await record(root, 'k1', fakeFish().fish, breakManifest)
+    expect(result && !result.ok && 'problems' in result).toBe(true)
+    expect(readFileSync(join(root, 'audio/act1/k1.mp3'), 'utf8')).toBe('old clip')
+    expect(readdirSync(join(root, 'audio/act1')).sort()).toEqual(['k1.mp3', 'manifest.json'])
   })
 
   it('refuses a line whose speaker has no voice, and knows no unknown line', async () => {

@@ -299,12 +299,13 @@ export function useRecordLines(partId: string) {
         const message = error instanceof Error ? error.message : String(error)
         setErrors((now) => ({ ...now, [key]: message }))
       } finally {
+        // The line stays "recording" until its new status is shown, so it is never offered twice.
+        await client.invalidateQueries({ queryKey: ['part', partId] })
         setRecording((now) => {
           const next = new Set(now)
           next.delete(key)
           return next
         })
-        void client.invalidateQueries({ queryKey: ['part', partId] })
       }
     },
     [partId, client],
