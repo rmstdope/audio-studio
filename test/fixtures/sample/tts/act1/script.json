@@ -1,0 +1,7 @@
+[
+  { "key": "a1", "speaker": "narrator", "text": "The lantern on the hill has not been lit in twenty years." },
+  { "key": "a2", "speaker": "keeper", "text": "You came. I hoped someone would." },
+  { "key": "a3", "speaker": "narrator", "text": "Wind moves through the grass like a slow tide." },
+  { "key": "a4", "speaker": "wren", "text": "Is it true the light keeps the dark away?" },
+  { "key": "a5", "speaker": "keeper", "text": "It keeps the dark honest. That is all a light can do." }
+]

@@ -1,0 +1,84 @@
+import { z } from 'zod'
+
+/** One voiced line of a part's dialog: the game's stable key, who says it, and the words. */
+export const LineSchema = z.object({
+  key: z.string().min(1),
+  speaker: z.string().min(1),
+  text: z.string(),
+})
+
+/** A part's dialog resource (RetroQuest: `tts/<act>/script.json`). Read only. */
+export const DialogSchema = z.array(LineSchema)
+
+/**
+ * One character in the project-wide cast. Unknown fields are kept, so writing the cast back
+ * never drops what another tool put there.
+ */
+export const CharacterSchema = z.looseObject({
+  voice: z.string().min(1).optional(),
+  voiceName: z.string().optional(),
+  style: z.string().optional(),
+  audition: z
+    .looseObject({
+      keywords: z.array(z.string()).optional(),
+      phrase: z.string().nullable().optional(),
+    })
+    .optional(),
+})
+
+/** The character resource: every character by name, and how words are said. */
+export const CastSchema = z.looseObject({
+  speakers: z.record(z.string(), CharacterSchema).default({}),
+  pronounce: z.record(z.string(), z.string()).default({}),
+})
+
+/** A part's delivery cues: line key → a cue that replaces the character's style for that line. */
+export const CuesSchema = z.record(z.string(), z.string())
+
+/** One clip in the game's manifest. Only what the studio needs is checked; the rest is kept. */
+export const ManifestEntrySchema = z.looseObject({
+  file: z.string().min(1),
+  speaker: z.string().optional(),
+  duration: z.number().optional(),
+})
+
+/** The game's clip manifest (RetroQuest: `web/public/audio/narration/<act>/manifest.json`). */
+export const ManifestSchema = z.record(z.string(), ManifestEntrySchema)
+
+/** What a clip was made from: its fingerprint, voice and model, and short hashes of the rest. */
+export const LockEntrySchema = z.object({
+  fp: z.string(),
+  voice: z.string(),
+  model: z.string(),
+  parts: z.object({ cue: z.string(), text: z.string(), said: z.string(), settings: z.string() }),
+  /** Share of the words Whisper heard in the kept take; absent for adopted clips. */
+  heard: z.number().min(0).max(1).optional(),
+  takes: z.number().int().min(1).optional(),
+  /** True when the clip was made before the studio, and taken as it was. */
+  adopted: z.boolean().optional(),
+  at: z.string(),
+})
+
+/** A part's lock (`narration.lock.json`): line key → what its clip was made from. */
+export const LockSchema = z.record(z.string(), LockEntrySchema)
+
+/** A voiced line of dialog. */
+export type Line = z.infer<typeof LineSchema>
+
+/** A character's entry in the cast. */
+export type Character = z.infer<typeof CharacterSchema>
+
+/** The project-wide cast. */
+export type Cast = z.infer<typeof CastSchema>
+
+/** A part's delivery cues. */
+export type Cues = z.infer<typeof CuesSchema>
+
+/** The game's clip manifest. */
+export type Manifest = z.infer<typeof ManifestSchema>
+
+/** What one clip was made from. */
+export type LockEntry = z.infer<typeof LockEntrySchema>
+
+/** A part's lock. */
+export type Lock = z.infer<typeof LockSchema>

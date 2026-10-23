@@ -1,0 +1,459 @@
+# Audio Studio — Architecture
+
+Audio Studio is a local, graphical tool for producing a game's audio. It is started from inside a
+checked-out game repository (the _consumer_), reads that repository's project file, and writes
+voice files and their metadata **in place**. Committing and pushing is left to the user.
+
+The first workspace is **Narration**: casting a voice for every character by audition, and
+recording every line of dialog with the cast voice, regenerating only what is missing or out of
+date. Music and sound effects are later workspaces on the same foundation.
+
+The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py`,
+`tts/narrate.py`) this tool replaces.
+
+---
+
+## 1. Goals and non-goals
+
+**Goals**
+
+- One command, run from the consumer repo root, opens the studio: `audio-studio`.
+- Everything the tool needs to know about the game is in one project file in the consumer repo.
+- Work on one _part_ (RetroQuest: an act) at a time.
+- A character is identified by its name across the whole project: the same name in different
+  parts is the same character with the same voice. Different voices need different names
+  (`narrator-act1`, `narrator-act2`).
+- Cast voices by audition: keyword search on Fish Audio, then rounds of listening and keeping or
+  dropping, until a single voice is left.
+- Generate narration for one character or the whole part: missing clips are recorded, clips whose
+  inputs changed are re-recorded, clips whose line left the script are removed.
+- Output stays compatible with what the game already reads (`manifest.json` with word timings).
+- Never touch git beyond reading `git status` to show what changed.
+
+**Non-goals (for now)**
+
+- Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
+  path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
+- Hosting, multi-user, or remote use. It is a localhost tool for one developer.
+- Music and sound effects (the architecture leaves room for them).
+
+---
+
+## 2. How it runs
+
+```
+retroquest/                      ← user runs `audio-studio` here
+├── audio-studio.json            ← project file (committed)
+├── .env                         ← FISH_AUDIO_API_KEY (gitignored, already exists)
+├── .audio-studio/               ← tool cache: audition clips, voice metadata (gitignored)
+├── tts/cast.json                ← character resource, shared by all parts (read + written)
+├── tts/act1/
+│   ├── script.json              ← dialog resource (read)
+│   ├── cues.json                ← per-line delivery cues (read + written)
+│   └── narration.lock.json      ← per-clip fingerprints (written, committed)
+└── web/public/audio/narration/act1/
+    ├── *.mp3                    ← clips (written)
+    └── manifest.json            ← key → file, speaker, duration, word timings (written)
+```
+
+1. `audio-studio` walks up from the current directory to find `audio-studio.json`. That directory
+   becomes the **project root**; every path in the project file is relative to it.
+2. It validates the project file and every resource it points to, then starts a Bun HTTP server on
+   `127.0.0.1` (random free port, or `--port`) and opens the browser on it.
+3. The UI talks to the server over a small JSON API, and gets live job progress over a WebSocket.
+4. Every write is checked against an allow-list: only files and folders the project file names, and
+   only inside the project root.
+
+Installed once from this repo with `bun link` (later `bun add -g`), then run in any consumer.
+
+---
+
+## 3. Technology
+
+| Concern                                     | Choice                                                           | Why                                                                                                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime, server, bundler, tests             | **Bun** (`Bun.serve` with HTML imports, `bun test`)              | One tool for everything; serves the React app with no separate build step.                                                                              |
+| UI                                          | **React 19 + TypeScript**, TanStack Query for server state       | Bun bundles JSX with no extra setup; Query handles caching and refetching.                                                                              |
+| Styling                                     | Plain CSS with design tokens (custom properties), one stylesheet | Small, no framework lock-in; dark-first theme.                                                                                                          |
+| Waveforms and playback                      | **wavesurfer.js**                                                | Waveform, seek, and region playback for the audition and line inspector.                                                                                |
+| Validation                                  | **zod**                                                          | One schema per file type gives validation, types and readable errors.                                                                                   |
+| TTS and voice library                       | **Fish Audio REST API** via a thin `fetch` client                | The calls in use are few (search, voice, TTS, credits); no SDK needed.                                                                                  |
+| Transcription (word timings, quality check) | **mlx-whisper** in a long-lived Python worker (`uv run`)         | Same model and quality bar as today; the model loads once, not once per clip. Behind an interface, so whisper.cpp can replace it on non-Apple machines. |
+| Encoding and joining                        | **ffmpeg** (subprocess)                                          | Already a dependency; MP3 64 kbps mono as today.                                                                                                        |
+
+A native window (Electrobun) can wrap the same web UI later; nothing in the design depends on it.
+
+---
+
+## 4. Module layout
+
+```
+audio-studio/
+├── bin/audio-studio.ts          CLI entry: find project, start server, open browser
+├── src/
+│   ├── core/                    pure logic, no I/O; most of the tests
+│   │   ├── project.ts           project file schema, path templates ({part})
+│   │   ├── resources.ts         schemas for script, cast, cues, manifest, lock
+│   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
+│   │   ├── fingerprint.ts       hash of everything that affects a clip
+│   │   ├── planner.ts           script × lock × disk → status per line, generation plan
+│   │   ├── align.ts             Whisper words → per-word timings, heard ratio
+│   │   └── audition.ts          audition state machine: rounds, keep/drop, finalist
+│   ├── services/                I/O behind interfaces (fakes in tests)
+│   │   ├── fish.ts              FishClient: searchVoices, getVoice, tts, credits
+│   │   ├── voiceSearch.ts       keyword search + local ranking (port of fish_tts.py search)
+│   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
+│   │   ├── audio.ts             join WAVs, encode MP3, measure duration, peaks
+│   │   ├── store.ts             read/write resources atomically, write allow-list,
+│   │   │                        stable diff-friendly JSON formatting
+│   │   ├── git.ts               `git status --porcelain` for the project's paths
+│   │   └── jobs.ts              job queue, concurrency, cancel, progress events
+│   ├── server/
+│   │   ├── index.ts             Bun.serve: routes, WebSocket, static UI
+│   │   └── api/*.ts             one file per resource (parts, characters, auditions, jobs)
+│   └── ui/                      React app
+│       ├── index.html
+│       ├── app/                 shell, routing, theme
+│       ├── features/
+│       │   ├── overview/        part dashboard, cast grid
+│       │   ├── audition/        casting rounds
+│       │   └── narration/       line table, plan, job progress, inspector
+│       └── components/          buttons, chips, waveform, player, status pills
+├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
+└── docs/
+```
+
+Rule of thumb: `core/` decides, `services/` does, `server/` exposes, `ui/` shows. `core/` has no
+imports from the others, so the rules for status, staleness and alignment are tested without
+audio, network or disk.
+
+---
+
+## 5. The project file
+
+`audio-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
+an id and a title.
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/<owner>/audio-studio/main/schema/project.json",
+  "name": "RetroQuest",
+  "description": "A retro-style text adventure played in the browser. Narrated by a warm storyteller; characters are villagers of Willowbrook.",
+  "env": ".env",
+  "narration": {
+    "partLabel": "Act",
+    "parts": [
+      { "id": "act1", "title": "Act I: The Call to Adventure" },
+      { "id": "act2", "title": "Act II" }
+    ],
+    "characters": "tts/cast.json",
+    "paths": {
+      "dialog": "tts/{part}/script.json",
+      "cues": "tts/{part}/cues.json",
+      "lock": "tts/{part}/narration.lock.json",
+      "clips": "web/public/audio/narration/{part}",
+      "manifest": "web/public/audio/narration/{part}/manifest.json"
+    },
+    "refreshDialog": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-{part}.ts",
+    "models": { "audition": "s2.1-pro-free", "draft": "s2.1-pro-free", "final": "s2.1-pro-free" },
+    "tts": { "temperature": 0.7, "topP": 0.7, "speed": 1.0 },
+    "output": { "codec": "mp3", "bitrate": "64k", "channels": 1 },
+    "quality": { "minHeard": 0.9, "takes": 3, "chunkLimit": 400, "parallel": 4 },
+    "audition": {
+      "phrase": "Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.",
+      "candidatesPerRound": 5,
+      "language": "en"
+    }
+  }
+}
+```
+
+- `refreshDialog` is optional. When set, the UI offers **Refresh dialog**, which runs it in the
+  project root and reloads the script. This is how the studio stays generic: the game owns how its
+  dialog is extracted.
+- `env` names the file holding `FISH_AUDIO_API_KEY`. The environment variable wins if set.
+- `characters` is one file for the whole project, not a per-part path (see §6).
+- `models` names the Fish model for each stage (see §8.4). For now all three must be the free model;
+  the project file is rejected with a clear message if a paid one is named.
+
+---
+
+## 6. Resources
+
+The formats are the ones RetroQuest uses today, so existing files work unchanged. The studio only
+**adds** fields; the game ignores what it doesn't know.
+
+**Dialog** (`script.json`, read only): `[{ key, speaker, text }]`. `key` is the game's stable id for
+the line (RetroQuest: a hash of speaker and words, so new wording gets a new key).
+
+**Characters** (`tts/cast.json`, read and written): one file for the whole project. A character is
+keyed by its name; every part whose dialog has a speaker of that name uses that entry, so its voice,
+style and audition keywords are the same in every part. To give a character a different voice in
+another part, the game names the speaker differently (`narrator-act2`), and it becomes a character
+of its own. The pronunciation table is project-wide too. Per-part differences in delivery go in the
+part's cues.
+
+```json
+{
+  "speakers": {
+    "grandmother": {
+      "voice": "e48a228e21a443d6a4302dc6238c8128",
+      "voiceName": "Gentle Granny",
+      "style": "[warm, gentle, a little worried]",
+      "audition": { "keywords": ["elderly female", "warm", "storyteller"], "phrase": null }
+    }
+  },
+  "pronounce": { "Act I:": "Act One:" }
+}
+```
+
+New fields: `voiceName` (shown in the UI; the id alone is unreadable) and `audition` (the keywords,
+plus an optional phrase that replaces the project's standard one). A speaker in the script with no
+entry in `cast.json` shows as **Uncast**. The UI shows, for each character, which parts it appears
+in and how many lines it has in each, because recasting it makes its lines stale in all of them.
+
+RetroQuest today has `tts/act1/cast.json`; switching over moves it to `tts/cast.json` once (only Act I
+is cast so far, so there is nothing to merge).
+
+**Cues** (`cues.json`, read and written): `{ key: cue }`, replacing a character's style for one line.
+
+**Manifest** (`manifest.json`, written): unchanged, `{ key: { file, speaker, duration, words[] } }`.
+This is what the game reads.
+
+**Lock** (`narration.lock.json`, written, committed): one entry per clip, recording what it was
+made from. Written one entry per line, keys sorted, so a re-recorded clip is a one-line diff.
+
+```json
+{
+  "0022d0ca3a78d2": {
+    "fp": "720367754eff3c80",
+    "voice": "7d80…",
+    "model": "s2.1-pro-free",
+    "parts": { "cue": "30e4588b", "text": "a05bdb9c", "said": "a05bdb9c", "settings": "4666d299" },
+    "heard": 0.96,
+    "takes": 1,
+    "at": "2026-10-23T10:14:00Z"
+  }
+}
+```
+
+`parts` are short hashes of the inputs that are not kept in the clear, so the planner can say which
+one changed. `heard` and `takes` are absent, and `adopted` is true, for clips made before the studio.
+
+The lock is a separate file so the manifest format the game depends on stays exactly as it is.
+
+**Cache** (`.audio-studio/`, gitignored): voice metadata and sample clips from Fish, audition clips,
+and audition sessions in progress. Safe to delete at any time.
+
+All JSON is written with stable key order and the same layout the file already has, through a
+temporary file and a rename, so diffs stay small and a crash never leaves a half-written file.
+
+---
+
+## 7. Staleness: the fingerprint
+
+A clip is up to date when its fingerprint matches the lock. The fingerprint is a SHA-256 of
+everything that changes the audio:
+
+```
+fp = sha256(json([
+  model,                      // the draft stage's model
+  voiceId,
+  cue,                        // the line's cue, else the character's style
+  said,                       // the line with pronunciations applied and checklist bullets read as a list
+  settings                    // temperature, topP, speed, chunkLimit, codec, bitrate, channels
+]))[:16]
+```
+
+Pronunciations go into the hash through `spokenText`, not as the whole table. Adding
+`"Elior": "El-ee-or"` therefore marks only the lines that contain "Elior" as stale, not the whole
+act.
+
+The **planner** gives every line one status:
+
+| Status      | Meaning                                                                | Action when generating              |
+| ----------- | ---------------------------------------------------------------------- | ----------------------------------- |
+| `ok`        | clip exists, fingerprint matches                                       | none                                |
+| `weak`      | up to date, but the best take was heard below `minHeard`               | offered for a retake, not automatic |
+| `stale`     | clip exists, fingerprint differs; the UI names the inputs that changed | re-record                           |
+| `missing`   | no clip, or its file is absent on disk                                 | record                              |
+| `untracked` | clip exists but has no lock entry: made before the studio              | none; offered for adoption          |
+| `uncast`    | speaker has no voice                                                   | blocked until cast                  |
+
+Clips in the manifest whose key is no longer in the dialog are listed as **orphans** (removed after
+confirmation when generating), and cues whose key is gone as **orphaned cues**.
+
+A stale line's reasons come from comparing the lock entry with today's inputs: `voice`, `model`,
+`cue`, `text`, `pronunciation` (the words as said changed but the words did not) and `settings`.
+
+**Adopting existing clips.** RetroQuest's 244 clips have no lock yet. On first open the studio
+shows them as `untracked` and offers **Adopt**: it writes the lock with today's fingerprints, treating
+what is on disk as up to date, so nothing is re-recorded just because the tool is new. Adopting is
+refused while any of the part's files has a problem, so a broken cast or lock can't be recorded as
+the truth.
+
+---
+
+## 8. Workflows
+
+### 8.1 Audition (casting a voice)
+
+```
+ keywords ──► search Fish library ──► rank ──► top N candidates
+                                                     │
+                     ┌───────────────────────────────┘
+                     ▼
+        record the audition phrase in each voice (in the character's style)
+                     │
+                     ▼
+        listen, mark Keep / Drop  ──► "Bring in more" adds N new candidates
+                     │
+                     ▼
+        next round with the kept ones … until one is left
+                     │
+                     ▼
+        Cast: write voice + voiceName to cast.json
+              → that character's clips become stale in every part
+```
+
+An audition is for a character, not for a part: it is started from any part the character appears
+in, and the result applies to all of them. Before **Cast**, the UI says how many lines go stale in
+each part.
+
+- **Search** queries Fish for the whole keyword phrase and each of its words, several pages each,
+  pools the results, keeps voices whose title, description or tags contain the keywords, and ranks
+  by match, then popularity (the search `fish_tts.py` already does, ported). Voices dropped earlier
+  in this audition, and the current voice, are left out of new candidates.
+- **Takes** use `models.audition` (for now the free model, so an audition costs nothing). Each
+  candidate card also offers Fish's own sample clip.
+- **Phrase**: the project's standard phrase, the character's own phrase, or any of their lines
+  picked from the script of any part ("hear it say something it will actually say").
+- Audition sessions are saved in `.audio-studio/auditions/<character>.json`, so a casting
+  can be paused and resumed. The cast is only changed on **Cast**.
+- **Add by id**: paste a Fish voice id or URL to bring a specific voice into the round.
+
+### 8.2 Generate narration
+
+1. The user picks a scope: the whole part, one character, a selection of lines, or the weak ones.
+2. The planner shows the plan: N to record, M to re-record (by reason), K orphans to remove, the
+   bytes of text, the cost for the model (free model: $0), and the account credit. Lines are
+   recorded with `models.draft`.
+3. **Generate** queues one job per line. For each line:
+   1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
+   2. TTS each chunk (WAV), join them with a short gap;
+   3. transcribe with Whisper, align the words to the shown text, compute the heard ratio;
+   4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
+   5. encode MP3 into the clips folder, update the manifest and lock entries, write both.
+4. Fish requests run `parallel` at a time; Whisper runs one at a time (one GPU). Progress streams to
+   the UI. A job can be cancelled; finished clips are kept, because each is written as it completes.
+5. Orphans are removed at the end, only if the user confirmed that in the plan.
+
+### 8.3 Smaller actions
+
+- Edit a character's style cue or keywords, a line's cue, or the pronunciation table: saved
+  immediately, and affected lines show as stale.
+- Retake a single line, or re-time it (re-measure word timings without new audio).
+- Refresh dialog (runs `refreshDialog`).
+- **Changes** panel: `git status` for the project's paths, so the user sees what to commit.
+
+### 8.4 Model stages and final generation
+
+There are three model stages in the project file: `audition` (candidate takes), `draft` (everyday
+generation while the script and cast still change) and `final` (the recording that ships).
+
+- **Now:** all three are the free model, and the project file may name nothing else. There is no
+  separate final step: a draft is the final recording, and the UI does not show the final step at
+  all while `draft` and `final` name the same model.
+- **Later:** with a paid `final` model, **Final generation** re-records every clip in a part whose
+  lock says it was made with another model. It is a normal plan (§8.2) with the cost in dollars and a
+  confirmation, and a clip made with the final model shows as `final` in the line table. Because the
+  model is part of the fingerprint, nothing else is needed to find these clips. A paid `audition`
+  or `draft` model works the same way, with its cost shown before each audition round or plan.
+
+---
+
+## 9. Server API (sketch)
+
+```
+GET    /api/project                              project, parts, credit
+GET    /api/parts/:part                          characters, status counts
+GET    /api/parts/:part/lines?speaker=&status=   lines with status and reason
+POST   /api/parts/:part/refresh                  run refreshDialog
+POST   /api/parts/:part/adopt                    write lock from existing clips
+PATCH  /api/parts/:part/cues/:key                line cue
+POST   /api/parts/:part/plan                     scope → plan (no side effects)
+GET    /api/characters                           all characters, with the parts and line counts of each
+PATCH  /api/characters/:id                       style, keywords, phrase
+PATCH  /api/pronounce                            pronunciation table
+GET    /api/auditions/:character                 current audition session
+POST   /api/auditions/:character/search          candidates from keywords (more=true adds N)
+POST   /api/auditions/:character/candidates      add by voice id
+POST   /api/auditions/:character/verdicts        keep/drop per candidate, next round
+POST   /api/auditions/:character/cast            write the chosen voice to cast.json
+POST   /api/jobs                                 run a plan
+DELETE /api/jobs/:id                             cancel
+GET    /api/audio/*                              serve clips and cached audition audio
+GET    /api/changes                              git status of project paths
+WS     /api/events                               job progress, file changes
+```
+
+The server also watches the resource files, so an edit made in the editor (or a `git checkout`)
+shows up in the UI without a restart.
+
+---
+
+## 10. Errors and safety
+
+- An invalid project file or resource opens the UI on an error page that names the file, the path
+  in the JSON, and what is wrong (from zod), instead of failing on the command line.
+- Missing tools (`ffmpeg`, `uv`) and a missing API key are checked at start and shown as a setup
+  checklist.
+- Writes outside the allow-list throw. Deleting clips (orphans) always needs confirmation.
+- Fish errors (rate limit, no credit, voice removed) mark the line as failed with the reason; the
+  rest of the job carries on.
+- The studio never runs `git add`, `commit` or `push`.
+
+---
+
+## 11. Testing
+
+- `core/` is covered by `bun test` unit tests: fingerprint stability, planner statuses and reasons,
+  spoken-text building, chunking, alignment (ported from `test_narrate.py`), audition state
+  transitions.
+- `services/` are tested against fakes (a fake `FishClient` and `Transcriber`), plus a few opt-in
+  live tests behind an env flag.
+- The server API is tested with an in-memory project fixture (a small consumer repo in
+  `test/fixtures/`).
+- UI: component tests for the audition and line table; one Playwright smoke test over the fixture.
+
+---
+
+## 12. Delivery plan
+
+Small, independently useful increments:
+
+1. **Skeleton**: CLI finds and validates the project, server and UI shell, parts and characters
+   shown read-only.
+2. **Status**: fingerprint, planner, lock, _Adopt existing clips_; line table with statuses. No API
+   calls yet.
+3. **Audition**: Fish client, voice search, rounds, cast written to `cast.json`.
+4. **Generate**: TTS, join, encode, manifest and lock, job runner with progress and cancel.
+5. **Quality**: Whisper worker, alignment, takes, weak lines and retakes, orphan removal.
+6. **Editing**: style, cue and pronunciation editing; Changes panel; Refresh dialog.
+7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
+   `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data
+   as one made by `narrate.py`, then retire `narrate.py` and `fish_tts.py`.
+8. **Later: paid models**: allow paid models per stage, Final generation (§8.4), costs in plans and
+   auditions.
+
+---
+
+## 13. Decisions
+
+1. **Characters are shared by name across parts.** The same name in two parts is one character
+   with one voice. Different voices need different names (`narrator-act1`, `narrator-act2`).
+   Hence one project-wide `cast.json`.
+2. **UI framework: React.**
+3. **Models: free only, for now.** The project file already has `audition`, `draft` and `final`
+   model stages, but all must be the free model. Paid models, mainly for a final generation step and
+   optionally for auditions and drafts, come later (§8.4).

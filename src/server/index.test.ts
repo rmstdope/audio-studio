@@ -1,0 +1,69 @@
+import { afterAll, describe, expect, it } from 'bun:test'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { projectJson, tempRepo } from '../../test/helpers'
+import { startServer } from './index'
+
+const root = tempRepo({
+  'audio-studio.json': projectJson(),
+  'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+  'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  'audio/act1/manifest.json': { a: { file: 'a.mp3' } },
+  'audio/act1/a.mp3': 'ID3-not-really-audio',
+})
+const server = startServer({ projectFile: join(root, 'audio-studio.json'), port: 0 })
+afterAll(() => server.stop(true))
+
+const url = (path: string) => new URL(path, server.url)
+const post = (path: string, origin: string | null = server.url.origin) =>
+  fetch(url(path), { method: 'POST', headers: origin ? { origin } : {} })
+
+describe('server', () => {
+  it('listens on localhost only', () => {
+    expect(server.hostname).toBe('127.0.0.1')
+  })
+
+  it('serves the project summary', async () => {
+    const body = await (await fetch(url('/api/project'))).json()
+    expect(body.ok).toBe(true)
+    expect(body.summary.name).toBe('Test Game')
+  })
+
+  it('serves a part with the state of its lines', async () => {
+    const body = await (await fetch(url('/api/parts/act1'))).json()
+    expect(body.part.lines[0]).toMatchObject({ key: 'a', status: 'untracked', file: 'a.mp3' })
+  })
+
+  it('answers an unknown part with 404', async () => {
+    expect((await fetch(url('/api/parts/act9'))).status).toBe(404)
+  })
+
+  it('serves a clip, and nothing outside the clips folder', async () => {
+    const clip = await fetch(url('/api/parts/act1/clips/a.mp3'))
+    expect(await clip.text()).toBe('ID3-not-really-audio')
+    expect((await fetch(url('/api/parts/act1/clips/manifest.jsonx'))).status).toBe(404)
+    expect((await fetch(url('/api/parts/act1/clips/..%2Fmanifest.json'))).status).toBe(404)
+  })
+
+  it('refuses changes from another page', async () => {
+    expect((await post('/api/parts/act1/adopt', 'https://evil.example')).status).toBe(403)
+    expect((await post('/api/parts/act1/adopt', null)).status).toBe(403)
+    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
+  })
+
+  it('adopts a part’s clips', async () => {
+    const response = await post('/api/parts/act1/adopt')
+    expect(await response.json()).toMatchObject({ ok: true, adopted: 1 })
+    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(true)
+  })
+
+  it('serves the UI', async () => {
+    expect(await (await fetch(server.url)).text()).toContain('<div id="root">')
+  })
+
+  it('answers unknown API routes with a JSON 404', async () => {
+    const response = await fetch(url('/api/nothing'))
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'not found' })
+  })
+})
