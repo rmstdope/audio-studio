@@ -83,6 +83,12 @@ const NarrationSchema = z
         // At least 100, so the built-in audition phrase always fits in one take.
         chunkLimit: z.number().int().min(MIN_CHUNK).default(400),
         parallel: z.number().int().min(1).default(4),
+        /**
+         * How takes are checked: mlx-whisper (Apple silicon, through uv), or none (one take each,
+         * word timings spread evenly).
+         */
+        transcriber: z.enum(['mlx-whisper', 'none']).default('mlx-whisper'),
+        whisperModel: z.string().min(1).default('mlx-community/whisper-large-v3-turbo'),
       })
       .prefault({}),
     audition: z

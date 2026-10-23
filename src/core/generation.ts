@@ -23,8 +23,13 @@ export interface GenerationPlan {
   /** UTF-8 bytes of text sent to Fish (cues included), which paid models charge for. */
   bytes: number
   model: string
-  /** Estimated cost in US dollars; 0 on the free model; null for a model whose price is unknown. */
+  /** Estimated cost in US dollars, for one take of each line; 0 on the free model; null for a
+   * model whose price is unknown. */
   cost: number | null
+  /** Takes a line may need at most (when a take is not heard well enough). */
+  takes: number
+  /** Whether takes are checked with Whisper. */
+  checked: boolean
 }
 
 const encoder = new TextEncoder()
@@ -39,11 +44,17 @@ export function planGeneration(
     model,
     speaker,
     sent = (line) => [line.cue ? `${line.cue} ${line.text}` : line.text],
+    takes = 1,
+    checked = false,
   }: {
     model: string
     speaker?: string
     /** The texts sent to Fish for a line (its pieces, with cue and pronunciations). */
     sent?: (line: LineState) => string[]
+    /** Takes a line may need at most. */
+    takes?: number
+    /** Whether takes are checked with Whisper. */
+    checked?: boolean
   },
 ): GenerationPlan {
   const inScope = (who: string | null) => !speaker || who === speaker
@@ -67,5 +78,7 @@ export function planGeneration(
     bytes,
     model,
     cost: price === undefined ? null : (bytes / 1_000_000) * price,
+    takes,
+    checked,
   }
 }

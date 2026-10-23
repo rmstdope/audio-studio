@@ -48,7 +48,13 @@ const encode = async (wav: Uint8Array, file: string) => {
   mkdirSync(dirname(file), { recursive: true })
   writeFileSync(file, wav)
 }
-const server = startServer({ projectFile: join(root, 'audio-studio.json'), port: 0, fish, encode })
+const server = startServer({
+  projectFile: join(root, 'audio-studio.json'),
+  port: 0,
+  fish,
+  encode,
+  transcriber: null,
+})
 afterAll(() => server.stop(true))
 
 const url = (path: string) => new URL(path, server.url)
@@ -283,7 +289,12 @@ describe('server, with problems', () => {
     'tts/cast.json': '{ broken',
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
-  const other = startServer({ projectFile: join(broken, 'audio-studio.json'), port: 0, fish: null })
+  const other = startServer({
+    projectFile: join(broken, 'audio-studio.json'),
+    port: 0,
+    fish: null,
+    transcriber: null,
+  })
   afterAll(() => other.stop(true))
 
   it('refuses to save keywords over a broken cast with 409', async () => {
@@ -315,6 +326,7 @@ describe('server, without an API key', () => {
     projectFile: join(keyless, 'audio-studio.json'),
     port: 0,
     fish: null,
+    transcriber: null,
   })
   afterAll(() => other.stop(true))
 
@@ -344,6 +356,7 @@ describe('server, generating a part', () => {
     port: 0,
     fish,
     encode,
+    transcriber: null,
   })
   afterAll(() => gen.stop(true))
   const at = (path: string) => new URL(path, gen.url)
@@ -351,7 +364,14 @@ describe('server, generating a part', () => {
 
   it('plans, runs a job to the end, and removes the agreed orphans', async () => {
     const planned = await (await fetch(at('/api/parts/act1/plan'))).json()
-    expect(planned.plan).toMatchObject({ keys: ['a', 'b'], missing: 2, orphans: ['old'], cost: 0 })
+    expect(planned.plan).toMatchObject({
+      keys: ['a', 'b'],
+      missing: 2,
+      orphans: ['old'],
+      cost: 0,
+      takes: 3,
+      checked: true,
+    })
     const started = await fetch(at('/api/parts/act1/jobs'), {
       method: 'POST',
       headers: own,
@@ -431,6 +451,7 @@ describe('server, generating only what was shown', () => {
     port: 0,
     fish,
     encode,
+    transcriber: null,
   })
   afterAll(() => shown.stop(true))
   const at = (path: string) => new URL(path, shown.url)
@@ -461,5 +482,28 @@ describe('server, generating only what was shown', () => {
     expect(part.part.lines.map((l: { status: string }) => l.status)).toEqual(['ok', 'missing'])
     expect(existsSync(join(shownRoot, 'audio/act1/seen.mp3'))).toBe(false)
     expect(existsSync(join(shownRoot, 'audio/act1/unseen.mp3'))).toBe(true)
+  })
+})
+
+describe('server, takes not checked', () => {
+  const plain = projectJson()
+  ;(plain.narration as { quality?: unknown }).quality = { transcriber: 'none' }
+  const plainRoot = tempRepo({
+    'audio-studio.json': plain,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const server = startServer({
+    projectFile: join(plainRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+
+  it('plans one unchecked take a line', async () => {
+    const answer = await (await fetch(new URL('/api/parts/act1/plan', server.url))).json()
+    expect(answer.plan).toMatchObject({ takes: 1, checked: false })
   })
 })

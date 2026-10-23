@@ -169,7 +169,12 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
       )}
       <span className="muted plan-facts">
         {p.model} · {formatBytes(p.bytes)} of text ·{' '}
-        {p.cost === null ? 'price unknown' : p.cost ? `about $${p.cost.toFixed(2)}` : 'free'} ·
+        {p.cost === null ? 'price unknown' : p.cost ? `about $${p.cost.toFixed(2)}` : 'free'} ·{' '}
+        {p.checked
+          ? `each take checked with Whisper, up to ${plural(p.takes, 'take')} a line${
+              p.cost ? ` (at most about $${(p.cost * p.takes).toFixed(2)})` : ''
+            } · `
+          : 'takes not checked · '}
         files are written in place; commit them when you are happy
       </span>
       {start.isError && <span className="adopt-error">{start.error.message}</span>}

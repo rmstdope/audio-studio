@@ -21,6 +21,7 @@ import {
   type SessionResult,
 } from '../services/sessions'
 import { fishFromEnv, type FishClient } from '../services/fish'
+import { createWhisperWorker, type Transcriber } from '../services/transcriber'
 import { adoptPart, clipFile, loadPart, loadProject, readPart } from '../services/workspace'
 import index from '../ui/index.html'
 
@@ -35,6 +36,19 @@ export interface ServerOptions {
   fish?: FishClient | null
   /** The clip encoder to use (tests); ffmpeg by default. */
   encode?: Encoder
+  /** The take checker to use (tests: null for none); by default a Whisper worker, started on use. */
+  transcriber?: Transcriber | null
+}
+
+/**
+ * The process's one Whisper worker, kept across `--dev` reloads (which rerun this module) so a
+ * reload never leaves a worker and its model behind. It starts on its first take and exits when
+ * the studio does.
+ */
+function sharedWhisper(): Transcriber {
+  const state = globalThis as { audioStudioWhisper?: Transcriber }
+  state.audioStudioWhisper ??= createWhisperWorker()
+  return state.audioStudioWhisper
 }
 
 /** A change to a character: its keywords, or its own audition phrase (null for the standard one). */
@@ -90,6 +104,7 @@ export function startServer({
   development = false,
   fish,
   encode,
+  transcriber,
 }: ServerOptions) {
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
@@ -110,6 +125,11 @@ export function startServer({
   /** Generation jobs, one per part at a time. */
   const jobs = createJobs()
 
+  /** The take checker: the one given (tests), else the process's one Whisper worker. */
+  async function transcriberFor(): Promise<Transcriber | null> {
+    return transcriber !== undefined ? transcriber : sharedWhisper()
+  }
+
   /** What generating a part (or one speaker in it) would do, or why it can't be planned. */
   async function planFor(part: string, speaker?: string) {
     const read = await readPart(projectFile, part)
@@ -123,6 +143,8 @@ export function startServer({
       speaker,
       // What is sent: each piece of a line with its cue and the cast's pronunciations.
       sent: (line) => spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
+      takes: narration.quality.transcriber === 'none' ? 1 : narration.quality.takes,
+      checked: narration.quality.transcriber !== 'none',
     })
     return { ok: true as const, plan, parallel: narration.quality.parallel }
   }
@@ -175,6 +197,7 @@ export function startServer({
           const result = await recordLine(projectFile, part, key, fishFor, {
             encode,
             limiter: fishWork,
+            transcriber: await transcriberFor(),
           })
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -211,11 +234,12 @@ export function startServer({
             keys,
             orphans,
             parallel,
-            record: (key) =>
+            record: async (key) =>
               recordLine(projectFile, part, key, fishFor, {
                 encode,
                 limiter: fishWork,
                 onlyIfNeeded: true,
+                transcriber: await transcriberFor(),
               }),
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys),
           })
