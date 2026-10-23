@@ -364,7 +364,14 @@ describe('server, generating a part', () => {
 
   it('plans, runs a job to the end, and removes the agreed orphans', async () => {
     const planned = await (await fetch(at('/api/parts/act1/plan'))).json()
-    expect(planned.plan).toMatchObject({ keys: ['a', 'b'], missing: 2, orphans: ['old'], cost: 0 })
+    expect(planned.plan).toMatchObject({
+      keys: ['a', 'b'],
+      missing: 2,
+      orphans: ['old'],
+      cost: 0,
+      takes: 3,
+      checked: true,
+    })
     const started = await fetch(at('/api/parts/act1/jobs'), {
       method: 'POST',
       headers: own,
@@ -475,5 +482,28 @@ describe('server, generating only what was shown', () => {
     expect(part.part.lines.map((l: { status: string }) => l.status)).toEqual(['ok', 'missing'])
     expect(existsSync(join(shownRoot, 'audio/act1/seen.mp3'))).toBe(false)
     expect(existsSync(join(shownRoot, 'audio/act1/unseen.mp3'))).toBe(true)
+  })
+})
+
+describe('server, takes not checked', () => {
+  const plain = projectJson()
+  ;(plain.narration as { quality?: unknown }).quality = { transcriber: 'none' }
+  const plainRoot = tempRepo({
+    'audio-studio.json': plain,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const server = startServer({
+    projectFile: join(plainRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+
+  it('plans one unchecked take a line', async () => {
+    const answer = await (await fetch(new URL('/api/parts/act1/plan', server.url))).json()
+    expect(answer.plan).toMatchObject({ takes: 1, checked: false })
   })
 })

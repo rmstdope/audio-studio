@@ -433,3 +433,35 @@ describe('recordLine, checked with Whisper', () => {
     expect(transcriber.calls).toBe(0)
   })
 })
+
+describe('recordLine, a later take failing', () => {
+  it('keeps the best take so far when a later one cannot be made', async () => {
+    const root = tempRepo(files)
+    let calls = 0
+    const flaky: FishClient = {
+      ...fakeFish().fish,
+      async tts() {
+        if (calls++ > 0) throw new Error('busy')
+        return silence(1)
+      },
+    }
+    const heard: Transcriber = {
+      async transcribe() {
+        return [{ start: 0, end: 0.95, words: [{ word: 'wakes', start: 0.3, end: 0.55 }] }]
+      },
+      close() {},
+    }
+    const result = await recordLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'k1',
+      async () => flaky,
+      {
+        encode: keepWav,
+        limiter: createLimiter(),
+        transcriber: heard,
+      },
+    )
+    expect(result).toMatchObject({ ok: true, heard: 0.333, takes: 1 })
+  })
+})

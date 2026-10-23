@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { alignWords, heardWords, saidWords, type HeardSegment, type TimedWord } from '../core/align'
+import {
+  alignWords,
+  heardWords,
+  pyRound,
+  saidWords,
+  type HeardSegment,
+  type TimedWord,
+} from '../core/align'
 import { clipInputs, fingerprint } from '../core/fingerprint'
 import { planPart } from '../core/planner'
 import { resolveInRoot } from '../core/paths'
@@ -64,7 +71,7 @@ interface Take {
 /**
  * Records one line: its text in sentence-sized pieces, each spoken by Fish in the speaker's voice
  * with its cue (the draft model), joined with a short pause, encoded as the project's output; then
- * the clip's manifest entry (with the words spread over it until clips are transcribed) and its
+ * the clip's manifest entry (with Whisper's word timings, or spread evenly when takes are not checked) and its
  * lock entry are written. Nothing is written unless the clip was made and the manifest and lock
  * could be read; the clip, then the manifest, then the lock are written last of all, so a failure
  * part-way leaves the line stale or untracked, never passing as up to date. At most
@@ -181,23 +188,29 @@ export async function recordLine(
     let takes = 0
     for (let take = 1; take <= (checker ? narration.quality.takes : 1); take++) {
       const made = await makeTake(take)
-      if (!made.ok) return made.failure
-      takes = take
+      // A later take that cannot be made keeps the best one already paid for.
+      if (!made.ok) {
+        if (best) break
+        return made.failure
+      }
       const { clip } = made
-      let timed = alignWords(tokens, [], clip.seconds).timed
-      let heard: number | null = null
-      if (checker) {
+      let attempt: Take
+      if (!checker) {
+        attempt = { clip, timed: alignWords(tokens, [], clip.seconds).timed, heard: null }
+      } else {
         try {
-          const segments = await transcribeWav(checker, clip.wav)
+          const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav)
           const aligned = alignWords(tokens, heardWords(segments, clip.seconds), clip.seconds, said)
-          timed = aligned.timed
-          heard = aligned.ratio
+          // Rounded as the lock keeps it, so the line's status agrees with this decision.
+          attempt = { clip, timed: aligned.timed, heard: pyRound(aligned.ratio) }
         } catch (error) {
+          if (best) break
           return { ok: false, reason: 'transcribe', message: messageOf(error) }
         }
       }
-      if (!best || (heard ?? 0) > (best.heard ?? 0)) best = { clip, timed, heard }
-      if (heard === null || heard >= narration.quality.minHeard) break
+      takes = take
+      if (!best || (attempt.heard ?? 0) > (best.heard ?? 0)) best = attempt
+      if (attempt.heard === null || attempt.heard >= narration.quality.minHeard) break
     }
     if (!best) return null
     const { clip } = best
@@ -215,7 +228,7 @@ export async function recordLine(
       return { ok: false, reason: 'encode', message: messageOf(error) }
     }
 
-    const duration = Math.round(clip.seconds * 1000) / 1000
+    const duration = pyRound(clip.seconds)
     const { fp, parts } = fingerprint(inputs)
     try {
       const problems = await inPartTurn(projectFile, partId, async () => {
@@ -236,7 +249,7 @@ export async function recordLine(
           model: inputs.model,
           parts,
           takes,
-          ...(best.heard === null ? {} : { heard: roundRatio(best.heard) }),
+          ...(best.heard === null ? {} : { heard: best.heard }),
           at: new Date().toISOString(),
         }
         // The lock last: if anything fails before it, the line shows as stale (its old lock entry)
@@ -249,7 +262,7 @@ export async function recordLine(
       if (problems.length) return { ok: false, problems }
       return best.heard === null
         ? { ok: true, key, duration }
-        : { ok: true, key, duration, heard: roundRatio(best.heard), takes }
+        : { ok: true, key, duration, heard: best.heard, takes }
     } catch (error) {
       return { ok: false, reason: 'write', message: messageOf(error) }
     } finally {
@@ -284,19 +297,18 @@ function sorted<T>(record: Record<string, T>): Record<string, T> {
 }
 
 /** What Whisper heard in a WAV: written to a temporary file outside the game, then removed. */
-async function transcribeWav(transcriber: Transcriber, wav: Uint8Array): Promise<HeardSegment[]> {
+async function transcribeWav(
+  transcriber: Transcriber,
+  model: string,
+  wav: Uint8Array,
+): Promise<HeardSegment[]> {
   const file = join(tmpdir(), `audio-studio-take-${randomUUID()}.wav`)
   await writeFile(file, wav)
   try {
-    return await transcriber.transcribe(file)
+    return await transcriber.transcribe(model, file)
   } finally {
     await rm(file, { force: true }).catch(() => {})
   }
-}
-
-/** A share of words heard, to three decimals, as kept in the lock. */
-function roundRatio(ratio: number): number {
-  return Math.round(ratio * 1000) / 1000
 }
 
 function messageOf(error: unknown): string {

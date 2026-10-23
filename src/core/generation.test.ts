@@ -71,3 +71,15 @@ describe('planGeneration, cost', () => {
     expect(plan.bytes).toBe(expected)
   })
 })
+
+describe('planGeneration, takes', () => {
+  it('says whether takes are checked, and how many a line may need', () => {
+    expect(
+      planGeneration(state, { model: 's2.1-pro-free', takes: 3, checked: true }),
+    ).toMatchObject({ takes: 3, checked: true })
+    expect(planGeneration(state, { model: 's2.1-pro-free' })).toMatchObject({
+      takes: 1,
+      checked: false,
+    })
+  })
+})

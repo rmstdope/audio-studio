@@ -103,15 +103,16 @@ audio-studio/
 │   │   ├── summary.ts           parts and characters as the UI shows them
 │   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
 │   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
-│   │   ├── align.ts             Whisper words → per-word timings, heard ratio (later)
-│   │   └── audition.ts          audition state machine: rounds, keep/drop, finalist (later)
+│   │   ├── align.ts             Whisper words → per-word timings, heard ratio (narrate.py's)
+│   │   ├── audition.ts          audition state machine: rounds, keep/drop, finalist
+│   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
 │   │   ├── fish.ts              FishClient (listVoices, getVoice; later tts, credits)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates for a character; changes to the cast, one at a time
-│   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker (later)
-│   │   ├── audio.ts             join WAVs, encode MP3, measure duration, peaks (later)
+│   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
+│   │   ├── audio.ts             encode MP3 with ffmpeg
 │   │   ├── files.ts             read resources, write atomically, lock formatting
 │   │   ├── workspace.ts         find the project, load it and its parts, adopt clips
 │   │   ├── git.ts               `git status --porcelain` for the project's paths

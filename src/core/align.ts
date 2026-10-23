@@ -21,10 +21,10 @@ export interface HeardSegment {
   words?: HeardWord[]
 }
 
-const NUMBERS: Record<string, string> = Object.fromEntries(
+const NUMBERS = new Map(
   'zero one two three four five six seven eight nine ten eleven twelve'
     .split(' ')
-    .map((word, n) => [word, String(n)]),
+    .map((word, n): [string, string] => [word, String(n)]),
 )
 
 /** A word without case or punctuation (narrate.py `_plain`). */
@@ -35,7 +35,7 @@ function plain(word: string): string {
 /** A word for comparison: plain, small numbers as digits, since Whisper writes "1" (`_norm`). */
 function norm(word: string): string {
   const p = plain(word)
-  return NUMBERS[p] ?? p
+  return NUMBERS.get(p) ?? p
 }
 
 /** A matching block: `[a, b, size]`, as Python's `SequenceMatcher.get_matching_blocks`. */
@@ -161,7 +161,7 @@ export function alignWords(
     const [rawStart, rawEnd] = times[k]!
     const start = Math.min(Math.max(rawStart, last), duration)
     const end = Math.min(Math.max(rawEnd, start), duration)
-    timed.push({ word, start: round(start), end: round(end) })
+    timed.push({ word, start: pyRound(start), end: pyRound(end) })
     last = start
   })
   return { timed, ratio: tokens.length ? matched / tokens.length : 1 }
@@ -203,7 +203,7 @@ export function spreadWords(text: string, duration: number): TimedWord[] {
  * rounded to the nearest, and an exact tie (only possible for a few dyadic values) to the even
  * millisecond. `toFixed` rounds the exact value too, but sends ties up.
  */
-function round(seconds: number): number {
+export function pyRound(seconds: number): number {
   const below = Math.floor(seconds * 1000)
   const twice = 2 * below + 1
   if (twice % 125 === 0 && twice / 2000 === seconds) {

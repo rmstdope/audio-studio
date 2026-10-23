@@ -3,6 +3,7 @@ import {
   alignWords,
   heardWords,
   matchingBlocks,
+  pyRound,
   saidWords,
   spreadWords,
   type HeardWord,
@@ -133,5 +134,19 @@ describe('matchingBlocks (Python’s difflib, autojunk off)', () => {
       [4, 0, 2],
       [6, 2, 0],
     ])
+  })
+})
+
+describe('pyRound (Python’s round(x, 3))', () => {
+  it('rounds exact ties to even, the rest by their exact value', () => {
+    expect([0.0625, 0.1875, 0.3125, 2.0625, 0.6625, 1.0005].map(pyRound)).toEqual([
+      0.062, 0.188, 0.312, 2.062, 0.662, 1.0,
+    ])
+  })
+
+  it('treats "constructor" as a word, not an object property', () => {
+    expect(alignWords(['constructor'], [{ word: 'constructor', start: 0, end: 1 }], 1).ratio).toBe(
+      1,
+    )
   })
 })

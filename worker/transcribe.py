@@ -11,10 +11,14 @@ stderr, so stdout carries only answers. Same Whisper as RetroQuest's narrate.py.
 """
 
 import json
+import os
 import sys
 
-answers = sys.stdout
-sys.stdout = sys.stderr  # keep library output off the answer channel
+# Answers go to a copy of the real stdout; file descriptor 1 itself now points at stderr, so
+# nothing the libraries print, Python or native, can get mixed into the answers.
+answers = os.fdopen(os.dup(1), "w")
+os.dup2(2, 1)
+sys.stdout = sys.stderr
 
 import mlx_whisper  # noqa: E402  (after the redirect)
 

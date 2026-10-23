@@ -26,8 +26,10 @@ export interface GenerationPlan {
   /** Estimated cost in US dollars, for one take of each line; 0 on the free model; null for a
    * model whose price is unknown. */
   cost: number | null
-  /** Takes a line may need at most (when a take is not heard well enough); 1 when unchecked. */
+  /** Takes a line may need at most (when a take is not heard well enough). */
   takes: number
+  /** Whether takes are checked with Whisper. */
+  checked: boolean
 }
 
 const encoder = new TextEncoder()
@@ -43,6 +45,7 @@ export function planGeneration(
     speaker,
     sent = (line) => [line.cue ? `${line.cue} ${line.text}` : line.text],
     takes = 1,
+    checked = false,
   }: {
     model: string
     speaker?: string
@@ -50,6 +53,8 @@ export function planGeneration(
     sent?: (line: LineState) => string[]
     /** Takes a line may need at most. */
     takes?: number
+    /** Whether takes are checked with Whisper. */
+    checked?: boolean
   },
 ): GenerationPlan {
   const inScope = (who: string | null) => !speaker || who === speaker
@@ -74,5 +79,6 @@ export function planGeneration(
     model,
     cost: price === undefined ? null : (bytes / 1_000_000) * price,
     takes,
+    checked,
   }
 }
