@@ -101,6 +101,16 @@ describe('summarize, pronunciations', () => {
   })
 })
 
+describe('summarize, refreshing', () => {
+  it('says whether the project can refresh its dialog', () => {
+    expect(summarize(input()).canRefresh).toBe(false)
+    const withCommand = ProjectSchema.parse(
+      projectJson({ narration: { ...(projectJson().narration as object), refreshDialog: 'make' } }),
+    )
+    expect(summarize(input({ project: withCommand })).canRefresh).toBe(true)
+  })
+})
+
 describe('displayName', () => {
   it('upper-cases the first letter only', () => {
     expect(displayName('narrator-act2')).toBe('Narrator-act2')
