@@ -8,14 +8,14 @@ See [docs/architecture.md](docs/architecture.md) for the design.
 
 ## Status
 
-Steps 1, 2, 3.1 and 3.2 of the delivery plan (`docs/architecture.md` §12): the studio validates
-the project, shows each part's characters and the state of every line's clip, adopts clips
-recorded before it, searches Fish Audio's library for voices for a character by keywords, and
-records each candidate saying the audition phrase in the character's style. Rounds, casting and
-generation come next.
+Steps 1 to 3 of the delivery plan (`docs/architecture.md` §12): the studio validates the project,
+shows each part's characters and the state of every line's clip, adopts clips recorded before it,
+and casts voices by audition: it searches Fish Audio's library by keywords, records each candidate
+saying the audition phrase in the character's style, and runs keep/drop rounds until one voice is
+left, which it writes to the cast. Generating narration comes next.
 
-Audition takes are cached in `.audio-studio/` in the game repository; add it to that repository's
-`.gitignore`.
+Audition takes and sessions are kept in `.audio-studio/` in the game repository; add it to that
+repository's `.gitignore`.
 
 ## Install
 

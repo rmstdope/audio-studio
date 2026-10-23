@@ -171,6 +171,45 @@ describe('server', () => {
     expect(audition).toMatchObject({ ok: true, takes: { w1: body.key } })
   })
 
+  it('runs an audition: start, verdicts, next round and cast', async () => {
+    const post = (path: string, body?: unknown) =>
+      fetch(url(path), {
+        method: 'POST',
+        headers: { origin: server.url.origin, 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+    expect(await (await fetch(url('/api/auditions/narrator'))).json()).toEqual({
+      ok: true,
+      session: null,
+      audition: null,
+      takes: {},
+    })
+    const started = await (await post('/api/auditions/narrator/start')).json()
+    expect(started.session.pool).toEqual(['w1'])
+    expect(started.audition.spoken).toContain('Once upon a time.')
+    expect(
+      (await post('/api/auditions/narrator/verdict', { voice: 'w1', verdict: 'maybe' })).status,
+    ).toBe(400)
+    const kept = await (
+      await post('/api/auditions/narrator/verdict', { voice: 'w1', verdict: 'keep' })
+    ).json()
+    expect(kept.session.verdicts).toEqual({ w1: 'keep' })
+    expect((await post('/api/auditions/narrator/next')).status).toBe(200)
+    const cast = await (await post('/api/auditions/narrator/cast')).json()
+    expect(cast).toMatchObject({ ok: true, voice: { id: 'w1', name: 'Warm' }, changed: true })
+    const saved = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(saved.speakers.narrator).toMatchObject({ voice: 'w1', voiceName: 'Warm' })
+    expect((await post('/api/auditions/narrator/cast')).status).toBe(409)
+  })
+
+  it('refuses audition changes from another page', async () => {
+    const response = await fetch(url('/api/auditions/narrator/start'), {
+      method: 'POST',
+      headers: { origin: 'https://evil.example' },
+    })
+    expect(response.status).toBe(403)
+  })
+
   it('serves the UI', async () => {
     expect(await (await fetch(server.url)).text()).toContain('<div id="root">')
   })

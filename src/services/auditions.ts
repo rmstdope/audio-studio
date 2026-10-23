@@ -9,6 +9,7 @@ import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
 import { auditionFor, castProblems, phrasePath, recordedTakes } from './takes'
+import { createSerial } from './serial'
 import { searchVoices } from './voiceSearch'
 import { loadWorkspace, type ProjectFailure } from './workspace'
 
@@ -158,12 +159,25 @@ function withAudition(
   )
 }
 
+/** Casts a voice for a character: its id and name in the cast; style and the rest stay as they are. */
+export function setVoice(
+  projectFile: string,
+  characterId: string,
+  voice: { id: string; name: string },
+): Promise<CharacterChange> {
+  return updateCharacter(projectFile, characterId, (entry) => ({
+    ...entry,
+    voice: voice.id,
+    voiceName: voice.name,
+  }))
+}
+
 /**
  * Writes in progress per project (one server serves one project, with one cast file), so changes
  * made at once are applied one after the other. Every cast writer must go through
  * `updateCharacter`.
  */
-const castWrites = new Map<string, Promise<unknown>>()
+const castWrites = createSerial()
 
 /**
  * Changes one character's entry in the cast and writes the cast back, in its own layout, leaving
@@ -176,13 +190,7 @@ function updateCharacter(
   characterId: string,
   change: (entry: Character) => Character,
 ): Promise<CharacterChange> {
-  const key = projectFile
-  const previous = castWrites.get(key) ?? Promise.resolve()
-  const next = previous.catch(() => {}).then(() => writeCharacter(projectFile, characterId, change))
-  castWrites.set(key, next)
-  return next.finally(() => {
-    if (castWrites.get(key) === next) castWrites.delete(key)
-  })
+  return castWrites.run(projectFile, () => writeCharacter(projectFile, characterId, change))
 }
 
 /** Pronunciation keys JavaScript would move to the front, changing the order they apply in. */

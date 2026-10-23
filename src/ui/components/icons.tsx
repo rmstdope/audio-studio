@@ -122,3 +122,12 @@ export function HeadphonesIcon() {
     </Stroke>
   )
 }
+
+/** Drop, remove. */
+export function CrossIcon() {
+  return (
+    <Stroke size={14}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </Stroke>
+  )
+}

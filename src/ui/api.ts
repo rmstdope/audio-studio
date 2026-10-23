@@ -1,12 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
+import type { CastResult, SessionView } from '../services/sessions'
 import type { AuditionTakesResult, TakeResult } from '../services/takes'
+import type { AuditionText } from '../core/takes'
 import { withAuditionTakes, withTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult } from '../services/workspace'
 
 /** A successful candidates answer. */
 type Found = Extract<NonNullable<CandidatesResult>, { ok: true }>
+
+/** A session view with a phrase to record takes of. */
+type Viewed = Extract<SessionView, { ok: true }> & { audition: AuditionText }
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path)
@@ -150,6 +155,9 @@ export function useTakes(characterId: string) {
           client.setQueryData<NonNullable<CandidatesResult>>(['candidates', characterId], (old) =>
             old?.ok ? withTake<Found>(old, voice, result) : old,
           )
+          client.setQueryData<SessionView>(['session', characterId], (old) =>
+            old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,
+          )
         } else {
           const message = 'message' in result ? result.message : 'the project’s files need fixing'
           setErrors((now) => ({ ...now, [voice]: message }))
@@ -171,6 +179,74 @@ export function useTakes(characterId: string) {
   )
 
   return { record, recording, errors }
+}
+
+/** A character's audition in progress, with the phrase and the takes of the voices in it. */
+export function useSession(characterId: string) {
+  return useQuery({
+    queryKey: ['session', characterId],
+    queryFn: () => getJson<SessionView>(`/api/auditions/${encodeURIComponent(characterId)}`),
+  })
+}
+
+/** What a session action sends: the path after the session's (`start`, `verdict`, …), and a body. */
+export interface SessionAction {
+  action: 'start' | 'verdict' | 'next' | 'more' | 'add' | 'discard'
+  body?: unknown
+}
+
+/**
+ * Changes a character's audition (start, verdicts, next round, more voices, add by id, discard)
+ * and shows the answer. Actions run one after another, in the order asked.
+ */
+export function useSessionAction(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `session-${characterId}` },
+    mutationFn: async ({ action, body }: SessionAction) => {
+      const base = `/api/auditions/${encodeURIComponent(characterId)}`
+      const response = await fetch(action === 'discard' ? base : `${base}/${action}`, {
+        method: action === 'discard' ? 'DELETE' : 'POST',
+        headers: body === undefined ? {} : { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`the audition answered ${response.status}`)
+      }
+      return (await response.json()) as SessionView
+    },
+    onSuccess: (view) => {
+      if (view.ok) client.setQueryData(['session', characterId], view)
+    },
+  })
+}
+
+/**
+ * Casts the one voice left in a character's audition. Afterwards the project, its parts (whose
+ * lines are now stale) and the character's candidates are loaded again.
+ */
+export function useCast(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `session-${characterId}` },
+    mutationFn: async () => {
+      const response = await fetch(`/api/auditions/${encodeURIComponent(characterId)}/cast`, {
+        method: 'POST',
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`casting answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CastResult>
+    },
+    onSuccess: (result) => {
+      if (!result.ok) return
+      const ended: SessionView = { ok: true, session: null, audition: null, takes: {} }
+      client.setQueryData<SessionView>(['session', characterId], () => ended)
+      void client.invalidateQueries({ queryKey: ['project'] })
+      void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
+    },
+  })
 }
 
 /** The URL of a recorded audition take. */
