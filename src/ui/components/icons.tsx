@@ -67,6 +67,18 @@ export function PeopleIcon() {
   )
 }
 
+/** Uncommitted changes: a branch with a change on it. */
+export function ChangesIcon() {
+  return (
+    <Stroke>
+      <circle cx="6" cy="5" r="2.5" />
+      <circle cx="6" cy="19" r="2.5" />
+      <circle cx="18" cy="12" r="2.5" />
+      <path d="M6 7.5v9M8.3 6.2c4.4 1 7.1 2.9 7.6 3.9" />
+    </Stroke>
+  )
+}
+
 /** Play a clip. */
 export function PlayIcon({ size = 14 }: { size?: number }) {
   return (

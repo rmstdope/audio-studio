@@ -25,6 +25,11 @@ describe('parseRoute', () => {
     expect(parseRoute('#/characters')).toEqual({ view: 'characters' })
   })
 
+  it('reads the changes view, and writes it back', () => {
+    expect(parseRoute('#/changes')).toEqual({ view: 'changes' })
+    expect(routeHref({ view: 'changes' })).toBe('#/changes')
+  })
+
   it('falls back to the default part', () => {
     expect(parseRoute('')).toEqual({ view: 'part', part: null })
     expect(parseRoute('#/nonsense')).toEqual({ view: 'part', part: null })

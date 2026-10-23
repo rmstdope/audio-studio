@@ -99,6 +99,7 @@ audio-studio/
 │   │   ├── resources.ts         schemas for script, cast, cues, manifest, lock
 │   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
 │   │   ├── pronounce.ts         the pronunciation table's rules (cleaning, problems)
+│   │   ├── changes.ts           git status output parsed and grouped by part
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
 │   │   ├── planner.ts           script × lock × disk → status per line, generation plan
 │   │   ├── summary.ts           parts and characters as the UI shows them
@@ -384,7 +385,8 @@ each part.
 - Retake a single line (built: Record, or Retake for a weak one). Re-timing one line, or clips
   already measured, waits until it is needed: measuring covers clips never checked (§8.2).
 - Refresh dialog (runs `refreshDialog`).
-- **Changes** panel: `git status` for the project's paths, so the user sees what to commit.
+- **Changes** panel (built): `git status` for the project's paths, so the user sees what to
+  commit.
 
 ### 8.4 Model stages and final generation
 
@@ -525,7 +527,10 @@ Small, independently useful increments:
       Nothing is trimmed (spaces anchor an entry: `"Al "`), an empty said form leaves the words
       out (as narrate.py does); each written form once, no `__proto__`, and no number-like key
       among others. The table is shown in the order the studio applies it.
-   3. **Changes panel**: `git status` for the project's paths.
+   3. **Changes panel** (built): `git status` for the project's own files only (the project file,
+      the cast, each part's dialog, cues, lock, manifest and clips), grouped by part with clips
+      counted; read again every few seconds, and counted in the sidebar. Only reads, without
+      optional locks (`GIT_OPTIONAL_LOCKS=0`), so it never touches the index either.
    4. **Refresh dialog**: run `refreshDialog`, and show the orphaned cues it leaves.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data

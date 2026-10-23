@@ -2,6 +2,7 @@ import { useProject } from './api'
 import { Problems } from './components/Problems'
 import { Sidebar } from './components/Sidebar'
 import { AuditionView } from './features/audition/AuditionView'
+import { ChangesView } from './features/changes/ChangesView'
 import { CharactersView } from './features/characters/CharactersView'
 import { LinesView } from './features/lines/LinesView'
 import { PartOverview } from './features/overview/PartOverview'
@@ -64,7 +65,9 @@ export function App() {
         {summary.problems.length > 0 && (
           <Problems title="Some files could not be read" problems={summary.problems} />
         )}
-        {route.view === 'characters' ? (
+        {route.view === 'changes' ? (
+          <ChangesView summary={summary} />
+        ) : route.view === 'characters' ? (
           <CharactersView summary={summary} />
         ) : route.view === 'audition' ? (
           <AuditionView key={route.character} summary={summary} characterId={route.character} />

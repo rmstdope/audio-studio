@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react'
 
-/** Where the UI is: a part's overview or its lines, every character, or one character's audition. */
+/**
+ * Where the UI is: a part's overview or its lines, every character, one character's audition, or
+ * the project's uncommitted changes.
+ */
 export type Route =
   | { view: 'part'; part: string | null }
   | { view: 'lines'; part: string }
   | { view: 'characters' }
+  | { view: 'changes' }
   | { view: 'audition'; character: string }
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines`, `#/characters`,
- * `#/characters/mira/audition`; anything else is the default part.
+ * `#/characters/mira/audition`, `#/changes`; anything else is the default part.
  */
 export function parseRoute(hash: string): Route {
   const [, first, second, third] = hash.replace(/^#/, '').split('/')
+  if (first === 'changes') return { view: 'changes' }
   if (first === 'characters') {
     return second && third === 'audition'
       ? { view: 'audition', character: decodeURIComponent(second) }
@@ -28,6 +33,7 @@ export function parseRoute(hash: string): Route {
 /** The hash for a route. */
 export function routeHref(route: Route): string {
   if (route.view === 'characters') return '#/characters'
+  if (route.view === 'changes') return '#/changes'
   if (route.view === 'audition')
     return `#/characters/${encodeURIComponent(route.character)}/audition`
   const part = encodeURIComponent(route.part ?? '')

@@ -180,6 +180,11 @@ describe('server', () => {
     expect(cast.speakers.narrator.style).toBe('[grave]')
   })
 
+  it('says what git sees of the project, here no repository', async () => {
+    const body = await (await fetch(url('/api/changes'))).json()
+    expect(body).toMatchObject({ ok: false, reason: 'no-git' })
+  })
+
   it('saves the pronunciation table, from the studio’s own page only', async () => {
     const patch = (body: unknown, origin = server.url.origin) =>
       fetch(url('/api/pronounce'), {

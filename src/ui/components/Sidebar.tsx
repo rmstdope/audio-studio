@@ -1,6 +1,7 @@
 import type { ProjectSummary } from '../../core/summary'
+import { useChanges } from '../api'
 import { routeHref, type Route } from '../route'
-import { MicIcon, MusicIcon, PeopleIcon, SpeakerIcon, WaveIcon } from './icons'
+import { MicIcon, MusicIcon, PeopleIcon, SpeakerIcon, WaveIcon, ChangesIcon } from './icons'
 import { longTitle, plural } from '../format'
 
 /** The studio's navigation: project, workspaces, the parts, and the project-wide characters. */
@@ -13,6 +14,7 @@ export function Sidebar({
   route: Route
   activePart: string | null
 }) {
+  const changes = useChanges()
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -84,6 +86,14 @@ export function Sidebar({
         >
           <PeopleIcon /> <span className="grow">All characters</span>
           <span className="meta">{summary.characters.length}</span>
+        </a>
+        <a
+          className="nav-item"
+          href={routeHref({ view: 'changes' })}
+          aria-current={route.view === 'changes' ? 'page' : undefined}
+        >
+          <ChangesIcon /> <span className="grow">Changes</span>
+          {changes.data?.ok && <span className="meta">{changes.data.groups.total}</span>}
         </a>
       </nav>
     </aside>
