@@ -414,7 +414,9 @@ POST   /api/auditions/:character/verdicts        keep/drop per candidate, next r
 POST   /api/auditions/:character/cast            write the chosen voice to cast.json
 POST   /api/jobs                                 run a plan
 DELETE /api/jobs/:id                             cancel
-GET    /api/auditions/:character/takes/:file     cached audition audio
+GET    /api/characters/:id/audition?voices=   the audition phrase and which voices have takes
+POST   /api/characters/:id/takes             record a take (own page only)
+GET    /api/takes/:key.mp3                   a recorded take
 GET    /api/changes                              git status of project paths
 WS     /api/events                               job progress, file changes
 ```

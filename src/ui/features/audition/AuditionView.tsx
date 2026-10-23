@@ -138,7 +138,7 @@ export function AuditionView({
                   {takes.recording.size
                     ? `Recording ${takes.recording.size}…`
                     : toRecord.length
-                      ? `Record takes for the top ${plural(toRecord.length, 'voice')}`
+                      ? `Record ${plural(toRecord.length, 'missing take')}`
                       : 'Top voices recorded'}
                 </button>
               )}
@@ -147,6 +147,8 @@ export function AuditionView({
               <p className="panel muted">Searching Fish Audio’s library…</p>
             ) : candidates.isError ? (
               <p className="panel muted">Could not search: {candidates.error.message}</p>
+            ) : result && !result.ok && 'problems' in result && !('file' in result) ? (
+              <Problems title="The cast could not be read" problems={result.problems} />
             ) : !result || !result.ok ? (
               <div className="empty-state">
                 <strong>

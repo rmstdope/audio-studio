@@ -81,6 +81,14 @@ describe('findCandidates', () => {
     expect(result.takes).toEqual({ w1: recorded.key })
   })
 
+  it('reports a broken cast instead of guessing the phrase', async () => {
+    const root = tempRepo({ ...files, 'tts/cast.json': '{ broken' })
+    const result = await findCandidates(join(root, 'audio-studio.json'), 'tilda', async () => fish)
+    expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
+      'tts/cast.json',
+    )
+  })
+
   it('finds nothing for a character without keywords', async () => {
     const root = tempRepo(files)
     const result = await findCandidates(join(root, 'audio-studio.json'), 'tilda', async () => fish)
@@ -144,6 +152,29 @@ describe('setPhrase', () => {
     await setPhrase(projectFile, 'grandmother', '   ')
     cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.grandmother.audition).toEqual({ keywords: ['warm'] })
+  })
+})
+
+describe('clearing audition fields', () => {
+  it('leaves no empty audition entry behind', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { grandmother: { voice: 'cur' } }, pronounce: {} },
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    await setPhrase(projectFile, 'grandmother', null)
+    await setKeywords(projectFile, 'grandmother', ['warm'])
+    await setKeywords(projectFile, 'grandmother', [])
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother).toEqual({ voice: 'cur' })
+  })
+
+  it('refuses a phrase too long for one take', async () => {
+    const root = tempRepo(files)
+    const result = await setPhrase(join(root, 'audio-studio.json'), 'grandmother', 'x'.repeat(401))
+    expect(result && !result.ok && 'problems' in result && result.problems[0]!.message).toContain(
+      '400',
+    )
   })
 })
 

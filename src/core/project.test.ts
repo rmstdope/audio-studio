@@ -41,6 +41,21 @@ describe('ProjectSchema', () => {
     ])
   })
 
+  it('refuses a standard audition phrase too long for one take', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    const found = problems({
+      ...base,
+      narration: { ...narration, audition: { phrase: 'x'.repeat(401) } },
+    })
+    expect(found.map((p) => [p.path, p.message])).toEqual([
+      [
+        'narration.audition.phrase',
+        'is 401 characters; a take is one piece of at most 400 (quality.chunkLimit)',
+      ],
+    ])
+  })
+
   it('requires {part} in part paths', () => {
     const base = projectJson()
     const narration = base.narration as { paths: Record<string, string> }

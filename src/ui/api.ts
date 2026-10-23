@@ -1,8 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
-import type { TakeResult } from '../services/takes'
+import type { AuditionTakesResult, TakeResult } from '../services/takes'
+import { withTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult } from '../services/workspace'
+
+/** A successful candidates answer. */
+type Found = Extract<NonNullable<CandidatesResult>, { ok: true }>
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path)
@@ -99,7 +103,21 @@ export function useSetPhrase(characterId: string) {
       }
       return (await response.json()) as NonNullable<CharacterChange>
     },
-    onSuccess: () => client.invalidateQueries({ queryKey: ['candidates', characterId] }),
+    // Refresh the phrase and takes shown, without searching Fish's library again.
+    onSuccess: async () => {
+      const key = ['candidates', characterId]
+      const shown = client.getQueryData<NonNullable<CandidatesResult>>(key)
+      if (!shown?.ok) return client.invalidateQueries({ queryKey: key })
+      const voices = [shown.current?.id, ...shown.candidates.map((c) => c.voice.id)]
+      const query = encodeURIComponent(voices.filter(Boolean).join(','))
+      const fresh = await getJson<NonNullable<AuditionTakesResult>>(
+        `/api/characters/${encodeURIComponent(characterId)}/audition?voices=${query}`,
+      ).catch(() => null)
+      if (!fresh?.ok) return client.invalidateQueries({ queryKey: key })
+      client.setQueryData<NonNullable<CandidatesResult>>(key, (old) =>
+        old?.ok ? { ...old, audition: fresh.audition, takes: fresh.takes } : old,
+      )
+    },
   })
 }
 
@@ -129,7 +147,7 @@ export function useTakes(characterId: string) {
         const result = (await response.json()) as NonNullable<TakeResult>
         if (result.ok) {
           client.setQueryData<NonNullable<CandidatesResult>>(['candidates', characterId], (old) =>
-            old?.ok ? { ...old, takes: { ...old.takes, [voice]: result.key } } : old,
+            old?.ok ? withTake<Found>(old, voice, result) : old,
           )
         } else {
           const message = 'message' in result ? result.message : 'the project’s files need fixing'

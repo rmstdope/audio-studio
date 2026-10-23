@@ -63,10 +63,17 @@ export async function loadProject(projectFile: string): Promise<LoadResult> {
   return loaded.ok ? { ok: true, summary: loaded.summary } : loaded
 }
 
-/** The parsed project file and the summary of the project, for the server's own use. */
-export async function loadWorkspace(
-  projectFile: string,
-): Promise<{ ok: true; project: Project; summary: ProjectSummary } | ProjectFailure> {
+/** The parsed project file, the cast and the summary of the project, for the server's own use. */
+export async function loadWorkspace(projectFile: string): Promise<
+  | {
+      ok: true
+      project: Project
+      /** The cast; null when it is broken (the summary's problems say why). */
+      cast: Cast | null
+      summary: ProjectSummary
+    }
+  | ProjectFailure
+> {
   const root = dirname(projectFile)
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -78,7 +85,12 @@ export async function loadWorkspace(
   for (const part of project.narration.parts) {
     dialogs[part.id] = await readDialog(root, project, part, problems)
   }
-  return { ok: true, project, summary: summarize({ project, root, dialogs, cast, problems }) }
+  return {
+    ok: true,
+    project,
+    cast,
+    summary: summarize({ project, root, dialogs, cast, problems }),
+  }
 }
 
 /** One part with the state of every clip in it. */
@@ -223,8 +235,11 @@ function usable<T>(read: T | 'missing' | 'invalid'): T | null {
   return read === 'missing' || read === 'invalid' ? null : read
 }
 
+/** The project's cast: empty if there is none yet, null (with the problem added) if it is broken. */
 async function readCast(root: string, project: Project, problems: Problem[]): Promise<Cast | null> {
-  return usable(await readResource(root, project.narration.characters, CastSchema, problems))
+  const read = await readResource(root, project.narration.characters, CastSchema, problems)
+  if (read === 'invalid') return null
+  return read === 'missing' ? { speakers: {}, pronounce: {} } : read
 }
 
 async function readDialog(

@@ -29,59 +29,71 @@ const PartSchema = z.object({
   title: z.string().min(1),
 })
 
-const NarrationSchema = z.object({
-  partLabel: z.string().min(1).default('Part'),
-  parts: z
-    .array(PartSchema)
-    .min(1)
-    .refine((parts) => new Set(parts.map((part) => part.id)).size === parts.length, {
-      error: 'part ids must be unique',
+const NarrationSchema = z
+  .object({
+    partLabel: z.string().min(1).default('Part'),
+    parts: z
+      .array(PartSchema)
+      .min(1)
+      .refine((parts) => new Set(parts.map((part) => part.id)).size === parts.length, {
+        error: 'part ids must be unique',
+      }),
+    characters: z.string().min(1),
+    paths: z.object({
+      dialog: partPath,
+      cues: partPath,
+      lock: partPath,
+      clips: partPath,
+      manifest: partPath,
     }),
-  characters: z.string().min(1),
-  paths: z.object({
-    dialog: partPath,
-    cues: partPath,
-    lock: partPath,
-    clips: partPath,
-    manifest: partPath,
-  }),
-  refreshDialog: z.string().optional(),
-  models: z.object({ audition: freeModel, draft: freeModel, final: freeModel }).prefault({}),
-  tts: z
-    .object({
-      temperature: z.number().min(0).max(1).default(0.7),
-      topP: z.number().min(0).max(1).default(0.7),
-      speed: z.number().positive().default(1),
-    })
-    .prefault({}),
-  output: z
-    .object({
-      codec: z.literal('mp3').default('mp3'),
-      bitrate: z.string().default('64k'),
-      channels: z.union([z.literal(1), z.literal(2)]).default(1),
-    })
-    .prefault({}),
-  quality: z
-    .object({
-      minHeard: z.number().min(0).max(1).default(0.9),
-      takes: z.number().int().min(1).default(3),
-      chunkLimit: z.number().int().min(50).default(400),
-      parallel: z.number().int().min(1).default(4),
-    })
-    .prefault({}),
-  audition: z
-    .object({
-      phrase: z
-        .string()
-        .min(1)
-        .default(
-          'Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.',
-        ),
-      candidatesPerRound: z.number().int().min(1).default(5),
-      language: z.string().default('en'),
-    })
-    .prefault({}),
-})
+    refreshDialog: z.string().optional(),
+    models: z.object({ audition: freeModel, draft: freeModel, final: freeModel }).prefault({}),
+    tts: z
+      .object({
+        temperature: z.number().min(0).max(1).default(0.7),
+        topP: z.number().min(0).max(1).default(0.7),
+        speed: z.number().positive().default(1),
+      })
+      .prefault({}),
+    output: z
+      .object({
+        codec: z.literal('mp3').default('mp3'),
+        bitrate: z.string().default('64k'),
+        channels: z.union([z.literal(1), z.literal(2)]).default(1),
+      })
+      .prefault({}),
+    quality: z
+      .object({
+        minHeard: z.number().min(0).max(1).default(0.9),
+        takes: z.number().int().min(1).default(3),
+        chunkLimit: z.number().int().min(50).default(400),
+        parallel: z.number().int().min(1).default(4),
+      })
+      .prefault({}),
+    audition: z
+      .object({
+        phrase: z
+          .string()
+          .min(1)
+          .default(
+            'Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.',
+          ),
+        candidatesPerRound: z.number().int().min(1).default(5),
+        language: z.string().default('en'),
+      })
+      .prefault({}),
+  })
+  .superRefine((narration, context) => {
+    const { phrase } = narration.audition
+    const limit = narration.quality.chunkLimit
+    if ([...phrase].length > limit) {
+      context.addIssue({
+        code: 'custom',
+        path: ['audition', 'phrase'],
+        message: `is ${[...phrase].length} characters; a take is one piece of at most ${limit} (quality.chunkLimit)`,
+      })
+    }
+  })
 
 /** The project file, `audio-studio.json`, in the consumer repository's root. */
 export const ProjectSchema = z.object({

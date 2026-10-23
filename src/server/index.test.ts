@@ -164,6 +164,11 @@ describe('server', () => {
     const take = await fetch(url(`/api/takes/${body.key}.mp3`))
     expect([...new Uint8Array(await take.arrayBuffer())]).toEqual([0x49, 0x44, 0x33])
     expect((await fetch(url('/api/takes/nope.mp3'))).status).toBe(404)
+    expect((await fetch(url(`/api/takes/${body.key}`))).status).toBe(404)
+    const audition = await (
+      await fetch(url('/api/characters/narrator/audition?voices=w1,other'))
+    ).json()
+    expect(audition).toMatchObject({ ok: true, takes: { w1: body.key } })
   })
 
   it('serves the UI', async () => {
@@ -206,7 +211,29 @@ describe('server, with problems', () => {
     expect(readFileSync(join(broken, 'tts/cast.json'), 'utf8')).toBe('{ broken')
   })
 
-  it('says there is no API key when there is none', async () => {
+  it('reports the broken cast when asked for candidates', async () => {
+    const body = await (
+      await fetch(new URL('/api/characters/narrator/candidates', other.url))
+    ).json()
+    expect(body.ok).toBe(false)
+    expect(body.problems[0].file).toBe('tts/cast.json')
+  })
+})
+
+describe('server, without an API key', () => {
+  const keyless = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const other = startServer({
+    projectFile: join(keyless, 'audio-studio.json'),
+    port: 0,
+    fish: null,
+  })
+  afterAll(() => other.stop(true))
+
+  it('says there is no API key', async () => {
     const body = await (
       await fetch(new URL('/api/characters/narrator/candidates', other.url))
     ).json()

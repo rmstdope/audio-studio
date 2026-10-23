@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { findCandidates, setKeywords, setPhrase, type FishFactory } from '../services/auditions'
 import { createLimiter } from '../services/limit'
-import { recordTake, takeFile } from '../services/takes'
+import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { fishFromEnv, type FishClient } from '../services/fish'
 import { adoptPart, clipFile, loadPart, loadProject } from '../services/workspace'
 import index from '../ui/index.html'
@@ -127,10 +127,20 @@ export function startServer({ projectFile, port, development = false, fish }: Se
           return Response.json(result, { status: 'problems' in result ? 409 : 200 })
         }),
       },
+      '/api/characters/:id/audition': {
+        GET: guard(async (request) => {
+          const voices = (new URL(request.url).searchParams.get('voices') ?? '')
+            .split(',')
+            .filter((voice) => /^[\w-]{1,64}$/.test(voice))
+            .slice(0, 50)
+          const result = await auditionTakes(projectFile, request.params.id, voices)
+          return result ? Response.json(result) : notFound()
+        }),
+      },
       '/api/takes/:file': {
         GET: guard(async (request) => {
-          const key = request.params.file.replace(/\.mp3$/, '')
-          const file = await takeFile(projectFile, key)
+          const key = /^([0-9a-f]{16})\.mp3$/.exec(request.params.file)?.[1]
+          const file = key ? await takeFile(projectFile, key) : null
           return file ? new Response(Bun.file(file)) : notFound()
         }),
       },

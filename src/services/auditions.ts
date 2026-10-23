@@ -8,9 +8,9 @@ import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
-import { auditionFor, readCast, recordedTakes } from './takes'
+import { auditionFor, recordedTakes } from './takes'
 import { searchVoices } from './voiceSearch'
-import { loadWorkspace, type ProjectFailure } from './workspace'
+import { loadWorkspace, openProject, type ProjectFailure } from './workspace'
 
 /** How many candidates an audition search returns at most. */
 export const CANDIDATE_LIMIT = 24
@@ -36,6 +36,7 @@ export type CandidatesResult =
       perRound: number
     }
   | { ok: false; reason: 'no-key' | 'fish'; message: string }
+  | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
 
@@ -47,9 +48,11 @@ export async function findCandidates(
 ): Promise<CandidatesResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
-  const { project, summary } = loaded
+  const { project, summary, cast } = loaded
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
+  // Without the cast the phrase, style and pronunciations are unknown: say so, don't guess.
+  if (!cast) return { ok: false, problems: summary.problems }
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) {
     return {
@@ -72,7 +75,6 @@ export async function findCandidates(
       : []
     const candidates = found.slice(0, CANDIDATE_LIMIT)
     const root = dirname(projectFile)
-    const cast = (await readCast(root, project, [])) ?? { speakers: {}, pronounce: {} }
     const audition = auditionFor(cast, characterId, project)
     const voices = [...(current ? [current.id] : []), ...candidates.map((c) => c.voice.id)]
     return {
@@ -112,23 +114,50 @@ export function setKeywords(
   const cleaned = keywords
     .map((k) => k.trim())
     .filter((k) => hasWords(k) && !seen.has(k.toLowerCase()) && seen.add(k.toLowerCase()))
-  return updateCharacter(projectFile, characterId, (entry) => ({
-    ...entry,
-    audition: { ...entry.audition, keywords: cleaned },
-  }))
+  return updateCharacter(projectFile, characterId, (entry) =>
+    withAudition(entry, { keywords: cleaned.length ? cleaned : undefined }),
+  )
 }
 
 /** Saves a character's own audition phrase in the cast; an empty phrase goes back to the standard one. */
-export function setPhrase(
+export async function setPhrase(
   projectFile: string,
   characterId: string,
   phrase: string | null,
 ): Promise<CharacterChange> {
-  const own = phrase?.trim()
-  return updateCharacter(projectFile, characterId, (entry) => {
-    const { phrase: _old, ...audition } = entry.audition ?? {}
-    return { ...entry, audition: own ? { ...audition, phrase: own } : audition }
-  })
+  const own = phrase?.trim() || undefined
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return opened
+  const limit = opened.project.narration.quality.chunkLimit
+  if (own && [...own].length > limit) {
+    const file = opened.project.narration.characters
+    const message = `the phrase is ${[...own].length} characters; a take is one piece of at most ${limit}`
+    return {
+      ok: false,
+      problems: [{ file, path: `speakers.${characterId}.audition.phrase`, message }],
+    }
+  }
+  return updateCharacter(projectFile, characterId, (entry) => withAudition(entry, { phrase: own }))
+}
+
+/**
+ * A character entry with audition fields changed; a field set to undefined is removed, and an
+ * audition left empty is removed too, so clearing a field leaves no trace in the cast.
+ */
+function withAudition(
+  entry: Character,
+  changes: { keywords?: string[]; phrase?: string },
+): Character {
+  const audition: Record<string, unknown> = { ...entry.audition, ...changes }
+  for (const key of Object.keys(audition)) if (audition[key] === undefined) delete audition[key]
+  const keep = Object.keys(audition).length > 0
+  if (!('audition' in entry)) return keep ? { ...entry, audition } : entry
+  // Keep the entry's own order: the audition stays where it was.
+  return Object.fromEntries(
+    Object.entries(entry).flatMap(([key, value]) =>
+      key !== 'audition' ? [[key, value]] : keep ? [[key, audition]] : [],
+    ),
+  )
 }
 
 /**

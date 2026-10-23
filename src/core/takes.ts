@@ -31,8 +31,22 @@ export interface TakeInputs {
   tts: Project['narration']['tts']
 }
 
+/**
+ * What the Fish client sends that is not in `TakeInputs` (format, latency, volume). Change it
+ * when the client changes them, so cached takes made the old way are not served as new.
+ */
+const TAKE_FORMAT = 'mp3/normal/volume0'
+
 /** A take's cache key: a short hash of everything that changes its audio. */
 export function takeKey({ model, voice, spoken, tts }: TakeInputs): string {
-  const value = JSON.stringify([model, voice, spoken, tts.temperature, tts.topP, tts.speed])
+  const value = JSON.stringify([
+    TAKE_FORMAT,
+    model,
+    voice,
+    spoken,
+    tts.temperature,
+    tts.topP,
+    tts.speed,
+  ])
   return createHash('sha256').update(value).digest('hex').slice(0, 16)
 }

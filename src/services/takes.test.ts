@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
-import { recordTake, takeFile } from './takes'
+import { auditionTakes, recordTake, takeFile } from './takes'
 
 const files = {
   'audio-studio.json': projectJson(),
@@ -75,6 +75,50 @@ describe('recordTake', () => {
     expect(a?.ok && b?.ok && a.key === b.key).toBe(true)
   })
 
+  it('records a take once even when a slower request started first', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const projectFile = join(root, 'audio-studio.json')
+    const limiter = createLimiter()
+    const slow = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40))
+      return fish
+    }
+    await Promise.all([
+      recordTake(projectFile, 'grandmother', 'v9', slow, limiter),
+      recordTake(projectFile, 'grandmother', 'v9', async () => fish, limiter),
+    ])
+    expect(requests).toHaveLength(1)
+  })
+
+  it('says which phrase the take is of', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const result = await recordTake(
+      join(root, 'audio-studio.json'),
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(result).toMatchObject({ ok: true, spoken: '[warm] El-ee-or, dear.' })
+  })
+
+  it('refuses empty audio from Fish, and keeps nothing', async () => {
+    const root = tempRepo(files)
+    const empty: FishClient = { ...fakeFish().fish, tts: async () => new Uint8Array() }
+    const projectFile = join(root, 'audio-studio.json')
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => empty,
+      createLimiter(),
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'fish' })
+    expect(existsSync(join(root, '.audio-studio/takes'))).toBe(false)
+  })
+
   it('says so when there is no API key, or Fish fails', async () => {
     const root = tempRepo(files)
     const projectFile = join(root, 'audio-studio.json')
@@ -119,5 +163,22 @@ describe('takeFile', () => {
     expect(await takeFile(projectFile, '0123456789abcdef')).not.toBeNull()
     expect(await takeFile(projectFile, 'fedcba9876543210')).toBeNull()
     expect(await takeFile(projectFile, '../audio-studio')).toBeNull()
+  })
+})
+
+describe('recordedTakes', () => {
+  it('finds the takes recorded for the phrase, the current voice included', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const projectFile = join(root, 'audio-studio.json')
+    const take = await recordTake(
+      projectFile,
+      'grandmother',
+      'cur',
+      async () => fish,
+      createLimiter(),
+    )
+    const result = await auditionTakes(projectFile, 'grandmother', ['cur', 'other'])
+    expect(take?.ok && result?.ok && result.takes).toEqual({ cur: take?.ok ? take.key : '' })
   })
 })
