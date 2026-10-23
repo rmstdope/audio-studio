@@ -180,6 +180,23 @@ describe('server', () => {
     expect(cast.speakers.narrator.style).toBe('[grave]')
   })
 
+  it('refreshes a part’s dialog from the studio’s own page only, here with no command', async () => {
+    const refresh = (origin: string) =>
+      fetch(url('/api/parts/act1/refresh'), { method: 'POST', headers: { origin } })
+    expect((await refresh('https://evil.example')).status).toBe(403)
+    const answer = await refresh(server.url.origin)
+    expect(answer.status).toBe(409)
+    expect(await answer.json()).toMatchObject({ ok: false, reason: 'none' })
+    expect(
+      (
+        await fetch(url('/api/parts/act9/refresh'), {
+          method: 'POST',
+          headers: { origin: server.url.origin },
+        })
+      ).status,
+    ).toBe(404)
+  })
+
   it('says what git sees of the project, here no repository', async () => {
     const body = await (await fetch(url('/api/changes'))).json()
     expect(body).toMatchObject({ ok: false, reason: 'no-git' })

@@ -100,6 +100,7 @@ audio-studio/
 │   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
 │   │   ├── pronounce.ts         the pronunciation table's rules (cleaning, problems)
 │   │   ├── changes.ts           git status output parsed and grouped by part
+│   │   ├── dialogDiff.ts        what a refreshed dialog added, removed and changed
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
 │   │   ├── planner.ts           script × lock × disk → status per line, generation plan
 │   │   ├── summary.ts           parts and characters as the UI shows them
@@ -384,7 +385,7 @@ each part.
   saved at once, and affected lines show as stale.
 - Retake a single line (built: Record, or Retake for a weak one). Re-timing one line, or clips
   already measured, waits until it is needed: measuring covers clips never checked (§8.2).
-- Refresh dialog (runs `refreshDialog`).
+- Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
 
@@ -532,7 +533,13 @@ Small, independently useful increments:
       counted, merge conflicts marked; read again every few seconds, and counted in the sidebar.
       Only reads, without optional locks (`GIT_OPTIONAL_LOCKS=0`), so it never touches the index
       either, and without `GIT_DIR` and the like from the environment.
-   4. **Refresh dialog**: run `refreshDialog`, and show the orphaned cues it leaves.
+   4. **Refresh dialog**, in two pull requests:
+      1. **Run it** (built): **Refresh dialog** on a part's overview runs the project's command
+         with `sh` in the project root (`{part}` replaced; part ids are safe in a shell), one at a
+         time per part, at most 10 minutes; then the dialog is read again and the lines added,
+         removed and changed are shown, or the command's output when it fails.
+      2. **Orphaned cues**: show the cues it leaves without a line, and move each to its line's
+         new key or remove it.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data
    as one made by `narrate.py`, then retire `narrate.py` and `fish_tts.py`.

@@ -15,6 +15,7 @@ import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
+import { refreshDialog } from '../services/refresh'
 import { measureLine, recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { nextRound, setVerdict } from '../core/audition'
@@ -318,6 +319,13 @@ export function startServer({
           }
           const { id } = request.params
           const result = await changeCharacter(id, body.data)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/refresh': {
+        POST: fromOwnPage(async (request) => {
+          const result = await refreshDialog(projectFile, request.params.part)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

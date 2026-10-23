@@ -8,6 +8,7 @@ import {
 import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
+import type { RefreshResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
@@ -224,6 +225,34 @@ export function useSetPronunciations() {
       }
       // The panel shows the saved table once the project has it.
       await client.invalidateQueries({ queryKey: ['project'] })
+    },
+  })
+}
+
+/**
+ * Runs the project's refreshDialog command for a part. Afterwards everything read from the dialog
+ * is loaded again: the project, the part, its plans, and what git sees.
+ */
+export function useRefreshDialog(partId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `refresh-${partId}` },
+    mutationFn: async () => {
+      const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/refresh`, {
+        method: 'POST',
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`refreshing answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<RefreshResult>
+    },
+    onSettled: async () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['changes'] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['part', partId] }),
+      ])
     },
   })
 }

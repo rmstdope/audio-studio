@@ -1,7 +1,8 @@
 import type { LineStatus } from '../../../core/planner'
 import type { PartSummary, ProjectSummary } from '../../../core/summary'
 import type { PartDetail } from '../../../services/workspace'
-import { useAdopt, usePart } from '../../api'
+import { useAdopt, usePart, useRefreshDialog } from '../../api'
+import type { RefreshResult } from '../../../services/refresh'
 import { CharacterCard } from '../../components/CharacterCard'
 import { AlertIcon, ListIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
@@ -16,6 +17,7 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
   const detail = usePart(part.id, hasDialog)
   const loaded = detail.data?.ok ? detail.data.part : null
   const toRecord = loaded ? loaded.counts.missing + loaded.counts.stale : 0
+  const refresh = useRefreshDialog(part.id)
 
   return (
     <>
@@ -27,11 +29,24 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
             {part.dialogPath}
           </span>
         </div>
-        {hasDialog && (
+        {(hasDialog || summary.canRefresh) && (
           <div className="header-actions">
-            <a className="btn" href={routeHref({ view: 'lines', part: part.id })}>
-              <ListIcon /> All {part.lineCount} lines
-            </a>
+            {summary.canRefresh && (
+              <button
+                className="btn"
+                type="button"
+                disabled={refresh.isPending}
+                title="Runs the project’s refreshDialog command to extract this dialog from the game"
+                onClick={() => refresh.mutate()}
+              >
+                {refresh.isPending ? 'Refreshing dialog…' : 'Refresh dialog'}
+              </button>
+            )}
+            {hasDialog && (
+              <a className="btn" href={routeHref({ view: 'lines', part: part.id })}>
+                <ListIcon /> All {part.lineCount} lines
+              </a>
+            )}
             {toRecord > 0 && (
               <a className="btn btn-primary" href={routeHref({ view: 'lines', part: part.id })}>
                 Generate {plural(toRecord, 'line')}
@@ -40,6 +55,13 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
           </div>
         )}
       </header>
+      {(refresh.data || refresh.isError) && (
+        <RefreshOutcome
+          result={refresh.data ?? null}
+          error={refresh.error?.message ?? null}
+          onClose={() => refresh.reset()}
+        />
+      )}
 
       {!hasDialog ? (
         <NoDialog summary={summary} part={part} />
@@ -209,12 +231,76 @@ function NoDialog({ summary, part }: { summary: ProjectSummary; part: PartSummar
         {part.dialog === 'missing' ? (
           <>
             There is no <span className="mono">{part.dialogPath}</span> yet. Extract the{' '}
-            {summary.partLabel.toLowerCase()}’s dialog from the game to start.
+            {summary.partLabel.toLowerCase()}’s dialog from the game to start
+            {summary.canRefresh ? ': Refresh dialog does it.' : '.'}
           </>
         ) : (
           'See the problems above for what is wrong with it.'
         )}
       </span>
     </div>
+  )
+}
+
+/** What the last Refresh dialog did: the lines added, removed and changed, or why it failed. */
+function RefreshOutcome({
+  result,
+  error,
+  onClose,
+}: {
+  result: NonNullable<RefreshResult> | null
+  error: string | null
+  onClose: () => void
+}) {
+  const close = (
+    <button className="btn" type="button" onClick={onClose}>
+      Close
+    </button>
+  )
+  if (result?.ok) {
+    const { added, removed, changed } = result.diff
+    const parts = [
+      added.length && `${added.length} added`,
+      removed.length && `${removed.length} removed`,
+      changed.length && `${changed.length} changed`,
+    ].filter(Boolean)
+    return (
+      <section className="panel refresh-outcome" aria-label="Refresh dialog">
+        <div className="refresh-head">
+          <div>
+            <span className="label">Dialog refreshed</span>
+            <strong>
+              {plural(result.lines, 'line')} · {parts.length ? parts.join(' · ') : 'no changes'}
+            </strong>
+          </div>
+          {close}
+        </div>
+        {removed.length > 0 && (
+          <span className="muted">
+            A reworded line gets a new key, so it shows as one removed and one added. Its old clip
+            is an orphan now, and its old cue too.
+          </span>
+        )}
+      </section>
+    )
+  }
+  const message =
+    error ?? (result && 'message' in result ? result.message : 'The dialog could not be refreshed.')
+  return (
+    <section className="panel refresh-outcome" aria-label="Refresh dialog">
+      <div className="refresh-head">
+        <div>
+          <span className="label">Refresh dialog failed</span>
+          <strong>{message}</strong>
+        </div>
+        {close}
+      </div>
+      {result && 'problems' in result && (
+        <Problems title="The new dialog cannot be used" problems={result.problems} />
+      )}
+      {result && 'output' in result && result.output && (
+        <pre className="refresh-output mono">{result.output}</pre>
+      )}
+    </section>
   )
 }
