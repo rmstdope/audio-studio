@@ -190,7 +190,7 @@ describe('server', () => {
     const table = { table: [['Eldoria', 'El-door-ia']], was: [] }
     expect((await patch(table, 'https://evil.example')).status).toBe(403)
     expect((await patch({ table: 'Eldoria' })).status).toBe(400)
-    expect((await patch({ table: [['Eldoria', '']], was: [] })).status).toBe(409)
+    expect((await patch({ table: [['', 'El-door-ia']], was: [] })).status).toBe(409)
     expect((await patch(table)).status).toBe(200)
     const project = await (await fetch(url('/api/project'))).json()
     expect(project.summary.pronounce).toEqual([['Eldoria', 'El-door-ia']])

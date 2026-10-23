@@ -521,8 +521,10 @@ Small, independently useful increments:
       move it). Affected lines show as stale. Orphaned cues (their line's key changed with its
       wording) are shown and re-keyed with Refresh dialog (6.4).
    2. **Pronunciations** (built): the table edited on All characters as a whole (add, change,
-      reorder, remove) and saved at once, refused if the file changed since the page showed it;
-      each written form once, with how it is said, and no number-like key among others.
+      reorder, remove) and saved at once, refused if the file changed since editing began.
+      Nothing is trimmed (spaces anchor an entry: `"Al "`), an empty said form leaves the words
+      out (as narrate.py does); each written form once, no `__proto__`, and no number-like key
+      among others. The table is shown in the order the studio applies it.
    3. **Changes panel**: `git status` for the project's paths.
    4. **Refresh dialog**: run `refreshDialog`, and show the orphaned cues it leaves.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to

@@ -203,10 +203,12 @@ export function useSetPronunciations() {
       return (await response.json()) as NonNullable<CharacterChange>
     },
     onSuccess: async (saved) => {
-      if (!saved.ok) return
-      void client.invalidateQueries({ queryKey: ['part'] })
-      void client.invalidateQueries({ queryKey: ['plan'] })
-      void client.invalidateQueries({ queryKey: ['candidates'] })
+      // Refused or not, the page shows the file's table again: a refusal may mean it changed.
+      if (saved.ok) {
+        void client.invalidateQueries({ queryKey: ['part'] })
+        void client.invalidateQueries({ queryKey: ['plan'] })
+        void client.invalidateQueries({ queryKey: ['candidates'] })
+      }
       // The panel shows the saved table once the project has it.
       await client.invalidateQueries({ queryKey: ['project'] })
     },

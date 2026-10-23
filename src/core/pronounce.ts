@@ -4,23 +4,25 @@ export type Pronunciation = [written: string, said: string]
 /** Keys JavaScript would move to the front of an object, changing the order they apply in. */
 export const INTEGER_LIKE = /^(0|[1-9]\d*)$/
 
-/** A table as typed: both sides trimmed, rows left empty dropped. */
+/**
+ * A table as typed, with rows left empty dropped. Nothing is trimmed: entries are matched as plain
+ * text, so spaces are what anchor one to whole words (`"Al "` is not in "Alice").
+ */
 export function cleanPronunciations(table: Pronunciation[]): Pronunciation[] {
-  return table
-    .map(([written, said]): Pronunciation => [written.trim(), said.trim()])
-    .filter(([written, said]) => written || said)
+  return table.filter(([written, said]) => written || said)
 }
 
 /**
- * Why a pronunciation table cannot be saved, or null: every entry needs the words it replaces
- * and how they are said, each written form once, and no number-like written form among others
- * (JavaScript would apply it first, where the file lists it later).
+ * Why a pronunciation table cannot be saved, or null: every entry needs the words it replaces (an
+ * empty said form leaves them out, as narrate.py does), each written form once, no
+ * `__proto__` (JavaScript cannot keep it as a key), and no number-like written form among
+ * others (JavaScript would apply it first, where the file lists it later).
  */
 export function pronounceProblem(table: Pronunciation[]): string | null {
   const seen = new Set<string>()
   for (const [written, said] of table) {
     if (!written) return `a pronunciation of “${said}” needs the words it replaces`
-    if (!said) return `“${written}” needs how it is said`
+    if (written === '__proto__') return '“__proto__” cannot be a pronunciation in JavaScript'
     if (seen.has(written)) return `“${written}” twice in the table`
     seen.add(written)
   }
@@ -31,6 +33,16 @@ export function pronounceProblem(table: Pronunciation[]): string | null {
       'JavaScript puts number keys first. Make it longer, e.g. “Act 10” or “10 ”.'
     )
   }
+  return null
+}
+
+/** A note on spaces at either end of a written or said form, which are easy to miss. */
+export function spaceNote(text: string): string | null {
+  const starts = text.startsWith(' ')
+  const ends = text.endsWith(' ')
+  if (starts && ends) return 'starts and ends with a space'
+  if (starts) return 'starts with a space'
+  if (ends) return 'ends with a space'
   return null
 }
 

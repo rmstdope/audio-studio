@@ -225,8 +225,8 @@ export function setVoice(
 
 /**
  * Writes in progress per project (one server serves one project, with one cast file), so changes
- * made at once are applied one after the other. Every cast writer must go through
- * `updateCharacter`.
+ * made at once are applied one after the other. Every cast write goes through it, by way of
+ * `writeCast`.
  */
 const castWrites = createSerial()
 
@@ -252,7 +252,19 @@ async function writeCharacter(
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
   if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
-  return writeCast(projectFile, (cast) => {
+  return writeCast(projectFile, (cast, parsed, path) => {
+    // A number-like pronunciation among others: parsing has already lost the file's order, so
+    // writing would change the order they apply in. The table itself can be fixed on its own.
+    const keys = Object.keys(parsed.pronounce)
+    const reordered = keys.filter((k) => INTEGER_LIKE.test(k))
+    if (reordered.length && keys.length > 1) {
+      const message =
+        `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move to the ` +
+        'top if the studio wrote this file, changing the order pronunciations apply in. Make ' +
+        'the key longer under Pronunciations on All characters, e.g. "Act 10" or "10 " (any key ' +
+        'that is not a plain number keeps its place).'
+      return [{ file: path, path: 'pronounce', message }]
+    }
     const speakers = { ...cast.speakers }
     speakers[characterId] = change(speakers[characterId] ?? {})
     return { ...cast, speakers }
@@ -265,15 +277,11 @@ type RawCast = Record<string, unknown> & { speakers?: Record<string, Character> 
 /**
  * Changes the cast as it is in the file (not as parsed with defaults, so nothing else changes)
  * and writes it back in its own layout. `change` gets the raw cast, the parsed one and the cast's
- * path, and gives
- * the new cast or the problems that stop it. Unless `ownTable`, a cast whose pronunciation order
- * the write would change is refused: with a number-like key among others, parsing has already
- * lost the file's order.
+ * path, and gives the new cast or the problems that stop it.
  */
 async function writeCast(
   projectFile: string,
   change: (raw: RawCast, parsed: Cast, path: string) => RawCast | Problem[],
-  { ownTable = false }: { ownTable?: boolean } = {},
 ): Promise<CharacterChange> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -287,25 +295,6 @@ async function writeCast(
   const raw = json.status === 'missing' ? { speakers: {}, pronounce: {} } : json.value
   const parsed = CastSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, problems: problemsFrom(path, parsed.error) }
-  const keys = Object.keys(parsed.data.pronounce)
-  const reordered = keys.filter((k) => INTEGER_LIKE.test(k))
-  if (!ownTable && reordered.length && keys.length > 1) {
-    return {
-      ok: false,
-      problems: [
-        {
-          file: path,
-          path: 'pronounce',
-          message:
-            `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move to the ` +
-            'top if the studio wrote this file, changing the order pronunciations apply in. ' +
-            'Make the key longer, e.g. "Act 10" or "10 " (any key that is not a plain number ' +
-            'keeps its place), or edit the file by hand.',
-        },
-      ],
-    }
-  }
-
   const changed = change(raw as RawCast, parsed.data, path)
   if (Array.isArray(changed)) return { ok: false, problems: changed }
   await writeAtomic(root, path, formatCast(changed))
@@ -313,9 +302,10 @@ async function writeCast(
 }
 
 /**
- * Saves the pronunciation table, in the order given (trimmed, empty rows dropped). `was` is the
- * table the page showed: if the file's differs, someone changed it meanwhile, and nothing is
- * written. Every line whose words as said change shows as stale.
+ * Saves the pronunciation table, in the order given (empty rows dropped, spaces kept). `was` is
+ * the table the editing began from: if the file's differs, someone changed it meanwhile, and
+ * nothing is written. The new table is checked itself, so a number-like key the character
+ * setters refuse can be fixed here. Every line whose words as said change shows as stale.
  */
 export function setPronunciations(
   projectFile: string,
@@ -324,21 +314,16 @@ export function setPronunciations(
 ): Promise<CharacterChange> {
   const clean = cleanPronunciations(table)
   return castWrites.run(projectFile, () =>
-    writeCast(
-      projectFile,
-      (raw, parsed, path) => {
-        const problem = (message: string): Problem[] => [{ file: path, path: 'pronounce', message }]
-        if (!sameTable(Object.entries(parsed.pronounce), was)) {
-          return problem(
-            'the pronunciations changed since the page showed them; reload and try again',
-          )
-        }
-        const why = pronounceProblem(clean)
-        if (why) return problem(why)
-        return { ...raw, pronounce: Object.fromEntries(clean) }
-      },
-      // The table shown is the order the studio applies; the new one is checked itself.
-      { ownTable: true },
-    ),
+    writeCast(projectFile, (raw, parsed, path) => {
+      const problem = (message: string): Problem[] => [{ file: path, path: 'pronounce', message }]
+      if (!sameTable(Object.entries(parsed.pronounce), was)) {
+        return problem(
+          'the pronunciations in the file changed since editing began; discard your changes to see them',
+        )
+      }
+      const why = pronounceProblem(clean)
+      if (why) return problem(why)
+      return { ...raw, pronounce: Object.fromEntries(clean) }
+    }),
   )
 }

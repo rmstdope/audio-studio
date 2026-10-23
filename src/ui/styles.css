@@ -1402,6 +1402,10 @@ a.btn {
   display: flex;
   gap: 4px;
 }
+.pronounce-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+}
 .pronounce-foot {
   display: flex;
   align-items: center;

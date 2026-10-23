@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'bun:test'
-import { cleanPronunciations, pronounceProblem, sameTable } from './pronounce'
+import { cleanPronunciations, pronounceProblem, sameTable, spaceNote } from './pronounce'
 
 describe('cleanPronunciations', () => {
-  it('trims both sides and drops rows left empty', () => {
+  it('drops rows left empty, and keeps spaces, which anchor an entry', () => {
     expect(
       cleanPronunciations([
-        ['  Eldoria ', ' El-door-ia '],
+        ['Al ', 'Al '],
         ['', ''],
-        ['  ', ' '],
+        [' I ', ' eye '],
       ]),
-    ).toEqual([['Eldoria', 'El-door-ia']])
+    ).toEqual([
+      ['Al ', 'Al '],
+      [' I ', ' eye '],
+    ])
   })
 })
 
@@ -24,18 +27,24 @@ describe('pronounceProblem', () => {
     expect(pronounceProblem([])).toBeNull()
   })
 
-  it('needs both the written words and how they are said', () => {
-    expect(pronounceProblem([['Eldoria', '']])).toContain('“Eldoria” needs how it is said')
+  it('needs the written words; an empty said form leaves them out, as in narrate.py', () => {
     expect(pronounceProblem([['', 'El-door-ia']])).toContain('the words it replaces')
+    expect(pronounceProblem([['um, ', '']])).toBeNull()
   })
 
-  it('takes each written form once', () => {
+  it('takes each written form once, spaces counting', () => {
     expect(
       pronounceProblem([
         ['Eldoria', 'a'],
         ['Eldoria', 'b'],
       ]),
     ).toContain('“Eldoria” twice')
+    expect(
+      pronounceProblem([
+        ['Eldoria', 'a'],
+        ['Eldoria ', 'b'],
+      ]),
+    ).toBeNull()
   })
 
   it('refuses a number among others, which JavaScript would move to the front', () => {
@@ -46,6 +55,25 @@ describe('pronounceProblem', () => {
         ['10', 'ten'],
       ]),
     ).toContain('“10”')
+    expect(
+      pronounceProblem([
+        ['Eldoria', 'x'],
+        ['10 ', 'ten '],
+      ]),
+    ).toBeNull()
+  })
+
+  it('refuses __proto__, which JavaScript cannot keep as a key', () => {
+    expect(pronounceProblem([['__proto__', 'x']])).toContain('__proto__')
+  })
+})
+
+describe('spaceNote', () => {
+  it('points out spaces at either end, which are easy to miss', () => {
+    expect(spaceNote('Al ')).toBe('ends with a space')
+    expect(spaceNote(' I ')).toBe('starts and ends with a space')
+    expect(spaceNote(' I')).toBe('starts with a space')
+    expect(spaceNote('Eldoria')).toBeNull()
   })
 })
 

@@ -392,7 +392,7 @@ describe('setPronunciations', () => {
     const table: [string, string][] = [
       ['Eldoria', 'El-dor-ia'],
       ['Act I:', 'Act One:'],
-      [' Willowbrook ', ' Willow brook '],
+      ['Willowbrook', 'Willow brook'],
     ]
     expect(await setPronunciations(join(root, 'audio-studio.json'), table, was)).toEqual({
       ok: true,
@@ -423,9 +423,57 @@ describe('setPronunciations', () => {
     })
   })
 
+  it('starts a cast when there is none', async () => {
+    const root = tempRepo({ ...files, 'tts/cast.json': undefined })
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setPronunciations(projectFile, [['Eldoria', 'El-door-ia']], [])).toEqual({
+      ok: true,
+    })
+    expect(JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))).toEqual({
+      speakers: {},
+      pronounce: { Eldoria: 'El-door-ia' },
+    })
+  })
+
+  it('lets the table fix a number key that the character setters refuse to rewrite', async () => {
+    const root = tempRepo({
+      ...withTable,
+      'tts/cast.json': { speakers: {}, pronounce: { Eldoria: 'x', '10': 'ten' } },
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    const shown: [string, string][] = [
+      ['10', 'ten'],
+      ['Eldoria', 'x'],
+    ]
+    expect(await setStyle(projectFile, 'grandmother', '[x]')).toMatchObject({ ok: false })
+    expect(await setPronunciations(projectFile, shown, shown)).toMatchObject({ ok: false })
+    const fixed: [string, string][] = [
+      ['Eldoria', 'x'],
+      ['Act 10', 'Act ten'],
+    ]
+    expect(await setPronunciations(projectFile, fixed, shown)).toEqual({ ok: true })
+    expect(await setStyle(projectFile, 'grandmother', '[x]')).toEqual({ ok: true })
+  })
+
+  it('keeps a character change made at the same time', async () => {
+    const root = tempRepo(withTable)
+    const projectFile = join(root, 'audio-studio.json')
+    await Promise.all([
+      setStyle(projectFile, 'grandmother', '[tired]'),
+      setPronunciations(projectFile, [['Eldoria', 'El-dor-ia']], was),
+    ])
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother.style).toBe('[tired]')
+    expect(cast.pronounce).toEqual({ Eldoria: 'El-dor-ia' })
+  })
+
   it('refuses a table with a problem', async () => {
     const root = tempRepo(withTable)
-    const result = await setPronunciations(join(root, 'audio-studio.json'), [['Eldoria', '']], was)
+    const result = await setPronunciations(
+      join(root, 'audio-studio.json'),
+      [['', 'El-door-ia']],
+      was,
+    )
     expect(result).toMatchObject({ ok: false, problems: [{ path: 'pronounce' }] })
   })
 })
