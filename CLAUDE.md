@@ -90,3 +90,17 @@ audio-studio --dev     # in a consumer repository, reloading on changes (after `
 
 `bun run check` passes (CI runs the same checks on every pull request and on `main`), new behaviour
 has tests, and `docs/architecture.md` matches what was built. Work on a branch, not on `main`.
+
+## Review of every pull request
+
+Every pull request gets an independent review by a sub-agent before it is handed over for merge:
+
+1. Start a fresh sub-agent to review the whole diff of the pull request against `main`. Give it the
+   pull request and this file, not your own conclusions, so its reading is not anchored on yours.
+   Ask for correctness bugs first, then breaches of the rules in this file (tests, design, the
+   consumer rules), then simplifications.
+2. Address every finding: fix it (test first, as always), or answer it with why it stays as it is.
+   No finding is left without an answer.
+3. Push the fixes, and if they were substantial, have them reviewed again.
+4. Report the findings and what was done with each in the pull request, then hand it over. Never
+   merge a pull request yourself.
