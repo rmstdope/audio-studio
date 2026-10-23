@@ -34,6 +34,9 @@ const fish: FishClient = {
   async getVoice() {
     throw new Error('not used')
   },
+  async tts() {
+    return new Uint8Array([0x49, 0x44, 0x33])
+  },
 }
 const server = startServer({ projectFile: join(root, 'audio-studio.json'), port: 0, fish })
 afterAll(() => server.stop(true))
@@ -137,6 +140,37 @@ describe('server', () => {
     expect(patch.status).toBe(404)
   })
 
+  it('saves a character’s own phrase', async () => {
+    const response = await fetch(url('/api/characters/narrator'), {
+      method: 'PATCH',
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ phrase: 'Once upon a time.' }),
+    })
+    expect(response.status).toBe(200)
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.narrator.audition.phrase).toBe('Once upon a time.')
+  })
+
+  it('records a take, from the studio’s own page only, and serves it', async () => {
+    const record = (origin: string) =>
+      fetch(url('/api/characters/narrator/takes'), {
+        method: 'POST',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify({ voice: 'w1' }),
+      })
+    expect((await record('https://evil.example')).status).toBe(403)
+    const body = await (await record(server.url.origin)).json()
+    expect(body).toMatchObject({ ok: true, cached: false })
+    const take = await fetch(url(`/api/takes/${body.key}.mp3`))
+    expect([...new Uint8Array(await take.arrayBuffer())]).toEqual([0x49, 0x44, 0x33])
+    expect((await fetch(url('/api/takes/nope.mp3'))).status).toBe(404)
+    expect((await fetch(url(`/api/takes/${body.key}`))).status).toBe(404)
+    const audition = await (
+      await fetch(url('/api/characters/narrator/audition?voices=w1,other'))
+    ).json()
+    expect(audition).toMatchObject({ ok: true, takes: { w1: body.key } })
+  })
+
   it('serves the UI', async () => {
     expect(await (await fetch(server.url)).text()).toContain('<div id="root">')
   })
@@ -177,7 +211,29 @@ describe('server, with problems', () => {
     expect(readFileSync(join(broken, 'tts/cast.json'), 'utf8')).toBe('{ broken')
   })
 
-  it('says there is no API key when there is none', async () => {
+  it('reports the broken cast when asked for candidates', async () => {
+    const body = await (
+      await fetch(new URL('/api/characters/narrator/candidates', other.url))
+    ).json()
+    expect(body.ok).toBe(false)
+    expect(body.problems[0].file).toBe('tts/cast.json')
+  })
+})
+
+describe('server, without an API key', () => {
+  const keyless = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const other = startServer({
+    projectFile: join(keyless, 'audio-studio.json'),
+    port: 0,
+    fish: null,
+  })
+  afterAll(() => other.stop(true))
+
+  it('says there is no API key', async () => {
     const body = await (
       await fetch(new URL('/api/characters/narrator/candidates', other.url))
     ).json()

@@ -32,6 +32,9 @@ function fakeFish(voices: Voice[], pageSize = 100) {
       if (!found) throw new Error('no such voice')
       return found
     },
+    async tts() {
+      return new Uint8Array([0x49, 0x44, 0x33])
+    },
   }
   return { client, queries, pageSize }
 }

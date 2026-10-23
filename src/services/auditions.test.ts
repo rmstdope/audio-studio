@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
-import { findCandidates, setKeywords } from './auditions'
+import { findCandidates, setKeywords, setPhrase } from './auditions'
+import { createLimiter } from './limit'
+import { recordTake } from './takes'
 import type { FishClient } from './fish'
 
 function voice(id: string, title: string, uses = 0): Voice {
@@ -36,6 +38,9 @@ const fish: FishClient = {
     if (!found) throw new Error('gone')
     return found
   },
+  async tts() {
+    return new Uint8Array([0x49, 0x44, 0x33])
+  },
 }
 
 const files = {
@@ -62,6 +67,26 @@ describe('findCandidates', () => {
     expect(result.keywords).toEqual(['warm'])
     expect(result.current?.id).toBe('cur')
     expect(result.candidates.map((c) => c.voice.id)).toEqual(['w1', 'w2'])
+  })
+
+  it('gives the audition phrase and the takes already recorded', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const limiter = createLimiter()
+    const recorded = await recordTake(projectFile, 'grandmother', 'w1', async () => fish, limiter)
+    const result = await findCandidates(projectFile, 'grandmother', async () => fish)
+    if (!result?.ok || !recorded?.ok) throw new Error('expected both to work')
+    expect(result.audition.own).toBe(false)
+    expect(result.audition.spoken).toStartWith('[warm] ')
+    expect(result.takes).toEqual({ w1: recorded.key })
+  })
+
+  it('reports a broken cast instead of guessing the phrase', async () => {
+    const root = tempRepo({ ...files, 'tts/cast.json': '{ broken' })
+    const result = await findCandidates(join(root, 'audio-studio.json'), 'tilda', async () => fish)
+    expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
+      'tts/cast.json',
+    )
   })
 
   it('finds nothing for a character without keywords', async () => {
@@ -111,6 +136,74 @@ describe('findCandidates', () => {
     expect(
       await findCandidates(join(root, 'audio-studio.json'), 'nobody', async () => fish),
     ).toBeNull()
+  })
+})
+
+describe('setPhrase', () => {
+  it('saves a character’s own phrase, and clears it again', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setPhrase(projectFile, 'grandmother', '  Come in, dear.  ')).toEqual({ ok: true })
+    let cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother.audition).toEqual({
+      keywords: ['warm'],
+      phrase: 'Come in, dear.',
+    })
+    await setPhrase(projectFile, 'grandmother', '   ')
+    cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother.audition).toEqual({ keywords: ['warm'] })
+  })
+})
+
+describe('clearing audition fields', () => {
+  it('leaves no empty audition entry behind', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { grandmother: { voice: 'cur' } }, pronounce: {} },
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    await setPhrase(projectFile, 'grandmother', null)
+    await setKeywords(projectFile, 'grandmother', ['warm'])
+    await setKeywords(projectFile, 'grandmother', [])
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother).toEqual({ voice: 'cur' })
+  })
+
+  it('keeps the entry’s order when clearing an audition between other fields', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json':
+        '{\n  "speakers": {\n    "grandmother": { "voice": "cur", "audition": { "phrase": "Hi." }, "style": "[warm]" }\n  }\n}\n',
+    })
+    await setPhrase(join(root, 'audio-studio.json'), 'grandmother', null)
+    expect(readFileSync(join(root, 'tts/cast.json'), 'utf8')).toBe(
+      '{\n  "speakers": {\n    "grandmother": { "voice": "cur", "style": "[warm]" }\n  }\n}\n',
+    )
+  })
+
+  it('treats a null phrase as no phrase when clearing', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': {
+        speakers: { grandmother: { audition: { phrase: null, keywords: ['a'] } } },
+      },
+    })
+    await setKeywords(join(root, 'audio-studio.json'), 'grandmother', [])
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother).toEqual({})
+  })
+
+  it('answers an unknown character with null, whatever its phrase', async () => {
+    const root = tempRepo(files)
+    expect(await setPhrase(join(root, 'audio-studio.json'), 'nobody', 'x'.repeat(401))).toBeNull()
+  })
+
+  it('refuses a phrase too long for one take', async () => {
+    const root = tempRepo(files)
+    const result = await setPhrase(join(root, 'audio-studio.json'), 'grandmother', 'x'.repeat(401))
+    expect(result && !result.ok && 'problems' in result && result.problems[0]!.message).toContain(
+      '400',
+    )
   })
 })
 

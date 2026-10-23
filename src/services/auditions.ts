@@ -1,12 +1,14 @@
 import { dirname } from 'node:path'
 import { formatCast } from '../core/castFormat'
 import { resolveInRoot } from '../core/paths'
-import { problemsFrom, type Problem, type Project } from '../core/project'
+import { phraseProblem, problemsFrom, type Problem, type Project } from '../core/project'
 import { CastSchema, type Character } from '../core/resources'
 import type { CharacterSummary } from '../core/summary'
+import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
+import { auditionFor, castProblems, phrasePath, recordedTakes } from './takes'
 import { searchVoices } from './voiceSearch'
 import { loadWorkspace, type ProjectFailure } from './workspace'
 
@@ -26,8 +28,15 @@ export type CandidatesResult =
       /** The character's current voice, if it has one and Fish still has it. */
       current: Voice | null
       candidates: Candidate[]
+      /** What the character says in a take. */
+      audition: AuditionText
+      /** Takes already recorded for this phrase, by voice id. */
+      takes: Record<string, string>
+      /** How many candidates a round has (the project's `audition.candidatesPerRound`). */
+      perRound: number
     }
   | { ok: false; reason: 'no-key' | 'fish'; message: string }
+  | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
 
@@ -39,9 +48,11 @@ export async function findCandidates(
 ): Promise<CandidatesResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
-  const { project, summary } = loaded
+  const { project, summary, cast } = loaded
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
+  // Without the cast the phrase, style and pronunciations are unknown: say so, don't guess.
+  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) {
     return {
@@ -55,20 +66,27 @@ export async function findCandidates(
   try {
     const current = character.voice ? await fish.getVoice(character.voice).catch(() => null) : null
     const exclude = new Set(character.voice ? [character.voice] : [])
-    const candidates = keywords.length
+    const found = keywords.length
       ? await searchVoices(fish, keywords, {
           language,
           exclude,
           parallel: project.narration.quality.parallel,
         })
       : []
+    const candidates = found.slice(0, CANDIDATE_LIMIT)
+    const root = dirname(projectFile)
+    const audition = auditionFor(cast, characterId, project)
+    const voices = [...(current ? [current.id] : []), ...candidates.map((c) => c.voice.id)]
     return {
       ok: true,
       character,
       keywords,
       language,
       current,
-      candidates: candidates.slice(0, CANDIDATE_LIMIT),
+      candidates,
+      audition,
+      takes: recordedTakes(root, project, audition, voices),
+      perRound: project.narration.audition.candidatesPerRound,
     }
   } catch (error) {
     return {
@@ -96,10 +114,48 @@ export function setKeywords(
   const cleaned = keywords
     .map((k) => k.trim())
     .filter((k) => hasWords(k) && !seen.has(k.toLowerCase()) && seen.add(k.toLowerCase()))
-  return updateCharacter(projectFile, characterId, (entry) => ({
-    ...entry,
-    audition: { ...entry.audition, keywords: cleaned },
-  }))
+  return updateCharacter(projectFile, characterId, (entry) =>
+    withAudition(entry, { keywords: cleaned.length ? cleaned : undefined }),
+  )
+}
+
+/** Saves a character's own audition phrase in the cast; an empty phrase goes back to the standard one. */
+export async function setPhrase(
+  projectFile: string,
+  characterId: string,
+  phrase: string | null,
+): Promise<CharacterChange> {
+  const own = phrase?.trim() || undefined
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
+  const { narration } = loaded.project
+  const tooLong = own ? phraseProblem(own, narration.quality.chunkLimit) : null
+  if (tooLong) {
+    const problem = { file: narration.characters, path: phrasePath(characterId), message: tooLong }
+    return { ok: false, problems: [problem] }
+  }
+  return updateCharacter(projectFile, characterId, (entry) => withAudition(entry, { phrase: own }))
+}
+
+/**
+ * A character entry with audition fields changed; a field that is undefined or null is removed, and an
+ * audition left empty is removed too, so clearing a field leaves no trace in the cast.
+ */
+function withAudition(
+  entry: Character,
+  changes: { keywords?: string[]; phrase?: string },
+): Character {
+  const audition: Record<string, unknown> = { ...entry.audition, ...changes }
+  for (const key of Object.keys(audition)) if (audition[key] == null) delete audition[key]
+  const keep = Object.keys(audition).length > 0
+  if (!('audition' in entry)) return keep ? { ...entry, audition } : entry
+  // Keep the entry's own order: the audition stays where it was.
+  return Object.fromEntries(
+    Object.entries(entry).flatMap(([key, value]) =>
+      key !== 'audition' ? [[key, value]] : keep ? [[key, audition]] : [],
+    ),
+  )
 }
 
 /**

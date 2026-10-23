@@ -61,11 +61,15 @@ export async function listFiles(folder: string): Promise<Set<string>> {
 }
 
 /**
- * Writes `text` to `path` (relative to `root`) through a temporary file and a rename, so a crash
+ * Writes `text` (or bytes) to `path` (relative to `root`) through a temporary file and a rename, so a crash
  * never leaves a half-written file. Each write has its own temporary file, so two writes at once
  * cannot mix. Creates the folder if needed.
  */
-export async function writeAtomic(root: string, path: string, text: string): Promise<void> {
+export async function writeAtomic(
+  root: string,
+  path: string,
+  text: string | Uint8Array,
+): Promise<void> {
   const file = resolveInRoot(root, path)
   await mkdir(dirname(file), { recursive: true })
   const temporary = `${file}.${randomUUID()}.tmp`

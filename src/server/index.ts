@@ -1,5 +1,7 @@
 import { z } from 'zod'
-import { findCandidates, setKeywords, type FishFactory } from '../services/auditions'
+import { findCandidates, setKeywords, setPhrase, type FishFactory } from '../services/auditions'
+import { createLimiter } from '../services/limit'
+import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { fishFromEnv, type FishClient } from '../services/fish'
 import { adoptPart, clipFile, loadPart, loadProject } from '../services/workspace'
 import index from '../ui/index.html'
@@ -15,7 +17,13 @@ export interface ServerOptions {
   fish?: FishClient | null
 }
 
-const KeywordsBody = z.object({ keywords: z.array(z.string()).max(20) })
+/** A change to a character: its keywords, or its own audition phrase (null for the standard one). */
+const CharacterBody = z.union([
+  z.object({ keywords: z.array(z.string()).max(20) }).strict(),
+  z.object({ phrase: z.string().max(10_000).nullable() }).strict(),
+])
+
+const TakeBody = z.object({ voice: z.string().regex(/^[\w-]{1,64}$/) })
 
 const notFound = () => Response.json({ error: 'not found' }, { status: 404 })
 
@@ -42,6 +50,8 @@ export function allowedHosts(port: number): string[] {
 export function startServer({ projectFile, port, development = false, fish }: ServerOptions) {
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
+  /** Audition takes being recorded: a few at a time, each once. */
+  const takes = createLimiter()
 
   /** Only requests addressed to the studio itself reach `handler`. */
   const guard =
@@ -91,12 +101,47 @@ export function startServer({ projectFile, port, development = false, fish }: Se
       },
       '/api/characters/:id': {
         PATCH: fromOwnPage(async (request) => {
-          const body = KeywordsBody.safeParse(await request.json().catch(() => null))
-          if (!body.success)
-            return Response.json({ error: 'expected { keywords: string[] }' }, { status: 400 })
-          const result = await setKeywords(projectFile, request.params.id, body.data.keywords)
+          const body = CharacterBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json(
+              { error: 'expected { keywords: string[] } or { phrase: string | null }' },
+              { status: 400 },
+            )
+          }
+          const { id } = request.params
+          const result =
+            'keywords' in body.data
+              ? await setKeywords(projectFile, id, body.data.keywords)
+              : await setPhrase(projectFile, id, body.data.phrase)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/characters/:id/takes': {
+        POST: fromOwnPage(async (request) => {
+          const body = TakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
+          const { id } = request.params
+          const result = await recordTake(projectFile, id, body.data.voice, fishFor, takes)
+          if (!result) return notFound()
+          return Response.json(result, { status: 'problems' in result ? 409 : 200 })
+        }),
+      },
+      '/api/characters/:id/audition': {
+        GET: guard(async (request) => {
+          const voices = (new URL(request.url).searchParams.get('voices') ?? '')
+            .split(',')
+            .filter((voice) => /^[\w-]{1,64}$/.test(voice))
+            .slice(0, 50)
+          const result = await auditionTakes(projectFile, request.params.id, voices)
+          return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/takes/:file': {
+        GET: guard(async (request) => {
+          const key = /^([0-9a-f]{16})\.mp3$/.exec(request.params.file)?.[1]
+          const file = key ? await takeFile(projectFile, key) : null
+          return file ? new Response(Bun.file(file)) : notFound()
         }),
       },
       '/api/characters/:id/candidates': {

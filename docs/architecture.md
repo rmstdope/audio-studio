@@ -390,7 +390,10 @@ generation while the script and cast still change) and `final` (the recording th
 Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's status),
 `POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
 `GET /api/characters/:id/candidates` (voices matching the character's keywords, with its current
-voice) and `PATCH /api/characters/:id` (keywords). The rest is the plan:
+voice, the audition phrase and the takes already recorded), `PATCH /api/characters/:id`
+(keywords or phrase), `POST /api/characters/:id/takes` (record a take) and `GET /api/takes/:file`.
+Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the audition model, voice,
+spoken phrase and settings, so a take is recorded once. The rest is the plan:
 
 ```
 GET    /api/project                              project, parts, credit
@@ -411,7 +414,9 @@ POST   /api/auditions/:character/verdicts        keep/drop per candidate, next r
 POST   /api/auditions/:character/cast            write the chosen voice to cast.json
 POST   /api/jobs                                 run a plan
 DELETE /api/jobs/:id                             cancel
-GET    /api/auditions/:character/takes/:file     cached audition audio
+GET    /api/characters/:id/audition?voices=   the audition phrase and which voices have takes
+POST   /api/characters/:id/takes             record a take (own page only)
+GET    /api/takes/:key.mp3                   a recorded take
 GET    /api/changes                              git status of project paths
 WS     /api/events                               job progress, file changes
 ```

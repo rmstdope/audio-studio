@@ -41,6 +41,36 @@ describe('ProjectSchema', () => {
     ])
   })
 
+  it('refuses a standard audition phrase too long for one take', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    const found = problems({
+      ...base,
+      narration: { ...narration, audition: { phrase: 'x'.repeat(401) } },
+    })
+    expect(found.map((p) => [p.path, p.message])).toEqual([
+      [
+        'narration.audition.phrase',
+        'is 401 characters; a take is one piece of at most 400 (quality.chunkLimit)',
+      ],
+    ])
+  })
+
+  it('never refuses a project for the built-in phrase, whatever chunk limit it allows', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    expect(
+      parse({ ...base, narration: { ...narration, quality: { chunkLimit: 100 } } }).success,
+    ).toBe(true)
+  })
+
+  it('reports only the chunk limit when the limit itself is wrong', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    const found = problems({ ...base, narration: { ...narration, quality: { chunkLimit: 10 } } })
+    expect(found.map((p) => p.path)).toEqual(['narration.quality.chunkLimit'])
+  })
+
   it('requires {part} in part paths', () => {
     const base = projectJson()
     const narration = base.narration as { paths: Record<string, string> }
