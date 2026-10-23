@@ -11,6 +11,7 @@ import {
   useSessionAction,
   useSetKeywords,
   useSetPhrase,
+  useSetStyle,
   useTakes,
 } from '../../api'
 import { CheckIcon } from '../../components/icons'
@@ -103,14 +104,7 @@ export function AuditionView({
         <aside className="audition-brief panel">
           <KeywordsEditor characterId={character.id} keywords={character.keywords} />
           {phrase && <PhraseEditor characterId={character.id} audition={phrase} />}
-          <div className="brief-item">
-            <span className="label">Style cue</span>
-            {character.style ? (
-              <span className="style-cue">{character.style}</span>
-            ) : (
-              <span className="muted">No style cue</span>
-            )}
-          </div>
+          <StyleEditor characterId={character.id} style={character.style} />
           {result?.ok && (
             <div className="brief-item">
               <span className="label">Language</span>
@@ -394,6 +388,55 @@ function PhraseEditor({ characterId, audition }: { characterId: string; audition
       </span>
       {save.data && !save.data.ok && 'problems' in save.data && (
         <Problems title="The phrase could not be saved" problems={save.data.problems} />
+      )}
+      {save.isError && <span className="adopt-error">{save.error.message}</span>}
+    </form>
+  )
+}
+
+/**
+ * A character's style cue, saved in the cast: how every line without its own cue is said, and
+ * the audition takes too.
+ */
+function StyleEditor({ characterId, style }: { characterId: string; style: string }) {
+  const save = useSetStyle(characterId)
+  const [draft, setDraft] = useState<string | null>(null)
+  const text = draft ?? style
+  const changed = draft !== null && draft.trim() !== style
+
+  return (
+    <form
+      className="brief-item"
+      onSubmit={(event) => {
+        event.preventDefault()
+        save.mutate(text, { onSuccess: (result) => result.ok && setDraft(null) })
+      }}
+    >
+      <label className="label" htmlFor="style">
+        Style cue
+      </label>
+      <input
+        id="style"
+        className="style-input mono"
+        placeholder="[warm, gentle, a little worried]"
+        value={text}
+        onChange={(e) => {
+          // A new draft: what went wrong with the last one no longer applies.
+          if (save.data || save.error) save.reset()
+          setDraft(e.target.value)
+        }}
+      />
+      <div className="keyword-add">
+        <button className="btn" type="submit" disabled={!changed || save.isPending}>
+          {save.isPending ? 'Saving…' : 'Save style'}
+        </button>
+      </div>
+      <span className="muted brief-hint">
+        Saved in the cast. Every line without its own cue is said this way, and so are the audition
+        takes: recorded lines show as stale until generated again.
+      </span>
+      {save.data && !save.data.ok && 'problems' in save.data && (
+        <Problems title="The style could not be saved" problems={save.data.problems} />
       )}
       {save.isError && <span className="adopt-error">{save.error.message}</span>}
     </form>

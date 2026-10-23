@@ -169,6 +169,38 @@ describe('server', () => {
     expect(cast.speakers.narrator.audition.phrase).toBe('Once upon a time.')
   })
 
+  it('saves a character’s style, which marks its recorded lines stale', async () => {
+    const response = await fetch(url('/api/characters/narrator'), {
+      method: 'PATCH',
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ style: '[grave]' }),
+    })
+    expect(response.status).toBe(200)
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.narrator.style).toBe('[grave]')
+  })
+
+  it('saves a line’s cue, from the studio’s own page only', async () => {
+    const patch = (key: string, body: unknown, origin = server.url.origin) =>
+      fetch(url(`/api/parts/act1/cues/${key}`), {
+        method: 'PATCH',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    expect((await patch('a', { cue: '[hushed]' }, 'https://evil.example')).status).toBe(403)
+    expect((await patch('a', { cue: 3 })).status).toBe(400)
+    expect((await patch('nope', { cue: '[hushed]' })).status).toBe(404)
+    expect((await patch('a', { cue: '[hushed]' })).status).toBe(200)
+    const part = await (await fetch(url('/api/parts/act1'))).json()
+    expect(part.part.lines.find((l: { key: string }) => l.key === 'a')).toMatchObject({
+      cue: '[hushed]',
+      ownCue: true,
+    })
+    expect((await patch('a', { cue: '' })).status).toBe(200)
+    const after = await (await fetch(url('/api/parts/act1'))).json()
+    expect(after.part.lines.find((l: { key: string }) => l.key === 'a').ownCue).toBe(false)
+  })
+
   it('records a take, from the studio’s own page only, and serves it', async () => {
     const record = (origin: string) =>
       fetch(url('/api/characters/narrator/takes'), {

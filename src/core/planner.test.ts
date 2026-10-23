@@ -125,3 +125,20 @@ describe('adoptUntracked', () => {
     expect(statuses(planPart(input({ lock })))).toEqual({ n1: 'ok', m1: 'ok', t1: 'uncast' })
   })
 })
+
+describe('planPart, cues', () => {
+  it('tells a line’s own cue from its character’s style', () => {
+    const state = planPart(input({ cues: { m1: '[sad]' } }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ cue: '[sad]', ownCue: true })
+    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({ cue: '[warm]', ownCue: false })
+  })
+
+  it('takes a key named like an object property for a line key, not a cue', () => {
+    const odd: Line[] = [
+      { key: 'toString', speaker: 'narrator', text: 'One.' },
+      { key: 'constructor', speaker: 'narrator', text: 'Two.' },
+    ]
+    const state = planPart(input({ lines: odd, manifest: {}, files: new Set() }))
+    for (const line of state.lines) expect(line).toMatchObject({ cue: '[warm]', ownCue: false })
+  })
+})

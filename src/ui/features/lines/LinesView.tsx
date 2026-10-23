@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
-import { clipUrl, usePart, useRecordLines } from '../../api'
+import { clipUrl, usePart, useRecordLines, useSetCue } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
@@ -176,7 +176,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                     </div>
                   </td>
                   <td>
-                    <span className="mono cue">{line.cue || '—'}</span>
+                    <CueCell partId={loaded.id} line={line} />
                   </td>
                   <td className="mono num">{seconds(line.duration)}</td>
                   <td className="mono num">{percent(line.heard)}</td>
@@ -276,5 +276,92 @@ function OrphanTable({
         </tbody>
       </table>
     </div>
+  )
+}
+
+/**
+ * A line's cue: its own, or its character's style (dimmed). Clicking it edits the line's own cue;
+ * saving an empty one goes back to the style.
+ */
+function CueCell({ partId, line }: { partId: string; line: LineState }) {
+  const save = useSetCue(partId)
+  const [draft, setDraft] = useState<string | null>(null)
+  const cell = useRef<HTMLButtonElement>(null)
+  const refocus = useRef(false)
+  const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
+  const own = line.ownCue ? line.cue : ''
+
+  // Back on the cue after editing, so the keyboard keeps its place in the table.
+  useEffect(() => {
+    if (draft === null && refocus.current) {
+      refocus.current = false
+      cell.current?.focus()
+    }
+  }, [draft])
+
+  const close = () => {
+    refocus.current = true
+    setDraft(null)
+  }
+  const done = (result: { ok: boolean }) => result.ok && close()
+
+  if (draft === null) {
+    return (
+      <button
+        ref={cell}
+        type="button"
+        className={`cue-button mono${line.ownCue ? '' : ' from-style'}`}
+        title={
+          line.ownCue
+            ? 'This line’s own cue: edit'
+            : 'The character’s style: give this line its own cue'
+        }
+        onClick={() => {
+          save.reset()
+          setDraft(own)
+        }}
+      >
+        {line.cue || '—'}
+      </button>
+    )
+  }
+  return (
+    <form
+      className="cue-edit"
+      onSubmit={(event) => {
+        event.preventDefault()
+        save.mutate({ key: line.key, cue: draft }, { onSuccess: done })
+      }}
+    >
+      <input
+        className="mono"
+        autoFocus
+        aria-label={`Cue for ${line.key}`}
+        placeholder={line.ownCue ? '' : line.cue || '[a cue for this line]'}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && close()}
+      />
+      <div className="cue-actions">
+        <button className="btn" type="submit" disabled={save.isPending || draft.trim() === own}>
+          {save.isPending ? 'Saving…' : 'Save'}
+        </button>
+        {line.ownCue && (
+          <button
+            className="btn"
+            type="button"
+            disabled={save.isPending}
+            onClick={() => save.mutate({ key: line.key, cue: '' }, { onSuccess: done })}
+          >
+            Use style
+          </button>
+        )}
+        <button className="btn" type="button" onClick={close}>
+          Cancel
+        </button>
+      </div>
+      {problems.length > 0 && <Problems title="The cue could not be saved" problems={problems} />}
+      {save.isError && <span className="adopt-error">{save.error.message}</span>}
+    </form>
   )
 }

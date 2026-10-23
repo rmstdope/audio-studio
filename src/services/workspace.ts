@@ -187,7 +187,13 @@ export interface PartRead {
   part: Part
   dialog: DialogState
   input: PlanInput
-  paths: { dialogPath: string; clipsPath: string; lockPath: string; manifestPath: string }
+  paths: {
+    dialogPath: string
+    cuesPath: string
+    clipsPath: string
+    lockPath: string
+    manifestPath: string
+  }
   problems: Problem[]
 }
 
@@ -232,6 +238,7 @@ export async function readPart(
     },
     paths: {
       dialogPath: at(templates.dialog),
+      cuesPath: at(templates.cues),
       clipsPath: at(templates.clips),
       lockPath: at(templates.lock),
       manifestPath: at(templates.manifest),

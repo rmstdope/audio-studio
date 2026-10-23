@@ -1,4 +1,11 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
+import type { CueChange } from '../services/cues'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
@@ -120,22 +127,85 @@ export function useSetPhrase(characterId: string) {
       return (await response.json()) as NonNullable<CharacterChange>
     },
     // Refresh the phrase and takes shown, without searching Fish's library again.
+    onSuccess: (saved) => (saved.ok ? refreshAudition(client, characterId) : undefined),
+  })
+}
+
+/**
+ * Reloads what a character's audition shows after its phrase or style changed: the round, and the
+ * takes of the voices shown, without searching Fish's library again.
+ */
+async function refreshAudition(client: QueryClient, characterId: string) {
+  // A round shows the phrase and its takes too; reloading it asks Fish nothing.
+  void client.invalidateQueries({ queryKey: ['session', characterId] })
+  const key = ['candidates', characterId]
+  const shown = client.getQueryData<NonNullable<CandidatesResult>>(key)
+  if (!shown?.ok) return client.invalidateQueries({ queryKey: key })
+  const voices = [shown.current?.id, ...shown.candidates.map((c) => c.voice.id)]
+  const query = encodeURIComponent(voices.filter(Boolean).join(','))
+  const fresh = await getJson<NonNullable<AuditionTakesResult>>(
+    `/api/characters/${encodeURIComponent(characterId)}/audition?voices=${query}`,
+  ).catch(() => null)
+  if (!fresh?.ok) return client.invalidateQueries({ queryKey: key })
+  client.setQueryData<NonNullable<CandidatesResult>>(key, (old) =>
+    old?.ok ? withAuditionTakes<Found>(old, fresh.audition, fresh.takes) : old,
+  )
+}
+
+/** Saves a character's style cue (empty to remove it); its lines and audition takes follow it. */
+export function useSetStyle(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `style-${characterId}` },
+    mutationFn: async (style: string) => {
+      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ style }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the style answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
     onSuccess: async (saved) => {
       if (!saved.ok) return
-      // A round shows the phrase and its takes too; reloading it asks Fish nothing.
-      void client.invalidateQueries({ queryKey: ['session', characterId] })
-      const key = ['candidates', characterId]
-      const shown = client.getQueryData<NonNullable<CandidatesResult>>(key)
-      if (!shown?.ok) return client.invalidateQueries({ queryKey: key })
-      const voices = [shown.current?.id, ...shown.candidates.map((c) => c.voice.id)]
-      const query = encodeURIComponent(voices.filter(Boolean).join(','))
-      const fresh = await getJson<NonNullable<AuditionTakesResult>>(
-        `/api/characters/${encodeURIComponent(characterId)}/audition?voices=${query}`,
-      ).catch(() => null)
-      if (!fresh?.ok) return client.invalidateQueries({ queryKey: key })
-      client.setQueryData<NonNullable<CandidatesResult>>(key, (old) =>
-        old?.ok ? withAuditionTakes<Found>(old, fresh.audition, fresh.takes) : old,
+      // Lines without their own cue are said in the style: their statuses change everywhere. The
+      // editor closes once the style shown is the new one.
+      void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['plan'] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        refreshAudition(client, characterId),
+      ])
+    },
+  })
+}
+
+/** Saves a line's own cue (empty to go back to the character's style), then reloads the part. */
+export function useSetCue(partId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ key, cue }: { key: string; cue: string }) => {
+      const response = await fetch(
+        `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ cue }),
+        },
       )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['project'] })
+      // The cell closes once the cue shown is the new one.
+      await client.invalidateQueries({ queryKey: ['part', partId] })
     },
   })
 }

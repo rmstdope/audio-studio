@@ -9,7 +9,18 @@ function line(
   reasons: LineState['reasons'] = [],
   text = 'Hello there.',
 ): LineState {
-  return { key, speaker, text, cue: '', status, reasons, heard: null, duration: null, file: null }
+  return {
+    key,
+    speaker,
+    text,
+    cue: '',
+    ownCue: false,
+    status,
+    reasons,
+    heard: null,
+    duration: null,
+    file: null,
+  }
 }
 
 const state = {

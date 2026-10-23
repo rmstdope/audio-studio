@@ -1,6 +1,6 @@
 import { clipInputs, fingerprint, staleReasons, type StaleReason } from './fingerprint'
 import type { Project } from './project'
-import type { Cast, Cues, Line, Lock, Manifest } from './resources'
+import { cueFor, type Cast, type Cues, type Line, type Lock, type Manifest } from './resources'
 
 /**
  * Where a line's clip stands:
@@ -23,6 +23,8 @@ export interface LineState {
   text: string
   /** The cue the line is (or would be) delivered with. */
   cue: string
+  /** Whether that is the line's own cue (from the part's cues), not its character's style. */
+  ownCue: boolean
   status: LineStatus
   reasons: StaleReason[]
   heard: number | null
@@ -85,7 +87,8 @@ export function planPart(input: PlanInput): PartState {
       key: line.key,
       speaker: line.speaker,
       text: line.text,
-      cue: inputs?.cue ?? cues[line.key] ?? character?.style ?? '',
+      cue: inputs?.cue ?? cueFor(cues, line.key) ?? character?.style ?? '',
+      ownCue: cueFor(cues, line.key) !== undefined,
       status,
       reasons,
       heard: file ? (entry?.heard ?? null) : null,

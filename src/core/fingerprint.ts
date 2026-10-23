@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Project } from './project'
-import type { Character, LockEntry } from './resources'
+import { cueFor, type Character, type LockEntry } from './resources'
 import { saidText } from './spoken'
 
 /** Everything that changes a clip's audio. Two clips with the same inputs sound the same. */
@@ -39,7 +39,7 @@ export function clipInputs(
   return {
     model: narration.models.draft,
     voice: character.voice,
-    cue: cues[line.key] ?? character.style ?? '',
+    cue: cueFor(cues, line.key) ?? character.style ?? '',
     text: line.text,
     said: saidText(line.text, pronounce),
     settings: JSON.stringify([

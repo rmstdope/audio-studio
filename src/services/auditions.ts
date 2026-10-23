@@ -133,6 +133,23 @@ export function setKeywords(
   )
 }
 
+/**
+ * Saves a character's style cue in the cast (the delivery of every line without its own cue),
+ * trimmed; an empty style removes it. The entry keeps its other fields and their order.
+ */
+export function setStyle(
+  projectFile: string,
+  characterId: string,
+  style: string,
+): Promise<CharacterChange> {
+  const own = style.trim()
+  return updateCharacter(projectFile, characterId, (entry) => {
+    if (own) return { ...entry, style: own }
+    const { style: _removed, ...rest } = entry
+    return rest
+  })
+}
+
 /** Saves a character's own audition phrase in the cast; an empty phrase goes back to the standard one. */
 export async function setPhrase(
   projectFile: string,
