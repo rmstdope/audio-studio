@@ -183,6 +183,7 @@ describe('server', () => {
       session: null,
       audition: null,
       takes: {},
+      recorded: [],
     })
     const started = await (await post('/api/auditions/narrator/start')).json()
     expect(started.session.pool).toEqual(['w1'])
@@ -202,12 +203,29 @@ describe('server', () => {
     expect((await post('/api/auditions/narrator/cast')).status).toBe(409)
   })
 
-  it('refuses audition changes from another page', async () => {
-    const response = await fetch(url('/api/auditions/narrator/start'), {
-      method: 'POST',
-      headers: { origin: 'https://evil.example' },
+  it('refuses every audition change from another page', async () => {
+    const changes: [string, string][] = [
+      ['DELETE', '/api/auditions/narrator'],
+      ...['start', 'verdict', 'next', 'more', 'add', 'cast'].map((action): [string, string] => [
+        'POST',
+        `/api/auditions/narrator/${action}`,
+      ]),
+    ]
+    for (const [method, path] of changes) {
+      const response = await fetch(url(path), {
+        method,
+        headers: { origin: 'https://evil.example' },
+      })
+      expect([path, response.status]).toEqual([path, 403])
+    }
+  })
+
+  it('answers ending the audition of an unknown character with 404', async () => {
+    const response = await fetch(url('/api/auditions/nobody'), {
+      method: 'DELETE',
+      headers: { origin: server.url.origin },
     })
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(404)
   })
 
   it('serves the UI', async () => {

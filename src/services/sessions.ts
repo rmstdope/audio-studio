@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import { rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { z } from 'zod'
 import {
+  AuditionSessionSchema,
   addVoice,
   bringMore,
   finalist,
@@ -18,37 +18,23 @@ import { findCandidates, setVoice, type FishFactory } from './auditions'
 import { readJson, writeAtomic } from './files'
 import { createSerial } from './serial'
 import { auditionTakes } from './takes'
-import { loadWorkspace, openProject, type ProjectFailure } from './workspace'
+import { loadPart, loadWorkspace, openProject, type ProjectFailure } from './workspace'
 
 /** Where audition sessions are kept, in the project's tool cache. */
 export const SESSIONS_DIR = '.audio-studio/auditions'
 
-/** A session, or why there is none. Null for an unknown character. */
-export type SessionResult =
-  | { ok: true; session: AuditionSession }
-  | { ok: false; reason: 'no-session' | 'no-key' | 'fish'; message: string }
+/** Why a session action did nothing. */
+export type SessionFailure =
+  | {
+      ok: false
+      reason: 'no-session' | 'no-key' | 'fish' | 'seen' | 'exhausted'
+      message: string
+    }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
-  | null
 
-/**
- * A saved session as read back: checked for its shape only, since the studio wrote it. A session
- * that does not fit (an older version, a hand edit) counts as none.
- */
-const SessionSchema = z.looseObject({
-  version: z.literal(1),
-  character: z.string(),
-  keywords: z.array(z.string()),
-  current: z.string().nullable(),
-  round: z.number().int().min(1),
-  rounds: z.array(z.object({ round: z.number(), voices: z.number() })),
-  pool: z.array(z.string()),
-  verdicts: z.record(z.string(), z.enum(['keep', 'drop'])),
-  dropped: z.array(z.string()),
-  queue: z.array(z.string()),
-  voices: z.record(z.string(), z.looseObject({ id: z.string(), title: z.string() })),
-  matched: z.record(z.string(), z.array(z.string())),
-})
+/** A session, or why there is none. Null for an unknown character. */
+export type SessionResult = { ok: true; session: AuditionSession } | SessionFailure | null
 
 /** Changes to one character's session, one at a time. */
 const sessionWrites = createSerial()
@@ -75,8 +61,6 @@ export function startAudition(
   return sessionWrites.run(key(projectFile, characterId), async () => {
     const found = await findCandidates(projectFile, characterId, fishFor)
     if (!found || !found.ok) return found
-    const opened = await openProject(projectFile)
-    if (!opened.ok) return opened
     const session = startSession({
       character: characterId,
       keywords: found.keywords,
@@ -89,11 +73,14 @@ export function startAudition(
   })
 }
 
-/** Applies `change` to the character's saved session and saves the result. */
+/**
+ * Applies `change` to the character's saved session and saves the result; a change may instead
+ * say why it did nothing, and then nothing is saved.
+ */
 export function changeSession(
   projectFile: string,
   characterId: string,
-  change: (session: AuditionSession) => AuditionSession | Promise<AuditionSession | SessionResult>,
+  change: (session: AuditionSession) => AuditionSession | Promise<AuditionSession | SessionFailure>,
 ): Promise<SessionResult> {
   return sessionWrites.run(key(projectFile, characterId), async () => {
     const known = await knownCharacter(projectFile, characterId)
@@ -107,7 +94,7 @@ export function changeSession(
       }
     }
     const changed = await change(session)
-    if (!changed || !('pool' in changed)) return changed
+    if ('ok' in changed) return changed
     await writeSession(projectFile, characterId, changed)
     return { ok: true, session: changed }
   })
@@ -115,7 +102,8 @@ export function changeSession(
 
 /**
  * Brings a round's worth of new candidates into the current round: from the queue, searching
- * Fish again first when the queue is short. Voices seen before in the audition never come back.
+ * Fish again (with the keywords the audition started with, leaving out every voice it has shown)
+ * when the queue is short. Says so when no new voice is left to find.
  */
 export async function moreVoices(
   projectFile: string,
@@ -126,14 +114,28 @@ export async function moreVoices(
   if (!opened.ok) return opened
   const perRound = opened.project.narration.audition.candidatesPerRound
   return changeSession(projectFile, characterId, async (session) => {
-    if (session.queue.length >= perRound) return bringMore(session, perRound)
-    const found = await findCandidates(projectFile, characterId, fishFor)
-    if (!found || !found.ok) return found
-    return bringMore(queueMore(session, found.candidates), perRound)
+    let next = session
+    if (next.queue.length < perRound) {
+      const found = await findCandidates(projectFile, characterId, fishFor, {
+        keywords: session.keywords,
+        exclude: [...session.pool, ...session.dropped, ...session.queue],
+      })
+      if (!found) return { ok: false, reason: 'fish', message: 'The character is gone.' }
+      if (!found.ok) return found
+      next = queueMore(next, found.candidates)
+    }
+    if (!next.queue.length) {
+      return {
+        ok: false,
+        reason: 'exhausted',
+        message: 'No more voices match these keywords. Try other keywords, or add one by its id.',
+      }
+    }
+    return bringMore(next, perRound)
   })
 }
 
-/** Brings a voice into the current round by its Fish id. */
+/** Brings a voice into the current round by its Fish id; says so if the audition has seen it. */
 export async function addVoiceById(
   projectFile: string,
   characterId: string,
@@ -142,11 +144,13 @@ export async function addVoiceById(
 ): Promise<SessionResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
-  const fish = await fishFor(dirname(projectFile), opened.project)
-  if (!fish) {
-    return { ok: false, reason: 'no-key', message: 'Set FISH_AUDIO_API_KEY to look voices up.' }
-  }
   return changeSession(projectFile, characterId, async (session) => {
+    const seen = seenMessage(session, voiceId)
+    if (seen) return { ok: false, reason: 'seen', message: seen }
+    const fish = await fishFor(dirname(projectFile), opened.project)
+    if (!fish) {
+      return { ok: false, reason: 'no-key', message: 'Set FISH_AUDIO_API_KEY to look voices up.' }
+    }
     try {
       return addVoice(session, await fish.getVoice(voiceId))
     } catch (error) {
@@ -156,13 +160,41 @@ export async function addVoiceById(
   })
 }
 
+/** Why a voice cannot be added to the audition, or null if it can. */
+function seenMessage(session: AuditionSession, voiceId: string): string | null {
+  if (session.pool.includes(voiceId)) return 'That voice is already in this round.'
+  if (session.dropped.includes(voiceId)) return 'That voice was dropped earlier in this audition.'
+  return null
+}
+
+/**
+ * The character's recorded lines per part: the lines with a clip, which casting another voice
+ * makes stale. Lines not recorded yet are missing either way, so they are not counted.
+ */
+export async function recordedLines(
+  projectFile: string,
+  characterId: string,
+): Promise<Appearance[]> {
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return []
+  const character = loaded.summary.characters.find((c) => c.id === characterId)
+  const recorded: Appearance[] = []
+  for (const { part } of character?.appearances ?? []) {
+    const read = await loadPart(projectFile, part)
+    if (!read?.ok) continue
+    const lines = read.part.lines.filter((l) => l.speaker === characterId && l.file).length
+    if (lines) recorded.push({ part, lines })
+  }
+  return recorded
+}
+
 /** What casting did: the voice cast, whether it changed, and the lines that are now stale. */
 export type CastResult =
   | {
       ok: true
       voice: { id: string; name: string }
       changed: boolean
-      /** The character's lines per part, all stale now that its voice changed. */
+      /** The character's recorded lines per part, all stale now that its voice changed. */
       stale: Appearance[]
     }
   | { ok: false; reason: 'no-session' | 'no-finalist'; message: string }
@@ -194,20 +226,56 @@ export function castFinalist(projectFile: string, characterId: string): Promise<
     }
     const voice = { id: winner, name: session.voices[winner]?.title ?? winner }
     const changed = winner !== character.voice
+    const stale = changed ? await recordedLines(projectFile, characterId) : []
     if (changed) {
       const written = await setVoice(projectFile, characterId, voice)
       if (!written || !written.ok) return written
     }
     await rm(sessionPath(projectFile, characterId), { force: true })
-    return { ok: true, voice, changed, stale: changed ? character.appearances : [] }
+    return { ok: true, voice, changed, stale }
   })
 }
 
-/** Ends the character's audition without casting. */
-export function discardSession(projectFile: string, characterId: string): Promise<void> {
-  return sessionWrites.run(key(projectFile, characterId), () =>
-    rm(sessionPath(projectFile, characterId), { force: true }),
-  )
+/** Ends the character's audition without casting; null for an unknown character. */
+export function discardSession(projectFile: string, characterId: string): Promise<true | null> {
+  return sessionWrites.run(key(projectFile, characterId), async () => {
+    if ((await knownCharacter(projectFile, characterId)) !== true) return null
+    await rm(sessionPath(projectFile, characterId), { force: true })
+    return true
+  })
+}
+
+/** A session as the page shows it: the session, the phrase, the takes, and what a cast would make stale. */
+export type SessionView =
+  | {
+      ok: true
+      session: AuditionSession | null
+      audition: AuditionText | null
+      takes: Record<string, string>
+      /** The character's recorded lines per part, which casting another voice would make stale. */
+      recorded: Appearance[]
+    }
+  | SessionFailure
+
+/** A session result with the phrase, the takes of the voices in the round, and the recorded lines. */
+export async function viewOf(
+  projectFile: string,
+  characterId: string,
+  result: { ok: true; session: AuditionSession | null } | SessionFailure,
+): Promise<SessionView> {
+  if (!result.ok) return result
+  const empty = { ok: true as const, audition: null, takes: {}, recorded: [] }
+  if (!result.session) return { ...empty, session: null }
+  const recorded = await recordedLines(projectFile, characterId)
+  const lookup = await auditionTakes(projectFile, characterId, result.session.pool)
+  if (!lookup?.ok) return { ...empty, session: result.session, recorded }
+  return {
+    ok: true,
+    session: result.session,
+    audition: lookup.audition,
+    takes: lookup.takes,
+    recorded,
+  }
 }
 
 async function knownCharacter(
@@ -219,16 +287,15 @@ async function knownCharacter(
   return loaded.summary.characters.some((c) => c.id === characterId) ? true : null
 }
 
+/** The saved session; none if there is no file, or it does not fit (an older version, a hand edit). */
 async function readSession(
   projectFile: string,
   characterId: string,
 ): Promise<AuditionSession | null> {
   const json = await readJson(sessionPath(projectFile, characterId))
   if (json.status !== 'ok') return null
-  const parsed = SessionSchema.safeParse(json.value)
-  return parsed.success && parsed.data.character === characterId
-    ? (parsed.data as unknown as AuditionSession)
-    : null
+  const parsed = AuditionSessionSchema.safeParse(json.value)
+  return parsed.success && parsed.data.character === characterId ? parsed.data : null
 }
 
 async function writeSession(projectFile: string, characterId: string, session: AuditionSession) {
@@ -252,28 +319,4 @@ function sessionFile(characterId: string): string {
 
 function sessionPath(projectFile: string, characterId: string): string {
   return resolveInRoot(dirname(projectFile), sessionFile(characterId))
-}
-
-/** A session as the page shows it: the session, the phrase, and the takes of the voices in it. */
-export type SessionView =
-  | {
-      ok: true
-      session: AuditionSession | null
-      audition: AuditionText | null
-      takes: Record<string, string>
-    }
-  | Exclude<SessionResult, { ok: true } | null>
-
-/** A session result with the phrase and the takes recorded for the voices in the round. */
-export async function viewOf(
-  projectFile: string,
-  characterId: string,
-  result:
-    { ok: true; session: AuditionSession | null } | Exclude<SessionResult, { ok: true } | null>,
-): Promise<SessionView> {
-  if (!result.ok) return result
-  if (!result.session) return { ok: true, session: null, audition: null, takes: {} }
-  const lookup = await auditionTakes(projectFile, characterId, result.session.pool)
-  if (!lookup?.ok) return { ok: true, session: result.session, audition: null, takes: {} }
-  return { ok: true, session: result.session, audition: lookup.audition, takes: lookup.takes }
 }

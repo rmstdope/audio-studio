@@ -341,7 +341,8 @@ each part.
   candidate card also offers Fish's own sample clip.
 - **Phrase**: the project's standard phrase, the character's own phrase, or any of their lines
   picked from the script of any part ("hear it say something it will actually say").
-- Audition sessions are saved in `.audio-studio/auditions/<character>.json`, so a casting
+- Audition sessions are saved in `.audio-studio/auditions/<character>-<hash>.json` (a readable name
+  plus a short hash of the id, so any character name makes a safe file name), so a casting
   can be paused and resumed. The cast is only changed on **Cast**.
 - **Add by id**: paste a Fish voice id or URL to bring a specific voice into the round.
 

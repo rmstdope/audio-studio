@@ -4,6 +4,7 @@ import type { SessionView } from '../../../services/sessions'
 import { useCast, useSessionAction, useTakes, type SessionAction } from '../../api'
 import { Problems } from '../../components/Problems'
 import { plural } from '../../format'
+import { voiceIdFrom } from '../../voiceId'
 import { VoiceCard } from './VoiceCard'
 
 /**
@@ -17,6 +18,7 @@ export function AuditionRound({
   playing,
   toggle,
   cast,
+  titles,
 }: {
   characterId: string
   view: Extract<SessionView, { ok: true }> & { session: AuditionSession }
@@ -24,11 +26,14 @@ export function AuditionRound({
   toggle: (id: string, url: string) => void
   /** Casting, owned by the page so its result outlives the round. */
   cast: ReturnType<typeof useCast>
+  /** Short part titles by id, for saying where lines go stale. */
+  titles: Map<string, string>
 }) {
   const { session, takes } = view
   const act = useSessionAction(characterId)
   const recorder = useTakes(characterId)
   const [voiceId, setVoiceId] = useState('')
+  const [idError, setIdError] = useState<string | null>(null)
 
   const run = (action: SessionAction) => act.mutate(action)
   const kept = session.pool.filter((v) => session.verdicts[v] === 'keep').length
@@ -37,6 +42,15 @@ export function AuditionRound({
   const winner = finalist(session)
   const toRecord = remaining(session).filter((v) => !takes[v] && !recorder.recording.has(v))
   const failed = act.data && !act.data.ok ? act.data : null
+  const exhausted = failed !== null && 'reason' in failed && failed.reason === 'exhausted'
+  // What casting someone else would do: every recorded line of the character goes stale.
+  const willStale = view.recorded.reduce((sum, a) => sum + a.lines, 0)
+  const castNote =
+    winner && winner !== session.current && willStale
+      ? `Casting makes ${plural(willStale, 'recorded line')} stale (${view.recorded
+          .map((a) => `${titles.get(a.part) ?? a.part}: ${a.lines}`)
+          .join(', ')}).`
+      : null
   const castFailed = cast.data && !cast.data.ok ? cast.data : null
 
   const hint = winner
@@ -49,8 +63,9 @@ export function AuditionRound({
 
   const addById = (event: FormEvent) => {
     event.preventDefault()
-    const id = voiceId.trim().replace(/^.*\//, '')
-    if (!id) return
+    const id = voiceIdFrom(voiceId)
+    if (!id) return setIdError('That is not a Fish voice id or voice URL.')
+    setIdError(null)
     run({ action: 'add', body: { voice: id } })
     setVoiceId('')
   }
@@ -98,6 +113,7 @@ export function AuditionRound({
       <div className="round-bar panel">
         <div className="round-hint">
           <strong>{hint}</strong>
+          {castNote && <span className="cast-note">{castNote}</span>}
           <span className="muted">
             Dropped voices never come back in this audition
             {session.dropped.length ? ` (${session.dropped.length} so far)` : ''}.
@@ -116,7 +132,7 @@ export function AuditionRound({
           <button
             className="btn"
             type="button"
-            disabled={act.isPending}
+            disabled={act.isPending || exhausted}
             onClick={() => run({ action: 'more' })}
           >
             Bring in more
@@ -161,6 +177,7 @@ export function AuditionRound({
             End audition
           </button>
         </div>
+        {idError && <span className="adopt-error">{idError}</span>}
         {failed && 'problems' in failed && (
           <Problems title="The audition could not go on" problems={failed.problems} />
         )}

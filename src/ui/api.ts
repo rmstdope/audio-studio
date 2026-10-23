@@ -51,9 +51,13 @@ export function useAdopt(partId: string) {
   })
 }
 
-/** Voices found for a character's audition. Cached for a while: each search asks Fish many times. */
-export function useCandidates(characterId: string) {
+/**
+ * Voices found for a character's audition. Cached for a while: each search asks Fish many times.
+ * Off while an audition round is shown, which does not need it.
+ */
+export function useCandidates(characterId: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ['candidates', characterId],
     queryFn: () =>
       getJson<NonNullable<CandidatesResult>>(
@@ -240,7 +244,13 @@ export function useCast(characterId: string) {
     },
     onSuccess: (result) => {
       if (!result.ok) return
-      const ended: SessionView = { ok: true, session: null, audition: null, takes: {} }
+      const ended: SessionView = {
+        ok: true,
+        session: null,
+        audition: null,
+        takes: {},
+        recorded: [],
+      }
       client.setQueryData<SessionView>(['session', characterId], () => ended)
       void client.invalidateQueries({ queryKey: ['project'] })
       void client.invalidateQueries({ queryKey: ['part'] })

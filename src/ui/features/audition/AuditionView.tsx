@@ -33,9 +33,10 @@ export function AuditionView({
   characterId: string
 }) {
   const character = summary.characters.find((c) => c.id === characterId)
-  const candidates = useCandidates(characterId)
-  const takes = useTakes(characterId)
   const sessionQuery = useSession(characterId)
+  const inRound = Boolean(sessionQuery.data?.ok && sessionQuery.data.session)
+  const candidates = useCandidates(characterId, sessionQuery.isSuccess && !inRound)
+  const takes = useTakes(characterId)
   const start = useSessionAction(characterId)
   const cast = useCast(characterId)
   const { playing, toggle } = useClipPlayer()
@@ -71,6 +72,7 @@ export function AuditionView({
   const view = sessionQuery.data?.ok ? sessionQuery.data : null
   const round = view?.session ? { ...view, session: view.session } : null
   const casted = cast.data?.ok ? cast.data : null
+  const phrase = round?.audition ?? ok?.audition ?? null
   const started = start.data && !start.data.ok ? start.data : null
 
   return (
@@ -100,7 +102,7 @@ export function AuditionView({
       <div className="audition">
         <aside className="audition-brief panel">
           <KeywordsEditor characterId={character.id} keywords={character.keywords} />
-          {ok && <PhraseEditor characterId={character.id} audition={ok.audition} />}
+          {phrase && <PhraseEditor characterId={character.id} audition={phrase} />}
           <div className="brief-item">
             <span className="label">Style cue</span>
             {character.style ? (
@@ -119,13 +121,16 @@ export function AuditionView({
 
         <section className="audition-main" aria-label="Candidates">
           {casted && <CastBanner result={casted} summary={summary} name={character.name} />}
-          {round ? (
+          {sessionQuery.isError ? (
+            <p className="panel muted">Could not load the audition: {sessionQuery.error.message}</p>
+          ) : round ? (
             <AuditionRound
               characterId={character.id}
               view={round}
               playing={playing}
               toggle={toggle}
               cast={cast}
+              titles={titles}
             />
           ) : (
             <>
@@ -160,7 +165,10 @@ export function AuditionView({
                       className="btn btn-primary"
                       type="button"
                       disabled={start.isPending || sessionQuery.isPending}
-                      onClick={() => start.mutate({ action: 'start' })}
+                      onClick={() => {
+                        cast.reset()
+                        start.mutate({ action: 'start' })
+                      }}
                       title="Round 1: the current voice and the top voices; keep and drop until one is left"
                     >
                       {start.isPending ? 'Starting…' : 'Start audition'}

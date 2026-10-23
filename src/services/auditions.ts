@@ -41,11 +41,20 @@ export type CandidatesResult =
   | ProjectFailure
   | null
 
+/** How to search for candidates other than with the character's keywords, leaving out its voice. */
+export interface SearchOptions {
+  /** Keywords to search with instead of the character's (e.g. the ones an audition started with). */
+  keywords?: string[]
+  /** More voices to leave out (e.g. every voice an audition has already shown). */
+  exclude?: Iterable<string>
+}
+
 /** Searches Fish's library with a character's audition keywords, leaving out its current voice. */
 export async function findCandidates(
   projectFile: string,
   characterId: string,
   fishFor: FishFactory,
+  options: SearchOptions = {},
 ): Promise<CandidatesResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -63,10 +72,14 @@ export async function findCandidates(
     }
   }
   const { language } = project.narration.audition
-  const keywords = character.keywords
+  const keywords = options.keywords ?? character.keywords
   try {
     const current = character.voice ? await fish.getVoice(character.voice).catch(() => null) : null
-    const exclude = new Set(character.voice ? [character.voice] : [])
+    // Left out before the list is cut, so a later search reaches voices past the first ones.
+    const exclude = new Set([
+      ...(character.voice ? [character.voice] : []),
+      ...(options.exclude ?? []),
+    ])
     const found = keywords.length
       ? await searchVoices(fish, keywords, {
           language,
@@ -165,11 +178,22 @@ export function setVoice(
   characterId: string,
   voice: { id: string; name: string },
 ): Promise<CharacterChange> {
-  return updateCharacter(projectFile, characterId, (entry) => ({
-    ...entry,
-    voice: voice.id,
-    voiceName: voice.name,
-  }))
+  return updateCharacter(projectFile, characterId, (entry) => {
+    if (!('voice' in entry)) return { ...entry, voice: voice.id, voiceName: voice.name }
+    // The voice stays where it was, its name right after it.
+    return Object.fromEntries(
+      Object.entries(entry).flatMap(([key, value]): [string, unknown][] =>
+        key === 'voice'
+          ? [
+              ['voice', voice.id],
+              ['voiceName', voice.name],
+            ]
+          : key === 'voiceName'
+            ? []
+            : [[key, value]],
+      ),
+    )
+  })
 }
 
 /**

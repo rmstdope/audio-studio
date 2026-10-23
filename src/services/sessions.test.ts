@@ -10,9 +10,11 @@ import {
   changeSession,
   discardSession,
   moreVoices,
+  recordedLines,
   sessionFor,
   startAudition,
 } from './sessions'
+import { setKeywords } from './auditions'
 
 function voice(id: string, title = `Warm ${id}`, uses = 10): Voice {
   return {
@@ -55,10 +57,13 @@ const project = projectJson()
 
 const files = {
   'audio-studio.json': project,
-  'tts/cast.json': {
-    speakers: { mira: { voice: 'cur', style: '[low]', audition: { keywords: ['warm'] } } },
-    pronounce: {},
-  },
+  'tts/cast.json':
+    '{\n  "speakers": {\n' +
+    '    "mira": { "voice": "cur", "style": "[low]", "audition": { "keywords": ["warm"] } },\n' +
+    '    "tilda": { "voice": "t1" }\n' +
+    '  },\n  "pronounce": { "Act I:": "Act One:", "Elior": "El-ee-or" }\n}\n',
+  'audio/act1/manifest.json': { a1: { file: 'a1.mp3' } },
+  'audio/act1/a1.mp3': 'clip',
   'tts/act1/script.json': [
     { key: 'a1', speaker: 'mira', text: 'Welcome.' },
     { key: 'a2', speaker: 'mira', text: 'Again.' },
@@ -136,11 +141,65 @@ describe('moreVoices', () => {
     const result = await moreVoices(projectFile, 'mira', fishFor)
     expect(result?.ok && result.session.pool).toEqual(['cur', 'a', 'b', 'c', 'd', 'e', 'f', 'g'])
     const again = await moreVoices(projectFile, 'mira', fishFor)
-    expect(again?.ok && again.session.pool.length).toBe(8)
+    expect(again).toMatchObject({ ok: false, reason: 'exhausted' })
+  })
+})
+
+describe('moreVoices, with a large library', () => {
+  it('keeps finding new voices beyond the first search, and says when there are none', async () => {
+    const many = Array.from({ length: 40 }, (_, i) => voice(`m${i}`, `Warm m${i}`, 1000 - i))
+    const big: FishClient = {
+      ...fish,
+      async listVoices(query) {
+        const items = many.filter((v) => v.title.toLowerCase().includes(query.title ?? ''))
+        return { total: items.length, items }
+      },
+      async getVoice() {
+        throw new Error('no current voice')
+      },
+    }
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await startAudition(projectFile, 'mira', async () => big)
+    let pool = 0
+    for (let i = 0; i < 20; i++) {
+      const result = await moreVoices(projectFile, 'mira', async () => big)
+      if (!result?.ok) {
+        expect(result).toMatchObject({ ok: false, reason: 'exhausted' })
+        break
+      }
+      pool = result.session.pool.length
+    }
+    expect(pool).toBe(40)
   })
 })
 
 describe('addVoiceById', () => {
+  it('says so when the voice is in the round or was dropped, without asking Fish', async () => {
+    const { projectFile } = await started()
+    const asked: string[] = []
+    const watching: FishClient = { ...fish, getVoice: (id) => (asked.push(id), fish.getVoice(id)) }
+    expect(await addVoiceById(projectFile, 'mira', 'a', async () => watching)).toMatchObject({
+      ok: false,
+      reason: 'seen',
+      message: 'That voice is already in this round.',
+    })
+    await changeSession(projectFile, 'mira', (s) => ({ ...s, verdicts: { a: 'drop' } }))
+    await changeSession(projectFile, 'mira', (s) => ({
+      ...s,
+      round: 2,
+      pool: s.pool.filter((v) => v !== 'a'),
+      dropped: ['a'],
+      verdicts: {},
+    }))
+    expect(await addVoiceById(projectFile, 'mira', 'a', async () => watching)).toMatchObject({
+      ok: false,
+      reason: 'seen',
+      message: 'That voice was dropped earlier in this audition.',
+    })
+    expect(asked).toEqual([])
+  })
+
   it('adds a voice from Fish by its id', async () => {
     const { projectFile } = await started()
     const result = await addVoiceById(projectFile, 'mira', 'x', fishFor)
@@ -158,7 +217,7 @@ describe('addVoiceById', () => {
 })
 
 describe('castFinalist', () => {
-  it('writes the last voice left to the cast, says which lines go stale, and ends the audition', async () => {
+  it('writes the last voice left to the cast, says which recorded lines go stale, and ends the audition', async () => {
     const { root, projectFile } = await started()
     await changeSession(projectFile, 'mira', (s) => ({
       ...s,
@@ -169,18 +228,14 @@ describe('castFinalist', () => {
       ok: true,
       voice: { id: 'b', name: 'Warm b' },
       changed: true,
-      stale: [
-        { part: 'act1', lines: 2 },
-        { part: 'act2', lines: 1 },
-      ],
+      stale: [{ part: 'act1', lines: 1 }],
     })
-    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
-    expect(cast.speakers.mira).toEqual({
-      voice: 'b',
-      style: '[low]',
-      audition: { keywords: ['warm'] },
-      voiceName: 'Warm b',
-    })
+    expect(readFileSync(join(root, 'tts/cast.json'), 'utf8')).toBe(
+      '{\n  "speakers": {\n' +
+        '    "mira": { "voice": "b", "voiceName": "Warm b", "style": "[low]", "audition": { "keywords": ["warm"] } },\n' +
+        '    "tilda": { "voice": "t1" }\n' +
+        '  },\n  "pronounce": { "Act I:": "Act One:", "Elior": "El-ee-or" }\n}\n',
+    )
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
   })
 
@@ -194,6 +249,20 @@ describe('castFinalist', () => {
     expect(result).toMatchObject({ ok: true, voice: { id: 'cur' }, changed: false, stale: [] })
   })
 
+  it('applies a cast queued with a keyword change, keeping both', async () => {
+    const { root, projectFile } = await started()
+    await changeSession(projectFile, 'mira', (s) => ({
+      ...s,
+      verdicts: { cur: 'drop', a: 'drop', c: 'drop' },
+    }))
+    await Promise.all([
+      castFinalist(projectFile, 'mira'),
+      setKeywords(projectFile, 'mira', ['old']),
+    ])
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.mira).toMatchObject({ voice: 'b', audition: { keywords: ['old'] } })
+  })
+
   it('refuses while more than one voice is left', async () => {
     const { projectFile } = await started()
     expect(await castFinalist(projectFile, 'mira')).toMatchObject({
@@ -203,7 +272,19 @@ describe('castFinalist', () => {
   })
 })
 
+describe('sessionFor, recorded lines', () => {
+  it('says how many recorded lines each part has, which a cast would make stale', async () => {
+    const { projectFile } = await started()
+    expect(await recordedLines(projectFile, 'mira')).toEqual([{ part: 'act1', lines: 1 }])
+  })
+})
+
 describe('discardSession', () => {
+  it('answers an unknown character with null', async () => {
+    const root = tempRepo(files)
+    expect(await discardSession(join(root, 'audio-studio.json'), 'nobody')).toBeNull()
+  })
+
   it('removes the saved session', async () => {
     const { root, projectFile } = await started()
     await discardSession(projectFile, 'mira')

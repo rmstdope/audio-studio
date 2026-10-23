@@ -1178,3 +1178,7 @@ a.btn {
 .cast-text .chip {
   text-decoration: none;
 }
+
+.cast-note {
+  color: var(--warn);
+}

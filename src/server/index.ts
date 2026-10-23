@@ -170,7 +170,7 @@ export function startServer({ projectFile, port, development = false, fish }: Se
         }),
         DELETE: fromOwnPage(async (request) => {
           const { id } = request.params
-          await discardSession(projectFile, id)
+          if (!(await discardSession(projectFile, id))) return notFound()
           return Response.json(await viewOf(projectFile, id, { ok: true, session: null }))
         }),
       },

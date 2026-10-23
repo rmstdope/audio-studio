@@ -1,4 +1,5 @@
-import type { Candidate, Voice } from './voiceSearch'
+import { z } from 'zod'
+import { VoiceSchema, type Candidate, type Voice } from './voiceSearch'
 
 /** What the user thinks of a voice in this round. */
 export type Verdict = 'keep' | 'drop'
@@ -6,29 +7,33 @@ export type Verdict = 'keep' | 'drop'
 /**
  * An audition in progress for one character: the voices in the current round, verdicts on them,
  * the voices dropped in earlier rounds, and the candidates waiting to be brought in. Every voice
- * shown is kept in `voices`, so a saved session can be shown again without searching Fish.
+ * shown is kept in `voices`, so a saved session can be shown again without searching Fish. Saved
+ * sessions are checked against this schema when read back.
  */
-export interface AuditionSession {
-  version: 1
-  character: string
+export const AuditionSessionSchema = z.object({
+  version: z.literal(1),
+  character: z.string(),
   /** The keywords the candidates were found with. */
-  keywords: string[]
+  keywords: z.array(z.string()),
   /** The character's voice when the audition started, if any; it takes part in round 1. */
-  current: string | null
-  round: number
+  current: z.string().nullable(),
+  round: z.number().int().min(1),
   /** Earlier rounds and how many voices each had. */
-  rounds: { round: number; voices: number }[]
+  rounds: z.array(z.object({ round: z.number().int(), voices: z.number().int() })),
   /** The voices in this round, in the order shown. */
-  pool: string[]
-  verdicts: Record<string, Verdict>
+  pool: z.array(z.string()),
+  verdicts: z.record(z.string(), z.enum(['keep', 'drop'])),
   /** Voices dropped in earlier rounds; they never come back in this audition. */
-  dropped: string[]
+  dropped: z.array(z.string()),
   /** Ranked candidates not brought in yet. */
-  queue: string[]
-  voices: Record<string, Voice>
+  queue: z.array(z.string()),
+  voices: z.record(z.string(), VoiceSchema),
   /** The keywords each candidate matched. */
-  matched: Record<string, string[]>
-}
+  matched: z.record(z.string(), z.array(z.string())),
+})
+
+/** An audition in progress for one character. */
+export type AuditionSession = z.infer<typeof AuditionSessionSchema>
 
 /** The first round: the current voice (if any) and the top `perRound` candidates; the rest queue. */
 export function startSession(options: {
