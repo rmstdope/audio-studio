@@ -483,7 +483,10 @@ describe('measureLine', () => {
     },
     close() {},
   }
-  const measureOptions = { transcriber: heardAll, clipSeconds: async () => 1.25 }
+  const measureOptions = {
+    transcriber: heardAll,
+    decode: async () => ({ wav: silence(1.25), seconds: 1.25 }),
+  }
 
   async function recorded(transcriber: Transcriber | null = null) {
     const root = tempRepo(files)
@@ -517,6 +520,26 @@ describe('measureLine', () => {
     ).toMatchObject({ ok: true, heard: 0 })
     const part = await loadPart(projectFile, 'act1')
     expect(part?.ok && part.part.lines.find((l) => l.key === 'k4')?.status).toBe('weak')
+  })
+
+  it('gives Whisper the clip decoded to WAV, as narrate.py --retime does', async () => {
+    const { projectFile } = await recorded()
+    const decoded = silence(1.25)
+    const seen: { path: string; wav: Uint8Array } = { path: '', wav: new Uint8Array() }
+    const listening: Transcriber = {
+      async transcribe(_model, file) {
+        seen.path = file
+        seen.wav = new Uint8Array(readFileSync(file))
+        return []
+      },
+      close() {},
+    }
+    await measureLine(projectFile, 'act1', 'k4', {
+      transcriber: listening,
+      decode: async () => ({ wav: decoded, seconds: 1.25 }),
+    })
+    expect(seen.path.endsWith('.wav')).toBe(true)
+    expect(seen.wav).toEqual(decoded)
   })
 
   it('refuses a line without a clip the studio knows', async () => {
@@ -590,14 +613,14 @@ describe('measureLine, edge cases', () => {
     const lockFile = join(root, 'tts/act1/narration.lock.json')
     const result = await measureLine(projectFile, 'act1', 'k4', {
       transcriber: heardAll,
-      clipSeconds: async () => {
+      decode: async () => {
         // The same line recorded again, with the same inputs, while this clip is measured.
         await new Promise((resolve) => setTimeout(resolve, 5))
         await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
           encode: keepWav,
           limiter: createLimiter(),
         })
-        return 1.25
+        return { wav: silence(1.25), seconds: 1.25 }
       },
     })
     expect(result).toEqual({ ok: true, key: 'k4', skipped: true })
@@ -614,7 +637,7 @@ describe('measureLine, edge cases', () => {
     const { projectFile } = await unchecked()
     const result = await measureLine(projectFile, 'act1', 'k4', {
       transcriber: heardAll,
-      clipSeconds: async () => {
+      decode: async () => {
         throw new Error('not audio')
       },
     })
@@ -623,7 +646,10 @@ describe('measureLine, edge cases', () => {
 
   it('measures only clips never measured', async () => {
     const { projectFile } = await unchecked()
-    const options = { transcriber: heardAll, clipSeconds: async () => 1.25 }
+    const options = {
+      transcriber: heardAll,
+      decode: async () => ({ wav: silence(1.25), seconds: 1.25 }),
+    }
     expect(await measureLine(projectFile, 'act1', 'k4', options)).toMatchObject({
       ok: true,
       heard: 1,

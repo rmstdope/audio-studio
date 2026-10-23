@@ -73,16 +73,20 @@ export function createFfmpegEncoder({ timeoutMs }: { timeoutMs: number }): Encod
 export const ffmpegEncoder: Encoder = createFfmpegEncoder({ timeoutMs: 120_000 })
 
 /**
- * A clip's length in seconds, from its decoded audio (as narrate.py `--retime` measures it): the
- * clip decoded by ffmpeg to WAV at its own rate, its frames counted.
+ * A clip decoded by ffmpeg to WAV at its own rate, and its length in seconds from its frames: what
+ * narrate.py `--retime` transcribes and measures (Whisper hears a WAV and an MP3 of the same clip
+ * slightly differently, so the studio gives it the WAV too).
  */
-export async function clipSeconds(file: string): Promise<number> {
+export async function decodeClip(
+  file: string,
+  { timeoutMs = 60_000 }: { timeoutMs?: number } = {},
+): Promise<{ wav: Uint8Array; seconds: number }> {
   let child
   try {
     child = Bun.spawn(['ffmpeg', '-loglevel', 'error', '-i', file, '-f', 'wav', '-'], {
       stdout: 'pipe',
       stderr: 'pipe',
-      timeout: 60_000,
+      timeout: timeoutMs,
       killSignal: 'SIGKILL',
     })
   } catch {
@@ -93,9 +97,15 @@ export async function clipSeconds(file: string): Promise<number> {
     new Response(child.stderr).text(),
     child.exited,
   ])
-  if (code !== 0)
+  if (child.signalCode === 'SIGKILL') {
+    throw new Error(`ffmpeg took longer than ${timeoutMs / 1000} s to decode the clip`)
+  }
+  if (code !== 0) {
     throw new Error(`ffmpeg could not read the clip: ${message.trim() || `exit code ${code}`}`)
-  const { format, data } = readWav(new Uint8Array(bytes))
+  }
+  // Piped, ffmpeg cannot fill in the sizes in the header (0xFFFFFFFF); readWav reads to the end.
+  const wav = new Uint8Array(bytes)
+  const { format, data } = readWav(wav)
   const frame = (format.bitsPerSample / 8) * format.channels
-  return data.length / frame / format.sampleRate
+  return { wav, seconds: data.length / frame / format.sampleRate }
 }

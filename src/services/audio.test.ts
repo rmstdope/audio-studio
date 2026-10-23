@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
-import { writeWav } from '../core/wav'
-import { clipSeconds, createFfmpegEncoder, ffmpegEncoder } from './audio'
+import { readWav, writeWav } from '../core/wav'
+import { createFfmpegEncoder, decodeClip, ffmpegEncoder } from './audio'
 
 const hasFfmpeg = Bun.which('ffmpeg') !== null
 
@@ -58,8 +58,8 @@ describe.skipIf(!hasFfmpeg)('ffmpegEncoder', () => {
   })
 })
 
-describe.skipIf(!hasFfmpeg)('clipSeconds', () => {
-  it('measures a clip’s length from its decoded audio', async () => {
+describe.skipIf(!hasFfmpeg)('decodeClip', () => {
+  it('says when decoding takes too long', async () => {
     const root = tempRepo({})
     const file = join(root, 'one.mp3')
     const second = writeWav({
@@ -67,7 +67,22 @@ describe.skipIf(!hasFfmpeg)('clipSeconds', () => {
       data: new Uint8Array(16000 * 2),
     })
     await ffmpegEncoder(second, file, { bitrate: '64k', channels: 1 })
-    const seconds = await clipSeconds(file)
+    expect(decodeClip(file, { timeoutMs: 1 })).rejects.toThrow('took longer than')
+  })
+
+  it('decodes a clip to WAV at its own rate, and measures its length from it', async () => {
+    const root = tempRepo({})
+    const file = join(root, 'one.mp3')
+    const second = writeWav({
+      format: { channels: 1, sampleRate: 16000, bitsPerSample: 16 },
+      data: new Uint8Array(16000 * 2),
+    })
+    await ffmpegEncoder(second, file, { bitrate: '64k', channels: 1 })
+    // Piped, ffmpeg cannot fill in the sizes in the header (0xFFFFFFFF): the data is read to the end.
+    const { wav, seconds } = await decodeClip(file)
+    const { format, data } = readWav(wav)
+    expect(format).toMatchObject({ channels: 1, sampleRate: 16000 })
+    expect(data.length).toBe(Math.round(seconds * 16000) * 2)
     expect(seconds).toBeGreaterThan(0.95)
     expect(seconds).toBeLessThan(1.1)
   })

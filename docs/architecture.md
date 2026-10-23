@@ -520,8 +520,9 @@ Small, independently useful increments:
 "none"` records one unchecked take, as before.
    2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when
       asked; clips never checked (adopted from narrate.py, or recorded unchecked) measured
-      without new audio (narrate.py `--retime`): length from the decoded clip, word timings and
-      heard share from Whisper, so a poorly heard clip shows as weak.
+      without new audio (narrate.py `--retime`): the clip decoded to WAV, its length from that and
+      what Whisper hears in that WAV (not the MP3, which Whisper hears slightly differently), so
+      the timings match narrate.py's exactly; a poorly heard clip shows as weak.
 6. **Editing**, in small pull requests:
    1. **Style and cues** (built): a character's style on its audition page, saved in the cast; a
       line's own cue in the lines table, saved in the part's cues file (its order kept, written

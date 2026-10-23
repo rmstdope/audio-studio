@@ -19,7 +19,7 @@ import { LockSchema, ManifestSchema, type Lock, type Manifest } from '../core/re
 import { spokenPieces } from '../core/spoken'
 import { joinWavs } from '../core/wav'
 import type { FishFactory } from './auditions'
-import { clipSeconds, ffmpegEncoder, type Encoder } from './audio'
+import { decodeClip, ffmpegEncoder, type Encoder } from './audio'
 import { formatEntriesPerLine, readResource, writeAtomic } from './files'
 import type { Limiter } from './limit'
 import type { Transcriber } from './transcriber'
@@ -314,7 +314,7 @@ async function transcribeWav(
   model: string,
   wav: Uint8Array,
 ): Promise<HeardSegment[]> {
-  const file = join(tmpdir(), `audio-studio-take-${randomUUID()}.wav`)
+  const file = join(tmpdir(), `audio-studio-heard-${randomUUID()}.wav`)
   await writeFile(file, wav)
   try {
     return await transcriber.transcribe(model, file)
@@ -383,10 +383,10 @@ export type MeasureResult =
   | ProjectFailure
   | null
 
-/** How clips are measured: Whisper, and how a clip's length is found (ffmpeg unless replaced). */
+/** How clips are measured: Whisper, and how a clip is decoded to WAV (ffmpeg unless replaced). */
 export interface MeasureOptions {
   transcriber: Transcriber | null
-  clipSeconds?: (file: string) => Promise<number>
+  decode?: (file: string) => Promise<{ wav: Uint8Array; seconds: number }>
 }
 
 /**
@@ -400,7 +400,7 @@ export async function measureLine(
   projectFile: string,
   partId: string,
   key: string,
-  { transcriber, clipSeconds: lengthOf = clipSeconds }: MeasureOptions,
+  { transcriber, decode = decodeClip }: MeasureOptions,
 ): Promise<MeasureResult> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
@@ -429,15 +429,17 @@ export async function measureLine(
   const root = dirname(projectFile)
   const clip = resolveInRoot(root, join(read.paths.clipsPath, entry.file))
 
-  let seconds: number
+  let decoded: { wav: Uint8Array; seconds: number }
   try {
-    seconds = await lengthOf(clip)
+    decoded = await decode(clip)
   } catch (error) {
     return { ok: false, reason: 'decode', message: messageOf(error) }
   }
+  const { seconds } = decoded
   let aligned: { timed: TimedWord[]; ratio: number }
   try {
-    const segments = await transcriber.transcribe(narration.quality.whisperModel, clip)
+    // The decoded WAV, as narrate.py --retime transcribes it, so the timings come out the same.
+    const segments = await transcribeWav(transcriber, narration.quality.whisperModel, decoded.wav)
     const said = saidWords(line.text, read.input.cast.pronounce)
     aligned = alignWords(line.text.split(' '), heardWords(segments, seconds), seconds, said)
   } catch (error) {
