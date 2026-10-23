@@ -2,6 +2,18 @@ import { z } from 'zod'
 import { findCandidates, setKeywords, setPhrase, type FishFactory } from '../services/auditions'
 import { createLimiter } from '../services/limit'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
+import { nextRound, setVerdict } from '../core/audition'
+import {
+  addVoiceById,
+  castFinalist,
+  changeSession,
+  discardSession,
+  moreVoices,
+  sessionFor,
+  startAudition,
+  viewOf,
+  type SessionResult,
+} from '../services/sessions'
 import { fishFromEnv, type FishClient } from '../services/fish'
 import { adoptPart, clipFile, loadPart, loadProject } from '../services/workspace'
 import index from '../ui/index.html'
@@ -22,6 +34,11 @@ const CharacterBody = z.union([
   z.object({ keywords: z.array(z.string()).max(20) }).strict(),
   z.object({ phrase: z.string().max(10_000).nullable() }).strict(),
 ])
+
+const VerdictBody = z.object({
+  voice: z.string().regex(/^[\w-]{1,64}$/),
+  verdict: z.enum(['keep', 'drop']).nullable(),
+})
 
 const TakeBody = z.object({ voice: z.string().regex(/^[\w-]{1,64}$/) })
 
@@ -50,6 +67,18 @@ export function allowedHosts(port: number): string[] {
 export function startServer({ projectFile, port, development = false, fish }: ServerOptions) {
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
+  /** A session action's answer: the session as the page shows it; 404 for an unknown character. */
+  async function answer(
+    characterId: string,
+    pending: Promise<SessionResult>,
+    options: { recorded?: boolean } = {},
+  ): Promise<Response> {
+    const result = await pending
+    if (!result) return notFound()
+    const view = await viewOf(projectFile, characterId, result, options)
+    return Response.json(view, { status: view.ok ? 200 : 409 })
+  }
+
   /** Audition takes being recorded: a few at a time, each once. */
   const takes = createLimiter()
 
@@ -135,6 +164,69 @@ export function startServer({ projectFile, port, development = false, fish }: Se
             .slice(0, 50)
           const result = await auditionTakes(projectFile, request.params.id, voices)
           return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/auditions/:id': {
+        GET: guard(async (request) => {
+          const { id } = request.params
+          const result = await sessionFor(projectFile, id)
+          return result ? Response.json(await viewOf(projectFile, id, result)) : notFound()
+        }),
+        DELETE: fromOwnPage(async (request) => {
+          const { id } = request.params
+          const discarded = await discardSession(projectFile, id)
+          if (!discarded) return notFound()
+          if (discarded !== true) return Response.json(discarded, { status: 409 })
+          return Response.json(await viewOf(projectFile, id, { ok: true, session: null }))
+        }),
+      },
+      '/api/auditions/:id/start': {
+        POST: fromOwnPage((request) =>
+          answer(request.params.id, startAudition(projectFile, request.params.id, fishFor)),
+        ),
+      },
+      '/api/auditions/:id/verdict': {
+        POST: fromOwnPage(async (request) => {
+          const body = VerdictBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json(
+              { error: "expected { voice, verdict: 'keep' | 'drop' | null }" },
+              { status: 400 },
+            )
+          }
+          const { voice, verdict } = body.data
+          const { id } = request.params
+          return answer(
+            id,
+            changeSession(projectFile, id, (s) => setVerdict(s, voice, verdict)),
+          )
+        }),
+      },
+      '/api/auditions/:id/next': {
+        POST: fromOwnPage((request) =>
+          answer(request.params.id, changeSession(projectFile, request.params.id, nextRound), {
+            recorded: false,
+          }),
+        ),
+      },
+      '/api/auditions/:id/more': {
+        POST: fromOwnPage((request) =>
+          answer(request.params.id, moreVoices(projectFile, request.params.id, fishFor)),
+        ),
+      },
+      '/api/auditions/:id/add': {
+        POST: fromOwnPage(async (request) => {
+          const body = TakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
+          const { id } = request.params
+          return answer(id, addVoiceById(projectFile, id, body.data.voice, fishFor))
+        }),
+      },
+      '/api/auditions/:id/cast': {
+        POST: fromOwnPage(async (request) => {
+          const result = await castFinalist(projectFile, request.params.id)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
       '/api/takes/:file': {

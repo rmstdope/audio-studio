@@ -1,17 +1,22 @@
-/** A voice in Fish Audio's library, as the studio uses it. */
-export interface Voice {
-  id: string
-  title: string
-  description: string
-  tags: string[]
-  languages: string[]
+import { z } from 'zod'
+
+/** A voice in Fish Audio's library, as the studio uses (and saves) it. */
+export const VoiceSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  tags: z.array(z.string()),
+  languages: z.array(z.string()),
   /** How many times it has been used for generation: Fish's measure of popularity. */
-  uses: number
-  likes: number
-  author: string
+  uses: z.number(),
+  likes: z.number(),
+  author: z.string(),
   /** The uploader's demo clip, if any. Free to play. */
-  sample: { text: string; audio: string } | null
-}
+  sample: z.object({ text: z.string(), audio: z.string() }).nullable(),
+})
+
+/** A voice in Fish Audio's library, as the studio uses it. */
+export type Voice = z.infer<typeof VoiceSchema>
 
 /** A voice found for an audition, with the keywords it matched. */
 export interface Candidate {

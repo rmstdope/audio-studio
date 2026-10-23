@@ -9,6 +9,7 @@ import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
 import { auditionFor, castProblems, phrasePath, recordedTakes } from './takes'
+import { createSerial } from './serial'
 import { searchVoices } from './voiceSearch'
 import { loadWorkspace, type ProjectFailure } from './workspace'
 
@@ -40,11 +41,20 @@ export type CandidatesResult =
   | ProjectFailure
   | null
 
+/** How to search for candidates other than with the character's keywords, leaving out its voice. */
+export interface SearchOptions {
+  /** Keywords to search with instead of the character's (e.g. the ones an audition started with). */
+  keywords?: string[]
+  /** More voices to leave out (e.g. every voice an audition has already shown). */
+  exclude?: Iterable<string>
+}
+
 /** Searches Fish's library with a character's audition keywords, leaving out its current voice. */
 export async function findCandidates(
   projectFile: string,
   characterId: string,
   fishFor: FishFactory,
+  options: SearchOptions = {},
 ): Promise<CandidatesResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -62,10 +72,14 @@ export async function findCandidates(
     }
   }
   const { language } = project.narration.audition
-  const keywords = character.keywords
+  const keywords = options.keywords ?? character.keywords
   try {
     const current = character.voice ? await fish.getVoice(character.voice).catch(() => null) : null
-    const exclude = new Set(character.voice ? [character.voice] : [])
+    // Left out before the list is cut, so a later search reaches voices past the first ones.
+    const exclude = new Set([
+      ...(character.voice ? [character.voice] : []),
+      ...(options.exclude ?? []),
+    ])
     const found = keywords.length
       ? await searchVoices(fish, keywords, {
           language,
@@ -158,12 +172,39 @@ function withAudition(
   )
 }
 
+/** Casts a voice for a character: its id and name in the cast; style and the rest stay as they are. */
+export function setVoice(
+  projectFile: string,
+  characterId: string,
+  voice: { id: string; name: string },
+): Promise<CharacterChange> {
+  return updateCharacter(projectFile, characterId, (entry) => {
+    if (!('voice' in entry)) {
+      const { voiceName: _old, ...rest } = entry
+      return { ...rest, voice: voice.id, voiceName: voice.name }
+    }
+    // The voice stays where it was, its name right after it.
+    return Object.fromEntries(
+      Object.entries(entry).flatMap(([key, value]): [string, unknown][] =>
+        key === 'voice'
+          ? [
+              ['voice', voice.id],
+              ['voiceName', voice.name],
+            ]
+          : key === 'voiceName'
+            ? []
+            : [[key, value]],
+      ),
+    )
+  })
+}
+
 /**
  * Writes in progress per project (one server serves one project, with one cast file), so changes
  * made at once are applied one after the other. Every cast writer must go through
  * `updateCharacter`.
  */
-const castWrites = new Map<string, Promise<unknown>>()
+const castWrites = createSerial()
 
 /**
  * Changes one character's entry in the cast and writes the cast back, in its own layout, leaving
@@ -176,13 +217,7 @@ function updateCharacter(
   characterId: string,
   change: (entry: Character) => Character,
 ): Promise<CharacterChange> {
-  const key = projectFile
-  const previous = castWrites.get(key) ?? Promise.resolve()
-  const next = previous.catch(() => {}).then(() => writeCharacter(projectFile, characterId, change))
-  castWrites.set(key, next)
-  return next.finally(() => {
-    if (castWrites.get(key) === next) castWrites.delete(key)
-  })
+  return castWrites.run(projectFile, () => writeCharacter(projectFile, characterId, change))
 }
 
 /** Pronunciation keys JavaScript would move to the front, changing the order they apply in. */

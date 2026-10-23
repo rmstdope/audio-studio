@@ -50,6 +50,14 @@
   --tint-6: #e3c9a0;
   --tint-6-bg: #2a241c;
   --chip: #1a1d26;
+  --kept-bg: #0f1a16;
+  --kept-line: #1f5a40;
+  --keep-on-bg: #163b2b;
+  --keep-on-line: #2e8a62;
+  --drop-on-bg: #3a1a20;
+  --drop-on-line: #8a3443;
+  --accent-soft-line: #5a3218;
+  --success-bg: #0f2219;
   --chip-hover: #262a35;
   --radius: 14px;
   --font: 'Geist', system-ui, -apple-system, sans-serif;
@@ -1037,4 +1045,140 @@ a.btn {
 
 .take-error {
   font-size: 12px;
+}
+
+/* Audition rounds */
+
+.rounds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.round-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  border: 1px solid var(--line-strong);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.round-chip span {
+  font-weight: 400;
+}
+
+.round-chip.now {
+  background: var(--accent-soft-bg);
+  border-color: var(--accent-soft-line);
+  color: var(--accent-soft-ink);
+}
+
+.voice-card.kept {
+  background: var(--kept-bg);
+  border-color: var(--kept-line);
+}
+
+.voice-card.dropped {
+  opacity: 0.5;
+}
+
+.verdict {
+  display: flex;
+  gap: 8px;
+}
+
+.verdict .btn {
+  flex: 1;
+  align-self: auto;
+}
+
+.verdict-keep[aria-pressed='true'] {
+  background: var(--keep-on-bg);
+  border-color: var(--keep-on-line);
+  color: var(--ok-ink);
+}
+
+.verdict-drop[aria-pressed='true'] {
+  background: var(--drop-on-bg);
+  border-color: var(--drop-on-line);
+  color: var(--danger-ink);
+}
+
+.round-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.round-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.round-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.round-actions .btn {
+  align-self: auto;
+}
+
+.add-voice {
+  display: flex;
+  gap: 8px;
+}
+
+.add-voice .search {
+  width: 220px;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.cast-banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--success-bg);
+  border: 1px solid var(--kept-line);
+  color: var(--ok-ink);
+}
+
+.cast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cast-text strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.cast-text .chip {
+  text-decoration: none;
+}
+
+.cast-note {
+  color: var(--warn);
 }

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
-import { findCandidates, setKeywords, setPhrase } from './auditions'
+import { findCandidates, setKeywords, setPhrase, setVoice } from './auditions'
 import { createLimiter } from './limit'
 import { recordTake } from './takes'
 import type { FishClient } from './fish'
@@ -305,5 +305,29 @@ describe('setKeywords', () => {
   it('returns null for a character the project does not have', async () => {
     const root = tempRepo(files)
     expect(await setKeywords(join(root, 'audio-studio.json'), 'nobody', ['x'])).toBeNull()
+  })
+})
+
+describe('setVoice', () => {
+  it('puts the name right after the voice, moving a stray old name', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': {
+        speakers: { grandmother: { voiceName: 'Old', style: '[w]', voice: 'cur' } },
+      },
+    })
+    await setVoice(join(root, 'audio-studio.json'), 'grandmother', { id: 'v', name: 'New' })
+    const cast = readFileSync(join(root, 'tts/cast.json'), 'utf8')
+    expect(cast).toContain('"grandmother": { "style": "[w]", "voice": "v", "voiceName": "New" }')
+  })
+
+  it('adds voice and name at the end for a character without a voice', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { grandmother: { voiceName: 'Old', style: '[w]' } } },
+    })
+    await setVoice(join(root, 'audio-studio.json'), 'grandmother', { id: 'v', name: 'New' })
+    const cast = readFileSync(join(root, 'tts/cast.json'), 'utf8')
+    expect(cast).toContain('"grandmother": { "style": "[w]", "voice": "v", "voiceName": "New" }')
   })
 })

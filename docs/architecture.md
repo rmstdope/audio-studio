@@ -341,7 +341,8 @@ each part.
   candidate card also offers Fish's own sample clip.
 - **Phrase**: the project's standard phrase, the character's own phrase, or any of their lines
   picked from the script of any part ("hear it say something it will actually say").
-- Audition sessions are saved in `.audio-studio/auditions/<character>.json`, so a casting
+- Audition sessions are saved in `.audio-studio/auditions/<character>-<hash>.json` (a readable name
+  plus a short hash of the id, so any character name makes a safe file name), so a casting
   can be paused and resumed. The cast is only changed on **Cast**.
 - **Add by id**: paste a Fish voice id or URL to bring a specific voice into the round.
 
@@ -393,7 +394,9 @@ Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's stat
 voice, the audition phrase and the takes already recorded), `PATCH /api/characters/:id`
 (keywords or phrase), `POST /api/characters/:id/takes` (record a take) and `GET /api/takes/:file`.
 Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the audition model, voice,
-spoken phrase and settings, so a take is recorded once. The rest is the plan:
+spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
+/api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `verdict`, `next`, `more`, `add` and
+`cast`; sessions are kept in `.audio-studio/auditions/`. The rest is the plan:
 
 ```
 GET    /api/project                              project, parts, credit
@@ -407,11 +410,14 @@ GET    /api/characters                           all characters, with the parts 
 PATCH  /api/characters/:id                       style, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table
 GET    /api/characters/:id/candidates            voices matching the keywords, current voice
-GET    /api/auditions/:character                 current audition session
-POST   /api/auditions/:character/search          candidates from keywords (more=true adds N)
-POST   /api/auditions/:character/candidates      add by voice id
-POST   /api/auditions/:character/verdicts        keep/drop per candidate, next round
-POST   /api/auditions/:character/cast            write the chosen voice to cast.json
+GET    /api/auditions/:id                        the audition in progress, with phrase and takes
+DELETE /api/auditions/:id                        end it without casting
+POST   /api/auditions/:id/start                  round 1 from a fresh search
+POST   /api/auditions/:id/verdict                keep / drop / undecided for one voice
+POST   /api/auditions/:id/next                   the next round with the voices not dropped
+POST   /api/auditions/:id/more                   a round's worth of new candidates
+POST   /api/auditions/:id/add                    a voice by its Fish id
+POST   /api/auditions/:id/cast                   write the last voice left to cast.json
 POST   /api/jobs                                 run a plan
 DELETE /api/jobs/:id                             cancel
 GET    /api/characters/:id/audition?voices=   the audition phrase and which voices have takes
