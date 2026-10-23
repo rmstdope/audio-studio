@@ -4,9 +4,11 @@ import { resolveInRoot } from '../core/paths'
 import { problemsFrom, type Problem, type Project } from '../core/project'
 import { CastSchema, type Character } from '../core/resources'
 import type { CharacterSummary } from '../core/summary'
+import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
+import { auditionFor, readCast, recordedTakes } from './takes'
 import { searchVoices } from './voiceSearch'
 import { loadWorkspace, type ProjectFailure } from './workspace'
 
@@ -26,6 +28,12 @@ export type CandidatesResult =
       /** The character's current voice, if it has one and Fish still has it. */
       current: Voice | null
       candidates: Candidate[]
+      /** What the character says in a take. */
+      audition: AuditionText
+      /** Takes already recorded for this phrase, by voice id. */
+      takes: Record<string, string>
+      /** How many candidates a round has (the project's `audition.candidatesPerRound`). */
+      perRound: number
     }
   | { ok: false; reason: 'no-key' | 'fish'; message: string }
   | ProjectFailure
@@ -55,20 +63,28 @@ export async function findCandidates(
   try {
     const current = character.voice ? await fish.getVoice(character.voice).catch(() => null) : null
     const exclude = new Set(character.voice ? [character.voice] : [])
-    const candidates = keywords.length
+    const found = keywords.length
       ? await searchVoices(fish, keywords, {
           language,
           exclude,
           parallel: project.narration.quality.parallel,
         })
       : []
+    const candidates = found.slice(0, CANDIDATE_LIMIT)
+    const root = dirname(projectFile)
+    const cast = (await readCast(root, project, [])) ?? { speakers: {}, pronounce: {} }
+    const audition = auditionFor(cast, characterId, project)
+    const voices = [...(current ? [current.id] : []), ...candidates.map((c) => c.voice.id)]
     return {
       ok: true,
       character,
       keywords,
       language,
       current,
-      candidates: candidates.slice(0, CANDIDATE_LIMIT),
+      candidates,
+      audition,
+      takes: recordedTakes(root, project, audition, voices),
+      perRound: project.narration.audition.candidatesPerRound,
     }
   } catch (error) {
     return {
@@ -100,6 +116,19 @@ export function setKeywords(
     ...entry,
     audition: { ...entry.audition, keywords: cleaned },
   }))
+}
+
+/** Saves a character's own audition phrase in the cast; an empty phrase goes back to the standard one. */
+export function setPhrase(
+  projectFile: string,
+  characterId: string,
+  phrase: string | null,
+): Promise<CharacterChange> {
+  const own = phrase?.trim()
+  return updateCharacter(projectFile, characterId, (entry) => {
+    const { phrase: _old, ...audition } = entry.audition ?? {}
+    return { ...entry, audition: own ? { ...audition, phrase: own } : audition }
+  })
 }
 
 /**

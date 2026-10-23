@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
+import type { TakeResult } from '../services/takes'
 import type { AdoptResult, LoadResult, PartResult } from '../services/workspace'
 
 async function getJson<T>(path: string): Promise<T> {
@@ -79,6 +81,82 @@ export function useSetKeywords(characterId: string) {
       return client.invalidateQueries({ queryKey: ['project'] })
     },
   })
+}
+
+/** Saves a character's own audition phrase (null for the standard one), then reloads its takes. */
+export function useSetPhrase(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `phrase-${characterId}` },
+    mutationFn: async (phrase: string | null) => {
+      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ phrase }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the phrase answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['candidates', characterId] }),
+  })
+}
+
+/**
+ * Records audition takes: `record(voice)` asks the server for the take and adds it to the
+ * candidates in the cache, without searching Fish again. `recording` holds the voices in progress,
+ * `errors` what went wrong per voice.
+ */
+export function useTakes(characterId: string) {
+  const client = useQueryClient()
+  const [recording, setRecording] = useState<Set<string>>(new Set())
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const record = useCallback(
+    async (voice: string) => {
+      setRecording((now) => new Set(now).add(voice))
+      setErrors(({ [voice]: _gone, ...rest }) => rest)
+      try {
+        const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}/takes`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ voice }),
+        })
+        if (!response.ok && response.status !== 409) {
+          throw new Error(`recording answered ${response.status}`)
+        }
+        const result = (await response.json()) as NonNullable<TakeResult>
+        if (result.ok) {
+          client.setQueryData<NonNullable<CandidatesResult>>(['candidates', characterId], (old) =>
+            old?.ok ? { ...old, takes: { ...old.takes, [voice]: result.key } } : old,
+          )
+        } else {
+          const message = 'message' in result ? result.message : 'the project’s files need fixing'
+          setErrors((now) => ({ ...now, [voice]: message }))
+        }
+      } catch (error) {
+        setErrors((now) => ({
+          ...now,
+          [voice]: error instanceof Error ? error.message : String(error),
+        }))
+      } finally {
+        setRecording((now) => {
+          const next = new Set(now)
+          next.delete(voice)
+          return next
+        })
+      }
+    },
+    [characterId, client],
+  )
+
+  return { record, recording, errors }
+}
+
+/** The URL of a recorded audition take. */
+export function takeUrl(key: string): string {
+  return `/api/takes/${key}.mp3`
 }
 
 /** The URL of a clip in a part. */

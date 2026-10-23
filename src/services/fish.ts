@@ -18,10 +18,22 @@ export interface VoiceQuery {
   pageNumber: number
 }
 
+/** A request to speak text in a voice. */
+export interface TtsRequest {
+  text: string
+  voice: string
+  model: string
+  temperature: number
+  topP: number
+  speed: number
+}
+
 /** What the studio needs from Fish Audio. Behind an interface, so tests use a fake. */
 export interface FishClient {
   listVoices(query: VoiceQuery): Promise<VoicePage>
   getVoice(id: string): Promise<Voice>
+  /** The text spoken in the voice, as MP3. */
+  tts(request: TtsRequest): Promise<Uint8Array>
 }
 
 /** Fish Audio answered with an error. */
@@ -102,6 +114,27 @@ export function createFishClient(
     },
     async getVoice(id) {
       return toVoice(ApiVoiceSchema.parse(await get(`/model/${encodeURIComponent(id)}`)))
+    },
+    async tts({ text, voice, model, temperature, topP, speed }) {
+      const response = await fetch(new URL('/v1/tts', baseUrl), {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+          model,
+        },
+        body: JSON.stringify({
+          text,
+          reference_id: voice,
+          format: 'mp3',
+          latency: 'normal',
+          temperature,
+          top_p: topP,
+          prosody: { speed, volume: 0 },
+        }),
+      })
+      if (!response.ok) throw new FishError(response.status, await errorMessage(response))
+      return new Uint8Array(await response.arrayBuffer())
     },
   }
 }

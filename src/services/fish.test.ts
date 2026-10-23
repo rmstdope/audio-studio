@@ -91,6 +91,57 @@ describe('createFishClient', () => {
   })
 })
 
+describe('tts', () => {
+  it('posts the text, voice and settings as JSON with the model in a header, and returns the audio', async () => {
+    const requests: Request[] = []
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      requests.push(new Request(input, init))
+      return new Response(new Uint8Array([1, 2, 3]))
+    }) as typeof globalThis.fetch
+    const audio = await createFishClient('secret', { fetch }).tts({
+      text: '[warm] Hello.',
+      voice: 'v1',
+      model: 's2.1-pro-free',
+      temperature: 0.7,
+      topP: 0.6,
+      speed: 0.9,
+    })
+    expect([...audio]).toEqual([1, 2, 3])
+    const request = requests[0]!
+    expect(request.method).toBe('POST')
+    expect(new URL(request.url).pathname).toBe('/v1/tts')
+    expect(request.headers.get('model')).toBe('s2.1-pro-free')
+    expect(request.headers.get('authorization')).toBe('Bearer secret')
+    expect(request.headers.get('content-type')).toBe('application/json')
+    expect(await request.json()).toEqual({
+      text: '[warm] Hello.',
+      reference_id: 'v1',
+      format: 'mp3',
+      latency: 'normal',
+      temperature: 0.7,
+      top_p: 0.6,
+      prosody: { speed: 0.9, volume: 0 },
+    })
+  })
+
+  it('throws a FishError when Fish refuses', async () => {
+    const fetch = (async () =>
+      Response.json(
+        { message: 'No credit' },
+        { status: 402 },
+      )) as unknown as typeof globalThis.fetch
+    const failing = createFishClient('k', { fetch }).tts({
+      text: 'x',
+      voice: 'v',
+      model: 'm',
+      temperature: 0.7,
+      topP: 0.7,
+      speed: 1,
+    })
+    await expect(failing).rejects.toThrow('Fish Audio answered 402: No credit')
+  })
+})
+
 describe('fishFromEnv', () => {
   const project = ProjectSchema.parse(projectJson())
 

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import type { ProjectSummary } from '../../../core/summary'
+import type { AuditionText } from '../../../core/takes'
 import type { Candidate, Voice } from '../../../core/voiceSearch'
-import { useCandidates, useSetKeywords } from '../../api'
+import { takeUrl, useCandidates, useSetKeywords, useSetPhrase, useTakes } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
@@ -23,6 +24,7 @@ export function AuditionView({
 }) {
   const character = summary.characters.find((c) => c.id === characterId)
   const candidates = useCandidates(characterId)
+  const takes = useTakes(characterId)
   const { playing, toggle } = useClipPlayer()
 
   if (!character) {
@@ -38,6 +40,21 @@ export function AuditionView({
 
   const titles = new Map(summary.parts.map((p) => [p.id, shortTitle(p.title)]))
   const result = candidates.data
+  const ok = result?.ok ? result : null
+  const takeProps = (voice: string) => ({
+    take: ok?.takes[voice] ?? null,
+    recording: takes.recording.has(voice),
+    error: takes.errors[voice] ?? null,
+    onRecord: () => void takes.record(voice),
+  })
+  // The current voice and the top of the list: the voices a round would start with.
+  const roundVoices = ok
+    ? [
+        ...(ok.current ? [ok.current.id] : []),
+        ...ok.candidates.slice(0, ok.perRound).map((c) => c.voice.id),
+      ]
+    : []
+  const toRecord = roundVoices.filter((v) => !ok?.takes[v] && !takes.recording.has(v))
 
   return (
     <>
@@ -66,6 +83,7 @@ export function AuditionView({
       <div className="audition">
         <aside className="audition-brief panel">
           <KeywordsEditor characterId={character.id} keywords={character.keywords} />
+          {ok && <PhraseEditor characterId={character.id} audition={ok.audition} />}
           <div className="brief-item">
             <span className="label">Style cue</span>
             {character.style ? (
@@ -86,7 +104,13 @@ export function AuditionView({
           {result?.ok && result.current && (
             <div className="section">
               <h2 className="section-title">Current voice</h2>
-              <VoiceCard voice={result.current} playing={playing} toggle={toggle} note="Cast now" />
+              <VoiceCard
+                voice={result.current}
+                playing={playing}
+                toggle={toggle}
+                note="Cast now"
+                {...takeProps(result.current.id)}
+              />
             </div>
           )}
           {!result?.ok && character.voice && (
@@ -102,6 +126,21 @@ export function AuditionView({
                 <span className="muted">
                   {plural(result.candidates.length, 'voice')} matching the keywords, best first
                 </span>
+              )}
+              {roundVoices.length > 0 && (
+                <button
+                  className="btn btn-primary section-action"
+                  type="button"
+                  disabled={toRecord.length === 0}
+                  onClick={() => toRecord.forEach((voice) => void takes.record(voice))}
+                  title="Each voice says the audition phrase in the character’s style (free model)"
+                >
+                  {takes.recording.size
+                    ? `Recording ${takes.recording.size}…`
+                    : toRecord.length
+                      ? `Record takes for the top ${plural(toRecord.length, 'voice')}`
+                      : 'Top voices recorded'}
+                </button>
               )}
             </div>
             {candidates.isPending ? (
@@ -143,6 +182,7 @@ export function AuditionView({
                     keywordCount={result.keywords.length}
                     playing={playing}
                     toggle={toggle}
+                    {...takeProps(candidate.voice.id)}
                   />
                 ))}
               </div>
@@ -209,6 +249,57 @@ function KeywordsEditor({ characterId, keywords }: { characterId: string; keywor
   )
 }
 
+function PhraseEditor({ characterId, audition }: { characterId: string; audition: AuditionText }) {
+  const save = useSetPhrase(characterId)
+  const [draft, setDraft] = useState<string | null>(null)
+  const text = draft ?? audition.phrase
+  const changed = draft !== null && draft.trim() !== audition.phrase
+
+  return (
+    <form
+      className="brief-item"
+      onSubmit={(event) => {
+        event.preventDefault()
+        save.mutate(text.trim() || null, { onSuccess: () => setDraft(null) })
+      }}
+    >
+      <label className="label" htmlFor="phrase">
+        Audition phrase · {audition.own ? 'this character’s own' : 'the project’s standard'}
+      </label>
+      <textarea
+        id="phrase"
+        className="phrase"
+        rows={3}
+        value={text}
+        onChange={(e) => setDraft(e.target.value)}
+      />
+      <div className="keyword-add">
+        <button className="btn" type="submit" disabled={!changed || save.isPending}>
+          {save.isPending ? 'Saving…' : 'Save phrase'}
+        </button>
+        {audition.own && (
+          <button
+            className="btn"
+            type="button"
+            disabled={save.isPending}
+            onClick={() => save.mutate(null, { onSuccess: () => setDraft(null) })}
+          >
+            Use the standard phrase
+          </button>
+        )}
+      </div>
+      <span className="muted brief-hint">
+        A changed phrase needs new takes. Sent to Fish as:{' '}
+        <span className="mono">{audition.spoken}</span>
+      </span>
+      {save.data && !save.data.ok && 'problems' in save.data && (
+        <Problems title="The phrase could not be saved" problems={save.data.problems} />
+      )}
+      {save.isError && <span className="adopt-error">{save.error.message}</span>}
+    </form>
+  )
+}
+
 function VoiceCard({
   voice,
   candidate,
@@ -216,6 +307,10 @@ function VoiceCard({
   playing,
   toggle,
   note,
+  take,
+  recording,
+  error,
+  onRecord,
 }: {
   voice: Voice
   candidate?: Candidate
@@ -223,6 +318,11 @@ function VoiceCard({
   playing: string | null
   toggle: (id: string, url: string) => void
   note?: string
+  /** The key of this voice's recorded take, if any. */
+  take: string | null
+  recording: boolean
+  error: string | null
+  onRecord: () => void
 }) {
   const sample = voice.sample
   return (
@@ -253,16 +353,40 @@ function VoiceCard({
           ))}
         </div>
       )}
+      <div className="voice-take">
+        {take ? (
+          <>
+            <button
+              type="button"
+              className="icon-btn take-play"
+              aria-label={
+                playing === `take:${voice.id}` ? 'Stop' : `Play the take of ${voice.title}`
+              }
+              onClick={() => toggle(`take:${voice.id}`, takeUrl(take))}
+            >
+              {playing === `take:${voice.id}` ? <PauseIcon /> : <PlayIcon />}
+            </button>
+            <span className="take-label">Take: the audition phrase in character</span>
+          </>
+        ) : (
+          <button className="btn" type="button" disabled={recording} onClick={onRecord}>
+            {recording ? 'Recording…' : 'Record take'}
+          </button>
+        )}
+      </div>
+      {error && <span className="adopt-error take-error">{error}</span>}
       <div className="voice-sample">
         {sample ? (
           <>
             <button
               type="button"
               className="icon-btn"
-              aria-label={playing === voice.id ? 'Stop' : `Play Fish’s sample of ${voice.title}`}
-              onClick={() => toggle(voice.id, sample.audio)}
+              aria-label={
+                playing === `sample:${voice.id}` ? 'Stop' : `Play Fish’s sample of ${voice.title}`
+              }
+              onClick={() => toggle(`sample:${voice.id}`, sample.audio)}
             >
-              {playing === voice.id ? <PauseIcon /> : <PlayIcon />}
+              {playing === `sample:${voice.id}` ? <PauseIcon /> : <PlayIcon />}
             </button>
             <span className="muted sample-text" title={sample.text}>
               Fish sample{sample.text ? `: “${sample.text}”` : ''}
