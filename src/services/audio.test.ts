@@ -59,6 +59,17 @@ describe.skipIf(!hasFfmpeg)('ffmpegEncoder', () => {
 })
 
 describe.skipIf(!hasFfmpeg)('decodeClip', () => {
+  it('says when decoding takes too long', async () => {
+    const root = tempRepo({})
+    const file = join(root, 'one.mp3')
+    const second = writeWav({
+      format: { channels: 1, sampleRate: 16000, bitsPerSample: 16 },
+      data: new Uint8Array(16000 * 2),
+    })
+    await ffmpegEncoder(second, file, { bitrate: '64k', channels: 1 })
+    expect(decodeClip(file, { timeoutMs: 1 })).rejects.toThrow('took longer than')
+  })
+
   it('decodes a clip to WAV at its own rate, and measures its length from it', async () => {
     const root = tempRepo({})
     const file = join(root, 'one.mp3')
@@ -67,8 +78,11 @@ describe.skipIf(!hasFfmpeg)('decodeClip', () => {
       data: new Uint8Array(16000 * 2),
     })
     await ffmpegEncoder(second, file, { bitrate: '64k', channels: 1 })
+    // Piped, ffmpeg cannot fill in the sizes in the header (0xFFFFFFFF): the data is read to the end.
     const { wav, seconds } = await decodeClip(file)
-    expect(readWav(wav).format).toMatchObject({ channels: 1, sampleRate: 16000 })
+    const { format, data } = readWav(wav)
+    expect(format).toMatchObject({ channels: 1, sampleRate: 16000 })
+    expect(data.length).toBe(Math.round(seconds * 16000) * 2)
     expect(seconds).toBeGreaterThan(0.95)
     expect(seconds).toBeLessThan(1.1)
   })
