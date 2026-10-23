@@ -24,7 +24,12 @@ describe('ProjectSchema', () => {
       final: 's2.1-pro-free',
     })
     expect(project.narration.quality.minHeard).toBe(0.9)
-    expect(project.narration.output).toEqual({ codec: 'mp3', bitrate: '64k', channels: 1 })
+    expect(project.narration.output).toEqual({
+      codec: 'mp3',
+      bitrate: '64k',
+      channels: 1,
+      lufs: null,
+    })
     expect(project.narration.audition.candidatesPerRound).toBe(5)
   })
 
@@ -106,5 +111,15 @@ describe('ProjectSchema', () => {
 describe('partPathFor', () => {
   it('replaces every {part}', () => {
     expect(partPathFor('tts/{part}/x-{part}.json', 'act2')).toBe('tts/act2/x-act2.json')
+  })
+})
+
+describe('ProjectSchema, loudness', () => {
+  it('levels nothing unless the project names a target loudness', () => {
+    expect(ProjectSchema.parse(projectJson()).narration.output.lufs).toBeNull()
+    const levelled = projectJson({
+      narration: { ...(projectJson().narration as object), output: { lufs: -16 } },
+    })
+    expect(ProjectSchema.parse(levelled).narration.output.lufs).toBe(-16)
   })
 })

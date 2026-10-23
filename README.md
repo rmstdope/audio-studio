@@ -24,7 +24,9 @@ you know what to commit (step 6.3); the studio itself never commits. **Refresh d
 project's `refreshDialog` command for a part and shows what changed; cues left without a line are
 listed on the part's overview, to give to the reworded line or remove (step 6.4).
 
-Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`), and checking
+Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`; with
+`"output": { "lufs": -16 }` each clip is also levelled to that loudness, as RetroQuest's `level.py`
+does), and checking
 takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads
 the model). Without them, set `"quality": { "transcriber": "none" }` in the project file.
 
