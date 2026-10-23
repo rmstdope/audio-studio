@@ -166,7 +166,14 @@ an id and a title.
     "models": { "audition": "s2.1-pro-free", "draft": "s2.1-pro-free", "final": "s2.1-pro-free" },
     "tts": { "temperature": 0.7, "topP": 0.7, "speed": 1.0 },
     "output": { "codec": "mp3", "bitrate": "64k", "channels": 1 },
-    "quality": { "minHeard": 0.9, "takes": 3, "chunkLimit": 400, "parallel": 4 },
+    "quality": {
+      "minHeard": 0.9,
+      "takes": 3,
+      "chunkLimit": 400,
+      "parallel": 4,
+      "transcriber": "mlx-whisper",
+      "whisperModel": "mlx-community/whisper-large-v3-turbo"
+    },
     "audition": {
       "phrase": "Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.",
       "candidatesPerRound": 5,
@@ -491,7 +498,16 @@ Small, independently useful increments:
       until step 5 transcribes it. A _Record_ button per line on the lines page.
    2. **Generate a part**: a plan for a scope (the part, a character), run as a job with progress and
       cancel, orphaned clips removed after confirmation.
-5. **Quality**: Whisper worker, alignment, takes, weak lines and retakes, re-timing clips.
+5. **Quality**, in two pull requests:
+   1. **Checked takes**: a Whisper worker (`worker/transcribe.py`, mlx-whisper through uv, the
+      model loaded once; it exits when the studio does), narrate.py's alignment ported exactly
+      (difflib's matching and Python's rounding; fuzz-compared on 300 cases), and up to
+      `quality.takes` takes per line until one is heard at `minHeard`, keeping the best: real
+      word timings in the manifest, the heard share and takes in the lock. `quality.transcriber:
+"none"` records one unchecked take, as before.
+   2. **Weak lines and re-timing**: retake weak lines from the plan; re-measure word timings of
+      existing clips without new audio (narrate.py `--retime`), which also gives adopted clips a
+      heard share.
 6. **Editing**: style, cue and pronunciation editing; Changes panel; Refresh dialog.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data

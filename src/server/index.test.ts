@@ -48,7 +48,13 @@ const encode = async (wav: Uint8Array, file: string) => {
   mkdirSync(dirname(file), { recursive: true })
   writeFileSync(file, wav)
 }
-const server = startServer({ projectFile: join(root, 'audio-studio.json'), port: 0, fish, encode })
+const server = startServer({
+  projectFile: join(root, 'audio-studio.json'),
+  port: 0,
+  fish,
+  encode,
+  transcriber: null,
+})
 afterAll(() => server.stop(true))
 
 const url = (path: string) => new URL(path, server.url)
@@ -283,7 +289,12 @@ describe('server, with problems', () => {
     'tts/cast.json': '{ broken',
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
-  const other = startServer({ projectFile: join(broken, 'audio-studio.json'), port: 0, fish: null })
+  const other = startServer({
+    projectFile: join(broken, 'audio-studio.json'),
+    port: 0,
+    fish: null,
+    transcriber: null,
+  })
   afterAll(() => other.stop(true))
 
   it('refuses to save keywords over a broken cast with 409', async () => {
@@ -315,6 +326,7 @@ describe('server, without an API key', () => {
     projectFile: join(keyless, 'audio-studio.json'),
     port: 0,
     fish: null,
+    transcriber: null,
   })
   afterAll(() => other.stop(true))
 
@@ -344,6 +356,7 @@ describe('server, generating a part', () => {
     port: 0,
     fish,
     encode,
+    transcriber: null,
   })
   afterAll(() => gen.stop(true))
   const at = (path: string) => new URL(path, gen.url)
@@ -431,6 +444,7 @@ describe('server, generating only what was shown', () => {
     port: 0,
     fish,
     encode,
+    transcriber: null,
   })
   afterAll(() => shown.stop(true))
   const at = (path: string) => new URL(path, shown.url)

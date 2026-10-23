@@ -7,6 +7,7 @@ import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
+import type { Transcriber } from './transcriber'
 import { recordLine, removeOrphans } from './narration'
 import { inPartTurn } from './partFiles'
 import { adoptPart, loadPart } from './workspace'
@@ -343,5 +344,92 @@ describe('recordLine, only if needed, racing a hand recording', () => {
       },
     )
     expect(result).toMatchObject({ ok: false, reason: 'uncast' })
+  })
+})
+
+describe('recordLine, checked with Whisper', () => {
+  /** A transcriber hearing, per call, the next of `hearings` (words of "Elior wakes up."). */
+  function hearing(...hearings: string[][]): Transcriber & { calls: number } {
+    const t = {
+      calls: 0,
+      async transcribe() {
+        const words = hearings[Math.min(t.calls++, hearings.length - 1)]!
+        return [
+          {
+            start: 0,
+            end: 0.95,
+            words: words.map((word, i) => ({ word, start: i * 0.3, end: i * 0.3 + 0.25 })),
+          },
+        ]
+      },
+      close() {},
+    }
+    return t
+  }
+
+  const recordChecked = (root: string, transcriber: Transcriber, fish: FishClient) =>
+    recordLine(join(root, 'audio-studio.json'), 'act1', 'k1', async () => fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+      transcriber,
+    })
+
+  it('keeps a take heard in full, with Whisper’s word timings', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const result = await recordChecked(root, hearing(['El-ee-or', 'wakes', 'up.']), fish)
+    expect(result).toEqual({ ok: true, key: 'k1', duration: 1, heard: 1, takes: 1 })
+    expect(requests).toHaveLength(1)
+    const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8'))
+    expect(manifest.k1.words).toEqual([
+      { word: 'Elior', start: 0, end: 0.25 },
+      { word: 'wakes', start: 0.3, end: 0.55 },
+      { word: 'up.', start: 0.6, end: 0.85 },
+    ])
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(lock.k1).toMatchObject({ heard: 1, takes: 1 })
+  })
+
+  it('takes again while a take is heard poorly, keeping the first good one', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const result = await recordChecked(root, hearing(['wakes'], ['El-ee-or', 'wakes', 'up.']), fish)
+    expect(result).toMatchObject({ ok: true, heard: 1, takes: 2 })
+    expect(requests).toHaveLength(2)
+  })
+
+  it('keeps the best of every take when none is heard well enough, and the line shows weak', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const result = await recordChecked(root, hearing(['wakes'], ['wakes', 'up.'], ['up.']), fish)
+    expect(result).toMatchObject({ ok: true, heard: 0.667, takes: 3 })
+    expect(requests).toHaveLength(3)
+    const part = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.status).toBe('weak')
+  })
+
+  it('writes nothing when Whisper fails', async () => {
+    const root = tempRepo(files)
+    const broken: Transcriber = {
+      transcribe: () => Promise.reject(new Error('Whisper could not start')),
+      close() {},
+    }
+    const result = await recordChecked(root, broken, fakeFish().fish)
+    expect(result).toEqual({ ok: false, reason: 'transcribe', message: 'Whisper could not start' })
+    expect(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8')).toBe(manifestText)
+    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
+  })
+
+  it('records one unchecked take when the project says so', async () => {
+    const unchecked = projectJson()
+    ;(unchecked.narration as { quality?: unknown }).quality = {
+      chunkLimit: 100,
+      transcriber: 'none',
+    }
+    const root = tempRepo({ ...files, 'audio-studio.json': unchecked })
+    const transcriber = hearing(['nothing'])
+    const result = await recordChecked(root, transcriber, fakeFish().fish)
+    expect(result).toEqual({ ok: true, key: 'k1', duration: 1 })
+    expect(transcriber.calls).toBe(0)
   })
 })

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { rename, rm } from 'node:fs/promises'
+import { rename, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { spreadWords } from '../core/align'
+import { alignWords, heardWords, saidWords, type HeardSegment, type TimedWord } from '../core/align'
 import { clipInputs, fingerprint } from '../core/fingerprint'
 import { planPart } from '../core/planner'
 import { resolveInRoot } from '../core/paths'
@@ -14,6 +15,7 @@ import type { FishFactory } from './auditions'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { formatEntriesPerLine, readResource, writeAtomic } from './files'
 import type { Limiter } from './limit'
+import type { Transcriber } from './transcriber'
 import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
 
@@ -22,12 +24,13 @@ export const GAP_SECONDS = 0.25
 
 /** A recorded line, or why it was not recorded. Null for an unknown part or line. */
 export type RecordResult =
-  | { ok: true; key: string; duration: number }
+  /** Recorded; with how well the kept take was heard, and how many takes it took, when checked. */
+  | { ok: true; key: string; duration: number; heard?: number; takes?: number }
   /** Asked to record only if needed, and the line is up to date by now: nothing was done. */
   | { ok: true; key: string; skipped: true }
   | {
       ok: false
-      reason: 'uncast' | 'no-key' | 'fish' | 'audio' | 'encode' | 'write'
+      reason: 'uncast' | 'no-key' | 'fish' | 'audio' | 'transcribe' | 'encode' | 'write'
       message: string
     }
   | { ok: false; problems: Problem[] }
@@ -46,6 +49,16 @@ export interface RecordOptions {
    * have been recorded or adopted meanwhile), so a job never pays for a line twice.
    */
   onlyIfNeeded?: boolean
+  /** Checks each take (unless the project's `quality.transcriber` is "none"); none: unchecked. */
+  transcriber?: Transcriber | null
+}
+
+/** One take of a line: its joined audio, its word timings, and the share of words heard. */
+interface Take {
+  clip: { wav: Uint8Array; seconds: number }
+  timed: TimedWord[]
+  /** Null when takes are not checked. */
+  heard: number | null
 }
 
 /**
@@ -63,7 +76,7 @@ export async function recordLine(
   partId: string,
   key: string,
   fishFor: FishFactory,
-  { encode = ffmpegEncoder, limiter, onlyIfNeeded = false }: RecordOptions,
+  { encode = ffmpegEncoder, limiter, onlyIfNeeded = false, transcriber = null }: RecordOptions,
 ): Promise<RecordResult> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
@@ -100,27 +113,16 @@ export async function recordLine(
   recording.then(forget, forget)
   return recording
 
-  async function record(): Promise<RecordResult> {
-    if (!inputs || !fish || !read || !read.ok || !line) return null
-    if (onlyIfNeeded) {
-      // Checked only now that this recording is registered: a recording of the same line that
-      // finished meanwhile has written its files before leaving, so it is seen here.
-      const fresh = await readPart(projectFile, partId)
-      if (!fresh || !fresh.ok) return fresh
-      const status = planPart(fresh.input).lines.find((l) => l.key === key)?.status
-      if (status === 'uncast') {
-        return {
-          ok: false,
-          reason: 'uncast',
-          message: `${line.speaker} has no voice yet; cast one first.`,
-        }
-      }
-      if (status !== 'missing' && status !== 'stale') return { ok: true, key, skipped: true }
-    }
-    // Only speaking holds a Fish slot; joining, encoding and writing do not.
+  /** One take: the line spoken by Fish (holding a Fish slot only while speaking), joined. */
+  async function makeTake(
+    take: number,
+  ): Promise<
+    { ok: true; clip: { wav: Uint8Array; seconds: number } } | { ok: false; failure: RecordResult }
+  > {
+    if (!inputs || !fish || !line) return { ok: false, failure: null }
     let pieces: Uint8Array[]
     try {
-      pieces = await limiter.run(`line\n${id}`, narration.quality.parallel, async () => {
+      pieces = await limiter.run(`line\n${id}\n${take}`, narration.quality.parallel, async () => {
         const spoken: Uint8Array[] = []
         const texts = spokenPieces(
           line.text,
@@ -144,18 +146,61 @@ export async function recordLine(
         return spoken
       })
     } catch (error) {
-      return { ok: false, reason: 'fish', message: messageOf(error) }
+      return { ok: false, failure: { ok: false, reason: 'fish', message: messageOf(error) } }
     }
-    let clip: { wav: Uint8Array; seconds: number }
     try {
-      clip = joinWavs(pieces, GAP_SECONDS)
+      return { ok: true, clip: joinWavs(pieces, GAP_SECONDS) }
     } catch (error) {
-      return {
-        ok: false,
-        reason: 'audio',
-        message: `Fish sent audio that could not be joined: ${messageOf(error)}`,
-      }
+      const message = `Fish sent audio that could not be joined: ${messageOf(error)}`
+      return { ok: false, failure: { ok: false, reason: 'audio', message } }
     }
+  }
+
+  async function record(): Promise<RecordResult> {
+    if (!inputs || !fish || !read || !read.ok || !line) return null
+    if (onlyIfNeeded) {
+      // Checked only now that this recording is registered: a recording of the same line that
+      // finished meanwhile has written its files before leaving, so it is seen here.
+      const fresh = await readPart(projectFile, partId)
+      if (!fresh || !fresh.ok) return fresh
+      const status = planPart(fresh.input).lines.find((l) => l.key === key)?.status
+      if (status === 'uncast') {
+        return {
+          ok: false,
+          reason: 'uncast',
+          message: `${line.speaker} has no voice yet; cast one first.`,
+        }
+      }
+      if (status !== 'missing' && status !== 'stale') return { ok: true, key, skipped: true }
+    }
+    // Takes until one is heard well enough (up to quality.takes), keeping the best: as narrate.py.
+    const checker = narration.quality.transcriber === 'none' ? null : transcriber
+    const tokens = line.text.split(' ')
+    const said = saidWords(line.text, cast.pronounce)
+    let best: Take | null = null
+    let takes = 0
+    for (let take = 1; take <= (checker ? narration.quality.takes : 1); take++) {
+      const made = await makeTake(take)
+      if (!made.ok) return made.failure
+      takes = take
+      const { clip } = made
+      let timed = alignWords(tokens, [], clip.seconds).timed
+      let heard: number | null = null
+      if (checker) {
+        try {
+          const segments = await transcribeWav(checker, clip.wav)
+          const aligned = alignWords(tokens, heardWords(segments, clip.seconds), clip.seconds, said)
+          timed = aligned.timed
+          heard = aligned.ratio
+        } catch (error) {
+          return { ok: false, reason: 'transcribe', message: messageOf(error) }
+        }
+      }
+      if (!best || (heard ?? 0) > (best.heard ?? 0)) best = { clip, timed, heard }
+      if (heard === null || heard >= narration.quality.minHeard) break
+    }
+    if (!best) return null
+    const { clip } = best
 
     // Encoded beside the clip under a hidden name (never served, never a stray clip), and moved
     // into place only in the part's turn, once the manifest and lock could be read.
@@ -183,14 +228,15 @@ export async function recordLine(
           file,
           speaker: line.speaker,
           duration,
-          words: spreadWords(line.text, duration),
+          words: best.timed,
         }
         lock[key] = {
           fp,
           voice: inputs.voice,
           model: inputs.model,
           parts,
-          takes: 1,
+          takes,
+          ...(best.heard === null ? {} : { heard: roundRatio(best.heard) }),
           at: new Date().toISOString(),
         }
         // The lock last: if anything fails before it, the line shows as stale (its old lock entry)
@@ -201,7 +247,9 @@ export async function recordLine(
         return []
       })
       if (problems.length) return { ok: false, problems }
-      return { ok: true, key, duration }
+      return best.heard === null
+        ? { ok: true, key, duration }
+        : { ok: true, key, duration, heard: roundRatio(best.heard), takes }
     } catch (error) {
       return { ok: false, reason: 'write', message: messageOf(error) }
     } finally {
@@ -233,6 +281,22 @@ function sorted<T>(record: Record<string, T>): Record<string, T> {
       .sort()
       .map((k) => [k, record[k]!]),
   )
+}
+
+/** What Whisper heard in a WAV: written to a temporary file outside the game, then removed. */
+async function transcribeWav(transcriber: Transcriber, wav: Uint8Array): Promise<HeardSegment[]> {
+  const file = join(tmpdir(), `audio-studio-take-${randomUUID()}.wav`)
+  await writeFile(file, wav)
+  try {
+    return await transcriber.transcribe(file)
+  } finally {
+    await rm(file, { force: true }).catch(() => {})
+  }
+}
+
+/** A share of words heard, to three decimals, as kept in the lock. */
+function roundRatio(ratio: number): number {
+  return Math.round(ratio * 1000) / 1000
 }
 
 function messageOf(error: unknown): string {

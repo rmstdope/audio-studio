@@ -14,9 +14,12 @@ and casts voices by audition: it searches Fish Audio's library by keywords, reco
 saying the audition phrase in the character's style, and runs keep/drop rounds until one voice is
 left, which it writes to the cast. It records narration: line by line, or a whole part (or one
 character) as a job with a plan, progress and Cancel, removing orphaned clips when asked (step 4).
-Checking takes with Whisper comes next.
+Each take is checked with Whisper, and recorded again (up to three times) until enough of its
+words are heard; the manifest gets real word timings. Retaking weak lines comes next.
 
-Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`).
+Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`), and checking
+takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads
+the model). Without them, set `"quality": { "transcriber": "none" }` in the project file.
 
 Audition takes and sessions are kept in `.audio-studio/` in the game repository; add it to that
 repository's `.gitignore`.
