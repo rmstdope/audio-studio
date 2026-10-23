@@ -505,6 +505,56 @@ describe('server, generating a part', () => {
   })
 })
 
+describe('server, refreshing and generating', () => {
+  const json = projectJson()
+  ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 0.5'
+  const busyRoot = tempRepo({
+    'audio-studio.json': json,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const slowFish: FishClient = {
+    ...fish,
+    async tts(...args) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      return fish.tts(...args)
+    },
+  }
+  const busy = startServer({
+    projectFile: join(busyRoot, 'audio-studio.json'),
+    port: 0,
+    fish: slowFish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => busy.stop(true))
+  const at = (path: string) => new URL(path, busy.url)
+  const own = { origin: busy.url.origin, 'content-type': 'application/json' }
+  const generate = () =>
+    fetch(at('/api/parts/act1/jobs'), {
+      method: 'POST',
+      headers: own,
+      body: JSON.stringify({ speaker: null, keys: ['a'], orphans: [] }),
+    })
+  const refresh = () => fetch(at('/api/parts/act1/refresh'), { method: 'POST', headers: own })
+
+  it('does not start a generation while the part is refreshing', async () => {
+    const refreshing = refresh()
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    const answer = await generate()
+    expect(answer.status).toBe(409)
+    expect((await answer.json()).error).toContain('refresh')
+    expect((await refreshing).status).toBe(200)
+  })
+
+  it('does not refresh while a generation runs on the part', async () => {
+    expect((await generate()).status).toBe(200)
+    const answer = await refresh()
+    expect(answer.status).toBe(409)
+    expect(await answer.json()).toMatchObject({ ok: false, reason: 'busy' })
+  })
+})
+
 describe('server, generating only what was shown', () => {
   const shownRoot = tempRepo({
     'audio-studio.json': projectJson(),

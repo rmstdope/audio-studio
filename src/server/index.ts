@@ -15,7 +15,7 @@ import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
-import { refreshDialog } from '../services/refresh'
+import { isRefreshing, refreshDialog } from '../services/refresh'
 import { measureLine, recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { nextRound, setVerdict } from '../core/audition'
@@ -264,6 +264,13 @@ export function startServer({
           if (!keys.length && !orphans.length) {
             return Response.json({ error: 'There is nothing to do.' }, { status: 409 })
           }
+          // Checked with no await before the job starts, so a refresh cannot slip in between.
+          if (isRefreshing(projectFile, part)) {
+            return Response.json(
+              { error: 'The dialog is being refreshed; generate when it is done.' },
+              { status: 409 },
+            )
+          }
           const job = jobs.start({
             kind: body.data.kind,
             part,
@@ -325,6 +332,12 @@ export function startServer({
       },
       '/api/parts/:part/refresh': {
         POST: fromOwnPage(async (request) => {
+          // A job reads the dialog as it records: refreshing under it would fail its lines.
+          const job = jobs.latest(request.params.part)
+          if (job && (job.status === 'running' || job.status === 'cancelling')) {
+            const message = 'A generation is running for this part; refresh when it is done.'
+            return Response.json({ ok: false, reason: 'busy', message }, { status: 409 })
+          }
           const result = await refreshDialog(projectFile, request.params.part)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })

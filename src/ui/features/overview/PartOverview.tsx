@@ -35,11 +35,11 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
               <button
                 className="btn"
                 type="button"
-                disabled={refresh.isPending}
+                disabled={refresh.pending}
                 title="Runs the project’s refreshDialog command to extract this dialog from the game"
-                onClick={() => refresh.mutate()}
+                onClick={refresh.start}
               >
-                {refresh.isPending ? 'Refreshing dialog…' : 'Refresh dialog'}
+                {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
               </button>
             )}
             {hasDialog && (
@@ -55,11 +55,11 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
           </div>
         )}
       </header>
-      {(refresh.data || refresh.isError) && (
+      {refresh.outcome && (
         <RefreshOutcome
-          result={refresh.data ?? null}
-          error={refresh.error?.message ?? null}
-          onClose={() => refresh.reset()}
+          result={refresh.outcome.result}
+          error={refresh.outcome.error}
+          onClose={refresh.dismiss}
         />
       )}
 
@@ -258,12 +258,14 @@ function RefreshOutcome({
     </button>
   )
   if (result?.ok) {
-    const { added, removed, changed } = result.diff
-    const parts = [
-      added.length && `${added.length} added`,
-      removed.length && `${removed.length} removed`,
-      changed.length && `${changed.length} changed`,
-    ].filter(Boolean)
+    const diff = result.diff
+    const parts = diff
+      ? [
+          diff.added.length && `${diff.added.length} added`,
+          diff.removed.length && `${diff.removed.length} removed`,
+          diff.changed.length && `${diff.changed.length} changed`,
+        ].filter(Boolean)
+      : ['the dialog could not be read before, so what changed is not known']
     return (
       <section className="panel refresh-outcome" aria-label="Refresh dialog">
         <div className="refresh-head">
@@ -275,10 +277,10 @@ function RefreshOutcome({
           </div>
           {close}
         </div>
-        {removed.length > 0 && (
+        {diff && diff.removed.length > 0 && (
           <span className="muted">
-            A reworded line gets a new key, so it shows as one removed and one added. Its old clip
-            is an orphan now, and its old cue too.
+            A reworded line gets a new key, so it shows as one removed and one added. Any clip or
+            cue the old line had is orphaned now.
           </span>
         )}
       </section>

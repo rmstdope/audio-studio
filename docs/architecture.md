@@ -63,7 +63,11 @@ retroquest/                      ← user runs `audio-studio` here
 3. The UI talks to the server over a small JSON API, and gets live job progress over a WebSocket.
 4. The studio writes only to paths the project file names, and every path goes through
    `resolveInRoot`, which refuses anything outside the project root. Clips are served only when
-   they are plain files in the part's clips folder (no folders, no symbolic links).
+   they are plain files in the part's clips folder (no folders, no symbolic links). The one
+   exception is **Refresh dialog**: it runs the project's own `refreshDialog` command (the game's
+   code, named in its project file) in the project root, only when the user clicks it on the
+   studio's page; what that command writes is the game's business, and the studio does not check
+   it beyond reading the dialog again.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 
@@ -537,7 +541,11 @@ Small, independently useful increments:
       1. **Run it** (built): **Refresh dialog** on a part's overview runs the project's command
          with `sh` in the project root (`{part}` replaced; part ids are safe in a shell), one at a
          time per part, at most 10 minutes; then the dialog is read again and the lines added,
-         removed and changed are shown, or the command's output when it fails.
+         removed and changed are shown (unknown when the dialog could not be read before), or
+         the command's output when it fails. The command runs in its own process group: a
+         timeout, the studio exiting (also on Ctrl-C) and the end of the command itself stop
+         everything it started. A refresh and a generation of the same part refuse each other,
+         on the server.
       2. **Orphaned cues**: show the cues it leaves without a line, and move each to its line's
          new key or remove it.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
