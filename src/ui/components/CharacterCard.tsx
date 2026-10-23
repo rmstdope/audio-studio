@@ -2,6 +2,8 @@ import type { LineStatus } from '../../core/planner'
 import type { CharacterSummary } from '../../core/summary'
 import { plural, tintFor, voiceLabel } from '../format'
 import { STATUS } from '../status'
+import { routeHref } from '../route'
+import { HeadphonesIcon } from './icons'
 import { StatusBar } from './StatusBar'
 
 /** The badge a card shows: cast state first, then what needs doing. */
@@ -86,6 +88,12 @@ export function CharacterCard({
             {part}
           </span>
         ))}
+        <a
+          className="btn card-action"
+          href={routeHref({ view: 'audition', character: character.id })}
+        >
+          <HeadphonesIcon /> Audition
+        </a>
       </div>
     </article>
   )

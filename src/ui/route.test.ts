@@ -11,6 +11,16 @@ describe('parseRoute', () => {
     expect(routeHref({ view: 'lines', part: 'act1' })).toBe('#/parts/act1/lines')
   })
 
+  it('reads a character’s audition', () => {
+    expect(parseRoute('#/characters/narrator-act2/audition')).toEqual({
+      view: 'audition',
+      character: 'narrator-act2',
+    })
+    expect(routeHref({ view: 'audition', character: 'old mira' })).toBe(
+      '#/characters/old%20mira/audition',
+    )
+  })
+
   it('reads the characters view', () => {
     expect(parseRoute('#/characters')).toEqual({ view: 'characters' })
   })

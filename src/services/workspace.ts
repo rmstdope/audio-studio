@@ -59,6 +59,14 @@ export type LoadResult = { ok: true; summary: ProjectSummary } | ProjectFailure
  * are reported alongside the summary; only a broken project file stops the load.
  */
 export async function loadProject(projectFile: string): Promise<LoadResult> {
+  const loaded = await loadWorkspace(projectFile)
+  return loaded.ok ? { ok: true, summary: loaded.summary } : loaded
+}
+
+/** The parsed project file and the summary of the project, for the server's own use. */
+export async function loadWorkspace(
+  projectFile: string,
+): Promise<{ ok: true; project: Project; summary: ProjectSummary } | ProjectFailure> {
   const root = dirname(projectFile)
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -70,7 +78,7 @@ export async function loadProject(projectFile: string): Promise<LoadResult> {
   for (const part of project.narration.parts) {
     dialogs[part.id] = await readDialog(root, project, part, problems)
   }
-  return { ok: true, summary: summarize({ project, root, dialogs, cast, problems }) }
+  return { ok: true, project, summary: summarize({ project, root, dialogs, cast, problems }) }
 }
 
 /** One part with the state of every clip in it. */
@@ -230,7 +238,8 @@ async function readDialog(
   return read === 'missing' || read === 'invalid' ? { status: read } : { status: 'ok', lines: read }
 }
 
-async function openProject(
+/** The validated project file, or why it cannot be used. */
+export async function openProject(
   projectFile: string,
 ): Promise<{ ok: true; project: Project } | ProjectFailure> {
   const root = dirname(projectFile)

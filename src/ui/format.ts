@@ -34,3 +34,14 @@ export function tintFor(id: string): { background: string; color: string } {
   const tint = (hash % TINTS) + 1
   return { background: `var(--tint-${tint}-bg)`, color: `var(--tint-${tint})` }
 }
+
+/** A count in few characters: `950`, `12.4k`, `1.2M`. */
+export function compact(count: number): string {
+  if (count < 1000) return String(count)
+  if (count < 1_000_000) return `${trim(count / 1000)}k`
+  return `${trim(count / 1_000_000)}M`
+}
+
+function trim(value: number): string {
+  return value >= 100 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, '')
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { longTitle, plural, shortTitle, tintFor, voiceLabel } from './format'
+import { compact, longTitle, plural, shortTitle, tintFor, voiceLabel } from './format'
 
 describe('titles', () => {
   it('splits a title at its colon', () => {
@@ -32,5 +32,17 @@ describe('tintFor', () => {
   it('is stable for an id, and uses the stylesheet’s tint tokens', () => {
     expect(tintFor('mira')).toEqual(tintFor('mira'))
     expect(tintFor('mira').background).toMatch(/^var\(--tint-[1-6]-bg\)$/)
+  })
+})
+
+describe('compact', () => {
+  it('shortens large counts', () => {
+    expect([950, 1000, 12_400, 112_000, 1_250_000].map(compact)).toEqual([
+      '950',
+      '1k',
+      '12.4k',
+      '112k',
+      '1.3M',
+    ])
   })
 })

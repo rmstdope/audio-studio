@@ -100,14 +100,19 @@ audio-studio/
 │   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
 │   │   ├── planner.ts           script × lock × disk → status per line, generation plan
-│   │   ├── align.ts             Whisper words → per-word timings, heard ratio
-│   │   └── audition.ts          audition state machine: rounds, keep/drop, finalist
+│   │   ├── summary.ts           parts and characters as the UI shows them
+│   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
+│   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
+│   │   ├── align.ts             Whisper words → per-word timings, heard ratio (later)
+│   │   └── audition.ts          audition state machine: rounds, keep/drop, finalist (later)
 │   ├── services/                I/O behind interfaces (fakes in tests)
-│   │   ├── fish.ts              FishClient: searchVoices, getVoice, tts, credits
-│   │   ├── voiceSearch.ts       keyword search + local ranking (port of fish_tts.py search)
-│   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
-│   │   ├── audio.ts             join WAVs, encode MP3, measure duration, peaks
-│   │   ├── files.ts             read resources, write atomically, diff-friendly JSON
+│   │   ├── env.ts               the Fish API key, from the environment or the env file
+│   │   ├── fish.ts              FishClient (listVoices, getVoice; later tts, credits)
+│   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
+│   │   ├── auditions.ts         candidates for a character; changes to the cast, one at a time
+│   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker (later)
+│   │   ├── audio.ts             join WAVs, encode MP3, measure duration, peaks (later)
+│   │   ├── files.ts             read resources, write atomically, lock formatting
 │   │   ├── workspace.ts         find the project, load it and its parts, adopt clips
 │   │   ├── git.ts               `git status --porcelain` for the project's paths
 │   │   └── jobs.ts              job queue, concurrency, cancel, progress events
@@ -214,6 +219,11 @@ New fields: `voiceName` (shown in the UI; the id alone is unreadable) and `audit
 plus an optional phrase that replaces the project's standard one). A speaker in the script with no
 entry in `cast.json` shows as **Uncast**. The UI shows, for each character, which parts it appears
 in and how many lines it has in each, because recasting it makes its lines stale in all of them.
+
+Pronunciations apply in the order the file lists them, with one limit: JavaScript puts integer-like
+keys (`"10"`) first when it reads the file, so the studio applies those first, where RetroQuest's
+Python tooling keeps file order. The studio refuses to rewrite a cast where this would change the
+order (an integer-like key among others); a longer key such as `"Act 10"` keeps its place.
 
 RetroQuest today has `tts/act1/cast.json`; switching over moves it to `tts/cast.json` once (only Act I
 is cast so far, so there is nothing to merge).
@@ -378,7 +388,9 @@ generation while the script and cast still change) and `final` (the recording th
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's status),
-`POST /api/parts/:part/adopt` and `GET /api/parts/:part/clips/:file`. The rest is the plan:
+`POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
+`GET /api/characters/:id/candidates` (voices matching the character's keywords, with its current
+voice) and `PATCH /api/characters/:id` (keywords). The rest is the plan:
 
 ```
 GET    /api/project                              project, parts, credit
@@ -391,6 +403,7 @@ POST   /api/parts/:part/plan                     scope → plan (no side effects
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table
+GET    /api/characters/:id/candidates            voices matching the keywords, current voice
 GET    /api/auditions/:character                 current audition session
 POST   /api/auditions/:character/search          candidates from keywords (more=true adds N)
 POST   /api/auditions/:character/candidates      add by voice id
@@ -442,7 +455,12 @@ Small, independently useful increments:
    shown read-only.
 2. **Status**: fingerprint, planner, lock, _Adopt existing clips_; line table with statuses. No API
    calls yet.
-3. **Audition**: Fish client, voice search, rounds, cast written to `cast.json`.
+3. **Audition**, in three pull requests:
+   1. **Voice search**: Fish client, API key from the env file, keywords saved in the cast, ranked
+      candidates with Fish's own samples.
+   2. **Takes**: the audition phrase spoken by each candidate in the character's style, cached.
+   3. **Rounds and casting**: keep/drop, bring in more, add by id, saved sessions, the chosen voice
+      written to `cast.json`.
 4. **Generate**: TTS, join, encode, manifest and lock, job runner with progress and cancel.
 5. **Quality**: Whisper worker, alignment, takes, weak lines and retakes, orphan removal.
 6. **Editing**: style, cue and pronunciation editing; Changes panel; Refresh dialog.

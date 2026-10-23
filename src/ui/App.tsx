@@ -1,6 +1,7 @@
 import { useProject } from './api'
 import { Problems } from './components/Problems'
 import { Sidebar } from './components/Sidebar'
+import { AuditionView } from './features/audition/AuditionView'
 import { CharactersView } from './features/characters/CharactersView'
 import { LinesView } from './features/lines/LinesView'
 import { PartOverview } from './features/overview/PartOverview'
@@ -50,7 +51,7 @@ export function App() {
   }
 
   const { summary } = result
-  const requested = route.view === 'characters' ? null : route.part
+  const requested = route.view === 'part' || route.view === 'lines' ? route.part : null
   const part =
     summary.parts.find((p) => p.id === requested) ??
     summary.parts.find((p) => p.dialog === 'ok') ??
@@ -65,6 +66,8 @@ export function App() {
         )}
         {route.view === 'characters' ? (
           <CharactersView summary={summary} />
+        ) : route.view === 'audition' ? (
+          <AuditionView key={route.character} summary={summary} characterId={route.character} />
         ) : route.view === 'lines' ? (
           <LinesView key={part.id} part={part} />
         ) : (
