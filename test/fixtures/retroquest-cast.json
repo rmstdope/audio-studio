@@ -1,0 +1,17 @@
+{
+  "speakers": {
+    "narrator": { "voice": "7d805071401d4b738334f332a8c320c2", "style": "[warm, gentle storyteller]" },
+    "grandmother": { "voice": "e48a228e21a443d6a4302dc6238c8128", "style": "[warm, gentle, a little worried]" },
+    "mira": { "voice": "52b38f57477c4a3dbaf9136e739d9799", "style": "[low, calm, knowing]" },
+    "priest": { "voice": "d5b3a0954fba413b924daa64cf19fcf4", "style": "[kind, hushed, reverent]" },
+    "fisherman": { "voice": "66fd169d1eca43298b3e977878f14e20", "style": "[weathered, friendly, unhurried]" },
+    "shopkeeper": { "voice": "592b2d14a67540dfa8ca486caa45b699", "style": "[bustling, cheerful]" },
+    "blacksmith": { "voice": "d3b518ad71b64fa2a3197779f217a5f1", "style": "[gruff, hearty]" },
+    "tilda": { "voice": "1c93f26e9a6e411ba05c263432e5d3ce", "style": "[chatty, lowering her voice]" },
+    "merchant": { "voice": "c16c2964a0324371b06f9c5bbe5e8f0f", "style": "[warm, salesman-like]" },
+    "mother": { "voice": "f7fe817b4b634c2cb763d240d95b1c2c", "style": "[tender, a little urgent, writing to her son]" },
+    "father": { "voice": "12a41b18606d4aff82e253bc293ea5e9", "style": "[warm, quiet, hopeful]" },
+    "elior": { "voice": "ad1e8d0c166e464789c6c9d1c003bedd", "style": "[young, breathless, remembering the night]" }
+  },
+  "pronounce": { "Act I:": "Act One:" }
+}

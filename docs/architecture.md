@@ -378,7 +378,9 @@ generation while the script and cast still change) and `final` (the recording th
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's status),
-`POST /api/parts/:part/adopt` and `GET /api/parts/:part/clips/:file`. The rest is the plan:
+`POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
+`GET /api/characters/:id/candidates` (voices matching the character's keywords, with its current
+voice) and `PATCH /api/characters/:id` (keywords). The rest is the plan:
 
 ```
 GET    /api/project                              project, parts, credit
@@ -391,6 +393,7 @@ POST   /api/parts/:part/plan                     scope → plan (no side effects
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table
+GET    /api/characters/:id/candidates            voices matching the keywords, current voice
 GET    /api/auditions/:character                 current audition session
 POST   /api/auditions/:character/search          candidates from keywords (more=true adds N)
 POST   /api/auditions/:character/candidates      add by voice id
@@ -442,7 +445,12 @@ Small, independently useful increments:
    shown read-only.
 2. **Status**: fingerprint, planner, lock, _Adopt existing clips_; line table with statuses. No API
    calls yet.
-3. **Audition**: Fish client, voice search, rounds, cast written to `cast.json`.
+3. **Audition**, in three pull requests:
+   1. **Voice search**: Fish client, API key from the env file, keywords saved in the cast, ranked
+      candidates with Fish's own samples.
+   2. **Takes**: the audition phrase spoken by each candidate in the character's style, cached.
+   3. **Rounds and casting**: keep/drop, bring in more, add by id, saved sessions, the chosen voice
+      written to `cast.json`.
 4. **Generate**: TTS, join, encode, manifest and lock, job runner with progress and cancel.
 5. **Quality**: Whisper worker, alignment, takes, weak lines and retakes, orphan removal.
 6. **Editing**: style, cue and pronunciation editing; Changes panel; Refresh dialog.

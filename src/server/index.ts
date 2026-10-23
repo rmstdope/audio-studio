@@ -1,4 +1,9 @@
-import { adoptPart, clipFile, loadPart, loadProject } from '../services/workspace'
+import { dirname } from 'node:path'
+import { z } from 'zod'
+import { findCandidates, setKeywords } from '../services/auditions'
+import { fishApiKey } from '../services/env'
+import { createFishClient, type FishClient } from '../services/fish'
+import { adoptPart, clipFile, loadPart, loadProject, openProject } from '../services/workspace'
 import index from '../ui/index.html'
 
 /** How to start the studio's server. */
@@ -8,7 +13,11 @@ export interface ServerOptions {
   port: number
   /** Hot reloading and browser console forwarding, for working on the studio itself. */
   development?: boolean
+  /** The Fish client to use (tests); by default one is made from the project's API key. */
+  fish?: FishClient | null
 }
+
+const KeywordsBody = z.object({ keywords: z.array(z.string()).max(20) })
 
 const notFound = () => Response.json({ error: 'not found' }, { status: 404 })
 
@@ -32,7 +41,16 @@ export function allowedHosts(port: number): string[] {
  * The API answers only requests addressed to 127.0.0.1 or localhost on its port, so a web page
  * whose host name was made to point at this machine (DNS rebinding) cannot read the project.
  */
-export function startServer({ projectFile, port, development = false }: ServerOptions) {
+export function startServer({ projectFile, port, development = false, fish }: ServerOptions) {
+  /** The Fish client, made from the API key on every use so a key added later is picked up. */
+  async function fishClient(): Promise<FishClient | null> {
+    if (fish !== undefined) return fish
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return null
+    const key = await fishApiKey(dirname(projectFile), opened.project.env)
+    return key ? createFishClient(key) : null
+  }
+
   /** Only requests addressed to the studio itself reach `handler`. */
   const guard =
     <R extends Request>(handler: (request: R) => Response | Promise<Response>) =>
@@ -77,6 +95,22 @@ export function startServer({ projectFile, port, development = false }: ServerOp
         GET: guard(async (request) => {
           const file = await clipFile(projectFile, request.params.part, request.params.file)
           return file ? new Response(Bun.file(file)) : notFound()
+        }),
+      },
+      '/api/characters/:id': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = KeywordsBody.safeParse(await request.json().catch(() => null))
+          if (!body.success)
+            return Response.json({ error: 'expected { keywords: string[] }' }, { status: 400 })
+          const result = await setKeywords(projectFile, request.params.id, body.data.keywords)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/characters/:id/candidates': {
+        GET: guard(async (request) => {
+          const result = await findCandidates(projectFile, request.params.id, await fishClient())
+          return result ? Response.json(result) : notFound()
         }),
       },
       '/api/*': guard(notFound),

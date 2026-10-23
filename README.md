@@ -8,8 +8,10 @@ See [docs/architecture.md](docs/architecture.md) for the design.
 
 ## Status
 
-Step 1 of the delivery plan: the studio finds and validates the project, and shows each part's
-characters and the project-wide cast, read only. Auditions and generation come next.
+Steps 1, 2 and 3.1 of the delivery plan (`docs/architecture.md` §12): the studio validates the
+project, shows each part's characters and the state of every line's clip, adopts clips recorded
+before it, and searches Fish Audio's library for voices for a character by keywords. Audition
+takes, casting and generation come next.
 
 ## Install
 

@@ -25,10 +25,11 @@ export function projectJson(overrides: Record<string, unknown> = {}): Record<str
   }
 }
 
-/** A temporary consumer repository holding `files` (path → JSON value, or raw text). */
+/** A temporary consumer repository holding `files` (path → JSON value, or raw text; undefined leaves it out). */
 export function tempRepo(files: Record<string, unknown>): string {
   const root = mkdtempSync(join(tmpdir(), 'audio-studio-test-'))
   for (const [path, content] of Object.entries(files)) {
+    if (content === undefined) continue
     const full = join(root, path)
     mkdirSync(dirname(full), { recursive: true })
     writeFileSync(full, typeof content === 'string' ? content : JSON.stringify(content, null, 2))

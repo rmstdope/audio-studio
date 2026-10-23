@@ -56,7 +56,9 @@ export function Sidebar({
             className="nav-item"
             href={routeHref({ view: 'part', part: part.id })}
             aria-current={
-              route.view !== 'characters' && activePart === part.id ? 'page' : undefined
+              (route.view === 'part' || route.view === 'lines') && activePart === part.id
+                ? 'page'
+                : undefined
             }
           >
             <span className="num">{index + 1}</span>
@@ -76,7 +78,9 @@ export function Sidebar({
         <a
           className="nav-item"
           href={routeHref({ view: 'characters' })}
-          aria-current={route.view === 'characters' ? 'page' : undefined}
+          aria-current={
+            route.view === 'characters' || route.view === 'audition' ? 'page' : undefined
+          }
         >
           <PeopleIcon /> <span className="grow">All characters</span>
           <span className="meta">{summary.characters.length}</span>

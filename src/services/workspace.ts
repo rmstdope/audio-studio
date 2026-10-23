@@ -230,7 +230,8 @@ async function readDialog(
   return read === 'missing' || read === 'invalid' ? { status: read } : { status: 'ok', lines: read }
 }
 
-async function openProject(
+/** The validated project file, or why it cannot be used. */
+export async function openProject(
   projectFile: string,
 ): Promise<{ ok: true; project: Project } | ProjectFailure> {
   const root = dirname(projectFile)

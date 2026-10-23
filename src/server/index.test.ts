@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import type { FishClient } from '../services/fish'
 import { allowedHosts, startServer } from './index'
 
 const root = tempRepo({
@@ -11,7 +12,30 @@ const root = tempRepo({
   'audio/act1/manifest.json': { a: { file: 'a.mp3' } },
   'audio/act1/a.mp3': 'ID3-not-really-audio',
 })
-const server = startServer({ projectFile: join(root, 'audio-studio.json'), port: 0 })
+const fish: FishClient = {
+  async listVoices() {
+    return {
+      total: 1,
+      items: [
+        {
+          id: 'w1',
+          title: 'Warm',
+          description: '',
+          tags: [],
+          languages: ['en'],
+          uses: 1,
+          likes: 0,
+          author: '',
+          sample: null,
+        },
+      ],
+    }
+  },
+  async getVoice() {
+    throw new Error('not used')
+  },
+}
+const server = startServer({ projectFile: join(root, 'audio-studio.json'), port: 0, fish })
 afterAll(() => server.stop(true))
 
 const url = (path: string) => new URL(path, server.url)
@@ -81,6 +105,30 @@ describe('server', () => {
   it('accepts changes from the page opened as localhost too', async () => {
     const response = await post('/api/parts/act1/adopt', `http://localhost:${server.port}`)
     expect(response.status).toBe(200)
+  })
+
+  it('saves a character’s keywords, from the studio’s own page only', async () => {
+    const patch = (body: unknown, origin = server.url.origin) =>
+      fetch(url('/api/characters/narrator'), {
+        method: 'PATCH',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    expect((await patch({ keywords: ['warm'] }, 'https://evil.example')).status).toBe(403)
+    expect((await patch({ keywords: 'warm' })).status).toBe(400)
+    expect((await patch({ keywords: ['warm'] })).status).toBe(200)
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.narrator.audition).toEqual({ keywords: ['warm'] })
+  })
+
+  it('finds candidates for a character with its keywords', async () => {
+    const body = await (await fetch(url('/api/characters/narrator/candidates'))).json()
+    expect(body).toMatchObject({ ok: true, keywords: ['warm'] })
+    expect(body.candidates.map((c: { voice: { id: string } }) => c.voice.id)).toEqual(['w1'])
+  })
+
+  it('answers an unknown character with 404', async () => {
+    expect((await fetch(url('/api/characters/nobody/candidates'))).status).toBe(404)
   })
 
   it('serves the UI', async () => {

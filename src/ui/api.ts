@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { CandidatesResult, CharacterChange } from '../services/auditions'
 import type { AdoptResult, LoadResult, PartResult } from '../services/workspace'
 
 async function getJson<T>(path: string): Promise<T> {
@@ -36,6 +37,41 @@ export function useAdopt(partId: string) {
     mutationFn: () =>
       postJson<NonNullable<AdoptResult>>(`/api/parts/${encodeURIComponent(partId)}/adopt`),
     onSuccess: () => client.invalidateQueries({ queryKey: ['part', partId] }),
+  })
+}
+
+/** Voices found for a character's audition. Cached for a while: each search asks Fish many times. */
+export function useCandidates(characterId: string) {
+  return useQuery({
+    queryKey: ['candidates', characterId],
+    queryFn: () =>
+      getJson<NonNullable<CandidatesResult>>(
+        `/api/characters/${encodeURIComponent(characterId)}/candidates`,
+      ),
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+}
+
+/** Saves a character's audition keywords, then searches again with them. */
+export function useSetKeywords(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (keywords: string[]) => {
+      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ keywords }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the keywords answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['candidates', characterId] })
+      client.invalidateQueries({ queryKey: ['project'] })
+    },
   })
 }
 

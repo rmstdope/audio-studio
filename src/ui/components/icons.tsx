@@ -112,3 +112,13 @@ export function AlertIcon() {
     </Stroke>
   )
 }
+
+/** Listen: auditions. */
+export function HeadphonesIcon() {
+  return (
+    <Stroke size={14}>
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+      <path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z" />
+    </Stroke>
+  )
+}
