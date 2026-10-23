@@ -65,6 +65,8 @@ const JobBody = z
   .object({
     /** Record lines (default), or measure clips with Whisper without new audio. */
     kind: z.enum(['record', 'measure']).default('record'),
+    /** Retake the weak lines among `keys` (only when the user ticked it). */
+    retakeWeak: z.boolean().default(false),
     speaker: z.string().min(1).max(200).nullable(),
     keys: z.array(z.string()).max(100_000),
     orphans: z.array(z.string()).max(100_000),
@@ -218,11 +220,14 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const body = JobBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
-            return Response.json({ error: 'expected { speaker, keys, orphans }' }, { status: 400 })
+            return Response.json(
+              { error: 'expected { kind, speaker, keys, orphans, retakeWeak }' },
+              { status: 400 },
+            )
           }
           const { part } = request.params
-          // Weak lines are in the fresh plan, so a retake the page showed is kept.
-          const planned = await planFor(part, body.data.speaker ?? undefined, true)
+          const { retakeWeak } = body.data
+          const planned = await planFor(part, body.data.speaker ?? undefined, retakeWeak)
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const { plan, parallel } = planned
@@ -248,6 +253,7 @@ export function startServer({
                     encode,
                     limiter: fishWork,
                     onlyIfNeeded: true,
+                    retakeWeak,
                     transcriber: await transcriberFor(),
                   }),
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys),

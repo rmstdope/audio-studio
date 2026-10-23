@@ -52,10 +52,13 @@ export interface RecordOptions {
   encode?: Encoder
   limiter: Limiter
   /**
-   * Record the line only if it still needs it when its turn comes: missing, stale or weak (a
-   * job's lines may have been recorded or adopted meanwhile), so a job never pays for a line twice.
+   * Record the line only if it still needs it when its turn comes: missing or stale, or weak with
+   * `retakeWeak` (a job's lines may have been recorded or adopted meanwhile), so a job never pays
+   * for a line twice, nor retakes a line that became weak meanwhile unless asked to.
    */
   onlyIfNeeded?: boolean
+  /** With `onlyIfNeeded`: weak lines need recording too (the user chose to retake them). */
+  retakeWeak?: boolean
   /** Checks each take (unless the project's `quality.transcriber` is "none"); none: unchecked. */
   transcriber?: Transcriber | null
 }
@@ -83,7 +86,13 @@ export async function recordLine(
   partId: string,
   key: string,
   fishFor: FishFactory,
-  { encode = ffmpegEncoder, limiter, onlyIfNeeded = false, transcriber = null }: RecordOptions,
+  {
+    encode = ffmpegEncoder,
+    limiter,
+    onlyIfNeeded = false,
+    retakeWeak = false,
+    transcriber = null,
+  }: RecordOptions,
 ): Promise<RecordResult> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
@@ -178,8 +187,8 @@ export async function recordLine(
           message: `${line.speaker} has no voice yet; cast one first.`,
         }
       }
-      // Weak lines are only ever handed over when the user chose to retake them.
-      if (status !== 'missing' && status !== 'stale' && status !== 'weak') {
+      const needed = status === 'missing' || status === 'stale' || (retakeWeak && status === 'weak')
+      if (!needed) {
         return { ok: true, key, skipped: true }
       }
     }
@@ -383,9 +392,9 @@ export interface MeasureOptions {
 /**
  * Measures a recorded clip without new audio (narrate.py `--retime`): its length from the decoded
  * audio, what Whisper hears in it, the words aligned. The manifest gets the word timings and
- * length, the lock how well the clip is heard, so a clip heard poorly shows as weak. Only clips
- * the studio knows (up to date or weak) are measured, and nothing is written if the clip was
- * recorded again meanwhile.
+ * length, the lock how well the clip is heard, so a clip heard poorly shows as weak. Only
+ * up-to-date clips never measured are, and nothing is written if the clip was recorded again
+ * meanwhile (its lock entry's time changed).
  */
 export async function measureLine(
   projectFile: string,
@@ -409,11 +418,12 @@ export async function measureLine(
   const state = planPart(read.input).lines.find((l) => l.key === key)
   const entry = read.input.manifest[key]
   const before = read.input.lock[key]
-  if (!state || (state.status !== 'ok' && state.status !== 'weak') || !entry || !before) {
+  // Only what plans offer: up-to-date clips never measured (adopted, or recorded unchecked).
+  if (!state || state.status !== 'ok' || !entry || !before || before.heard !== undefined) {
     return {
       ok: false,
       reason: 'not-recorded',
-      message: 'Only clips the studio knows can be measured; record or adopt the line first.',
+      message: 'Only up-to-date clips never checked by Whisper can be measured.',
     }
   }
   const root = dirname(projectFile)
@@ -444,7 +454,7 @@ export async function measureLine(
     const now = manifest[key]
     const locked = lock[key]
     // Recorded again while it was being measured: the new clip is measured by its own recording.
-    if (!now || !locked || now.file !== entry.file || locked.fp !== before.fp) {
+    if (!now || !locked || now.file !== entry.file || locked.at !== before.at) {
       return { ok: true, key, skipped: true }
     }
     manifest[key] = { ...now, duration, words: aligned.timed }

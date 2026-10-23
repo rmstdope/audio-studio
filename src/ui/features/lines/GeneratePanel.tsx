@@ -140,7 +140,13 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
           disabled={nothing || start.isPending}
           onClick={() =>
             start.mutate(
-              { kind: 'record', speaker, keys: p.keys, orphans: removeOrphans ? p.orphans : [] },
+              {
+                kind: 'record',
+                retakeWeak,
+                speaker,
+                keys: p.keys,
+                orphans: removeOrphans ? p.orphans : [],
+              },
               {
                 onSuccess: (started) => {
                   setShownJob(started.id)

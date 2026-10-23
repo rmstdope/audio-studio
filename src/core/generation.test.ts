@@ -107,9 +107,13 @@ describe('planGeneration, weak and unmeasured lines', () => {
   })
 
   it('lists clips never measured, for checking without new audio', () => {
-    expect(planGeneration(measured, { model: 's2.1-pro-free' }).unmeasured).toEqual(['b'])
+    expect(planGeneration(measured, { model: 's2.1-pro-free', checked: true }).unmeasured).toEqual([
+      'b',
+    ])
     expect(
-      planGeneration(measured, { model: 's2.1-pro-free', speaker: 'tilda' }).unmeasured,
+      planGeneration(measured, { model: 's2.1-pro-free', checked: true, speaker: 'tilda' })
+        .unmeasured,
     ).toEqual([])
+    expect(planGeneration(measured, { model: 's2.1-pro-free' }).unmeasured).toEqual([])
   })
 })

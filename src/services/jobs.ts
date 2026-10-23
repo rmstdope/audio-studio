@@ -18,7 +18,10 @@ export interface JobState {
   total: number
   /** Lines finished: recorded, skipped or failed. */
   done: number
-  /** Lines skipped because they no longer needed recording (recorded meanwhile, adopted). */
+  /**
+   * Lines skipped: no longer needing recording (recorded meanwhile, adopted), or, when measuring,
+   * recorded again meanwhile.
+   */
   skipped: number
   failed: { key: string; message: string }[]
   /** Lines being recorded right now. */

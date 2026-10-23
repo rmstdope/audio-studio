@@ -527,7 +527,7 @@ describe('measureLine', () => {
 })
 
 describe('recordLine, retaking a weak line', () => {
-  it('records a weak line when a job asks for it', async () => {
+  it('skips a weak line in a job that was not asked to retake weak lines', async () => {
     const root = tempRepo(files)
     const projectFile = join(root, 'audio-studio.json')
     const poor: Transcriber = { transcribe: async () => [], close() {} }
@@ -542,7 +542,95 @@ describe('recordLine, retaking a weak line', () => {
       transcriber: poor,
       onlyIfNeeded: true,
     })
+    expect(again).toEqual({ ok: true, key: 'k4', skipped: true })
+    expect(requests).toHaveLength(0)
+  })
+
+  it('records a weak line when a job asks for it', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const poor: Transcriber = { transcribe: async () => [], close() {} }
+    const options = { encode: keepWav, limiter: createLimiter() }
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+      ...options,
+      transcriber: poor,
+    })
+    const { fish, requests } = fakeFish()
+    const again = await recordLine(projectFile, 'act1', 'k4', async () => fish, {
+      ...options,
+      transcriber: poor,
+      onlyIfNeeded: true,
+      retakeWeak: true,
+    })
     expect(again).toMatchObject({ ok: true, takes: 3 })
     expect(requests).toHaveLength(3)
+  })
+})
+
+describe('measureLine, edge cases', () => {
+  const heardAll: Transcriber = {
+    async transcribe() {
+      return [{ start: 0, end: 0.95, words: [{ word: 'Welcome.', start: 0.1, end: 0.6 }] }]
+    },
+    close() {},
+  }
+
+  async function unchecked() {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+    })
+    return { root, projectFile }
+  }
+
+  it('writes nothing when the clip was recorded again while it was measured', async () => {
+    const { root, projectFile } = await unchecked()
+    const lockFile = join(root, 'tts/act1/narration.lock.json')
+    const result = await measureLine(projectFile, 'act1', 'k4', {
+      transcriber: heardAll,
+      clipSeconds: async () => {
+        // The same line recorded again, with the same inputs, while this clip is measured.
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+          encode: keepWav,
+          limiter: createLimiter(),
+        })
+        return 1.25
+      },
+    })
+    expect(result).toEqual({ ok: true, key: 'k4', skipped: true })
+    expect(JSON.parse(readFileSync(lockFile, 'utf8')).k4.heard).toBeUndefined()
+  })
+
+  it('refuses when takes are not checked', async () => {
+    const { projectFile } = await unchecked()
+    const result = await measureLine(projectFile, 'act1', 'k4', { transcriber: null })
+    expect(result).toMatchObject({ ok: false, reason: 'unchecked' })
+  })
+
+  it('reports a clip that cannot be decoded', async () => {
+    const { projectFile } = await unchecked()
+    const result = await measureLine(projectFile, 'act1', 'k4', {
+      transcriber: heardAll,
+      clipSeconds: async () => {
+        throw new Error('not audio')
+      },
+    })
+    expect(result).toMatchObject({ ok: false, reason: 'decode', message: 'not audio' })
+  })
+
+  it('measures only clips never measured', async () => {
+    const { projectFile } = await unchecked()
+    const options = { transcriber: heardAll, clipSeconds: async () => 1.25 }
+    expect(await measureLine(projectFile, 'act1', 'k4', options)).toMatchObject({
+      ok: true,
+      heard: 1,
+    })
+    expect(await measureLine(projectFile, 'act1', 'k4', options)).toMatchObject({
+      ok: false,
+      reason: 'not-recorded',
+    })
   })
 })

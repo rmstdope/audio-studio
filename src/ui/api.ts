@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
@@ -338,6 +338,8 @@ export function usePlan(partId: string, speaker: string | null, weak = false) {
       const query = params.size ? `?${params}` : ''
       return getJson<PlanAnswer>(`/api/parts/${encodeURIComponent(partId)}/plan${query}`)
     },
+    // Ticking a box asks for another plan: keep showing the last one meanwhile.
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -375,6 +377,7 @@ export function useJobActions(partId: string) {
   const start = useMutation({
     mutationFn: async (options: {
       kind: JobState['kind']
+      retakeWeak?: boolean
       speaker: string | null
       keys: string[]
       orphans: string[]

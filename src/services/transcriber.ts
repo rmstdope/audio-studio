@@ -3,7 +3,7 @@ import type { HeardSegment } from '../core/align'
 
 /** Hears what a clip says. Behind an interface, so tests use a fake. */
 export interface Transcriber {
-  /** What Whisper (`model`) heard in the WAV file at `path`: its segments, with word timings. */
+  /** What Whisper (`model`) heard in the audio file at `path` (WAV or MP3): segments, word timings. */
   transcribe(model: string, path: string): Promise<HeardSegment[]>
   /** Stops the worker, if one is running. */
   close(): void

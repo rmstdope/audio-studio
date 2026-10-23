@@ -15,7 +15,10 @@ export interface GenerationPlan {
   keys: string[]
   /** Weak lines in scope: recorded but heard below the bar; retaken only when asked. */
   weak: string[]
-  /** Up-to-date clips in scope never checked by Whisper (recorded before the studio, or unchecked). */
+  /**
+   * Up-to-date clips in scope never checked by Whisper (recorded before the studio, or unchecked);
+   * none when takes are not checked.
+   */
   unmeasured: string[]
   missing: number
   /** Stale lines by the reasons they are stale (a line can count under several). */
@@ -81,9 +84,11 @@ export function planGeneration(
   return {
     keys: toRecord.map((line) => line.key),
     weak: lines.filter((line) => line.status === 'weak').map((line) => line.key),
-    unmeasured: lines
-      .filter((line) => line.status === 'ok' && line.file && line.heard === null)
-      .map((line) => line.key),
+    unmeasured: checked
+      ? lines
+          .filter((line) => line.status === 'ok' && line.file && line.heard === null)
+          .map((line) => line.key)
+      : [],
     missing: toRecord.filter((line) => line.status === 'missing').length,
     stale,
     uncast: [...new Set(lines.filter((l) => l.status === 'uncast').map((l) => l.speaker))],
