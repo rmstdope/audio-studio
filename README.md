@@ -21,7 +21,8 @@ unchecked) can be measured with Whisper without new audio. A character's style i
 audition page, a line's own cue by clicking it in the lines table, and the pronunciation table on
 All characters (steps 6.1 and 6.2). **Changes** lists what git sees of the studio's files, so
 you know what to commit (step 6.3); the studio itself never commits. **Refresh dialog** runs the
-project's `refreshDialog` command for a part and shows what changed (step 6.4).
+project's `refreshDialog` command for a part and shows what changed; cues left without a line are
+listed on the part's overview, to give to the reworded line or remove (step 6.4).
 
 Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`), and checking
 takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads

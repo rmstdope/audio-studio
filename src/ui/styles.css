@@ -1493,3 +1493,50 @@ a.btn {
   border-radius: 9px;
   white-space: pre-wrap;
 }
+
+.orphan-cues {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.orphan-cues > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.orphan-cues ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.orphan-cues li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orphan-cue-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+.orphan-cue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.orphan-cue-actions select {
+  flex: 1 1 260px;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 6px 8px;
+}

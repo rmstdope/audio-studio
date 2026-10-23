@@ -282,6 +282,33 @@ export function useRefreshDialog(partId: string) {
   }
 }
 
+/** Gives an orphaned cue to a line (`to`), or removes it (null), then reloads the part. */
+export function useMoveCue(partId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ key, to }: { key: string; to: string | null }) => {
+      const response = await fetch(
+        `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}/move`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ to }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`moving the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['changes'] })
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
 /** Saves a line's own cue (empty to go back to the character's style), then reloads the part. */
 export function useSetCue(partId: string) {
   const client = useQueryClient()

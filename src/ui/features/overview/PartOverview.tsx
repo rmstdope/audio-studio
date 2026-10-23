@@ -1,7 +1,8 @@
-import type { LineStatus } from '../../../core/planner'
-import type { PartSummary, ProjectSummary } from '../../../core/summary'
+import { useState } from 'react'
+import type { LineState, LineStatus } from '../../../core/planner'
+import { displayName, type PartSummary, type ProjectSummary } from '../../../core/summary'
 import type { PartDetail } from '../../../services/workspace'
-import { useAdopt, usePart, useRefreshDialog } from '../../api'
+import { useAdopt, useMoveCue, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
 import { CharacterCard } from '../../components/CharacterCard'
 import { AlertIcon, ListIcon } from '../../components/icons'
@@ -73,6 +74,7 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
               problems={loaded.problems}
             />
           )}
+          {loaded && loaded.orphanCues.length > 0 && <OrphanCues part={loaded} />}
           {loaded ? (
             <StatusPanel part={loaded} />
           ) : (
@@ -304,5 +306,102 @@ function RefreshOutcome({
         <pre className="refresh-output mono">{result.output}</pre>
       )}
     </section>
+  )
+}
+
+/**
+ * Cues whose line left the dialog, usually because it was reworded and got a new key: each can be
+ * given to its line's new key, or removed. Lines without a clip come first, since a reworded line
+ * has none yet.
+ */
+function OrphanCues({ part }: { part: PartDetail }) {
+  const free = part.lines.filter((line) => !line.ownCue)
+  const fresh = free.filter((line) => line.file === null)
+  const recorded = free.filter((line) => line.file !== null)
+  return (
+    <section className="panel orphan-cues" aria-label="Orphaned cues">
+      <div>
+        <span className="label">Orphaned cues</span>
+        <strong>{plural(part.orphanCues.length, 'cue')} without a line</strong>
+      </div>
+      <span className="muted">
+        Their lines left the dialog, usually reworded under a new key. Give each cue to its line’s
+        new key, or remove it.
+      </span>
+      <ul>
+        {part.orphanCues.map((orphan) => (
+          <OrphanCue
+            key={orphan.key}
+            partId={part.id}
+            orphan={orphan}
+            fresh={fresh}
+            recorded={recorded}
+          />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function OrphanCue({
+  partId,
+  orphan,
+  fresh,
+  recorded,
+}: {
+  partId: string
+  orphan: { key: string; cue: string }
+  fresh: LineState[]
+  recorded: LineState[]
+}) {
+  const move = useMoveCue(partId)
+  const [to, setTo] = useState('')
+  const problems = move.data && !move.data.ok && 'problems' in move.data ? move.data.problems : []
+  const option = (line: LineState) => (
+    <option key={line.key} value={line.key}>
+      {displayName(line.speaker)}:{' '}
+      {line.text.length > 70 ? `${line.text.slice(0, 70)}…` : line.text}
+    </option>
+  )
+  return (
+    <li>
+      <div className="orphan-cue-head">
+        <span className="mono cue">{orphan.cue}</span>
+        <span className="mono muted">{orphan.key}</span>
+      </div>
+      <div className="orphan-cue-actions">
+        <select
+          aria-label={`Line to give ${orphan.cue} to`}
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+        >
+          <option value="">Give it to a line…</option>
+          {fresh.length > 0 && (
+            <optgroup label="Lines without a clip">{fresh.map(option)}</optgroup>
+          )}
+          {recorded.length > 0 && (
+            <optgroup label="Recorded lines">{recorded.map(option)}</optgroup>
+          )}
+        </select>
+        <button
+          className="btn"
+          type="button"
+          disabled={!to || move.isPending}
+          onClick={() => move.mutate({ key: orphan.key, to })}
+        >
+          Move
+        </button>
+        <button
+          className="btn"
+          type="button"
+          disabled={move.isPending}
+          onClick={() => move.mutate({ key: orphan.key, to: null })}
+        >
+          Remove
+        </button>
+      </div>
+      {problems.length > 0 && <Problems title="The cue could not be moved" problems={problems} />}
+      {move.isError && <span className="adopt-error">{move.error.message}</span>}
+    </li>
   )
 }

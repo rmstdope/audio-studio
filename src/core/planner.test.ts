@@ -110,7 +110,7 @@ describe('planPart', () => {
       }),
     )
     expect(state.orphans).toEqual([{ key: 'old', speaker: 'mira', file: 'old.mp3' }])
-    expect(state.orphanCues).toEqual(['gone'])
+    expect(state.orphanCues).toEqual([{ key: 'gone', cue: '[soft]' }])
   })
 })
 

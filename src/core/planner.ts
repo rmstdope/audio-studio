@@ -44,7 +44,7 @@ export interface PartState {
   lines: LineState[]
   orphans: Orphan[]
   /** Cue keys whose line is no longer in the dialog (its wording changed, so its key did). */
-  orphanCues: string[]
+  orphanCues: { key: string; cue: string }[]
   counts: Record<LineStatus, number>
 }
 
@@ -102,9 +102,10 @@ export function planPart(input: PlanInput): PartState {
     .filter(([key]) => !keys.has(key))
     .map(([key, clip]) => ({ key, speaker: clip.speaker ?? null, file: clip.file }))
     .sort((a, b) => a.key.localeCompare(b.key))
-  const orphanCues = Object.keys(cues)
-    .filter((key) => !keys.has(key))
-    .sort()
+  const orphanCues = Object.entries(cues)
+    .filter(([key]) => !keys.has(key))
+    .map(([key, cue]) => ({ key, cue }))
+    .sort((a, b) => a.key.localeCompare(b.key))
 
   return { lines: states, orphans, orphanCues, counts }
 }
