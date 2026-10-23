@@ -59,8 +59,14 @@ export function isRefreshing(projectFile: string, partId: string): boolean {
   return active.has(partKey(projectFile, partId))
 }
 
-/** The process groups of the commands running now, so they can be stopped with the studio. */
-const running = new Set<number>()
+/**
+ * The process groups of the commands running now, so they can be stopped with the studio, and
+ * whether the studio's exit is watched. Kept on `globalThis`, as `--dev` reruns this module: one
+ * set and one set of handlers for the process.
+ */
+const studio = globalThis as { audioStudioRefreshes?: { running: Set<number>; watched: boolean } }
+studio.audioStudioRefreshes ??= { running: new Set(), watched: false }
+const { running } = studio.audioStudioRefreshes
 
 /**
  * Stops every refresh command running now, with everything it started. The commands run in their
@@ -68,7 +74,7 @@ const running = new Set<number>()
  * when it exits.
  */
 export function stopRefreshes(): void {
-  for (const pid of running) killGroup(pid)
+  for (const pid of studio.audioStudioRefreshes!.running) killGroup(pid)
 }
 
 function killGroup(pid: number): void {
@@ -79,12 +85,11 @@ function killGroup(pid: number): void {
   }
 }
 
-let stopsWithStudio = false
-
 /** Makes sure the running commands are stopped when the studio exits or is interrupted. */
 function stopWithStudio(): void {
-  if (stopsWithStudio) return
-  stopsWithStudio = true
+  const state = studio.audioStudioRefreshes!
+  if (state.watched) return
+  state.watched = true
   process.once('exit', stopRefreshes)
   for (const [signal, code] of [
     ['SIGINT', 130],
@@ -147,7 +152,8 @@ const GRACE_MS = 1500
  * Runs a command with the shell in `cwd`, in its own process group so that a timeout stops
  * everything it started (the game's `npx` and `node` too, which would otherwise keep the output
  * open): whether it worked, and the end of what it said. It is judged by the shell's exit: what it
- * leaves running in the background gets a moment to finish its output, then is stopped.
+ * leaves running in the background is stopped, after a moment to finish its output if it holds
+ * it.
  */
 async function shell(
   command: string,
@@ -164,6 +170,7 @@ async function shell(
   running.add(child.pid)
   let timedOut = false
   let ended = false
+  let grace: ReturnType<typeof setTimeout> | undefined
   const timer = setTimeout(() => {
     if (ended) return
     timedOut = true
@@ -172,7 +179,8 @@ async function shell(
   const exit = child.exited.then((code) => {
     ended = true
     clearTimeout(timer)
-    setTimeout(() => killGroup(child.pid), GRACE_MS).unref()
+    grace = setTimeout(() => killGroup(child.pid), GRACE_MS)
+    grace.unref()
     return code
   })
   try {
@@ -187,6 +195,7 @@ async function shell(
     return { ok: false, message, output }
   } finally {
     clearTimeout(timer)
+    clearTimeout(grace)
     // Whatever happened (a stream error too), nothing of it is left running.
     killGroup(child.pid)
     running.delete(child.pid)

@@ -244,12 +244,6 @@ export function startServer({
       '/api/parts/:part/jobs': {
         POST: fromOwnPage(async (request) => {
           const body = JobBody.safeParse(await request.json().catch(() => null))
-          if (isRefreshing(projectFile, request.params.part)) {
-            return Response.json(
-              { error: 'The dialog is being refreshed; generate when it is done.' },
-              { status: 409 },
-            )
-          }
           if (!body.success) {
             return Response.json(
               { error: 'expected { kind, speaker, keys, orphans, retakeWeak }' },
@@ -269,6 +263,13 @@ export function startServer({
           const orphans = measuring ? [] : plan.orphans.filter((key) => shownOrphans.has(key))
           if (!keys.length && !orphans.length) {
             return Response.json({ error: 'There is nothing to do.' }, { status: 409 })
+          }
+          // Checked with no await before the job starts, so a refresh cannot slip in between.
+          if (isRefreshing(projectFile, part)) {
+            return Response.json(
+              { error: 'The dialog is being refreshed; generate when it is done.' },
+              { status: 409 },
+            )
           }
           const job = jobs.start({
             kind: body.data.kind,

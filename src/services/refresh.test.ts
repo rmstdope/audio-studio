@@ -82,7 +82,14 @@ describe('refreshDialog', () => {
       timeoutMs: 20_000,
     })
     expect(result).toMatchObject({ ok: true, lines: 2 })
-    expect(Date.now() - started).toBeLessThan(10_000)
+    expect(Date.now() - started).toBeLessThan(4000)
+  })
+
+  it('leaves nothing running in the background once the command is done', async () => {
+    const root = tempRepo(project('(sleep 1 && echo late > marker.txt) >/dev/null 2>&1 &'))
+    expect(await refreshDialog(join(root, 'audio-studio.json'), 'act1')).toMatchObject({ ok: true })
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(existsSync(join(root, 'marker.txt'))).toBe(false)
   })
 
   it('says while a part is refreshing, and stops every refresh when the studio stops', async () => {

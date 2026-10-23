@@ -267,16 +267,18 @@ export function useRefreshDialog(partId: string) {
     filters: { mutationKey },
     select: (m) => m.state as MutationState<NonNullable<RefreshResult>, Error>,
   }).at(-1)
-  const [dismissed, setDismissed] = useState<number | null>(null)
   const settled = last && last.status !== 'pending' && last.status !== 'idle'
   return {
     start: () => mutation.mutate(),
     pending,
-    outcome:
-      settled && last.submittedAt !== dismissed
-        ? { result: last.data ?? null, error: last.error?.message ?? null }
-        : null,
-    dismiss: () => setDismissed(last?.submittedAt ?? null),
+    outcome: settled ? { result: last.data ?? null, error: last.error?.message ?? null } : null,
+    // Closing forgets the finished refreshes, so the outcome does not come back on a later visit.
+    dismiss: () => {
+      const cache = client.getMutationCache()
+      for (const done of cache.findAll({ mutationKey })) {
+        if (done.state.status !== 'pending') cache.remove(done)
+      }
+    },
   }
 }
 
