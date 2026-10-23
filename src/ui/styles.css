@@ -1313,3 +1313,11 @@ a.btn {
 .header-actions .btn {
   align-self: auto;
 }
+
+.generate .measure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}

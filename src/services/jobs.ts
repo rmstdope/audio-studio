@@ -1,9 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import type { RecordResult } from './narration'
+import type { MeasureResult, RecordResult } from './narration'
+
+/** What a job does to each line: record it, or measure its clip. */
+export type JobKind = 'record' | 'measure'
+
+/** What doing one line gave. */
+export type StepResult = RecordResult | MeasureResult
 
 /** A generation job as the page shows it. */
 export interface JobState {
   id: string
+  kind: JobKind
   part: string
   /** The one speaker generated, or null for the whole part. */
   speaker: string | null
@@ -11,7 +18,10 @@ export interface JobState {
   total: number
   /** Lines finished: recorded, skipped or failed. */
   done: number
-  /** Lines skipped because they no longer needed recording (recorded meanwhile, adopted). */
+  /**
+   * Lines skipped: no longer needing recording (recorded meanwhile, adopted), or, when measuring,
+   * recorded again meanwhile.
+   */
   skipped: number
   failed: { key: string; message: string }[]
   /** Lines being recorded right now. */
@@ -28,13 +38,15 @@ export interface JobState {
 
 /** What a job does: which lines to record and how, and which orphans to remove at the end. */
 export interface JobOptions {
+  kind?: JobKind
   part: string
   speaker: string | null
   keys: string[]
   /** Orphans to remove once every line is done; empty unless the user agreed. */
   orphans: string[]
   parallel: number
-  record: (key: string) => Promise<RecordResult>
+  /** Does one line: records it, or measures its clip. */
+  record: (key: string) => Promise<StepResult>
   removeOrphans: (keys: string[]) => Promise<number>
 }
 
@@ -82,6 +94,7 @@ export function createJobs(): Jobs {
         queue: [...options.keys],
         state: {
           id: randomUUID(),
+          kind: options.kind ?? 'record',
           part: options.part,
           speaker: options.speaker,
           status: 'running',
@@ -157,7 +170,7 @@ async function run(job: Running, options: JobOptions): Promise<void> {
 }
 
 /** Why a line's recording failed, or null when it did not. */
-function failure(result: RecordResult): string | null {
+function failure(result: StepResult): string | null {
   if (!result) return 'the line is no longer in the dialog'
   if (result.ok) return null
   if ('message' in result && typeof result.message === 'string') return result.message

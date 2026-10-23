@@ -15,10 +15,10 @@ import { STATUS, percent, seconds, statusDetail } from '../../status'
 type Filter = 'all' | 'attention' | LineStatus | 'orphans'
 
 /**
- * Lines a Record button is offered for: no clip, or a clip made from other inputs. Weak takes get
- * one once recordings are checked (step 5); until then a new take could not be judged better.
+ * Lines a Record button is offered for: no clip, a clip made from other inputs, or a weak one
+ * (Retake).
  */
-const RECORDABLE = new Set<LineStatus>(['missing', 'stale'])
+const RECORDABLE = new Set<LineStatus>(['missing', 'stale', 'weak'])
 
 /** Lines that need something done: everything but up to date. */
 const needsAttention = (line: LineState) => line.status !== 'ok'
@@ -199,7 +199,11 @@ export function LinesView({ part }: { part: PartSummary }) {
                           disabled={recorder.recording.has(line.key)}
                           onClick={() => void recorder.record(line.key)}
                         >
-                          {recorder.recording.has(line.key) ? 'Recording…' : 'Record'}
+                          {recorder.recording.has(line.key)
+                            ? 'Recording…'
+                            : line.status === 'weak'
+                              ? 'Retake'
+                              : 'Record'}
                         </button>
                       )}
                     </div>

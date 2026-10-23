@@ -356,14 +356,15 @@ each part.
 
 ### 8.2 Generate narration
 
-1. The user picks a scope: the whole part or one character (built), a selection of lines or the weak
-   ones (later).
+1. The user picks a scope: the whole part or one character, and whether to retake the weak lines
+   too (built); a selection of lines (later).
 2. The planner shows the plan: N to record, M to re-record (by reason), K orphans to remove, the
    bytes of text as sent, the cost for the model (free model: $0; "price unknown" for a model not in
    the price list), and later the account credit. The page sends the lines and orphans it showed;
    the server does only those that are still in its own fresh plan, and a line recorded meanwhile
-   is skipped. Lines are
-   recorded with `models.draft`.
+   is skipped (as is one that became weak meanwhile, unless weak lines were to be retaken). Lines
+   are recorded with `models.draft`. Up-to-date clips Whisper never checked can be measured
+   instead, without new audio (a job of kind `measure`).
 3. **Generate** queues one job per line. For each line:
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
    2. TTS each chunk (WAV), join them with a short gap;
@@ -379,7 +380,8 @@ each part.
 
 - Edit a character's style cue or keywords, a line's cue, or the pronunciation table: saved
   immediately, and affected lines show as stale.
-- Retake a single line, or re-time it (re-measure word timings without new audio).
+- Retake a single line (built: Record, or Retake for a weak one). Re-timing one line, or clips
+  already measured, waits until it is needed: measuring covers clips never checked (§8.2).
 - Refresh dialog (runs `refreshDialog`).
 - **Changes** panel: `git status` for the project's paths, so the user sees what to commit.
 
@@ -407,8 +409,9 @@ Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's stat
 voice, the audition phrase and the takes already recorded), `PATCH /api/characters/:id`
 (keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`
 `POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock),
-`GET /api/parts/:part/plan?speaker=` (what generating would do), `POST /api/parts/:part/jobs`
-(start a generation, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
+`GET /api/parts/:part/plan?speaker=&weak=1` (what generating would do, weak lines included if
+asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure, speaker, keys, orphans,
+retakeWeak }`: start a generation or a measuring, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
 `GET`/`DELETE /api/jobs/:id` (progress, cancel).
 Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the audition model, voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
@@ -422,7 +425,7 @@ GET    /api/parts/:part/clips/:file              a clip from the part's clips fo
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue
-GET    /api/parts/:part/plan?speaker=            scope → plan (no side effects)
+GET    /api/parts/:part/plan?speaker=&weak=1     scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table
@@ -506,9 +509,10 @@ Small, independently useful increments:
       `quality.takes` takes per line until one is heard at `minHeard`, keeping the best: real
       word timings in the manifest, the heard share and takes in the lock. `quality.transcriber:
 "none"` records one unchecked take, as before.
-   2. **Weak lines and re-timing**: retake weak lines from the plan; re-measure word timings of
-      existing clips without new audio (narrate.py `--retime`), which also gives adopted clips a
-      heard share.
+   2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when
+      asked; clips never checked (adopted from narrate.py, or recorded unchecked) measured
+      without new audio (narrate.py `--retime`): length from the decoded clip, word timings and
+      heard share from Whisper, so a poorly heard clip shows as weak.
 6. **Editing**: style, cue and pronunciation editing; Changes panel; Refresh dialog.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data

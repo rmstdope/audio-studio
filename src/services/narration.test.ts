@@ -8,7 +8,7 @@ import type { Encoder } from './audio'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
 import type { Transcriber } from './transcriber'
-import { recordLine, removeOrphans } from './narration'
+import { measureLine, recordLine, removeOrphans } from './narration'
 import { inPartTurn } from './partFiles'
 import { adoptPart, loadPart } from './workspace'
 
@@ -463,5 +463,174 @@ describe('recordLine, a later take failing', () => {
       },
     )
     expect(result).toMatchObject({ ok: true, heard: 0.333, takes: 1 })
+  })
+})
+
+describe('measureLine', () => {
+  const heardAll: Transcriber = {
+    async transcribe() {
+      return [
+        {
+          start: 0,
+          end: 0.95,
+          words: [['Welcome.', 0.1, 0.6]].map(([word, start, end]) => ({
+            word: word as string,
+            start: start as number,
+            end: end as number,
+          })),
+        },
+      ]
+    },
+    close() {},
+  }
+  const measureOptions = { transcriber: heardAll, clipSeconds: async () => 1.25 }
+
+  async function recorded(transcriber: Transcriber | null = null) {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+      transcriber,
+    })
+    return { root, projectFile }
+  }
+
+  it('measures a clip never checked: word timings, duration and how well it is heard', async () => {
+    const { root, projectFile } = await recorded()
+    const result = await measureLine(projectFile, 'act1', 'k4', measureOptions)
+    expect(result).toEqual({ ok: true, key: 'k4', heard: 1, duration: 1.25 })
+    const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8'))
+    expect(manifest.k4).toMatchObject({
+      duration: 1.25,
+      words: [{ word: 'Welcome.', start: 0.1, end: 0.6 }],
+    })
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(lock.k4.heard).toBe(1)
+  })
+
+  it('makes a clip heard poorly weak', async () => {
+    const { projectFile } = await recorded()
+    const nothing: Transcriber = { transcribe: async () => [], close() {} }
+    expect(
+      await measureLine(projectFile, 'act1', 'k4', { ...measureOptions, transcriber: nothing }),
+    ).toMatchObject({ ok: true, heard: 0 })
+    const part = await loadPart(projectFile, 'act1')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'k4')?.status).toBe('weak')
+  })
+
+  it('refuses a line without a clip the studio knows', async () => {
+    const root = tempRepo(files)
+    const result = await measureLine(join(root, 'audio-studio.json'), 'act1', 'k4', measureOptions)
+    expect(result).toMatchObject({ ok: false, reason: 'not-recorded' })
+  })
+})
+
+describe('recordLine, retaking a weak line', () => {
+  it('skips a weak line in a job that was not asked to retake weak lines', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const poor: Transcriber = { transcribe: async () => [], close() {} }
+    const options = { encode: keepWav, limiter: createLimiter() }
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+      ...options,
+      transcriber: poor,
+    })
+    const { fish, requests } = fakeFish()
+    const again = await recordLine(projectFile, 'act1', 'k4', async () => fish, {
+      ...options,
+      transcriber: poor,
+      onlyIfNeeded: true,
+    })
+    expect(again).toEqual({ ok: true, key: 'k4', skipped: true })
+    expect(requests).toHaveLength(0)
+  })
+
+  it('records a weak line when a job asks for it', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const poor: Transcriber = { transcribe: async () => [], close() {} }
+    const options = { encode: keepWav, limiter: createLimiter() }
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+      ...options,
+      transcriber: poor,
+    })
+    const { fish, requests } = fakeFish()
+    const again = await recordLine(projectFile, 'act1', 'k4', async () => fish, {
+      ...options,
+      transcriber: poor,
+      onlyIfNeeded: true,
+      retakeWeak: true,
+    })
+    expect(again).toMatchObject({ ok: true, takes: 3 })
+    expect(requests).toHaveLength(3)
+  })
+})
+
+describe('measureLine, edge cases', () => {
+  const heardAll: Transcriber = {
+    async transcribe() {
+      return [{ start: 0, end: 0.95, words: [{ word: 'Welcome.', start: 0.1, end: 0.6 }] }]
+    },
+    close() {},
+  }
+
+  async function unchecked() {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+    })
+    return { root, projectFile }
+  }
+
+  it('writes nothing when the clip was recorded again while it was measured', async () => {
+    const { root, projectFile } = await unchecked()
+    const lockFile = join(root, 'tts/act1/narration.lock.json')
+    const result = await measureLine(projectFile, 'act1', 'k4', {
+      transcriber: heardAll,
+      clipSeconds: async () => {
+        // The same line recorded again, with the same inputs, while this clip is measured.
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+          encode: keepWav,
+          limiter: createLimiter(),
+        })
+        return 1.25
+      },
+    })
+    expect(result).toEqual({ ok: true, key: 'k4', skipped: true })
+    expect(JSON.parse(readFileSync(lockFile, 'utf8')).k4.heard).toBeUndefined()
+  })
+
+  it('refuses when takes are not checked', async () => {
+    const { projectFile } = await unchecked()
+    const result = await measureLine(projectFile, 'act1', 'k4', { transcriber: null })
+    expect(result).toMatchObject({ ok: false, reason: 'unchecked' })
+  })
+
+  it('reports a clip that cannot be decoded', async () => {
+    const { projectFile } = await unchecked()
+    const result = await measureLine(projectFile, 'act1', 'k4', {
+      transcriber: heardAll,
+      clipSeconds: async () => {
+        throw new Error('not audio')
+      },
+    })
+    expect(result).toMatchObject({ ok: false, reason: 'decode', message: 'not audio' })
+  })
+
+  it('measures only clips never measured', async () => {
+    const { projectFile } = await unchecked()
+    const options = { transcriber: heardAll, clipSeconds: async () => 1.25 }
+    expect(await measureLine(projectFile, 'act1', 'k4', options)).toMatchObject({
+      ok: true,
+      heard: 1,
+    })
+    expect(await measureLine(projectFile, 'act1', 'k4', options)).toMatchObject({
+      ok: false,
+      reason: 'not-recorded',
+    })
   })
 })

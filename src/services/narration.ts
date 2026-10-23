@@ -19,7 +19,7 @@ import { LockSchema, ManifestSchema, type Lock, type Manifest } from '../core/re
 import { spokenPieces } from '../core/spoken'
 import { joinWavs } from '../core/wav'
 import type { FishFactory } from './auditions'
-import { ffmpegEncoder, type Encoder } from './audio'
+import { clipSeconds, ffmpegEncoder, type Encoder } from './audio'
 import { formatEntriesPerLine, readResource, writeAtomic } from './files'
 import type { Limiter } from './limit'
 import type { Transcriber } from './transcriber'
@@ -52,10 +52,13 @@ export interface RecordOptions {
   encode?: Encoder
   limiter: Limiter
   /**
-   * Record the line only if it is still missing or stale when its turn comes (a job's lines may
-   * have been recorded or adopted meanwhile), so a job never pays for a line twice.
+   * Record the line only if it still needs it when its turn comes: missing or stale, or weak with
+   * `retakeWeak` (a job's lines may have been recorded or adopted meanwhile), so a job never pays
+   * for a line twice, nor retakes a line that became weak meanwhile unless asked to.
    */
   onlyIfNeeded?: boolean
+  /** With `onlyIfNeeded`: weak lines need recording too (the user chose to retake them). */
+  retakeWeak?: boolean
   /** Checks each take (unless the project's `quality.transcriber` is "none"); none: unchecked. */
   transcriber?: Transcriber | null
 }
@@ -83,7 +86,13 @@ export async function recordLine(
   partId: string,
   key: string,
   fishFor: FishFactory,
-  { encode = ffmpegEncoder, limiter, onlyIfNeeded = false, transcriber = null }: RecordOptions,
+  {
+    encode = ffmpegEncoder,
+    limiter,
+    onlyIfNeeded = false,
+    retakeWeak = false,
+    transcriber = null,
+  }: RecordOptions,
 ): Promise<RecordResult> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
@@ -178,7 +187,10 @@ export async function recordLine(
           message: `${line.speaker} has no voice yet; cast one first.`,
         }
       }
-      if (status !== 'missing' && status !== 'stale') return { ok: true, key, skipped: true }
+      const needed = status === 'missing' || status === 'stale' || (retakeWeak && status === 'weak')
+      if (!needed) {
+        return { ok: true, key, skipped: true }
+      }
     }
     // Takes until one is heard well enough (up to quality.takes), keeping the best: as narrate.py.
     const checker = narration.quality.transcriber === 'none' ? null : transcriber
@@ -360,4 +372,96 @@ export async function removeOrphans(
     }
     return removed
   })
+}
+
+/** A measured clip, or why it was not measured. Null for an unknown part or line. */
+export type MeasureResult =
+  | { ok: true; key: string; heard: number; duration: number }
+  | { ok: true; key: string; skipped: true }
+  | { ok: false; reason: 'not-recorded' | 'unchecked' | 'decode' | 'transcribe'; message: string }
+  | { ok: false; problems: Problem[] }
+  | ProjectFailure
+  | null
+
+/** How clips are measured: Whisper, and how a clip's length is found (ffmpeg unless replaced). */
+export interface MeasureOptions {
+  transcriber: Transcriber | null
+  clipSeconds?: (file: string) => Promise<number>
+}
+
+/**
+ * Measures a recorded clip without new audio (narrate.py `--retime`): its length from the decoded
+ * audio, what Whisper hears in it, the words aligned. The manifest gets the word timings and
+ * length, the lock how well the clip is heard, so a clip heard poorly shows as weak. Only
+ * up-to-date clips never measured are, and nothing is written if the clip was recorded again
+ * meanwhile (its lock entry's time changed).
+ */
+export async function measureLine(
+  projectFile: string,
+  partId: string,
+  key: string,
+  { transcriber, clipSeconds: lengthOf = clipSeconds }: MeasureOptions,
+): Promise<MeasureResult> {
+  const read = await readPart(projectFile, partId)
+  if (!read || !read.ok) return read
+  if (read.problems.length) return { ok: false, problems: read.problems }
+  const line = read.input.lines.find((l) => l.key === key)
+  if (!line) return null
+  const { narration } = read.project
+  if (narration.quality.transcriber === 'none' || !transcriber) {
+    return {
+      ok: false,
+      reason: 'unchecked',
+      message: 'Clips are not checked (quality.transcriber is "none").',
+    }
+  }
+  const state = planPart(read.input).lines.find((l) => l.key === key)
+  const entry = read.input.manifest[key]
+  const before = read.input.lock[key]
+  // Only what plans offer: up-to-date clips never measured (adopted, or recorded unchecked).
+  if (!state || state.status !== 'ok' || !entry || !before || before.heard !== undefined) {
+    return {
+      ok: false,
+      reason: 'not-recorded',
+      message: 'Only up-to-date clips never checked by Whisper can be measured.',
+    }
+  }
+  const root = dirname(projectFile)
+  const clip = resolveInRoot(root, join(read.paths.clipsPath, entry.file))
+
+  let seconds: number
+  try {
+    seconds = await lengthOf(clip)
+  } catch (error) {
+    return { ok: false, reason: 'decode', message: messageOf(error) }
+  }
+  let aligned: { timed: TimedWord[]; ratio: number }
+  try {
+    const segments = await transcriber.transcribe(narration.quality.whisperModel, clip)
+    const said = saidWords(line.text, read.input.cast.pronounce)
+    aligned = alignWords(line.text.split(' '), heardWords(segments, seconds), seconds, said)
+  } catch (error) {
+    return { ok: false, reason: 'transcribe', message: messageOf(error) }
+  }
+  const duration = pyRound(seconds)
+  const heard = pyRound(aligned.ratio)
+
+  const result = await inPartTurn(projectFile, partId, async (): Promise<MeasureResult> => {
+    const found: Problem[] = []
+    const manifest = await manifestNow(root, read.paths.manifestPath, found)
+    const lock = await lockNow(root, read.paths.lockPath, found)
+    if (!manifest || !lock) return { ok: false, problems: found }
+    const now = manifest[key]
+    const locked = lock[key]
+    // Recorded again while it was being measured: the new clip is measured by its own recording.
+    if (!now || !locked || now.file !== entry.file || locked.at !== before.at) {
+      return { ok: true, key, skipped: true }
+    }
+    manifest[key] = { ...now, duration, words: aligned.timed }
+    lock[key] = { ...locked, heard }
+    await writeAtomic(root, read.paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
+    await writeAtomic(root, read.paths.lockPath, formatEntriesPerLine(lock))
+    return { ok: true, key, heard, duration }
+  })
+  return result
 }

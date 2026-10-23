@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
@@ -327,14 +327,21 @@ export type PlanAnswer =
   | { ok: false; problems: Problem[] }
   | ProjectFailure
 
-/** The generation plan for a part, or one speaker in it (null for all). */
-export function usePlan(partId: string, speaker: string | null) {
+/** The generation plan for a part, or one speaker in it (null for all); weak lines retaken if asked. */
+export function usePlan(partId: string, speaker: string | null, weak = false) {
   return useQuery({
-    queryKey: ['plan', partId, speaker],
+    queryKey: ['plan', partId, speaker, weak],
     queryFn: () => {
-      const query = speaker ? `?speaker=${encodeURIComponent(speaker)}` : ''
+      const params = new URLSearchParams()
+      if (speaker) params.set('speaker', speaker)
+      if (weak) params.set('weak', '1')
+      const query = params.size ? `?${params}` : ''
       return getJson<PlanAnswer>(`/api/parts/${encodeURIComponent(partId)}/plan${query}`)
     },
+    // Ticking the retake box asks for another plan: keep showing the last one for the same scope
+    // meanwhile (its buttons wait), but never another speaker's.
+    placeholderData: (previous, query) =>
+      query?.queryKey[2] === speaker ? keepPreviousData(previous) : undefined,
   })
 }
 
@@ -370,7 +377,13 @@ export function useJob(partId: string) {
 export function useJobActions(partId: string) {
   const client = useQueryClient()
   const start = useMutation({
-    mutationFn: async (options: { speaker: string | null; keys: string[]; orphans: string[] }) => {
+    mutationFn: async (options: {
+      kind: JobState['kind']
+      retakeWeak?: boolean
+      speaker: string | null
+      keys: string[]
+      orphans: string[]
+    }) => {
       const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/jobs`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

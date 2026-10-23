@@ -83,3 +83,37 @@ describe('planGeneration, takes', () => {
     })
   })
 })
+
+describe('planGeneration, weak and unmeasured lines', () => {
+  const measured = {
+    lines: [
+      { ...line('a', 'mira', 'ok'), file: 'a.mp3', heard: 0.97 },
+      { ...line('b', 'mira', 'ok'), file: 'b.mp3', heard: null },
+      { ...line('c', 'tilda', 'weak'), file: 'c.mp3', heard: 0.8 },
+      line('d', 'tilda', 'missing'),
+    ],
+    orphans: [],
+  }
+
+  it('lists weak lines apart, and records them only when asked', () => {
+    expect(planGeneration(measured, { model: 's2.1-pro-free' })).toMatchObject({
+      keys: ['d'],
+      weak: ['c'],
+    })
+    expect(planGeneration(measured, { model: 's2.1-pro-free', includeWeak: true }).keys).toEqual([
+      'c',
+      'd',
+    ])
+  })
+
+  it('lists clips never measured, for checking without new audio', () => {
+    expect(planGeneration(measured, { model: 's2.1-pro-free', checked: true }).unmeasured).toEqual([
+      'b',
+    ])
+    expect(
+      planGeneration(measured, { model: 's2.1-pro-free', checked: true, speaker: 'tilda' })
+        .unmeasured,
+    ).toEqual([])
+    expect(planGeneration(measured, { model: 's2.1-pro-free' }).unmeasured).toEqual([])
+  })
+})

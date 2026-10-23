@@ -1,5 +1,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { readWav } from '../core/wav'
 
 /** How clips are encoded (the project's `output`). */
 export interface EncodeOptions {
@@ -70,3 +71,31 @@ export function createFfmpegEncoder({ timeoutMs }: { timeoutMs: number }): Encod
 
 /** The encoder the studio uses: ffmpeg, stopped after two minutes. */
 export const ffmpegEncoder: Encoder = createFfmpegEncoder({ timeoutMs: 120_000 })
+
+/**
+ * A clip's length in seconds, from its decoded audio (as narrate.py `--retime` measures it): the
+ * clip decoded by ffmpeg to WAV at its own rate, its frames counted.
+ */
+export async function clipSeconds(file: string): Promise<number> {
+  let child
+  try {
+    child = Bun.spawn(['ffmpeg', '-loglevel', 'error', '-i', file, '-f', 'wav', '-'], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: 60_000,
+      killSignal: 'SIGKILL',
+    })
+  } catch {
+    throw new Error('ffmpeg is needed to measure clips: install it (e.g. brew install ffmpeg)')
+  }
+  const [bytes, message, code] = await Promise.all([
+    new Response(child.stdout).arrayBuffer(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
+  if (code !== 0)
+    throw new Error(`ffmpeg could not read the clip: ${message.trim() || `exit code ${code}`}`)
+  const { format, data } = readWav(new Uint8Array(bytes))
+  const frame = (format.bitsPerSample / 8) * format.channels
+  return data.length / frame / format.sampleRate
+}

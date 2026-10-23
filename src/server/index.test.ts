@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import { writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { FishClient } from '../services/fish'
+import { createLimiter } from '../services/limit'
+import { recordLine } from '../services/narration'
 import { allowedHosts, startServer } from './index'
 
 const root = tempRepo({
@@ -505,5 +507,79 @@ describe('server, takes not checked', () => {
   it('plans one unchecked take a line', async () => {
     const answer = await (await fetch(new URL('/api/parts/act1/plan', server.url))).json()
     expect(answer.plan).toMatchObject({ takes: 1, checked: false })
+  })
+})
+
+describe.skipIf(!Bun.which('ffmpeg'))('server, measuring clips', () => {
+  const measureRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
+  })
+  const projectFile = join(measureRoot, 'audio-studio.json')
+  /** Hears "Once upon" only, whatever the clip. */
+  const halfHeard = {
+    transcribe: async () => [
+      {
+        start: 0,
+        end: 0.9,
+        words: [
+          { word: 'Once', start: 0, end: 0.3 },
+          { word: 'upon', start: 0.3, end: 0.6 },
+        ],
+      },
+    ],
+    close() {},
+  }
+  const server = startServer({ projectFile, port: 0, fish, encode, transcriber: halfHeard })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+
+  async function finish(id: string) {
+    let state = await (await fetch(at(`/api/jobs/${id}`))).json()
+    while (state.status === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      state = await (await fetch(at(`/api/jobs/${id}`))).json()
+    }
+    return state
+  }
+
+  it('measures a clip recorded unchecked, which then shows how well it is heard', async () => {
+    const unchecked = await recordLine(projectFile, 'act1', 'a', async () => fish, {
+      encode,
+      limiter: createLimiter(),
+    })
+    expect(unchecked).toMatchObject({ ok: true })
+    const planned = await (await fetch(at('/api/parts/act1/plan'))).json()
+    expect(planned.plan.unmeasured).toEqual(['a'])
+    const job = await (
+      await fetch(at('/api/parts/act1/jobs'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify({ kind: 'measure', speaker: null, keys: ['a'], orphans: [] }),
+      })
+    ).json()
+    expect(job.kind).toBe('measure')
+    expect(await finish(job.id)).toMatchObject({ status: 'done', failed: [] })
+    const part = await (await fetch(at('/api/parts/act1'))).json()
+    expect(part.part.lines[0]).toMatchObject({ status: 'weak', heard: 0.5 })
+    const weak = await (await fetch(at('/api/parts/act1/plan?weak=1'))).json()
+    expect(weak.plan).toMatchObject({ keys: ['a'], weak: ['a'], unmeasured: [] })
+  })
+
+  it('retakes a weak line only when the job says so', async () => {
+    const recordJob = async (retakeWeak?: boolean) => {
+      const started = await (
+        await fetch(at('/api/parts/act1/jobs'), {
+          method: 'POST',
+          headers: own,
+          body: JSON.stringify({ speaker: null, keys: ['a'], orphans: [], retakeWeak }),
+        })
+      ).json()
+      return started.id ? finish(started.id) : started
+    }
+    expect(await recordJob()).toEqual({ error: 'There is nothing to do.' })
+    expect(await recordJob(true)).toMatchObject({ status: 'done', done: 1, skipped: 0 })
   })
 })
