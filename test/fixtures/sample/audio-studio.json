@@ -1,0 +1,19 @@
+{
+  "name": "Sample Quest",
+  "description": "A tiny project for working on the studio.",
+  "narration": {
+    "partLabel": "Act",
+    "parts": [
+      { "id": "act1", "title": "Act I: The Lantern" },
+      { "id": "act2", "title": "Act II: The Road" }
+    ],
+    "characters": "tts/cast.json",
+    "paths": {
+      "dialog": "tts/{part}/script.json",
+      "cues": "tts/{part}/cues.json",
+      "lock": "tts/{part}/narration.lock.json",
+      "clips": "audio/narration/{part}",
+      "manifest": "audio/narration/{part}/manifest.json"
+    }
+  }
+}

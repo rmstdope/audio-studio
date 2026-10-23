@@ -1,0 +1,249 @@
+import { useMemo, useState } from 'react'
+import type { LineState, LineStatus } from '../../../core/planner'
+import type { PartSummary } from '../../../core/summary'
+import { clipUrl, usePart } from '../../api'
+import { PauseIcon, PlayIcon } from '../../components/icons'
+import { Problems } from '../../components/Problems'
+import { StatusDot, StatusPill } from '../../components/StatusBar'
+import { useClipPlayer } from '../../components/useClipPlayer'
+import { displayName } from '../../../core/summary'
+import { longTitle, plural, shortTitle } from '../../format'
+import { routeHref } from '../../route'
+import { STATUS, percent, seconds, statusDetail } from '../../status'
+
+type Filter = 'all' | 'attention' | LineStatus | 'orphans'
+
+/** Lines that need something done: everything but up to date. */
+const needsAttention = (line: LineState) => line.status !== 'ok'
+
+/** Every line of a part with the state of its clip, filtered by status, speaker and words. */
+export function LinesView({ part }: { part: PartSummary }) {
+  const detail = usePart(part.id, part.dialog === 'ok')
+  const { playing, toggle } = useClipPlayer()
+  const [filter, setFilter] = useState<Filter>('attention')
+  const [speaker, setSpeaker] = useState('')
+  const [search, setSearch] = useState('')
+
+  const loaded = detail.data?.ok ? detail.data.part : null
+  const lines = useMemo(() => {
+    const words = search.trim().toLowerCase()
+    return (loaded?.lines ?? []).filter(
+      (line) =>
+        (filter === 'all' ||
+          (filter === 'attention' ? needsAttention(line) : line.status === filter)) &&
+        (!speaker || line.speaker === speaker) &&
+        (!words || line.text.toLowerCase().includes(words) || line.key.includes(words)),
+    )
+  }, [loaded, filter, speaker, search])
+
+  const header = (
+    <header className="page-header">
+      <div>
+        <span className="crumbs">
+          <a href={routeHref({ view: 'part', part: part.id })}>
+            Narration / {shortTitle(part.title)}
+          </a>
+        </span>
+        <h1>Lines</h1>
+        <span className="muted">
+          {longTitle(part.title)} · {plural(part.lineCount, 'line')}
+        </span>
+      </div>
+    </header>
+  )
+
+  if (!loaded) {
+    return (
+      <>
+        {header}
+        <section className="panel muted">
+          {part.dialog !== 'ok'
+            ? 'This part has no dialog yet.'
+            : detail.isError
+              ? `Could not load the part: ${detail.error.message}`
+              : 'Checking clips…'}
+        </section>
+      </>
+    )
+  }
+
+  const attention = loaded.lines.filter(needsAttention).length
+  const tabs: { id: Filter; label: string; count: number; status?: LineStatus }[] = [
+    { id: 'attention', label: 'Needs attention', count: attention },
+    ...(Object.keys(STATUS) as LineStatus[])
+      .filter((s) => loaded.counts[s] > 0)
+      .map((s) => ({ id: s, label: STATUS[s].label, count: loaded.counts[s], status: s })),
+    ...(loaded.orphans.length
+      ? [{ id: 'orphans' as const, label: 'Orphaned', count: loaded.orphans.length }]
+      : []),
+    { id: 'all', label: 'All', count: loaded.lines.length },
+  ]
+  const speakers = [...new Set(loaded.lines.map((l) => l.speaker))].sort()
+
+  return (
+    <>
+      {header}
+      {loaded.problems.length > 0 && (
+        <Problems title="Some of this part’s files could not be read" problems={loaded.problems} />
+      )}
+
+      <div className="toolbar">
+        <div className="tabs" role="tablist" aria-label="Filter by status">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              className="tab"
+              aria-selected={filter === tab.id}
+              onClick={() => setFilter(tab.id)}
+            >
+              {tab.status && <StatusDot status={tab.status} />}
+              {tab.label}
+              <span className="mono tab-count">{tab.count}</span>
+            </button>
+          ))}
+        </div>
+        <div className="filters">
+          <label className="field">
+            <span>Character</span>
+            <select value={speaker} onChange={(e) => setSpeaker(e.target.value)}>
+              <option value="">All</option>
+              {speakers.map((s) => (
+                <option key={s} value={s}>
+                  {displayName(s)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <input
+            className="search"
+            type="search"
+            placeholder="Search lines"
+            aria-label="Search lines"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {filter === 'orphans' ? (
+        <OrphanTable part={loaded.id} orphans={loaded.orphans} playing={playing} toggle={toggle} />
+      ) : (
+        <div className="table-box">
+          <table className="table">
+            <thead>
+              <tr>
+                <th style={{ width: 130 }}>Status</th>
+                <th>Line</th>
+                <th style={{ width: 220 }}>Delivery</th>
+                <th style={{ width: 70 }}>Length</th>
+                <th style={{ width: 70 }}>Heard</th>
+                <th style={{ width: 56 }}>
+                  <span className="sr-only">Play</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.key}>
+                  <td>
+                    <StatusPill status={line.status} />
+                  </td>
+                  <td>
+                    <div className="line-cell">
+                      <span className="line-speaker">
+                        {displayName(line.speaker)} <span className="mono muted">{line.key}</span>
+                      </span>
+                      <span className="line-text">{line.text}</span>
+                      {line.status !== 'ok' && (
+                        <span className="line-detail" style={{ color: STATUS[line.status].color }}>
+                          {statusDetail(line, loaded.minHeard)}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <span className="mono cue">{line.cue || '—'}</span>
+                  </td>
+                  <td className="mono num">{seconds(line.duration)}</td>
+                  <td className="mono num">{percent(line.heard)}</td>
+                  <td>
+                    {line.file && (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label={playing === line.key ? 'Stop' : `Play ${line.key}`}
+                        onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
+                      >
+                        {playing === line.key ? <PauseIcon /> : <PlayIcon />}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {lines.length === 0 && <p className="table-empty muted">No lines match.</p>}
+        </div>
+      )}
+      <span className="muted" style={{ fontSize: 12 }}>
+        Showing {plural(filter === 'orphans' ? loaded.orphans.length : lines.length, 'line')}
+      </span>
+    </>
+  )
+}
+
+function OrphanTable({
+  part,
+  orphans,
+  playing,
+  toggle,
+}: {
+  part: string
+  orphans: { key: string; speaker: string | null; file: string }[]
+  playing: string | null
+  toggle: (id: string, url: string) => void
+}) {
+  return (
+    <div className="table-box">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Clip</th>
+            <th style={{ width: 160 }}>Speaker</th>
+            <th style={{ width: 56 }}>
+              <span className="sr-only">Play</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {orphans.map((orphan) => (
+            <tr key={orphan.key}>
+              <td>
+                <div className="line-cell">
+                  <span className="mono">{orphan.file}</span>
+                  <span className="line-detail muted">
+                    Its line is no longer in the dialog: the wording changed or the line was
+                    removed.
+                  </span>
+                </div>
+              </td>
+              <td>{orphan.speaker ? displayName(orphan.speaker) : '—'}</td>
+              <td>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={playing === orphan.key ? 'Stop' : `Play ${orphan.file}`}
+                  onClick={() => toggle(orphan.key, clipUrl(part, orphan.file))}
+                >
+                  {playing === orphan.key ? <PauseIcon /> : <PlayIcon />}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}

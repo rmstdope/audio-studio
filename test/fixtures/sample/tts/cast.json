@@ -1,0 +1,7 @@
+{
+  "speakers": {
+    "narrator": { "voice": "7d805071401d4b738334f332a8c320c2", "voiceName": "Old man bible storytelling", "style": "[warm, gentle storyteller]" },
+    "keeper": { "voice": "e48a228e21a443d6a4302dc6238c8128", "style": "[low, kind, unhurried]", "audition": { "keywords": ["old", "male", "calm"] } }
+  },
+  "pronounce": {}
+}
