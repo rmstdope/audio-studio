@@ -14,6 +14,7 @@ import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { setCue } from '../services/cues'
+import { gitChanges } from '../services/git'
 import { measureLine, recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { nextRound, setVerdict } from '../core/audition'
@@ -320,6 +321,9 @@ export function startServer({
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
+      },
+      '/api/changes': {
+        GET: guard(async () => Response.json(await gitChanges(projectFile))),
       },
       '/api/pronounce': {
         PATCH: fromOwnPage(async (request) => {

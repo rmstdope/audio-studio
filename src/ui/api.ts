@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query'
 import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
+import type { ChangesResult } from '../services/git'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
@@ -42,6 +43,18 @@ async function postJson<T>(path: string): Promise<T> {
 /** The project summary, or the problems with the project file. Refetched when the window regains focus. */
 export function useProject() {
   return useQuery({ queryKey: ['project'], queryFn: () => getJson<LoadResult>('/api/project') })
+}
+
+/**
+ * What git sees of the project's files, for the Changes page and its count in the sidebar: read
+ * again every few seconds, since recording, editing or a commit outside the studio changes it.
+ */
+export function useChanges() {
+  return useQuery({
+    queryKey: ['changes'],
+    queryFn: () => getJson<ChangesResult>('/api/changes'),
+    refetchInterval: 5000,
+  })
 }
 
 /** A part with the state of every line's clip. */

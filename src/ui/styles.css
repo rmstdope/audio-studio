@@ -1428,3 +1428,38 @@ a.btn {
     grid-column: 1 / -1;
   }
 }
+
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.changes .panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.change-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.change-files li,
+.change-clips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+.change-files .mono {
+  overflow-wrap: anywhere;
+}
+.change-kind {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 64px;
+}
