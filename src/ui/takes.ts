@@ -16,3 +16,16 @@ export function withTake<T extends WithTakes>(
   if (take.spoken !== candidates.audition.spoken) return candidates
   return { ...candidates, takes: { ...candidates.takes, [voice]: take.key } }
 }
+
+/**
+ * The candidates with the audition phrase and takes from a fresh lookup. When the phrase is the
+ * one already shown, takes recorded since the lookup was read are kept too.
+ */
+export function withAuditionTakes<T extends WithTakes>(
+  candidates: T,
+  audition: T['audition'],
+  takes: Record<string, string>,
+): T {
+  const same = audition.spoken === candidates.audition.spoken
+  return { ...candidates, audition, takes: same ? { ...takes, ...candidates.takes } : takes }
+}

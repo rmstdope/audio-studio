@@ -3,6 +3,20 @@ import { z } from 'zod'
 /** Fish Audio models a project may use for now. Paid models come with final generation. */
 export const FREE_MODELS = ['s2.1-pro-free'] as const
 
+/** The smallest `quality.chunkLimit` allowed. */
+const MIN_CHUNK = 100
+
+/**
+ * Why an audition phrase cannot be one take, or null if it can: a take is sent as one piece, as
+ * narrate.py sends any text up to `chunkLimit` characters (counted as Python counts them).
+ */
+export function phraseProblem(phrase: string, chunkLimit: number): string | null {
+  const length = [...phrase].length
+  return length > chunkLimit
+    ? `is ${length} characters; a take is one piece of at most ${chunkLimit} (quality.chunkLimit)`
+    : null
+}
+
 /** The file name the CLI looks for, walking up from the current directory. */
 export const PROJECT_FILE = 'audio-studio.json'
 
@@ -66,7 +80,8 @@ const NarrationSchema = z
       .object({
         minHeard: z.number().min(0).max(1).default(0.9),
         takes: z.number().int().min(1).default(3),
-        chunkLimit: z.number().int().min(50).default(400),
+        // At least 100, so the built-in audition phrase always fits in one take.
+        chunkLimit: z.number().int().min(MIN_CHUNK).default(400),
         parallel: z.number().int().min(1).default(4),
       })
       .prefault({}),
@@ -84,15 +99,12 @@ const NarrationSchema = z
       .prefault({}),
   })
   .superRefine((narration, context) => {
-    const { phrase } = narration.audition
     const limit = narration.quality.chunkLimit
-    if ([...phrase].length > limit) {
-      context.addIssue({
-        code: 'custom',
-        path: ['audition', 'phrase'],
-        message: `is ${[...phrase].length} characters; a take is one piece of at most ${limit} (quality.chunkLimit)`,
-      })
-    }
+    // A wrong limit is reported on its own; measuring against it would only add noise.
+    if (!Number.isInteger(limit) || limit < MIN_CHUNK) return
+    const problem = phraseProblem(narration.audition.phrase, limit)
+    if (problem)
+      context.addIssue({ code: 'custom', path: ['audition', 'phrase'], message: problem })
   })
 
 /** The project file, `audio-studio.json`, in the consumer repository's root. */

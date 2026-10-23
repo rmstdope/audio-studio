@@ -1,16 +1,16 @@
 import { dirname } from 'node:path'
 import { formatCast } from '../core/castFormat'
 import { resolveInRoot } from '../core/paths'
-import { problemsFrom, type Problem, type Project } from '../core/project'
+import { phraseProblem, problemsFrom, type Problem, type Project } from '../core/project'
 import { CastSchema, type Character } from '../core/resources'
 import type { CharacterSummary } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
-import { auditionFor, recordedTakes } from './takes'
+import { auditionFor, castProblems, phrasePath, recordedTakes } from './takes'
 import { searchVoices } from './voiceSearch'
-import { loadWorkspace, openProject, type ProjectFailure } from './workspace'
+import { loadWorkspace, type ProjectFailure } from './workspace'
 
 /** How many candidates an audition search returns at most. */
 export const CANDIDATE_LIMIT = 24
@@ -52,7 +52,7 @@ export async function findCandidates(
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
   // Without the cast the phrase, style and pronunciations are unknown: say so, don't guess.
-  if (!cast) return { ok: false, problems: summary.problems }
+  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) {
     return {
@@ -126,22 +126,20 @@ export async function setPhrase(
   phrase: string | null,
 ): Promise<CharacterChange> {
   const own = phrase?.trim() || undefined
-  const opened = await openProject(projectFile)
-  if (!opened.ok) return opened
-  const limit = opened.project.narration.quality.chunkLimit
-  if (own && [...own].length > limit) {
-    const file = opened.project.narration.characters
-    const message = `the phrase is ${[...own].length} characters; a take is one piece of at most ${limit}`
-    return {
-      ok: false,
-      problems: [{ file, path: `speakers.${characterId}.audition.phrase`, message }],
-    }
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
+  const { narration } = loaded.project
+  const tooLong = own ? phraseProblem(own, narration.quality.chunkLimit) : null
+  if (tooLong) {
+    const problem = { file: narration.characters, path: phrasePath(characterId), message: tooLong }
+    return { ok: false, problems: [problem] }
   }
   return updateCharacter(projectFile, characterId, (entry) => withAudition(entry, { phrase: own }))
 }
 
 /**
- * A character entry with audition fields changed; a field set to undefined is removed, and an
+ * A character entry with audition fields changed; a field that is undefined or null is removed, and an
  * audition left empty is removed too, so clearing a field leaves no trace in the cast.
  */
 function withAudition(
@@ -149,7 +147,7 @@ function withAudition(
   changes: { keywords?: string[]; phrase?: string },
 ): Character {
   const audition: Record<string, unknown> = { ...entry.audition, ...changes }
-  for (const key of Object.keys(audition)) if (audition[key] === undefined) delete audition[key]
+  for (const key of Object.keys(audition)) if (audition[key] == null) delete audition[key]
   const keep = Object.keys(audition).length > 0
   if (!('audition' in entry)) return keep ? { ...entry, audition } : entry
   // Keep the entry's own order: the audition stays where it was.

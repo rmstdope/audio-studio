@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
 import type { AuditionTakesResult, TakeResult } from '../services/takes'
-import { withTake } from './takes'
+import { withAuditionTakes, withTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult } from '../services/workspace'
 
 /** A successful candidates answer. */
@@ -104,7 +104,8 @@ export function useSetPhrase(characterId: string) {
       return (await response.json()) as NonNullable<CharacterChange>
     },
     // Refresh the phrase and takes shown, without searching Fish's library again.
-    onSuccess: async () => {
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
       const key = ['candidates', characterId]
       const shown = client.getQueryData<NonNullable<CandidatesResult>>(key)
       if (!shown?.ok) return client.invalidateQueries({ queryKey: key })
@@ -115,7 +116,7 @@ export function useSetPhrase(characterId: string) {
       ).catch(() => null)
       if (!fresh?.ok) return client.invalidateQueries({ queryKey: key })
       client.setQueryData<NonNullable<CandidatesResult>>(key, (old) =>
-        old?.ok ? { ...old, audition: fresh.audition, takes: fresh.takes } : old,
+        old?.ok ? withAuditionTakes<Found>(old, fresh.audition, fresh.takes) : old,
       )
     },
   })

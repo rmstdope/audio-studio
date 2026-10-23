@@ -20,7 +20,7 @@ export interface ServerOptions {
 /** A change to a character: its keywords, or its own audition phrase (null for the standard one). */
 const CharacterBody = z.union([
   z.object({ keywords: z.array(z.string()).max(20) }).strict(),
-  z.object({ phrase: z.string().max(500).nullable() }).strict(),
+  z.object({ phrase: z.string().max(10_000).nullable() }).strict(),
 ])
 
 const TakeBody = z.object({ voice: z.string().regex(/^[\w-]{1,64}$/) })

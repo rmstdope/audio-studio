@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
-import type { Problem, Project } from '../core/project'
+import { phraseProblem, type Problem, type Project } from '../core/project'
 import type { Cast } from '../core/resources'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
 import type { FishFactory } from './auditions'
@@ -35,10 +35,17 @@ export async function recordTake(
   if (!loaded.ok) return { ok: false, problems: loaded.problems }
   const { project, cast, summary } = loaded
   if (!summary.characters.some((c) => c.id === characterId)) return null
-  if (!cast) return { ok: false, problems: summary.problems }
+  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
 
   const root = dirname(projectFile)
   const text = auditionFor(cast, characterId, project)
+  // A phrase edited into the cast by hand is checked too: never pay for a take that is too long.
+  const tooLong = phraseProblem(text.phrase, project.narration.quality.chunkLimit)
+  if (tooLong) {
+    const where = text.own ? phrasePath(characterId) : 'narration.audition.phrase'
+    const file = text.own ? project.narration.characters : basename(projectFile)
+    return { ok: false, problems: [{ file, path: where, message: tooLong }] }
+  }
   const key = takeOf(project, voiceId, text)
   const file = resolveInRoot(root, takePath(key))
   const recorded = { ok: true as const, key, spoken: text.spoken }
@@ -95,7 +102,7 @@ export async function auditionTakes(
   if (!loaded.ok) return { ok: false, problems: loaded.problems }
   const { project, cast, summary } = loaded
   if (!summary.characters.some((c) => c.id === characterId)) return null
-  if (!cast) return { ok: false, problems: summary.problems }
+  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
   const audition = auditionFor(cast, characterId, project)
   return {
     ok: true,
@@ -129,6 +136,19 @@ export async function takeFile(projectFile: string, key: string): Promise<string
   if (!/^[0-9a-f]{16}$/.test(key)) return null
   const file = join(resolveInRoot(dirname(projectFile), TAKES_DIR), `${key}.mp3`)
   return existsSync(file) ? file : null
+}
+
+/** The problems of the cast file, out of all the project's. */
+export function castProblems(project: Project, problems: Problem[]): Problem[] {
+  return problems.filter((problem) => problem.file === project.narration.characters)
+}
+
+/** Where a character's own phrase is in the cast, as a problem path. */
+export function phrasePath(characterId: string): string {
+  const id = /^[A-Za-z_][\w-]*$/.test(characterId)
+    ? `.${characterId}`
+    : `[${JSON.stringify(characterId)}]`
+  return `speakers${id}.audition.phrase`
 }
 
 function takePath(key: string): string {

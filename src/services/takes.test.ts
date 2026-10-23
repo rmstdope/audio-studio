@@ -84,11 +84,13 @@ describe('recordTake', () => {
       await new Promise((resolve) => setTimeout(resolve, 40))
       return fish
     }
-    await Promise.all([
+    const [slower, faster] = await Promise.all([
       recordTake(projectFile, 'grandmother', 'v9', slow, limiter),
       recordTake(projectFile, 'grandmother', 'v9', async () => fish, limiter),
     ])
     expect(requests).toHaveLength(1)
+    expect(slower).toMatchObject({ ok: true, cached: true })
+    expect(faster).toMatchObject({ ok: true, cached: false })
   })
 
   it('says which phrase the take is of', async () => {
@@ -117,6 +119,45 @@ describe('recordTake', () => {
     )
     expect(result).toMatchObject({ ok: false, reason: 'fish' })
     expect(existsSync(join(root, '.audio-studio/takes'))).toBe(false)
+  })
+
+  it('refuses a phrase in the cast too long for one take, and pays nothing', async () => {
+    const long = 'x'.repeat(401)
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { grandmother: { voice: 'cur', audition: { phrase: long } } } },
+    })
+    const { fish, requests } = fakeFish()
+    const result = await recordTake(
+      join(root, 'audio-studio.json'),
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(result && !result.ok && 'problems' in result && result.problems[0]!.message).toContain(
+      '401',
+    )
+    expect(requests).toEqual([])
+  })
+
+  it('lists only the cast’s problems when the cast is broken', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': '{ broken',
+      'tts/act2/script.json': '[ broken',
+    })
+    const { fish } = fakeFish()
+    const result = await recordTake(
+      join(root, 'audio-studio.json'),
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(
+      result && !result.ok && 'problems' in result && result.problems.map((p) => p.file),
+    ).toEqual(['tts/cast.json'])
   })
 
   it('says so when there is no API key, or Fish fails', async () => {

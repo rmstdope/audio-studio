@@ -169,6 +169,35 @@ describe('clearing audition fields', () => {
     expect(cast.speakers.grandmother).toEqual({ voice: 'cur' })
   })
 
+  it('keeps the entry’s order when clearing an audition between other fields', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json':
+        '{\n  "speakers": {\n    "grandmother": { "voice": "cur", "audition": { "phrase": "Hi." }, "style": "[warm]" }\n  }\n}\n',
+    })
+    await setPhrase(join(root, 'audio-studio.json'), 'grandmother', null)
+    expect(readFileSync(join(root, 'tts/cast.json'), 'utf8')).toBe(
+      '{\n  "speakers": {\n    "grandmother": { "voice": "cur", "style": "[warm]" }\n  }\n}\n',
+    )
+  })
+
+  it('treats a null phrase as no phrase when clearing', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': {
+        speakers: { grandmother: { audition: { phrase: null, keywords: ['a'] } } },
+      },
+    })
+    await setKeywords(join(root, 'audio-studio.json'), 'grandmother', [])
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother).toEqual({})
+  })
+
+  it('answers an unknown character with null, whatever its phrase', async () => {
+    const root = tempRepo(files)
+    expect(await setPhrase(join(root, 'audio-studio.json'), 'nobody', 'x'.repeat(401))).toBeNull()
+  })
+
   it('refuses a phrase too long for one take', async () => {
     const root = tempRepo(files)
     const result = await setPhrase(join(root, 'audio-studio.json'), 'grandmother', 'x'.repeat(401))

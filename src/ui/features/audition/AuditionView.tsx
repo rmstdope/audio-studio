@@ -262,7 +262,7 @@ function PhraseEditor({ characterId, audition }: { characterId: string; audition
       className="brief-item"
       onSubmit={(event) => {
         event.preventDefault()
-        save.mutate(text.trim() || null, { onSuccess: () => setDraft(null) })
+        save.mutate(text.trim() || null, { onSuccess: (result) => result.ok && setDraft(null) })
       }}
     >
       <label className="label" htmlFor="phrase">
@@ -284,7 +284,9 @@ function PhraseEditor({ characterId, audition }: { characterId: string; audition
             className="btn"
             type="button"
             disabled={save.isPending}
-            onClick={() => save.mutate(null, { onSuccess: () => setDraft(null) })}
+            onClick={() =>
+              save.mutate(null, { onSuccess: (result) => result.ok && setDraft(null) })
+            }
           >
             Use the standard phrase
           </button>
