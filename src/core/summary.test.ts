@@ -90,6 +90,17 @@ describe('summarize', () => {
   })
 })
 
+describe('summarize, pronunciations', () => {
+  it('lists the table in its order, or null when the cast cannot be read', () => {
+    const cast = { speakers: {}, pronounce: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' } }
+    expect(summarize(input({ cast })).pronounce).toEqual([
+      ['Act I:', 'Act One:'],
+      ['Eldoria', 'El-door-ia'],
+    ])
+    expect(summarize(input()).pronounce).toBeNull()
+  })
+})
+
 describe('displayName', () => {
   it('upper-cases the first letter only', () => {
     expect(displayName('narrator-act2')).toBe('Narrator-act2')

@@ -3,7 +3,14 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
-import { findCandidates, setKeywords, setPhrase, setStyle, setVoice } from './auditions'
+import {
+  findCandidates,
+  setKeywords,
+  setPhrase,
+  setPronunciations,
+  setStyle,
+  setVoice,
+} from './auditions'
 import { createLimiter } from './limit'
 import { recordTake } from './takes'
 import type { FishClient } from './fish'
@@ -364,5 +371,61 @@ describe('setStyle', () => {
   it('knows no unknown character', async () => {
     const root = tempRepo(files)
     expect(await setStyle(join(root, 'audio-studio.json'), 'nobody', '[x]')).toBeNull()
+  })
+})
+
+describe('setPronunciations', () => {
+  const withTable = {
+    ...files,
+    'tts/cast.json': {
+      speakers: { grandmother: { voice: 'cur', style: '[warm]' } },
+      pronounce: { 'Act I:': 'Act One:', Eldoria: 'El-door-ia' },
+    },
+  }
+  const was: [string, string][] = [
+    ['Act I:', 'Act One:'],
+    ['Eldoria', 'El-door-ia'],
+  ]
+
+  it('saves the table in the order given, keeping the characters', async () => {
+    const root = tempRepo(withTable)
+    const table: [string, string][] = [
+      ['Eldoria', 'El-dor-ia'],
+      ['Act I:', 'Act One:'],
+      [' Willowbrook ', ' Willow brook '],
+    ]
+    expect(await setPronunciations(join(root, 'audio-studio.json'), table, was)).toEqual({
+      ok: true,
+    })
+    const text = readFileSync(join(root, 'tts/cast.json'), 'utf8')
+    expect(Object.entries(JSON.parse(text).pronounce)).toEqual([
+      ['Eldoria', 'El-dor-ia'],
+      ['Act I:', 'Act One:'],
+      ['Willowbrook', 'Willow brook'],
+    ])
+    expect(JSON.parse(text).speakers.grandmother).toEqual({ voice: 'cur', style: '[warm]' })
+  })
+
+  it('refuses when the table changed since the page showed it', async () => {
+    const root = tempRepo(withTable)
+    const result = await setPronunciations(
+      join(root, 'audio-studio.json'),
+      [],
+      [['Act I:', 'Act One:']],
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/cast.json', path: 'pronounce' }],
+    })
+    expect(JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).pronounce).toEqual({
+      'Act I:': 'Act One:',
+      Eldoria: 'El-door-ia',
+    })
+  })
+
+  it('refuses a table with a problem', async () => {
+    const root = tempRepo(withTable)
+    const result = await setPronunciations(join(root, 'audio-studio.json'), [['Eldoria', '']], was)
+    expect(result).toMatchObject({ ok: false, problems: [{ path: 'pronounce' }] })
   })
 })

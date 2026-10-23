@@ -1,4 +1,5 @@
 import { partPathFor, type Problem, type Project } from './project'
+import type { Pronunciation } from './pronounce'
 import type { Cast, Line } from './resources'
 
 /** What reading a part's dialog gave: its lines, no file yet, or a file that failed validation. */
@@ -43,6 +44,8 @@ export interface ProjectSummary {
   charactersPath: string
   parts: PartSummary[]
   characters: CharacterSummary[]
+  /** The pronunciation table in file order; null when the cast cannot be read. */
+  pronounce: Pronunciation[] | null
   problems: Problem[]
 }
 
@@ -118,6 +121,7 @@ export function summarize({
     charactersPath: narration.characters,
     parts,
     characters: characters.sort((a, b) => b.totalLines - a.totalLines || a.id.localeCompare(b.id)),
+    pronounce: cast ? Object.entries(cast.pronounce) : null,
     problems,
   }
 }

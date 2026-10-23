@@ -98,6 +98,7 @@ audio-studio/
 │   │   ├── project.ts           project file schema, path templates ({part})
 │   │   ├── resources.ts         schemas for script, cast, cues, manifest, lock
 │   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
+│   │   ├── pronounce.ts         the pronunciation table's rules (cleaning, problems)
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
 │   │   ├── planner.ts           script × lock × disk → status per line, generation plan
 │   │   ├── summary.ts           parts and characters as the UI shows them
@@ -378,8 +379,8 @@ each part.
 
 ### 8.3 Smaller actions
 
-- Edit a character's style cue or keywords, a line's cue (built), or the pronunciation table:
-  saved immediately, and affected lines show as stale.
+- Edit a character's style cue or keywords, a line's cue, or the pronunciation table (built):
+  saved at once, and affected lines show as stale.
 - Retake a single line (built: Record, or Retake for a weak one). Re-timing one line, or clips
   already measured, waits until it is needed: measuring covers clips never checked (§8.2).
 - Refresh dialog (runs `refreshDialog`).
@@ -428,7 +429,7 @@ PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the s
 GET    /api/parts/:part/plan?speaker=&weak=1     scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
-PATCH  /api/pronounce                            pronunciation table
+PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
 GET    /api/characters/:id/candidates            voices matching the keywords, current voice
 GET    /api/auditions/:id                        the audition in progress, with phrase and takes
 DELETE /api/auditions/:id                        end it without casting
@@ -519,7 +520,9 @@ Small, independently useful increments:
       with two-space indent, a cleared cue removed; a number-like key refused, as JavaScript would
       move it). Affected lines show as stale. Orphaned cues (their line's key changed with its
       wording) are shown and re-keyed with Refresh dialog (6.4).
-   2. **Pronunciations**: the table edited in the studio.
+   2. **Pronunciations** (built): the table edited on All characters as a whole (add, change,
+      reorder, remove) and saved at once, refused if the file changed since the page showed it;
+      each written form once, with how it is said, and no number-like key among others.
    3. **Changes panel**: `git status` for the project's paths.
    4. **Refresh dialog**: run `refreshDialog`, and show the orphaned cues it leaves.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to

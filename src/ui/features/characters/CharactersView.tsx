@@ -1,6 +1,7 @@
 import type { ProjectSummary } from '../../../core/summary'
 import { CharacterCard } from '../../components/CharacterCard'
 import { plural, shortTitle } from '../../format'
+import { PronunciationsPanel } from './PronunciationsPanel'
 
 /** Every character in the project, with the parts each one speaks in. */
 export function CharactersView({ summary }: { summary: ProjectSummary }) {
@@ -19,6 +20,9 @@ export function CharactersView({ summary }: { summary: ProjectSummary }) {
           </span>
         </div>
       </header>
+      {summary.pronounce && (
+        <PronunciationsPanel table={summary.pronounce} castPath={summary.charactersPath} />
+      )}
       {summary.characters.length ? (
         <div className="cards">
           {summary.characters.map((character) => (
