@@ -51,3 +51,23 @@ describe('planGeneration', () => {
     expect(plan.cost).toBeCloseTo((plan.bytes / 1_000_000) * 15, 9)
   })
 })
+
+describe('planGeneration, cost', () => {
+  it('does not call an unknown model free', () => {
+    expect(planGeneration(state, { model: 'brand-new' }).cost).toBeNull()
+  })
+
+  it('counts the text as it is sent, when told how', () => {
+    const plan = planGeneration(state, {
+      model: 's2-pro',
+      sent: (line) => [`[cue] ${line.text}`, '[cue] more'],
+    })
+    const expected =
+      3 * new TextEncoder().encode('[cue] more').length +
+      ['Once upon a time.', 'Hello there.', 'Hello there.'].reduce(
+        (s, t) => s + new TextEncoder().encode(`[cue] ${t}`).length,
+        0,
+      )
+    expect(plan.bytes).toBe(expected)
+  })
+})

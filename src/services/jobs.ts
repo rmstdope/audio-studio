@@ -9,13 +9,17 @@ export interface JobState {
   speaker: string | null
   status: 'running' | 'cancelling' | 'done' | 'cancelled'
   total: number
-  /** Lines finished, recorded or failed. */
+  /** Lines finished: recorded, skipped or failed. */
   done: number
+  /** Lines skipped because they no longer needed recording (recorded meanwhile, adopted). */
+  skipped: number
   failed: { key: string; message: string }[]
   /** Lines being recorded right now. */
   recording: string[]
   /** Orphaned clips removed at the end. */
   removed: number
+  /** Why removing the orphans failed, if it did. */
+  orphanError: string | null
   startedAt: string
   finishedAt: string | null
 }
@@ -41,101 +45,117 @@ export interface Jobs {
   cancel(id: string): JobState | null
 }
 
+/** A job and the lines it has not started yet. */
+interface Running {
+  state: JobState
+  queue: string[]
+}
+
 /**
  * Generation jobs: each records its lines `parallel` at a time, goes on past a failed line, and
- * removes the agreed orphans once every line is done. Cancelling stops new lines from starting;
- * lines under way finish, and no orphans are removed. One job per part runs at a time.
+ * removes the agreed orphans once every line is done. Cancelling stops lines not started yet;
+ * lines under way finish, and no orphans are removed. Once every line has started there is
+ * nothing left to cancel. One job per part runs at a time, and only each part's latest is kept.
  */
 export function createJobs(): Jobs {
-  const jobs = new Map<string, JobState>()
-  const latest = new Map<string, string>()
+  const byPart = new Map<string, Running>()
+  const find = (id: string) => [...byPart.values()].find((job) => job.state.id === id)
 
-  const snapshot = (job: JobState): JobState => ({
-    ...job,
-    failed: [...job.failed],
-    recording: [...job.recording],
+  const snapshot = ({ state }: Running): JobState => ({
+    ...state,
+    failed: [...state.failed],
+    recording: [...state.recording],
   })
 
   return {
     start(options) {
-      const previous = latest.get(options.part)
-      const current = previous ? jobs.get(previous) : undefined
-      if (current && (current.status === 'running' || current.status === 'cancelling')) {
+      const current = byPart.get(options.part)
+      if (
+        current &&
+        (current.state.status === 'running' || current.state.status === 'cancelling')
+      ) {
         return { error: `A generation is already running for ${options.part}.` }
       }
-      const job: JobState = {
-        id: randomUUID(),
-        part: options.part,
-        speaker: options.speaker,
-        status: 'running',
-        total: options.keys.length,
-        done: 0,
-        failed: [],
-        recording: [],
-        removed: 0,
-        startedAt: new Date().toISOString(),
-        finishedAt: null,
+      const job: Running = {
+        queue: [...options.keys],
+        state: {
+          id: randomUUID(),
+          part: options.part,
+          speaker: options.speaker,
+          status: 'running',
+          total: options.keys.length,
+          done: 0,
+          skipped: 0,
+          failed: [],
+          recording: [],
+          removed: 0,
+          orphanError: null,
+          startedAt: new Date().toISOString(),
+          finishedAt: null,
+        },
       }
-      jobs.set(job.id, job)
-      latest.set(options.part, job.id)
+      byPart.set(options.part, job)
       void run(job, options)
       return snapshot(job)
     },
     get(id) {
-      const job = jobs.get(id)
+      const job = find(id)
       return job ? snapshot(job) : null
     },
     latest(part) {
-      const id = latest.get(part)
-      const job = id ? jobs.get(id) : undefined
+      const job = byPart.get(part)
       return job ? snapshot(job) : null
     },
     cancel(id) {
-      const job = jobs.get(id)
+      const job = find(id)
       if (!job) return null
-      if (job.status === 'running') job.status = 'cancelling'
+      if (job.state.status === 'running' && job.queue.length) job.state.status = 'cancelling'
       return snapshot(job)
     },
   }
 }
 
-async function run(job: JobState, options: JobOptions): Promise<void> {
-  const queue = [...options.keys]
+async function run(job: Running, options: JobOptions): Promise<void> {
+  const { state } = job
   const worker = async () => {
-    for (let key = queue.shift(); key !== undefined; key = queue.shift()) {
-      if (job.status !== 'running') return
-      job.recording.push(key)
+    while (state.status === 'running') {
+      const key = job.queue.shift()
+      if (key === undefined) return
+      state.recording.push(key)
       try {
         const result = await options.record(key)
-        if (!result || !result.ok) job.failed.push({ key, message: failure(result) })
+        const why = failure(result)
+        if (why) state.failed.push({ key, message: why })
+        else if (result?.ok && 'skipped' in result) state.skipped++
       } catch (error) {
-        job.failed.push({ key, message: error instanceof Error ? error.message : String(error) })
+        state.failed.push({ key, message: messageOf(error) })
       } finally {
-        job.recording = job.recording.filter((k) => k !== key)
-        job.done++
+        state.recording = state.recording.filter((k) => k !== key)
+        state.done++
       }
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, options.parallel) }, worker))
-  if (job.status === 'running' && options.orphans.length) {
+  if (state.status === 'running' && options.orphans.length) {
     try {
-      job.removed = await options.removeOrphans(options.orphans)
+      state.removed = await options.removeOrphans(options.orphans)
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      job.failed.push({
-        key: 'orphans',
-        message: `could not remove the orphaned clips: ${message}`,
-      })
+      state.orphanError = messageOf(error)
     }
   }
-  job.status = job.status === 'running' ? 'done' : 'cancelled'
-  job.finishedAt = new Date().toISOString()
+  state.status = state.status === 'running' ? 'done' : 'cancelled'
+  state.finishedAt = new Date().toISOString()
 }
 
-function failure(result: RecordResult): string {
+/** Why a line's recording failed, or null when it did not. */
+function failure(result: RecordResult): string | null {
   if (!result) return 'the line is no longer in the dialog'
-  if (result.ok) return ''
+  if (result.ok) return null
   if ('message' in result && typeof result.message === 'string') return result.message
   if ('problems' in result) return result.problems.map((p) => `${p.file}: ${p.message}`).join('; ')
   return 'could not be recorded'
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

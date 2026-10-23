@@ -355,7 +355,11 @@ describe('server, generating a part', () => {
     const started = await fetch(at('/api/parts/act1/jobs'), {
       method: 'POST',
       headers: own,
-      body: JSON.stringify({ speaker: null, removeOrphans: true }),
+      body: JSON.stringify({
+        speaker: null,
+        keys: planned.plan.keys,
+        orphans: planned.plan.orphans,
+      }),
     })
     const job = await started.json()
     expect(job).toMatchObject({ status: 'running', total: 2 })
@@ -376,9 +380,23 @@ describe('server, generating a part', () => {
     const response = await fetch(at('/api/parts/act1/jobs'), {
       method: 'POST',
       headers: own,
-      body: JSON.stringify({ speaker: null, removeOrphans: false }),
+      body: JSON.stringify({ speaker: null, keys: ['a', 'b'], orphans: [] }),
     })
     expect(response.status).toBe(409)
+  })
+
+  it('refuses a body that is not a generation', async () => {
+    for (const body of [
+      { speaker: null, removeOrphans: true },
+      { speaker: null, keys: [], orphans: [], extra: 1 },
+    ]) {
+      const response = await fetch(at('/api/parts/act1/jobs'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify(body),
+      })
+      expect(response.status).toBe(400)
+    }
   })
 
   it('takes jobs and cancels only from the studio’s own page', async () => {
@@ -386,9 +404,62 @@ describe('server, generating a part', () => {
     const start = await fetch(at('/api/parts/act1/jobs'), {
       method: 'POST',
       headers: evil,
-      body: JSON.stringify({ speaker: null, removeOrphans: false }),
+      body: JSON.stringify({ speaker: null, keys: [], orphans: [] }),
     })
     expect(start.status).toBe(403)
     expect((await fetch(at('/api/jobs/x'), { method: 'DELETE', headers: evil })).status).toBe(403)
+  })
+})
+
+describe('server, generating only what was shown', () => {
+  const shownRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } } },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'narrator', text: 'Once.' },
+      { key: 'b', speaker: 'mira', text: 'Twice.' },
+    ],
+    'audio/act1/manifest.json': {
+      seen: { file: 'seen.mp3', speaker: 'mira', duration: 1, words: [] },
+      unseen: { file: 'unseen.mp3', speaker: 'mira', duration: 1, words: [] },
+    },
+    'audio/act1/seen.mp3': 'x',
+    'audio/act1/unseen.mp3': 'x',
+  })
+  const shown = startServer({
+    projectFile: join(shownRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+  })
+  afterAll(() => shown.stop(true))
+  const at = (path: string) => new URL(path, shown.url)
+  const own = { origin: shown.url.origin, 'content-type': 'application/json' }
+
+  it('plans one speaker with ?speaker=', async () => {
+    const answer = await (await fetch(at('/api/parts/act1/plan?speaker=mira'))).json()
+    expect(answer.plan).toMatchObject({ keys: ['b'], orphans: ['seen', 'unseen'] })
+  })
+
+  it('records and removes only what the page showed, and runs one job per part', async () => {
+    const start = (keys: string[], orphans: string[]) =>
+      fetch(at('/api/parts/act1/jobs'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify({ speaker: null, keys, orphans }),
+      })
+    const first = await (await start(['a'], ['seen'])).json()
+    expect(first).toMatchObject({ total: 1 })
+    expect((await start(['b'], [])).status).toBe(409)
+    let state = first
+    while (state.status === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      state = await (await fetch(at(`/api/jobs/${first.id}`))).json()
+    }
+    expect(state).toMatchObject({ status: 'done', removed: 1 })
+    const part = await (await fetch(at('/api/parts/act1'))).json()
+    expect(part.part.lines.map((l: { status: string }) => l.status)).toEqual(['ok', 'missing'])
+    expect(existsSync(join(shownRoot, 'audio/act1/seen.mp3'))).toBe(false)
+    expect(existsSync(join(shownRoot, 'audio/act1/unseen.mp3'))).toBe(true)
   })
 })

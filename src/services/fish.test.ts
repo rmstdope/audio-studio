@@ -142,6 +142,18 @@ describe('tts', () => {
   })
 })
 
+describe('tts, timeout', () => {
+  it('gives up on a request that never answers', async () => {
+    const fetch = ((_input: string | URL | Request, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+      })) as typeof globalThis.fetch
+    const client = createFishClient('k', { fetch, timeoutMs: 20 })
+    const request = { text: 'x', voice: 'v', model: 'm', temperature: 0.7, topP: 0.7, speed: 1 }
+    await expect(client.tts(request)).rejects.toThrow('did not answer within')
+  })
+})
+
 describe('fishFromEnv', () => {
   const project = ProjectSchema.parse(projectJson())
 

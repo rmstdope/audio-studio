@@ -268,3 +268,43 @@ describe('removeOrphans', () => {
     expect(lock).toEqual({})
   })
 })
+
+describe('recordLine, only if needed', () => {
+  it('skips a line that is up to date by now, without asking Fish', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    await record(root, 'k1', fish)
+    const again = await recordLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'k1',
+      async () => fish,
+      {
+        encode: keepWav,
+        limiter: createLimiter(),
+        onlyIfNeeded: true,
+      },
+    )
+    expect(again).toEqual({ ok: true, key: 'k1', skipped: true })
+    expect(requests).toHaveLength(1)
+  })
+})
+
+describe('removeOrphans, shared and odd files', () => {
+  it('keeps a clip another line still uses, and never deletes a file that is not a clip', async () => {
+    const root = tempRepo({
+      ...files,
+      'audio/act1/manifest.json': {
+        k4: { file: 'shared.mp3', speaker: 'mira', duration: 1, words: [] },
+        old: { file: 'shared.mp3', speaker: 'mira', duration: 1, words: [] },
+        odd: { file: 'notes.txt', speaker: 'mira', duration: 1, words: [] },
+      },
+      'audio/act1/shared.mp3': 'in use',
+      'audio/act1/notes.txt': 'keep',
+    })
+    const removed = await removeOrphans(join(root, 'audio-studio.json'), 'act1', ['old', 'odd'])
+    expect(removed).toBe(2)
+    expect(existsSync(join(root, 'audio/act1/shared.mp3'))).toBe(true)
+    expect(existsSync(join(root, 'audio/act1/notes.txt'))).toBe(true)
+  })
+})

@@ -3,6 +3,7 @@ import { rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { spreadWords } from '../core/align'
 import { clipInputs, fingerprint } from '../core/fingerprint'
+import { planPart } from '../core/planner'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
@@ -22,6 +23,8 @@ export const GAP_SECONDS = 0.25
 /** A recorded line, or why it was not recorded. Null for an unknown part or line. */
 export type RecordResult =
   | { ok: true; key: string; duration: number }
+  /** Asked to record only if needed, and the line is up to date by now: nothing was done. */
+  | { ok: true; key: string; skipped: true }
   | {
       ok: false
       reason: 'uncast' | 'no-key' | 'fish' | 'audio' | 'encode' | 'write'
@@ -38,6 +41,11 @@ const recordings = new Map<string, Promise<RecordResult>>()
 export interface RecordOptions {
   encode?: Encoder
   limiter: Limiter
+  /**
+   * Record the line only if it is still missing or stale when its turn comes (a job's lines may
+   * have been recorded or adopted meanwhile), so a job never pays for a line twice.
+   */
+  onlyIfNeeded?: boolean
 }
 
 /**
@@ -55,13 +63,17 @@ export async function recordLine(
   partId: string,
   key: string,
   fishFor: FishFactory,
-  { encode = ffmpegEncoder, limiter }: RecordOptions,
+  { encode = ffmpegEncoder, limiter, onlyIfNeeded = false }: RecordOptions,
 ): Promise<RecordResult> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
   if (read.problems.length) return { ok: false, problems: read.problems }
   const line = read.input.lines.find((l) => l.key === key)
   if (!line) return null
+  if (onlyIfNeeded) {
+    const status = planPart(read.input).lines.find((l) => l.key === key)?.status
+    if (status !== 'missing' && status !== 'stale') return { ok: true, key, skipped: true }
+  }
   const { cast, cues } = read.input
   const { narration } = read.project
   const inputs = clipInputs(line, cast.speakers[line.speaker], cues, cast.pronounce, narration)
@@ -238,10 +250,12 @@ export async function removeOrphans(
     for (const key of keys) {
       const entry = manifest[key]
       if (!entry || lines.has(key)) continue
-      if (SAFE_CLIP.test(entry.file)) {
+      delete manifest[key]
+      // Only a clip (`.mp3`), and only if no other line still uses the file.
+      const stillUsed = Object.values(manifest).some((other) => other.file === entry.file)
+      if (SAFE_CLIP.test(entry.file) && entry.file.endsWith('.mp3') && !stillUsed) {
         await rm(resolveInRoot(root, join(read.paths.clipsPath, entry.file)), { force: true })
       }
-      delete manifest[key]
       delete lock[key]
       removed++
     }
