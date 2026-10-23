@@ -8,7 +8,7 @@ import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import { LockSchema, ManifestSchema, type Lock, type Manifest } from '../core/resources'
-import { chunkText, spokenText } from '../core/spoken'
+import { spokenPieces } from '../core/spoken'
 import { joinWavs } from '../core/wav'
 import type { FishFactory } from './auditions'
 import { ffmpegEncoder, type Encoder } from './audio'
@@ -70,10 +70,6 @@ export async function recordLine(
   if (read.problems.length) return { ok: false, problems: read.problems }
   const line = read.input.lines.find((l) => l.key === key)
   if (!line) return null
-  if (onlyIfNeeded) {
-    const status = planPart(read.input).lines.find((l) => l.key === key)?.status
-    if (status !== 'missing' && status !== 'stale') return { ok: true, key, skipped: true }
-  }
   const { cast, cues } = read.input
   const { narration } = read.project
   const inputs = clipInputs(line, cast.speakers[line.speaker], cues, cast.pronounce, narration)
@@ -106,15 +102,36 @@ export async function recordLine(
 
   async function record(): Promise<RecordResult> {
     if (!inputs || !fish || !read || !read.ok || !line) return null
+    if (onlyIfNeeded) {
+      // Checked only now that this recording is registered: a recording of the same line that
+      // finished meanwhile has written its files before leaving, so it is seen here.
+      const fresh = await readPart(projectFile, partId)
+      if (!fresh || !fresh.ok) return fresh
+      const status = planPart(fresh.input).lines.find((l) => l.key === key)?.status
+      if (status === 'uncast') {
+        return {
+          ok: false,
+          reason: 'uncast',
+          message: `${line.speaker} has no voice yet; cast one first.`,
+        }
+      }
+      if (status !== 'missing' && status !== 'stale') return { ok: true, key, skipped: true }
+    }
     // Only speaking holds a Fish slot; joining, encoding and writing do not.
     let pieces: Uint8Array[]
     try {
       pieces = await limiter.run(`line\n${id}`, narration.quality.parallel, async () => {
         const spoken: Uint8Array[] = []
-        for (const chunk of chunkText(line.text, narration.quality.chunkLimit)) {
+        const texts = spokenPieces(
+          line.text,
+          inputs.cue,
+          cast.pronounce,
+          narration.quality.chunkLimit,
+        )
+        for (const text of texts) {
           spoken.push(
             await fish.tts({
-              text: spokenText(chunk, inputs.cue, cast.pronounce),
+              text,
               voice: inputs.voice,
               model: inputs.model,
               temperature: narration.tts.temperature,
@@ -250,10 +267,12 @@ export async function removeOrphans(
     for (const key of keys) {
       const entry = manifest[key]
       if (!entry || lines.has(key)) continue
+      // Only clips (`.mp3` files inside the clips folder); anything else is left as it is.
+      if (!SAFE_CLIP.test(entry.file) || !entry.file.endsWith('.mp3')) continue
       delete manifest[key]
-      // Only a clip (`.mp3`), and only if no other line still uses the file.
+      // The file goes only if no other line still uses it.
       const stillUsed = Object.values(manifest).some((other) => other.file === entry.file)
-      if (SAFE_CLIP.test(entry.file) && entry.file.endsWith('.mp3') && !stillUsed) {
+      if (!stillUsed) {
         await rm(resolveInRoot(root, join(read.paths.clipsPath, entry.file)), { force: true })
       }
       delete lock[key]

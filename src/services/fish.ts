@@ -97,7 +97,7 @@ export function createFishClient(
   }: { fetch?: typeof globalThis.fetch; baseUrl?: string; timeoutMs?: number } = {},
 ): FishClient {
   /** A request that gives up after `timeoutMs`, saying so, so a stuck request never blocks a job. */
-  async function timed(request: () => Promise<Response>): Promise<Response> {
+  async function timed<T>(request: () => Promise<T>): Promise<T> {
     try {
       return await request()
     } catch (error) {
@@ -116,14 +116,15 @@ export function createFishClient(
     for (const [name, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') url.searchParams.set(name, String(value))
     }
-    const response = await timed(() =>
-      fetch(url, {
+    // The whole request, the body read included, is timed: a body that stalls gives up too.
+    return timed(async () => {
+      const response = await fetch(url, {
         headers: { authorization: `Bearer ${apiKey}` },
         signal: AbortSignal.timeout(timeoutMs),
-      }),
-    )
-    if (!response.ok) throw new FishError(response.status, await errorMessage(response))
-    return response.json()
+      })
+      if (!response.ok) throw new FishError(response.status, await errorMessage(response))
+      return (await response.json()) as unknown
+    })
   }
 
   return {
@@ -142,8 +143,8 @@ export function createFishClient(
       return toVoice(ApiVoiceSchema.parse(await get(`/model/${encodeURIComponent(id)}`)))
     },
     async tts({ text, voice, model, temperature, topP, speed, format = 'mp3' }) {
-      const response = await timed(() =>
-        fetch(new URL('/v1/tts', baseUrl), {
+      return timed(async () => {
+        const response = await fetch(new URL('/v1/tts', baseUrl), {
           signal: AbortSignal.timeout(timeoutMs),
           method: 'POST',
           headers: {
@@ -160,10 +161,10 @@ export function createFishClient(
             top_p: topP,
             prosody: { speed, volume: 0 },
           }),
-        }),
-      )
-      if (!response.ok) throw new FishError(response.status, await errorMessage(response))
-      return new Uint8Array(await response.arrayBuffer())
+        })
+        if (!response.ok) throw new FishError(response.status, await errorMessage(response))
+        return new Uint8Array(await response.arrayBuffer())
+      })
     },
   }
 }

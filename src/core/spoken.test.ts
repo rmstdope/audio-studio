@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { chunkText, saidText, spokenText } from './spoken'
+import { chunkText, saidText, spokenPieces, spokenText } from './spoken'
 
 describe('spokenText', () => {
   it('adds the cue and says names as cast', () => {
@@ -53,5 +53,14 @@ describe('chunkText', () => {
   it('keeps an overlong sentence whole', () => {
     const text = 'This single sentence is far longer than the limit.'
     expect(chunkText(text, 10)).toEqual([text])
+  })
+})
+
+describe('spokenPieces', () => {
+  it('is each piece of a line with the cue and pronunciations, as sent to Fish', () => {
+    expect(spokenPieces('Elior waits. He waits.', '[low]', { Elior: 'El-ee-or' }, 14)).toEqual([
+      '[low] El-ee-or waits.',
+      '[low] He waits.',
+    ])
   })
 })

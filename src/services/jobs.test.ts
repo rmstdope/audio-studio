@@ -179,3 +179,31 @@ describe('jobs, edge cases', () => {
     expect(done).toMatchObject({ done: 1, skipped: 1, failed: [] })
   })
 })
+
+describe('jobs, cancel with every line under way', () => {
+  it('cancels while the last lines record, and removes no orphans', async () => {
+    const jobs = createJobs()
+    let removeCalled = false
+    const job = jobs.start({
+      part: 'act1',
+      speaker: null,
+      keys: ['a', 'b'],
+      orphans: ['o'],
+      parallel: 2,
+      record: async (key) => {
+        await tick(30)
+        return { ok: true, key, duration: 1 }
+      },
+      removeOrphans: async () => {
+        removeCalled = true
+        return 1
+      },
+    })
+    if ('error' in job) throw new Error(job.error)
+    await tick(5)
+    expect(jobs.cancel(job.id)?.status).toBe('cancelling')
+    const done = await finished(() => jobs.get(job.id))
+    expect(done).toMatchObject({ status: 'cancelled', done: 2 })
+    expect(removeCalled).toBe(false)
+  })
+})

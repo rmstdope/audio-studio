@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { StaleReason } from '../../../core/fingerprint'
 import { displayName } from '../../../core/summary'
 import { useJob, useJobActions, usePlan } from '../../api'
@@ -20,6 +20,17 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
 
   const current = job.data ?? null
   const running = current && (current.status === 'running' || current.status === 'cancelling')
+
+  // A job seen running stays on screen until closed, so its result and failures are always seen,
+  // even after leaving the page and coming back while it ran.
+  const runningId = running ? current.id : null
+  useEffect(() => {
+    if (runningId) setShownJob(runningId)
+  }, [runningId])
+
+  // The orphan box only ever confirms the orphans shown: a different set clears it.
+  const orphanSet = plan.data?.ok ? plan.data.plan.orphans.join('\n') : ''
+  useEffect(() => setRemoveOrphans(false), [orphanSet])
 
   if (current && (running || shownJob === current.id)) {
     const progress = current.total ? (current.done / current.total) * 100 : 100
@@ -45,7 +56,9 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
             <button
               className="btn"
               type="button"
-              disabled={current.status === 'cancelling' || cancel.isPending}
+              disabled={
+                current.status === 'cancelling' || current.removingOrphans || cancel.isPending
+              }
               onClick={() => cancel.mutate(current.id)}
             >
               {current.status === 'cancelling' ? 'Finishing lines under way…' : 'Cancel'}

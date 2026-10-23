@@ -18,6 +18,8 @@ export interface JobState {
   recording: string[]
   /** Orphaned clips removed at the end. */
   removed: number
+  /** True while the orphans are being removed: the one phase that cannot be cancelled. */
+  removingOrphans: boolean
   /** Why removing the orphans failed, if it did. */
   orphanError: string | null
   startedAt: string
@@ -54,8 +56,8 @@ interface Running {
 /**
  * Generation jobs: each records its lines `parallel` at a time, goes on past a failed line, and
  * removes the agreed orphans once every line is done. Cancelling stops lines not started yet;
- * lines under way finish, and no orphans are removed. Once every line has started there is
- * nothing left to cancel. One job per part runs at a time, and only each part's latest is kept.
+ * lines under way finish, and no orphans are removed. Only the orphan removal itself cannot be
+ * cancelled. One job per part runs at a time, and only each part's latest is kept.
  */
 export function createJobs(): Jobs {
   const byPart = new Map<string, Running>()
@@ -89,6 +91,7 @@ export function createJobs(): Jobs {
           failed: [],
           recording: [],
           removed: 0,
+          removingOrphans: false,
           orphanError: null,
           startedAt: new Date().toISOString(),
           finishedAt: null,
@@ -109,7 +112,10 @@ export function createJobs(): Jobs {
     cancel(id) {
       const job = find(id)
       if (!job) return null
-      if (job.state.status === 'running' && job.queue.length) job.state.status = 'cancelling'
+      // Until the orphans are being removed: lines waiting or under way can still be cancelled.
+      if (job.state.status === 'running' && !job.state.removingOrphans) {
+        job.state.status = 'cancelling'
+      }
       return snapshot(job)
     },
   }
@@ -137,10 +143,13 @@ async function run(job: Running, options: JobOptions): Promise<void> {
   }
   await Promise.all(Array.from({ length: Math.max(1, options.parallel) }, worker))
   if (state.status === 'running' && options.orphans.length) {
+    state.removingOrphans = true
     try {
       state.removed = await options.removeOrphans(options.orphans)
     } catch (error) {
       state.orphanError = messageOf(error)
+    } finally {
+      state.removingOrphans = false
     }
   }
   state.status = state.status === 'running' ? 'done' : 'cancelled'

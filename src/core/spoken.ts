@@ -37,3 +37,17 @@ export function chunkText(text: string, limit: number): string[] {
 function length(text: string): number {
   return [...text].length
 }
+
+/**
+ * What Fish is sent for a line: each sentence-sized piece, with the cue and the cast's
+ * pronunciations (as narrate.py `_take` does). Used both to record and to price a plan, so the
+ * two never drift apart.
+ */
+export function spokenPieces(
+  text: string,
+  cue: string,
+  pronounce: Record<string, string>,
+  chunkLimit: number,
+): string[] {
+  return chunkText(text, chunkLimit).map((chunk) => spokenText(chunk, cue, pronounce))
+}

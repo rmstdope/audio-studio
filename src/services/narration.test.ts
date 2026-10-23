@@ -258,12 +258,13 @@ describe('removeOrphans', () => {
       'k4',
       'sneaky',
     ])
-    expect(removed).toBe(2)
+    // `sneaky` points outside the clips folder: it is left alone, entry and all.
+    expect(removed).toBe(1)
     expect(existsSync(join(root, 'audio/act1/gone.mp3'))).toBe(false)
     expect(existsSync(join(root, 'audio/act1/k4.mp3'))).toBe(true)
     expect(existsSync(join(root, 'tts/cast.json'))).toBe(true)
     const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8'))
-    expect(Object.keys(manifest)).toEqual(['k4'])
+    expect(Object.keys(manifest)).toEqual(['k4', 'sneaky'])
     const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
     expect(lock).toEqual({})
   })
@@ -303,8 +304,44 @@ describe('removeOrphans, shared and odd files', () => {
       'audio/act1/notes.txt': 'keep',
     })
     const removed = await removeOrphans(join(root, 'audio-studio.json'), 'act1', ['old', 'odd'])
-    expect(removed).toBe(2)
+    expect(removed).toBe(1)
     expect(existsSync(join(root, 'audio/act1/shared.mp3'))).toBe(true)
     expect(existsSync(join(root, 'audio/act1/notes.txt'))).toBe(true)
+  })
+})
+
+describe('recordLine, only if needed, racing a hand recording', () => {
+  it('skips the line when a hand recording finishes while the job is getting ready', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const limiter = createLimiter()
+    let release = () => {}
+    const held = new Promise<void>((r) => (release = r))
+    const job = recordLine(projectFile, 'act1', 'k1', async () => (await held, fish), {
+      encode: keepWav,
+      limiter,
+      onlyIfNeeded: true,
+    })
+    await recordLine(projectFile, 'act1', 'k1', async () => fish, { encode: keepWav, limiter })
+    release()
+    expect(await job).toEqual({ ok: true, key: 'k1', skipped: true })
+    expect(requests).toHaveLength(1)
+  })
+
+  it('reports a line whose speaker lost its voice as uncast, not as up to date', async () => {
+    const root = tempRepo({ ...files, 'tts/cast.json': { speakers: {}, pronounce: {} } })
+    const result = await recordLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'k1',
+      async () => fakeFish().fish,
+      {
+        encode: keepWav,
+        limiter: createLimiter(),
+        onlyIfNeeded: true,
+      },
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'uncast' })
   })
 })

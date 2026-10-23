@@ -154,6 +154,26 @@ describe('tts, timeout', () => {
   })
 })
 
+describe('requests, a stalled body', () => {
+  it('gives up on an answer whose body never ends', async () => {
+    const fetch = ((_input: string | URL | Request, init?: RequestInit) => {
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"total'))
+          init?.signal?.addEventListener('abort', () => controller.error(init.signal?.reason))
+        },
+      })
+      return Promise.resolve(
+        new Response(body, { headers: { 'content-type': 'application/json' } }),
+      )
+    }) as typeof globalThis.fetch
+    const client = createFishClient('k', { fetch, timeoutMs: 20 })
+    await expect(client.listVoices({ title: 'x', pageSize: 1, pageNumber: 1 })).rejects.toThrow(
+      'did not answer within',
+    )
+  })
+})
+
 describe('fishFromEnv', () => {
   const project = ProjectSchema.parse(projectJson())
 

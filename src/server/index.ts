@@ -4,7 +4,7 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { planGeneration } from '../core/generation'
 import { planPart } from '../core/planner'
-import { chunkText, spokenText } from '../core/spoken'
+import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
@@ -122,10 +122,7 @@ export function startServer({
       model: narration.models.draft,
       speaker,
       // What is sent: each piece of a line with its cue and the cast's pronunciations.
-      sent: (line) =>
-        chunkText(line.text, narration.quality.chunkLimit).map((chunk) =>
-          spokenText(chunk, line.cue, pronounce),
-        ),
+      sent: (line) => spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
     })
     return { ok: true as const, plan, parallel: narration.quality.parallel }
   }
