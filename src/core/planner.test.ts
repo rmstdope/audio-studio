@@ -114,6 +114,13 @@ describe('planPart', () => {
   })
 })
 
+describe('planPart, orphaned cues', () => {
+  it('lists them in the cues file’s order, as the user sees it there', () => {
+    const state = planPart(input({ cues: { zz: '[a]', n1: '[warm]', gone: '[b]' } }))
+    expect(state.orphanCues.map((c) => c.key)).toEqual(['zz', 'gone'])
+  })
+})
+
 describe('adoptUntracked', () => {
   it('takes untracked clips as made from today’s inputs, leaving the rest alone', () => {
     const existing = { n1: entryFor(lines[0]!, cast, { heard: 0.95 }) }

@@ -527,7 +527,7 @@ Small, independently useful increments:
       line's own cue in the lines table, saved in the part's cues file (its order kept, written
       with two-space indent, a cleared cue removed; a number-like key refused, as JavaScript would
       move it). Affected lines show as stale. Orphaned cues (their line's key changed with its
-      wording) are shown and re-keyed with Refresh dialog (6.4).
+      wording) are shown and re-keyed on the part's overview (6.4.2).
    2. **Pronunciations** (built): the table edited on All characters as a whole (add, change,
       reorder, remove) and saved at once, refused if the file changed since editing began.
       Nothing is trimmed (spaces anchor an entry: `"Al "`), an empty said form leaves the words
@@ -549,7 +549,8 @@ Small, independently useful increments:
          on the server.
       2. **Orphaned cues** (built): a part's overview lists the cues whose line left the dialog,
          with their text; each is given to a line (in its place in the cues file; lines without a
-         clip offered first, since a reworded line has none yet) or removed. A line with its own
+         clip offered first, since a reworded line has none yet, and suggested when it is the only
+         one; numbered as in the dialog) or removed. Listed in the cues file's order. A line with its own
          cue is not offered over.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data

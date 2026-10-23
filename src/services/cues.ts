@@ -25,11 +25,13 @@ export async function setCue(
   const own = cue.trim()
   return changeCues(projectFile, partId, [key], (entries) => {
     const current = entries.find(([k]) => k === key)?.[1] ?? ''
-    if (current === own) return entries
-    if (!own) return entries.filter(([k]) => k !== key)
-    return entries.some(([k]) => k === key)
-      ? entries.map(([k, v]): Cue => [k, k === key ? own : v])
-      : [...entries, [key, own]]
+    if (current === own) return { entries }
+    if (!own) return { entries: entries.filter(([k]) => k !== key) }
+    return {
+      entries: entries.some(([k]) => k === key)
+        ? entries.map(([k, v]): Cue => [k, k === key ? own : v])
+        : [...entries, [key, own]],
+    }
   })
 }
 
@@ -45,18 +47,17 @@ export async function moveCue(
   from: string,
   to: string | null,
 ): Promise<CueChange> {
-  return changeCues(projectFile, partId, to ? [to] : [], (entries, path, inDialog) => {
+  return changeCues(projectFile, partId, to === null ? [] : [to], (entries, path, inDialog) => {
+    const problem = (key: string, message: string) => ({
+      problems: [{ file: path, path: key, message }],
+    })
     if (!entries.some(([k]) => k === from)) return null
-    if (inDialog.has(from)) {
-      return [{ file: path, path: from, message: 'this cue’s line is still in the dialog' }]
-    }
-    if (to === null) return entries.filter(([k]) => k !== from)
+    if (inDialog.has(from)) return problem(from, 'this cue’s line is still in the dialog')
+    if (to === null) return { entries: entries.filter(([k]) => k !== from) }
     if (entries.some(([k]) => k === to)) {
-      return [
-        { file: path, path: to, message: 'this line has its own cue already; clear it first' },
-      ]
+      return problem(to, 'this line has its own cue already; clear it first')
     }
-    return entries.map(([k, v]): Cue => [k === from ? to : k, v])
+    return { entries: entries.map(([k, v]): Cue => [k === from ? to : k, v]) }
   })
 }
 
@@ -65,7 +66,8 @@ type Cue = [key: string, cue: string]
 
 /**
  * Changes the part's cues file in the part's turn: `change` gets its entries in file order (own
- * keys only, so `__proto__` is a key like any other), the file's path and the dialog's keys, and
+ * keys only, so `__proto__` is kept like any other key; parsing elsewhere drops it, so it is never
+ * listed among orphaned cues), the file's path and the dialog's keys, and
  * gives the new entries, problems, or null (unknown). `lines` must all be in the dialog, or the
  * answer is null. The file is hand-edited too: its order is kept and it is written with two-space
  * indent, one cue per line; nothing is written when nothing changes. A broken file is reported,
@@ -76,7 +78,11 @@ async function changeCues(
   projectFile: string,
   partId: string,
   lines: string[],
-  change: (entries: Cue[], path: string, inDialog: Set<string>) => Cue[] | Problem[] | null,
+  change: (
+    entries: Cue[],
+    path: string,
+    inDialog: Set<string>,
+  ) => { entries: Cue[] } | { problems: Problem[] } | null,
 ): Promise<CueChange> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
@@ -95,9 +101,10 @@ async function changeCues(
     if (!parsed.success) return { ok: false, problems: problemsFrom(path, parsed.error) }
     const entries = Object.entries(raw as Record<string, string>)
 
-    const changed = change(entries, path, inDialog)
-    if (changed === null) return null
-    if (isProblems(changed)) return { ok: false, problems: changed }
+    const outcome = change(entries, path, inDialog)
+    if (outcome === null) return null
+    if ('problems' in outcome) return { ok: false, problems: outcome.problems }
+    const changed = outcome.entries
     if (sameEntries(changed, entries)) return { ok: true }
     const moved = changed.map(([k]) => k).filter((k) => INTEGER_LIKE.test(k))
     if (moved.length && changed.length > 1) {
@@ -109,10 +116,6 @@ async function changeCues(
     await writeAtomic(root, path, formatCues(changed))
     return { ok: true }
   })
-}
-
-function isProblems(value: Cue[] | Problem[]): value is Problem[] {
-  return value.length > 0 && !Array.isArray(value[0])
 }
 
 function sameEntries(a: Cue[], b: Cue[]): boolean {

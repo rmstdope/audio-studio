@@ -105,7 +105,6 @@ export function planPart(input: PlanInput): PartState {
   const orphanCues = Object.entries(cues)
     .filter(([key]) => !keys.has(key))
     .map(([key, cue]) => ({ key, cue }))
-    .sort((a, b) => a.key.localeCompare(b.key))
 
   return { lines: states, orphans, orphanCues, counts }
 }

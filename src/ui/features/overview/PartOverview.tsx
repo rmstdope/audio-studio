@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { LineState, LineStatus } from '../../../core/planner'
-import { displayName, type PartSummary, type ProjectSummary } from '../../../core/summary'
+import type { LineStatus } from '../../../core/planner'
+import type { PartSummary, ProjectSummary } from '../../../core/summary'
 import type { PartDetail } from '../../../services/workspace'
 import { useAdopt, useMoveCue, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
@@ -9,6 +9,7 @@ import { AlertIcon, ListIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusBar, StatusDot } from '../../components/StatusBar'
 import { longTitle, plural, shortTitle } from '../../format'
+import { cueTargets, type CueTarget } from '../../cueTargets'
 import { routeHref } from '../../route'
 import { REASON, STATUS, reasonCounts } from '../../status'
 
@@ -311,13 +312,11 @@ function RefreshOutcome({
 
 /**
  * Cues whose line left the dialog, usually because it was reworded and got a new key: each can be
- * given to its line's new key, or removed. Lines without a clip come first, since a reworded line
- * has none yet.
+ * given to a line, or removed. The picker lists lines without their own cue, those without a clip
+ * first (a reworded line has none yet), and suggests the one line without a clip if there is one.
  */
 function OrphanCues({ part }: { part: PartDetail }) {
-  const free = part.lines.filter((line) => !line.ownCue)
-  const fresh = free.filter((line) => line.file === null)
-  const recorded = free.filter((line) => line.file !== null)
+  const targets = cueTargets(part.lines)
   return (
     <section className="panel orphan-cues" aria-label="Orphaned cues">
       <div>
@@ -330,13 +329,7 @@ function OrphanCues({ part }: { part: PartDetail }) {
       </span>
       <ul>
         {part.orphanCues.map((orphan) => (
-          <OrphanCue
-            key={orphan.key}
-            partId={part.id}
-            orphan={orphan}
-            fresh={fresh}
-            recorded={recorded}
-          />
+          <OrphanCue key={orphan.key} partId={part.id} orphan={orphan} targets={targets} />
         ))}
       </ul>
     </section>
@@ -346,21 +339,22 @@ function OrphanCues({ part }: { part: PartDetail }) {
 function OrphanCue({
   partId,
   orphan,
-  fresh,
-  recorded,
+  targets,
 }: {
   partId: string
   orphan: { key: string; cue: string }
-  fresh: LineState[]
-  recorded: LineState[]
+  targets: ReturnType<typeof cueTargets>
 }) {
   const move = useMoveCue(partId)
-  const [to, setTo] = useState('')
+  const [picked, setPicked] = useState<string | null>(null)
+  // Only a line still offered counts: after a reload the picked one may have its own cue now.
+  const offered = (key: string | null) =>
+    key !== null && [...targets.fresh, ...targets.recorded].some((t) => t.key === key)
+  const to = offered(picked) ? picked! : (targets.suggested ?? '')
   const problems = move.data && !move.data.ok && 'problems' in move.data ? move.data.problems : []
-  const option = (line: LineState) => (
-    <option key={line.key} value={line.key}>
-      {displayName(line.speaker)}:{' '}
-      {line.text.length > 70 ? `${line.text.slice(0, 70)}…` : line.text}
+  const option = (target: CueTarget) => (
+    <option key={target.key} value={target.key}>
+      {target.label}
     </option>
   )
   return (
@@ -371,16 +365,16 @@ function OrphanCue({
       </div>
       <div className="orphan-cue-actions">
         <select
-          aria-label={`Line to give ${orphan.cue} to`}
+          aria-label={`Line to give the cue ${orphan.cue} to`}
           value={to}
-          onChange={(e) => setTo(e.target.value)}
+          onChange={(e) => setPicked(e.target.value || null)}
         >
           <option value="">Give it to a line…</option>
-          {fresh.length > 0 && (
-            <optgroup label="Lines without a clip">{fresh.map(option)}</optgroup>
+          {targets.fresh.length > 0 && (
+            <optgroup label="Lines without a clip">{targets.fresh.map(option)}</optgroup>
           )}
-          {recorded.length > 0 && (
-            <optgroup label="Recorded lines">{recorded.map(option)}</optgroup>
+          {targets.recorded.length > 0 && (
+            <optgroup label="Recorded lines">{targets.recorded.map(option)}</optgroup>
           )}
         </select>
         <button

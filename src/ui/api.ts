@@ -295,13 +295,18 @@ export function useMoveCue(partId: string) {
           body: JSON.stringify({ to }),
         },
       )
+      if (response.status === 404) {
+        throw new Error(
+          'That cue or line is no longer in this part; the page shows it as it is now.',
+        )
+      }
       if (!response.ok && response.status !== 409) {
         throw new Error(`moving the cue answered ${response.status}`)
       }
       return (await response.json()) as NonNullable<CueChange>
     },
-    onSuccess: async (saved) => {
-      if (!saved.ok) return
+    // Moved or not (a 404 means the part changed), the page shows the part as it is now.
+    onSettled: async () => {
       void client.invalidateQueries({ queryKey: ['plan', partId] })
       void client.invalidateQueries({ queryKey: ['changes'] })
       await client.invalidateQueries({ queryKey: ['part', partId] })
