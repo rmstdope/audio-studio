@@ -1,7 +1,8 @@
+import { posix } from 'node:path'
 import { partPathFor, type Project } from './project'
 
-/** How git sees a changed file. */
-export type ChangeKind = 'new' | 'modified' | 'deleted' | 'renamed'
+/** How git sees a changed file; a conflict is a merge left to resolve before committing. */
+export type ChangeKind = 'new' | 'modified' | 'deleted' | 'renamed' | 'conflict'
 
 /** One changed file, by its path from the project root. */
 export interface Change {
@@ -30,24 +31,73 @@ export interface ChangeGroups {
   parts: PartChanges[]
 }
 
+/** A part's files by path (with their role) and its clips folder (ending in `/`). */
+export interface PartPaths {
+  id: string
+  title: string
+  files: Record<string, FileRole>
+  clips: string
+}
+
+/** Every path the studio writes, from the project root, normalised as git writes them. */
+export interface ProjectPaths {
+  /** The project file and the cast. */
+  own: string[]
+  parts: PartPaths[]
+}
+
+/** A path from the project file as git writes it: no `./`, no doubled or trailing slashes. */
+function normal(path: string): string {
+  return posix.normalize(path).replace(/^\.\//, '').replace(/\/+$/, '')
+}
+
+/** The paths the studio reads and writes for a project: what git is asked about, and grouped by. */
+export function projectPaths(project: Project, projectPath: string): ProjectPaths {
+  const { narration } = project
+  return {
+    own: [normal(projectPath), normal(narration.characters)],
+    parts: narration.parts.map((part) => {
+      const at = (template: string) => normal(partPathFor(template, part.id))
+      return {
+        id: part.id,
+        title: part.title,
+        files: {
+          [at(narration.paths.dialog)]: 'dialog',
+          [at(narration.paths.cues)]: 'cues',
+          [at(narration.paths.lock)]: 'lock',
+          [at(narration.paths.manifest)]: 'manifest',
+        },
+        clips: `${at(narration.paths.clips)}/`,
+      }
+    }),
+  }
+}
+
 /**
  * The changes in `git status --porcelain=v1 -z` output: two status letters, a space and the
- * path, separated by NULs; a rename or copy is followed by the path it came from.
+ * path, separated by NULs; a rename or copy is followed by the path it came from. Paths are from
+ * the repository's top, so `prefix` (the project root's place in it, `git rev-parse
+ * --show-prefix`) is taken off. A copy counts as new: its source is still there.
  */
-export function parsePorcelain(text: string): Change[] {
+export function parsePorcelain(text: string, prefix = ''): Change[] {
   const fields = text.split('\0')
   const changes: Change[] = []
+  const local = (path: string) => (path.startsWith(prefix) ? path.slice(prefix.length) : path)
   for (let i = 0; i < fields.length; i++) {
     const field = fields[i]!
     if (field.length < 4) continue
-    const code = field.slice(0, 2)
-    const path = field.slice(3)
-    if (code.includes('R') || code.includes('C')) {
-      changes.push({ path, change: 'renamed', from: fields[++i] ?? '' })
-    } else if (code === '??' || code.includes('A')) {
-      changes.push({ path, change: 'new' })
+    const [x, y] = [field[0]!, field[1]!]
+    const path = local(field.slice(3))
+    const code = x + y
+    if (x === 'R' || x === 'C') {
+      const from = local(fields[++i] ?? '')
+      changes.push(x === 'R' ? { path, change: 'renamed', from } : { path, change: 'new' })
+    } else if (code.includes('U') || code === 'AA' || code === 'DD') {
+      changes.push({ path, change: 'conflict' })
     } else if (code.includes('D')) {
       changes.push({ path, change: 'deleted' })
+    } else if (code === '??' || x === 'A') {
+      changes.push({ path, change: 'new' })
     } else {
       changes.push({ path, change: 'modified' })
     }
@@ -57,35 +107,34 @@ export function parsePorcelain(text: string): Change[] {
 
 /**
  * The changes grouped by what they belong to: the project file and the cast, then each part's
- * dialog, cues, lock and manifest, and its clips counted by kind. Parts without changes are left
- * out; a path that belongs nowhere is not counted.
+ * dialog, cues, lock and manifest, and its clips (`.mp3`) counted by kind. Parts without changes
+ * are left out; a path that belongs nowhere is not counted.
  */
 export function groupChanges(
   project: Project,
   projectPath: string,
   changes: Change[],
 ): ChangeGroups {
-  const { narration } = project
-  const own = new Set([projectPath, narration.characters])
+  const paths = projectPaths(project, projectPath)
+  const own = new Set(paths.own)
   const projectChanges = changes.filter((c) => own.has(c.path))
   let total = projectChanges.length
 
-  const parts = narration.parts.flatMap((part): PartChanges[] => {
-    const at = (template: string) => partPathFor(template, part.id)
-    const roles = new Map<string, FileRole>([
-      [at(narration.paths.dialog), 'dialog'],
-      [at(narration.paths.cues), 'cues'],
-      [at(narration.paths.lock), 'lock'],
-      [at(narration.paths.manifest), 'manifest'],
-    ])
-    const clipsDir = `${at(narration.paths.clips).replace(/\/+$/, '')}/`
+  const parts = paths.parts.flatMap((part): PartChanges[] => {
     const files: PartChanges['files'] = []
-    const clips: Record<ChangeKind, number> = { new: 0, modified: 0, deleted: 0, renamed: 0 }
+    const clips: Record<ChangeKind, number> = {
+      new: 0,
+      modified: 0,
+      deleted: 0,
+      renamed: 0,
+      conflict: 0,
+    }
     for (const change of changes) {
-      const role = roles.get(change.path)
+      const role = Object.hasOwn(part.files, change.path) ? part.files[change.path] : undefined
       if (role) files.push({ ...change, role })
-      else if (change.path.startsWith(clipsDir) && change.path.endsWith('.mp3'))
+      else if (change.path.startsWith(part.clips) && change.path.endsWith('.mp3')) {
         clips[change.change]++
+      }
     }
     const count = files.length + Object.values(clips).reduce((a, b) => a + b, 0)
     total += count

@@ -529,8 +529,9 @@ Small, independently useful increments:
       among others. The table is shown in the order the studio applies it.
    3. **Changes panel** (built): `git status` for the project's own files only (the project file,
       the cast, each part's dialog, cues, lock, manifest and clips), grouped by part with clips
-      counted; read again every few seconds, and counted in the sidebar. Only reads, without
-      optional locks (`GIT_OPTIONAL_LOCKS=0`), so it never touches the index either.
+      counted, merge conflicts marked; read again every few seconds, and counted in the sidebar.
+      Only reads, without optional locks (`GIT_OPTIONAL_LOCKS=0`), so it never touches the index
+      either, and without `GIT_DIR` and the like from the environment.
    4. **Refresh dialog**: run `refreshDialog`, and show the orphaned cues it leaves.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data

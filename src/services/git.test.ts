@@ -44,7 +44,7 @@ describe('gitChanges', () => {
         id: 'act1',
         title: 'Act I',
         files: [{ path: 'tts/act1/cues.json', change: 'new', role: 'cues' }],
-        clips: { new: 1, modified: 0, deleted: 1, renamed: 0 },
+        clips: { new: 1, modified: 0, deleted: 1, renamed: 0, conflict: 0 },
       },
     ])
   })
@@ -64,6 +64,13 @@ describe('gitChanges', () => {
     const result = await gitChanges(join(root, 'audio-studio.json'))
     if (!result?.ok) throw new Error(JSON.stringify(result))
     expect(result.groups.project.map((c) => c.path)).toEqual(['audio-studio.json', 'tts/cast.json'])
+  })
+
+  it('says when git cannot be run, rather than that there is no repository', async () => {
+    const root = tempRepo(files)
+    expect(
+      await gitChanges(join(root, 'audio-studio.json'), { git: 'no-such-git-xyz' }),
+    ).toMatchObject({ ok: false, reason: 'git', message: expect.stringContaining('git') })
   })
 
   it('says when the project is not in a git repository', async () => {

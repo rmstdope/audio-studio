@@ -8,6 +8,7 @@ const KIND: Record<ChangeKind, { label: string; color: string }> = {
   modified: { label: 'Changed', color: 'var(--warn)' },
   deleted: { label: 'Deleted', color: 'var(--danger-ink)' },
   renamed: { label: 'Renamed', color: 'var(--info)' },
+  conflict: { label: 'Conflict', color: 'var(--accent)' },
 }
 
 const ROLE: Record<FileRole, string> = {
@@ -63,8 +64,21 @@ function ChangesBody({ summary }: { summary: ProjectSummary }) {
       </div>
     )
   }
+  const conflicts =
+    groups.project.filter((c) => c.change === 'conflict').length +
+    groups.parts.reduce(
+      (sum, part) =>
+        sum + part.clips.conflict + part.files.filter((f) => f.change === 'conflict').length,
+      0,
+    )
   return (
     <div className="changes">
+      {conflicts > 0 && (
+        <span className="adopt-error">
+          {plural(conflicts, 'file')} with a merge conflict: resolve{' '}
+          {conflicts === 1 ? 'it' : 'them'} in git before committing.
+        </span>
+      )}
       {groups.project.length > 0 && (
         <section className="panel" aria-label="Project files">
           <span className="label">Project and cast</span>
