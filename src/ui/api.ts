@@ -338,8 +338,10 @@ export function usePlan(partId: string, speaker: string | null, weak = false) {
       const query = params.size ? `?${params}` : ''
       return getJson<PlanAnswer>(`/api/parts/${encodeURIComponent(partId)}/plan${query}`)
     },
-    // Ticking a box asks for another plan: keep showing the last one meanwhile.
-    placeholderData: keepPreviousData,
+    // Ticking the retake box asks for another plan: keep showing the last one for the same scope
+    // meanwhile (its buttons wait), but never another speaker's.
+    placeholderData: (previous, query) =>
+      query?.queryKey[2] === speaker ? keepPreviousData(previous) : undefined,
   })
 }
 

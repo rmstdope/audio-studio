@@ -121,6 +121,8 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
   }
   const { plan: p } = answer
   const nothing = p.keys.length === 0 && (p.orphans.length === 0 || !removeOrphans)
+  // The previous plan, shown while the new one loads: nothing is started from it.
+  const waiting = plan.isPlaceholderData
   const reasons = (Object.entries(p.stale) as [StaleReason, number][]).sort((a, b) => b[1] - a[1])
 
   return (
@@ -137,7 +139,7 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
         <button
           className="btn btn-primary"
           type="button"
-          disabled={nothing || start.isPending}
+          disabled={nothing || waiting || start.isPending}
           onClick={() =>
             start.mutate(
               {
@@ -188,7 +190,7 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
           <button
             className="btn"
             type="button"
-            disabled={start.isPending}
+            disabled={waiting || start.isPending}
             onClick={() =>
               start.mutate(
                 { kind: 'measure', speaker, keys: p.unmeasured, orphans: [] },
