@@ -241,12 +241,18 @@ describe('review fixes', () => {
   })
 
   it('serves only plain files from the clips folder', async () => {
-    const root = tempRepo({ ...files, 'audio/act1/sub.d/x': 'x', 'outside.txt': 'secret' })
+    const root = tempRepo({
+      ...files,
+      'audio/act1/sub.d/x': 'x',
+      'audio/act1/.hidden': 'x',
+      'outside.txt': 'secret',
+    })
     symlinkSync(join(root, 'outside.txt'), join(root, 'audio/act1/link.mp3'))
     const projectFile = join(root, 'audio-studio.json')
     expect(await clipFile(projectFile, 'act1', 'a.mp3')).toBe(join(root, 'audio/act1/a.mp3'))
     expect(await clipFile(projectFile, 'act1', 'sub.d')).toBeNull()
     expect(await clipFile(projectFile, 'act1', 'link.mp3')).toBeNull()
+    expect(await clipFile(projectFile, 'act1', '.hidden')).toBeNull()
   })
 })
 

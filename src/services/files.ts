@@ -73,7 +73,8 @@ export async function writeAtomic(root: string, path: string, text: string): Pro
     await writeFile(temporary, text)
     await rename(temporary, file)
   } catch (error) {
-    await rm(temporary, { force: true })
+    // Report the write's error, not a failure to clean up after it.
+    await rm(temporary, { force: true }).catch(() => {})
     throw error
   }
 }

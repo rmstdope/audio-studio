@@ -136,8 +136,8 @@ export async function adoptPart(
 
 /**
  * The absolute path of a clip in a part's clips folder, or null if the part is unknown or the
- * name is not a plain file there. Folders and symbolic links are never served, as the planner
- * never counts them as clips either.
+ * name is not a plain file there. Folders, symbolic links and hidden files are never served; the
+ * planner never counts the first two as clips either.
  */
 export async function clipFile(
   projectFile: string,
@@ -147,7 +147,7 @@ export async function clipFile(
   const opened = await openProject(projectFile)
   if (!opened.ok) return null
   const { narration } = opened.project
-  if (!narration.parts.some((p) => p.id === partId)) return null
+  if (!narration.parts.some((p) => p.id === partId) || file.startsWith('.')) return null
   const folder = resolveInRoot(dirname(projectFile), partPathFor(narration.paths.clips, partId))
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }

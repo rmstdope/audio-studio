@@ -36,10 +36,24 @@ export const CharacterSchema = z.looseObject({
     .optional(),
 })
 
+/**
+ * How words are said: written → said, applied in the order of the file. One limit: JSON objects
+ * in JavaScript put integer-like keys (`"10"`) first, so such an entry is applied before the
+ * others, where Python's narrate.py keeps file order. It only matters when entries chain.
+ */
+const PronounceSchema = z.record(z.string(), z.string()).superRefine((pronounce, context) => {
+  if ('' in pronounce) {
+    context.addIssue({
+      code: 'custom',
+      message: 'a pronunciation needs the word it replaces; one has an empty word',
+    })
+  }
+})
+
 /** The character resource: every character by name, and how words are said. */
 export const CastSchema = z.looseObject({
   speakers: z.record(z.string(), CharacterSchema).default({}),
-  pronounce: z.record(z.string().min(1), z.string()).default({}),
+  pronounce: PronounceSchema.default({}),
 })
 
 /** A part's delivery cues: line key → a cue that replaces the character's style for that line. */

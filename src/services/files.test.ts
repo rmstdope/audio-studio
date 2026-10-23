@@ -48,3 +48,11 @@ describe('writeAtomic, twice at once', () => {
     expect(readdirSync(root)).toEqual(['x.json'])
   })
 })
+
+describe('writeAtomic, when the write fails', () => {
+  it('throws and leaves no temporary file', async () => {
+    const root = tempRepo({ 'taken/x': 'a folder where the file should go' })
+    await expect(writeAtomic(root, 'taken', '{}')).rejects.toThrow()
+    expect(readdirSync(root)).toEqual(['taken'])
+  })
+})

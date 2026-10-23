@@ -15,6 +15,16 @@ const notFound = () => Response.json({ error: 'not found' }, { status: 404 })
 const forbidden = (error: string) => Response.json({ error }, { status: 403 })
 
 /**
+ * The Host values the studio answers to on `port`. Browsers leave the port out on port 80, so
+ * there the bare names count too.
+ */
+export function allowedHosts(port: number): string[] {
+  const names = ['127.0.0.1', 'localhost']
+  const withPort = names.map((name) => `${name}:${port}`)
+  return port === 80 ? [...withPort, ...names] : withPort
+}
+
+/**
  * The studio's local server: the UI, and a JSON API over the project. It listens on 127.0.0.1
  * only, reads the project from disk on every request, so edits show up on reload, and takes
  * changes only from its own page.
@@ -27,7 +37,7 @@ export function startServer({ projectFile, port, development = false }: ServerOp
   const guard =
     <R extends Request>(handler: (request: R) => Response | Promise<Response>) =>
     (request: R) =>
-      hosts().includes(request.headers.get('host') ?? '')
+      hosts().includes(request.headers.get('host')?.toLowerCase() ?? '')
         ? handler(request)
         : forbidden('requests must be addressed to the studio itself')
 
@@ -78,9 +88,8 @@ export function startServer({ projectFile, port, development = false }: ServerOp
     },
   })
 
-  /** The Host values the studio answers to. */
   function hosts(): string[] {
-    return [`127.0.0.1:${server.port}`, `localhost:${server.port}`]
+    return allowedHosts(server.port!)
   }
 
   return server

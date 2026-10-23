@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { startServer } from './index'
+import { allowedHosts, startServer } from './index'
 
 const root = tempRepo({
   'audio-studio.json': projectJson(),
@@ -58,6 +58,13 @@ describe('server', () => {
     expect(response.status).toBe(403)
   })
 
+  it('refuses another host name on every API route', async () => {
+    for (const path of ['/api/parts/act1', '/api/parts/act1/clips/a.mp3', '/api/nothing']) {
+      const response = await fetch(url(path), { headers: { host: `evil.example:${server.port}` } })
+      expect(response.status).toBe(403)
+    }
+  })
+
   it('accepts localhost as well as 127.0.0.1', async () => {
     const response = await fetch(url('/api/project'), {
       headers: { host: `localhost:${server.port}` },
@@ -84,5 +91,15 @@ describe('server', () => {
     const response = await fetch(url('/api/nothing'))
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'not found' })
+  })
+})
+
+describe('allowedHosts', () => {
+  it('names both addresses with the port', () => {
+    expect(allowedHosts(4801)).toEqual(['127.0.0.1:4801', 'localhost:4801'])
+  })
+
+  it('also takes them without the port on port 80, where browsers leave it out', () => {
+    expect(allowedHosts(80)).toEqual(['127.0.0.1:80', 'localhost:80', '127.0.0.1', 'localhost'])
   })
 })
