@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { loadPart } from './workspace'
@@ -67,6 +67,46 @@ describe('setCue', () => {
     const result = await setCue(projectFile, 'act1', 'a', '[x]')
     expect(result).toMatchObject({ ok: false, problems: [{ file: 'tts/act1/cues.json' }] })
     expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe('{ broken')
+  })
+
+  it('writes nothing when the cue does not change', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const cuesFile = join(root, 'tts/act1/cues.json')
+    expect(await setCue(projectFile, 'act1', 'a', '')).toEqual({ ok: true })
+    expect(existsSync(cuesFile)).toBe(false)
+    writeFileSync(cuesFile, '{\n    "a": "[caf\\u00e9]"\n}')
+    expect(await setCue(projectFile, 'act1', 'a', '[café]')).toEqual({ ok: true })
+    expect(await setCue(projectFile, 'act1', 'b', ' ')).toEqual({ ok: true })
+    expect(readFileSync(cuesFile, 'utf8')).toBe('{\n    "a": "[caf\\u00e9]"\n}')
+  })
+
+  it('refuses a number-like key that JavaScript would move to the front', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': [
+        { key: 'b', speaker: 'mira', text: 'Goodbye.' },
+        { key: '10', speaker: 'mira', text: 'Ten.' },
+      ],
+      'tts/act1/cues.json': { b: '[sad]' },
+    })
+    const result = await setCue(join(root, 'audio-studio.json'), 'act1', '10', '[x]')
+    expect(result).toMatchObject({ ok: false, problems: [{ file: 'tts/act1/cues.json' }] })
+    expect(JSON.parse(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8'))).toEqual({
+      b: '[sad]',
+    })
+  })
+
+  it('saves a cue for a line keyed like an object property', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': [{ key: '__proto__', speaker: 'mira', text: 'Odd.' }],
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setCue(projectFile, 'act1', '__proto__', '[odd]')).toEqual({ ok: true })
+    expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe(
+      '{\n  "__proto__": "[odd]"\n}\n',
+    )
   })
 
   it('knows no unknown part or line', async () => {

@@ -394,6 +394,10 @@ function PhraseEditor({ characterId, audition }: { characterId: string; audition
   )
 }
 
+/**
+ * A character's style cue, saved in the cast: how every line without its own cue is said, and
+ * the audition takes too.
+ */
 function StyleEditor({ characterId, style }: { characterId: string; style: string }) {
   const save = useSetStyle(characterId)
   const [draft, setDraft] = useState<string | null>(null)
@@ -416,7 +420,11 @@ function StyleEditor({ characterId, style }: { characterId: string; style: strin
         className="style-input mono"
         placeholder="[warm, gentle, a little worried]"
         value={text}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          // A new draft: what went wrong with the last one no longer applies.
+          if (save.data || save.error) save.reset()
+          setDraft(e.target.value)
+        }}
       />
       <div className="keyword-add">
         <button className="btn" type="submit" disabled={!changed || save.isPending}>

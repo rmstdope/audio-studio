@@ -60,6 +60,11 @@ export const CastSchema = z.looseObject({
 /** A part's delivery cues: line key → a cue that replaces the character's style for that line. */
 export const CuesSchema = z.record(z.string(), z.string())
 
+/** A line's own cue, if it has one (only the file's own keys: never `toString` and the like). */
+export function cueFor(cues: Record<string, string>, key: string): string | undefined {
+  return Object.hasOwn(cues, key) ? cues[key] : undefined
+}
+
 /** One clip in the game's manifest. Only what the studio needs is checked; the rest is kept. */
 export const ManifestEntrySchema = z.looseObject({
   file: z.string().min(1),

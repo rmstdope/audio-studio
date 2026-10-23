@@ -197,6 +197,8 @@ describe('server', () => {
       ownCue: true,
     })
     expect((await patch('a', { cue: '' })).status).toBe(200)
+    const after = await (await fetch(url('/api/parts/act1'))).json()
+    expect(after.part.lines.find((l: { key: string }) => l.key === 'a').ownCue).toBe(false)
   })
 
   it('records a take, from the studio’s own page only, and serves it', async () => {

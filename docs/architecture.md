@@ -515,11 +515,13 @@ Small, independently useful increments:
       heard share from Whisper, so a poorly heard clip shows as weak.
 6. **Editing**, in small pull requests:
    1. **Style and cues** (built): a character's style on its audition page, saved in the cast; a
-      line's own cue in the lines table, saved in the part's cues file (its order and indent
-      kept, a cleared cue removed). Affected lines show as stale.
+      line's own cue in the lines table, saved in the part's cues file (its order kept, written
+      with two-space indent, a cleared cue removed; a number-like key refused, as JavaScript would
+      move it). Affected lines show as stale. Orphaned cues (their line's key changed with its
+      wording) are shown and re-keyed with Refresh dialog (6.4).
    2. **Pronunciations**: the table edited in the studio.
    3. **Changes panel**: `git status` for the project's paths.
-   4. **Refresh dialog**: run `refreshDialog`.
+   4. **Refresh dialog**: run `refreshDialog`, and show the orphaned cues it leaves.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data
    as one made by `narrate.py`, then retire `narrate.py` and `fish_tts.py`.

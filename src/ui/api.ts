@@ -170,11 +170,14 @@ export function useSetStyle(characterId: string) {
     },
     onSuccess: async (saved) => {
       if (!saved.ok) return
-      // Lines without their own cue are said in the style: their statuses change everywhere.
-      void client.invalidateQueries({ queryKey: ['project'] })
+      // Lines without their own cue are said in the style: their statuses change everywhere. The
+      // editor closes once the style shown is the new one.
       void client.invalidateQueries({ queryKey: ['part'] })
       void client.invalidateQueries({ queryKey: ['plan'] })
-      await refreshAudition(client, characterId)
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        refreshAudition(client, characterId),
+      ])
     },
   })
 }
@@ -197,11 +200,12 @@ export function useSetCue(partId: string) {
       }
       return (await response.json()) as NonNullable<CueChange>
     },
-    onSuccess: (saved) => {
+    onSuccess: async (saved) => {
       if (!saved.ok) return
-      void client.invalidateQueries({ queryKey: ['part', partId] })
       void client.invalidateQueries({ queryKey: ['plan', partId] })
       void client.invalidateQueries({ queryKey: ['project'] })
+      // The cell closes once the cue shown is the new one.
+      await client.invalidateQueries({ queryKey: ['part', partId] })
     },
   })
 }

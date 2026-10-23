@@ -146,6 +146,13 @@ export function startServer({
   }
 
   /** What generating a part (or one speaker in it) would do, or why it can't be planned. */
+  /** Saves the one field of a character a PATCH changes. */
+  function changeCharacter(id: string, change: z.infer<typeof CharacterBody>) {
+    if ('keywords' in change) return setKeywords(projectFile, id, change.keywords)
+    if ('style' in change) return setStyle(projectFile, id, change.style)
+    return setPhrase(projectFile, id, change.phrase)
+  }
+
   async function planFor(part: string, speaker?: string, includeWeak = false) {
     const read = await readPart(projectFile, part)
     if (!read) return null
@@ -304,13 +311,7 @@ export function startServer({
             )
           }
           const { id } = request.params
-          const change = body.data
-          const result =
-            'keywords' in change
-              ? await setKeywords(projectFile, id, change.keywords)
-              : 'style' in change
-                ? await setStyle(projectFile, id, change.style)
-                : await setPhrase(projectFile, id, change.phrase)
+          const result = await changeCharacter(id, body.data)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

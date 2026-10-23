@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
 import { clipUrl, usePart, useRecordLines, useSetCue } from '../../api'
@@ -286,11 +286,29 @@ function OrphanTable({
 function CueCell({ partId, line }: { partId: string; line: LineState }) {
   const save = useSetCue(partId)
   const [draft, setDraft] = useState<string | null>(null)
+  const cell = useRef<HTMLButtonElement>(null)
+  const refocus = useRef(false)
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
+  const own = line.ownCue ? line.cue : ''
+
+  // Back on the cue after editing, so the keyboard keeps its place in the table.
+  useEffect(() => {
+    if (draft === null && refocus.current) {
+      refocus.current = false
+      cell.current?.focus()
+    }
+  }, [draft])
+
+  const close = () => {
+    refocus.current = true
+    setDraft(null)
+  }
+  const done = (result: { ok: boolean }) => result.ok && close()
 
   if (draft === null) {
     return (
       <button
+        ref={cell}
         type="button"
         className={`cue-button mono${line.ownCue ? '' : ' from-style'}`}
         title={
@@ -298,13 +316,15 @@ function CueCell({ partId, line }: { partId: string; line: LineState }) {
             ? 'This line’s own cue: edit'
             : 'The character’s style: give this line its own cue'
         }
-        onClick={() => setDraft(line.ownCue ? line.cue : '')}
+        onClick={() => {
+          save.reset()
+          setDraft(own)
+        }}
       >
         {line.cue || '—'}
       </button>
     )
   }
-  const done = (result: { ok: boolean }) => result.ok && setDraft(null)
   return (
     <form
       className="cue-edit"
@@ -320,10 +340,10 @@ function CueCell({ partId, line }: { partId: string; line: LineState }) {
         placeholder={line.ownCue ? '' : line.cue || '[a cue for this line]'}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => e.key === 'Escape' && setDraft(null)}
+        onKeyDown={(e) => e.key === 'Escape' && close()}
       />
       <div className="cue-actions">
-        <button className="btn" type="submit" disabled={save.isPending}>
+        <button className="btn" type="submit" disabled={save.isPending || draft.trim() === own}>
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
         {line.ownCue && (
@@ -336,7 +356,7 @@ function CueCell({ partId, line }: { partId: string; line: LineState }) {
             Use style
           </button>
         )}
-        <button className="btn" type="button" onClick={() => setDraft(null)}>
+        <button className="btn" type="button" onClick={close}>
           Cancel
         </button>
       </div>
