@@ -129,6 +129,12 @@ describe('server', () => {
 
   it('answers an unknown character with 404', async () => {
     expect((await fetch(url('/api/characters/nobody/candidates'))).status).toBe(404)
+    const patch = await fetch(url('/api/characters/nobody'), {
+      method: 'PATCH',
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ keywords: ['x'] }),
+    })
+    expect(patch.status).toBe(404)
   })
 
   it('serves the UI', async () => {
@@ -149,5 +155,32 @@ describe('allowedHosts', () => {
 
   it('also takes them without the port on port 80, where browsers leave it out', () => {
     expect(allowedHosts(80)).toEqual(['127.0.0.1:80', 'localhost:80', '127.0.0.1', 'localhost'])
+  })
+})
+
+describe('server, with problems', () => {
+  const broken = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': '{ broken',
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const other = startServer({ projectFile: join(broken, 'audio-studio.json'), port: 0, fish: null })
+  afterAll(() => other.stop(true))
+
+  it('refuses to save keywords over a broken cast with 409', async () => {
+    const response = await fetch(new URL('/api/characters/narrator', other.url), {
+      method: 'PATCH',
+      headers: { origin: other.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ keywords: ['warm'] }),
+    })
+    expect(response.status).toBe(409)
+    expect(readFileSync(join(broken, 'tts/cast.json'), 'utf8')).toBe('{ broken')
+  })
+
+  it('says there is no API key when there is none', async () => {
+    const body = await (
+      await fetch(new URL('/api/characters/narrator/candidates', other.url))
+    ).json()
+    expect(body).toMatchObject({ ok: false, reason: 'no-key' })
   })
 })

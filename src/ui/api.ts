@@ -68,9 +68,11 @@ export function useSetKeywords(characterId: string) {
       }
       return (await response.json()) as NonNullable<CharacterChange>
     },
+    // Stay pending until the project (which holds the saved keywords) is reloaded, so the chips
+    // never fall back to the old list; the search reruns on its own time.
     onSuccess: () => {
-      client.invalidateQueries({ queryKey: ['candidates', characterId] })
-      client.invalidateQueries({ queryKey: ['project'] })
+      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
+      return client.invalidateQueries({ queryKey: ['project'] })
     },
   })
 }

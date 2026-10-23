@@ -1,16 +1,20 @@
 import { dirname } from 'node:path'
 import { formatCast } from '../core/castFormat'
-import type { Problem } from '../core/project'
-import { CastSchema, type Cast, type Character } from '../core/resources'
+import { resolveInRoot } from '../core/paths'
+import { problemsFrom, type Problem, type Project } from '../core/project'
+import { CastSchema, type Character } from '../core/resources'
 import type { CharacterSummary } from '../core/summary'
-import type { Candidate, Voice } from '../core/voiceSearch'
+import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
-import { readResource, writeAtomic } from './files'
+import { readJson, writeAtomic } from './files'
 import { searchVoices } from './voiceSearch'
-import { loadProject, openProject, type ProjectFailure } from './workspace'
+import { loadWorkspace, type ProjectFailure } from './workspace'
 
 /** How many candidates an audition search returns at most. */
 export const CANDIDATE_LIMIT = 24
+
+/** Makes the Fish client for a project, or null when there is no API key. */
+export type FishFactory = (root: string, project: Project) => Promise<FishClient | null>
 
 /** Voices found for a character, or why there are none. Null for an unknown character. */
 export type CandidatesResult =
@@ -27,19 +31,18 @@ export type CandidatesResult =
   | ProjectFailure
   | null
 
-/**
- * Searches Fish's library with a character's audition keywords, leaving out its current voice.
- * `fish` is null when there is no API key.
- */
+/** Searches Fish's library with a character's audition keywords, leaving out its current voice. */
 export async function findCandidates(
   projectFile: string,
   characterId: string,
-  fish: FishClient | null,
+  fishFor: FishFactory,
 ): Promise<CandidatesResult> {
-  const loaded = await loadProject(projectFile)
+  const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
-  const character = loaded.summary.characters.find((c) => c.id === characterId)
+  const { project, summary } = loaded
+  const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
+  const fish = await fishFor(dirname(projectFile), project)
   if (!fish) {
     return {
       ok: false,
@@ -47,15 +50,17 @@ export async function findCandidates(
       message: 'Set FISH_AUDIO_API_KEY in the project’s env file, or in the environment.',
     }
   }
-  const opened = await openProject(projectFile)
-  if (!opened.ok) return opened
-  const language = opened.project.narration.audition.language
+  const { language } = project.narration.audition
   const keywords = character.keywords
   try {
     const current = character.voice ? await fish.getVoice(character.voice).catch(() => null) : null
     const exclude = new Set(character.voice ? [character.voice] : [])
     const candidates = keywords.length
-      ? await searchVoices(fish, keywords, { language, exclude })
+      ? await searchVoices(fish, keywords, {
+          language,
+          exclude,
+          parallel: project.narration.quality.parallel,
+        })
       : []
     return {
       ok: true,
@@ -66,7 +71,11 @@ export async function findCandidates(
       candidates: candidates.slice(0, CANDIDATE_LIMIT),
     }
   } catch (error) {
-    return { ok: false, reason: 'fish', message: (error as Error).message }
+    return {
+      ok: false,
+      reason: 'fish',
+      message: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 
@@ -74,39 +83,90 @@ export async function findCandidates(
 export type CharacterChange =
   { ok: true } | { ok: false; problems: Problem[] } | ProjectFailure | null
 
-/** Saves a character's audition keywords in the cast: trimmed, without empties or repeats. */
+/**
+ * Saves a character's audition keywords in the cast: trimmed, without ones that have no words,
+ * and once each regardless of case (the first spelling is kept).
+ */
 export function setKeywords(
   projectFile: string,
   characterId: string,
   keywords: string[],
 ): Promise<CharacterChange> {
-  const cleaned = [...new Set(keywords.map((k) => k.trim()).filter(Boolean))]
+  const seen = new Set<string>()
+  const cleaned = keywords
+    .map((k) => k.trim())
+    .filter((k) => hasWords(k) && !seen.has(k.toLowerCase()) && seen.add(k.toLowerCase()))
   return updateCharacter(projectFile, characterId, (entry) => ({
     ...entry,
     audition: { ...entry.audition, keywords: cleaned },
   }))
 }
 
+/** Writes in progress per cast file, so changes made at once are applied one after the other. */
+const castWrites = new Map<string, Promise<unknown>>()
+
 /**
- * Changes one character's entry in the cast and writes the cast back, in its own layout. The
- * character must be in the project (in the cast or speaking in a part); a speaker not in the cast
- * yet gets an entry. Refuses to write over a cast that cannot be read.
+ * Changes one character's entry in the cast and writes the cast back, in its own layout, leaving
+ * everything else as it was. The character must be in the project (in the cast or speaking in a
+ * part); a speaker not in the cast yet gets an entry. Changes to one cast file are applied one at
+ * a time, each on what the one before wrote.
  */
-async function updateCharacter(
+function updateCharacter(
   projectFile: string,
   characterId: string,
   change: (entry: Character) => Character,
 ): Promise<CharacterChange> {
-  const loaded = await loadProject(projectFile)
+  const key = projectFile
+  const previous = castWrites.get(key) ?? Promise.resolve()
+  const next = previous.catch(() => {}).then(() => writeCharacter(projectFile, characterId, change))
+  castWrites.set(key, next)
+  return next.finally(() => {
+    if (castWrites.get(key) === next) castWrites.delete(key)
+  })
+}
+
+/** Pronunciation keys JavaScript would move to the front, changing the order they apply in. */
+const INTEGER_LIKE = /^(0|[1-9]\d*)$/
+
+async function writeCharacter(
+  projectFile: string,
+  characterId: string,
+  change: (entry: Character) => Character,
+): Promise<CharacterChange> {
+  const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
   if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
   const root = dirname(projectFile)
-  const path = loaded.summary.charactersPath
-  const problems: Problem[] = []
-  const read = await readResource(root, path, CastSchema, problems)
-  if (read === 'invalid') return { ok: false, problems }
-  const cast: Cast = read === 'missing' ? { speakers: {}, pronounce: {} } : read
-  const speakers = { ...cast.speakers, [characterId]: change(cast.speakers[characterId] ?? {}) }
+  const path = loaded.project.narration.characters
+
+  // Change the cast as it is in the file, not as parsed with defaults, so nothing else changes.
+  const json = await readJson(resolveInRoot(root, path))
+  if (json.status === 'invalid') {
+    return { ok: false, problems: [{ file: path, path: '', message: json.message }] }
+  }
+  const raw = json.status === 'missing' ? { speakers: {}, pronounce: {} } : json.value
+  const parsed = CastSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, problems: problemsFrom(path, parsed.error) }
+  const reordered = Object.keys(parsed.data.pronounce).filter((k) => INTEGER_LIKE.test(k))
+  if (reordered.length) {
+    return {
+      ok: false,
+      problems: [
+        {
+          file: path,
+          path: 'pronounce',
+          message:
+            `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move first ` +
+            'if the studio wrote this file, changing the order pronunciations apply in; ' +
+            'edit the file by hand, or write the number another way (e.g. "Ten")',
+        },
+      ],
+    }
+  }
+
+  const cast = raw as Record<string, unknown> & { speakers?: Record<string, Character> }
+  const speakers = { ...cast.speakers }
+  speakers[characterId] = change(speakers[characterId] ?? {})
   await writeAtomic(root, path, formatCast({ ...cast, speakers }))
   return { ok: true }
 }

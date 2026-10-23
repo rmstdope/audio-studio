@@ -1,9 +1,7 @@
-import { dirname } from 'node:path'
 import { z } from 'zod'
-import { findCandidates, setKeywords } from '../services/auditions'
-import { fishApiKey } from '../services/env'
-import { createFishClient, type FishClient } from '../services/fish'
-import { adoptPart, clipFile, loadPart, loadProject, openProject } from '../services/workspace'
+import { findCandidates, setKeywords, type FishFactory } from '../services/auditions'
+import { fishFromEnv, type FishClient } from '../services/fish'
+import { adoptPart, clipFile, loadPart, loadProject } from '../services/workspace'
 import index from '../ui/index.html'
 
 /** How to start the studio's server. */
@@ -42,14 +40,8 @@ export function allowedHosts(port: number): string[] {
  * whose host name was made to point at this machine (DNS rebinding) cannot read the project.
  */
 export function startServer({ projectFile, port, development = false, fish }: ServerOptions) {
-  /** The Fish client, made from the API key on every use so a key added later is picked up. */
-  async function fishClient(): Promise<FishClient | null> {
-    if (fish !== undefined) return fish
-    const opened = await openProject(projectFile)
-    if (!opened.ok) return null
-    const key = await fishApiKey(dirname(projectFile), opened.project.env)
-    return key ? createFishClient(key) : null
-  }
+  /** The Fish client: the one given (tests), else made from the project's API key on every use. */
+  const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
 
   /** Only requests addressed to the studio itself reach `handler`. */
   const guard =
@@ -109,7 +101,7 @@ export function startServer({ projectFile, port, development = false, fish }: Se
       },
       '/api/characters/:id/candidates': {
         GET: guard(async (request) => {
-          const result = await findCandidates(projectFile, request.params.id, await fishClient())
+          const result = await findCandidates(projectFile, request.params.id, fishFor)
           return result ? Response.json(result) : notFound()
         }),
       },

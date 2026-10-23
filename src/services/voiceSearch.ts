@@ -9,10 +9,9 @@ export interface SearchOptions {
   pageSize?: number
   /** Pages to read per term at most. */
   pages?: number
+  /** Requests to Fish at once (the project's `quality.parallel`). */
+  parallel?: number
 }
-
-/** Requests to Fish at once. */
-const PARALLEL = 4
 
 /**
  * Voices in Fish's library for an audition: every search term (see `searchTerms`) is searched,
@@ -21,7 +20,7 @@ const PARALLEL = 4
 export async function searchVoices(
   client: FishClient,
   keywords: string[],
-  { language, exclude, pageSize = 100, pages = 2 }: SearchOptions,
+  { language, exclude, pageSize = 100, pages = 2, parallel = 4 }: SearchOptions,
 ): Promise<Candidate[]> {
   const terms = searchTerms(keywords)
   const pooled: Voice[] = []
@@ -32,8 +31,8 @@ export async function searchVoices(
       if (page.items.length < pageSize) break
     }
   }
-  for (let i = 0; i < terms.length; i += PARALLEL) {
-    await Promise.all(terms.slice(i, i + PARALLEL).map(searchTerm))
+  for (let i = 0; i < terms.length; i += parallel) {
+    await Promise.all(terms.slice(i, i + parallel).map(searchTerm))
   }
   return rankVoices(pooled, keywords, exclude)
 }

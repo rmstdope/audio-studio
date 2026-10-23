@@ -1,5 +1,7 @@
 import { z } from 'zod'
+import type { Project } from '../core/project'
 import type { Voice } from '../core/voiceSearch'
+import { fishApiKey } from './env'
 
 /** A page of Fish's voice library. */
 export interface VoicePage {
@@ -102,6 +104,19 @@ export function createFishClient(
       return toVoice(ApiVoiceSchema.parse(await get(`/model/${encodeURIComponent(id)}`)))
     },
   }
+}
+
+/**
+ * The Fish client for a project, made from its API key (environment, else the project's env
+ * file), or null when there is none. Read on every call, so a key added later is picked up.
+ */
+export async function fishFromEnv(
+  root: string,
+  project: Project,
+  environment: Record<string, string | undefined> = process.env,
+): Promise<FishClient | null> {
+  const key = await fishApiKey(root, project.env, environment)
+  return key ? createFishClient(key) : null
 }
 
 async function errorMessage(response: Response): Promise<string> {

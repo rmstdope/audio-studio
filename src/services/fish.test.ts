@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test'
-import { createFishClient, FishError } from './fish'
+import { projectJson, tempRepo } from '../../test/helpers'
+import { ProjectSchema } from '../core/project'
+import { createFishClient, FishError, fishFromEnv } from './fish'
 
 const apiVoice = {
   _id: 'v1',
@@ -86,5 +88,18 @@ describe('createFishClient', () => {
     const failing = createFishClient('bad', { fetch }).getVoice('v1')
     await expect(failing).rejects.toBeInstanceOf(FishError)
     await expect(failing).rejects.toThrow('Fish Audio answered 401: Invalid api key')
+  })
+})
+
+describe('fishFromEnv', () => {
+  const project = ProjectSchema.parse(projectJson())
+
+  it('makes a client from the key in the project’s env file', async () => {
+    const root = tempRepo({ '.env': 'FISH_AUDIO_API_KEY=secret\n' })
+    expect(await fishFromEnv(root, project, {})).not.toBeNull()
+  })
+
+  it('is null without a key', async () => {
+    expect(await fishFromEnv(tempRepo({}), project, {})).toBeNull()
   })
 })

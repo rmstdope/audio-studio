@@ -19,14 +19,20 @@ export interface Candidate {
   matched: string[]
 }
 
-const WORD = /[\p{L}\p{N}']+/gu
+const WORD = /[\p{L}\p{N}'’]+/gu
 
 function words(text: string): string[] {
   return text.toLowerCase().match(WORD) ?? []
 }
 
+/** Keywords in lower case, once each, without ones that have no words (they would match anything). */
 function clean(keywords: string[]): string[] {
-  return [...new Set(keywords.map((k) => k.trim().toLowerCase()).filter(Boolean))]
+  return [...new Set(keywords.map((k) => k.trim().toLowerCase()))].filter((k) => words(k).length)
+}
+
+/** Whether a keyword has any word to match. */
+export function hasWords(keyword: string): boolean {
+  return words(keyword).length > 0
 }
 
 /**
@@ -36,7 +42,8 @@ function clean(keywords: string[]): string[] {
  */
 export function searchTerms(keywords: string[]): string[] {
   const phrases = clean(keywords)
-  return [...new Set([...phrases, ...phrases.flatMap(words)])]
+  const single = phrases.flatMap(words).filter((word) => word.length > 1)
+  return [...new Set([...phrases, ...single])]
 }
 
 /**

@@ -5,17 +5,21 @@ const LINE_LIMIT = 100
 
 /**
  * The cast as text, in the layout RetroQuest's cast already has: one line per character, nested
- * values inline, so a change to one character is a one-line diff. Unknown top-level fields are
- * kept after `speakers` and `pronounce`.
+ * values inline, so a change to one character is a one-line diff. Top-level fields stay in their
+ * order, and none is added.
  */
-export function formatCast(cast: Cast): string {
-  const { speakers, pronounce, ...rest } = cast
-  const sections = [
-    `  "speakers": ${block(speakers, 2)}`,
-    `  "pronounce": ${fitting(pronounce, '  "pronounce": ')}`,
-    ...Object.entries(rest).map(([key, value]) => `  ${JSON.stringify(key)}: ${inline(value)}`),
-  ]
+export function formatCast(cast: Cast | Record<string, unknown>): string {
+  const sections = Object.entries(cast).map(([key, value]) => {
+    const prefix = `  ${JSON.stringify(key)}: `
+    if (key === 'speakers' && isRecord(value)) return prefix + block(value, 2)
+    if (key === 'pronounce' && isRecord(value)) return prefix + fitting(value, prefix)
+    return prefix + inline(value)
+  })
   return `{\n${sections.join(',\n')}\n}\n`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 /** An object with one entry per line, each value inline. */

@@ -160,7 +160,8 @@ function KeywordsEditor({ characterId, keywords }: { characterId: string; keywor
   const add = (event: FormEvent) => {
     event.preventDefault()
     const word = draft.trim()
-    if (!word || current.includes(word)) return setDraft('')
+    const known = current.some((k) => k.toLowerCase() === word.toLowerCase())
+    if (!word || known) return setDraft('')
     save.mutate([...current, word])
     setDraft('')
   }

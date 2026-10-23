@@ -27,7 +27,18 @@ describe('searchTerms', () => {
   })
 })
 
+describe('searchTerms, skipping what cannot match', () => {
+  it('drops keywords without letters or digits, and one-letter words', () => {
+    expect(searchTerms(['-', 'grandma’s voice'])).toEqual(['grandma’s voice', 'grandma’s', 'voice'])
+  })
+})
+
 describe('rankVoices', () => {
+  it('does not let a keyword without words match every voice', () => {
+    const ranked = rankVoices([voice('a', { title: 'Young man' })], ['-', 'warm'], new Set())
+    expect(ranked).toEqual([])
+  })
+
   const keywords = ['elderly female', 'warm', 'storyteller']
 
   it('keeps voices matching at least one keyword, most keywords first, then most used', () => {

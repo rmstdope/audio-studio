@@ -100,14 +100,19 @@ audio-studio/
 │   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
 │   │   ├── planner.ts           script × lock × disk → status per line, generation plan
-│   │   ├── align.ts             Whisper words → per-word timings, heard ratio
-│   │   └── audition.ts          audition state machine: rounds, keep/drop, finalist
+│   │   ├── summary.ts           parts and characters as the UI shows them
+│   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
+│   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
+│   │   ├── align.ts             Whisper words → per-word timings, heard ratio (later)
+│   │   └── audition.ts          audition state machine: rounds, keep/drop, finalist (later)
 │   ├── services/                I/O behind interfaces (fakes in tests)
-│   │   ├── fish.ts              FishClient: searchVoices, getVoice, tts, credits
-│   │   ├── voiceSearch.ts       keyword search + local ranking (port of fish_tts.py search)
-│   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
-│   │   ├── audio.ts             join WAVs, encode MP3, measure duration, peaks
-│   │   ├── files.ts             read resources, write atomically, diff-friendly JSON
+│   │   ├── env.ts               the Fish API key, from the environment or the env file
+│   │   ├── fish.ts              FishClient (listVoices, getVoice; later tts, credits)
+│   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
+│   │   ├── auditions.ts         candidates for a character; changes to the cast, one at a time
+│   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker (later)
+│   │   ├── audio.ts             join WAVs, encode MP3, measure duration, peaks (later)
+│   │   ├── files.ts             read resources, write atomically, lock formatting
 │   │   ├── workspace.ts         find the project, load it and its parts, adopt clips
 │   │   ├── git.ts               `git status --porcelain` for the project's paths
 │   │   └── jobs.ts              job queue, concurrency, cancel, progress events

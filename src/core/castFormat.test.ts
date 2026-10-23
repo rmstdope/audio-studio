@@ -39,9 +39,8 @@ describe('formatCast', () => {
     expect(JSON.parse(text)).toEqual({ speakers: {}, pronounce })
   })
 
-  it('keeps other top-level fields, after the known ones', () => {
-    const text = formatCast({ notes: 'hi', speakers: {}, pronounce: {} })
-    expect(JSON.parse(text)).toEqual({ speakers: {}, pronounce: {}, notes: 'hi' })
-    expect(text.indexOf('"notes"')).toBeGreaterThan(text.indexOf('"pronounce"'))
+  it('keeps top-level fields in their order, adding none', () => {
+    const text = formatCast({ notes: 'hi', speakers: { a: { voice: 'v' } } })
+    expect(text).toBe('{\n  "notes": "hi",\n  "speakers": {\n    "a": { "voice": "v" }\n  }\n}\n')
   })
 })
