@@ -2,7 +2,9 @@ import { z } from 'zod'
 import { findCandidates, setKeywords, setPhrase, type FishFactory } from '../services/auditions'
 import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
-import { recordLine } from '../services/narration'
+import { planGeneration } from '../core/generation'
+import { createJobs } from '../services/jobs'
+import { recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { nextRound, setVerdict } from '../core/audition'
 import {
@@ -17,7 +19,7 @@ import {
   type SessionResult,
 } from '../services/sessions'
 import { fishFromEnv, type FishClient } from '../services/fish'
-import { adoptPart, clipFile, loadPart, loadProject } from '../services/workspace'
+import { adoptPart, clipFile, loadPart, loadProject, openProject } from '../services/workspace'
 import index from '../ui/index.html'
 
 /** How to start the studio's server. */
@@ -38,6 +40,11 @@ const CharacterBody = z.union([
   z.object({ keywords: z.array(z.string()).max(20) }).strict(),
   z.object({ phrase: z.string().max(10_000).nullable() }).strict(),
 ])
+
+const JobBody = z.object({
+  speaker: z.string().min(1).nullable(),
+  removeOrphans: z.boolean(),
+})
 
 const VerdictBody = z.object({
   voice: z.string().regex(/^[\w-]{1,64}$/),
@@ -91,6 +98,21 @@ export function startServer({
 
   /** Fish TTS requests (audition takes and lines alike): `quality.parallel` at a time, each once. */
   const fishWork = createLimiter()
+  /** Generation jobs, one per part at a time. */
+  const jobs = createJobs()
+
+  /** What generating a part (or one speaker in it) would do, or why it can't be planned. */
+  async function planFor(part: string, speaker?: string) {
+    const loaded = await loadPart(projectFile, part)
+    if (!loaded) return null
+    if (!loaded.ok) return loaded
+    if (loaded.part.problems.length) return { ok: false as const, problems: loaded.part.problems }
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const { narration } = opened.project
+    const plan = planGeneration(loaded.part, { model: narration.models.draft, speaker })
+    return { ok: true as const, plan, parallel: narration.quality.parallel }
+  }
 
   /** Only requests addressed to the studio itself reach `handler`. */
   const guard =
@@ -143,6 +165,54 @@ export function startServer({
           })
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/plan': {
+        GET: guard(async (request) => {
+          const speaker = new URL(request.url).searchParams.get('speaker') || undefined
+          const plan = await planFor(request.params.part, speaker)
+          return plan ? Response.json(plan) : notFound()
+        }),
+      },
+      '/api/parts/:part/jobs': {
+        POST: fromOwnPage(async (request) => {
+          const body = JobBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { speaker, removeOrphans }' }, { status: 400 })
+          }
+          const { part } = request.params
+          const planned = await planFor(part, body.data.speaker ?? undefined)
+          if (!planned) return notFound()
+          if (!planned.ok) return Response.json(planned, { status: 409 })
+          const { plan, parallel } = planned
+          const orphans = body.data.removeOrphans ? plan.orphans : []
+          if (!plan.keys.length && !orphans.length) {
+            return Response.json({ error: 'There is nothing to generate.' }, { status: 409 })
+          }
+          const job = jobs.start({
+            part,
+            speaker: body.data.speaker,
+            keys: plan.keys,
+            orphans,
+            parallel,
+            record: (key) =>
+              recordLine(projectFile, part, key, fishFor, { encode, limiter: fishWork }),
+            removeOrphans: (keys) => removeOrphans(projectFile, part, keys),
+          })
+          return Response.json(job, { status: 'error' in job ? 409 : 200 })
+        }),
+      },
+      '/api/parts/:part/jobs/latest': {
+        GET: guard((request) => Response.json(jobs.latest(request.params.part))),
+      },
+      '/api/jobs/:id': {
+        GET: guard((request) => {
+          const job = jobs.get(request.params.id)
+          return job ? Response.json(job) : notFound()
+        }),
+        DELETE: fromOwnPage(async (request) => {
+          const job = jobs.cancel(request.params.id)
+          return job ? Response.json(job) : notFound()
         }),
       },
       '/api/parts/:part/clips/:file': {

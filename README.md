@@ -12,8 +12,9 @@ Steps 1 to 3 of the delivery plan (`docs/architecture.md` §12): the studio vali
 shows each part's characters and the state of every line's clip, adopts clips recorded before it,
 and casts voices by audition: it searches Fish Audio's library by keywords, records each candidate
 saying the audition phrase in the character's style, and runs keep/drop rounds until one voice is
-left, which it writes to the cast. Lines can be recorded one by one, or all those shown, from the
-lines page (step 4.1); generating a whole part as a job comes next.
+left, which it writes to the cast. It records narration: line by line, or a whole part (or one
+character) as a job with a plan, progress and Cancel, removing orphaned clips when asked (step 4).
+Checking takes with Whisper comes next.
 
 Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`).
 

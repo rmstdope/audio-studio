@@ -1,0 +1,156 @@
+import { useState } from 'react'
+import type { StaleReason } from '../../../core/fingerprint'
+import { displayName } from '../../../core/summary'
+import { useJob, useJobActions, usePlan } from '../../api'
+import { Problems } from '../../components/Problems'
+import { plural } from '../../format'
+import { REASON } from '../../status'
+
+/**
+ * Generating a part, or one character in it: the plan (what would be recorded and why, the
+ * orphans, the model and its cost), then the job's progress with Cancel, then what it did.
+ */
+export function GeneratePanel({ partId, speaker }: { partId: string; speaker: string | null }) {
+  const plan = usePlan(partId, speaker)
+  const job = useJob(partId)
+  const { start, cancel } = useJobActions(partId)
+  const [removeOrphans, setRemoveOrphans] = useState(false)
+  const [dismissed, setDismissed] = useState<string | null>(null)
+
+  const current = job.data ?? null
+  const running = current && (current.status === 'running' || current.status === 'cancelling')
+
+  if (current && (running || dismissed !== current.id)) {
+    const progress = current.total ? (current.done / current.total) * 100 : 100
+    return (
+      <section className="panel generate" aria-label="Generation">
+        <div className="generate-head">
+          <div>
+            <span className="label">
+              {running
+                ? current.status === 'cancelling'
+                  ? 'Cancelling'
+                  : 'Generating'
+                : current.status === 'cancelled'
+                  ? 'Cancelled'
+                  : 'Done'}
+            </span>
+            <strong>
+              {current.done} of {plural(current.total, 'line')}
+              {current.speaker ? ` · ${displayName(current.speaker)}` : ''}
+            </strong>
+          </div>
+          {running ? (
+            <button
+              className="btn"
+              type="button"
+              disabled={current.status === 'cancelling' || cancel.isPending}
+              onClick={() => cancel.mutate(current.id)}
+            >
+              {current.status === 'cancelling' ? 'Finishing lines under way…' : 'Cancel'}
+            </button>
+          ) : (
+            <button className="btn" type="button" onClick={() => setDismissed(current.id)}>
+              Close
+            </button>
+          )}
+        </div>
+        <div className="progress" aria-hidden="true">
+          <span style={{ width: `${progress}%` }} />
+        </div>
+        {running && current.recording.length > 0 && (
+          <span className="muted">Recording {current.recording.join(', ')}</span>
+        )}
+        {!running && (
+          <span className="muted">
+            {plural(
+              current.done - current.failed.filter((f) => f.key !== 'orphans').length,
+              'line',
+            )}{' '}
+            recorded
+            {current.removed ? ` · ${plural(current.removed, 'orphaned clip')} removed` : ''}
+            {current.status === 'cancelled' ? ' · the rest were left as they were' : ''}
+          </span>
+        )}
+        {current.failed.length > 0 && (
+          <ul className="failures">
+            {current.failed.map((f) => (
+              <li key={f.key}>
+                <span className="mono">{f.key}</span>: {f.message}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    )
+  }
+
+  if (plan.isPending) return <section className="panel muted">Planning…</section>
+  if (plan.isError)
+    return <section className="panel muted">Could not plan: {plan.error.message}</section>
+  const answer = plan.data
+  if (!answer.ok) {
+    return <Problems title="Generation cannot be planned" problems={answer.problems} />
+  }
+  const { plan: p } = answer
+  const nothing = p.keys.length === 0 && (p.orphans.length === 0 || !removeOrphans)
+  const reasons = (Object.entries(p.stale) as [StaleReason, number][]).sort((a, b) => b[1] - a[1])
+
+  return (
+    <section className="panel generate" aria-label="Generation plan">
+      <div className="generate-head">
+        <div>
+          <span className="label">
+            Generate · {speaker ? displayName(speaker) : 'every character'}
+          </span>
+          <strong>
+            {p.keys.length ? `Record ${plural(p.keys.length, 'line')}` : 'Every line is recorded'}
+          </strong>
+        </div>
+        <button
+          className="btn btn-primary"
+          type="button"
+          disabled={nothing || start.isPending}
+          onClick={() => start.mutate({ speaker, removeOrphans })}
+        >
+          {start.isPending ? 'Starting…' : 'Generate'}
+        </button>
+      </div>
+      {(p.missing > 0 || reasons.length > 0) && (
+        <ul className="plan-list">
+          {p.missing > 0 && <li>{plural(p.missing, 'missing line')}</li>}
+          {reasons.map(([reason, n]) => (
+            <li key={reason}>
+              {plural(n, 'line')}: {REASON[reason]}
+            </li>
+          ))}
+        </ul>
+      )}
+      {p.uncast.length > 0 && (
+        <span className="cast-note">
+          Not recorded until cast: {p.uncast.map(displayName).join(', ')}.
+        </span>
+      )}
+      {p.orphans.length > 0 && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={removeOrphans}
+            onChange={(e) => setRemoveOrphans(e.target.checked)}
+          />
+          Also remove {plural(p.orphans.length, 'orphaned clip')} (their lines left the dialog)
+        </label>
+      )}
+      <span className="muted plan-facts">
+        {p.model} · {formatBytes(p.bytes)} of text ·{' '}
+        {p.cost ? `about $${p.cost.toFixed(2)}` : 'free'} · files are written in place; commit them
+        when you are happy
+      </span>
+      {start.isError && <span className="adopt-error">{start.error.message}</span>}
+    </section>
+  )
+}
+
+function formatBytes(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`
+}

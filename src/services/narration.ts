@@ -209,3 +209,46 @@ function sorted<T>(record: Record<string, T>): Record<string, T> {
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
+
+/** A clip file name that stays inside the clips folder. */
+const SAFE_CLIP = /^[\w-][\w.-]*$/
+
+/**
+ * Removes orphaned clips (their line left the dialog): the clip file, its manifest entry and its
+ * lock entry. Only keys that are orphans now, read afresh in the part's turn, are removed, and a
+ * clip file is deleted only if its name stays inside the clips folder. Returns how many orphans
+ * were removed.
+ */
+export async function removeOrphans(
+  projectFile: string,
+  partId: string,
+  keys: string[],
+): Promise<number> {
+  return inPartTurn(projectFile, partId, async () => {
+    const read = await readPart(projectFile, partId)
+    if (!read || !read.ok) return 0
+    if (read.problems.length) {
+      throw new Error(read.problems.map((p) => `${p.file}: ${p.message}`).join('; '))
+    }
+    const root = dirname(projectFile)
+    const lines = new Set(read.input.lines.map((line) => line.key))
+    const manifest = { ...read.input.manifest }
+    const lock = { ...read.input.lock }
+    let removed = 0
+    for (const key of keys) {
+      const entry = manifest[key]
+      if (!entry || lines.has(key)) continue
+      if (SAFE_CLIP.test(entry.file)) {
+        await rm(resolveInRoot(root, join(read.paths.clipsPath, entry.file)), { force: true })
+      }
+      delete manifest[key]
+      delete lock[key]
+      removed++
+    }
+    if (removed) {
+      await writeAtomic(root, read.paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
+      await writeAtomic(root, read.paths.lockPath, formatEntriesPerLine(lock))
+    }
+    return removed
+  })
+}

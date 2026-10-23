@@ -15,6 +15,7 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
   const hasDialog = part.dialog === 'ok'
   const detail = usePart(part.id, hasDialog)
   const loaded = detail.data?.ok ? detail.data.part : null
+  const toRecord = loaded ? loaded.counts.missing + loaded.counts.stale : 0
 
   return (
     <>
@@ -27,9 +28,16 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
           </span>
         </div>
         {hasDialog && (
-          <a className="btn" href={routeHref({ view: 'lines', part: part.id })}>
-            <ListIcon /> All {part.lineCount} lines
-          </a>
+          <div className="header-actions">
+            <a className="btn" href={routeHref({ view: 'lines', part: part.id })}>
+              <ListIcon /> All {part.lineCount} lines
+            </a>
+            {toRecord > 0 && (
+              <a className="btn btn-primary" href={routeHref({ view: 'lines', part: part.id })}>
+                Generate {plural(toRecord, 'line')}
+              </a>
+            )}
+          </div>
         )}
       </header>
 
