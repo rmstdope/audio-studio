@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { FishClient } from '../services/fish'
 import { allowedHosts, startServer } from './index'
@@ -34,11 +35,20 @@ const fish: FishClient = {
   async getVoice() {
     throw new Error('not used')
   },
-  async tts() {
-    return new Uint8Array([0x49, 0x44, 0x33])
+  async tts(request) {
+    if (request.format !== 'wav') return new Uint8Array([0x49, 0x44, 0x33])
+    return writeWav({
+      format: { channels: 1, sampleRate: 1000, bitsPerSample: 16 },
+      data: new Uint8Array(2000),
+    })
   },
 }
-const server = startServer({ projectFile: join(root, 'audio-studio.json'), port: 0, fish })
+/** An encoder that keeps the WAV, so the tests need no ffmpeg. */
+const encode = async (wav: Uint8Array, file: string) => {
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, wav)
+}
+const server = startServer({ projectFile: join(root, 'audio-studio.json'), port: 0, fish, encode })
 afterAll(() => server.stop(true))
 
 const url = (path: string) => new URL(path, server.url)
@@ -226,6 +236,24 @@ describe('server', () => {
       headers: { origin: server.url.origin },
     })
     expect(response.status).toBe(404)
+  })
+
+  it('records a line, from the studio’s own page only', async () => {
+    const record = (origin: string) =>
+      fetch(url('/api/parts/act1/lines/a/record'), { method: 'POST', headers: { origin } })
+    expect((await record('https://evil.example')).status).toBe(403)
+    const body = await (await record(server.url.origin)).json()
+    expect(body).toEqual({ ok: true, key: 'a', duration: 1 })
+    const part = await (await fetch(url('/api/parts/act1'))).json()
+    expect(part.part.lines[0].status).toBe('ok')
+    expect(
+      (
+        await fetch(url('/api/parts/act1/lines/nope/record'), {
+          method: 'POST',
+          headers: { origin: server.url.origin },
+        })
+      ).status,
+    ).toBe(404)
   })
 
   it('serves the UI', async () => {

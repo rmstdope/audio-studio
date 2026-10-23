@@ -1182,3 +1182,47 @@ a.btn {
 .cast-note {
   color: var(--warn);
 }
+
+/* Recording lines */
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.row-record {
+  min-height: 34px;
+  padding: 0 12px;
+  align-self: auto;
+}
+
+.row-error {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.record-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+}
+
+.record-bar .btn {
+  align-self: auto;
+}
+
+.confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.confirm .btn {
+  align-self: auto;
+}

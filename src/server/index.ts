@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { findCandidates, setKeywords, setPhrase, type FishFactory } from '../services/auditions'
+import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
+import { recordLine } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { nextRound, setVerdict } from '../core/audition'
 import {
@@ -27,6 +29,8 @@ export interface ServerOptions {
   development?: boolean
   /** The Fish client to use (tests); by default one is made from the project's API key. */
   fish?: FishClient | null
+  /** The clip encoder to use (tests); ffmpeg by default. */
+  encode?: Encoder
 }
 
 /** A change to a character: its keywords, or its own audition phrase (null for the standard one). */
@@ -64,7 +68,13 @@ export function allowedHosts(port: number): string[] {
  * The API answers only requests addressed to 127.0.0.1 or localhost on its port, so a web page
  * whose host name was made to point at this machine (DNS rebinding) cannot read the project.
  */
-export function startServer({ projectFile, port, development = false, fish }: ServerOptions) {
+export function startServer({
+  projectFile,
+  port,
+  development = false,
+  fish,
+  encode,
+}: ServerOptions) {
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
   /** A session action's answer: the session as the page shows it; 404 for an unknown character. */
@@ -79,8 +89,8 @@ export function startServer({ projectFile, port, development = false, fish }: Se
     return Response.json(view, { status: view.ok ? 200 : 409 })
   }
 
-  /** Audition takes being recorded: a few at a time, each once. */
-  const takes = createLimiter()
+  /** Fish TTS requests (audition takes and lines alike): `quality.parallel` at a time, each once. */
+  const fishWork = createLimiter()
 
   /** Only requests addressed to the studio itself reach `handler`. */
   const guard =
@@ -103,6 +113,8 @@ export function startServer({ projectFile, port, development = false, fish }: Se
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port,
+    // Recording a line or a batch of takes can take well over Bun's default 10 s; never cut it off.
+    idleTimeout: 0,
     development: development ? { hmr: true, console: true } : false,
     routes: {
       '/': index,
@@ -118,6 +130,17 @@ export function startServer({ projectFile, port, development = false, fish }: Se
       '/api/parts/:part/adopt': {
         POST: fromOwnPage(async (request) => {
           const result = await adoptPart(projectFile, request.params.part)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/lines/:key/record': {
+        POST: fromOwnPage(async (request) => {
+          const { part, key } = request.params
+          const result = await recordLine(projectFile, part, key, fishFor, {
+            encode,
+            limiter: fishWork,
+          })
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -151,7 +174,7 @@ export function startServer({ projectFile, port, development = false, fish }: Se
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { id } = request.params
-          const result = await recordTake(projectFile, id, body.data.voice, fishFor, takes)
+          const result = await recordTake(projectFile, id, body.data.voice, fishFor, fishWork)
           if (!result) return notFound()
           return Response.json(result, { status: 'problems' in result ? 409 : 200 })
         }),

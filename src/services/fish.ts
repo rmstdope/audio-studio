@@ -26,13 +26,15 @@ export interface TtsRequest {
   temperature: number
   topP: number
   speed: number
+  /** The audio format; MP3 unless asked for WAV (lines are joined as WAV, then encoded). */
+  format?: 'mp3' | 'wav'
 }
 
 /** What the studio needs from Fish Audio. Behind an interface, so tests use a fake. */
 export interface FishClient {
   listVoices(query: VoiceQuery): Promise<VoicePage>
   getVoice(id: string): Promise<Voice>
-  /** The text spoken in the voice, as MP3. */
+  /** The text spoken in the voice, as MP3 (or WAV when asked). */
   tts(request: TtsRequest): Promise<Uint8Array>
 }
 
@@ -115,7 +117,7 @@ export function createFishClient(
     async getVoice(id) {
       return toVoice(ApiVoiceSchema.parse(await get(`/model/${encodeURIComponent(id)}`)))
     },
-    async tts({ text, voice, model, temperature, topP, speed }) {
+    async tts({ text, voice, model, temperature, topP, speed, format = 'mp3' }) {
       const response = await fetch(new URL('/v1/tts', baseUrl), {
         method: 'POST',
         headers: {
@@ -126,7 +128,7 @@ export function createFishClient(
         body: JSON.stringify({
           text,
           reference_id: voice,
-          format: 'mp3',
+          format,
           latency: 'normal',
           temperature,
           top_p: topP,

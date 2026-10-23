@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
-import { clipUrl, usePart } from '../../api'
+import { clipUrl, usePart, useRecordLines } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
@@ -13,6 +13,15 @@ import { STATUS, percent, seconds, statusDetail } from '../../status'
 
 type Filter = 'all' | 'attention' | LineStatus | 'orphans'
 
+/**
+ * Lines a Record button is offered for: no clip, or a clip made from other inputs. Weak takes get
+ * one once recordings are checked (step 5); until then a new take could not be judged better.
+ */
+const RECORDABLE = new Set<LineStatus>(['missing', 'stale'])
+
+/** Recording more lines than this at once asks first. */
+const CONFIRM_ABOVE = 10
+
 /** Lines that need something done: everything but up to date. */
 const needsAttention = (line: LineState) => line.status !== 'ok'
 
@@ -20,6 +29,8 @@ const needsAttention = (line: LineState) => line.status !== 'ok'
 export function LinesView({ part }: { part: PartSummary }) {
   const detail = usePart(part.id, part.dialog === 'ok')
   const { playing, toggle } = useClipPlayer()
+  const recorder = useRecordLines(part.id)
+  const [confirming, setConfirming] = useState(false)
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
   const [search, setSearch] = useState('')
@@ -57,17 +68,22 @@ export function LinesView({ part }: { part: PartSummary }) {
       <>
         {header}
         <section className="panel muted">
-          {part.dialog !== 'ok'
-            ? 'This part has no dialog yet.'
-            : detail.isError
-              ? `Could not load the part: ${detail.error.message}`
-              : 'Checking clips…'}
+          {part.dialog === 'invalid'
+            ? 'The dialog file could not be read: see the part’s overview for what is wrong.'
+            : part.dialog !== 'ok'
+              ? 'This part has no dialog yet.'
+              : detail.isError
+                ? `Could not load the part: ${detail.error.message}`
+                : 'Checking clips…'}
         </section>
       </>
     )
   }
 
   const attention = loaded.lines.filter(needsAttention).length
+  const toRecord = lines.filter(
+    (line) => RECORDABLE.has(line.status) && !recorder.recording.has(line.key),
+  )
   const tabs: { id: Filter; label: string; count: number; status?: LineStatus }[] = [
     { id: 'attention', label: 'Needs attention', count: attention },
     ...(Object.keys(STATUS) as LineStatus[])
@@ -127,6 +143,47 @@ export function LinesView({ part }: { part: PartSummary }) {
         </div>
       </div>
 
+      {toRecord.length > 0 && filter !== 'orphans' && (
+        <div className="record-bar">
+          <span className="muted">
+            Recording uses the draft model ({loaded.draftModel}). Word timings are spread evenly
+            until clips are transcribed.
+          </span>
+          {confirming ? (
+            <span className="confirm">
+              <span>
+                Record {plural(toRecord.length, 'line')} on {loaded.draftModel}?
+              </span>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={() => {
+                  setConfirming(false)
+                  toRecord.forEach((line) => void recorder.record(line.key))
+                }}
+              >
+                Yes, record them
+              </button>
+              <button className="btn btn-ghost" type="button" onClick={() => setConfirming(false)}>
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() =>
+                toRecord.length > CONFIRM_ABOVE
+                  ? setConfirming(true)
+                  : toRecord.forEach((line) => void recorder.record(line.key))
+              }
+            >
+              Record {plural(toRecord.length, 'line')} shown
+            </button>
+          )}
+        </div>
+      )}
+
       {filter === 'orphans' ? (
         <OrphanTable part={loaded.id} orphans={loaded.orphans} playing={playing} toggle={toggle} />
       ) : (
@@ -139,8 +196,8 @@ export function LinesView({ part }: { part: PartSummary }) {
                 <th style={{ width: 220 }}>Delivery</th>
                 <th style={{ width: 70 }}>Length</th>
                 <th style={{ width: 70 }}>Heard</th>
-                <th style={{ width: 56 }}>
-                  <span className="sr-only">Play</span>
+                <th style={{ width: 140 }}>
+                  <span className="sr-only">Play and record</span>
                 </th>
               </tr>
             </thead>
@@ -169,15 +226,30 @@ export function LinesView({ part }: { part: PartSummary }) {
                   <td className="mono num">{seconds(line.duration)}</td>
                   <td className="mono num">{percent(line.heard)}</td>
                   <td>
-                    {line.file && (
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        aria-label={playing === line.key ? 'Stop' : `Play ${line.key}`}
-                        onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
-                      >
-                        {playing === line.key ? <PauseIcon /> : <PlayIcon />}
-                      </button>
+                    <div className="row-actions">
+                      {line.file && (
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          aria-label={playing === line.key ? 'Stop' : `Play ${line.key}`}
+                          onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
+                        >
+                          {playing === line.key ? <PauseIcon /> : <PlayIcon />}
+                        </button>
+                      )}
+                      {RECORDABLE.has(line.status) && (
+                        <button
+                          type="button"
+                          className="btn row-record"
+                          disabled={recorder.recording.has(line.key)}
+                          onClick={() => void recorder.record(line.key)}
+                        >
+                          {recorder.recording.has(line.key) ? 'Recording…' : 'Record'}
+                        </button>
+                      )}
+                    </div>
+                    {recorder.errors[line.key] && (
+                      <span className="adopt-error row-error">{recorder.errors[line.key]}</span>
                     )}
                   </td>
                 </tr>

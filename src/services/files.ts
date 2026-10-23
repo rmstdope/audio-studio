@@ -15,8 +15,10 @@ export async function readJson(file: string): Promise<JsonRead> {
   try {
     text = await readFile(file, 'utf8')
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { status: 'missing' }
-    throw error
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT') return { status: 'missing' }
+    // A file that is there but cannot be read (a folder, no permission) is a problem to show.
+    return { status: 'invalid', message: `could not be read (${code ?? (error as Error).message})` }
   }
   try {
     return { status: 'ok', value: JSON.parse(text) }
