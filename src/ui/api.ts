@@ -115,6 +115,8 @@ export function useSetPhrase(characterId: string) {
     // Refresh the phrase and takes shown, without searching Fish's library again.
     onSuccess: async (saved) => {
       if (!saved.ok) return
+      // A round shows the phrase and its takes too; reloading it asks Fish nothing.
+      void client.invalidateQueries({ queryKey: ['session', characterId] })
       const key = ['candidates', characterId]
       const shown = client.getQueryData<NonNullable<CandidatesResult>>(key)
       if (!shown?.ok) return client.invalidateQueries({ queryKey: key })
@@ -220,7 +222,11 @@ export function useSessionAction(characterId: string) {
       return (await response.json()) as SessionView
     },
     onSuccess: (view) => {
-      if (view.ok) client.setQueryData(['session', characterId], view)
+      if (!view.ok) return
+      // An answer without the recorded lines (after a verdict) keeps the ones shown.
+      client.setQueryData<SessionView>(['session', characterId], (old) =>
+        view.recorded === undefined && old?.ok ? { ...view, recorded: old.recorded } : view,
+      )
     },
   })
 }

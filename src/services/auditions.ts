@@ -179,7 +179,10 @@ export function setVoice(
   voice: { id: string; name: string },
 ): Promise<CharacterChange> {
   return updateCharacter(projectFile, characterId, (entry) => {
-    if (!('voice' in entry)) return { ...entry, voice: voice.id, voiceName: voice.name }
+    if (!('voice' in entry)) {
+      const { voiceName: _old, ...rest } = entry
+      return { ...rest, voice: voice.id, voiceName: voice.name }
+    }
     // The voice stays where it was, its name right after it.
     return Object.fromEntries(
       Object.entries(entry).flatMap(([key, value]): [string, unknown][] =>

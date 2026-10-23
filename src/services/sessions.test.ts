@@ -174,7 +174,32 @@ describe('moreVoices, with a large library', () => {
   })
 })
 
+describe('moreVoices, keywords', () => {
+  it('searches with the keywords the audition started with, even after they change', async () => {
+    const { projectFile } = await started()
+    await setKeywords(projectFile, 'mira', ['cold'])
+    const asked: string[] = []
+    const watching: FishClient = {
+      ...fish,
+      listVoices: (query) => (asked.push(query.title ?? ''), fish.listVoices(query)),
+    }
+    await moreVoices(projectFile, 'mira', async () => watching)
+    await moreVoices(projectFile, 'mira', async () => watching)
+    expect(asked.length).toBeGreaterThan(0)
+    expect(new Set(asked)).toEqual(new Set(['warm']))
+  })
+})
+
 describe('addVoiceById', () => {
+  it('takes a queued voice from the session, without asking Fish', async () => {
+    const { projectFile } = await started()
+    const asked: string[] = []
+    const watching: FishClient = { ...fish, getVoice: (id) => (asked.push(id), fish.getVoice(id)) }
+    const result = await addVoiceById(projectFile, 'mira', 'e', async () => watching)
+    expect(result?.ok && result.session.pool.at(-1)).toBe('e')
+    expect(asked).toEqual([])
+  })
+
   it('says so when the voice is in the round or was dropped, without asking Fish', async () => {
     const { projectFile } = await started()
     const asked: string[] = []
@@ -280,9 +305,14 @@ describe('sessionFor, recorded lines', () => {
 })
 
 describe('discardSession', () => {
-  it('answers an unknown character with null', async () => {
+  it('answers an unknown character with null, and a broken project with its problems', async () => {
     const root = tempRepo(files)
     expect(await discardSession(join(root, 'audio-studio.json'), 'nobody')).toBeNull()
+    const broken = tempRepo({ ...files, 'audio-studio.json': '{' })
+    expect(await discardSession(join(broken, 'audio-studio.json'), 'mira')).toMatchObject({
+      ok: false,
+      file: 'audio-studio.json',
+    })
   })
 
   it('removes the saved session', async () => {

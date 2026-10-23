@@ -19,6 +19,13 @@ describe('voiceIdFrom', () => {
     }
   })
 
+  it('takes a URL typed without its scheme, and the id after /m/', () => {
+    expect(voiceIdFrom('fish.audio/m/abc123')).toBe('abc123')
+    expect(voiceIdFrom('www.fish.audio/m/abc123/')).toBe('abc123')
+    expect(voiceIdFrom('https://fish.audio/m/abc123/samples')).toBe('abc123')
+    expect(voiceIdFrom('https://fish.audio/m/')).toBeNull()
+  })
+
   it('is null for something that is not an id', () => {
     expect(voiceIdFrom('')).toBeNull()
     expect(voiceIdFrom('not an id!')).toBeNull()

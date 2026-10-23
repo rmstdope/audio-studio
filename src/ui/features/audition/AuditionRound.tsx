@@ -42,12 +42,15 @@ export function AuditionRound({
   const winner = finalist(session)
   const toRecord = remaining(session).filter((v) => !takes[v] && !recorder.recording.has(v))
   const failed = act.data && !act.data.ok ? act.data : null
-  const exhausted = failed !== null && 'reason' in failed && failed.reason === 'exhausted'
+  // Once a search finds nothing new, no later one will (it leaves out everything seen so far).
+  const [exhausted, setExhausted] = useState(false)
+  if (!exhausted && failed && 'reason' in failed && failed.reason === 'exhausted')
+    setExhausted(true)
   // What casting someone else would do: every recorded line of the character goes stale.
-  const willStale = view.recorded.reduce((sum, a) => sum + a.lines, 0)
+  const willStale = (view.recorded ?? []).reduce((sum, a) => sum + a.lines, 0)
   const castNote =
     winner && winner !== session.current && willStale
-      ? `Casting makes ${plural(willStale, 'recorded line')} stale (${view.recorded
+      ? `Casting makes ${plural(willStale, 'recorded line')} stale (${(view.recorded ?? [])
           .map((a) => `${titles.get(a.part) ?? a.part}: ${a.lines}`)
           .join(', ')}).`
       : null
@@ -143,7 +146,10 @@ export function AuditionRound({
               placeholder="Fish voice id or URL"
               aria-label="Fish voice id or URL"
               value={voiceId}
-              onChange={(e) => setVoiceId(e.target.value)}
+              onChange={(e) => {
+                setVoiceId(e.target.value)
+                setIdError(null)
+              }}
             />
             <button className="btn" type="submit" disabled={!voiceId.trim()}>
               Add

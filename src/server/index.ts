@@ -68,10 +68,14 @@ export function startServer({ projectFile, port, development = false, fish }: Se
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
   /** A session action's answer: the session as the page shows it; 404 for an unknown character. */
-  async function answer(characterId: string, pending: Promise<SessionResult>): Promise<Response> {
+  async function answer(
+    characterId: string,
+    pending: Promise<SessionResult>,
+    options: { recorded?: boolean } = {},
+  ): Promise<Response> {
     const result = await pending
     if (!result) return notFound()
-    const view = await viewOf(projectFile, characterId, result)
+    const view = await viewOf(projectFile, characterId, result, options)
     return Response.json(view, { status: view.ok ? 200 : 409 })
   }
 
@@ -170,7 +174,9 @@ export function startServer({ projectFile, port, development = false, fish }: Se
         }),
         DELETE: fromOwnPage(async (request) => {
           const { id } = request.params
-          if (!(await discardSession(projectFile, id))) return notFound()
+          const discarded = await discardSession(projectFile, id)
+          if (!discarded) return notFound()
+          if (discarded !== true) return Response.json(discarded, { status: 409 })
           return Response.json(await viewOf(projectFile, id, { ok: true, session: null }))
         }),
       },
@@ -198,7 +204,9 @@ export function startServer({ projectFile, port, development = false, fish }: Se
       },
       '/api/auditions/:id/next': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, changeSession(projectFile, request.params.id, nextRound)),
+          answer(request.params.id, changeSession(projectFile, request.params.id, nextRound), {
+            recorded: false,
+          }),
         ),
       },
       '/api/auditions/:id/more': {
