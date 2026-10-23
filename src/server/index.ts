@@ -1,11 +1,18 @@
 import { z } from 'zod'
-import { findCandidates, setKeywords, setPhrase, type FishFactory } from '../services/auditions'
+import {
+  findCandidates,
+  setKeywords,
+  setPhrase,
+  setStyle,
+  type FishFactory,
+} from '../services/auditions'
 import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { planGeneration } from '../core/generation'
 import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
+import { setCue } from '../services/cues'
 import { measureLine, recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
 import { nextRound, setVerdict } from '../core/audition'
@@ -55,7 +62,11 @@ function sharedWhisper(): Transcriber {
 const CharacterBody = z.union([
   z.object({ keywords: z.array(z.string()).max(20) }).strict(),
   z.object({ phrase: z.string().max(10_000).nullable() }).strict(),
+  z.object({ style: z.string().max(1_000) }).strict(),
 ])
+
+/** A line's own cue; empty to go back to the character's style. */
+const CueBody = z.object({ cue: z.string().max(1_000) }).strict()
 
 /**
  * A generation to start: the scope, and the lines and orphans the page showed. Only those, and
@@ -285,15 +296,31 @@ export function startServer({
           const body = CharacterBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
             return Response.json(
-              { error: 'expected { keywords: string[] } or { phrase: string | null }' },
+              {
+                error:
+                  'expected { keywords: string[] }, { phrase: string | null } or { style: string }',
+              },
               { status: 400 },
             )
           }
           const { id } = request.params
+          const change = body.data
           const result =
-            'keywords' in body.data
-              ? await setKeywords(projectFile, id, body.data.keywords)
-              : await setPhrase(projectFile, id, body.data.phrase)
+            'keywords' in change
+              ? await setKeywords(projectFile, id, change.keywords)
+              : 'style' in change
+                ? await setStyle(projectFile, id, change.style)
+                : await setPhrase(projectFile, id, change.phrase)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/cues/:key': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = CueBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { cue }' }, { status: 400 })
+          const { part, key } = request.params
+          const result = await setCue(projectFile, part, key, body.data.cue)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

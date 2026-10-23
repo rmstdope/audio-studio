@@ -8,6 +8,7 @@ function line(overrides: Partial<LineState>): LineState {
     speaker: 'mira',
     text: 'Hello.',
     cue: '',
+    ownCue: false,
     status: 'ok',
     reasons: [],
     heard: null,

@@ -378,8 +378,8 @@ each part.
 
 ### 8.3 Smaller actions
 
-- Edit a character's style cue or keywords, a line's cue, or the pronunciation table: saved
-  immediately, and affected lines show as stale.
+- Edit a character's style cue or keywords, a line's cue (built), or the pronunciation table:
+  saved immediately, and affected lines show as stale.
 - Retake a single line (built: Record, or Retake for a weak one). Re-timing one line, or clips
   already measured, waits until it is needed: measuring covers clips never checked (§8.2).
 - Refresh dialog (runs `refreshDialog`).
@@ -424,7 +424,7 @@ GET    /api/parts/:part                          the part, every line with its s
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
-PATCH  /api/parts/:part/cues/:key                line cue
+PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
 GET    /api/parts/:part/plan?speaker=&weak=1     scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
@@ -513,7 +513,13 @@ Small, independently useful increments:
       asked; clips never checked (adopted from narrate.py, or recorded unchecked) measured
       without new audio (narrate.py `--retime`): length from the decoded clip, word timings and
       heard share from Whisper, so a poorly heard clip shows as weak.
-6. **Editing**: style, cue and pronunciation editing; Changes panel; Refresh dialog.
+6. **Editing**, in small pull requests:
+   1. **Style and cues** (built): a character's style on its audition page, saved in the cast; a
+      line's own cue in the lines table, saved in the part's cues file (its order and indent
+      kept, a cleared cue removed). Affected lines show as stale.
+   2. **Pronunciations**: the table edited in the studio.
+   3. **Changes panel**: `git status` for the project's paths.
+   4. **Refresh dialog**: run `refreshDialog`.
 7. **RetroQuest switch-over**: add `audio-studio.json` to RetroQuest, move `tts/act1/cast.json` to
    `tts/cast.json`, adopt the Act I clips, check that a regenerated clip gets the same timing data
    as one made by `narrate.py`, then retire `narrate.py` and `fish_tts.py`.

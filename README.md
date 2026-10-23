@@ -8,7 +8,7 @@ See [docs/architecture.md](docs/architecture.md) for the design.
 
 ## Status
 
-Steps 1 to 3 of the delivery plan (`docs/architecture.md` §12): the studio validates the project,
+Steps 1 to 5 of the delivery plan (`docs/architecture.md` §12): the studio validates the project,
 shows each part's characters and the state of every line's clip, adopts clips recorded before it,
 and casts voices by audition: it searches Fish Audio's library by keywords, records each candidate
 saying the audition phrase in the character's style, and runs keep/drop rounds until one voice is
@@ -17,7 +17,8 @@ character) as a job with a plan, progress and Cancel, removing orphaned clips wh
 Each take is checked with Whisper, and recorded again (up to three times) until enough of its
 words are heard; the manifest gets real word timings. A line never heard well enough shows as
 weak: retake it from its row, or from Generate when asked. Clips recorded before the studio (or
-unchecked) can be measured with Whisper without new audio.
+unchecked) can be measured with Whisper without new audio. A character's style is edited on its
+audition page, and a line's own cue by clicking it in the lines table (step 6.1).
 
 Recording needs [ffmpeg](https://ffmpeg.org) to encode clips (`brew install ffmpeg`), and checking
 takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads

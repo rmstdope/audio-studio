@@ -23,6 +23,8 @@ export interface LineState {
   text: string
   /** The cue the line is (or would be) delivered with. */
   cue: string
+  /** Whether that is the line's own cue (from the part's cues), not its character's style. */
+  ownCue: boolean
   status: LineStatus
   reasons: StaleReason[]
   heard: number | null
@@ -86,6 +88,7 @@ export function planPart(input: PlanInput): PartState {
       speaker: line.speaker,
       text: line.text,
       cue: inputs?.cue ?? cues[line.key] ?? character?.style ?? '',
+      ownCue: line.key in cues,
       status,
       reasons,
       heard: file ? (entry?.heard ?? null) : null,

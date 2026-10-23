@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
-import { findCandidates, setKeywords, setPhrase, setVoice } from './auditions'
+import { findCandidates, setKeywords, setPhrase, setStyle, setVoice } from './auditions'
 import { createLimiter } from './limit'
 import { recordTake } from './takes'
 import type { FishClient } from './fish'
@@ -329,5 +329,40 @@ describe('setVoice', () => {
     await setVoice(join(root, 'audio-studio.json'), 'grandmother', { id: 'v', name: 'New' })
     const cast = readFileSync(join(root, 'tts/cast.json'), 'utf8')
     expect(cast).toContain('"grandmother": { "style": "[w]", "voice": "v", "voiceName": "New" }')
+  })
+})
+
+describe('setStyle', () => {
+  it('saves a character’s style cue, trimmed, keeping the rest of the entry', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setStyle(projectFile, 'grandmother', '  [tired, kind]  ')).toEqual({ ok: true })
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother).toEqual({
+      voice: 'cur',
+      style: '[tired, kind]',
+      audition: { keywords: ['warm'] },
+    })
+  })
+
+  it('removes the style when it is cleared', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await setStyle(projectFile, 'grandmother', ' ')
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother).toEqual({ voice: 'cur', audition: { keywords: ['warm'] } })
+  })
+
+  it('gives a character not yet in the cast an entry', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setStyle(projectFile, 'tilda', '[bright]')).toEqual({ ok: true })
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.tilda).toEqual({ style: '[bright]' })
+  })
+
+  it('knows no unknown character', async () => {
+    const root = tempRepo(files)
+    expect(await setStyle(join(root, 'audio-studio.json'), 'nobody', '[x]')).toBeNull()
   })
 })
