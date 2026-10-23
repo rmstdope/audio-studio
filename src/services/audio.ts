@@ -1,5 +1,4 @@
-import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { pyFixed } from '../core/pyformat'
 import { readWav } from '../core/wav'
@@ -16,9 +15,10 @@ export interface EncodeOptions {
 export type Encoder = (wav: Uint8Array, file: string, options: EncodeOptions) => Promise<void>
 
 /**
- * An ffmpeg encoder (as RetroQuest's narrate.py uses) writing into `file`. On failure nothing is
- * left at `file`, and the error is ffmpeg's own, even when it stops reading its input early. An
- * encode taking longer than `timeoutMs` is killed (ffmpeg ignores a polite stop while it waits for
+ * An ffmpeg encoder (as RetroQuest's narrate.py uses) writing into `file`, then levelling it to
+ * `lufs` when that is set (see `levelClip`). On failure nothing is left at `file`, and the error is
+ * ffmpeg's own, even when it stops reading its input early. The encode, and the levelling, each
+ * get `timeoutMs`, and are killed after it (ffmpeg ignores a polite stop while it waits for
  * input).
  */
 export function createFfmpegEncoder({ timeoutMs }: { timeoutMs: number }): Encoder {
@@ -81,7 +81,7 @@ export function createFfmpegEncoder({ timeoutMs }: { timeoutMs: number }): Encod
   }
 }
 
-/** The encoder the studio uses: ffmpeg, stopped after two minutes. */
+/** The encoder the studio uses: ffmpeg, stopped after two minutes to encode and two to level. */
 export const ffmpegEncoder: Encoder = createFfmpegEncoder({ timeoutMs: 120_000 })
 
 /**
@@ -132,35 +132,42 @@ const PASSES = 4
  * RetroQuest's level.py, command for command, so a clip comes out the same either way. The gain is
  * what loudnorm's measurement asks for; a limiter keeps the peaks it would push too high below
  * −1.5 dBFS, which takes a little loudness off, so the result is measured again and the gain
- * corrected, up to four encodes, until within 0.5 LU. A clip too short or silent to measure is
- * refused and left as it was.
+ * corrected, up to four encodes, until within 0.5 LU. The levelled clip is written next to the
+ * clip (a hidden sibling) and renamed over it. Gives the loudness it came out at, which may still
+ * be off target after four encodes (level.py prints a warning then; the studio leaves it to the
+ * caller). A clip too short or silent to measure is refused and left as it was. Everything,
+ * all its ffmpeg runs together, must be done within `timeoutMs`.
  */
 export async function levelClip(
   file: string,
   lufs: number,
   { timeoutMs = 120_000 }: { timeoutMs?: number } = {},
-): Promise<void> {
-  const stream = await probe(file, timeoutMs)
-  const measured = await loudness(file, timeoutMs)
+): Promise<number> {
+  const deadline = Date.now() + timeoutMs
+  const left = () => Math.max(1, deadline - Date.now())
+  const stream = await probe(file, left())
+  const measured = await loudness(file, left())
   if (!Number.isFinite(measured)) {
     throw new Error('the clip is too short or silent to measure its loudness')
   }
   let gain = lufs - measured
-  const dir = await mkdtemp(join(tmpdir(), 'audio-studio-level-'))
+  let reached = measured
+  const out = join(dirname(file), `.${basename(file, '.mp3')}.level.mp3`)
   try {
-    const out = join(dir, basename(file))
     for (let pass = 0; pass < PASSES; pass++) {
       const args = ['-loglevel', 'error', '-y', '-i', file, '-af', gainFilter(gain)]
       args.push('-ar', stream.sample_rate, '-ac', String(stream.channels))
       if (stream.bit_rate) args.push('-b:a', stream.bit_rate)
-      await ffmpeg([...args, out], timeoutMs)
-      const miss = lufs - (await loudness(out, timeoutMs))
+      await ffmpeg([...args, out], left())
+      reached = await loudness(out, left())
+      const miss = lufs - reached
       if (Math.abs(miss) <= 0.5) break
       gain += miss
     }
-    await copyFile(out, file)
+    await rename(out, file)
+    return reached
   } finally {
-    await rm(dir, { recursive: true, force: true })
+    await rm(out, { force: true })
   }
 }
 
@@ -226,10 +233,11 @@ async function run(
     child.exited,
   ])
   if (child.signalCode === 'SIGKILL') {
-    throw new Error(`${tool} took longer than ${timeoutMs / 1000} s levelling the clip`)
+    throw new Error(`${tool} ran out of the time for levelling the clip, and was stopped`)
   }
   if (code !== 0) {
-    throw new Error(`${tool} could not level the clip: ${stderr.trim().split('\n').at(-1)}`)
+    const why = stderr.trim().split('\n').at(-1) || `exit code ${code}`
+    throw new Error(`${tool} could not level the clip: ${why}`)
   }
   return { stdout, stderr }
 }

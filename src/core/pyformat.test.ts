@@ -12,5 +12,6 @@ describe('pyFixed (Python’s f"{x:.Nf}")', () => {
       '0.00',
     ])
     expect(pyFixed(10 ** (-1.5 / 20), 4)).toBe('0.8414')
+    expect(pyFixed(-0, 2)).toBe('-0.00')
   })
 })

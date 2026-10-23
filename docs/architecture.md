@@ -119,7 +119,7 @@ audio-studio/
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates for a character; changes to the cast, one at a time
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
-│   │   ├── audio.ts             encode MP3 with ffmpeg
+│   │   ├── audio.ts             encode MP3 with ffmpeg, level its loudness (as level.py)
 │   │   ├── files.ts             read resources, write atomically, lock formatting
 │   │   ├── workspace.ts         find the project, load it and its parts, adopt clips
 │   │   ├── git.ts               `git status --porcelain` for the project's paths

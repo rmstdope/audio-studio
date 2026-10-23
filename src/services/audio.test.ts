@@ -158,8 +158,29 @@ describe.skipIf(!hasFfmpeg || !Bun.which('ffprobe'))('levelClip', () => {
     })
     await ffmpegEncoder(silent, file, { bitrate: '64k', channels: 1 })
     const before = readFileSync(file)
-    expect(levelClip(file, -16)).rejects.toThrow('too short or silent')
+    await expect(levelClip(file, -16)).rejects.toThrow('too short or silent')
     expect(readFileSync(file)).toEqual(before)
+    expect(readdirSync(root)).toEqual(['silent.mp3'])
+  })
+
+  it('says how loud the clip came out', async () => {
+    const root = tempRepo({})
+    const file = join(root, 'quiet.mp3')
+    await ffmpegEncoder(sine(0.05), file, { bitrate: '64k', channels: 1 })
+    expect(Math.abs((await levelClip(file, -16)) + 16)).toBeLessThanOrEqual(0.5)
+  })
+
+  it('leaves no clip when the encoder cannot level it', async () => {
+    const root = tempRepo({})
+    const file = join(root, 'clips', 'k1.mp3')
+    const silent = writeWav({
+      format: { channels: 1, sampleRate: 24000, bitsPerSample: 16 },
+      data: new Uint8Array(24000 * 2),
+    })
+    await expect(
+      ffmpegEncoder(silent, file, { bitrate: '64k', channels: 1, lufs: -16 }),
+    ).rejects.toThrow('too short or silent')
+    expect(readdirSync(join(root, 'clips'))).toEqual([])
   })
 
   it('is done by the encoder when the project names a loudness', async () => {
