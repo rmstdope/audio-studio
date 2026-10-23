@@ -325,3 +325,70 @@ describe('server, without an API key', () => {
     expect(body).toMatchObject({ ok: false, reason: 'no-key' })
   })
 })
+
+describe('server, generating a part', () => {
+  const genRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'narrator', text: 'Once.' },
+      { key: 'b', speaker: 'narrator', text: 'Twice.' },
+    ],
+    'audio/act1/manifest.json': {
+      old: { file: 'old.mp3', speaker: 'narrator', duration: 1, words: [] },
+    },
+    'audio/act1/old.mp3': 'old',
+  })
+  const gen = startServer({
+    projectFile: join(genRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+  })
+  afterAll(() => gen.stop(true))
+  const at = (path: string) => new URL(path, gen.url)
+  const own = { origin: gen.url.origin, 'content-type': 'application/json' }
+
+  it('plans, runs a job to the end, and removes the agreed orphans', async () => {
+    const planned = await (await fetch(at('/api/parts/act1/plan'))).json()
+    expect(planned.plan).toMatchObject({ keys: ['a', 'b'], missing: 2, orphans: ['old'], cost: 0 })
+    const started = await fetch(at('/api/parts/act1/jobs'), {
+      method: 'POST',
+      headers: own,
+      body: JSON.stringify({ speaker: null, removeOrphans: true }),
+    })
+    const job = await started.json()
+    expect(job).toMatchObject({ status: 'running', total: 2 })
+    let state = job
+    while (state.status === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      state = await (await fetch(at(`/api/jobs/${job.id}`))).json()
+    }
+    expect(state).toMatchObject({ status: 'done', done: 2, failed: [], removed: 1 })
+    expect((await (await fetch(at('/api/parts/act1/jobs/latest'))).json()).id).toBe(job.id)
+    const part = await (await fetch(at('/api/parts/act1'))).json()
+    expect(part.part.counts.ok).toBe(2)
+    expect(part.part.orphans).toEqual([])
+    expect(existsSync(join(genRoot, 'audio/act1/old.mp3'))).toBe(false)
+  })
+
+  it('has nothing to generate once everything is up to date', async () => {
+    const response = await fetch(at('/api/parts/act1/jobs'), {
+      method: 'POST',
+      headers: own,
+      body: JSON.stringify({ speaker: null, removeOrphans: false }),
+    })
+    expect(response.status).toBe(409)
+  })
+
+  it('takes jobs and cancels only from the studio’s own page', async () => {
+    const evil = { origin: 'https://evil.example', 'content-type': 'application/json' }
+    const start = await fetch(at('/api/parts/act1/jobs'), {
+      method: 'POST',
+      headers: evil,
+      body: JSON.stringify({ speaker: null, removeOrphans: false }),
+    })
+    expect(start.status).toBe(403)
+    expect((await fetch(at('/api/jobs/x'), { method: 'DELETE', headers: evil })).status).toBe(403)
+  })
+})

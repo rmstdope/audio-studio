@@ -7,7 +7,7 @@ import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
-import { recordLine } from './narration'
+import { recordLine, removeOrphans } from './narration'
 import { inPartTurn } from './partFiles'
 import { adoptPart, loadPart } from './workspace'
 
@@ -227,5 +227,44 @@ describe('recordLine', () => {
     expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
       'tts/act1/narration.lock.json',
     )
+  })
+})
+
+describe('removeOrphans', () => {
+  const orphanFiles = {
+    ...files,
+    'audio/act1/manifest.json': {
+      gone: { file: 'gone.mp3', speaker: 'mira', duration: 1, words: [] },
+      k4: { file: 'k4.mp3', speaker: 'mira', duration: 1, words: [] },
+      sneaky: { file: '../../tts/cast.json', speaker: 'mira', duration: 1, words: [] },
+    },
+    'audio/act1/gone.mp3': 'old',
+    'audio/act1/k4.mp3': 'current',
+    'tts/act1/narration.lock.json': {
+      gone: {
+        fp: 'x',
+        voice: 'v',
+        model: 'm',
+        parts: { cue: '', text: '', said: '', settings: '' },
+        at: 't',
+      },
+    },
+  }
+
+  it('removes the clips, manifest and lock entries of lines no longer in the dialog', async () => {
+    const root = tempRepo(orphanFiles)
+    const removed = await removeOrphans(join(root, 'audio-studio.json'), 'act1', [
+      'gone',
+      'k4',
+      'sneaky',
+    ])
+    expect(removed).toBe(2)
+    expect(existsSync(join(root, 'audio/act1/gone.mp3'))).toBe(false)
+    expect(existsSync(join(root, 'audio/act1/k4.mp3'))).toBe(true)
+    expect(existsSync(join(root, 'tts/cast.json'))).toBe(true)
+    const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8'))
+    expect(Object.keys(manifest)).toEqual(['k4'])
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(lock).toEqual({})
   })
 })

@@ -358,8 +358,9 @@ each part.
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
    5. encode MP3 into the clips folder, update the manifest and lock entries, write both.
-4. Fish requests run `parallel` at a time; Whisper runs one at a time (one GPU). Progress streams to
-   the UI. A job can be cancelled; finished clips are kept, because each is written as it completes.
+4. Fish requests run `parallel` at a time; Whisper runs one at a time (one GPU). The page polls the
+   job's progress every second while it runs. A job can be cancelled: no new line starts, lines
+   under way finish, and finished clips are kept, because each is written as it completes.
 5. Orphans are removed at the end, only if the user confirmed that in the plan.
 
 ### 8.3 Smaller actions
@@ -393,7 +394,10 @@ Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's stat
 `GET /api/characters/:id/candidates` (voices matching the character's keywords, with its current
 voice, the audition phrase and the takes already recorded), `PATCH /api/characters/:id`
 (keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`
-and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock).
+`POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock),
+`GET /api/parts/:part/plan?speaker=` (what generating would do), `POST /api/parts/:part/jobs`
+(start a generation, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
+`GET`/`DELETE /api/jobs/:id` (progress, cancel).
 Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the audition model, voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `verdict`, `next`, `more`, `add` and
@@ -406,7 +410,7 @@ GET    /api/parts/:part/clips/:file              a clip from the part's clips fo
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue
-POST   /api/parts/:part/plan                     scope → plan (no side effects)
+GET    /api/parts/:part/plan?speaker=            scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table
@@ -419,13 +423,15 @@ POST   /api/auditions/:id/next                   the next round with the voices 
 POST   /api/auditions/:id/more                   a round's worth of new candidates
 POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write the last voice left to cast.json
-POST   /api/jobs                                 run a plan
+POST   /api/parts/:part/jobs                     run a plan (one job per part at a time)
+GET    /api/parts/:part/jobs/latest              the part's latest job
+GET    /api/jobs/:id                             a job's progress (polled while it runs)
 DELETE /api/jobs/:id                             cancel
 GET    /api/characters/:id/audition?voices=   the audition phrase and which voices have takes
 POST   /api/characters/:id/takes             record a take (own page only)
 GET    /api/takes/:key.mp3                   a recorded take
 GET    /api/changes                              git status of project paths
-WS     /api/events                               job progress, file changes
+WS     /api/events                               file changes (later; job progress is polled)
 ```
 
 Planned (step 6): the server watches the resource files, so an edit made in the editor (or a

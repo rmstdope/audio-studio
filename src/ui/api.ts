@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
+import type { GenerationPlan } from '../core/generation'
+import type { Problem } from '../core/project'
+import type { JobState } from '../services/jobs'
 import type { RecordResult } from '../services/narration'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { AuditionTakesResult, TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import { withAuditionTakes, withTake } from './takes'
-import type { AdoptResult, LoadResult, PartResult } from '../services/workspace'
+import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
 /** A successful candidates answer. */
 type Found = Extract<NonNullable<CandidatesResult>, { ok: true }>
@@ -312,6 +315,78 @@ export function useRecordLines(partId: string) {
   )
 
   return { record, recording, errors }
+}
+
+/** What generating a part (or one speaker in it) would do, or why it cannot be planned. */
+export type PlanAnswer =
+  | { ok: true; plan: GenerationPlan; parallel: number }
+  | { ok: false; problems: Problem[] }
+  | ProjectFailure
+
+/** The generation plan for a part, or one speaker in it (null for all). */
+export function usePlan(partId: string, speaker: string | null) {
+  return useQuery({
+    queryKey: ['plan', partId, speaker],
+    queryFn: () => {
+      const query = speaker ? `?speaker=${encodeURIComponent(speaker)}` : ''
+      return getJson<PlanAnswer>(`/api/parts/${encodeURIComponent(partId)}/plan${query}`)
+    },
+  })
+}
+
+/**
+ * The part's latest generation job, polled every second while it runs. When it finishes, the
+ * part and its plans are loaded again.
+ */
+export function useJob(partId: string) {
+  const client = useQueryClient()
+  return useQuery({
+    queryKey: ['job', partId],
+    queryFn: async () => {
+      const job = await getJson<JobState | null>(
+        `/api/parts/${encodeURIComponent(partId)}/jobs/latest`,
+      )
+      const before = client.getQueryData<JobState | null>(['job', partId])
+      // Keep the lines' statuses current while the job runs, and once more when it ends.
+      if (job && (job.status !== 'done' || before?.status !== 'done')) {
+        void client.invalidateQueries({ queryKey: ['part', partId] })
+        void client.invalidateQueries({ queryKey: ['plan', partId] })
+      }
+      return job
+    },
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status === 'running' || status === 'cancelling' ? 1000 : false
+    },
+  })
+}
+
+/** Starts generating a part, or cancels the running job. */
+export function useJobActions(partId: string) {
+  const client = useQueryClient()
+  const start = useMutation({
+    mutationFn: async (options: { speaker: string | null; removeOrphans: boolean }) => {
+      const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/jobs`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(options),
+      })
+      const body = (await response.json()) as JobState | { error: string }
+      if ('error' in body) throw new Error(body.error)
+      if (!response.ok) throw new Error(`generating answered ${response.status}`)
+      return body
+    },
+    onSuccess: (job) => client.setQueryData(['job', partId], job),
+  })
+  const cancel = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error(`cancelling answered ${response.status}`)
+      return (await response.json()) as JobState
+    },
+    onSuccess: (job) => client.setQueryData(['job', partId], job),
+  })
+  return { start, cancel }
 }
 
 /** The URL of a clip in a part. */

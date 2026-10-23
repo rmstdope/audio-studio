@@ -5,6 +5,7 @@ import { clipUrl, usePart, useRecordLines } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
+import { GeneratePanel } from './GeneratePanel'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
 import { longTitle, plural, shortTitle } from '../../format'
@@ -19,9 +20,6 @@ type Filter = 'all' | 'attention' | LineStatus | 'orphans'
  */
 const RECORDABLE = new Set<LineStatus>(['missing', 'stale'])
 
-/** Recording more lines than this at once asks first. */
-const CONFIRM_ABOVE = 10
-
 /** Lines that need something done: everything but up to date. */
 const needsAttention = (line: LineState) => line.status !== 'ok'
 
@@ -30,7 +28,6 @@ export function LinesView({ part }: { part: PartSummary }) {
   const detail = usePart(part.id, part.dialog === 'ok')
   const { playing, toggle } = useClipPlayer()
   const recorder = useRecordLines(part.id)
-  const [confirming, setConfirming] = useState(false)
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
   const [search, setSearch] = useState('')
@@ -81,9 +78,6 @@ export function LinesView({ part }: { part: PartSummary }) {
   }
 
   const attention = loaded.lines.filter(needsAttention).length
-  const toRecord = lines.filter(
-    (line) => RECORDABLE.has(line.status) && !recorder.recording.has(line.key),
-  )
   const tabs: { id: Filter; label: string; count: number; status?: LineStatus }[] = [
     { id: 'attention', label: 'Needs attention', count: attention },
     ...(Object.keys(STATUS) as LineStatus[])
@@ -143,46 +137,7 @@ export function LinesView({ part }: { part: PartSummary }) {
         </div>
       </div>
 
-      {toRecord.length > 0 && filter !== 'orphans' && (
-        <div className="record-bar">
-          <span className="muted">
-            Recording uses the draft model ({loaded.draftModel}). Word timings are spread evenly
-            until clips are transcribed.
-          </span>
-          {confirming ? (
-            <span className="confirm">
-              <span>
-                Record {plural(toRecord.length, 'line')} on {loaded.draftModel}?
-              </span>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => {
-                  setConfirming(false)
-                  toRecord.forEach((line) => void recorder.record(line.key))
-                }}
-              >
-                Yes, record them
-              </button>
-              <button className="btn btn-ghost" type="button" onClick={() => setConfirming(false)}>
-                Cancel
-              </button>
-            </span>
-          ) : (
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={() =>
-                toRecord.length > CONFIRM_ABOVE
-                  ? setConfirming(true)
-                  : toRecord.forEach((line) => void recorder.record(line.key))
-              }
-            >
-              Record {plural(toRecord.length, 'line')} shown
-            </button>
-          )}
-        </div>
-      )}
+      <GeneratePanel partId={loaded.id} speaker={speaker || null} />
 
       {filter === 'orphans' ? (
         <OrphanTable part={loaded.id} orphans={loaded.orphans} playing={playing} toggle={toggle} />
