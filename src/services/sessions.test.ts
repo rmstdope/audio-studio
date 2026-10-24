@@ -6,16 +6,17 @@ import type { Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
 import {
   addVoiceById,
-  castFinalist,
+  castVoice,
   changeSession,
   discardSession,
   moreVoices,
+  moveVoice,
   recordedLines,
-  judge,
   sessionFor,
   startAudition,
+  undoLastDrop,
 } from './sessions'
-import { allowVoices, ruledOutIds, updateRuledOut } from './ruledOut'
+import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { setKeywords } from './auditions'
 
 /** Rules voices out, as a drop does. */
@@ -93,9 +94,10 @@ async function started() {
 }
 
 describe('startAudition', () => {
-  it('starts round 1 from the search, with the current voice, and saves it', async () => {
+  it('starts from the search, the current voice on the shortlist, and saves it', async () => {
     const { projectFile, session } = await started()
-    expect(session.pool).toEqual(['cur', 'a', 'b', 'c'])
+    expect(session.shortlist).toEqual(['cur'])
+    expect(session.toHear).toEqual(['a', 'b', 'c'])
     expect(session.queue).toEqual(['d', 'e', 'f', 'g'])
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session })
   })
@@ -107,28 +109,33 @@ describe('startAudition', () => {
       session: null,
     })
   })
+
+  it('takes an audition saved in rounds, before the shortlist, for none', async () => {
+    const { root, projectFile } = await started()
+    const [file] = readdirSync(join(root, '.audio-studio/auditions'))
+    const path = join(root, '.audio-studio/auditions', file!)
+    writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), version: 1 }))
+    expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
+  })
 })
 
 describe('changeSession', () => {
   it('applies a change and saves it', async () => {
     const { projectFile } = await started()
-    const result = await changeSession(projectFile, 'mira', (s) => ({
-      ...s,
-      verdicts: { a: 'drop' },
-    }))
-    expect(result?.ok && result.session.verdicts).toEqual({ a: 'drop' })
+    const result = await changeSession(projectFile, 'mira', (s) => ({ ...s, toHear: ['b'] }))
+    expect(result?.ok && result.session.toHear).toEqual(['b'])
     const saved = await sessionFor(projectFile, 'mira')
-    expect(saved?.ok && saved.session?.verdicts).toEqual({ a: 'drop' })
+    expect(saved?.ok && saved.session?.toHear).toEqual(['b'])
   })
 
   it('applies changes made at once one after the other', async () => {
     const { projectFile } = await started()
     await Promise.all([
-      changeSession(projectFile, 'mira', (s) => ({ ...s, verdicts: { ...s.verdicts, a: 'drop' } })),
-      changeSession(projectFile, 'mira', (s) => ({ ...s, verdicts: { ...s.verdicts, b: 'keep' } })),
+      moveVoice(projectFile, 'mira', 'a', 'shortlist'),
+      moveVoice(projectFile, 'mira', 'b', 'shortlist'),
     ])
     const saved = await sessionFor(projectFile, 'mira')
-    expect(saved?.ok && saved.session?.verdicts).toEqual({ a: 'drop', b: 'keep' })
+    expect(saved?.ok && saved.session?.shortlist).toEqual(['cur', 'a', 'b'])
   })
 
   it('says so when there is no session', async () => {
@@ -141,18 +148,32 @@ describe('changeSession', () => {
   })
 })
 
+describe('moveVoice', () => {
+  it('shortlists, unlists and drops a voice', async () => {
+    const { projectFile } = await started()
+    await moveVoice(projectFile, 'mira', 'a', 'shortlist')
+    await moveVoice(projectFile, 'mira', 'cur', 'unlist')
+    const result = await moveVoice(projectFile, 'mira', 'b', 'drop')
+    expect(result?.ok && [result.session.shortlist, result.session.toHear]).toEqual([
+      ['a'],
+      ['cur', 'c'],
+    ])
+  })
+})
+
 describe('moreVoices', () => {
   it('brings in a round’s worth from the queue', async () => {
     const { projectFile } = await started()
     const result = await moreVoices(projectFile, 'mira', fishFor)
-    expect(result?.ok && result.session.pool).toEqual(['cur', 'a', 'b', 'c', 'd', 'e', 'f'])
+    expect(result?.ok && result.session.toHear).toEqual(['a', 'b', 'c', 'd', 'e', 'f'])
   })
 
   it('searches again when the queue runs out, never bringing back a seen voice', async () => {
     const { projectFile } = await started()
+    await moveVoice(projectFile, 'mira', 'a', 'drop')
     await moreVoices(projectFile, 'mira', fishFor)
     const result = await moreVoices(projectFile, 'mira', fishFor)
-    expect(result?.ok && result.session.pool).toEqual(['cur', 'a', 'b', 'c', 'd', 'e', 'f', 'g'])
+    expect(result?.ok && result.session.toHear).toEqual(['b', 'c', 'd', 'e', 'f', 'g'])
     const again = await moreVoices(projectFile, 'mira', fishFor)
     expect(again).toMatchObject({ ok: false, reason: 'exhausted' })
   })
@@ -174,16 +195,16 @@ describe('moreVoices, with a large library', () => {
     const root = tempRepo(files)
     const projectFile = join(root, 'audio-studio.json')
     await startAudition(projectFile, 'mira', async () => big)
-    let pool = 0
+    let shown = 0
     for (let i = 0; i < 20; i++) {
       const result = await moreVoices(projectFile, 'mira', async () => big)
       if (!result?.ok) {
         expect(result).toMatchObject({ ok: false, reason: 'exhausted' })
         break
       }
-      pool = result.session.pool.length
+      shown = result.session.toHear.length
     }
-    expect(pool).toBe(40)
+    expect(shown).toBe(40)
   })
 })
 
@@ -209,39 +230,28 @@ describe('addVoiceById', () => {
     const asked: string[] = []
     const watching: FishClient = { ...fish, getVoice: (id) => (asked.push(id), fish.getVoice(id)) }
     const result = await addVoiceById(projectFile, 'mira', 'e', async () => watching)
-    expect(result?.ok && result.session.pool.at(-1)).toBe('e')
+    expect(result?.ok && result.session.toHear[0]).toBe('e')
     expect(asked).toEqual([])
   })
 
-  it('says so when the voice is in the round or was dropped, without asking Fish', async () => {
+  it('says so when the voice is in the audition already, without asking Fish', async () => {
     const { projectFile } = await started()
     const asked: string[] = []
     const watching: FishClient = { ...fish, getVoice: (id) => (asked.push(id), fish.getVoice(id)) }
-    expect(await addVoiceById(projectFile, 'mira', 'a', async () => watching)).toMatchObject({
-      ok: false,
-      reason: 'seen',
-      message: 'That voice is already in this round.',
-    })
-    await changeSession(projectFile, 'mira', (s) => ({ ...s, verdicts: { a: 'drop' } }))
-    await changeSession(projectFile, 'mira', (s) => ({
-      ...s,
-      round: 2,
-      pool: s.pool.filter((v) => v !== 'a'),
-      dropped: ['a'],
-      verdicts: {},
-    }))
-    expect(await addVoiceById(projectFile, 'mira', 'a', async () => watching)).toMatchObject({
-      ok: false,
-      reason: 'seen',
-      message: 'That voice was dropped earlier in this audition.',
-    })
+    for (const id of ['a', 'cur']) {
+      expect(await addVoiceById(projectFile, 'mira', id, async () => watching)).toMatchObject({
+        ok: false,
+        reason: 'seen',
+        message: 'That voice is in this audition already.',
+      })
+    }
     expect(asked).toEqual([])
   })
 
   it('adds a voice from Fish by its id', async () => {
     const { projectFile } = await started()
     const result = await addVoiceById(projectFile, 'mira', 'x', fishFor)
-    expect(result?.ok && result.session.pool.at(-1)).toBe('x')
+    expect(result?.ok && result.session.toHear[0]).toBe('x')
   })
 
   it('says what Fish said when the voice does not exist', async () => {
@@ -254,14 +264,11 @@ describe('addVoiceById', () => {
   })
 })
 
-describe('castFinalist', () => {
-  it('writes the last voice left to the cast, says which recorded lines go stale, and ends the audition', async () => {
+describe('castVoice', () => {
+  it('writes a shortlisted voice to the cast, says which recorded lines go stale, and ends the audition', async () => {
     const { root, projectFile } = await started()
-    await changeSession(projectFile, 'mira', (s) => ({
-      ...s,
-      verdicts: { cur: 'drop', a: 'drop', c: 'drop' },
-    }))
-    const result = await castFinalist(projectFile, 'mira')
+    await moveVoice(projectFile, 'mira', 'b', 'shortlist')
+    const result = await castVoice(projectFile, 'mira', 'b')
     expect(result).toEqual({
       ok: true,
       voice: { id: 'b', name: 'Warm b' },
@@ -277,35 +284,28 @@ describe('castFinalist', () => {
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
   })
 
-  it('changes nothing when the current voice wins', async () => {
+  it('changes nothing when the current voice is kept', async () => {
     const { projectFile } = await started()
-    await changeSession(projectFile, 'mira', (s) => ({
-      ...s,
-      verdicts: { a: 'drop', b: 'drop', c: 'drop' },
-    }))
-    const result = await castFinalist(projectFile, 'mira')
+    const result = await castVoice(projectFile, 'mira', 'cur')
     expect(result).toMatchObject({ ok: true, voice: { id: 'cur' }, changed: false, stale: [] })
   })
 
   it('applies a cast queued with a keyword change, keeping both', async () => {
     const { root, projectFile } = await started()
-    await changeSession(projectFile, 'mira', (s) => ({
-      ...s,
-      verdicts: { cur: 'drop', a: 'drop', c: 'drop' },
-    }))
+    await moveVoice(projectFile, 'mira', 'b', 'shortlist')
     await Promise.all([
-      castFinalist(projectFile, 'mira'),
+      castVoice(projectFile, 'mira', 'b'),
       setKeywords(projectFile, 'mira', ['old']),
     ])
     const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.mira).toMatchObject({ voice: 'b', audition: { keywords: ['old'] } })
   })
 
-  it('refuses while more than one voice is left', async () => {
+  it('refuses a voice not on the shortlist', async () => {
     const { projectFile } = await started()
-    expect(await castFinalist(projectFile, 'mira')).toMatchObject({
+    expect(await castVoice(projectFile, 'mira', 'a')).toMatchObject({
       ok: false,
-      reason: 'no-finalist',
+      reason: 'not-shortlisted',
     })
   })
 })
@@ -328,64 +328,57 @@ describe('discardSession', () => {
     })
   })
 
-  it('removes the saved session', async () => {
+  it('removes the saved session, leaving the voices dropped ruled out', async () => {
     const { root, projectFile } = await started()
+    await moveVoice(projectFile, 'mira', 'a', 'drop')
     await discardSession(projectFile, 'mira')
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
     expect(readdirSync(join(root, '.audio-studio/auditions'))).toEqual([])
     expect(existsSync(join(root, 'tts/cast.json'))).toBe(true)
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
   })
 })
 
 describe('ruled-out voices in an audition', () => {
-  it('rules a voice out when it is dropped, and allows it again when the drop is taken back', async () => {
+  it('rules a voice out when it is dropped, and allows it again when the drop is undone', async () => {
     const { projectFile } = await started()
-    const dropped = await judge(projectFile, 'mira', 'a', 'drop')
-    expect(dropped?.ok && dropped.session.verdicts).toEqual({ a: 'drop' })
+    await moveVoice(projectFile, 'mira', 'a', 'shortlist')
+    await moveVoice(projectFile, 'mira', 'a', 'drop')
     expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
-    await judge(projectFile, 'mira', 'b', 'keep')
-    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
-    await judge(projectFile, 'mira', 'a', null)
+    const undone = await undoLastDrop(projectFile, 'mira')
+    expect(undone?.ok && undone.session.shortlist).toEqual(['a', 'cur'])
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
   })
 
-  it('keeps the two files in step when verdicts on a voice are given at once', async () => {
-    for (const order of [['drop', null] as const, [null, 'drop'] as const]) {
-      const { projectFile } = await started()
-      await Promise.all(order.map((verdict) => judge(projectFile, 'mira', 'a', verdict)))
-      const saved = await sessionFor(projectFile, 'mira')
-      const dropped = saved?.ok && saved.session?.verdicts.a === 'drop'
-      expect(await ruledOutIds(projectFile, 'mira')).toEqual(dropped ? ['a'] : [])
-    }
+  it('keeps the two files in step when a drop and its undo are asked for at once', async () => {
+    const { projectFile } = await started()
+    await Promise.all([
+      moveVoice(projectFile, 'mira', 'a', 'drop'),
+      undoLastDrop(projectFile, 'mira'),
+    ])
+    const saved = await sessionFor(projectFile, 'mira')
+    const dropped = saved?.ok && saved.session?.dropped.some((d) => d.id === 'a')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual(dropped ? ['a'] : [])
   })
 
   it('changes nothing when the ruled-out voices cannot be saved', async () => {
     const { root, projectFile } = await started()
     writeFileSync(join(root, '.audio-studio/ruled-out'), 'in the way')
-    await expect(judge(projectFile, 'mira', 'a', 'drop')).rejects.toThrow()
+    await expect(moveVoice(projectFile, 'mira', 'a', 'drop')).rejects.toThrow()
     const saved = await sessionFor(projectFile, 'mira')
-    expect(saved?.ok && saved.session?.verdicts).toEqual({})
+    expect(saved?.ok && saved.session?.toHear).toEqual(['a', 'b', 'c'])
   })
 
-  it('keeps a voice dropped in the round dropped when it is allowed again from the list', async () => {
+  it('never rules out the current voice, though it can be dropped', async () => {
     const { projectFile } = await started()
-    await judge(projectFile, 'mira', 'a', 'drop')
-    await allowVoices(projectFile, 'mira', ['a'])
-    await judge(projectFile, 'mira', 'b', 'keep')
-    const saved = await sessionFor(projectFile, 'mira')
-    expect(saved?.ok && saved.session?.verdicts.a).toBe('drop')
+    const result = await moveVoice(projectFile, 'mira', 'cur', 'drop')
+    expect(result?.ok && result.session.shortlist).toEqual([])
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
   })
 
-  it('never rules out the current voice', async () => {
+  it('rules out nothing for a voice not on the board', async () => {
     const { projectFile } = await started()
-    await judge(projectFile, 'mira', 'cur', 'drop')
-    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
-  })
-
-  it('rules out nothing for a voice not in the round', async () => {
-    const { projectFile } = await started()
-    await judge(projectFile, 'mira', 'g', 'drop')
+    await moveVoice(projectFile, 'mira', 'g', 'drop')
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
   })
 
@@ -398,26 +391,23 @@ describe('ruled-out voices in an audition', () => {
     ])
     const result = await startAudition(projectFile, 'mira', fishFor)
     if (!result?.ok) throw new Error(JSON.stringify(result))
-    expect(result.session.pool).toEqual(['cur', 'b', 'c', 'd'])
+    expect(result.session.toHear).toEqual(['b', 'c', 'd'])
     expect(result.session.queue).toEqual(['f', 'g'])
     const more = await moreVoices(projectFile, 'mira', fishFor)
-    expect(more?.ok && more.session.pool).toEqual(['cur', 'b', 'c', 'd', 'f', 'g'])
+    expect(more?.ok && more.session.toHear).toEqual(['b', 'c', 'd', 'f', 'g'])
   })
 
-  it('allows a ruled-out voice again when it is brought in by its id', async () => {
+  it('allows a ruled-out voice again when it is brought in by its id, also one dropped in this audition', async () => {
     const root = tempRepo(files)
     const projectFile = join(root, 'audio-studio.json')
     await ruleOutVoices(projectFile, 'mira', [{ id: 'a', title: 'Warm a' }])
     await startAudition(projectFile, 'mira', fishFor)
     const added = await addVoiceById(projectFile, 'mira', 'a', fishFor)
-    expect(added?.ok && added.session.pool.at(-1)).toBe('a')
+    expect(added?.ok && added.session.toHear[0]).toBe('a')
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
-  })
-
-  it('keeps a voice dropped in this audition ruled out when it is asked for by id', async () => {
-    const { projectFile } = await started()
-    await judge(projectFile, 'mira', 'a', 'drop')
-    expect(await addVoiceById(projectFile, 'mira', 'a', fishFor)).toMatchObject({ reason: 'seen' })
-    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
+    await moveVoice(projectFile, 'mira', 'b', 'drop')
+    const again = await addVoiceById(projectFile, 'mira', 'b', fishFor)
+    expect(again?.ok && [again.session.toHear[0], again.session.dropped]).toEqual(['b', []])
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
   })
 })

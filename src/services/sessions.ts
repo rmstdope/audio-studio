@@ -4,12 +4,14 @@ import {
   AuditionSessionSchema,
   addVoice,
   bringMore,
-  finalist,
+  drop,
+  placeOf,
   queueMore,
-  setVerdict,
+  shortlist,
   startSession,
+  undoDrop,
+  unlist,
   type AuditionSession,
-  type Verdict,
 } from '../core/audition'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
@@ -60,7 +62,7 @@ export async function sessionFor(
 
 /**
  * Starts (or starts over) a character's audition from a fresh search with its keywords: the
- * current voice and the top candidates in round 1, the rest queued.
+ * current voice on the shortlist, the top candidates to hear, the rest queued.
  */
 export function startAudition(
   projectFile: string,
@@ -117,37 +119,50 @@ export function changeSession(
   })
 }
 
+/** What can be done with a voice on the board. */
+export type VoiceMove = 'shortlist' | 'unlist' | 'drop'
+
 /**
- * Sets the verdict on a voice in the round (null clears it). A dropped voice is ruled out for the
- * character, so no later search shows it again; taking the drop back allows it again. The current
- * voice is never ruled out: it takes part in every audition.
+ * Shortlists a voice, unlists it, or drops it. A dropped voice is ruled out for the character, so
+ * no later search shows it again. The current voice can be dropped from the board but is never
+ * ruled out: it takes part in every audition.
  */
-export function judge(
+export function moveVoice(
   projectFile: string,
   characterId: string,
   voice: string,
-  verdict: Verdict | null,
+  move: VoiceMove,
 ): Promise<SessionResult> {
+  const apply = { shortlist, unlist, drop }[move]
   return changeSession(
     projectFile,
     characterId,
-    (s) => setVerdict(s, voice, verdict),
+    (s) => apply(s, voice),
     async (session) => {
-      if (!session.pool.includes(voice) || voice === session.current) return
+      if (move !== 'drop' || voice === session.current) return
       const title = session.voices[voice]?.title ?? voice
-      await updateRuledOut(
-        projectFile,
-        characterId,
-        session.verdicts[voice] === 'drop' ? { out: [{ id: voice, title }] } : { allowed: [voice] },
-      )
+      await updateRuledOut(projectFile, characterId, { out: [{ id: voice, title }] })
+    },
+  )
+}
+
+/** Undoes the last drop: the voice goes back where it was, and is no longer ruled out. */
+export function undoLastDrop(projectFile: string, characterId: string): Promise<SessionResult> {
+  let undone: string | undefined
+  return changeSession(
+    projectFile,
+    characterId,
+    (s) => ((undone = s.dropped.at(-1)?.id), undoDrop(s)),
+    async () => {
+      if (undone) await updateRuledOut(projectFile, characterId, { allowed: [undone] })
     },
   )
 }
 
 /**
- * Brings a round's worth of new candidates into the current round: from the queue, searching
- * Fish again (with the keywords the audition started with, leaving out every voice it has shown)
- * when the queue is short. Says so when no new voice is left to find.
+ * Brings a round's worth of new candidates in to hear: from the queue, searching Fish again (with
+ * the keywords the audition started with, leaving out every voice it has shown) when the queue is
+ * short. Says so when no new voice is left to find.
  */
 export async function moreVoices(
   projectFile: string,
@@ -164,7 +179,12 @@ export async function moreVoices(
   if (snapshot && snapshot.queue.length < perRound) {
     const search = await findCandidates(projectFile, characterId, fishFor, {
       keywords: snapshot.keywords,
-      exclude: [...snapshot.pool, ...snapshot.dropped, ...snapshot.queue],
+      exclude: [
+        ...snapshot.shortlist,
+        ...snapshot.toHear,
+        ...snapshot.dropped.map((d) => d.id),
+        ...snapshot.queue,
+      ],
     })
     if (!search) return null
     if (!search.ok) return search
@@ -184,7 +204,10 @@ export async function moreVoices(
   })
 }
 
-/** Brings a voice into the current round by its Fish id; says so if the audition has seen it. */
+/**
+ * Brings a voice in to hear by its Fish id, also one dropped or ruled out before (it is then no
+ * longer ruled out); says so if it is on the board already.
+ */
 export async function addVoiceById(
   projectFile: string,
   characterId: string,
@@ -197,8 +220,9 @@ export async function addVoiceById(
     projectFile,
     characterId,
     async (session) => {
-      const seen = seenMessage(session, voiceId)
-      if (seen) return { ok: false, reason: 'seen', message: seen }
+      if (placeOf(session, voiceId)) {
+        return { ok: false, reason: 'seen', message: 'That voice is in this audition already.' }
+      }
       const queued = session.queue.includes(voiceId) ? session.voices[voiceId] : undefined
       if (queued) return addVoice(session, queued)
       const fish = await fishFor(dirname(projectFile), opened.project)
@@ -215,13 +239,6 @@ export async function addVoiceById(
     // Asking for a voice by its id is wanting to hear it: it is no longer ruled out.
     () => updateRuledOut(projectFile, characterId, { allowed: [voiceId] }),
   )
-}
-
-/** Why a voice cannot be added to the audition, or null if it can. */
-function seenMessage(session: AuditionSession, voiceId: string): string | null {
-  if (session.pool.includes(voiceId)) return 'That voice is already in this round.'
-  if (session.dropped.includes(voiceId)) return 'That voice was dropped earlier in this audition.'
-  return null
 }
 
 /**
@@ -254,16 +271,20 @@ export type CastResult =
       /** The character's recorded lines per part, all stale now that its voice changed. */
       stale: Appearance[]
     }
-  | { ok: false; reason: 'no-session' | 'no-finalist'; message: string }
+  | { ok: false; reason: 'no-session' | 'not-shortlisted'; message: string }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
 
 /**
- * Casts the one voice left in the audition: writes it to the cast and ends the audition. When the
- * current voice wins, the cast is left as it is.
+ * Casts a shortlisted voice: writes it to the cast and ends the audition. Keeping the current
+ * voice leaves the cast as it is.
  */
-export function castFinalist(projectFile: string, characterId: string): Promise<CastResult> {
+export function castVoice(
+  projectFile: string,
+  characterId: string,
+  winner: string,
+): Promise<CastResult> {
   return sessionWrites.run(key(projectFile, characterId), async () => {
     const loaded = await loadWorkspace(projectFile)
     if (!loaded.ok) return loaded
@@ -273,12 +294,11 @@ export function castFinalist(projectFile: string, characterId: string): Promise<
     if (!session) {
       return { ok: false, reason: 'no-session', message: 'There is no audition to cast from.' }
     }
-    const winner = finalist(session)
-    if (!winner) {
+    if (!session.shortlist.includes(winner)) {
       return {
         ok: false,
-        reason: 'no-finalist',
-        message: 'Drop voices until one is left, then cast it.',
+        reason: 'not-shortlisted',
+        message: 'Only a shortlisted voice can be cast; shortlist it first.',
       }
     }
     const voice = { id: winner, name: session.voices[winner]?.title ?? winner }
@@ -315,13 +335,13 @@ export type SessionView =
       takes: Record<string, string>
       /**
        * The character's recorded lines per part, which casting another voice would make stale.
-       * Left out after a verdict or a new round, which cannot change it: keep the last one shown.
+       * Left out after a change to the board, which cannot change it: keep the last one shown.
        */
       recorded?: Appearance[]
     }
   | SessionFailure
 
-/** A session result with the phrase, the takes of the voices in the round, and the recorded lines. */
+/** A session result with the phrase, the takes of the voices on the board, and the recorded lines. */
 export async function viewOf(
   projectFile: string,
   characterId: string,
@@ -333,7 +353,8 @@ export async function viewOf(
   if (!result.session) return { ...empty, session: null }
   // Counting recorded lines plans every part the character is in: only when it may have changed.
   const recorded = withRecorded ? await recordedLines(projectFile, characterId) : undefined
-  const lookup = await auditionTakes(projectFile, characterId, result.session.pool)
+  const { shortlist: listed, toHear } = result.session
+  const lookup = await auditionTakes(projectFile, characterId, [...listed, ...toHear])
   if (!lookup?.ok) return { ...empty, session: result.session, recorded }
   return {
     ok: true,

@@ -23,8 +23,8 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - A character is identified by its name across the whole project: the same name in different
   parts is the same character with the same voice. Different voices need different names
   (`narrator-act1`, `narrator-act2`).
-- Cast voices by audition: keyword search on Fish Audio, then rounds of listening and keeping or
-  dropping, until a single voice is left.
+- Cast voices by audition: keyword search on Fish Audio, then listening, dropping and
+  shortlisting, and casting one of the shortlist.
 - Generate narration for one character or the whole part: missing clips are recorded, clips whose
   inputs changed are re-recorded, clips whose line left the script are removed.
 - Output stays compatible with what the game already reads (`manifest.json` with word timings).
@@ -113,7 +113,7 @@ audio-studio/
 │   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
 │   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
 │   │   ├── align.ts             Whisper words → per-word timings, heard ratio (narrate.py's)
-│   │   ├── audition.ts          audition state machine: rounds, keep/drop, finalist
+│   │   ├── audition.ts          the audition board: to hear, shortlist, drop and undo
 │   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
@@ -138,7 +138,7 @@ audio-studio/
 │       ├── app/                 shell, routing, theme
 │       ├── features/
 │       │   ├── overview/        part dashboard, cast grid
-│       │   ├── audition/        casting rounds
+│       │   ├── audition/        the audition board, ruled-out voices
 │       │   └── narration/       line table, plan, job progress, inspector
 │       └── components/          buttons, chips, waveform, player, status pills
 ├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
@@ -334,10 +334,9 @@ the truth.
 
 ### 8.1 Audition (casting a voice)
 
-This is the audition being built in step 9 (§12). Built so far: ruled-out voices (9.1), listed on
-the audition page for now. Until the shortlist board (9.2) lands, an audition still runs in rounds
-of Keep and Drop, a round going on with the voices not dropped until one is left to cast; a
-dropped voice is ruled out as below.
+This is the audition being built in step 9 (§12). Built so far: ruled-out voices (9.1) and the
+shortlist board (9.2); the audition is started from, and its ruled-out voices listed on, the
+audition page until the character page (9.3) takes its place.
 
 Every character has a **character page** (`#/characters/<id>`, from 9.3), the one place about
 it: its cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish), its
@@ -363,7 +362,7 @@ and discarded from there; the page itself shows no candidates.
 
 An audition is for a character, not for a part: the result applies to every part it speaks in.
 
-- From 9.2: **To hear** holds the candidates being listened to, best match first. **Bring in N more** adds
+- **To hear** holds the candidates being listened to, best match first. **Bring in N more** adds
   the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
   **Bring in a specific voice** adds one by its Fish id or URL.
 - **Drop** takes a voice out of the audition at once and rules it out for the character: no later
@@ -376,10 +375,11 @@ An audition is for a character, not for a part: the result applies to every part
   audition. Keeping the current voice ends the audition with the cast unchanged.
 - Only Drop rules a voice out. The voice replaced by a cast, and the shortlisted and unheard
   voices of an audition, can come back in a later one.
-- **Pause** leaves the audition as it is (it is saved after every change) for the character page;
+- **Pause** leaves the audition as it is (it is saved after every change) for the character page
+  (for now, the list of characters);
   **Stop audition** ends it without casting, after saying what that means. Its dropped voices
-  stay ruled out. (Until then, Drop is the round's verdict, and the cast voice is never ruled
-  out.)
+  stay ruled out. The cast voice can be dropped from the board, but it is never ruled out: it
+  takes part in every audition.
 - **Search** queries Fish for the whole keyword phrase and each of its words, several pages each,
   pools the results, keeps voices whose title, description or tags contain the keywords, and ranks
   by match, then popularity (the search `fish_tts.py` already does, ported). Ruled-out voices,
@@ -456,7 +456,7 @@ generation while the script and cast still change) and `final` (the recording th
   edited afterwards becomes a draft one until the next final recording). A weak final clip is
   retaken only with the final model: from its row, or by the final plan when asked. With one
   model for both, there is no final step: a final plan or recording is a draft one. A paid
-  `audition` model is still to come, with its cost per round.
+  `audition` model is still to come, with its cost per take.
 
 ---
 
@@ -475,8 +475,8 @@ retakeWeak }`: start a generation or a measuring, the server planning it afresh)
 `GET`/`DELETE /api/jobs/:id` (progress, cancel).
 Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the audition model, voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
-/api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `verdict`, `next`, `more`, `add` and
-`cast`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
+/api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
+`undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
 `DELETE /api/characters/:id/ruled-out/:voice` (allow one again). The rest is the plan:
 
@@ -498,13 +498,13 @@ GET    /api/characters/:id/ruled-out             voices ruled out for it, the la
 DELETE /api/characters/:id/ruled-out             forget them all
 DELETE /api/characters/:id/ruled-out/:voice      allow one again
 GET    /api/auditions/:id                        the audition in progress, with phrase and takes
-DELETE /api/auditions/:id                        end it without casting
-POST   /api/auditions/:id/start                  round 1 from a fresh search
-POST   /api/auditions/:id/verdict                keep / drop / undecided for one voice
-POST   /api/auditions/:id/next                   the next round with the voices not dropped
-POST   /api/auditions/:id/more                   a round's worth of new candidates
+DELETE /api/auditions/:id                        stop it without casting
+POST   /api/auditions/:id/start                  an audition from a fresh search
+POST   /api/auditions/:id/move                   shortlist, unlist or drop a voice
+POST   /api/auditions/:id/undo                   undo the last drop
+POST   /api/auditions/:id/more                   more candidates to hear
 POST   /api/auditions/:id/add                    a voice by its Fish id
-POST   /api/auditions/:id/cast                   write the last voice left to cast.json
+POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json
 POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
                                                  part at a time); a paid
                                                  one with { confirmedCost }, else 409 with
@@ -644,9 +644,11 @@ Small, independently useful increments:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in
       `.audio-studio/ruled-out/`, left out of every later search for it; listed on the audition
       page, each allowed again or all forgotten.
-   2. **Shortlist board**: voices to hear, Drop (gone at once, undo the last) and Shortlist,
-      bring in more or a specific voice, cast any shortlisted voice after saying what goes stale;
-      Pause, and Stop audition after saying what it means. Rounds go.
+   2. **Shortlist board** (built): voices to hear, Drop (gone at once, the last undone from a
+      notice) and Shortlist, bring in more or a specific voice (also one dropped before), cast any
+      shortlisted voice after saying what goes stale; Pause, and Stop audition after saying what
+      it means. Takes record by themselves. Rounds are gone; an audition saved in rounds is no
+      longer one in progress.
    3. **Character page**: the voice, lines per part, delivery and casting brief, ruled-out
       voices and the audition in progress, in place of today's audition landing page.
    4. **Hear it in the game**: the character's recorded lines on its page, played one by one or in

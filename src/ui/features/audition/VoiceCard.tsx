@@ -1,12 +1,13 @@
-import type { Verdict } from '../../../core/audition'
+import type { ReactNode } from 'react'
 import type { Candidate, Voice } from '../../../core/voiceSearch'
 import { takeUrl } from '../../api'
-import { CheckIcon, CrossIcon, PauseIcon, PlayIcon } from '../../components/icons'
+import { PauseIcon, PlayIcon } from '../../components/icons'
 import { compact } from '../../format'
 
 /**
  * A voice in an audition: who made it and how popular it is, its take (the audition phrase in the
- * character's style) or a button to record one, Fish's own sample, and, in a round, Keep and Drop.
+ * character's style) or a button to record one, Fish's own sample, and, on the board, what can be
+ * done with it (`actions`).
  */
 export function VoiceCard({
   voice,
@@ -19,8 +20,8 @@ export function VoiceCard({
   recording,
   error,
   onRecord,
-  verdict,
-  onVerdict,
+  listed = false,
+  actions,
 }: {
   voice: Voice
   candidate?: Candidate
@@ -33,14 +34,14 @@ export function VoiceCard({
   recording: boolean
   error: string | null
   onRecord: () => void
-  /** In an audition round: the verdict on the voice, and how to change it. */
-  verdict?: Verdict | null
-  onVerdict?: (verdict: Verdict | null) => void
+  /** Whether the voice is on the shortlist, which is shown apart. */
+  listed?: boolean
+  /** On the board: buttons for what can be done with the voice. */
+  actions?: ReactNode
 }) {
   const sample = voice.sample
-  const state = verdict === 'keep' ? ' kept' : verdict === 'drop' ? ' dropped' : ''
   return (
-    <article className={`card voice-card${state}`} aria-label={voice.title}>
+    <article className={`card voice-card${listed ? ' kept' : ''}`} aria-label={voice.title}>
       <div className="card-head">
         <div className="card-title">
           <strong>{voice.title || 'Untitled voice'}</strong>
@@ -84,7 +85,7 @@ export function VoiceCard({
           </>
         ) : (
           <button className="btn" type="button" disabled={recording} onClick={onRecord}>
-            {recording ? 'Recording…' : 'Record take'}
+            {recording ? 'Recording take…' : 'Record take'}
           </button>
         )}
       </div>
@@ -110,26 +111,7 @@ export function VoiceCard({
           <span className="muted">No sample from Fish</span>
         )}
       </div>
-      {onVerdict && (
-        <div className="verdict">
-          <button
-            type="button"
-            className="btn verdict-keep"
-            aria-pressed={verdict === 'keep'}
-            onClick={() => onVerdict(verdict === 'keep' ? null : 'keep')}
-          >
-            <CheckIcon /> Keep
-          </button>
-          <button
-            type="button"
-            className="btn verdict-drop"
-            aria-pressed={verdict === 'drop'}
-            onClick={() => onVerdict(verdict === 'drop' ? null : 'drop')}
-          >
-            <CrossIcon /> Drop
-          </button>
-        </div>
-      )}
+      {actions && <div className="verdict">{actions}</div>}
       <span className="mono muted voice-id">{voice.id}</span>
     </article>
   )

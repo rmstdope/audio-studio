@@ -295,12 +295,12 @@ describe('server', () => {
     const listed = async () => await (await fetch(url('/api/characters/narrator/ruled-out'))).json()
     expect(await listed()).toEqual({ ok: true, voices: [] })
     await send('POST', '/api/auditions/narrator/start')
-    await send('POST', '/api/auditions/narrator/verdict', { voice: 'w1', verdict: 'drop' })
+    await send('POST', '/api/auditions/narrator/move', { voice: 'w1', move: 'drop' })
     expect(await listed()).toMatchObject({ ok: true, voices: [{ id: 'w1', title: 'Warm' }] })
     const one = await send('DELETE', '/api/characters/narrator/ruled-out/w1')
     expect(await one.json()).toEqual({ ok: true, voices: [] })
-    await send('POST', '/api/auditions/narrator/verdict', { voice: 'w1', verdict: null })
-    await send('POST', '/api/auditions/narrator/verdict', { voice: 'w1', verdict: 'drop' })
+    await send('POST', '/api/auditions/narrator/undo')
+    await send('POST', '/api/auditions/narrator/move', { voice: 'w1', move: 'drop' })
     const all = await send('DELETE', '/api/characters/narrator/ruled-out')
     expect(await all.json()).toEqual({ ok: true, voices: [] })
     await send('DELETE', '/api/auditions/narrator')
@@ -321,7 +321,7 @@ describe('server', () => {
     }
   })
 
-  it('runs an audition: start, verdicts, next round and cast', async () => {
+  it('runs an audition: start, shortlist, drop and undo, and cast', async () => {
     const post = (path: string, body?: unknown) =>
       fetch(url(path), {
         method: 'POST',
@@ -336,27 +336,34 @@ describe('server', () => {
       recorded: [],
     })
     const started = await (await post('/api/auditions/narrator/start')).json()
-    expect(started.session.pool).toEqual(['w1'])
+    expect(started.session.toHear).toEqual(['w1'])
     expect(started.audition.spoken).toContain('Once upon a time.')
-    expect(
-      (await post('/api/auditions/narrator/verdict', { voice: 'w1', verdict: 'maybe' })).status,
-    ).toBe(400)
-    const kept = await (
-      await post('/api/auditions/narrator/verdict', { voice: 'w1', verdict: 'keep' })
+    expect((await post('/api/auditions/narrator/move', { voice: 'w1', move: 'keep' })).status).toBe(
+      400,
+    )
+    const dropped = await (
+      await post('/api/auditions/narrator/move', { voice: 'w1', move: 'drop' })
     ).json()
-    expect(kept.session.verdicts).toEqual({ w1: 'keep' })
-    expect((await post('/api/auditions/narrator/next')).status).toBe(200)
-    const cast = await (await post('/api/auditions/narrator/cast')).json()
+    expect(dropped.session.dropped).toEqual([{ id: 'w1', from: 'toHear' }])
+    expect(dropped.recorded).toBeUndefined()
+    await post('/api/auditions/narrator/undo')
+    expect((await post('/api/auditions/narrator/cast', { voice: 'w1' })).status).toBe(409)
+    const listed = await (
+      await post('/api/auditions/narrator/move', { voice: 'w1', move: 'shortlist' })
+    ).json()
+    expect(listed.session.shortlist).toEqual(['w1'])
+    expect((await post('/api/auditions/narrator/cast')).status).toBe(400)
+    const cast = await (await post('/api/auditions/narrator/cast', { voice: 'w1' })).json()
     expect(cast).toMatchObject({ ok: true, voice: { id: 'w1', name: 'Warm' }, changed: true })
     const saved = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(saved.speakers.narrator).toMatchObject({ voice: 'w1', voiceName: 'Warm' })
-    expect((await post('/api/auditions/narrator/cast')).status).toBe(409)
+    expect((await post('/api/auditions/narrator/cast', { voice: 'w1' })).status).toBe(409)
   })
 
   it('refuses every audition change from another page', async () => {
     const changes: [string, string][] = [
       ['DELETE', '/api/auditions/narrator'],
-      ...['start', 'verdict', 'next', 'more', 'add', 'cast'].map((action): [string, string] => [
+      ...['start', 'move', 'undo', 'more', 'add', 'cast'].map((action): [string, string] => [
         'POST',
         `/api/auditions/narrator/${action}`,
       ]),

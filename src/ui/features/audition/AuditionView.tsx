@@ -2,8 +2,8 @@ import { useState, type FormEvent } from 'react'
 import type { ProjectSummary } from '../../../core/summary'
 import type { AuditionText } from '../../../core/takes'
 import type { CastResult } from '../../../services/sessions'
-import { AuditionRound } from './AuditionRound'
 import { RuledOutPanel } from './RuledOutPanel'
+import { ShortlistBoard } from './ShortlistBoard'
 import { VoiceCard } from './VoiceCard'
 import {
   useCandidates,
@@ -24,8 +24,8 @@ import { routeHref } from '../../route'
 
 /**
  * A character's audition: its search keywords and phrase, and either the voices in Fish's library
- * that match (with takes and samples, and a way to start an audition) or the audition's current
- * round. After casting, what changed.
+ * that match (with takes and samples, and a way to start an audition) or the audition's board.
+ * After casting, what changed.
  */
 export function AuditionView({
   summary,
@@ -63,7 +63,7 @@ export function AuditionView({
     error: takes.errors[voice] ?? null,
     onRecord: () => void takes.record(voice),
   })
-  // The current voice and the top of the list: the voices a round would start with.
+  // The current voice and the top of the list: the voices an audition would start with.
   const roundVoices = ok
     ? [
         ...(ok.current ? [ok.current.id] : []),
@@ -120,8 +120,10 @@ export function AuditionView({
           {sessionQuery.isError ? (
             <p className="panel muted">Could not load the audition: {sessionQuery.error.message}</p>
           ) : round ? (
-            <AuditionRound
+            <ShortlistBoard
               characterId={character.id}
+              name={character.name}
+              lines={character.totalLines}
               view={round}
               playing={playing}
               toggle={toggle}
@@ -165,7 +167,7 @@ export function AuditionView({
                         cast.reset()
                         start.mutate({ action: 'start' })
                       }}
-                      title="Round 1: the current voice and the top voices; keep and drop until one is left"
+                      title="The current voice on the shortlist, the top voices to hear: drop and shortlist, then cast one"
                     >
                       {start.isPending ? 'Starting…' : 'Start audition'}
                     </button>

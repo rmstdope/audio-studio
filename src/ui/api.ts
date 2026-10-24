@@ -421,15 +421,16 @@ export function useSession(characterId: string) {
   })
 }
 
-/** What a session action sends: the path after the session's (`start`, `verdict`, …), and a body. */
+/** What a session action sends: the path after the session's (`start`, `move`, …), and a body. */
 export interface SessionAction {
-  action: 'start' | 'verdict' | 'next' | 'more' | 'add' | 'discard'
+  action: 'start' | 'move' | 'undo' | 'more' | 'add' | 'discard'
   body?: unknown
 }
 
 /**
- * Changes a character's audition (start, verdicts, next round, more voices, add by id, discard)
- * and shows the answer. Actions run one after another, in the order asked.
+ * Changes a character's audition (start, shortlist, unlist or drop a voice, undo the last drop,
+ * more voices, add by id, stop) and shows the answer. Actions run one after another, in the order
+ * asked.
  */
 export function useSessionAction(characterId: string) {
   const client = useQueryClient()
@@ -449,7 +450,7 @@ export function useSessionAction(characterId: string) {
     },
     onSuccess: (view) => {
       if (!view.ok) return
-      // A drop rules a voice out, taking it back or adding a voice by id allows it again; the
+      // A drop rules a voice out, undoing it or adding a voice by id allows it again; the
       // candidates shown once the audition ends leave out what is ruled out.
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
       void client.invalidateQueries({ queryKey: ['candidates', characterId] })
@@ -462,16 +463,18 @@ export function useSessionAction(characterId: string) {
 }
 
 /**
- * Casts the one voice left in a character's audition. Afterwards the project, its parts (whose
- * lines are now stale) and the character's candidates are loaded again.
+ * Casts a shortlisted voice, ending the audition. Afterwards the project, its parts (whose lines
+ * are now stale) and the character's candidates are loaded again.
  */
 export function useCast(characterId: string) {
   const client = useQueryClient()
   return useMutation({
     scope: { id: `session-${characterId}` },
-    mutationFn: async () => {
+    mutationFn: async (voice: string) => {
       const response = await fetch(`/api/auditions/${encodeURIComponent(characterId)}/cast`, {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ voice }),
       })
       if (!response.ok && response.status !== 409) {
         throw new Error(`casting answered ${response.status}`)
