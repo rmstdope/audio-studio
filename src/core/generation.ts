@@ -26,6 +26,8 @@ export interface GenerationPlan {
   /** Estimated cost in US dollars, for one take of each line; 0 on the free model; null for a
    * model whose price is unknown. */
   cost: number | null
+  /** The most the plan can cost: every line needing every take (null for an unknown price). */
+  ceiling: number | null
   /** Takes a line may need at most (when a take is not heard well enough). */
   takes: number
   /** Whether takes are checked with Whisper. */
@@ -92,7 +94,34 @@ export function planGeneration(
     bytes,
     model,
     cost: price === undefined ? null : (bytes / 1_000_000) * price,
+    ceiling: price === undefined ? null : (bytes / 1_000_000) * price * takes,
     takes,
     checked,
   }
+}
+
+/**
+ * The most recording `keys` can cost in dollars: the bytes sent for those lines at the model's
+ * price at `at`, times every take; null for a model whose price is unknown.
+ */
+export function costCeiling(
+  state: { lines: LineState[] },
+  keys: string[],
+  {
+    model,
+    sent = (line) => [line.cue ? `${line.cue} ${line.text}` : line.text],
+    takes = 1,
+    at,
+  }: { model: string; sent?: (line: LineState) => string[]; takes?: number; at: Date },
+): number | null {
+  const price = priceOf(model, at)
+  if (price === undefined) return null
+  const wanted = new Set(keys)
+  const bytes = state.lines
+    .filter((line) => wanted.has(line.key))
+    .reduce(
+      (sum, line) => sum + sent(line).reduce((s, text) => s + encoder.encode(text).length, 0),
+      0,
+    )
+  return (bytes / 1_000_000) * price * takes
 }

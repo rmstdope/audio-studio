@@ -10,7 +10,9 @@ import {
 } from '../services/auditions'
 import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
-import { planGeneration } from '../core/generation'
+import { costCeiling, planGeneration } from '../core/generation'
+import type { LineState } from '../core/planner'
+import { spendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
@@ -99,8 +101,13 @@ const JobBody = z
     speaker: z.string().min(1).max(200).nullable(),
     keys: z.array(z.string()).max(100_000),
     orphans: z.array(z.string()).max(100_000),
+    /** The most the user agreed to spend, in dollars, for a paid model. */
+    confirmedCost: z.number().nonnegative().optional(),
   })
   .strict()
+
+/** Recording one line: the most the user agreed to spend on it, for a paid model. */
+const RecordBody = z.object({ confirmedCost: z.number().nonnegative().optional() }).strict()
 
 const VerdictBody = z.object({
   voice: z.string().regex(/^[\w-]{1,64}$/),
@@ -182,6 +189,17 @@ export function startServer({
     }
   }
 
+  /**
+   * Whether recording that costs at most `ceiling` may start: null if so, else why not. The credit
+   * is asked for only once the cost is confirmed, and only for a paid model.
+   */
+  async function spendCheck(ceiling: number | null, confirmed?: number) {
+    const unconfirmed = spendProblem({ ceiling, confirmed })
+    if (!unconfirmed || unconfirmed.reason !== 'credit') return unconfirmed
+    const credit = await creditOf()
+    return spendProblem({ ceiling, confirmed, credit: credit.ok ? credit.credit : null })
+  }
+
   /** The take checker: the one given (tests), else the process's one Whisper worker. */
   async function transcriberFor(): Promise<Transcriber | null> {
     return transcriber !== undefined ? transcriber : sharedWhisper()
@@ -202,17 +220,24 @@ export function startServer({
     if (read.problems.length) return { ok: false as const, problems: read.problems }
     const { narration } = read.project
     const { pronounce } = read.input.cast
-    const plan = planGeneration(planPart(read.input), {
+    const state = planPart(read.input)
+    const pricing = {
       at: new Date(),
       model: narration.models.draft,
-      speaker,
       // What is sent: each piece of a line with its cue and the cast's pronunciations.
-      sent: (line) => spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
+      sent: (line: LineState) =>
+        spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
       takes: narration.quality.transcriber === 'none' ? 1 : narration.quality.takes,
+    }
+    const plan = planGeneration(state, {
+      ...pricing,
+      speaker,
       checked: narration.quality.transcriber !== 'none',
       includeWeak,
     })
-    return { ok: true as const, plan, parallel: narration.quality.parallel }
+    // The most recording these lines can cost, priced as the plan was.
+    const ceilingOf = (keys: string[]) => costCeiling(state, keys, pricing)
+    return { ok: true as const, plan, ceilingOf, parallel: narration.quality.parallel }
   }
 
   /** Only requests addressed to the studio itself reach `handler`. */
@@ -260,6 +285,21 @@ export function startServer({
       '/api/parts/:part/lines/:key/record': {
         POST: fromOwnPage(async (request) => {
           const { part, key } = request.params
+          const text = await request.text()
+          const json = text
+            ? await Promise.resolve(text)
+                .then(JSON.parse)
+                .catch(() => null)
+            : {}
+          const body = RecordBody.safeParse(json)
+          if (!body.success) {
+            return Response.json({ error: 'expected { confirmedCost? }' }, { status: 400 })
+          }
+          const planned = await planFor(part, undefined, true)
+          if (planned?.ok) {
+            const problem = await spendCheck(planned.ceilingOf([key]), body.data.confirmedCost)
+            if (problem) return Response.json({ ok: false, ...problem }, { status: 409 })
+          }
           const result = await recordLine(projectFile, part, key, fishFor, {
             encode,
             limiter: fishWork,
@@ -299,6 +339,11 @@ export function startServer({
           const orphans = measuring ? [] : plan.orphans.filter((key) => shownOrphans.has(key))
           if (!keys.length && !orphans.length) {
             return Response.json({ error: 'There is nothing to do.' }, { status: 409 })
+          }
+          if (!measuring) {
+            const problem = await spendCheck(planned.ceilingOf(keys), body.data.confirmedCost)
+            if (problem)
+              return Response.json({ error: problem.message, ...problem }, { status: 409 })
           }
           // Checked with no await before the job starts, so a refresh cannot slip in between.
           if (isRefreshing(projectFile, part)) {

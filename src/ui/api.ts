@@ -495,26 +495,37 @@ export function takeUrl(key: string): string {
 }
 
 /**
- * Records lines of a part: `record(key)` asks the server to record the line, then reloads the
- * part so its status shows. `recording` holds the lines in progress, `errors` what went wrong.
+ * Records lines one by one from their rows. On a paid model the server first answers with the
+ * most the line can cost: `toConfirm` holds it per line until the user confirms (`record` again
+ * with that amount) or `cancel`s. `recording` holds the lines in progress, `errors` what went
+ * wrong per line.
  */
 export function useRecordLines(partId: string) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [toConfirm, setToConfirm] = useState<Record<string, number>>({})
+  const forget = (key: string) => setToConfirm(({ [key]: _gone, ...rest }) => rest)
 
   const record = useCallback(
-    async (key: string) => {
+    async (key: string, confirmedCost?: number) => {
       setRecording((now) => new Set(now).add(key))
       setErrors(({ [key]: _gone, ...rest }) => rest)
+      forget(key)
       try {
         const path = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/record`
-        const response = await fetch(path, { method: 'POST' })
+        const response = await fetch(path, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(confirmedCost === undefined ? {} : { confirmedCost }),
+        })
         if (!response.ok && response.status !== 409) {
           throw new Error(`recording answered ${response.status}`)
         }
-        const result = (await response.json()) as NonNullable<RecordResult>
-        if (!result.ok) {
+        const result = (await response.json()) as NonNullable<RecordResult> | SpendAnswer
+        if (!result.ok && 'ceiling' in result) {
+          setToConfirm((now) => ({ ...now, [key]: result.ceiling }))
+        } else if (!result.ok) {
           const message = 'message' in result ? result.message : 'the part’s files need fixing'
           setErrors((now) => ({ ...now, [key]: message }))
         }
@@ -536,7 +547,15 @@ export function useRecordLines(partId: string) {
     [partId, client],
   )
 
-  return { record, recording, errors }
+  return { record, recording, errors, toConfirm, cancel: forget }
+}
+
+/** The server asking to confirm a paid recording: the most it can cost, in dollars. */
+export interface SpendAnswer {
+  ok: false
+  reason: 'confirm'
+  ceiling: number
+  message: string
 }
 
 /** What generating a part (or one speaker in it) would do, or why it cannot be planned. */
@@ -602,6 +621,8 @@ export function useJobActions(partId: string) {
     mutationFn: async (options: {
       kind: JobState['kind']
       retakeWeak?: boolean
+      /** The most the user agreed to spend, for a paid model. */
+      confirmedCost?: number
       speaker: string | null
       keys: string[]
       orphans: string[]

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { LineState } from './planner'
-import { planGeneration } from './generation'
+import { planGeneration, costCeiling } from './generation'
 
 /** A fixed moment to price plans at: no promotion runs then for the models tested. */
 const AT = new Date('2026-10-24T12:00:00Z')
@@ -142,5 +142,31 @@ describe('planGeneration, weak and unmeasured lines', () => {
         .unmeasured,
     ).toEqual([])
     expect(planGeneration(measured, { at: AT, model: 's2.1-pro-free' }).unmeasured).toEqual([])
+  })
+})
+
+describe('costCeiling', () => {
+  it('is the most the lines can cost: their bytes at the price, every take needed', () => {
+    const plan = planGeneration(state, { at: AT, model: 's2-pro', takes: 3 })
+    const keys = plan.keys.slice(0, 1)
+    const one = planGeneration(
+      { lines: state.lines.filter((l) => keys.includes(l.key)), orphans: [] },
+      { at: AT, model: 's2-pro' },
+    )
+    expect(costCeiling(state, keys, { at: AT, model: 's2-pro', takes: 3 })).toBeCloseTo(
+      (one.bytes / 1_000_000) * 15 * 3,
+      12,
+    )
+    expect(costCeiling(state, keys, { at: AT, model: 's2.1-pro-free', takes: 3 })).toBe(0)
+    expect(costCeiling(state, keys, { at: AT, model: 'brand-new', takes: 3 })).toBeNull()
+  })
+
+  it('is what the plan says at most, for the plan’s own lines', () => {
+    const plan = planGeneration(state, { at: AT, model: 's2-pro', takes: 3 })
+    expect(plan.ceiling).toBeCloseTo((plan.cost ?? 0) * 3, 12)
+    expect(costCeiling(state, plan.keys, { at: AT, model: 's2-pro', takes: 3 })).toBeCloseTo(
+      plan.ceiling!,
+      12,
+    )
   })
 })

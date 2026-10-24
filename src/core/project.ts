@@ -1,6 +1,7 @@
 import { z } from 'zod'
+import { isPriced } from './prices'
 
-/** Fish Audio models a project may use for now. Paid models come with final generation. */
+/** Fish Audio's free model: the only one for auditions, for now. */
 export const FREE_MODELS = ['s2.1-pro-free'] as const
 
 /** The smallest `quality.chunkLimit` allowed. */
@@ -20,12 +21,21 @@ export function phraseProblem(phrase: string, chunkLimit: number): string | null
 /** The file name the CLI looks for, walking up from the current directory. */
 export const PROJECT_FILE = 'audio-studio.json'
 
-const freeModel = z
+/** The audition model: free only, for now (a paid audition would need its cost per round). */
+const auditionModel = z
   .string()
   .default(FREE_MODELS[0])
   .refine((model) => (FREE_MODELS as readonly string[]).includes(model), {
     error: (issue) =>
-      `"${String(issue.input)}" is not available yet: only ${FREE_MODELS.join(', ')} can be used for now`,
+      `"${String(issue.input)}" cannot be used for auditions yet: only ${FREE_MODELS.join(', ')} can`,
+  })
+
+/** A recording model: any whose price the studio knows, so a plan can say what it costs. */
+const recordingModel = z
+  .string()
+  .default(FREE_MODELS[0])
+  .refine(isPriced, {
+    error: (issue) => `"${String(issue.input)}" has no known price, so its cost cannot be shown`,
   })
 
 /** A path that differs per part, so it must contain `{part}`. */
@@ -61,7 +71,9 @@ const NarrationSchema = z
       manifest: partPath,
     }),
     refreshDialog: z.string().optional(),
-    models: z.object({ audition: freeModel, draft: freeModel, final: freeModel }).prefault({}),
+    models: z
+      .object({ audition: auditionModel, draft: recordingModel, final: recordingModel })
+      .prefault({}),
     tts: z
       .object({
         temperature: z.number().min(0).max(1).default(0.7),

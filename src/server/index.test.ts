@@ -756,3 +756,96 @@ describe.skipIf(!Bun.which('ffmpeg'))('server, measuring clips', () => {
     expect(await recordJob(true)).toMatchObject({ status: 'done', done: 1, skipped: 0 })
   })
 })
+
+describe('server, a paid draft model', () => {
+  const paid = projectJson({
+    narration: { ...(projectJson().narration as object), models: { draft: 's2-pro' } },
+  })
+  const paidRoot = tempRepo({
+    'audio-studio.json': paid,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
+  })
+  let credit = 10
+  let spoken = 0
+  const account: FishClient = {
+    ...fish,
+    async credit() {
+      return credit
+    },
+    async tts(request) {
+      spoken++
+      return fish.tts(request)
+    },
+  }
+  const server = startServer({
+    projectFile: join(paidRoot, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const record = (confirmedCost?: number) =>
+    fetch(at('/api/parts/act1/lines/a/record'), {
+      method: 'POST',
+      headers: own,
+      body: JSON.stringify(confirmedCost === undefined ? {} : { confirmedCost }),
+    })
+
+  it('plans the cost, and the most it can cost', async () => {
+    const { plan } = await (await fetch(at('/api/parts/act1/plan'))).json()
+    expect(plan.cost).toBeGreaterThan(0)
+    expect(plan.ceiling).toBeCloseTo(plan.cost * 3, 12)
+  })
+
+  it('records a line only once its cost is confirmed, saying what to confirm', async () => {
+    const asked = await record()
+    expect(asked.status).toBe(409)
+    const body = await asked.json()
+    expect(body).toMatchObject({ ok: false, reason: 'confirm' })
+    expect(body.ceiling).toBeGreaterThan(0)
+    expect(spoken).toBe(0)
+    expect((await record(body.ceiling / 2)).status).toBe(409)
+    expect(spoken).toBe(0)
+    credit = body.ceiling / 2
+    expect(await (await record(body.ceiling)).json()).toMatchObject({ ok: false, reason: 'credit' })
+    expect(spoken).toBe(0)
+    credit = 10
+    expect(await (await record(body.ceiling)).json()).toMatchObject({ ok: true, key: 'a' })
+    expect(spoken).toBeGreaterThan(0)
+  })
+
+  it('answers a body it cannot read with 400', async () => {
+    const bad = await fetch(at('/api/parts/act1/lines/a/record'), {
+      method: 'POST',
+      headers: own,
+      body: '{ not json',
+    })
+    expect(bad.status).toBe(400)
+  })
+
+  it('starts a paid job only for the cost confirmed', async () => {
+    writeFileSync(
+      join(paidRoot, 'tts/act1/script.json'),
+      JSON.stringify([
+        { key: 'a', speaker: 'narrator', text: 'Once upon a time.' },
+        { key: 'b', speaker: 'narrator', text: 'There was a fox.' },
+      ]),
+    )
+    const { plan } = await (await fetch(at('/api/parts/act1/plan'))).json()
+    expect(plan.keys).toEqual(['b'])
+    const start = (confirmedCost?: number) =>
+      fetch(at('/api/parts/act1/jobs'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify({ speaker: null, keys: ['b'], orphans: [], confirmedCost }),
+      })
+    const refused = await start()
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toMatchObject({ reason: 'confirm' })
+    expect((await start(plan.ceiling)).status).toBe(200)
+  })
+})

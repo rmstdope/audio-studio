@@ -33,15 +33,18 @@ describe('ProjectSchema', () => {
     expect(project.narration.audition.candidatesPerRound).toBe(5)
   })
 
-  it('rejects a paid model, naming the stage', () => {
+  it('rejects a paid audition model, naming the stage', () => {
     const base = projectJson()
     const narration = base.narration as Record<string, unknown>
-    const found = problems({ ...base, narration: { ...narration, models: { final: 'drama-3' } } })
+    const found = problems({
+      ...base,
+      narration: { ...narration, models: { audition: 'drama-3' } },
+    })
     expect(found).toEqual([
       {
         file: 'audio-studio.json',
-        path: 'narration.models.final',
-        message: '"drama-3" is not available yet: only s2.1-pro-free can be used for now',
+        path: 'narration.models.audition',
+        message: '"drama-3" cannot be used for auditions yet: only s2.1-pro-free can',
       },
     ])
   })
@@ -121,5 +124,26 @@ describe('ProjectSchema, loudness', () => {
       narration: { ...(projectJson().narration as object), output: { lufs: -16 } },
     })
     expect(ProjectSchema.parse(levelled).narration.output.lufs).toBe(-16)
+  })
+})
+
+describe('ProjectSchema, paid models', () => {
+  const withModels = (models: Record<string, string>) =>
+    ProjectSchema.safeParse(
+      projectJson({ narration: { ...(projectJson().narration as object), models } }),
+    )
+
+  it('takes a priced model for drafts and the final recording', () => {
+    const parsed = withModels({ draft: 's2-pro', final: 'drama-3' })
+    expect(parsed.success && parsed.data.narration.models).toEqual({
+      audition: 's2.1-pro-free',
+      draft: 's2-pro',
+      final: 'drama-3',
+    })
+  })
+
+  it('refuses a model without a known price, and a paid audition for now', () => {
+    expect(withModels({ draft: 'brand-new' }).success).toBe(false)
+    expect(withModels({ audition: 's2-pro' }).success).toBe(false)
   })
 })

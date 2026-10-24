@@ -8,7 +8,7 @@ import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { GeneratePanel } from './GeneratePanel'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
-import { longTitle, plural, shortTitle } from '../../format'
+import { dollars, longTitle, plural, shortTitle } from '../../format'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 
@@ -192,20 +192,41 @@ export function LinesView({ part }: { part: PartSummary }) {
                           {playing === line.key ? <PauseIcon /> : <PlayIcon />}
                         </button>
                       )}
-                      {RECORDABLE.has(line.status) && (
-                        <button
-                          type="button"
-                          className="btn row-record"
-                          disabled={recorder.recording.has(line.key)}
-                          onClick={() => void recorder.record(line.key)}
-                        >
-                          {recorder.recording.has(line.key)
-                            ? 'Recording…'
-                            : line.status === 'weak'
-                              ? 'Retake'
-                              : 'Record'}
-                        </button>
-                      )}
+                      {RECORDABLE.has(line.status) &&
+                        (recorder.toConfirm[line.key] !== undefined ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-primary row-record"
+                              title="The most this line can cost on your Fish account (every take)"
+                              onClick={() =>
+                                void recorder.record(line.key, recorder.toConfirm[line.key])
+                              }
+                            >
+                              Pay up to {dollars(recorder.toConfirm[line.key]!)}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={() => recorder.cancel(line.key)}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn row-record"
+                            disabled={recorder.recording.has(line.key)}
+                            onClick={() => void recorder.record(line.key)}
+                          >
+                            {recorder.recording.has(line.key)
+                              ? 'Recording…'
+                              : line.status === 'weak'
+                                ? 'Retake'
+                                : 'Record'}
+                          </button>
+                        ))}
                     </div>
                     {recorder.errors[line.key] && (
                       <span className="adopt-error row-error">{recorder.errors[line.key]}</span>
