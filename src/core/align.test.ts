@@ -231,6 +231,42 @@ describe('alignWords, words joined by hyphens and dashes', () => {
   })
 })
 
+describe('alignWords, ampersands', () => {
+  it('reads an ampersand as "and", heard on its own or joined to a word', () => {
+    const shown = 'A & L'.split(' ')
+    expect(alignWords(shown, words([' A', 0, 0.4], [' &L.', 0.5, 1]), 2).ratio).toBe(1)
+    expect(
+      alignWords(shown, words([' A', 0, 0.4], [' and', 0.5, 0.7], [' L', 0.8, 1]), 2).ratio,
+    ).toBe(1)
+    expect(
+      alignWords('A and L'.split(' '), words([' A', 0, 0.4], [' &', 0.5, 0.6]), 2).missed,
+    ).toEqual([2])
+  })
+
+  it('gives the parts of a heard word joined by an ampersand an even share of its time', () => {
+    const { timed } = alignWords('A & L'.split(' '), words([' A', 0, 0.4], [' &L.', 0.5, 1]), 2)
+    expect(timed.slice(1)).toEqual([
+      { word: '&', start: 0.5, end: 0.75 },
+      { word: 'L', start: 0.75, end: 1 },
+    ])
+  })
+
+  it('gives an ampersand heard with punctuation all of its time', () => {
+    const heard = words([' A', 0, 1], [' &.', 1, 2], [' L', 2, 3])
+    expect(alignWords('A & L'.split(' '), heard, 3).timed[1]).toEqual({
+      word: '&',
+      start: 1,
+      end: 2,
+    })
+  })
+
+  it('still misses an ampersand the voice left out', () => {
+    expect(alignWords('A & L'.split(' '), words([' A', 0, 0.4], [' L', 0.5, 1]), 2).missed).toEqual(
+      [1],
+    )
+  })
+})
+
 describe('alignWords, quoted speech', () => {
   it("takes the two spellings of a possessive after s for one (Sorceress's, Sorceress')", () => {
     const heard = words(['You', 0, 1], ['received', 1, 2], ["Sorceress'", 2, 3], ['Truth.', 3, 4])
