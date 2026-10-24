@@ -144,6 +144,10 @@ describe('alignWords, names Whisper spells its own way', () => {
       3 / 4,
     )
     expect(start(['"Aren', 'went'], ['Arn', 'went'], cast)).toBe(1)
+    expect(start(["Aren's", 'sword', 'shines.'], ["Arn's", 'sword', 'shines.'], cast)).toBe(1)
+    expect(
+      start(['Act', 'I:', 'There', 'and', 'back'], ['Act', 'I:', 'Where', 'and', 'back']),
+    ).toBe(4 / 5)
   })
 
   it('counts one mid-sentence, unknown, compared as said', () => {
@@ -161,13 +165,16 @@ describe('alignWords, names Whisper spells its own way', () => {
     expect(alignWords(['wait', 'Aren'], heardAs('wait', '...', 'Arn'), 3).ratio).toBe(1)
   })
 
-  it('does not count a lowercase word, a name under four letters, or two letters off', () => {
+  it('does not count a lowercase or all-caps word, a name under four letters, or two letters off', () => {
     expect(
       alignWords(['I', 'will', 'never', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
     ).toBe(3 / 4)
     expect(alignWords(['see', 'Kai', 'came'], heardAs('see', 'Kaid', 'came'), 3).ratio).toBe(2 / 3)
     expect(alignWords(['see', "Kai's", 'cat'], heardAs('see', 'Kais', 'cat'), 3).ratio).toBe(2 / 3)
     expect(alignWords(['the', 'Malakar'], heardAs('the', 'Malacore'), 2).ratio).toBe(1 / 2)
+    expect(
+      alignWords(['I', 'will', 'NEVER', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
+    ).toBe(3 / 4)
   })
 
   it('does not count a number one digit off', () => {
@@ -185,12 +192,12 @@ describe('alignWords, names Whisper spells its own way', () => {
 })
 
 describe('knownNames', () => {
-  it('gives the words of the cast’s names and of its pronunciations, plain', () => {
+  it('gives the one-word names of the cast and of its pronunciations, plain', () => {
     const names = knownNames({
-      speakers: { aren: {}, 'unmasked sorceress': {} },
+      speakers: { aren: {}, 'unmasked sorceress': {}, 'ancient tree spirit': {} },
       pronounce: { Lyria: 'LEER-ee-a', 'Act I:': 'Act One:' },
     })
-    expect([...names].sort()).toEqual(['act', 'aren', 'i', 'lyria', 'sorceress', 'unmasked'])
+    expect([...names].sort()).toEqual(['aren', 'lyria'])
   })
 })
 

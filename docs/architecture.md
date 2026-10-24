@@ -421,9 +421,11 @@ An audition is for a character, not for a part: the result applies to every part
       share of shown words heard). Alignment is narrate.py's, with one departure: a name heard in
       its place one letter off, as Whisper spells an invented name ("Aren" as "Arn"), counts as
       heard and takes the heard word's times. Only a capitalised shown word of four letters or
-      more (a possessive 's not counted), nothing but letters, qualifies, and where a sentence
-      starts only a known name: a word of the cast's character names or pronunciations. Lowercase
-      words, short ones, numbers and other sentence-initial words must match exactly;
+      more (a possessive 's not counted), nothing but letters and not all capitals, qualifies;
+      where a sentence starts (after . ! ? … or a colon, or opening a quote) only a known name: a
+      one-word character id of the cast ("aren", not "ancient tree spirit") or pronunciation.
+      Lowercase words, short ones, numbers and other sentence-initial words must match exactly. A
+      title-case word mid-sentence ("The Call") is taken for a name;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
    5. encode MP3 into the clips folder, update the manifest and lock entries, write both.
 4. Fish requests run `parallel` at a time; Whisper runs one at a time (one GPU). The page polls the
