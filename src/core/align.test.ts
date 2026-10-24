@@ -112,6 +112,125 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
   })
 })
 
+describe('alignWords, words joined by hyphens and dashes', () => {
+  const heardAs = (...said: string[]) =>
+    words(...said.map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const text = "Bundles of resin-sweet stems and silverleaf—Mira's blends for steadying wounds."
+
+  it('compares the parts of joined words, and a compound heard as two words', () => {
+    const heard = heardAs(
+      ..."bundles of resin sweet stems and silver leaf, Mira's blends for steadying wounds.".split(
+        ' ',
+      ),
+    )
+    const { timed, ratio } = alignWords(text.split(' '), heard, 20)
+    expect(ratio).toBe(1)
+    expect(timed[2]).toEqual({ word: 'resin-sweet', start: 2, end: 3.5 })
+    expect(timed[5]).toEqual({ word: "silverleaf—Mira's", start: 6, end: 8.5 })
+  })
+
+  it('misses a joined word when one of its parts is not heard', () => {
+    const heard = heardAs(
+      ...'bundles of resin sweet stems and silver leaf, mirrors blends for steadying wounds.'.split(
+        ' ',
+      ),
+    )
+    const { ratio, missed } = alignWords(text.split(' '), heard, 20)
+    expect(missed).toEqual([5])
+    expect(ratio).toBe(9 / 10)
+  })
+
+  it('compares a compound heard joined, or as one word, with the words shown apart', () => {
+    expect(alignWords(['resin', 'sweet', 'stems'], heardAs('resin-sweet', 'stems'), 3).ratio).toBe(
+      1,
+    )
+    expect(alignWords(['silver', 'leaf', 'blends'], heardAs('silverleaf', 'blends'), 3).ratio).toBe(
+      1,
+    )
+  })
+
+  it('leaves punctuation beside a dash out of the parts', () => {
+    const ratio = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).ratio
+    expect(ratio('I thought—" she said.', 'I thought, she said.')).toBe(1)
+    expect(ratio('"—and then', 'and then')).toBe(1)
+    expect(ratio('Wait—! Now.', 'Wait! Now.')).toBe(1)
+    expect(ratio('well—... yes', 'well... yes')).toBe(1)
+  })
+
+  it('matches a joined word heard as written, numbers too, beside a word misheard', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('old one-eyed Borin', 'old one-eyed Borin')).toEqual([])
+    expect(missed('twenty-one men', 'twenty-one men')).toEqual([])
+    expect(missed('the bright resin-sweet stems', 'the white resin-sweet stems')).toEqual([1])
+    expect(missed('the bright silverleaf grows', 'the white silver leaf grows')).toEqual([1])
+    expect(missed('the silverleaf bright grows', 'the silver leaf white grows')).toEqual([2])
+  })
+
+  it('spreads a joined word partly heard between its neighbours, as one not heard', () => {
+    const { timed } = alignWords(
+      ['a', 'silverleaf—Mira', 'b'],
+      heardAs('a', 'silver', 'leaf', 'mirrors', 'b'),
+      5,
+    )
+    expect(timed[1]).toEqual({ word: 'silverleaf—Mira', start: 0.5, end: 4 })
+  })
+
+  it('matches whole words first, so a part does not take a word heard on its own', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('a well-known well', 'a wellknown well')).toEqual([])
+    expect(missed('Goodbye, goodbye.', 'Good-bye, goodbye.')).toEqual([])
+    expect(missed('silverleaf leaf', 'silver-leaf leaf')).toEqual([])
+    expect(missed('wait — now', 'wait — now')).toEqual([])
+  })
+
+  it('joins words with number words in them', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('every one of them', 'everyone of them')).toEqual([])
+    expect(missed('anyone can come', 'any one can come')).toEqual([])
+  })
+
+  it('looks past a word heard that is not shown, and a word shown not heard', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('we saw silverleaf today', 'we saw um silver leaf today')).toEqual([])
+    expect(missed('we saw bright silverleaf today', 'we saw silver leaf today')).toEqual([2])
+  })
+
+  it('forgives a name beside a joined word misheard, as whole-word matching does', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('x Aren resin-sweet y', 'x Arn raisin y')).toEqual([2])
+    expect(missed('so Aren well-made bread', 'so Arn wellmaid bread')).toEqual([2])
+    expect(missed('x Aren whatever y', 'x Arn half-heard y')).toEqual([2])
+    expect(missed('x Aren x-the y', 'x Arn the y')).toEqual([2])
+  })
+
+  it('takes a word after a dash for a sentence start, forgiving only a known name there', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, new Set(['mira']))
+        .missed
+    expect(missed('"Wait—Where is he?"', 'Wait there is he?')).toEqual([0])
+    expect(missed('We ran.—Here they come.', 'We ran her they come.')).toEqual([1])
+    expect(missed("the leaf—Mirra's blend", "the leaf Mira's blend")).toEqual([1])
+    expect(missed("the leaf—Mira's blend", "the leaf Mra's blend")).toEqual([])
+  })
+
+  it('forgives a name Whisper wrote in parts, and one pronounced in other parts', () => {
+    const r = (shown: string, said: string, as?: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, as?.split(' ')).ratio
+    expect(r('so Elior waits', 'so El-eor waits', 'so El-ee-or waits')).toBe(1)
+    expect(r('so Lyria waits', 'so Leer-ee-a waits', 'so LEER-ee-a waits')).toBe(1)
+  })
+
+  it('still counts a dash on its own, which nobody says, as not heard', () => {
+    expect(alignWords(['wait', '—', 'now'], heardAs('wait', 'now'), 2).missed).toEqual([1])
+  })
+})
+
 describe('alignWords, quoted speech', () => {
   it('counts a plural possessive heard without its apostrophe', () => {
     expect(
