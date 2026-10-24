@@ -358,6 +358,43 @@ describe('alignWords, names Whisper spells its own way', () => {
     expect(alignWords(['wait', '—', 'Aren'], heardAs('wait', 'Arn'), 2).missed).toEqual([1])
   })
 
+  it('counts a name Whisper spelled by its sound (Malachar, LifeLite)', () => {
+    const missed = (shown: string, said: string, names?: Set<string>) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, names).missed
+    expect(
+      missed('Malakar sits by the shards.', 'Malachar sits by the shards.', new Set(['malakar'])),
+    ).toEqual([])
+    expect(missed('The Lifelight Elixir is gone.', 'The LifeLite Elixir is gone.')).toEqual([])
+    expect(missed('then Phyllis came', 'then Filis came')).toEqual([])
+    expect(missed('then Cecily came', 'then Sesily came')).toEqual([])
+    expect(missed('then Ella came', 'then Elle came')).toEqual([])
+  })
+
+  it('does not take short names, soft c or the ch of church for sound-alikes', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    for (const [shown, said] of [
+      ['Emma', 'Eva'],
+      ['Miss', 'Mrs'],
+      ['Chuck', 'Cook'],
+      ['Lucy', 'Luke'],
+      ['Grace', 'Drake'],
+      ['Charlie', 'Carly'],
+      ['Church', 'Kirk'],
+      ['Mitch', 'Mick'],
+    ]) {
+      expect(missed(`then ${shown} came`, `then ${said} came`)).toEqual([1])
+    }
+  })
+
+  it('does not count a sound-alike lowercase word, or a name two sounds off', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('the night came', 'the nite came')).toEqual([1])
+    expect(missed("the leaf Mira's blend", 'the leaf mirrors blend')).toEqual([2])
+    expect(missed('then Malakar came', 'then Malacore came')).toEqual([1])
+  })
+
   it('pairs words only where as many were heard as shown between matches', () => {
     expect(
       alignWords(['and', 'Aren', 'and', 'Lysa'], heardAs('and', 'Arn', 'Ren', 'and', 'Lysa'), 5)
