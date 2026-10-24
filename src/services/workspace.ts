@@ -64,6 +64,16 @@ export async function loadProject(projectFile: string): Promise<LoadResult> {
   return loaded.ok ? { ok: true, summary: loaded.summary } : loaded
 }
 
+/** True if the project has the character (in the cast or speaking in a part); null if not. */
+export async function knownCharacter(
+  projectFile: string,
+  characterId: string,
+): Promise<true | ProjectFailure | null> {
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  return loaded.summary.characters.some((c) => c.id === characterId) ? true : null
+}
+
 /** The parsed project file, the cast and the summary of the project, for the server's own use. */
 export async function loadWorkspace(projectFile: string): Promise<
   | {

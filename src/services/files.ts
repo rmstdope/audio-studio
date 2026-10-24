@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { z } from 'zod'
@@ -94,4 +94,14 @@ export function formatEntriesPerLine(record: Record<string, unknown>): string {
   if (!keys.length) return '{}\n'
   const lines = keys.map((key) => ` ${JSON.stringify(key)}: ${JSON.stringify(record[key])}`)
   return `{\n${lines.join(',\n')}\n}\n`
+}
+
+/**
+ * A file of one character's in a folder of the tool's cache: a readable name plus a short hash of
+ * the id, so any character id makes a safe file name.
+ */
+export function characterFile(dir: string, characterId: string): string {
+  const readable = characterId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 40)
+  const hash = createHash('sha256').update(characterId).digest('hex').slice(0, 8)
+  return `${dir}/${readable}-${hash}.json`
 }

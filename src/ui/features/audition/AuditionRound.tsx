@@ -118,7 +118,7 @@ export function AuditionRound({
           <strong>{hint}</strong>
           {castNote && <span className="cast-note">{castNote}</span>}
           <span className="muted">
-            Dropped voices never come back in this audition
+            Dropped voices are ruled out: no later audition for this character shows them again
             {session.dropped.length ? ` (${session.dropped.length} so far)` : ''}.
           </span>
         </div>

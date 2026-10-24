@@ -3,6 +3,7 @@ import type { ProjectSummary } from '../../../core/summary'
 import type { AuditionText } from '../../../core/takes'
 import type { CastResult } from '../../../services/sessions'
 import { AuditionRound } from './AuditionRound'
+import { RuledOutPanel } from './RuledOutPanel'
 import { VoiceCard } from './VoiceCard'
 import {
   useCandidates,
@@ -111,6 +112,7 @@ export function AuditionView({
               <span className="mono">{result.language}</span>
             </div>
           )}
+          <RuledOutPanel characterId={character.id} name={character.name} />
         </aside>
 
         <section className="audition-main" aria-label="Candidates">

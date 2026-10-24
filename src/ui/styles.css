@@ -1150,6 +1150,36 @@ a.btn {
   color: var(--muted);
 }
 
+.btn-small {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.ruled-out {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.ruled-out li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.ruled-out li span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cast-banner {
   display: flex;
   gap: 14px;

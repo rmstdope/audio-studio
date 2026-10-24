@@ -285,6 +285,41 @@ describe('server', () => {
     expect(audition).toMatchObject({ ok: true, takes: { w1: body.key } })
   })
 
+  it('rules out a dropped voice, lists it, and allows one or all again', async () => {
+    const send = (method: string, path: string, body?: unknown) =>
+      fetch(url(path), {
+        method,
+        headers: { origin: server.url.origin, 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+    const listed = async () => await (await fetch(url('/api/characters/narrator/ruled-out'))).json()
+    expect(await listed()).toEqual({ ok: true, voices: [] })
+    await send('POST', '/api/auditions/narrator/start')
+    await send('POST', '/api/auditions/narrator/verdict', { voice: 'w1', verdict: 'drop' })
+    expect(await listed()).toMatchObject({ ok: true, voices: [{ id: 'w1', title: 'Warm' }] })
+    const one = await send('DELETE', '/api/characters/narrator/ruled-out/w1')
+    expect(await one.json()).toEqual({ ok: true, voices: [] })
+    await send('POST', '/api/auditions/narrator/verdict', { voice: 'w1', verdict: null })
+    await send('POST', '/api/auditions/narrator/verdict', { voice: 'w1', verdict: 'drop' })
+    const all = await send('DELETE', '/api/characters/narrator/ruled-out')
+    expect(await all.json()).toEqual({ ok: true, voices: [] })
+    await send('DELETE', '/api/auditions/narrator')
+    expect((await fetch(url('/api/characters/nobody/ruled-out'))).status).toBe(404)
+    expect((await send('DELETE', '/api/characters/narrator/ruled-out/not%20an%20id')).status).toBe(
+      400,
+    )
+    for (const path of [
+      '/api/characters/narrator/ruled-out',
+      '/api/characters/narrator/ruled-out/w1',
+    ]) {
+      const response = await fetch(url(path), {
+        method: 'DELETE',
+        headers: { origin: 'https://evil.example' },
+      })
+      expect([path, response.status]).toEqual([path, 403])
+    }
+  })
+
   it('runs an audition: start, verdicts, next round and cast', async () => {
     const post = (path: string, body?: unknown) =>
       fetch(url(path), {
