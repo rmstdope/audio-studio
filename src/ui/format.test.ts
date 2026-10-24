@@ -53,5 +53,6 @@ describe('dollars', () => {
     expect(dollars(12.3456)).toBe('$12.35')
     expect(dollars(0)).toBe('$0.00')
     expect(dollars(0.0004)).toBe('under $0.01')
+    expect(dollars(-5)).toBe('-$5.00')
   })
 })

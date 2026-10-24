@@ -105,9 +105,11 @@ describe('credit', () => {
     expect(requests[0]!.headers.get('authorization')).toBe('Bearer secret')
   })
 
-  it('throws when Fish answers with something that is not a credit', async () => {
-    const { fetch } = fakeFetch({ credit: 'lots' })
-    expect(createFishClient('secret', { fetch }).credit()).rejects.toThrow('credit')
+  it('throws when Fish answers with something that is not an amount', async () => {
+    for (const credit of ['lots', '', ' ', '0x10', '1e400']) {
+      const { fetch } = fakeFetch({ credit })
+      await expect(createFishClient('secret', { fetch }).credit()).rejects.toThrow('credit')
+    }
   })
 })
 

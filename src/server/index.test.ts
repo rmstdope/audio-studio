@@ -435,6 +435,28 @@ describe('server, without an API key', () => {
     expect(body).toMatchObject({ ok: false, reason: 'no-key' })
   })
 
+  it('says when Fish cannot tell the credit', async () => {
+    const down = startServer({
+      projectFile: join(root, 'audio-studio.json'),
+      port: 0,
+      fish: {
+        ...fish,
+        credit: () => Promise.reject(new Error('Fish Audio answered 401: invalid key')),
+      },
+      transcriber: null,
+    })
+    try {
+      const body = await (await fetch(new URL('/api/credit', down.url))).json()
+      expect(body).toEqual({
+        ok: false,
+        reason: 'fish',
+        message: 'Fish Audio answered 401: invalid key',
+      })
+    } finally {
+      down.stop(true)
+    }
+  })
+
   it('has no credit to tell without a key', async () => {
     const body = await (await fetch(new URL('/api/credit', other.url))).json()
     expect(body).toMatchObject({ ok: false, reason: 'no-key' })

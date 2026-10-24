@@ -31,11 +31,15 @@ export function Sidebar({
         <span className="mono muted project-path" title={summary.root}>
           {summary.root.split(/[\\/]/).filter(Boolean).pop()}
         </span>
-        {credit.data?.ok && (
-          <span className="muted project-credit" title="Fish Audio API credit, for paid models">
-            Credit {dollars(credit.data.credit)}
+        {credit.data?.ok ? (
+          <span className="muted project-credit" title="Fish Audio API credit">
+            {dollars(credit.data.credit)} credit for paid models
           </span>
-        )}
+        ) : credit.data?.reason === 'fish' ? (
+          <span className="muted project-credit" title={credit.data.message}>
+            Credit unknown: Fish did not answer
+          </span>
+        ) : null}
       </div>
 
       <nav className="nav" aria-label="Workspaces">

@@ -25,6 +25,7 @@ import type { Limiter } from './limit'
 import type { Transcriber } from './transcriber'
 import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
+import { NO_KEY } from './fish'
 
 /** Seconds of silence between the pieces of a long line (as in RetroQuest's narrate.py). */
 export const GAP_SECONDS = 0.25
@@ -115,7 +116,7 @@ export async function recordLine(
     return {
       ok: false,
       reason: 'no-key',
-      message: 'Set FISH_AUDIO_API_KEY in the project’s env file, or in the environment.',
+      message: NO_KEY,
     }
   }
 

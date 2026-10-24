@@ -48,6 +48,7 @@ function trim(value: number): string {
 
 /** An amount in US dollars, to the cent; a fraction of a cent above nothing says so. */
 export function dollars(amount: number): string {
+  if (amount < 0) return `-${dollars(-amount)}`
   if (amount > 0 && amount < 0.005) return 'under $0.01'
   return `$${amount.toFixed(2)}`
 }

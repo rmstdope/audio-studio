@@ -67,7 +67,7 @@ describe.skipIf(!hasFfmpeg)('decodeClip', () => {
       data: new Uint8Array(16000 * 2),
     })
     await ffmpegEncoder(second, file, { bitrate: '64k', channels: 1 })
-    expect(decodeClip(file, { timeoutMs: 1 })).rejects.toThrow('took longer than')
+    await expect(decodeClip(file, { timeoutMs: 1 })).rejects.toThrow('took longer than')
   })
 
   it('decodes a clip to WAV at its own rate, and measures its length from it', async () => {

@@ -31,7 +31,7 @@ import {
   viewOf,
   type SessionResult,
 } from '../services/sessions'
-import { fishFromEnv, type CreditResult, type FishClient } from '../services/fish'
+import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
 import {
   adoptPart,
@@ -158,7 +158,7 @@ export function startServer({
   /** Generation jobs, one per part at a time. */
   const jobs = createJobs()
 
-  /** The account's remaining credit (a free call), or why it cannot be read. */
+  /** The account's remaining credit, or why it cannot be read. */
   async function creditOf(): Promise<CreditResult> {
     const opened = await openProject(projectFile)
     if (!opened.ok)
@@ -168,7 +168,7 @@ export function startServer({
       return {
         ok: false,
         reason: 'no-key',
-        message: 'Set FISH_AUDIO_API_KEY in the project’s env file, or in the environment.',
+        message: NO_KEY,
       }
     }
     try {
@@ -203,6 +203,7 @@ export function startServer({
     const { narration } = read.project
     const { pronounce } = read.input.cast
     const plan = planGeneration(planPart(read.input), {
+      at: new Date(),
       model: narration.models.draft,
       speaker,
       // What is sent: each piece of a line with its cue and the cast's pronunciations.

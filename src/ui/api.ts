@@ -62,13 +62,17 @@ export function useChanges() {
   })
 }
 
-/** The Fish account's remaining credit, read again every minute and after recording. */
+/**
+ * The Fish account's remaining credit. It changes only when money is spent or added, so it is read
+ * again after recording and every five minutes, not on every return to the window.
+ */
 export function useCredit() {
   return useQuery({
     queryKey: ['credit'],
     queryFn: () => getJson<CreditResult>('/api/credit'),
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -520,6 +524,7 @@ export function useRecordLines(partId: string) {
       } finally {
         // The line stays "recording" until its new status is shown, so it is never offered twice.
         void client.invalidateQueries({ queryKey: ['plan', partId] })
+        void client.invalidateQueries({ queryKey: ['credit'] })
         await client.invalidateQueries({ queryKey: ['part', partId] })
         setRecording((now) => {
           const next = new Set(now)
@@ -576,6 +581,10 @@ export function useJob(partId: string) {
       if (job && (running || before?.status !== job.status)) {
         void client.invalidateQueries({ queryKey: ['part', partId] })
         void client.invalidateQueries({ queryKey: ['plan', partId] })
+      }
+      // A finished job may have spent credit.
+      if (job && !running && before?.status !== job.status) {
+        void client.invalidateQueries({ queryKey: ['credit'] })
       }
       return job
     },

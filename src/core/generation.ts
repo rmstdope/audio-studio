@@ -48,7 +48,7 @@ export function planGeneration(
     takes = 1,
     checked = false,
     includeWeak = false,
-    at = new Date(),
+    at,
   }: {
     model: string
     speaker?: string
@@ -60,8 +60,8 @@ export function planGeneration(
     checked?: boolean
     /** Retake the weak lines too. */
     includeWeak?: boolean
-    /** When the plan is priced (now unless given): prices change, promotions end. */
-    at?: Date
+    /** When the plan is priced: prices change, promotions end. */
+    at: Date
   },
 ): GenerationPlan {
   const inScope = (who: string | null) => !speaker || who === speaker

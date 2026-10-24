@@ -116,7 +116,7 @@ audio-studio/
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
-│   │   ├── fish.ts              FishClient (listVoices, getVoice; later tts, credits)
+│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates for a character; changes to the cast, one at a time
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
@@ -368,7 +368,8 @@ each part.
    too (built); a selection of lines (later).
 2. The planner shows the plan: N to record, M to re-record (by reason), K orphans to remove, the
    bytes of text as sent, the cost for the model (free model: $0; "price unknown" for a model not in
-   the price list), and later the account credit. The page sends the lines and orphans it showed;
+   the price list); the account's credit is shown under the project. The page sends the lines and
+   orphans it showed;
    the server does only those that are still in its own fresh plan, and a line recorded meanwhile
    is skipped (as is one that became weak meanwhile, unless weak lines were to be retaken). Lines
    are recorded with `models.draft`. Up-to-date clips Whisper never checked can be measured
@@ -571,7 +572,9 @@ Small, independently useful increments:
    1. **Prices and credit** (built): a dated price list (`core/prices.ts`, from Fish's pricing
       page; a promotion ends at its moment, so `drama-3` costs $10 until 2026-11-12 17:00 UTC and
       $50 after), plans priced when they are made, and the account's API credit
-      (`GET /wallet/self/api-credit`, a free call) shown under the project.
+      (`GET /wallet/self/api-credit`; Fish gives it as a string without a unit, taken to be
+      dollars) shown under the project, read again after recording and every five minutes, or
+      "unknown" when Fish does not answer.
    2. **Paid models per stage**: the project file may name a paid model for a stage; a paid job
       shows its cost in dollars and starts only when the user confirms that amount, and the
       server refuses one costing more than confirmed or than the account's credit.
