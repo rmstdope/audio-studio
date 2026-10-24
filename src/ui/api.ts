@@ -3,6 +3,7 @@ import {
   useIsMutating,
   useMutation,
   useMutationState,
+  useQueries,
   useQuery,
   useQueryClient,
   type MutationState,
@@ -80,10 +81,21 @@ export function useCredit() {
 
 /** A part with the state of every line's clip. */
 export function usePart(partId: string, enabled = true) {
-  return useQuery({
+  return useQuery({ ...partQuery(partId), enabled })
+}
+
+/** How a part is asked for and cached, the same for one part as for several. */
+function partQuery(partId: string) {
+  return {
     queryKey: ['part', partId],
     queryFn: () => getJson<NonNullable<PartResult>>(`/api/parts/${encodeURIComponent(partId)}`),
-    enabled,
+  }
+}
+
+/** Several parts, as `usePart` loads each (sharing its cache), in the order given. */
+export function useParts(partIds: string[]) {
+  return useQueries({
+    queries: partIds.map(partQuery),
   })
 }
 

@@ -1,42 +1,39 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPlayer, type Clip, type PlayerState } from '../player'
 
 /**
- * One clip playing at a time: `toggle(id, url)` plays it, or stops it if it is the one playing.
- * `playing` is the id of the clip playing, or null.
+ * One clip playing at a time (see `createPlayer`): `toggle(id, url)` plays it, or stops it if it
+ * is the one playing; `playInTurn(clips)` plays clips one after another, skipping one that fails
+ * (any toggle stops that). `playing` is the id of the clip playing, or null; `inTurn` says
+ * whether a list is being played.
  */
 export function useClipPlayer() {
-  const audio = useRef<HTMLAudioElement | null>(null)
-  const [playing, setPlaying] = useState<string | null>(null)
+  const [state, setState] = useState<PlayerState>({ playing: null, inTurn: false })
+  const player = useRef<ReturnType<typeof createPlayer> | null>(null)
 
   useEffect(() => {
     const element = new Audio()
-    const stop = () => setPlaying(null)
-    element.addEventListener('ended', stop)
-    element.addEventListener('error', stop)
-    audio.current = element
+    const made = createPlayer(element, setState)
+    element.addEventListener('ended', made.ended)
+    element.addEventListener('error', made.failed)
+    player.current = made
     return () => {
-      element.pause()
-      element.removeEventListener('ended', stop)
-      element.removeEventListener('error', stop)
+      // Disposed, not just paused: a play still loading must not start the next clip.
+      made.dispose()
+      element.removeEventListener('ended', made.ended)
+      element.removeEventListener('error', made.failed)
+      player.current = null
     }
   }, [])
 
-  const toggle = useCallback(
-    (id: string, url: string) => {
-      const element = audio.current
-      if (!element) return
-      if (playing === id) {
-        element.pause()
-        setPlaying(null)
-        return
-      }
-      element.src = url
-      element.currentTime = 0
-      setPlaying(id)
-      element.play().catch(() => setPlaying(null))
-    },
-    [playing],
+  // The same functions on every render; they reach the player made on mount.
+  const actions = useMemo(
+    () => ({
+      toggle: (id: string, url: string) => player.current?.toggle(id, url),
+      playInTurn: (clips: Clip[]) => player.current?.playInTurn(clips),
+      stop: () => player.current?.stop(),
+    }),
+    [],
   )
-
-  return { playing, toggle }
+  return { ...state, ...actions }
 }
