@@ -32,7 +32,7 @@ const NUMBERS = new Map(
  * ("don't", "Lysa's") but not at its ends, where they are single quotes around speech ("'You",
  * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. The two ways
  * of writing a possessive after s are one ("Sorceress's" and "Sorceress'" are "sorceress"). An
- * ampersand is the word "and".
+ * ampersand is the word "and" ("&L." is "andl", two words heard as one: see `alignGap`).
  */
 function plain(word: string): string {
   return word
@@ -268,24 +268,8 @@ function piecesOf(tokens: string[], said: string[], from: number, to: number): P
  * the word's time; punctuation it wrote on its own is left out.
  */
 function heardParts(heard: HeardWord[]): HeardWord[] {
-  return splitHeard(heard, (word) => word.split(JOINS).filter((part) => norm(part)))
-}
-
-/**
- * Whisper's words with an ampersand split off as a word of its own ("&L." is "&" and "L."), each
- * part an even share of the word's time, as Whisper writes "A & L" as "A &L.".
- */
-function ampersandsApart(heard: HeardWord[]): HeardWord[] {
-  // Others are left as they are, for whole-word matching as narrate.py's.
-  return splitHeard(heard, (word) =>
-    word.includes('&') ? word.split(/(&)/).filter((part) => part.trim()) : [word],
-  )
-}
-
-/** Whisper's words split into the parts `partsOf` gives, each an even share of the word's time. */
-function splitHeard(heard: HeardWord[], partsOf: (word: string) => string[]): HeardWord[] {
   return heard.flatMap((w) => {
-    const parts = partsOf(w.word)
+    const parts = w.word.split(JOINS).filter((part) => norm(part))
     const step = (w.end - w.start) / parts.length
     return parts.map((word, k) => ({
       word,
@@ -436,7 +420,6 @@ export function alignWords(
   said?: string[],
   names: ReadonlySet<string> = new Set(),
 ): { timed: TimedWord[]; ratio: number; missed: number[] } {
-  heard = ampersandsApart(heard)
   const spoken = said && said.length === tokens.length ? said : tokens
   const want = spoken.map(norm)
   const got = heard.map((w) => norm(w.word))

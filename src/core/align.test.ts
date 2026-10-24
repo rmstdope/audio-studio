@@ -251,6 +251,15 @@ describe('alignWords, ampersands', () => {
     ])
   })
 
+  it('gives an ampersand heard with punctuation all of its time', () => {
+    const heard = words([' A', 0, 1], [' &.', 1, 2], [' L', 2, 3])
+    expect(alignWords('A & L'.split(' '), heard, 3).timed[1]).toEqual({
+      word: '&',
+      start: 1,
+      end: 2,
+    })
+  })
+
   it('still misses an ampersand the voice left out', () => {
     expect(alignWords('A & L'.split(' '), words([' A', 0, 0.4], [' L', 0.5, 1]), 2).missed).toEqual(
       [1],
