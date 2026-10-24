@@ -66,7 +66,7 @@ export function soundAlikes(extra: readonly (readonly string[])[] = []): SoundAl
     return up === word ? word : root(up)
   }
   for (const group of [...SOUND_ALIKE, ...extra]) {
-    const [first, ...rest] = group.map(norm).filter(Boolean)
+    const [first, ...rest] = group.map(norm).filter(Boolean).map(american)
     if (!first) continue
     for (const word of rest) {
       const [a, b] = [root(first), root(word)]
@@ -83,9 +83,29 @@ function key(word: string, alike: SoundAlike): string {
   return grouped(norm(word), alike)
 }
 
-/** A word as `norm` gives it, as the word of its sound-alike group, if it has one. */
+/** A word as `norm` gives it, spelled the American way, as the word of its sound-alike group. */
 function grouped(word: string, alike: SoundAlike): string {
-  return alike.get(word) ?? word
+  const us = american(word)
+  return alike.get(us) ?? us
+}
+
+/**
+ * A word as `norm` gives it, with the British spellings Whisper writes the American way spelled
+ * so: -our as -or after two letters or more ("colour", "odours", "armoury"; not "our", "your",
+ * "four"), -re as -er after a consonant ("centre", "sombre"; not "were", "fire", nor "timbre",
+ * which is not "timber"), a doubled l after a or e with another vowel before, before -er, -ed,
+ * -ing or -ous ("traveller", "duelled"; not "spelled", "called", nor "refilled", which is not
+ * "refiled"), and -ise and -yse as -ize and -yze after four letters or more ("realise",
+ * "analyse"; not "rise"). Only plain words, not contractions. Both sides are spelled so, so a word
+ * that changes though it is not British still matches itself.
+ */
+function american(word: string): string {
+  if (!/^[a-z]+$/.test(word)) return word
+  return word
+    .replace(/^([a-z]{2,})our(?=(?:s|ed|ing|ite|able|ably|ful|y|ies|er|less|hood|ly)?s?$)/, '$1or')
+    .replace(/^(?!timbres?$)([a-z]*[aeiou][a-z]*[^aeiou])re(s?)$/, '$1er$2')
+    .replace(/^([a-z]*[aeiou][^aeiou]*[ae])ll(?=(?:er|ed|ing|ous)s?$)/, '$1l')
+    .replace(/^([a-z]{4,}[iy])s(?=(?:e|es|ed|ing|ations?)$)/, '$1z')
 }
 
 /** A matching block: `[a, b, size]`, as Python's `SequenceMatcher.get_matching_blocks`. */

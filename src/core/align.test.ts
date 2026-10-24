@@ -582,6 +582,56 @@ describe('alignWords, words that sound the same', () => {
   })
 })
 
+describe('alignWords, British spellings Whisper writes the American way', () => {
+  const heardAs = (line: string) =>
+    words(...line.split(' ').map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const align = (shown: string, heard: string) =>
+    alignWords(shown.split(' '), heardAs(heard), 9).ratio
+
+  it('counts traveller as traveler, and colour, centre, realise and analyse alike', () => {
+    expect(align('A traveller—', 'A traveler!')).toBe(1)
+    expect(
+      align(
+        'They travelled, cancelling marvellous plans.',
+        'They traveled, canceling marvelous plans.',
+      ),
+    ).toBe(1)
+    expect(
+      align("The colours of our neighbour's armoury.", "The colors of our neighbor's armory."),
+    ).toBe(1)
+    expect(align('An honourable, favourite flavour.', 'An honorable, favorite flavor.')).toBe(1)
+    expect(align('The sombre centre of theatres.', 'The somber center of theaters.')).toBe(1)
+    expect(
+      align('I realise they organised it; analyse it.', 'I realize they organized it; analyze it.'),
+    ).toBe(1)
+  })
+
+  it('leaves words that only look alike apart', () => {
+    expect(align('our hour', 'or her')).toBe(0)
+    expect(align('your flour', 'yor floor')).toBe(0)
+    expect(align('were here', 'wer her')).toBe(0)
+    expect(align('spelled called yelling', 'speled caled yeling')).toBe(0)
+    expect(align('size rise', 'sizz rize')).toBe(0)
+    // Rare words a rule would make one, though they sound otherwise, are kept apart.
+    expect(align('refilled untilled', 'refiled untiled')).toBe(0)
+    expect(align('timbre', 'timber')).toBe(0)
+  })
+
+  it('counts plurals and other endings, odour, duelled and the listed ones', () => {
+    expect(align('Travellers realises odours', 'Travelers realizes odors')).toBe(1)
+    expect(align('duelled fuelled dialled', 'dueled fueled dialed')).toBe(1)
+    expect(align('defence offence plough', 'defense offense plow')).toBe(1)
+  })
+
+  it("spells a project's own sound-alikes the same way", () => {
+    const alike = soundAlikes([['colour', 'collar']])
+    const heard = heardAs('a red collar')
+    expect(alignWords('a red colour'.split(' '), heard, 9, undefined, new Set(), alike).ratio).toBe(
+      1,
+    )
+  })
+})
+
 describe('knownNames', () => {
   it('gives the one-word names of the cast and of its pronunciations, plain', () => {
     const names = knownNames({
