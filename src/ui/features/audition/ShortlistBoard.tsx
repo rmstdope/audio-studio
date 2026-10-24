@@ -192,7 +192,9 @@ export function ShortlistBoard({
       </div>
 
       {casting !== null && (
+        // One per voice: asked about another voice, it opens (and comes into view) anew.
         <Confirm
+          key={casting}
           title={
             keeping
               ? `Keep ${title(casting)} as ${name}’s voice?`

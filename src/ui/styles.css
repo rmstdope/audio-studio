@@ -1284,6 +1284,7 @@ a.btn {
   gap: 12px;
   border-color: var(--line-strong);
   background: var(--raised);
+  scroll-margin-top: 16px;
 }
 
 .confirm-effects {
@@ -1416,17 +1417,6 @@ a.btn {
 }
 
 .record-bar .btn {
-  align-self: auto;
-}
-
-.confirm {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.confirm .btn {
   align-self: auto;
 }
 
