@@ -83,13 +83,17 @@ describe('recordTake', () => {
     const { fish, requests } = fakeFish()
     const projectFile = join(root, 'audio-studio.json')
     const limiter = createLimiter()
+    // The slower request gets its client only once the faster one has stored the take: an event,
+    // not a time, so a busy machine cannot reorder them.
+    let stored!: () => void
+    const takeStored = new Promise<void>((resolve) => (stored = resolve))
     const slow = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 40))
+      await takeStored
       return fish
     }
     const [slower, faster] = await Promise.all([
       recordTake(projectFile, 'grandmother', 'v9', slow, limiter),
-      recordTake(projectFile, 'grandmother', 'v9', async () => fish, limiter),
+      recordTake(projectFile, 'grandmother', 'v9', async () => fish, limiter).finally(stored),
     ])
     expect(requests).toHaveLength(1)
     expect(slower).toMatchObject({ ok: true, cached: true })
