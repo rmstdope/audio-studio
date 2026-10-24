@@ -1,3 +1,4 @@
+import { SOUND_ALIKE } from './soundAlike'
 import { spokenText } from './spoken'
 
 /** One shown word and when it is spoken, in seconds from the clip's start. */
@@ -48,6 +49,43 @@ function plain(word: string): string {
 function norm(word: string): string {
   const p = plain(word)
   return NUMBERS.get(p) ?? p
+}
+
+/** Words matched as one, as they sound the same: each word (as `norm` gives it) → its group's. */
+export type SoundAlike = ReadonlyMap<string, string>
+
+/**
+ * The words that sound the same: the built-in groups (`SOUND_ALIKE`) and `extra` ones (a
+ * project's `quality.soundAlike`), groups that share a word joined into one. Each word maps to
+ * one word of its group, the same for all, as `norm` writes them ("two" is "2").
+ */
+export function soundAlikes(extra: readonly (readonly string[])[] = []): SoundAlike {
+  const parent = new Map<string, string>()
+  const root = (word: string): string => {
+    const up = parent.get(word) ?? word
+    return up === word ? word : root(up)
+  }
+  for (const group of [...SOUND_ALIKE, ...extra]) {
+    const [first, ...rest] = group.map(norm).filter(Boolean)
+    if (!first) continue
+    for (const word of rest) {
+      const [a, b] = [root(first), root(word)]
+      if (a !== b) parent.set(b, a)
+    }
+  }
+  return new Map([...parent.keys()].map((word) => [word, root(word)]))
+}
+
+const BUILT_IN = soundAlikes()
+
+/** A word as it is matched exactly: `norm`, then the word of its sound-alike group, if any. */
+function key(word: string, alike: SoundAlike): string {
+  return grouped(norm(word), alike)
+}
+
+/** A word as `norm` gives it, as the word of its sound-alike group, if it has one. */
+function grouped(word: string, alike: SoundAlike): string {
+  return alike.get(word) ?? word
 }
 
 /** A matching block: `[a, b, size]`, as Python's `SequenceMatcher.get_matching_blocks`. */
@@ -339,6 +377,7 @@ function alignGap(
   said: string[],
   heard: HeardWord[],
   names: ReadonlySet<string>,
+  alike: SoundAlike,
   [from, to]: [number, number],
   [hFrom, hTo]: [number, number],
   times: ([number, number] | null)[],
@@ -368,8 +407,10 @@ function alignGap(
   // The heard words before the gap, then its parts, to tell where Whisper starts a sentence.
   const partsWritten = [...written.slice(0, hFrom), ...parts.map((p) => p.word.trim())]
   if (!pieces.length || !parts.length) return
-  const want = pieces.map((p) => p.want)
-  const got = parts.map((w) => norm(w.word))
+  // Sound-alikes are one only where parts match exactly; a name is guessed from what Whisper wrote.
+  const heardNorm = parts.map((w) => norm(w.word))
+  const want = pieces.map((p) => grouped(p.want, alike))
+  const got = heardNorm.map((w) => grouped(w, alike))
   const gotSpelled = parts.map((w) => plain(w.word))
   const at: ([number, number] | null)[] = pieces.map(() => null)
   const take = (p: number, first: number, last = first) =>
@@ -400,7 +441,7 @@ function alignGap(
     const n = hTo - h - (sTo - s - 1)
     if (!guess || n < 1) return null
     const piece = pieces[s]!
-    const spelled = got.slice(h, h + n).join('')
+    const spelled = heardNorm.slice(h, h + n).join('')
     const asName = n === 1 && writtenAsName(partsWritten, hFrom + h)
     if (!spelledAlike(piece.shown, piece.atStart, piece.said, spelled, names, asName)) return null
     return { shown: 1, heard: n, apply: () => take(s, h, h + n - 1) }
@@ -452,7 +493,8 @@ function alignGap(
  * parts, split at hyphens and dashes on both sides, with compounds, names and words written as
  * shown though said otherwise forgiven (`alignGap`); such a word is heard when all its parts are.
  * `said` is the same words as actually said (see `saidWords`), compared in place of the shown
- * ones; `names` are the known names (see `knownNames`). Returns the timed words, the share of
+ * ones; `names` are the known names (see `knownNames`), `alike` the words that sound the same,
+ * matched as one wherever words are matched exactly (see `soundAlikes`). Returns the timed words, the share of
  * words that were heard (punctuation on its own, "—" or "…", is no word: it is only timed), and
  * the indices of the shown words that were not (`missed`).
  */
@@ -462,15 +504,16 @@ export function alignWords(
   duration: number,
   said?: string[],
   names: ReadonlySet<string> = new Set(),
+  alike: SoundAlike = BUILT_IN,
 ): { timed: TimedWord[]; ratio: number; missed: number[] } {
   const spoken = said && said.length === tokens.length ? said : tokens
-  const want = spoken.map(norm)
-  const got = heard.map((w) => norm(w.word))
+  const want = spoken.map((w) => key(w, alike))
+  const got = heard.map((w) => key(w.word, alike))
   const times: ([number, number] | null)[] = tokens.map(() => null)
   let wantFrom = 0
   let gotFrom = 0
   for (const [a, b, size] of matchingBlocks(want, got)) {
-    alignGap(tokens, spoken, heard, names, [wantFrom, a], [gotFrom, b], times)
+    alignGap(tokens, spoken, heard, names, alike, [wantFrom, a], [gotFrom, b], times)
     for (let k = 0; k < size; k++) {
       const w = heard[b + k]!
       times[a + k] = [w.start, w.end]
