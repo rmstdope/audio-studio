@@ -116,16 +116,42 @@ describe('alignWords, names Whisper spells its own way', () => {
   const heardAs = (...said: string[]) =>
     words(...said.map((w, i): [string, number, number] => [w, i, i + 0.5]))
 
-  it('counts a word heard in its place with a spelling one letter off, and takes its times', () => {
+  it('counts a name heard in its place one letter off, taking its times and no other', () => {
     const heard = heardAs('This', 'was', 'theirs,', 'you', 'know,', 'Arn', 'and', "Lisa's.")
     const { timed, ratio } = alignWords(text.split(' '), heard, 9)
     expect(ratio).toBe(1)
-    expect(timed[5]).toEqual({ word: 'Aren', start: 5, end: 5.5 })
+    expect(timed.slice(4, 7)).toEqual([
+      { word: 'know.', start: 4, end: 4.5 },
+      { word: 'Aren', start: 5, end: 5.5 },
+      { word: 'and', start: 6, end: 6.5 },
+    ])
   })
 
-  it('does not count a short word heard as another, or a word two letters off', () => {
-    expect(alignWords(['it', 'was', 'late'], heardAs('it', 'has', 'late'), 3).ratio).toBe(2 / 3)
+  it('counts one at the start of the line, and one compared as said', () => {
+    expect(alignWords(['Aren', 'went', 'home'], heardAs('Arn', 'went', 'home'), 3).ratio).toBe(1)
+    expect(alignWords(['"Aren', 'went'], heardAs('Arn', 'went'), 2).ratio).toBe(1)
+    expect(
+      alignWords(['Aren', 'waits'], heardAs('Ahrn', 'waits'), 2, ['Ahren', 'waits']).ratio,
+    ).toBe(1)
+  })
+
+  it('counts it past a dash or an ellipsis, which nobody hears', () => {
+    expect(alignWords(['wait', '—', 'Aren'], heardAs('wait', 'Arn'), 2).ratio).toBe(2 / 3)
+    expect(alignWords(['...', 'Aren'], heardAs('Arn'), 1).ratio).toBe(1 / 2)
+  })
+
+  it('does not count a lowercase word, a shown word under four letters, or two letters off', () => {
+    expect(
+      alignWords(['I', 'will', 'never', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
+    ).toBe(3 / 4)
+    expect(alignWords(['Kai', 'came'], heardAs('Kaid', 'came'), 2).ratio).toBe(1 / 2)
     expect(alignWords(['the', 'Malakar'], heardAs('the', 'Malacore'), 2).ratio).toBe(1 / 2)
+  })
+
+  it('does not count a number one digit off', () => {
+    expect(
+      alignWords(['In', '1984', 'it', 'fell'], heardAs('In', '1985', 'it', 'fell'), 4).ratio,
+    ).toBe(3 / 4)
   })
 
   it('pairs words only where as many were heard as shown between matches', () => {

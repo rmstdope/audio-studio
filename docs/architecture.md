@@ -112,7 +112,7 @@ audio-studio/
 │   │   ├── summary.ts           parts and characters as the UI shows them
 │   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
 │   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
-│   │   ├── align.ts             Whisper words → per-word timings, heard ratio (narrate.py's)
+│   │   ├── align.ts             Whisper words → word timings, heard ratio (narrate.py's, + names)
 │   │   ├── audition.ts          the audition board: to hear, shortlist, drop and undo
 │   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
 │   │   └── wav.ts               read and join WAVs
@@ -418,8 +418,10 @@ An audition is for a character, not for a part: the result applies to every part
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
    2. TTS each chunk (WAV), join them with a short gap;
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the
-      share of shown words heard; a word heard in its place one letter off, as Whisper spells an
-      invented name, "Aren" as "Arn", counts as heard if it has at least four letters);
+      share of shown words heard). Alignment is narrate.py's, with one departure: a name heard in
+      its place one letter off, as Whisper spells an invented name ("Aren" as "Arn"), counts as
+      heard and takes the heard word's times. Only a capitalised shown word of four letters or
+      more, all letters, qualifies; lowercase words, short ones and numbers must match exactly;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
    5. encode MP3 into the clips folder, update the manifest and lock entries, write both.
 4. Fish requests run `parallel` at a time; Whisper runs one at a time (one GPU). The page polls the
@@ -591,7 +593,8 @@ Small, independently useful increments:
       asked; clips never checked (adopted from narrate.py, or recorded unchecked) measured
       without new audio (narrate.py `--retime`): the clip decoded to WAV, its length from that and
       what Whisper hears in that WAV (not the MP3, which Whisper hears slightly differently), so
-      the timings match narrate.py's exactly; a poorly heard clip shows as weak.
+      the timings match narrate.py's exactly; a poorly heard clip shows as weak. (Since then,
+      names Whisper spells one letter off count as heard, see §8.2, so such lines differ.)
 6. **Editing**, in small pull requests:
    1. **Style and cues** (built): a character's style on its audition page, saved in the cast; a
       line's own cue in the lines table, saved in the part's cues file (its order kept, written
@@ -625,7 +628,8 @@ Small, independently useful increments:
 7. **RetroQuest switch-over**. RetroQuest's narration moved on meanwhile (Acts II–IV recorded with
    `narrate.py`, clips levelled to −16 LUFS by `level.py`, a cast per act, `extract-act.ts`), so:
    1. **Parity** (built): measured clips are transcribed from their decoded WAV, as
-      `narrate.py --retime` does; on Act I the manifest is byte-identical to its.
+      `narrate.py --retime` does; on Act I the manifest was byte-identical to its (until names
+      spelled one letter off counted as heard).
    2. **Loudness** (built): `output.lufs` levels each new clip as `level.py` does, command for
       command (`pyFixed` formats numbers as Python does); clips come out byte-identical. Not in
       the fingerprint: changing the target does not make clips stale.
