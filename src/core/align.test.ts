@@ -113,6 +113,28 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
 })
 
 describe('alignWords, quoted speech', () => {
+  it('counts a plural possessive heard without its apostrophe', () => {
+    expect(
+      alignWords(
+        ['the', "elders'", 'hall'],
+        words(['the', 0, 1], ['elders', 1, 2], ['hall', 2, 3]),
+        3,
+      ).ratio,
+    ).toBe(1)
+  })
+
+  it('takes a word opening single quotes for a sentence start, not a name', () => {
+    const shown = "She asked, 'Will you come?'".split(' ')
+    const heard = words(
+      ['She', 0, 1],
+      ['asked,', 1, 2],
+      ['Well', 2, 3],
+      ['you', 3, 4],
+      ['come?', 4, 5],
+    )
+    expect(alignWords(shown, heard, 5).missed).toEqual([2])
+  })
+
   it('takes single quotes around words for quotes, not part of the words', () => {
     const text = "'You will need this more than I will.'"
     const heard = words(

@@ -167,7 +167,7 @@ function oneLetterApart(x: string, y: string): boolean {
  * a colon (a title's "Act I: The Call"), or one opening a quote.
  */
 function startsSentence(tokens: string[], i: number): boolean {
-  return i === 0 || /^["“‘(]/.test(tokens[i]!) || /[.!?…:]["'”’)\]]*$/.test(tokens[i - 1]!)
+  return i === 0 || /^["“‘'(]/.test(tokens[i]!) || /[.!?…:]["'”’)\]]*$/.test(tokens[i - 1]!)
 }
 
 /**
