@@ -64,6 +64,13 @@ describe('planGeneration', () => {
 })
 
 describe('planGeneration, cost', () => {
+  it('prices at the moment planned, a promotion included', () => {
+    const before = planGeneration(state, { model: 'drama-3', at: new Date('2026-11-01T00:00:00Z') })
+    const after = planGeneration(state, { model: 'drama-3', at: new Date('2026-12-01T00:00:00Z') })
+    expect(before.cost).toBeCloseTo((before.bytes / 1_000_000) * 10, 9)
+    expect(after.cost).toBeCloseTo((after.bytes / 1_000_000) * 50, 9)
+  })
+
   it('does not call an unknown model free', () => {
     expect(planGeneration(state, { model: 'brand-new' }).cost).toBeNull()
   })

@@ -11,6 +11,7 @@ import {
 import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
+import type { CreditResult } from '../services/fish'
 import type { RefreshResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
@@ -58,6 +59,16 @@ export function useChanges() {
     queryKey: ['changes'],
     queryFn: () => getJson<ChangesResult>('/api/changes'),
     refetchInterval: 5000,
+  })
+}
+
+/** The Fish account's remaining credit, read again every minute and after recording. */
+export function useCredit() {
+  return useQuery({
+    queryKey: ['credit'],
+    queryFn: () => getJson<CreditResult>('/api/credit'),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
   })
 }
 

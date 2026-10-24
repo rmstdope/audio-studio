@@ -125,69 +125,92 @@ async function lufsOf(file: string): Promise<number> {
 }
 
 describe.skipIf(!hasFfmpeg || !Bun.which('ffprobe'))('levelClip', () => {
-  it('brings a clip to the target loudness, keeping its rate, channels and bit rate', async () => {
-    const root = tempRepo({})
-    const file = join(root, 'quiet.mp3')
-    await ffmpegEncoder(sine(0.05), file, { bitrate: '64k', channels: 1 })
-    expect(Math.abs((await lufsOf(file)) + 16)).toBeGreaterThan(3)
-    await levelClip(file, -16)
-    expect(Math.abs((await lufsOf(file)) + 16)).toBeLessThanOrEqual(0.5)
-    const probe = Bun.spawnSync([
-      'ffprobe',
-      '-v',
-      'error',
-      '-show_entries',
-      'stream=sample_rate,channels,bit_rate',
-      '-of',
-      'json',
-      file,
-    ])
-    expect(JSON.parse(probe.stdout.toString()).streams[0]).toMatchObject({
-      sample_rate: '24000',
-      channels: 1,
-      bit_rate: '64000',
-    })
-  })
+  // Each runs ffmpeg up to ten times; on a busy machine that takes more than the usual 5 s.
+  const SLOW = 60_000
 
-  it('refuses a clip too silent to measure, leaving it as it was', async () => {
-    const root = tempRepo({})
-    const file = join(root, 'silent.mp3')
-    const silent = writeWav({
-      format: { channels: 1, sampleRate: 24000, bitsPerSample: 16 },
-      data: new Uint8Array(24000 * 2),
-    })
-    await ffmpegEncoder(silent, file, { bitrate: '64k', channels: 1 })
-    const before = readFileSync(file)
-    await expect(levelClip(file, -16)).rejects.toThrow('too short or silent')
-    expect(readFileSync(file)).toEqual(before)
-    expect(readdirSync(root)).toEqual(['silent.mp3'])
-  })
+  it(
+    'brings a clip to the target loudness, keeping its rate, channels and bit rate',
+    async () => {
+      const root = tempRepo({})
+      const file = join(root, 'quiet.mp3')
+      await ffmpegEncoder(sine(0.05), file, { bitrate: '64k', channels: 1 })
+      expect(Math.abs((await lufsOf(file)) + 16)).toBeGreaterThan(3)
+      await levelClip(file, -16)
+      expect(Math.abs((await lufsOf(file)) + 16)).toBeLessThanOrEqual(0.5)
+      const probe = Bun.spawnSync([
+        'ffprobe',
+        '-v',
+        'error',
+        '-show_entries',
+        'stream=sample_rate,channels,bit_rate',
+        '-of',
+        'json',
+        file,
+      ])
+      expect(JSON.parse(probe.stdout.toString()).streams[0]).toMatchObject({
+        sample_rate: '24000',
+        channels: 1,
+        bit_rate: '64000',
+      })
+    },
+    SLOW,
+  )
 
-  it('says how loud the clip came out', async () => {
-    const root = tempRepo({})
-    const file = join(root, 'quiet.mp3')
-    await ffmpegEncoder(sine(0.05), file, { bitrate: '64k', channels: 1 })
-    expect(Math.abs((await levelClip(file, -16)) + 16)).toBeLessThanOrEqual(0.5)
-  })
+  it(
+    'refuses a clip too silent to measure, leaving it as it was',
+    async () => {
+      const root = tempRepo({})
+      const file = join(root, 'silent.mp3')
+      const silent = writeWav({
+        format: { channels: 1, sampleRate: 24000, bitsPerSample: 16 },
+        data: new Uint8Array(24000 * 2),
+      })
+      await ffmpegEncoder(silent, file, { bitrate: '64k', channels: 1 })
+      const before = readFileSync(file)
+      await expect(levelClip(file, -16)).rejects.toThrow('too short or silent')
+      expect(readFileSync(file)).toEqual(before)
+      expect(readdirSync(root)).toEqual(['silent.mp3'])
+    },
+    SLOW,
+  )
 
-  it('leaves no clip when the encoder cannot level it', async () => {
-    const root = tempRepo({})
-    const file = join(root, 'clips', 'k1.mp3')
-    const silent = writeWav({
-      format: { channels: 1, sampleRate: 24000, bitsPerSample: 16 },
-      data: new Uint8Array(24000 * 2),
-    })
-    await expect(
-      ffmpegEncoder(silent, file, { bitrate: '64k', channels: 1, lufs: -16 }),
-    ).rejects.toThrow('too short or silent')
-    expect(readdirSync(join(root, 'clips'))).toEqual([])
-  })
+  it(
+    'says how loud the clip came out',
+    async () => {
+      const root = tempRepo({})
+      const file = join(root, 'quiet.mp3')
+      await ffmpegEncoder(sine(0.05), file, { bitrate: '64k', channels: 1 })
+      expect(Math.abs((await levelClip(file, -16)) + 16)).toBeLessThanOrEqual(0.5)
+    },
+    SLOW,
+  )
 
-  it('is done by the encoder when the project names a loudness', async () => {
-    const root = tempRepo({})
-    const file = join(root, 'clips', 'k1.mp3')
-    await ffmpegEncoder(sine(0.05), file, { bitrate: '64k', channels: 1, lufs: -16 })
-    expect(Math.abs((await lufsOf(file)) + 16)).toBeLessThanOrEqual(0.5)
-    expect(readdirSync(join(root, 'clips'))).toEqual(['k1.mp3'])
-  })
+  it(
+    'leaves no clip when the encoder cannot level it',
+    async () => {
+      const root = tempRepo({})
+      const file = join(root, 'clips', 'k1.mp3')
+      const silent = writeWav({
+        format: { channels: 1, sampleRate: 24000, bitsPerSample: 16 },
+        data: new Uint8Array(24000 * 2),
+      })
+      await expect(
+        ffmpegEncoder(silent, file, { bitrate: '64k', channels: 1, lufs: -16 }),
+      ).rejects.toThrow('too short or silent')
+      expect(readdirSync(join(root, 'clips'))).toEqual([])
+    },
+    SLOW,
+  )
+
+  it(
+    'is done by the encoder when the project names a loudness',
+    async () => {
+      const root = tempRepo({})
+      const file = join(root, 'clips', 'k1.mp3')
+      await ffmpegEncoder(sine(0.05), file, { bitrate: '64k', channels: 1, lufs: -16 })
+      expect(Math.abs((await lufsOf(file)) + 16)).toBeLessThanOrEqual(0.5)
+      expect(readdirSync(join(root, 'clips'))).toEqual(['k1.mp3'])
+    },
+    SLOW,
+  )
 })

@@ -91,6 +91,26 @@ describe('createFishClient', () => {
   })
 })
 
+describe('credit', () => {
+  it('reads the account’s remaining API credit, in dollars', async () => {
+    const { fetch, requests } = fakeFetch({
+      _id: 'w',
+      user_id: 'u',
+      credit: '12.3456',
+      cumulative_top_up: '20',
+    })
+    const client = createFishClient('secret', { fetch })
+    expect(await client.credit()).toBe(12.3456)
+    expect(new URL(requests[0]!.url).pathname).toBe('/wallet/self/api-credit')
+    expect(requests[0]!.headers.get('authorization')).toBe('Bearer secret')
+  })
+
+  it('throws when Fish answers with something that is not a credit', async () => {
+    const { fetch } = fakeFetch({ credit: 'lots' })
+    expect(createFishClient('secret', { fetch }).credit()).rejects.toThrow('credit')
+  })
+})
+
 describe('tts', () => {
   it('posts the text, voice and settings as JSON with the model in a header, and returns the audio', async () => {
     const requests: Request[] = []

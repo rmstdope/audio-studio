@@ -1,3 +1,4 @@
+import { dirname } from 'node:path'
 import { z } from 'zod'
 import {
   findCandidates,
@@ -30,9 +31,16 @@ import {
   viewOf,
   type SessionResult,
 } from '../services/sessions'
-import { fishFromEnv, type FishClient } from '../services/fish'
+import { fishFromEnv, type CreditResult, type FishClient } from '../services/fish'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
-import { adoptPart, clipFile, loadPart, loadProject, readPart } from '../services/workspace'
+import {
+  adoptPart,
+  clipFile,
+  loadPart,
+  loadProject,
+  openProject,
+  readPart,
+} from '../services/workspace'
 import index from '../ui/index.html'
 
 /** How to start the studio's server. */
@@ -149,6 +157,30 @@ export function startServer({
   const fishWork = createLimiter()
   /** Generation jobs, one per part at a time. */
   const jobs = createJobs()
+
+  /** The account's remaining credit (a free call), or why it cannot be read. */
+  async function creditOf(): Promise<CreditResult> {
+    const opened = await openProject(projectFile)
+    if (!opened.ok)
+      return { ok: false, reason: 'project', message: 'The project file cannot be read.' }
+    const client = await fishFor(dirname(projectFile), opened.project)
+    if (!client) {
+      return {
+        ok: false,
+        reason: 'no-key',
+        message: 'Set FISH_AUDIO_API_KEY in the project’s env file, or in the environment.',
+      }
+    }
+    try {
+      return { ok: true, credit: await client.credit() }
+    } catch (error) {
+      return {
+        ok: false,
+        reason: 'fish',
+        message: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
 
   /** The take checker: the one given (tests), else the process's one Whisper worker. */
   async function transcriberFor(): Promise<Transcriber | null> {
@@ -355,6 +387,9 @@ export function startServer({
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
+      },
+      '/api/credit': {
+        GET: guard(async () => Response.json(await creditOf())),
       },
       '/api/changes': {
         GET: guard(async () => Response.json(await gitChanges(projectFile))),

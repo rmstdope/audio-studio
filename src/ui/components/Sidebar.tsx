@@ -1,8 +1,8 @@
 import type { ProjectSummary } from '../../core/summary'
-import { useChanges } from '../api'
+import { useChanges, useCredit } from '../api'
 import { routeHref, type Route } from '../route'
 import { MicIcon, MusicIcon, PeopleIcon, SpeakerIcon, WaveIcon, ChangesIcon } from './icons'
-import { longTitle, plural } from '../format'
+import { dollars, longTitle, plural } from '../format'
 
 /** The studio's navigation: project, workspaces, the parts, and the project-wide characters. */
 export function Sidebar({
@@ -15,6 +15,7 @@ export function Sidebar({
   activePart: string | null
 }) {
   const changes = useChanges()
+  const credit = useCredit()
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -30,6 +31,11 @@ export function Sidebar({
         <span className="mono muted project-path" title={summary.root}>
           {summary.root.split(/[\\/]/).filter(Boolean).pop()}
         </span>
+        {credit.data?.ok && (
+          <span className="muted project-credit" title="Fish Audio API credit, for paid models">
+            Credit {dollars(credit.data.credit)}
+          </span>
+        )}
       </div>
 
       <nav className="nav" aria-label="Workspaces">

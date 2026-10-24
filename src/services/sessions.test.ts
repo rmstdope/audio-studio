@@ -37,6 +37,9 @@ const library = [
 const extra = voice('x', 'Someone else')
 
 const fish: FishClient = {
+  async credit() {
+    return 25
+  },
   async listVoices(query) {
     const items = library.filter((v) => v.title.toLowerCase().includes(query.title ?? ''))
     return { total: items.length, items }

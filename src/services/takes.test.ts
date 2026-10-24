@@ -20,6 +20,9 @@ const files = {
 function fakeFish() {
   const requests: TtsRequest[] = []
   const fish: FishClient = {
+    async credit() {
+      return 25
+    },
     listVoices: () => Promise.reject(new Error('not used')),
     getVoice: () => Promise.reject(new Error('not used')),
     async tts(request) {

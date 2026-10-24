@@ -103,6 +103,7 @@ audio-studio/
 │   │   ├── resources.ts         schemas for script, cast, cues, manifest, lock
 │   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
 │   │   ├── pronounce.ts         the pronunciation table's rules (cleaning, problems)
+│   │   ├── prices.ts            Fish's prices per model, promotions with their end
 │   │   ├── changes.ts           git status output parsed and grouped by part
 │   │   ├── dialogDiff.ts        what a refreshed dialog added, removed and changed
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
@@ -427,7 +428,8 @@ spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DE
 `cast`; sessions are kept in `.audio-studio/auditions/`. The rest is the plan:
 
 ```
-GET    /api/project                              project, parts, credit
+GET    /api/project                              project, parts
+GET    /api/credit                               the Fish account's API credit (dollars)
 GET    /api/parts/:part                          the part, every line with its status and reason
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 POST   /api/parts/:part/refresh                  run refreshDialog
@@ -560,13 +562,20 @@ Small, independently useful increments:
    2. **Loudness** (built): `output.lufs` levels each new clip as `level.py` does, command for
       command (`pyFixed` formats numbers as Python does); clips come out byte-identical. Not in
       the fingerprint: changing the target does not make clips stale.
-   3. **The switch**: in RetroQuest, one shared `tts/cast.json` from the four act casts (the
+   3. **The switch** (built, RetroQuest #508): in RetroQuest, one shared `tts/cast.json` from the four act casts (the
       grandmother's recast everywhere; the mother's Act III style as cues on her Act III lines),
       `audio-studio.json` for all four acts with the new extractor, every act's clips adopted,
       `.audio-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
       (`level.py` stays for the music).
-8. **Later: paid models**: allow paid models per stage, Final generation (§8.4), costs in plans and
-   auditions.
+8. **Paid models**, in three pull requests:
+   1. **Prices and credit** (built): a dated price list (`core/prices.ts`, from Fish's pricing
+      page; a promotion ends at its moment, so `drama-3` costs $10 until 2026-11-12 17:00 UTC and
+      $50 after), plans priced when they are made, and the account's API credit
+      (`GET /wallet/self/api-credit`, a free call) shown under the project.
+   2. **Paid models per stage**: the project file may name a paid model for a stage; a paid job
+      shows its cost in dollars and starts only when the user confirms that amount, and the
+      server refuses one costing more than confirmed or than the account's credit.
+   3. **Final generation** (§8.4).
 
 ---
 

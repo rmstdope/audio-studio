@@ -36,7 +36,14 @@ export interface FishClient {
   getVoice(id: string): Promise<Voice>
   /** The text spoken in the voice, as MP3 (or WAV when asked). */
   tts(request: TtsRequest): Promise<Uint8Array>
+  /** The account's remaining API credit, in US dollars (what paid models are billed from). */
+  credit(): Promise<number>
 }
+
+/** The account's remaining API credit in dollars, or why it is not known. */
+export type CreditResult =
+  | { ok: true; credit: number }
+  | { ok: false; reason: 'no-key' | 'fish' | 'project'; message: string }
 
 /** Fish Audio answered with an error. */
 export class FishError extends Error {
@@ -138,6 +145,15 @@ export function createFishClient(
       })
       const page = ApiPageSchema.parse(body)
       return { total: page.total, items: page.items.map(toVoice) }
+    },
+    async credit() {
+      const { credit } = z
+        .looseObject({ credit: z.string() })
+        .parse(await get('/wallet/self/api-credit'))
+      const dollars = Number(credit)
+      if (!Number.isFinite(dollars))
+        throw new Error(`Fish gave a credit that is not a number: ${credit}`)
+      return dollars
     },
     async getVoice(id) {
       return toVoice(ApiVoiceSchema.parse(await get(`/model/${encodeURIComponent(id)}`)))
