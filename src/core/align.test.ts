@@ -251,6 +251,8 @@ describe('alignWords, words joined by hyphens and dashes', () => {
     expect(alignWords(shown, heard, 4, undefined, new Set(['malakar'])).ratio).toBe(1)
     expect(alignWords(['…', '-', '—'], [], 1).ratio).toBe(1)
     expect(alignWords(['wait', '…', 'now'], heardAs('wait'), 2).ratio).toBe(1 / 2)
+    // Letters outside a to z are still a word, though they compare as nothing.
+    expect(alignWords(['wait', 'Да'], heardAs('wait'), 2).missed).toEqual([1])
   })
 })
 
