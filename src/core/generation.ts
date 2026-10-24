@@ -110,9 +110,10 @@ export function planGeneration(
           .map((line) => line.key)
       : [],
     missing: toRecord.filter((line) => line.status === 'missing').length,
-    drafted: toRecord.filter(
-      (line) => !line.final && (line.status === 'ok' || line.status === 'weak'),
-    ).length,
+    drafted: final
+      ? toRecord.filter((line) => !line.final && (line.status === 'ok' || line.status === 'weak'))
+          .length
+      : 0,
     untracked: toRecord.filter((line) => line.status === 'untracked').length,
     stale,
     uncast: [...new Set(lines.filter((l) => l.status === 'uncast').map((l) => l.speaker))],

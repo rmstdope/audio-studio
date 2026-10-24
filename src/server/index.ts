@@ -350,7 +350,7 @@ export function startServer({
           const text = await request.text()
           const body = RecordBody.safeParse(parseOrNull(text || '{}'))
           if (!body.success) {
-            return Response.json({ error: 'expected { confirmedCost? }' }, { status: 400 })
+            return Response.json({ error: 'expected { confirmedCost?, stage? }' }, { status: 400 })
           }
           // Fails closed: without a plan, nothing is priced, so nothing is recorded.
           const planned = await planFor(part, undefined, true, body.data.stage)

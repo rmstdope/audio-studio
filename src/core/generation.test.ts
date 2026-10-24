@@ -240,3 +240,12 @@ describe('planGeneration, the weak lines offered', () => {
     ).toEqual(['a'])
   })
 })
+
+describe('planGeneration, drafted lines', () => {
+  it('counts drafted lines only in a final plan', () => {
+    const lines: LineState[] = [{ ...line('b', 'mira', 'weak'), file: 'b.mp3' }]
+    expect(
+      planGeneration({ lines, orphans: [] }, { at: AT, model: 'x', includeWeak: true }).drafted,
+    ).toBe(0)
+  })
+})
