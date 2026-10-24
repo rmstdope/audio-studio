@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { markMissed } from './heard'
+import { canCompare, markMissed } from './heard'
 
 describe('markMissed', () => {
   it('gives the shown words, each saying whether Whisper missed it', () => {
@@ -10,5 +10,13 @@ describe('markMissed', () => {
       { word: 'and', missed: false },
       { word: "Lysa's.", missed: false },
     ])
+  })
+})
+
+describe('canCompare', () => {
+  it('offers the comparison only for a take heard below full', () => {
+    expect(canCompare(0.875)).toBe(true)
+    expect(canCompare(1)).toBe(false)
+    expect(canCompare(null)).toBe(false)
   })
 })

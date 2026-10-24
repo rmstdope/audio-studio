@@ -284,7 +284,7 @@ The lock is a separate file so the manifest format the game depends on stays exa
 **Cache** (`.audio-studio/`, gitignored): the tool's own state, none of it the game's: audition
 takes, audition sessions in progress, the voices ruled out per character, and what Whisper heard
 of each kept take heard below full (`.audio-studio/heard/<part>-<hash>.json`: per line, the lock
-entry's time, Whisper's words and the shown words it missed). Deleting it loses nothing the game
+entry's time, the text it was checked against, Whisper's words and the shown words it missed). Deleting it loses nothing the game
 needs; it forgets paused auditions, ruled-out voices and what was heard.
 
 All JSON is written with stable key order and the same layout the file already has, through a

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'bun:test'
 import { HeardSchema, emptyHeard, withHeard } from './heard'
 
 describe('withHeard', () => {
-  const line = { at: '2026-10-24T16:11:29.762Z', words: ['This', 'was', 'Arn'], missed: [2] }
+  const line = {
+    at: '2026-10-24T16:11:29.762Z',
+    text: 'This was Aren.',
+    words: ['This', 'was', 'Arn'],
+    missed: [2],
+  }
 
   it('keeps what was heard of a line, replacing what was kept before', () => {
     const once = withHeard(emptyHeard('act1'), 'k1', { ...line, missed: [0, 2] })

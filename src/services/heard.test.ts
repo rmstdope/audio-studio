@@ -3,6 +3,7 @@ import { readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { HEARD_DIR, heardFor, keepHeard } from './heard'
+import { inPartTurn } from './partFiles'
 
 const at = '2026-10-24T16:11:29.762Z'
 const files = {
@@ -20,7 +21,7 @@ const files = {
     },
   },
 }
-const line = { at, words: ['Welcome'], missed: [1] }
+const line = { at, text: 'Welcome home.', words: ['Welcome'], missed: [1] }
 
 function project() {
   return join(tempRepo(files), 'audio-studio.json')
@@ -31,6 +32,29 @@ describe('what Whisper heard, kept', () => {
     const projectFile = project()
     await keepHeard(projectFile, 'act1', 'k1', line)
     expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({ ok: true, heard: line })
+  })
+
+  it('gives the text the take was checked against, though the line changed since', async () => {
+    const projectFile = project()
+    await keepHeard(projectFile, 'act1', 'k1', line)
+    const script = [{ key: 'k1', speaker: 'mira', text: 'Welcome back home.' }]
+    writeFileSync(join(projectFile, '..', 'tts/act1/script.json'), JSON.stringify(script))
+    expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({ ok: true, heard: line })
+  })
+
+  it('waits for a take being written in the part’s turn', async () => {
+    const projectFile = project()
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const writing = inPartTurn(projectFile, 'act1', async () => {
+      await held
+      await keepHeard(projectFile, 'act1', 'k1', line)
+    })
+    const reading = heardFor(projectFile, 'act1', 'k1')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    release()
+    await writing
+    expect(await reading).toEqual({ ok: true, heard: line })
   })
 
   it('gives nothing for a later take, or when nothing was kept', async () => {

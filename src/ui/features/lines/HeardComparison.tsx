@@ -2,18 +2,10 @@ import { useHeard } from '../../api'
 import { markMissed } from '../../heard'
 
 /**
- * What Whisper heard of a line's take beside its text, the words it missed marked, so a weak or
- * imperfect score can be judged by ear and eye.
+ * What Whisper heard of a line's take beside the text it was checked against (the line's, unless
+ * changed since), the words it missed marked, so an imperfect score can be judged by eye.
  */
-export function HeardComparison({
-  partId,
-  lineKey,
-  text,
-}: {
-  partId: string
-  lineKey: string
-  text: string
-}) {
+export function HeardComparison({ partId, lineKey }: { partId: string; lineKey: string }) {
   const query = useHeard(partId, lineKey)
   if (query.isPending) return <p className="muted heard-compare">Loading what Whisper heard…</p>
   if (query.isError) {
@@ -39,7 +31,7 @@ export function HeardComparison({
     <dl className="heard-compare">
       <dt>Text</dt>
       <dd>
-        {markMissed(text, result.heard.missed).map(({ word, missed }, i) => (
+        {markMissed(result.heard.text, result.heard.missed).map(({ word, missed }, i) => (
           <span key={i}>
             {i > 0 && ' '}
             {missed ? <mark title="Not heard">{word}</mark> : word}

@@ -4,9 +4,11 @@ import { z } from 'zod'
 export const HeardLineSchema = z.object({
   /** The lock entry's time of the take, so a later take's clip is never shown with it. */
   at: z.string(),
+  /** The line's text the take was checked against: the text may change before it is retaken. */
+  text: z.string(),
   /** Whisper's words, as it wrote them. */
   words: z.array(z.string()),
-  /** The indices of the shown words (the text split on spaces) that were not heard. */
+  /** The indices of the shown words (`text` split on spaces) that were not heard. */
   missed: z.array(z.number().int().min(0)),
 })
 

@@ -346,9 +346,7 @@ export async function recordLine(
           await rename(temporary, target)
           await writeAtomic(root, paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
           await writeAtomic(root, paths.lockPath, formatEntriesPerLine(lock))
-          const { heard } = best
-          if (heard !== null)
-            await keepWhatWasHeard(projectFile, partId, key, at, { ...best, heard })
+          await keepWhatWasHeard(projectFile, partId, key, { ...best, at, text: line.text })
           return []
         },
       )
@@ -392,17 +390,18 @@ function sorted<T>(record: Record<string, T>): Record<string, T> {
 
 /**
  * Keeps what Whisper heard of a take heard below full, for the page to show beside the text, or
- * forgets what was kept (heard in full). The studio's own state, not the game's: failing to keep it
- * fails nothing, the clip and its lock entry are written already.
+ * forgets what was kept (heard in full); nothing for an unchecked take. The studio's own state, not
+ * the game's: failing to keep it fails nothing, the clip and its lock entry are written already.
  */
 async function keepWhatWasHeard(
   projectFile: string,
   partId: string,
   key: string,
-  at: string,
-  take: { heard: number; words: string[]; missed: number[] },
+  take: { heard: number | null; at: string; text: string; words: string[]; missed: number[] },
 ): Promise<void> {
-  const line = take.heard < 1 ? { at, words: take.words, missed: take.missed } : null
+  const { heard, at, text, words, missed } = take
+  if (heard === null) return
+  const line = heard < 1 ? { at, text, words, missed } : null
   await keepHeard(projectFile, partId, key, line).catch(() => {})
 }
 
@@ -564,8 +563,10 @@ export async function measureLine(
     lock[key] = { ...locked, heard }
     await writeAtomic(root, read.paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
     await writeAtomic(root, read.paths.lockPath, formatEntriesPerLine(lock))
-    await keepWhatWasHeard(projectFile, partId, key, locked.at, {
+    await keepWhatWasHeard(projectFile, partId, key, {
       heard,
+      at: locked.at,
+      text: line.text,
       words,
       missed: aligned.missed,
     })

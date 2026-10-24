@@ -96,7 +96,6 @@ export function useHeard(partId: string, key: string) {
       getJson<NonNullable<HeardResult>>(
         `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/heard`,
       ),
-    staleTime: 0,
   })
 }
 

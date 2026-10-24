@@ -7,6 +7,7 @@ import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { GeneratePanel } from './GeneratePanel'
 import { HeardComparison } from './HeardComparison'
+import { canCompare } from '../../heard'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
@@ -196,7 +197,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                     </td>
                     <td className="mono num">{seconds(line.duration)}</td>
                     <td className="mono num">
-                      {line.heard !== null && line.heard < 1 ? (
+                      {canCompare(line.heard) ? (
                         <button
                           type="button"
                           className="heard-btn"
@@ -274,11 +275,11 @@ export function LinesView({ part }: { part: PartSummary }) {
                       )}
                     </td>
                   </tr>
-                  {comparing === line.key && (
+                  {comparing === line.key && canCompare(line.heard) && (
                     <tr className="heard-row">
                       <td />
                       <td colSpan={5}>
-                        <HeardComparison partId={loaded.id} lineKey={line.key} text={line.text} />
+                        <HeardComparison partId={loaded.id} lineKey={line.key} />
                       </td>
                     </tr>
                   )}

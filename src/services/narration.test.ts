@@ -410,11 +410,19 @@ describe('recordLine, checked with Whisper', () => {
     const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
     expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({
       ok: true,
-      heard: { at: lock.k1.at, words: ['wakes', 'up.'], missed: [0] },
+      heard: { at: lock.k1.at, text: 'Elior wakes up.', words: ['wakes', 'up.'], missed: [0] },
     })
     await recordChecked(root, hearing(['El-ee-or', 'wakes', 'up.']), fakeFish().fish)
     expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({ ok: true, heard: null })
     expect(readdirSync(join(root, HEARD_DIR))).toEqual([])
+  })
+
+  it('records the line even when what Whisper heard cannot be kept', async () => {
+    const root = tempRepo({ ...files, [HEARD_DIR]: 'a file where the folder would go' })
+    const result = await recordChecked(root, hearing(['wakes']), fakeFish().fish)
+    expect(result).toMatchObject({ ok: true, key: 'k1', heard: 0.333 })
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(lock.k1.heard).toBe(0.333)
   })
 
   it('takes again while a take is heard poorly, keeping the first good one', async () => {
@@ -551,7 +559,7 @@ describe('measureLine', () => {
     const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
     expect(await heardFor(projectFile, 'act1', 'k4')).toEqual({
       ok: true,
-      heard: { at: lock.k4.at, words: ['Welcom'], missed: [0] },
+      heard: { at: lock.k4.at, text: 'Welcome.', words: ['Welcom'], missed: [0] },
     })
   })
 
