@@ -277,6 +277,15 @@ describe('alignWords, quoted speech', () => {
     expect(alignWords(["it's", 'is'], its, 2).missed).toEqual([0])
   })
 
+  it("takes a plural possessive and a singular one for the same word (founders', founder's)", () => {
+    const shown = "From the founders' line, to the next.".split(' ')
+    const heard = "From the founder's line to the next.".split(' ')
+    const timed = (said: string[]) =>
+      words(...said.map((w, i): [string, number, number] => [w, i, i + 1]))
+    expect(alignWords(shown, timed(heard), 7).ratio).toBe(1)
+    expect(alignWords(heard, timed(shown), 7).ratio).toBe(1)
+  })
+
   it('counts a plural possessive heard without its apostrophe', () => {
     expect(
       alignWords(
@@ -375,11 +384,27 @@ describe('alignWords, names Whisper spells its own way', () => {
       alignWords(['I', 'will', 'never', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
     ).toBe(3 / 4)
     expect(alignWords(['see', 'Kai', 'came'], heardAs('see', 'Kaid', 'came'), 3).ratio).toBe(2 / 3)
-    expect(alignWords(['see', "Kai's", 'cat'], heardAs('see', 'Kais', 'cat'), 3).ratio).toBe(2 / 3)
+    expect(alignWords(['see', "Kai's", 'cat'], heardAs('see', "Kaid's", 'cat'), 3).ratio).toBe(
+      2 / 3,
+    )
     expect(alignWords(['the', 'Malakar'], heardAs('the', 'Malacore'), 2).ratio).toBe(1 / 2)
     expect(
       alignWords(['I', 'will', 'NEVER', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
     ).toBe(3 / 4)
+  })
+
+  it('measures a name by its letters as said, its possessive not counted', () => {
+    const heard = heardAs('so', 'Kaiya', 'waits')
+    expect(alignWords(['so', 'Kai', 'waits'], heard, 3, ['so', 'Kaiyah', 'waits']).ratio).toBe(1)
+    const its = heardAs('so', "Kaiya's", 'waits')
+    expect(alignWords(['so', "Kai's", 'waits'], its, 3, ['so', "Kaiyah's", 'waits']).ratio).toBe(1)
+    expect(
+      alignWords(['so', 'Kaiyah', 'waits'], heardAs('so', 'Kaia', 'waits'), 3, [
+        'so',
+        'Kai',
+        'waits',
+      ]).ratio,
+    ).toBe(2 / 3)
   })
 
   it('does not count a number one digit off', () => {
