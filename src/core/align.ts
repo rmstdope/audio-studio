@@ -51,7 +51,7 @@ function norm(word: string): string {
   return NUMBERS.get(p) ?? p
 }
 
-/** Words compared as one because they sound the same: each word (as `norm` gives it) → its group's. */
+/** Words matched as one, as they sound the same: each word (as `norm` gives it) → its group's. */
 export type SoundAlike = ReadonlyMap<string, string>
 
 /**
@@ -78,10 +78,14 @@ export function soundAlikes(extra: readonly (readonly string[])[] = []): SoundAl
 
 const BUILT_IN = soundAlikes()
 
-/** A word as it is matched: `norm`, then the word of its sound-alike group, if it has one. */
+/** A word as it is matched exactly: `norm`, then the word of its sound-alike group, if any. */
 function key(word: string, alike: SoundAlike): string {
-  const n = norm(word)
-  return alike.get(n) ?? n
+  return grouped(norm(word), alike)
+}
+
+/** A word as `norm` gives it, as the word of its sound-alike group, if it has one. */
+function grouped(word: string, alike: SoundAlike): string {
+  return alike.get(word) ?? word
 }
 
 /** A matching block: `[a, b, size]`, as Python's `SequenceMatcher.get_matching_blocks`. */
@@ -403,8 +407,10 @@ function alignGap(
   // The heard words before the gap, then its parts, to tell where Whisper starts a sentence.
   const partsWritten = [...written.slice(0, hFrom), ...parts.map((p) => p.word.trim())]
   if (!pieces.length || !parts.length) return
-  const want = pieces.map((p) => alike.get(p.want) ?? p.want)
-  const got = parts.map((w) => key(w.word, alike))
+  // Sound-alikes are one only where parts match exactly; a name is guessed from what Whisper wrote.
+  const heardNorm = parts.map((w) => norm(w.word))
+  const want = pieces.map((p) => grouped(p.want, alike))
+  const got = heardNorm.map((w) => grouped(w, alike))
   const gotSpelled = parts.map((w) => plain(w.word))
   const at: ([number, number] | null)[] = pieces.map(() => null)
   const take = (p: number, first: number, last = first) =>
@@ -435,7 +441,7 @@ function alignGap(
     const n = hTo - h - (sTo - s - 1)
     if (!guess || n < 1) return null
     const piece = pieces[s]!
-    const spelled = got.slice(h, h + n).join('')
+    const spelled = heardNorm.slice(h, h + n).join('')
     const asName = n === 1 && writtenAsName(partsWritten, hFrom + h)
     if (!spelledAlike(piece.shown, piece.atStart, piece.said, spelled, names, asName)) return null
     return { shown: 1, heard: n, apply: () => take(s, h, h + n - 1) }
@@ -488,7 +494,7 @@ function alignGap(
  * shown though said otherwise forgiven (`alignGap`); such a word is heard when all its parts are.
  * `said` is the same words as actually said (see `saidWords`), compared in place of the shown
  * ones; `names` are the known names (see `knownNames`), `alike` the words that sound the same,
- * matched as one (see `soundAlikes`). Returns the timed words, the share of
+ * matched as one wherever words are matched exactly (see `soundAlikes`). Returns the timed words, the share of
  * words that were heard (punctuation on its own, "—" or "…", is no word: it is only timed), and
  * the indices of the shown words that were not (`missed`).
  */

@@ -562,8 +562,13 @@ describe('alignWords, words that sound the same', () => {
 
   it('does not count a word that sounds otherwise', () => {
     expect(align('Rest at the inn.', 'Rest at the an.').missed).toEqual([3])
-    expect(align('He comes weekly.', 'He comes weekly.', new Map()).ratio).toBe(1)
+    expect(align('He comes weekly.', 'He comes weakly.', new Map()).missed).toEqual([2])
     expect(align('Rest at the inn.', 'Rest at the in.', new Map()).missed).toEqual([3])
+  })
+
+  it('guesses a name in a joined word from the heard word as written, not its group', () => {
+    expect(align('Ask Inne-born now.', 'Ask Inn born now.').ratio).toBe(1)
+    expect(align('the Thrones-keep wall', 'the Throne keep wall').ratio).toBe(1)
   })
 
   it("adds a project's own groups to the built-in ones, joining groups that share a word", () => {

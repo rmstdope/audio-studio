@@ -260,6 +260,8 @@ export async function recordLine(
     const checker = narration.quality.transcriber === 'none' ? null : transcriber
     const tokens = line.text.split(' ')
     const said = saidWords(line.text, cast.pronounce)
+    const names = knownNames(cast)
+    const alike = soundAlikes(narration.quality.soundAlike)
     let best: Take | null = null
     let takes = 0
     for (let take = 1; take <= (checker ? narration.quality.takes : 1); take++) {
@@ -278,8 +280,7 @@ export async function recordLine(
         try {
           const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav)
           const words = heardWords(segments, clip.seconds)
-          const alike = soundAlikes(narration.quality.soundAlike)
-          const aligned = alignWords(tokens, words, clip.seconds, said, knownNames(cast), alike)
+          const aligned = alignWords(tokens, words, clip.seconds, said, names, alike)
           // Rounded as the lock keeps it, so the line's status agrees with this decision.
           attempt = {
             clip,

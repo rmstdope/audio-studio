@@ -107,7 +107,13 @@ const NarrationSchema = z
          * The game's own words that sound the same ("Lyria" and "Liria"), a group each, added to
          * the built-in ones: Whisper writing one for another still counts as heard.
          */
-        soundAlike: z.array(z.array(z.string().min(1)).min(2)).default([]),
+        soundAlike: z
+          .array(
+            z
+              .array(z.string().regex(/^\S*[\p{L}\p{N}]\S*$/u, 'expected one word, with letters'))
+              .min(2),
+          )
+          .default([]),
       })
       .prefault({}),
     audition: z
