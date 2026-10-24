@@ -1,92 +1,42 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { afterInTurn } from '../inGame'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPlayer, type Clip, type PlayerState } from '../player'
 
-/** A clip to play: an id to tell it by, and where it is. */
-export interface Clip {
-  id: string
-  url: string
-}
+export type { Clip }
 
 /**
- * One clip playing at a time: `toggle(id, url)` plays it, or stops it if it is the one playing.
- * `playInTurn(clips)` plays clips one after another (any toggle stops that). `playing` is the id
- * of the clip playing, or null; `inTurn` says whether a list is being played.
+ * One clip playing at a time (see `createPlayer`): `toggle(id, url)` plays it, or stops it if it
+ * is the one playing; `playInTurn(clips)` plays clips one after another, skipping one that fails
+ * (any toggle stops that). `playing` is the id of the clip playing, or null; `inTurn` says
+ * whether a list is being played.
  */
 export function useClipPlayer() {
-  const audio = useRef<HTMLAudioElement | null>(null)
-  const [playing, setPlaying] = useState<string | null>(null)
-  const [inTurn, setInTurn] = useState(false)
-  // The list played in turn, and the clip playing, for the `ended` handler to go on from.
-  const queue = useRef<Clip[]>([])
-  const current = useRef<string | null>(null)
-
-  const start = useCallback((element: HTMLAudioElement, clip: Clip) => {
-    element.src = clip.url
-    element.currentTime = 0
-    current.current = clip.id
-    setPlaying(clip.id)
-    element.play().catch(() => stopAll())
-  }, [])
-
-  const stopAll = () => {
-    queue.current = []
-    current.current = null
-    setInTurn(false)
-    setPlaying(null)
-  }
+  const [state, setState] = useState<PlayerState>({ playing: null, inTurn: false })
+  const player = useRef<ReturnType<typeof createPlayer> | null>(null)
 
   useEffect(() => {
     const element = new Audio()
-    const ended = () => {
-      const ids = queue.current.map((c) => c.id)
-      const next = current.current ? afterInTurn(ids, current.current) : null
-      const clip = next ? queue.current.find((c) => c.id === next) : undefined
-      if (clip) start(element, clip)
-      else stopAll()
-    }
+    const made = createPlayer(element, setState)
+    const ended = () => made.ended()
+    const failed = () => made.failed()
     element.addEventListener('ended', ended)
-    element.addEventListener('error', ended)
-    audio.current = element
+    element.addEventListener('error', failed)
+    player.current = made
     return () => {
       element.pause()
       element.removeEventListener('ended', ended)
-      element.removeEventListener('error', ended)
+      element.removeEventListener('error', failed)
+      player.current = null
     }
-  }, [start])
-
-  const toggle = useCallback(
-    (id: string, url: string) => {
-      const element = audio.current
-      if (!element) return
-      queue.current = []
-      setInTurn(false)
-      if (playing === id) {
-        element.pause()
-        current.current = null
-        setPlaying(null)
-        return
-      }
-      start(element, { id, url })
-    },
-    [playing, start],
-  )
-
-  const playInTurn = useCallback(
-    (clips: Clip[]) => {
-      const element = audio.current
-      if (!element || !clips.length) return
-      queue.current = clips
-      setInTurn(true)
-      start(element, clips[0]!)
-    },
-    [start],
-  )
-
-  /** Stops whatever is playing, a list included. */
-  const stop = useCallback(() => {
-    audio.current?.pause()
-    stopAll()
   }, [])
 
-  return { playing, toggle, playInTurn, inTurn, stop }
+  // The same functions on every render; they reach the player made on mount.
+  const actions = useMemo(
+    () => ({
+      toggle: (id: string, url: string) => player.current?.toggle(id, url),
+      playInTurn: (clips: Clip[]) => player.current?.playInTurn(clips),
+      stop: () => player.current?.stop(),
+    }),
+    [],
+  )
+  return { ...state, ...actions }
 }

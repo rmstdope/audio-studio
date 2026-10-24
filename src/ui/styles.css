@@ -1174,7 +1174,9 @@ a.btn {
 }
 
 .in-game-actions {
-  justify-content: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* Audition board */

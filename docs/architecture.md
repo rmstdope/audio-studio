@@ -341,9 +341,10 @@ Every character has a **character page** (`#/characters/<id>`), the one place ab
 cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish; the take
 records by itself when missing), its lines per part, its delivery (the style cue) and casting
 brief (search keywords and audition phrase), the voices ruled out for it, the audition in
-progress, if there is one, and **Hear it in the game**: its recorded lines with their part and
-cue, as the game plays them, one by one or all in turn. An audition is started, resumed and stopped from there; the page
-shows no candidates. The **audition page** (`#/characters/<id>/audition`) shows the board, with
+progress, if there is one, and **Hear it in the game**: its recorded lines with their part, cue
+and status, as the game plays them, one by one or all in turn (the first five shown until asked
+for all; any other play stops the list; a clip that fails is skipped). An audition is started,
+resumed and stopped from there; the page shows no candidates. The **audition page** (`#/characters/<id>/audition`) shows the board, with
 the phrase and style the takes are recorded with beside it and the keywords the audition started
 with; with no audition in progress, it offers to start one.
 

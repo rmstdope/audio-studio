@@ -355,8 +355,10 @@ function InTheGame({
     speaker,
   )
   const clips: Clip[] = lines.map((l) => ({ id: l.id, url: clipUrl(l.part, l.file) }))
-  const shown = all ? lines : lines.slice(0, SHOWN_LINES)
+  // While the list plays in turn, every line shows, so the one playing is always on the page.
+  const shown = all || player.inTurn ? lines : lines.slice(0, SHOWN_LINES)
   const pending = loaded.some((q) => q.isPending)
+  const failed = loaded.filter((q) => q.isError || (q.data && !q.data.ok)).length
   return (
     <section className="panel in-game" aria-label="Hear it in the game">
       <div className="section-head">
@@ -366,18 +368,26 @@ function InTheGame({
             ? `${plural(lines.length, 'recorded line')}, as the game plays them`
             : pending
               ? 'Loading…'
-              : `None of ${name}’s lines is recorded yet.`}
+              : failed
+                ? ''
+                : `None of ${name}’s lines is recorded yet.`}
         </span>
       </div>
+      {failed > 0 && (
+        <span className="adopt-error">
+          {plural(failed, 'part')} could not be loaded; {failed === 1 ? 'its' : 'their'} lines are
+          left out. Open {failed === 1 ? 'it' : 'them'} to see why.
+        </span>
+      )}
       {shown.length > 0 && (
         <ol className="in-game-lines">
-          {shown.map((l) => (
+          {shown.map((l, i) => (
             <li key={l.id}>
               <button
                 type="button"
                 className="icon-btn"
                 aria-label={player.playing === l.id ? 'Stop' : `Play “${l.text}”`}
-                onClick={() => player.toggle(l.id, clipUrl(l.part, l.file))}
+                onClick={() => player.toggle(l.id, clips[i]!.url)}
               >
                 {player.playing === l.id ? <PauseIcon /> : <PlayIcon />}
               </button>
@@ -399,7 +409,7 @@ function InTheGame({
         </ol>
       )}
       {lines.length > 0 && (
-        <div className="confirm-actions in-game-actions">
+        <div className="in-game-actions">
           {lines.length > SHOWN_LINES && (
             <button className="btn btn-ghost" type="button" onClick={() => setAll(!all)}>
               {all ? 'Show fewer' : `All ${lines.length} lines`}
