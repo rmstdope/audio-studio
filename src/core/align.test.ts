@@ -200,6 +200,25 @@ describe('alignWords, words joined by hyphens and dashes', () => {
     expect(missed('we saw bright silverleaf today', 'we saw silver leaf today')).toEqual([2])
   })
 
+  it('forgives a name beside a joined word misheard, as whole-word matching does', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('x Aren resin-sweet y', 'x Arn raisin y')).toEqual([2])
+    expect(missed('so Aren well-made bread', 'so Arn wellmaid bread')).toEqual([2])
+    expect(missed('x Aren whatever y', 'x Arn half-heard y')).toEqual([2])
+    expect(missed('x Aren x-the y', 'x Arn the y')).toEqual([2])
+  })
+
+  it('takes a word after a dash for a sentence start, forgiving only a known name there', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, new Set(['mira']))
+        .missed
+    expect(missed('"Wait—Where is he?"', 'Wait there is he?')).toEqual([0])
+    expect(missed('We ran.—Here they come.', 'We ran her they come.')).toEqual([1])
+    expect(missed("the leaf—Mirra's blend", "the leaf Mira's blend")).toEqual([1])
+    expect(missed("the leaf—Mira's blend", "the leaf Mra's blend")).toEqual([])
+  })
+
   it('forgives a name Whisper wrote in parts, and one pronounced in other parts', () => {
     const r = (shown: string, said: string, as?: string) =>
       alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, as?.split(' ')).ratio

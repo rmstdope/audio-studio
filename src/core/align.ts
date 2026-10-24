@@ -206,8 +206,9 @@ interface Piece {
 
 /**
  * The parts of the shown words `from` to `to`, split at hyphens and dashes, punctuation beside a
- * dash left out ("thought—\"" is "thought"); a word that is only punctuation has none. The parts as
- * said replace the shown ones; a word said in other parts than shown is one part, as said.
+ * dash left out ("thought—\"" is "thought"); a word that is only punctuation has none. A part after
+ * a dash is taken for a sentence start. The parts as said replace the shown ones; a word said in
+ * other parts than shown is one part, as said.
  */
 function piecesOf(tokens: string[], said: string[], from: number, to: number): Piece[] {
   const partsOf = (word: string) => word.split(JOINS).filter((part) => norm(part))
@@ -225,7 +226,9 @@ function piecesOf(tokens: string[], said: string[], from: number, to: number): P
     const atStart = startsSentence(tokens, i)
     // Said in other parts than shown ("Elior" as "El-ee-or"): the word as said, whole.
     if (spoken.length !== shown.length) pieces.push(piece(i, tokens[i]!, said[i]!, atStart))
-    else spoken.forEach((part, k) => pieces.push(piece(i, shown[k]!, part, k === 0 && atStart)))
+    // A part after a dash starts a sentence as a word does ("Wait—Where"): no name is guessed
+    // there unless it is a known one.
+    else spoken.forEach((part, k) => pieces.push(piece(i, shown[k]!, part, k > 0 || atStart)))
   }
   return pieces
 }
@@ -237,7 +240,7 @@ function piecesOf(tokens: string[], said: string[], from: number, to: number): P
 function heardParts(heard: HeardWord[]): HeardWord[] {
   return heard.flatMap((w) => {
     const parts = w.word.split(JOINS).filter((part) => norm(part))
-    const step = (w.end - w.start) / Math.max(parts.length, 1)
+    const step = (w.end - w.start) / parts.length
     return parts.map((word, k) => ({
       word,
       start: w.start + step * k,
@@ -275,6 +278,22 @@ function alignGap(
   [hFrom, hTo]: [number, number],
   times: ([number, number] | null)[],
 ): void {
+  // As narrate.py's matching and main did: where as many words were heard as shown, a name heard
+  // in its place one letter off, word for word.
+  const shownWords: number[] = []
+  for (let i = from; i < to; i++) if (norm(said[i]!)) shownWords.push(i)
+  const heardWords: number[] = []
+  for (let j = hFrom; j < hTo; j++) if (norm(heard[j]!.word)) heardWords.push(j)
+  if (shownWords.length === heardWords.length) {
+    shownWords.forEach((i, k) => {
+      const w = heard[heardWords[k]!]!
+      const atStart = startsSentence(tokens, i)
+      if (spelledAlike(tokens[i]!, atStart, norm(said[i]!), norm(w.word), names)) {
+        times[i] = [w.start, w.end]
+      }
+    })
+  }
+
   const pieces = piecesOf(tokens, said, from, to)
   const parts = heardParts(heard.slice(hFrom, hTo))
   if (!pieces.length || !parts.length) return
@@ -344,11 +363,12 @@ function alignGap(
     h = b + size
   }
 
-  // A shown word is heard when all its parts are, and spans them.
+  // A shown word is heard when all its parts are, and spans them (unless forgiven whole above).
   for (let i = from; i < to; i++) {
+    if (times[i]) continue
     const mine = pieces.flatMap((piece, p) => (piece.token === i ? [at[p]] : []))
-    if (!mine.length || mine.some((span) => !span)) continue
-    const spans = mine as [number, number][]
+    const spans = mine.filter((span): span is [number, number] => span !== null)
+    if (!mine.length || spans.length < mine.length) continue
     times[i] = [Math.min(...spans.map((t) => t[0])), Math.max(...spans.map((t) => t[1]))]
   }
 }
