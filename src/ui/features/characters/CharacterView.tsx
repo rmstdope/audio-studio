@@ -19,10 +19,11 @@ import { Failure } from '../../components/Failure'
 import { HeadphonesIcon, PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusBar } from '../../components/StatusBar'
-import { useClipPlayer, type Clip } from '../../components/useClipPlayer'
+import { useClipPlayer } from '../../components/useClipPlayer'
 import { compact, plural, shortTitle, tintFor, voiceLabel } from '../../format'
 import { routeHref } from '../../route'
-import { recordedLinesOf } from '../../inGame'
+import { inGameState, recordedLinesOf } from '../../inGame'
+import type { Clip } from '../../player'
 import { linesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
 import { voiceUrl } from '../../voiceId'
@@ -327,9 +328,6 @@ function VoicePanel({
   )
 }
 
-/** How many recorded lines are listed before "All N lines". */
-const SHOWN_LINES = 5
-
 /**
  * The character's recorded lines, as the game plays them: each with its part and cue, played one
  * by one or all in turn, the first few shown until asked for all.
@@ -347,47 +345,47 @@ function InTheGame({
 }) {
   const loaded = useParts(parts.map((p) => p.id))
   const [all, setAll] = useState(false)
-  const lines = recordedLinesOf(
-    parts.map((p, i) => {
-      const data = loaded[i]?.data
-      return { ...p, lines: data?.ok ? data.part.lines : null }
-    }),
-    speaker,
-  )
+  const listed = parts.map((p, i) => {
+    const query = loaded[i]
+    const data = query?.data
+    const state = data?.ok ? 'loaded' : query?.isPending ? 'pending' : 'failed'
+    return { ...p, state, lines: data?.ok ? data.part.lines : null } as const
+  })
+  const lines = recordedLinesOf(listed, speaker)
+  const view = inGameState(listed, lines, all)
   const clips: Clip[] = lines.map((l) => ({ id: l.id, url: clipUrl(l.part, l.file) }))
-  // While the list plays in turn, every line shows, so the one playing is always on the page.
-  const shown = all || player.inTurn ? lines : lines.slice(0, SHOWN_LINES)
-  const pending = loaded.some((q) => q.isPending)
-  const failed = loaded.filter((q) => q.isError || (q.data && !q.data.ok)).length
   return (
     <section className="panel in-game" aria-label="Hear it in the game">
       <div className="section-head">
         <h2 className="section-title">Hear it in the game</h2>
         <span className="muted">
-          {lines.length
-            ? `${plural(lines.length, 'recorded line')}, as the game plays them`
-            : pending
-              ? 'Loading…'
-              : failed
-                ? ''
-                : `None of ${name}’s lines is recorded yet.`}
+          {lines.length > 0 && `${plural(lines.length, 'recorded line')}, as the game plays them`}
+          {lines.length > 0 && view.loading && ' · '}
+          {view.loading}
+          {view.empty && `None of ${name}’s lines is recorded yet.`}
         </span>
       </div>
-      {failed > 0 && (
+      {view.failed.length > 0 && (
         <span className="adopt-error">
-          {plural(failed, 'part')} could not be loaded; {failed === 1 ? 'its' : 'their'} lines are
-          left out. Open {failed === 1 ? 'it' : 'them'} to see why.
+          Could not load the lines of{' '}
+          {view.failed.map((p, i) => (
+            <span key={p.id}>
+              {i > 0 && (i === view.failed.length - 1 ? ' and ' : ', ')}
+              <a href={routeHref({ view: 'lines', part: p.id })}>{p.title}</a>
+            </span>
+          ))}
+          ; they are left out here. Open {view.failed.length === 1 ? 'it' : 'them'} to see why.
         </span>
       )}
-      {shown.length > 0 && (
+      {view.shown.length > 0 && (
         <ol className="in-game-lines">
-          {shown.map((l, i) => (
+          {view.shown.map((l) => (
             <li key={l.id}>
               <button
                 type="button"
                 className="icon-btn"
                 aria-label={player.playing === l.id ? 'Stop' : `Play “${l.text}”`}
-                onClick={() => player.toggle(l.id, clips[i]!.url)}
+                onClick={() => player.toggle(l.id, clipUrl(l.part, l.file))}
               >
                 {player.playing === l.id ? <PauseIcon /> : <PlayIcon />}
               </button>
@@ -410,7 +408,7 @@ function InTheGame({
       )}
       {lines.length > 0 && (
         <div className="in-game-actions">
-          {lines.length > SHOWN_LINES && (
+          {(view.more > 0 || all) && (
             <button className="btn btn-ghost" type="button" onClick={() => setAll(!all)}>
               {all ? 'Show fewer' : `All ${lines.length} lines`}
             </button>
@@ -418,7 +416,13 @@ function InTheGame({
           <button
             className="btn"
             type="button"
-            onClick={() => (player.inTurn ? player.stop() : player.playInTurn(clips))}
+            disabled={!player.inTurn && !view.canPlayAll}
+            onClick={() => {
+              if (player.inTurn) return player.stop()
+              // Every line shows while they play, and stays shown after.
+              setAll(true)
+              player.playInTurn(clips)
+            }}
           >
             {player.inTurn ? 'Stop' : 'Play all in turn'}
           </button>

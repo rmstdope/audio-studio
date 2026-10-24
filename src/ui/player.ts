@@ -1,5 +1,3 @@
-import { afterInTurn } from './inGame'
-
 /** A clip to play: an id to tell it by, and where it is. */
 export interface Clip {
   id: string
@@ -25,16 +23,19 @@ export interface PlayerState {
  * fails is skipped). The element's `ended` and `error` events are passed on as `ended()` and
  * `failed()`. A failure can be told twice (the error event, then the rejected `play()`); each
  * play has a token, and only the play still current is acted on, so a clip is skipped once and a
- * play replaced meanwhile is let be. `onChange` hears every change of state.
+ * play replaced meanwhile is let be. `onChange` hears every change of state; `dispose` ends it.
  */
 export function createPlayer(element: AudioLike, onChange: (state: PlayerState) => void) {
   let queue: Clip[] = []
   let current: string | null = null
   let token = 0
+  // Once disposed (its page left), the player starts nothing again.
+  let disposed = false
 
   const emit = () => onChange({ playing: current, inTurn: queue.length > 0 })
 
   const start = (clip: Clip) => {
+    if (disposed) return
     const mine = ++token
     element.src = clip.url
     element.currentTime = 0
@@ -53,13 +54,8 @@ export function createPlayer(element: AudioLike, onChange: (state: PlayerState) 
 
   /** The next clip of the list, or the end. */
   const advance = () => {
-    const next = current
-      ? afterInTurn(
-          queue.map((c) => c.id),
-          current,
-        )
-      : null
-    const clip = queue.find((c) => c.id === next)
+    const at = queue.findIndex((c) => c.id === current)
+    const clip = at >= 0 ? queue[at + 1] : undefined
     if (clip) start(clip)
     else stop()
   }
@@ -87,5 +83,10 @@ export function createPlayer(element: AudioLike, onChange: (state: PlayerState) 
     ended: advance,
     /** The clip playing could not be played. */
     failed: () => fail(token),
+    /** Stops for good: the page is left, and nothing the element says after starts a clip. */
+    dispose() {
+      stop()
+      disposed = true
+    },
   }
 }

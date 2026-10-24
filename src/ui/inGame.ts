@@ -41,8 +41,33 @@ export function recordedLinesOf(
   )
 }
 
-/** The clip to play after `ended` when playing `queue` in turn, or null after the last. */
-export function afterInTurn(queue: string[], ended: string): string | null {
-  const at = queue.indexOf(ended)
-  return at >= 0 && at + 1 < queue.length ? queue[at + 1]! : null
+/** How many recorded lines are listed before "All N lines". */
+export const SHOWN_LINES = 5
+
+/** A part the list is made from, and whether its lines are in yet. */
+export interface ListedPart {
+  id: string
+  title: string
+  state: 'loaded' | 'pending' | 'failed'
+}
+
+/**
+ * What the list of recorded lines shows: the lines (the first few, or all), how many more there
+ * are, whether they can be played in turn (only once every part is in, so none is left out),
+ * what is still loading, whether nothing is recorded at all, and the parts that failed to load.
+ */
+export function inGameState(parts: ListedPart[], lines: RecordedLine[], all: boolean) {
+  const pending = parts.filter((p) => p.state === 'pending').length
+  const failed = parts.filter((p) => p.state === 'failed').map(({ id, title }) => ({ id, title }))
+  const shown = all ? lines : lines.slice(0, SHOWN_LINES)
+  return {
+    shown,
+    more: lines.length - shown.length,
+    canPlayAll: lines.length > 0 && pending === 0,
+    loading: pending
+      ? `Loading ${lines.length ? `${pending} more` : pending} ${pending === 1 ? 'part' : 'parts'}…`
+      : null,
+    empty: lines.length === 0 && pending === 0 && failed.length === 0,
+    failed,
+  }
 }

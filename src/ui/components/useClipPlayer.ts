@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPlayer, type Clip, type PlayerState } from '../player'
 
-export type { Clip }
-
 /**
  * One clip playing at a time (see `createPlayer`): `toggle(id, url)` plays it, or stops it if it
  * is the one playing; `playInTurn(clips)` plays clips one after another, skipping one that fails
@@ -16,15 +14,14 @@ export function useClipPlayer() {
   useEffect(() => {
     const element = new Audio()
     const made = createPlayer(element, setState)
-    const ended = () => made.ended()
-    const failed = () => made.failed()
-    element.addEventListener('ended', ended)
-    element.addEventListener('error', failed)
+    element.addEventListener('ended', made.ended)
+    element.addEventListener('error', made.failed)
     player.current = made
     return () => {
-      element.pause()
-      element.removeEventListener('ended', ended)
-      element.removeEventListener('error', failed)
+      // Disposed, not just paused: a play still loading must not start the next clip.
+      made.dispose()
+      element.removeEventListener('ended', made.ended)
+      element.removeEventListener('error', made.failed)
       player.current = null
     }
   }, [])
