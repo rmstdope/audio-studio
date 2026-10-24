@@ -26,6 +26,7 @@ import { decodeClip, ffmpegEncoder, type Encoder } from './audio'
 import { formatEntriesPerLine, readResource, writeAtomic } from './files'
 import type { Limiter } from './limit'
 import type { Transcriber } from './transcriber'
+import { keepHeard } from './heard'
 import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
 import { NO_KEY } from './fish'
@@ -92,6 +93,9 @@ interface Take {
   timed: TimedWord[]
   /** Null when takes are not checked. */
   heard: number | null
+  /** What Whisper heard, and the shown words it missed (none when not checked). */
+  words: string[]
+  missed: number[]
 }
 
 /**
@@ -267,19 +271,21 @@ export async function recordLine(
       const { clip } = made
       let attempt: Take
       if (!checker) {
-        attempt = { clip, timed: alignWords(tokens, [], clip.seconds).timed, heard: null }
+        const timed = alignWords(tokens, [], clip.seconds).timed
+        attempt = { clip, timed, heard: null, words: [], missed: [] }
       } else {
         try {
           const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav)
-          const aligned = alignWords(
-            tokens,
-            heardWords(segments, clip.seconds),
-            clip.seconds,
-            said,
-            knownNames(cast),
-          )
+          const words = heardWords(segments, clip.seconds)
+          const aligned = alignWords(tokens, words, clip.seconds, said, knownNames(cast))
           // Rounded as the lock keeps it, so the line's status agrees with this decision.
-          attempt = { clip, timed: aligned.timed, heard: pyRound(aligned.ratio) }
+          attempt = {
+            clip,
+            timed: aligned.timed,
+            heard: pyRound(aligned.ratio),
+            words: words.map((w) => w.word.trim()),
+            missed: aligned.missed,
+          }
         } catch (error) {
           if (best) break
           return { ok: false, reason: 'transcribe', message: messageOf(error) }
@@ -325,6 +331,7 @@ export async function recordLine(
             duration,
             words: best.timed,
           }
+          const at = new Date().toISOString()
           lock[key] = {
             fp,
             voice: inputs.voice,
@@ -332,13 +339,16 @@ export async function recordLine(
             parts,
             takes,
             ...(best.heard === null ? {} : { heard: best.heard }),
-            at: new Date().toISOString(),
+            at,
           }
           // The lock last: if anything fails before it, the line shows as stale (its old lock entry)
           // or untracked (none), never as up to date.
           await rename(temporary, target)
           await writeAtomic(root, paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
           await writeAtomic(root, paths.lockPath, formatEntriesPerLine(lock))
+          const { heard } = best
+          if (heard !== null)
+            await keepWhatWasHeard(projectFile, partId, key, at, { ...best, heard })
           return []
         },
       )
@@ -378,6 +388,22 @@ function sorted<T>(record: Record<string, T>): Record<string, T> {
       .sort()
       .map((k) => [k, record[k]!]),
   )
+}
+
+/**
+ * Keeps what Whisper heard of a take heard below full, for the page to show beside the text, or
+ * forgets what was kept (heard in full). The studio's own state, not the game's: failing to keep it
+ * fails nothing, the clip and its lock entry are written already.
+ */
+async function keepWhatWasHeard(
+  projectFile: string,
+  partId: string,
+  key: string,
+  at: string,
+  take: { heard: number; words: string[]; missed: number[] },
+): Promise<void> {
+  const line = take.heard < 1 ? { at, words: take.words, missed: take.missed } : null
+  await keepHeard(projectFile, partId, key, line).catch(() => {})
 }
 
 /** What Whisper heard in a WAV: written to a temporary file outside the game, then removed. */
@@ -508,13 +534,15 @@ export async function measureLine(
     return { ok: false, reason: 'decode', message: messageOf(error) }
   }
   const { seconds } = decoded
-  let aligned: { timed: TimedWord[]; ratio: number }
+  let aligned: { timed: TimedWord[]; ratio: number; missed: number[] }
+  let words: string[]
   try {
     // The decoded WAV, as narrate.py --retime transcribes it, so the timings come out the same.
     const segments = await transcribeWav(transcriber, narration.quality.whisperModel, decoded.wav)
     const said = saidWords(line.text, read.input.cast.pronounce)
-    const words = heardWords(segments, seconds)
-    aligned = alignWords(line.text.split(' '), words, seconds, said, knownNames(read.input.cast))
+    const heardNow = heardWords(segments, seconds)
+    aligned = alignWords(line.text.split(' '), heardNow, seconds, said, knownNames(read.input.cast))
+    words = heardNow.map((w) => w.word.trim())
   } catch (error) {
     return { ok: false, reason: 'transcribe', message: messageOf(error) }
   }
@@ -536,6 +564,11 @@ export async function measureLine(
     lock[key] = { ...locked, heard }
     await writeAtomic(root, read.paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
     await writeAtomic(root, read.paths.lockPath, formatEntriesPerLine(lock))
+    await keepWhatWasHeard(projectFile, partId, key, locked.at, {
+      heard,
+      words,
+      missed: aligned.missed,
+    })
     return { ok: true, key, heard, duration }
   })
   return result

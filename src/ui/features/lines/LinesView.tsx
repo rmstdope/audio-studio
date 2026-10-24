@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
 import { clipUrl, usePart, useRecordLines, useSetCue } from '../../api'
@@ -6,6 +6,7 @@ import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { GeneratePanel } from './GeneratePanel'
+import { HeardComparison } from './HeardComparison'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
@@ -31,6 +32,8 @@ export function LinesView({ part }: { part: PartSummary }) {
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
   const [search, setSearch] = useState('')
+  // The line whose take is compared with what Whisper heard, if any.
+  const [comparing, setComparing] = useState<string | null>(null)
 
   const loaded = detail.data?.ok ? detail.data.part : null
   const lines = useMemo(() => {
@@ -162,97 +165,124 @@ export function LinesView({ part }: { part: PartSummary }) {
             </thead>
             <tbody>
               {lines.map((line) => (
-                <tr key={line.key}>
-                  <td>
-                    <StatusPill status={line.status} />
-                    {line.final && (
-                      <span className="final-badge" title="Made with the final model">
-                        final
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="line-cell">
-                      <span className="line-speaker">
-                        {displayName(line.speaker)} <span className="mono muted">{line.key}</span>
-                      </span>
-                      <span className="line-text">{line.text}</span>
-                      {line.status !== 'ok' && (
-                        <span className="line-detail" style={{ color: STATUS[line.status].color }}>
-                          {statusDetail(line, loaded.minHeard)}
+                <Fragment key={line.key}>
+                  <tr>
+                    <td>
+                      <StatusPill status={line.status} />
+                      {line.final && (
+                        <span className="final-badge" title="Made with the final model">
+                          final
                         </span>
                       )}
-                    </div>
-                  </td>
-                  <td>
-                    <CueCell partId={loaded.id} line={line} />
-                  </td>
-                  <td className="mono num">{seconds(line.duration)}</td>
-                  <td className="mono num">{percent(line.heard)}</td>
-                  <td>
-                    <div className="row-actions">
-                      {line.file && (
+                    </td>
+                    <td>
+                      <div className="line-cell">
+                        <span className="line-speaker">
+                          {displayName(line.speaker)} <span className="mono muted">{line.key}</span>
+                        </span>
+                        <span className="line-text">{line.text}</span>
+                        {line.status !== 'ok' && (
+                          <span
+                            className="line-detail"
+                            style={{ color: STATUS[line.status].color }}
+                          >
+                            {statusDetail(line, loaded.minHeard)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <CueCell partId={loaded.id} line={line} />
+                    </td>
+                    <td className="mono num">{seconds(line.duration)}</td>
+                    <td className="mono num">
+                      {line.heard !== null && line.heard < 1 ? (
                         <button
                           type="button"
-                          className="icon-btn"
-                          aria-label={playing === line.key ? 'Stop' : `Play ${line.key}`}
-                          onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
+                          className="heard-btn"
+                          aria-expanded={comparing === line.key}
+                          title="Compare what Whisper heard with the text"
+                          onClick={() => setComparing(comparing === line.key ? null : line.key)}
                         >
-                          {playing === line.key ? <PauseIcon /> : <PlayIcon />}
+                          {percent(line.heard)}
                         </button>
+                      ) : (
+                        percent(line.heard)
                       )}
-                      {RECORDABLE.has(line.status) &&
-                        (recorder.toConfirm[line.key] !== undefined ? (
-                          <>
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        {line.file && (
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label={playing === line.key ? 'Stop' : `Play ${line.key}`}
+                            onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
+                          >
+                            {playing === line.key ? <PauseIcon /> : <PlayIcon />}
+                          </button>
+                        )}
+                        {RECORDABLE.has(line.status) &&
+                          (recorder.toConfirm[line.key] !== undefined ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-primary row-record"
+                                title="The most this line can cost on your Fish account (every take)"
+                                onClick={() =>
+                                  void recorder.record(
+                                    line.key,
+                                    recorder.toConfirm[line.key],
+                                    line.final ? 'final' : 'draft',
+                                  )
+                                }
+                              >
+                                Pay up to {dollars(recorder.toConfirm[line.key]!)}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() => recorder.cancel(line.key)}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
                             <button
                               type="button"
-                              className="btn btn-primary row-record"
-                              title="The most this line can cost on your Fish account (every take)"
+                              className="btn row-record"
+                              disabled={recorder.recording.has(line.key)}
+                              // A final clip is recorded again with the final model, never downgraded.
                               onClick={() =>
                                 void recorder.record(
                                   line.key,
-                                  recorder.toConfirm[line.key],
+                                  undefined,
                                   line.final ? 'final' : 'draft',
                                 )
                               }
                             >
-                              Pay up to {dollars(recorder.toConfirm[line.key]!)}
+                              {recorder.recording.has(line.key)
+                                ? 'Recording…'
+                                : line.status === 'weak'
+                                  ? 'Retake'
+                                  : 'Record'}
                             </button>
-                            <button
-                              type="button"
-                              className="btn"
-                              onClick={() => recorder.cancel(line.key)}
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn row-record"
-                            disabled={recorder.recording.has(line.key)}
-                            // A final clip is recorded again with the final model, never downgraded.
-                            onClick={() =>
-                              void recorder.record(
-                                line.key,
-                                undefined,
-                                line.final ? 'final' : 'draft',
-                              )
-                            }
-                          >
-                            {recorder.recording.has(line.key)
-                              ? 'Recording…'
-                              : line.status === 'weak'
-                                ? 'Retake'
-                                : 'Record'}
-                          </button>
-                        ))}
-                    </div>
-                    {recorder.errors[line.key] && (
-                      <span className="adopt-error row-error">{recorder.errors[line.key]}</span>
-                    )}
-                  </td>
-                </tr>
+                          ))}
+                      </div>
+                      {recorder.errors[line.key] && (
+                        <span className="adopt-error row-error">{recorder.errors[line.key]}</span>
+                      )}
+                    </td>
+                  </tr>
+                  {comparing === line.key && (
+                    <tr className="heard-row">
+                      <td />
+                      <td colSpan={5}>
+                        <HeardComparison partId={loaded.id} lineKey={line.key} text={line.text} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

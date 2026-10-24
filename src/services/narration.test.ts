@@ -4,6 +4,7 @@ import { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from 
 import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { HEARD_DIR, heardFor } from './heard'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import type { FishClient, TtsRequest } from './fish'
@@ -402,6 +403,20 @@ describe('recordLine, checked with Whisper', () => {
     expect(requests).toHaveLength(1)
   })
 
+  it('keeps what Whisper heard of a kept take heard poorly, and forgets it once heard in full', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await recordChecked(root, hearing(['wakes'], ['wakes', 'up.'], ['up.']), fakeFish().fish)
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({
+      ok: true,
+      heard: { at: lock.k1.at, words: ['wakes', 'up.'], missed: [0] },
+    })
+    await recordChecked(root, hearing(['El-ee-or', 'wakes', 'up.']), fakeFish().fish)
+    expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({ ok: true, heard: null })
+    expect(readdirSync(join(root, HEARD_DIR))).toEqual([])
+  })
+
   it('takes again while a take is heard poorly, keeping the first good one', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
@@ -522,6 +537,22 @@ describe('measureLine', () => {
     })
     const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
     expect(lock.k4.heard).toBe(1)
+  })
+
+  it('keeps what Whisper heard of a measured clip heard poorly', async () => {
+    const { root, projectFile } = await recorded()
+    const half: Transcriber = {
+      transcribe: async () => [
+        { start: 0, end: 1, words: [{ word: 'Welcom', start: 0, end: 0.5 }] },
+      ],
+      close() {},
+    }
+    await measureLine(projectFile, 'act1', 'k4', { ...measureOptions, transcriber: half })
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(await heardFor(projectFile, 'act1', 'k4')).toEqual({
+      ok: true,
+      heard: { at: lock.k4.at, words: ['Welcom'], missed: [0] },
+    })
   })
 
   it('makes a clip heard poorly weak', async () => {

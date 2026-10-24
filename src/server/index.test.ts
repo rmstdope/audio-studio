@@ -82,6 +82,13 @@ describe('server', () => {
     expect(body.part.lines[0]).toMatchObject({ key: 'a', status: 'untracked', file: 'a.mp3' })
   })
 
+  it('serves what Whisper heard of a line, and 404 for an unknown line', async () => {
+    const body = await (await fetch(url('/api/parts/act1/lines/a/heard'))).json()
+    expect(body).toEqual({ ok: true, heard: null })
+    expect((await fetch(url('/api/parts/act1/lines/zz/heard'))).status).toBe(404)
+    expect((await fetch(url('/api/parts/act9/lines/a/heard'))).status).toBe(404)
+  })
+
   it('answers an unknown part with 404', async () => {
     expect((await fetch(url('/api/parts/act9'))).status).toBe(404)
   })

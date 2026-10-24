@@ -191,8 +191,8 @@ function spelledAlike(
  * dash, that nobody says), a name heard in its place one letter off (`spelledAlike`; `names` are
  * the known ones, see `knownNames`) counts as matched too, unlike narrate.py, so a name Whisper
  * spells its own way is not taken for a word missed. `said` is the same words as actually said
- * (see `saidWords`), compared in place of the shown ones. Returns the timed words and the share of
- * words that were heard.
+ * (see `saidWords`), compared in place of the shown ones. Returns the timed words, the share of
+ * words that were heard, and the indices of the shown words that were not (`missed`).
  */
 export function alignWords(
   tokens: string[],
@@ -200,7 +200,7 @@ export function alignWords(
   duration: number,
   said?: string[],
   names: ReadonlySet<string> = new Set(),
-): { timed: TimedWord[]; ratio: number } {
+): { timed: TimedWord[]; ratio: number; missed: number[] } {
   const want = (said && said.length === tokens.length ? said : tokens).map(norm)
   const got = heard.map((w) => norm(w.word))
   const times: ([number, number] | null)[] = tokens.map(() => null)
@@ -226,7 +226,8 @@ export function alignWords(
     wantFrom = a + size
     gotFrom = b + size
   }
-  const matched = times.filter((t) => t !== null).length
+  const missed = tokens.flatMap((_, k) => (times[k] ? [] : [k]))
+  const matched = tokens.length - missed.length
 
   let i = 0
   while (i < tokens.length) {
@@ -252,7 +253,7 @@ export function alignWords(
     timed.push({ word, start: pyRound(start), end: pyRound(end) })
     last = start
   })
-  return { timed, ratio: tokens.length ? matched / tokens.length : 1 }
+  return { timed, ratio: tokens.length ? matched / tokens.length : 1, missed }
 }
 
 /**

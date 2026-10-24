@@ -183,6 +183,12 @@ describe('alignWords, names Whisper spells its own way', () => {
     ).toBe(3 / 4)
   })
 
+  it('says which shown words were not heard', () => {
+    const heard = heardAs('This', 'was', 'you', 'know,', 'Arn', 'and', "Lysa's.")
+    expect(alignWords(text.split(' '), heard, 9, undefined, cast).missed).toEqual([2])
+    expect(alignWords(['wait', '—', 'Aren'], heardAs('wait', 'Arn'), 2).missed).toEqual([1])
+  })
+
   it('pairs words only where as many were heard as shown between matches', () => {
     expect(
       alignWords(['and', 'Aren', 'and', 'Lysa'], heardAs('and', 'Arn', 'Ren', 'and', 'Lysa'), 5)

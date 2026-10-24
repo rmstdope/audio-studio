@@ -35,6 +35,7 @@ import {
   type SessionResult,
 } from '../services/sessions'
 import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
+import { heardFor } from '../services/heard'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
 import {
   adoptPart,
@@ -351,6 +352,13 @@ export function startServer({
       '/api/parts/:part/adopt': {
         POST: fromOwnPage(async (request) => {
           const result = await adoptPart(projectFile, request.params.part)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/lines/:key/heard': {
+        GET: guard(async (request) => {
+          const result = await heardFor(projectFile, request.params.part, request.params.key)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
