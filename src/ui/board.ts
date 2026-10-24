@@ -131,9 +131,19 @@ export function isRuledOut(id: string, ruledOut: string[] | null, current: strin
   return id !== current && (ruledOut === null || ruledOut.includes(id))
 }
 
-/** Whether the clip playing (an id like `take:<voice>` or `sample:<voice>`) is of this voice. */
+/** The player's id for a voice's take. */
+export function takeClip(voice: string): string {
+  return `take:${voice}`
+}
+
+/** The player's id for Fish's sample of a voice. */
+export function sampleClip(voice: string): string {
+  return `sample:${voice}`
+}
+
+/** Whether the clip playing is the take or the sample of this voice. */
 export function playsVoice(playing: string | null, voice: string): boolean {
-  return playing === `take:${voice}` || playing === `sample:${voice}`
+  return playing === takeClip(voice) || playing === sampleClip(voice)
 }
 
 /** The voice whose drop the page can offer to undo: the one it dropped, while that is the last. */

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Candidate, Voice } from '../../../core/voiceSearch'
 import { takeUrl } from '../../api'
+import { sampleClip, takeClip } from '../../board'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { compact } from '../../format'
 
@@ -75,11 +76,11 @@ export function VoiceCard({
               type="button"
               className="icon-btn take-play"
               aria-label={
-                playing === `take:${voice.id}` ? 'Stop' : `Play the take of ${voice.title}`
+                playing === takeClip(voice.id) ? 'Stop' : `Play the take of ${voice.title}`
               }
-              onClick={() => toggle(`take:${voice.id}`, takeUrl(take))}
+              onClick={() => toggle(takeClip(voice.id), takeUrl(take))}
             >
-              {playing === `take:${voice.id}` ? <PauseIcon /> : <PlayIcon />}
+              {playing === takeClip(voice.id) ? <PauseIcon /> : <PlayIcon />}
             </button>
             <span className="take-label">Take: the audition phrase in character</span>
           </>
@@ -97,11 +98,11 @@ export function VoiceCard({
               type="button"
               className="icon-btn"
               aria-label={
-                playing === `sample:${voice.id}` ? 'Stop' : `Play Fish’s sample of ${voice.title}`
+                playing === sampleClip(voice.id) ? 'Stop' : `Play Fish’s sample of ${voice.title}`
               }
-              onClick={() => toggle(`sample:${voice.id}`, sample.audio)}
+              onClick={() => toggle(sampleClip(voice.id), sample.audio)}
             >
-              {playing === `sample:${voice.id}` ? <PauseIcon /> : <PlayIcon />}
+              {playing === sampleClip(voice.id) ? <PauseIcon /> : <PlayIcon />}
             </button>
             <span className="muted sample-text" title={sample.text}>
               Fish sample{sample.text ? `: “${sample.text}”` : ''}

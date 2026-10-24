@@ -78,11 +78,15 @@ export function ShortlistBoard({
     // `missing` is new on every render; what it holds is what matters.
   }, [missing.join(',')])
 
+  // Nothing of the board plays on once it is gone (the audition stopped or a voice cast).
+  useEffect(() => stop, [])
+
   const run = (action: SessionAction, onDone?: () => void) => {
     setAsking(null)
     act.mutate(action, { onSuccess: (result) => result.ok && onDone?.() })
   }
   const move = (voice: string, to: 'shortlist' | 'unlist' | 'drop') => {
+    // At once, not when the drop is saved: Drop says the voice has been heard enough.
     if (to === 'drop' && playsVoice(playing, voice)) stop()
     run({ action: 'move', body: { voice, move: to } }, () =>
       setDroppedHere(to === 'drop' ? voice : null),

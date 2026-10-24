@@ -3,8 +3,10 @@ import {
   castEffects,
   droppedRuledOut,
   playsVoice,
+  sampleClip,
   stopEffects,
   stopEffectsFor,
+  takeClip,
   takesToRecord,
   undoFor,
 } from './board'
@@ -163,10 +165,11 @@ describe('stopEffectsFor', () => {
 
 describe('playsVoice', () => {
   it('tells whether what plays is the take or the sample of a voice', () => {
-    expect(playsVoice('take:v1', 'v1')).toBe(true)
-    expect(playsVoice('sample:v1', 'v1')).toBe(true)
-    expect(playsVoice('take:v12', 'v1')).toBe(false)
-    expect(playsVoice('take:v2', 'v1')).toBe(false)
+    expect(playsVoice(takeClip('v1'), 'v1')).toBe(true)
+    expect(playsVoice(sampleClip('v1'), 'v1')).toBe(true)
+    expect(playsVoice(takeClip('v12'), 'v1')).toBe(false)
+    expect(playsVoice(sampleClip('v2'), 'v1')).toBe(false)
+    expect(takeClip('v1')).not.toBe(sampleClip('v1'))
     expect(playsVoice(null, 'v1')).toBe(false)
   })
 })
