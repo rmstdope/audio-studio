@@ -112,6 +112,25 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
   })
 })
 
+describe('alignWords, quoted speech', () => {
+  it('takes single quotes around words for quotes, not part of the words', () => {
+    const text = "'You will need this more than I will.'"
+    const heard = words(
+      ...'You will need this more than I will.'
+        .split(' ')
+        .map((w, i): [string, number, number] => [w, i, i + 0.5]),
+    )
+    expect(alignWords(text.split(' '), heard, 9).ratio).toBe(1)
+    expect(
+      alignWords(
+        ["Lysa's", "elders'", "don't"],
+        words(["Lysa's", 0, 1], ["elders'", 1, 2], ['dont', 2, 3]),
+        3,
+      ).ratio,
+    ).toBe(2 / 3)
+  })
+})
+
 describe('alignWords, names Whisper spells its own way', () => {
   const text = "This was theirs, you know. Aren and Lysa's."
   const heardAs = (...said: string[]) =>
