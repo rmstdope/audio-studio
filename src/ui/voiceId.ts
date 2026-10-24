@@ -19,3 +19,8 @@ export function voiceIdFrom(input: string): string | null {
     return null
   }
 }
+
+/** The voice's page on Fish Audio. */
+export function voiceUrl(id: string): string {
+  return `https://fish.audio/m/${encodeURIComponent(id)}/`
+}

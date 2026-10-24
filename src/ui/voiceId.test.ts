@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { voiceIdFrom } from './voiceId'
+import { voiceIdFrom, voiceUrl } from './voiceId'
 
 describe('voiceIdFrom', () => {
   it('takes a bare id', () => {
@@ -30,5 +30,12 @@ describe('voiceIdFrom', () => {
     expect(voiceIdFrom('')).toBeNull()
     expect(voiceIdFrom('not an id!')).toBeNull()
     expect(voiceIdFrom('https://fish.audio/')).toBeNull()
+  })
+})
+
+describe('voiceUrl', () => {
+  it('gives the voice’s page on Fish Audio, which reads back as its id', () => {
+    expect(voiceUrl('e48a228e21a4')).toBe('https://fish.audio/m/e48a228e21a4/')
+    expect(voiceIdFrom(voiceUrl('e48a228e21a4'))).toBe('e48a228e21a4')
   })
 })

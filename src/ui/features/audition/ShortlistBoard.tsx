@@ -180,7 +180,10 @@ export function ShortlistBoard({
           )}
         </span>
         <span className="spacer" />
-        <a className="btn btn-ghost" href={routeHref({ view: 'characters' })}>
+        <a
+          className="btn btn-ghost"
+          href={routeHref({ view: 'character', character: characterId })}
+        >
           Pause
         </a>
         <button className="btn" type="button" onClick={() => setAsking({ kind: 'stop' })}>
@@ -229,7 +232,7 @@ export function ShortlistBoard({
           onBack={() => setAsking(null)}
           note="To come back to it later instead, pause: the audition stays as it is."
         >
-          <a className="btn" href={routeHref({ view: 'characters' })}>
+          <a className="btn" href={routeHref({ view: 'character', character: characterId })}>
             Pause instead
           </a>
           <button

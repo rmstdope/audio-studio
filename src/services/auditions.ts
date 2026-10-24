@@ -123,6 +123,66 @@ export async function findCandidates(
   }
 }
 
+/** A character's cast voice for its page, or why it cannot be shown. Null for an unknown character. */
+export type CharacterVoiceResult =
+  | {
+      ok: true
+      /** The cast voice's id; null when the character is not cast. */
+      id: string | null
+      /** The cast voice as Fish knows it; null when uncast, or when Fish did not say (`lookup`). */
+      voice: Voice | null
+      /** Why Fish's details of the cast voice are missing, or null. */
+      lookup: string | null
+      /** The key of the cast voice's take of the audition phrase, if recorded. */
+      take: string | null
+      /** What the character says in a take. */
+      audition: AuditionText
+      /** The language voices are searched in. */
+      language: string
+    }
+  | { ok: false; problems: Problem[] }
+  | ProjectFailure
+  | null
+
+/**
+ * A character's cast voice, for its page: Fish's details of it (one lookup, no search), its take
+ * of the audition phrase, and the phrase itself. Without a key, or when Fish fails, says why the
+ * details are missing; the page still shows the voice by its id and cast name.
+ */
+export async function characterVoice(
+  projectFile: string,
+  characterId: string,
+  fishFor: FishFactory,
+): Promise<CharacterVoiceResult> {
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  const { project, summary, cast } = loaded
+  const character = summary.characters.find((c) => c.id === characterId)
+  if (!character) return null
+  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  const audition = auditionFor(cast, characterId, project)
+  const { language } = project.narration.audition
+  const id = character.voice
+  const answer = {
+    ok: true as const,
+    id,
+    voice: null,
+    lookup: null,
+    take: null,
+    audition,
+    language,
+  }
+  if (!id) return answer
+  const take = recordedTakes(dirname(projectFile), project, audition, [id])[id] ?? null
+  const fish = await fishFor(dirname(projectFile), project)
+  if (!fish) return { ...answer, take, lookup: NO_KEY }
+  try {
+    return { ...answer, take, voice: await fish.getVoice(id) }
+  } catch (error) {
+    return { ...answer, take, lookup: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 /** What changing a character did, or why it did nothing. Null for an unknown character. */
 export type CharacterChange =
   { ok: true } | { ok: false; problems: Problem[] } | ProjectFailure | null

@@ -3,6 +3,7 @@ import { Problems } from './components/Problems'
 import { Sidebar } from './components/Sidebar'
 import { AuditionView } from './features/audition/AuditionView'
 import { ChangesView } from './features/changes/ChangesView'
+import { CharacterView } from './features/characters/CharacterView'
 import { CharactersView } from './features/characters/CharactersView'
 import { LinesView } from './features/lines/LinesView'
 import { PartOverview } from './features/overview/PartOverview'
@@ -69,6 +70,8 @@ export function App() {
           <ChangesView summary={summary} />
         ) : route.view === 'characters' ? (
           <CharactersView summary={summary} />
+        ) : route.view === 'character' ? (
+          <CharacterView key={route.character} summary={summary} characterId={route.character} />
         ) : route.view === 'audition' ? (
           <AuditionView key={route.character} summary={summary} characterId={route.character} />
         ) : route.view === 'lines' ? (

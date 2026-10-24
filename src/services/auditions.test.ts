@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
 import {
+  characterVoice,
   findCandidates,
   setKeywords,
   setPhrase,
@@ -145,6 +146,67 @@ describe('findCandidates', () => {
     const root = tempRepo(files)
     expect(
       await findCandidates(join(root, 'audio-studio.json'), 'nobody', async () => fish),
+    ).toBeNull()
+  })
+})
+
+describe('characterVoice', () => {
+  it('gives the cast voice as Fish knows it, its take and the audition phrase', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const recorded = await recordTake(
+      projectFile,
+      'grandmother',
+      'cur',
+      async () => fish,
+      createLimiter(),
+    )
+    const result = await characterVoice(projectFile, 'grandmother', async () => fish)
+    if (!result?.ok || !recorded?.ok) throw new Error(JSON.stringify(result))
+    expect([result.id, result.voice?.title]).toEqual(['cur', 'warm current'])
+    expect(result.lookup).toBeNull()
+    expect(result.take).toBe(recorded.key)
+    expect(result.audition.spoken).toStartWith('[warm] ')
+    expect(result.language).toBe('en')
+  })
+
+  it('has no voice for a character not cast, and asks Fish nothing', async () => {
+    const root = tempRepo(files)
+    let asked = 0
+    const counting: FishClient = { ...fish, getVoice: (id) => (asked++, fish.getVoice(id)) }
+    const result = await characterVoice(
+      join(root, 'audio-studio.json'),
+      'tilda',
+      async () => counting,
+    )
+    expect(result).toMatchObject({ ok: true, id: null, voice: null, lookup: null, take: null })
+    expect(asked).toBe(0)
+  })
+
+  it('says why Fish could not give the details, without a key or when it fails', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const keyless = await characterVoice(projectFile, 'grandmother', async () => null)
+    expect(keyless).toMatchObject({ ok: true, voice: null })
+    expect(keyless?.ok && keyless.lookup).toContain('FISH_AUDIO_API_KEY')
+    const failing: FishClient = { ...fish, getVoice: () => Promise.reject(new Error('busy')) }
+    const failed = await characterVoice(projectFile, 'grandmother', async () => failing)
+    expect(failed).toMatchObject({ ok: true, id: 'cur', voice: null, lookup: 'busy' })
+  })
+
+  it('reports a broken cast, and answers an unknown character with null', async () => {
+    const broken = tempRepo({ ...files, 'tts/cast.json': '{ broken' })
+    const result = await characterVoice(
+      join(broken, 'audio-studio.json'),
+      'tilda',
+      async () => fish,
+    )
+    expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
+      'tts/cast.json',
+    )
+    const root = tempRepo(files)
+    expect(
+      await characterVoice(join(root, 'audio-studio.json'), 'nobody', async () => fish),
     ).toBeNull()
   })
 })

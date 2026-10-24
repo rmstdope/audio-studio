@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { LineState } from '../core/planner'
-import { percent, reasonCounts, seconds, statusDetail } from './status'
+import { linesSummary, percent, reasonCounts, seconds, speakerCounts, statusDetail } from './status'
 
 function line(overrides: Partial<LineState>): LineState {
   return {
@@ -56,5 +56,24 @@ describe('formatting', () => {
     expect(percent(null)).toBe('—')
     expect(seconds(4.24)).toBe('4.2s')
     expect(seconds(null)).toBe('—')
+  })
+})
+
+describe('speakerCounts', () => {
+  it('counts the statuses of one speaker’s lines', () => {
+    const lines = [
+      line({ status: 'ok' }),
+      line({ status: 'weak' }),
+      line({ status: 'ok' }),
+      line({ speaker: 'tilda', status: 'stale' }),
+    ]
+    expect(speakerCounts(lines, 'mira')).toEqual({ ok: 2, weak: 1 })
+  })
+})
+
+describe('linesSummary', () => {
+  it('says what lines need, or that all are up to date', () => {
+    expect(linesSummary({ ok: 2, weak: 1, stale: 2 })).toBe('2 stale · 1 weak')
+    expect(linesSummary({ ok: 3 })).toBe('all up to date')
   })
 })

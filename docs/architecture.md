@@ -120,7 +120,7 @@ audio-studio/
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
 │   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
-│   │   ├── auditions.ts         candidates for a character; changes to the cast, one at a time
+│   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
 │   │   ├── takes.ts             audition takes: recorded once, cached by what they are made of
@@ -139,6 +139,7 @@ audio-studio/
 │       ├── features/
 │       │   ├── overview/        part dashboard, cast grid
 │       │   ├── audition/        the audition board, ruled-out voices
+│       │   ├── characters/      all characters, a character's page, the casting brief
 │       │   └── narration/       line table, plan, job progress, inspector
 │       └── components/          buttons, chips, waveform, player, status pills
 ├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
@@ -334,11 +335,11 @@ the truth.
 
 ### 8.1 Audition (casting a voice)
 
-This is the audition being built in step 9 (§12). Built so far: ruled-out voices (9.1) and the
-shortlist board (9.2); the audition is started from, and its ruled-out voices listed on, the
-audition page until the character page (9.3) takes its place.
+This is the audition being built in step 9 (§12). Built so far: ruled-out voices (9.1), the
+shortlist board (9.2) and the character page (9.3); hearing the character's recorded lines on
+its page comes with 9.4.
 
-Every character has a **character page** (`#/characters/<id>`, from 9.3), the one place about
+Every character has a **character page** (`#/characters/<id>`), the one place about
 it: its cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish), its
 lines per part, its delivery (the style cue) and casting brief (search keywords and audition
 phrase), the voices ruled out for it, and the audition in progress, if there is one. An audition
@@ -375,8 +376,7 @@ An audition is for a character, not for a part: the result applies to every part
   audition. Keeping the current voice ends the audition with the cast unchanged.
 - Only Drop rules a voice out. The voice replaced by a cast, and the shortlisted and unheard
   voices of an audition, can come back in a later one.
-- **Pause** leaves the audition as it is (it is saved after every change) for the character page
-  (for now, the list of characters);
+- **Pause** leaves the audition as it is (it is saved after every change) for the character page;
   **Stop audition** ends it without casting, after saying what that means. Its dropped voices
   stay ruled out. The cast voice can be dropped from the board, but it is never ruled out: it
   takes part in every audition.
@@ -465,8 +465,8 @@ generation while the script and cast still change) and `final` (the recording th
 
 Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's status),
 `POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
-`GET /api/characters/:id/candidates` (voices matching the character's keywords, with its current
-voice, the audition phrase and the takes already recorded), `PATCH /api/characters/:id`
+`GET /api/characters/:id/voice` (its cast voice as Fish knows it, its take and the audition
+phrase; one lookup, no search), `PATCH /api/characters/:id`
 (keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`
 `POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
 `{ confirmedCost }` on a paid model, else 409 with the ceiling to confirm),
@@ -494,7 +494,7 @@ GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no si
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
-GET    /api/characters/:id/candidates            voices matching the keywords, current voice
+GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
 GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
 DELETE /api/characters/:id/ruled-out             forget them all
 DELETE /api/characters/:id/ruled-out/:voice      allow one again
@@ -513,7 +513,6 @@ POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | fi
 GET    /api/parts/:part/jobs/latest              the part's latest job
 GET    /api/jobs/:id                             a job's progress (polled while it runs)
 DELETE /api/jobs/:id                             cancel
-GET    /api/characters/:id/audition?voices=   the audition phrase and which voices have takes
 POST   /api/characters/:id/takes             record a take (own page only)
 GET    /api/takes/:key.mp3                   a recorded take
 GET    /api/changes                              git status of project paths
@@ -650,8 +649,10 @@ Small, independently useful increments:
       shortlisted voice after saying what goes stale; Pause, and Stop audition after saying what
       it means. Takes record by themselves. Rounds are gone; an audition saved in rounds is no
       longer one in progress.
-   3. **Character page**: the voice, lines per part, delivery and casting brief, ruled-out
-      voices and the audition in progress, in place of today's audition landing page.
+   3. **Character page** (built): the cast voice (Fish's details, its take, recorded by itself,
+      and sample, its page on Fish), the lines per part, delivery and casting brief, ruled-out
+      voices, and the audition in progress (resume, or stop after saying what it means). The
+      audition page shows only the board; the list of matching voices before an audition is gone.
    4. **Hear it in the game**: the character's recorded lines on its page, played one by one or in
       turn.
 
