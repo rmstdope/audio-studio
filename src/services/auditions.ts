@@ -15,6 +15,7 @@ import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import { NO_KEY, type FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
+import { ruledOutIds } from './ruledOut'
 import { auditionFor, castProblems, phrasePath, recordedTakes } from './takes'
 import { createSerial } from './serial'
 import { searchVoices } from './voiceSearch'
@@ -56,7 +57,10 @@ export interface SearchOptions {
   exclude?: Iterable<string>
 }
 
-/** Searches Fish's library with a character's audition keywords, leaving out its current voice. */
+/**
+ * Searches Fish's library with a character's audition keywords, leaving out its current voice and
+ * the voices ruled out for it.
+ */
 export async function findCandidates(
   projectFile: string,
   characterId: string,
@@ -85,6 +89,7 @@ export async function findCandidates(
     // Left out before the list is cut, so a later search reaches voices past the first ones.
     const exclude = new Set([
       ...(character.voice ? [character.voice] : []),
+      ...(await ruledOutIds(projectFile, characterId)),
       ...(options.exclude ?? []),
     ])
     const found = keywords.length

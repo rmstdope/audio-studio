@@ -19,6 +19,7 @@ import type { GenerationPlan } from '../core/generation'
 import type { Problem } from '../core/project'
 import type { JobState } from '../services/jobs'
 import type { RecordResult } from '../services/narration'
+import type { RuledOutResult } from '../services/ruledOut'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { AuditionTakesResult, TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
@@ -448,6 +449,10 @@ export function useSessionAction(characterId: string) {
     },
     onSuccess: (view) => {
       if (!view.ok) return
+      // A drop rules a voice out, taking it back or adding a voice by id allows it again; the
+      // candidates shown once the audition ends leave out what is ruled out.
+      void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
+      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
       // An answer without the recorded lines (after a verdict) keeps the ones shown.
       client.setQueryData<SessionView>(['session', characterId], (old) =>
         view.recorded === undefined && old?.ok ? { ...view, recorded: old.recorded } : view,
@@ -485,6 +490,50 @@ export function useCast(characterId: string) {
       client.setQueryData<SessionView>(['session', characterId], () => ended)
       void client.invalidateQueries({ queryKey: ['project'] })
       void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
+    },
+  })
+}
+
+/** The voices ruled out for a character (dropped in auditions), the latest first. */
+export function useRuledOut(characterId: string) {
+  return useQuery({
+    queryKey: ['ruled-out', characterId],
+    queryFn: async () => {
+      const path = `/api/characters/${encodeURIComponent(characterId)}/ruled-out`
+      const response = await fetch(path)
+      if (!response.ok && response.status !== 409)
+        throw new Error(`${path} answered ${response.status}`)
+      return okRuledOut((await response.json()) as NonNullable<RuledOutResult>)
+    },
+  })
+}
+
+/** Ruled-out voices, or an error naming what is wrong with the project. */
+function okRuledOut(result: NonNullable<RuledOutResult>) {
+  if (!result.ok) throw new Error(result.problems.map((p) => `${p.file}: ${p.message}`).join('; '))
+  return result
+}
+
+/**
+ * Allows ruled-out voices again: one by its id, or every one (null), forgetting them all. Searches for the
+ * character may show them again, so its candidates are searched again.
+ */
+export function useAllowVoices(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `ruled-out-${characterId}` },
+    mutationFn: async (voice: string | null) => {
+      const base = `/api/characters/${encodeURIComponent(characterId)}/ruled-out`
+      const path = voice === null ? base : `${base}/${encodeURIComponent(voice)}`
+      const response = await fetch(path, { method: 'DELETE' })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`allowing voices again answered ${response.status}`)
+      }
+      return okRuledOut((await response.json()) as NonNullable<RuledOutResult>)
+    },
+    onSuccess: (result) => {
+      client.setQueryData(['ruled-out', characterId], result)
       void client.invalidateQueries({ queryKey: ['candidates', characterId] })
     },
   })

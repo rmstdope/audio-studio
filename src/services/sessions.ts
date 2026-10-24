@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import {
@@ -7,8 +6,10 @@ import {
   bringMore,
   finalist,
   queueMore,
+  setVerdict,
   startSession,
   type AuditionSession,
+  type Verdict,
 } from '../core/audition'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
@@ -16,10 +17,17 @@ import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import type { Candidate } from '../core/voiceSearch'
 import { findCandidates, setVoice, type FishFactory } from './auditions'
-import { readJson, writeAtomic } from './files'
+import { characterFile, readJson, writeAtomic } from './files'
+import { updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
 import { auditionTakes } from './takes'
-import { loadPart, loadWorkspace, openProject, type ProjectFailure } from './workspace'
+import {
+  knownCharacter,
+  loadPart,
+  loadWorkspace,
+  openProject,
+  type ProjectFailure,
+} from './workspace'
 
 /** Where audition sessions are kept, in the project's tool cache. */
 export const SESSIONS_DIR = '.audio-studio/auditions'
@@ -76,7 +84,10 @@ export function startAudition(
 
 /**
  * Applies `change` to the character's saved session and saves the result; a change may instead
- * say why it did nothing, and then nothing is saved.
+ * say why it did nothing, and then nothing is saved; a change that changes nothing saves nothing
+ * either. `alongside` writes what goes with the change (the ruled-out voices), before the session
+ * and before the next change may start: what it writes follows the session's changes in their
+ * order, and if it fails, the session is left as it was.
  */
 export function changeSession(
   projectFile: string,
@@ -84,6 +95,7 @@ export function changeSession(
   change: (
     session: AuditionSession,
   ) => AuditionSession | SessionFailure | Promise<AuditionSession | SessionFailure>,
+  alongside?: (session: AuditionSession) => Promise<unknown>,
 ): Promise<SessionResult> {
   return sessionWrites.run(key(projectFile, characterId), async () => {
     const known = await knownCharacter(projectFile, characterId)
@@ -98,9 +110,38 @@ export function changeSession(
     }
     const changed = await change(session)
     if ('ok' in changed) return changed
+    if (changed === session) return { ok: true, session }
+    await alongside?.(changed)
     await writeSession(projectFile, characterId, changed)
     return { ok: true, session: changed }
   })
+}
+
+/**
+ * Sets the verdict on a voice in the round (null clears it). A dropped voice is ruled out for the
+ * character, so no later search shows it again; taking the drop back allows it again. The current
+ * voice is never ruled out: it takes part in every audition.
+ */
+export function judge(
+  projectFile: string,
+  characterId: string,
+  voice: string,
+  verdict: Verdict | null,
+): Promise<SessionResult> {
+  return changeSession(
+    projectFile,
+    characterId,
+    (s) => setVerdict(s, voice, verdict),
+    async (session) => {
+      if (!session.pool.includes(voice) || voice === session.current) return
+      const title = session.voices[voice]?.title ?? voice
+      await updateRuledOut(
+        projectFile,
+        characterId,
+        session.verdicts[voice] === 'drop' ? { out: [{ id: voice, title }] } : { allowed: [voice] },
+      )
+    },
+  )
 }
 
 /**
@@ -152,22 +193,28 @@ export async function addVoiceById(
 ): Promise<SessionResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
-  return changeSession(projectFile, characterId, async (session) => {
-    const seen = seenMessage(session, voiceId)
-    if (seen) return { ok: false, reason: 'seen', message: seen }
-    const queued = session.queue.includes(voiceId) ? session.voices[voiceId] : undefined
-    if (queued) return addVoice(session, queued)
-    const fish = await fishFor(dirname(projectFile), opened.project)
-    if (!fish) {
-      return { ok: false, reason: 'no-key', message: 'Set FISH_AUDIO_API_KEY to look voices up.' }
-    }
-    try {
-      return addVoice(session, await fish.getVoice(voiceId))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      return { ok: false, reason: 'fish', message }
-    }
-  })
+  return changeSession(
+    projectFile,
+    characterId,
+    async (session) => {
+      const seen = seenMessage(session, voiceId)
+      if (seen) return { ok: false, reason: 'seen', message: seen }
+      const queued = session.queue.includes(voiceId) ? session.voices[voiceId] : undefined
+      if (queued) return addVoice(session, queued)
+      const fish = await fishFor(dirname(projectFile), opened.project)
+      if (!fish) {
+        return { ok: false, reason: 'no-key', message: 'Set FISH_AUDIO_API_KEY to look voices up.' }
+      }
+      try {
+        return addVoice(session, await fish.getVoice(voiceId))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { ok: false, reason: 'fish', message }
+      }
+    },
+    // Asking for a voice by its id is wanting to hear it: it is no longer ruled out.
+    () => updateRuledOut(projectFile, characterId, { allowed: [voiceId] }),
+  )
 }
 
 /** Why a voice cannot be added to the audition, or null if it can. */
@@ -297,15 +344,6 @@ export async function viewOf(
   }
 }
 
-async function knownCharacter(
-  projectFile: string,
-  characterId: string,
-): Promise<true | ProjectFailure | null> {
-  const loaded = await loadWorkspace(projectFile)
-  if (!loaded.ok) return loaded
-  return loaded.summary.characters.some((c) => c.id === characterId) ? true : null
-}
-
 /** The saved session; none if there is no file, or it does not fit (an older version, a hand edit). */
 async function readSession(
   projectFile: string,
@@ -329,11 +367,8 @@ function key(projectFile: string, characterId: string): string {
   return `${projectFile}\n${characterId}`
 }
 
-/** A session's file: a readable name plus a short hash, so any character id makes a safe name. */
 function sessionFile(characterId: string): string {
-  const readable = characterId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 40)
-  const hash = createHash('sha256').update(characterId).digest('hex').slice(0, 8)
-  return `${SESSIONS_DIR}/${readable}-${hash}.json`
+  return characterFile(SESSIONS_DIR, characterId)
 }
 
 function sessionPath(projectFile: string, characterId: string): string {

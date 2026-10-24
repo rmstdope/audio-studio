@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
@@ -11,10 +11,20 @@ import {
   discardSession,
   moreVoices,
   recordedLines,
+  judge,
   sessionFor,
   startAudition,
 } from './sessions'
+import { allowVoices, ruledOutIds, updateRuledOut } from './ruledOut'
 import { setKeywords } from './auditions'
+
+/** Rules voices out, as a drop does. */
+const ruleOutVoices = (
+  projectFile: string,
+  characterId: string,
+  voices: { id: string; title: string }[],
+  at?: Date,
+) => updateRuledOut(projectFile, characterId, { out: voices }, at)
 
 function voice(id: string, title = `Warm ${id}`, uses = 10): Voice {
   return {
@@ -324,5 +334,90 @@ describe('discardSession', () => {
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
     expect(readdirSync(join(root, '.audio-studio/auditions'))).toEqual([])
     expect(existsSync(join(root, 'tts/cast.json'))).toBe(true)
+  })
+})
+
+describe('ruled-out voices in an audition', () => {
+  it('rules a voice out when it is dropped, and allows it again when the drop is taken back', async () => {
+    const { projectFile } = await started()
+    const dropped = await judge(projectFile, 'mira', 'a', 'drop')
+    expect(dropped?.ok && dropped.session.verdicts).toEqual({ a: 'drop' })
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
+    await judge(projectFile, 'mira', 'b', 'keep')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
+    await judge(projectFile, 'mira', 'a', null)
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+
+  it('keeps the two files in step when verdicts on a voice are given at once', async () => {
+    for (const order of [['drop', null] as const, [null, 'drop'] as const]) {
+      const { projectFile } = await started()
+      await Promise.all(order.map((verdict) => judge(projectFile, 'mira', 'a', verdict)))
+      const saved = await sessionFor(projectFile, 'mira')
+      const dropped = saved?.ok && saved.session?.verdicts.a === 'drop'
+      expect(await ruledOutIds(projectFile, 'mira')).toEqual(dropped ? ['a'] : [])
+    }
+  })
+
+  it('changes nothing when the ruled-out voices cannot be saved', async () => {
+    const { root, projectFile } = await started()
+    writeFileSync(join(root, '.audio-studio/ruled-out'), 'in the way')
+    await expect(judge(projectFile, 'mira', 'a', 'drop')).rejects.toThrow()
+    const saved = await sessionFor(projectFile, 'mira')
+    expect(saved?.ok && saved.session?.verdicts).toEqual({})
+  })
+
+  it('keeps a voice dropped in the round dropped when it is allowed again from the list', async () => {
+    const { projectFile } = await started()
+    await judge(projectFile, 'mira', 'a', 'drop')
+    await allowVoices(projectFile, 'mira', ['a'])
+    await judge(projectFile, 'mira', 'b', 'keep')
+    const saved = await sessionFor(projectFile, 'mira')
+    expect(saved?.ok && saved.session?.verdicts.a).toBe('drop')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+
+  it('never rules out the current voice', async () => {
+    const { projectFile } = await started()
+    await judge(projectFile, 'mira', 'cur', 'drop')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+
+  it('rules out nothing for a voice not in the round', async () => {
+    const { projectFile } = await started()
+    await judge(projectFile, 'mira', 'g', 'drop')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+
+  it('leaves voices ruled out earlier out of a new audition and of later searches', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await ruleOutVoices(projectFile, 'mira', [
+      { id: 'a', title: 'Warm a' },
+      { id: 'e', title: 'Warm e' },
+    ])
+    const result = await startAudition(projectFile, 'mira', fishFor)
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.session.pool).toEqual(['cur', 'b', 'c', 'd'])
+    expect(result.session.queue).toEqual(['f', 'g'])
+    const more = await moreVoices(projectFile, 'mira', fishFor)
+    expect(more?.ok && more.session.pool).toEqual(['cur', 'b', 'c', 'd', 'f', 'g'])
+  })
+
+  it('allows a ruled-out voice again when it is brought in by its id', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await ruleOutVoices(projectFile, 'mira', [{ id: 'a', title: 'Warm a' }])
+    await startAudition(projectFile, 'mira', fishFor)
+    const added = await addVoiceById(projectFile, 'mira', 'a', fishFor)
+    expect(added?.ok && added.session.pool.at(-1)).toBe('a')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+
+  it('keeps a voice dropped in this audition ruled out when it is asked for by id', async () => {
+    const { projectFile } = await started()
+    await judge(projectFile, 'mira', 'a', 'drop')
+    expect(await addVoiceById(projectFile, 'mira', 'a', fishFor)).toMatchObject({ reason: 'seen' })
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
   })
 })

@@ -21,12 +21,14 @@ import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { measureLine, recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
-import { nextRound, setVerdict } from '../core/audition'
+import { nextRound } from '../core/audition'
+import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
   castFinalist,
   changeSession,
   discardSession,
+  judge,
   moreVoices,
   sessionFor,
   startAudition,
@@ -126,12 +128,15 @@ const RecordBody = z
   })
   .strict()
 
+/** What a Fish voice id may look like: letters, digits, `_` and `-`. */
+const VOICE_ID = /^[\w-]{1,64}$/
+
 const VerdictBody = z.object({
-  voice: z.string().regex(/^[\w-]{1,64}$/),
+  voice: z.string().regex(VOICE_ID),
   verdict: z.enum(['keep', 'drop']).nullable(),
 })
 
-const TakeBody = z.object({ voice: z.string().regex(/^[\w-]{1,64}$/) })
+const TakeBody = z.object({ voice: z.string().regex(VOICE_ID) })
 
 const notFound = () => Response.json({ error: 'not found' }, { status: 404 })
 
@@ -165,6 +170,13 @@ export function startServer({
 }: ServerOptions) {
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
+  /** A character's ruled-out voices as an answer: 404 for an unknown character, 409 for a broken project. */
+  async function ruledOut(pending: Promise<RuledOutResult>): Promise<Response> {
+    const result = await pending
+    if (!result) return notFound()
+    return Response.json(result, { status: result.ok ? 200 : 409 })
+  }
+
   /** A session action's answer: the session as the page shows it; 404 for an unknown character. */
   async function answer(
     characterId: string,
@@ -559,7 +571,7 @@ export function startServer({
         GET: guard(async (request) => {
           const voices = (new URL(request.url).searchParams.get('voices') ?? '')
             .split(',')
-            .filter((voice) => /^[\w-]{1,64}$/.test(voice))
+            .filter((voice) => VOICE_ID.test(voice))
             .slice(0, 50)
           const result = await auditionTakes(projectFile, request.params.id, voices)
           return result ? Response.json(result) : notFound()
@@ -595,10 +607,7 @@ export function startServer({
           }
           const { voice, verdict } = body.data
           const { id } = request.params
-          return answer(
-            id,
-            changeSession(projectFile, id, (s) => setVerdict(s, voice, verdict)),
-          )
+          return answer(id, judge(projectFile, id, voice, verdict))
         }),
       },
       '/api/auditions/:id/next': {
@@ -626,6 +635,20 @@ export function startServer({
           const result = await castFinalist(projectFile, request.params.id)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/characters/:id/ruled-out': {
+        GET: guard(async (request) => ruledOut(ruledOutVoices(projectFile, request.params.id))),
+        DELETE: fromOwnPage((request) =>
+          ruledOut(allowVoices(projectFile, request.params.id, 'all')),
+        ),
+      },
+      '/api/characters/:id/ruled-out/:voice': {
+        DELETE: fromOwnPage(async (request) => {
+          const { id, voice } = request.params
+          if (!VOICE_ID.test(voice))
+            return Response.json({ error: 'not a voice id' }, { status: 400 })
+          return ruledOut(allowVoices(projectFile, id, [voice]))
         }),
       },
       '/api/takes/:file': {
