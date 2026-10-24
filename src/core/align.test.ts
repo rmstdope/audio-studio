@@ -235,6 +235,8 @@ describe('alignWords, quoted speech', () => {
   it("takes the two spellings of a possessive after s for one (Sorceress's, Sorceress')", () => {
     const heard = words(['You', 0, 1], ['received', 1, 2], ["Sorceress'", 2, 3], ['Truth.', 3, 4])
     expect(alignWords("You received Sorceress's Truth!".split(' '), heard, 4).ratio).toBe(1)
+    const back = words(["Sorceress's", 0, 1], ['Truth.', 1, 2])
+    expect(alignWords(["Sorceress'", 'Truth.'], back, 2).ratio).toBe(1)
     const its = words(['it', 0, 1], ['is', 1, 2])
     expect(alignWords(["it's", 'is'], its, 2).missed).toEqual([0])
   })
