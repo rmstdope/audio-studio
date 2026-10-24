@@ -6,6 +6,7 @@ import {
   castEffects,
   droppedRuledOut,
   isRuledOut,
+  playsVoice,
   stopEffectsFor,
   takesToRecord,
   undoFor,
@@ -32,6 +33,7 @@ export function ShortlistBoard({
   view,
   playing,
   toggle,
+  stop,
   cast,
   titles,
 }: {
@@ -43,6 +45,8 @@ export function ShortlistBoard({
   view: Extract<SessionView, { ok: true }> & { session: AuditionSession }
   playing: string | null
   toggle: (id: string, url: string) => void
+  /** Stops what plays: a dropped voice is not heard on after its card is gone. */
+  stop: () => void
   /** Casting, owned by the page so its result outlives the board. */
   cast: ReturnType<typeof useCast>
   /** Short part titles by id, for saying where lines go stale. */
@@ -78,10 +82,12 @@ export function ShortlistBoard({
     setAsking(null)
     act.mutate(action, { onSuccess: (result) => result.ok && onDone?.() })
   }
-  const move = (voice: string, to: 'shortlist' | 'unlist' | 'drop') =>
+  const move = (voice: string, to: 'shortlist' | 'unlist' | 'drop') => {
+    if (to === 'drop' && playsVoice(playing, voice)) stop()
     run({ action: 'move', body: { voice, move: to } }, () =>
       setDroppedHere(to === 'drop' ? voice : null),
     )
+  }
   const undoable = undoFor(droppedHere, session.dropped)
   const title = (id: string) => session.voices[id]?.title || 'Untitled voice'
   const current = session.current ? title(session.current) : null

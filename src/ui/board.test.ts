@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   castEffects,
   droppedRuledOut,
+  playsVoice,
   stopEffects,
   stopEffectsFor,
   takesToRecord,
@@ -157,5 +158,15 @@ describe('stopEffectsFor', () => {
         shortlisted: 1,
       }),
     )
+  })
+})
+
+describe('playsVoice', () => {
+  it('tells whether what plays is the take or the sample of a voice', () => {
+    expect(playsVoice('take:v1', 'v1')).toBe(true)
+    expect(playsVoice('sample:v1', 'v1')).toBe(true)
+    expect(playsVoice('take:v12', 'v1')).toBe(false)
+    expect(playsVoice('take:v2', 'v1')).toBe(false)
+    expect(playsVoice(null, 'v1')).toBe(false)
   })
 })

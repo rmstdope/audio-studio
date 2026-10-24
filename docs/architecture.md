@@ -371,7 +371,7 @@ An audition is for a character, not for a part: the result applies to every part
   the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
   **Bring in a specific voice** adds one by its Fish id or URL.
 - **Drop** takes a voice out of the audition at once and rules it out for the character: no later
-  search for it shows that voice again. The last drop can be undone. The character page lists
+  search for it shows that voice again. Its take or sample stops if it is playing. The last drop can be undone. The character page lists
   the ruled-out voices; one can be allowed again, or all of them forgotten so every voice is in
   the running again. Bringing in a ruled-out voice by its id allows it again.
 - **Shortlist** moves a voice to the shortlist, **Unlist** back to the voices to hear. The current
