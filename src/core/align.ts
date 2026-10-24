@@ -200,8 +200,9 @@ function soundOf(word: string): string {
  * is) unless it is a known name, of at least four letters (apostrophes and a possessive 's not
  * counted) and nothing else, and the heard one is one letter apart, as spelled or as they sound
  * (`soundOf`, where that leaves four letters), or, for a known name heard as one word Whisper
- * capitalised (`written`), only its vowels other as they sound (`vowelsApart`). Lowercase words, short ones and numbers are left
- * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
+ * wrote as a name (`asName`), only its vowels other as they sound (`vowelsApart`). Lowercase
+ * words, short ones and numbers are left out, where one letter makes another word ("never" and
+ * "ever", "was" and "has", 1984 and 1985).
  */
 function spelledAlike(
   shown: string,
@@ -209,9 +210,9 @@ function spelledAlike(
   want: string,
   got: string,
   names: ReadonlySet<string>,
-  written?: string,
+  asName = false,
 ): boolean {
-  if (!/^[^A-Za-z0-9]*[A-Z]/.test(shown) || !/[a-z]/.test(shown)) return false
+  if (!capitalised(shown) || !/[a-z]/.test(shown)) return false
   const known = names.has(bare(shown))
   if (atStart && !known) return false
   if (!isWord(want, 4) || !isWord(got)) return false
@@ -220,7 +221,20 @@ function spelledAlike(
   const [a, b] = [soundOf(want), soundOf(got)]
   if (Math.min(a.length, b.length) >= 4 && (a === b || oneLetterApart(a, b))) return true
   // A known name with other vowels ("Elior" as "Ilyar"), heard as one word Whisper wrote as a name.
-  return known && !!written && /^[^A-Za-z0-9]*[A-Z]/.test(written) && vowelsApart(a, b)
+  return known && asName && vowelsApart(a, b)
+}
+
+/** Whether a word starts with a capital, past any quotes or brackets. */
+function capitalised(word: string): boolean {
+  return /^[^A-Za-z0-9]*[A-Z]/.test(word)
+}
+
+/**
+ * Whether Whisper wrote the `i`th of `words` as a name: capitalised where no sentence of its
+ * starts, since it capitalises every word that does ("More, wait" is no name).
+ */
+function writtenAsName(words: string[], i: number): boolean {
+  return capitalised(words[i]!) && !startsSentence(words, i)
 }
 
 /**
@@ -229,7 +243,7 @@ function spelledAlike(
  */
 function vowelsApart(x: string, y: string): boolean {
   const vowel = (c: string) => 'aeiou'.includes(c)
-  if (x === y || x.length !== y.length || x.replace(/[aeiou]/g, '').length < 2) return false
+  if (x.length !== y.length || x.replace(/[aeiou]/g, '').length < 2) return false
   return [...x].every((c, k) => c === y[k] || (vowel(c) && vowel(y[k]!)))
 }
 
@@ -325,13 +339,23 @@ function alignGap(
   // in its place one letter off, word for word.
   const shownWords: number[] = []
   for (let i = from; i < to; i++) if (norm(said[i]!)) shownWords.push(i)
+  const written = heard.map((w) => w.word.trim())
   const heardWords: number[] = []
   for (let j = hFrom; j < hTo; j++) if (norm(heard[j]!.word)) heardWords.push(j)
   if (shownWords.length === heardWords.length) {
     shownWords.forEach((i, k) => {
       const w = heard[heardWords[k]!]!
       const atStart = startsSentence(tokens, i)
-      if (spelledAlike(tokens[i]!, atStart, norm(said[i]!), norm(w.word), names, w.word)) {
+      if (
+        spelledAlike(
+          tokens[i]!,
+          atStart,
+          norm(said[i]!),
+          norm(w.word),
+          names,
+          writtenAsName(written, heardWords[k]!),
+        )
+      ) {
         times[i] = [w.start, w.end]
       }
     })
@@ -339,6 +363,8 @@ function alignGap(
 
   const pieces = piecesOf(tokens, said, from, to)
   const parts = heardParts(heard.slice(hFrom, hTo))
+  // The heard words before the gap, then its parts, to tell where Whisper starts a sentence.
+  const partsWritten = [...written.slice(0, hFrom), ...parts.map((p) => p.word.trim())]
   if (!pieces.length || !parts.length) return
   const want = pieces.map((p) => p.want)
   const got = parts.map((w) => norm(w.word))
@@ -373,8 +399,8 @@ function alignGap(
     if (!guess || n < 1) return null
     const piece = pieces[s]!
     const spelled = got.slice(h, h + n).join('')
-    const written = n === 1 ? parts[h]!.word : undefined
-    if (!spelledAlike(piece.shown, piece.atStart, want[s]!, spelled, names, written)) return null
+    const asName = n === 1 && writtenAsName(partsWritten, hFrom + h)
+    if (!spelledAlike(piece.shown, piece.atStart, want[s]!, spelled, names, asName)) return null
     return { shown: 1, heard: n, apply: () => take(s, h, h + n - 1) }
   }
 

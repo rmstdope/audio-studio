@@ -438,6 +438,18 @@ describe('alignWords, names Whisper spells its own way', () => {
     }
   })
 
+  it('does not count a word Whisper capitalised only to start a sentence', () => {
+    const names = new Set(['mira', 'aren', 'lysa', 'elior'])
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, names).missed
+    expect(missed('Mira, wait here.', 'More, wait here.')).toEqual([0])
+    expect(missed('Aren, go now.', 'Iron, go now.')).toEqual([0])
+    expect(missed('Lysa, come back.', 'Lose, come back.')).toEqual([0])
+    expect(missed('and Mira, wait', 'and. More, wait')).toEqual([1])
+    expect(missed('Elior, wait.', 'Ilyar, wait.')).toEqual([0])
+    expect(missed('so, Elior, wait.', 'so, Ilyar, wait.')).toEqual([])
+  })
+
   it('pairs words only where as many were heard as shown between matches', () => {
     expect(
       alignWords(['and', 'Aren', 'and', 'Lysa'], heardAs('and', 'Arn', 'Ren', 'and', 'Lysa'), 5)
