@@ -52,3 +52,17 @@ export function dollars(amount: number): string {
   if (amount > 0 && amount < 0.005) return 'under $0.01'
   return `$${amount.toFixed(2)}`
 }
+
+/**
+ * An amount rounded up to the next cent: what a "Pay up to" button shows and sends, so the amount
+ * agreed is never less than the amount shown, and never less than the cost.
+ */
+export function centsUp(amount: number): number {
+  // Floating point can put a whole number of cents a hair above (0.42 * 100); the cent below is
+  // taken only when it still covers the amount, so the result is never less than the amount.
+  let cents = Math.ceil(amount * 100)
+  if ((cents - 1) / 100 >= amount) cents -= 1
+  // amount * 100 can itself round down onto a whole cent (0.35000000000000003 * 100 is 35).
+  if (cents / 100 < amount) cents += 1
+  return cents / 100
+}

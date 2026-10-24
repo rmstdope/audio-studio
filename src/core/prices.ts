@@ -18,3 +18,8 @@ export function priceOf(model: string, at: Date): number | undefined {
   const { promotion } = entry
   return promotion && at < new Date(promotion.until) ? promotion.price : entry.price
 }
+
+/** Whether the studio knows a model's price, so it can say what using it costs. */
+export function isPriced(model: string): boolean {
+  return Object.hasOwn(PRICES, model)
+}

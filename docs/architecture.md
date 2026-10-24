@@ -104,6 +104,7 @@ audio-studio/
 │   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
 │   │   ├── pronounce.ts         the pronunciation table's rules (cleaning, problems)
 │   │   ├── prices.ts            Fish's prices per model, promotions with their end
+│   │   ├── spend.ts             whether a paid recording may start (confirmed, covered)
 │   │   ├── changes.ts           git status output parsed and grouped by part
 │   │   ├── dialogDiff.ts        what a refreshed dialog added, removed and changed
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
@@ -197,8 +198,9 @@ an id and a title.
   dialog is extracted.
 - `env` names the file holding `FISH_AUDIO_API_KEY`. The environment variable wins if set.
 - `characters` is one file for the whole project, not a per-part path (see §6).
-- `models` names the Fish model for each stage (see §8.4). For now all three must be the free model;
-  the project file is rejected with a clear message if a paid one is named.
+- `models` names the Fish model for each stage (see §8.4). `audition` must be the free model for
+  now; `draft` and `final` may name any model whose price the studio knows. Anything else is
+  rejected with a clear message.
 
 ---
 
@@ -400,9 +402,19 @@ each part.
 There are three model stages in the project file: `audition` (candidate takes), `draft` (everyday
 generation while the script and cast still change) and `final` (the recording that ships).
 
-- **Now:** all three are the free model, and the project file may name nothing else. There is no
-  separate final step: a draft is the final recording, and the UI does not show the final step at
-  all while `draft` and `final` name the same model.
+- **Now:** `audition` is the free model only. `draft` and `final` may name any model whose price
+  the studio knows (`core/prices.ts`). A paid recording, a job or one line, starts only when the user
+  has confirmed the most it can cost (every line needing every take, priced when asked), and the
+  account's credit covers it: the server works the ceiling out itself and refuses a request without
+  a confirmation at least that high (answering with the ceiling to confirm), or when the credit is
+  short or unknown. The confirmed dollars become the recording's budget: charged before every
+  request to Fish, at that moment's price, it refuses another model than the one confirmed and
+  anything beyond what is left, so nothing changed meanwhile (the project's model, a cue, the
+  takes, a promotion ending) spends more than was agreed; without a budget only the free model
+  can be used. All that running recordings were given is held back from the credit until they
+  end (Fish may bill a request after it was charged); a recording refused after it was admitted,
+  and a job when it ends, give theirs back. There is no
+  separate final step yet: a draft is the final recording.
 - **Later:** with a paid `final` model, **Final generation** re-records every clip in a part whose
   lock says it was made with another model. It is a normal plan (§8.2) with the cost in dollars and a
   confirmation, and a clip made with the final model shows as `final` in the line table. Because the
@@ -418,7 +430,8 @@ Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's stat
 `GET /api/characters/:id/candidates` (voices matching the character's keywords, with its current
 voice, the audition phrase and the takes already recorded), `PATCH /api/characters/:id`
 (keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`
-`POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock),
+`POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
+`{ confirmedCost }` on a paid model, else 409 with the ceiling to confirm),
 `GET /api/parts/:part/plan?speaker=&weak=1` (what generating would do, weak lines included if
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure, speaker, keys, orphans,
 retakeWeak }`: start a generation or a measuring, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
@@ -450,7 +463,9 @@ POST   /api/auditions/:id/next                   the next round with the voices 
 POST   /api/auditions/:id/more                   a round's worth of new candidates
 POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write the last voice left to cast.json
-POST   /api/parts/:part/jobs                     run a plan (one job per part at a time)
+POST   /api/parts/:part/jobs                     run a plan (one job per part at a time); a paid
+                                                 one with { confirmedCost }, else 409 with
+                                                 { reason: confirm | credit | price, ceiling }
 GET    /api/parts/:part/jobs/latest              the part's latest job
 GET    /api/jobs/:id                             a job's progress (polled while it runs)
 DELETE /api/jobs/:id                             cancel
@@ -575,9 +590,10 @@ Small, independently useful increments:
       (`GET /wallet/self/api-credit`; Fish gives it as a string without a unit, taken to be
       dollars) shown under the project, read again after recording and every five minutes, or
       "unknown" when Fish does not answer.
-   2. **Paid models per stage**: the project file may name a paid model for a stage; a paid job
-      shows its cost in dollars and starts only when the user confirms that amount, and the
-      server refuses one costing more than confirmed or than the account's credit.
+   2. **Paid models per stage** (built): `draft` and `final` may name a priced model (`audition`
+      stays free); a paid job or line asks to "Pay up to $X" with a second click, X being the most
+      it can cost, and the server refuses one without that confirmation or beyond the credit
+      (`core/spend.ts`).
    3. **Final generation** (§8.4).
 
 ---

@@ -3,7 +3,7 @@ import type { StaleReason } from '../../../core/fingerprint'
 import { displayName } from '../../../core/summary'
 import { useJob, useJobActions, usePlan } from '../../api'
 import { Problems } from '../../components/Problems'
-import { dollars, plural } from '../../format'
+import { centsUp, dollars, plural } from '../../format'
 import { REASON } from '../../status'
 
 /**
@@ -16,6 +16,8 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
   const plan = usePlan(partId, speaker, retakeWeak)
   const job = useJob(partId)
   const { start, cancel } = useJobActions(partId)
+  // A paid plan's Generate asks once more; a different plan clears the question.
+  const [confirming, setConfirming] = useState(false)
   const [removeOrphans, setRemoveOrphans] = useState(false)
   // A finished job is shown only if it was started here, until it is closed.
   const [shownJob, setShownJob] = useState<string | null>(null)
@@ -32,6 +34,8 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
 
   // The orphan box only ever confirms the orphans shown: a different set clears it.
   const orphanSet = plan.data?.ok ? plan.data.plan.orphans.join('\n') : ''
+  const ceilingShown = plan.data?.ok ? plan.data.plan.ceiling : null
+  useEffect(() => setConfirming(false), [ceilingShown, speaker, retakeWeak])
   useEffect(() => setRemoveOrphans(false), [orphanSet])
 
   if (current && (running || shownJob === current.id)) {
@@ -120,6 +124,9 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
     return <Problems title="Generation cannot be planned" problems={answer.problems} />
   }
   const { plan: p } = answer
+  const paid = p.keys.length > 0 && (p.ceiling ?? 0) > 0
+  // What "Pay up to" shows and sends: the most it can cost, rounded up to the cent.
+  const agreed = centsUp(p.ceiling ?? 0)
   const nothing = p.keys.length === 0 && (p.orphans.length === 0 || !removeOrphans)
   // The previous plan, shown while the new one loads: nothing is started from it.
   const waiting = plan.isPlaceholderData
@@ -136,30 +143,50 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
             {p.keys.length ? `Record ${plural(p.keys.length, 'line')}` : 'Every line is recorded'}
           </strong>
         </div>
-        <button
-          className="btn btn-primary"
-          type="button"
-          disabled={nothing || waiting || start.isPending}
-          onClick={() =>
-            start.mutate(
-              {
-                kind: 'record',
-                retakeWeak,
-                speaker,
-                keys: p.keys,
-                orphans: removeOrphans ? p.orphans : [],
-              },
-              {
-                onSuccess: (started) => {
-                  setShownJob(started.id)
-                  setRemoveOrphans(false)
+        <div className="header-actions">
+          {confirming && (
+            <button className="btn" type="button" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+          )}
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={nothing || waiting || start.isPending}
+            title={
+              paid
+                ? 'The most this can cost on your Fish account: every line, every take'
+                : undefined
+            }
+            onClick={() => {
+              // A paid plan asks once more, naming the most it can cost; that is what is agreed.
+              if (paid && !confirming) return setConfirming(true)
+              setConfirming(false)
+              start.mutate(
+                {
+                  kind: 'record',
+                  retakeWeak,
+                  speaker,
+                  keys: p.keys,
+                  orphans: removeOrphans ? p.orphans : [],
+                  confirmedCost: paid ? agreed : undefined,
                 },
-              },
-            )
-          }
-        >
-          {start.isPending ? 'Starting…' : 'Generate'}
-        </button>
+                {
+                  onSuccess: (started) => {
+                    setShownJob(started.id)
+                    setRemoveOrphans(false)
+                  },
+                },
+              )
+            }}
+          >
+            {start.isPending
+              ? 'Starting…'
+              : confirming
+                ? `Pay up to ${dollars(agreed)}`
+                : 'Generate'}
+          </button>
+        </div>
       </div>
       {(p.missing > 0 || reasons.length > 0) && (
         <ul className="plan-list">

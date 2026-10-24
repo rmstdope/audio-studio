@@ -22,6 +22,7 @@ import type { RecordResult } from '../services/narration'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { AuditionTakesResult, TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
+import { centsUp } from './format'
 import { withAuditionTakes, withTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
@@ -495,26 +496,38 @@ export function takeUrl(key: string): string {
 }
 
 /**
- * Records lines of a part: `record(key)` asks the server to record the line, then reloads the
- * part so its status shows. `recording` holds the lines in progress, `errors` what went wrong.
+ * Records lines one by one from their rows. On a paid model the server first answers with the
+ * most the line can cost: `toConfirm` holds it per line until the user confirms (`record` again
+ * with that amount) or `cancel`s. `recording` holds the lines in progress, `errors` what went
+ * wrong per line.
  */
 export function useRecordLines(partId: string) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [toConfirm, setToConfirm] = useState<Record<string, number>>({})
+  const forget = (key: string) => setToConfirm(({ [key]: _gone, ...rest }) => rest)
 
   const record = useCallback(
-    async (key: string) => {
+    async (key: string, confirmedCost?: number) => {
       setRecording((now) => new Set(now).add(key))
       setErrors(({ [key]: _gone, ...rest }) => rest)
+      forget(key)
       try {
         const path = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/record`
-        const response = await fetch(path, { method: 'POST' })
+        const response = await fetch(path, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(confirmedCost === undefined ? {} : { confirmedCost }),
+        })
         if (!response.ok && response.status !== 409) {
           throw new Error(`recording answered ${response.status}`)
         }
-        const result = (await response.json()) as NonNullable<RecordResult>
-        if (!result.ok) {
+        const result = (await response.json()) as NonNullable<RecordResult> | SpendAnswer
+        if (!result.ok && 'ceiling' in result) {
+          // Shown and sent rounded up to the cent, so the amount agreed covers the cost.
+          setToConfirm((now) => ({ ...now, [key]: centsUp(result.ceiling) }))
+        } else if (!result.ok) {
           const message = 'message' in result ? result.message : 'the part’s files need fixing'
           setErrors((now) => ({ ...now, [key]: message }))
         }
@@ -536,7 +549,15 @@ export function useRecordLines(partId: string) {
     [partId, client],
   )
 
-  return { record, recording, errors }
+  return { record, recording, errors, toConfirm, cancel: forget }
+}
+
+/** The server asking to confirm a paid recording: the most it can cost, in dollars. */
+export interface SpendAnswer {
+  ok: false
+  reason: 'confirm'
+  ceiling: number
+  message: string
 }
 
 /** What generating a part (or one speaker in it) would do, or why it cannot be planned. */
@@ -602,6 +623,8 @@ export function useJobActions(partId: string) {
     mutationFn: async (options: {
       kind: JobState['kind']
       retakeWeak?: boolean
+      /** The most the user agreed to spend, for a paid model. */
+      confirmedCost?: number
       speaker: string | null
       keys: string[]
       orphans: string[]
@@ -617,6 +640,8 @@ export function useJobActions(partId: string) {
       return body
     },
     onSuccess: (job) => client.setQueryData(['job', partId], job),
+    // Refused (the cost changed, a promotion ended): the plan shows what to confirm now.
+    onError: () => client.invalidateQueries({ queryKey: ['plan', partId] }),
   })
   const cancel = useMutation({
     mutationFn: async (id: string) => {

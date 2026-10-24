@@ -10,7 +10,9 @@ import {
 } from '../services/auditions'
 import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
-import { planGeneration } from '../core/generation'
+import { costCeiling, planGeneration } from '../core/generation'
+import type { LineState } from '../core/planner'
+import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
@@ -99,8 +101,22 @@ const JobBody = z
     speaker: z.string().min(1).max(200).nullable(),
     keys: z.array(z.string()).max(100_000),
     orphans: z.array(z.string()).max(100_000),
+    /** The most the user agreed to spend, in dollars, for a paid model. */
+    confirmedCost: z.number().nonnegative().optional(),
   })
   .strict()
+
+/** JSON text parsed, or null when it is not JSON (answered with 400 by the route's schema). */
+function parseOrNull(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+/** Recording one line: the most the user agreed to spend on it, for a paid model. */
+const RecordBody = z.object({ confirmedCost: z.number().nonnegative().optional() }).strict()
 
 const VerdictBody = z.object({
   voice: z.string().regex(/^[\w-]{1,64}$/),
@@ -182,6 +198,47 @@ export function startServer({
     }
   }
 
+  /**
+   * Admits a recording on `model` costing at most `ceiling`: a budget for it (the confirmed
+   * dollars, held back from the credit while it runs; release it with `budgets.delete`), or why
+   * not. The credit is asked for only once a paid cost is confirmed.
+   */
+  function admit(
+    model: string,
+    ceiling: number | null,
+    confirmed?: number,
+  ): Promise<{ budget: Budget } | { problem: SpendProblem }> {
+    const asked = spendProblem({ ceiling, confirmed })
+    if (asked && asked.reason !== 'credit') return Promise.resolve({ problem: asked })
+    // Free: nothing to hold back, so no need to wait for anyone else's credit check.
+    if (!ceiling) return Promise.resolve({ budget: createBudget({ model, dollars: 0 }) })
+    // The budget is what was confirmed, rounded to cents at most a cent above the ceiling; the
+    // credit is checked against that whole budget.
+    const dollars = Math.min(confirmed ?? ceiling, ceiling + 0.01)
+    return (async () => {
+      // A recording that ends while the credit is read may not be billed in that reading yet:
+      // what was held back when it was asked for is still counted.
+      const heldWhenAsked = new Set(budgets)
+      const credit = await creditOf()
+      // From here to adding the budget nothing awaits, so two recordings asked for at once cannot
+      // both count on the same credit: the second sees the first's budget held back.
+      const free = credit.ok ? credit.credit - reserved(heldWhenAsked) : null
+      const problem = spendProblem({ ceiling: dollars, confirmed: dollars, credit: free })
+      if (problem) return { problem }
+      const budget = createBudget({ model, dollars })
+      budgets.add(budget)
+      return { budget }
+    })()
+  }
+
+  /**
+   * The budgets of the recordings running now. All they were given is held back from the credit
+   * until they end: Fish may bill a request some time after it was charged to its budget.
+   */
+  const budgets = new Set<Budget>()
+  const reserved = (also: Set<Budget> = new Set()) =>
+    [...new Set([...budgets, ...also])].reduce((sum, budget) => sum + budget.dollars, 0)
+
   /** The take checker: the one given (tests), else the process's one Whisper worker. */
   async function transcriberFor(): Promise<Transcriber | null> {
     return transcriber !== undefined ? transcriber : sharedWhisper()
@@ -202,17 +259,30 @@ export function startServer({
     if (read.problems.length) return { ok: false as const, problems: read.problems }
     const { narration } = read.project
     const { pronounce } = read.input.cast
-    const plan = planGeneration(planPart(read.input), {
+    const state = planPart(read.input)
+    const pricing = {
       at: new Date(),
       model: narration.models.draft,
-      speaker,
       // What is sent: each piece of a line with its cue and the cast's pronunciations.
-      sent: (line) => spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
+      sent: (line: LineState) =>
+        spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
       takes: narration.quality.transcriber === 'none' ? 1 : narration.quality.takes,
+    }
+    const plan = planGeneration(state, {
+      ...pricing,
+      speaker,
       checked: narration.quality.transcriber !== 'none',
       includeWeak,
     })
-    return { ok: true as const, plan, parallel: narration.quality.parallel }
+    // The most recording these lines can cost, priced as the plan was.
+    const ceilingOf = (keys: string[]) => costCeiling(state, keys, pricing)
+    return {
+      ok: true as const,
+      plan,
+      model: pricing.model,
+      ceilingOf,
+      parallel: narration.quality.parallel,
+    }
   }
 
   /** Only requests addressed to the studio itself reach `handler`. */
@@ -260,13 +330,35 @@ export function startServer({
       '/api/parts/:part/lines/:key/record': {
         POST: fromOwnPage(async (request) => {
           const { part, key } = request.params
-          const result = await recordLine(projectFile, part, key, fishFor, {
-            encode,
-            limiter: fishWork,
-            transcriber: await transcriberFor(),
-          })
-          if (!result) return notFound()
-          return Response.json(result, { status: result.ok ? 200 : 409 })
+          const text = await request.text()
+          const body = RecordBody.safeParse(parseOrNull(text || '{}'))
+          if (!body.success) {
+            return Response.json({ error: 'expected { confirmedCost? }' }, { status: 400 })
+          }
+          // Fails closed: without a plan, nothing is priced, so nothing is recorded.
+          const planned = await planFor(part, undefined, true)
+          if (!planned) return notFound()
+          if (!planned.ok) return Response.json(planned, { status: 409 })
+          const admitted = await admit(
+            planned.model,
+            planned.ceilingOf([key]),
+            body.data.confirmedCost,
+          )
+          if ('problem' in admitted) {
+            return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
+          }
+          try {
+            const result = await recordLine(projectFile, part, key, fishFor, {
+              encode,
+              limiter: fishWork,
+              transcriber: await transcriberFor(),
+              budget: admitted.budget,
+            })
+            if (!result) return notFound()
+            return Response.json(result, { status: result.ok ? 200 : 409 })
+          } finally {
+            budgets.delete(admitted.budget)
+          }
         }),
       },
       '/api/parts/:part/plan': {
@@ -300,8 +392,17 @@ export function startServer({
           if (!keys.length && !orphans.length) {
             return Response.json({ error: 'There is nothing to do.' }, { status: 409 })
           }
+          const admitted = measuring
+            ? { budget: createBudget({ model: planned.model, dollars: 0 }) }
+            : await admit(planned.model, planned.ceilingOf(keys), body.data.confirmedCost)
+          if ('problem' in admitted) {
+            const { problem } = admitted
+            return Response.json({ error: problem.message, ...problem }, { status: 409 })
+          }
+          const { budget } = admitted
           // Checked with no await before the job starts, so a refresh cannot slip in between.
           if (isRefreshing(projectFile, part)) {
+            budgets.delete(budget)
             return Response.json(
               { error: 'The dialog is being refreshed; generate when it is done.' },
               { status: 409 },
@@ -322,10 +423,14 @@ export function startServer({
                     limiter: fishWork,
                     onlyIfNeeded: true,
                     retakeWeak,
+                    budget,
                     transcriber: await transcriberFor(),
                   }),
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys),
+            onEnd: () => budgets.delete(budget),
           })
+          // Not started (another job runs for the part): nothing is held back for it.
+          if ('error' in job) budgets.delete(budget)
           return Response.json(job, { status: 'error' in job ? 409 : 200 })
         }),
       },
