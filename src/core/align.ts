@@ -171,11 +171,27 @@ function startsSentence(tokens: string[], i: number): boolean {
 }
 
 /**
+ * A word as it sounds, roughly: common spellings of one sound made the same ("Malachar" and
+ * "Malakar", "LifeLite" and "Lifelight" one letter apart, "Phyllis" and "Filis" alike), so a name
+ * Whisper spells by its sound is told from one it misheard.
+ */
+function soundOf(word: string): string {
+  return word
+    .replace(/'/g, '')
+    .replace(/igh/g, 'i')
+    .replace(/ph/g, 'f')
+    .replace(/ch|ck|c|q/g, 'k')
+    .replace(/y/g, 'i')
+    .replace(/z/g, 's')
+    .replace(/(.)\1+/g, '$1')
+}
+
+/**
  * Whether a heard word is a name as Whisper spells it ("Aren" as "Arn"): the shown word is
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
  * is) unless it is a known name, of at least four letters (apostrophes and a possessive 's not
- * counted) and nothing else, and the heard one is one letter apart. Lowercase words, short ones
- * and numbers are left out, where one letter makes another word ("never" and "ever", "was" and
+ * counted) and nothing else, and the heard one is one letter apart as they sound (`soundOf`).
+ * Lowercase words, short ones and numbers are left out, where one letter makes another word ("never" and "ever", "was" and
  * "has", 1984 and 1985).
  */
 function spelledAlike(
@@ -187,7 +203,9 @@ function spelledAlike(
 ): boolean {
   if (!/^[^A-Za-z0-9]*[A-Z]/.test(shown) || !/[a-z]/.test(shown)) return false
   if (atStart && !names.has(bare(shown))) return false
-  return isWord(want, 4) && isWord(got) && oneLetterApart(want, got)
+  if (!isWord(want, 4) || !isWord(got)) return false
+  const [a, b] = [soundOf(want), soundOf(got)]
+  return a === b || oneLetterApart(a, b)
 }
 
 /** Hyphens and dashes, which join words written without spaces ("resin-sweet", "leaf—Mira's"). */
