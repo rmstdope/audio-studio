@@ -52,7 +52,7 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
     const heard = words(
       ['I', 0.0, 0.2],
       ['am', 0.2, 0.4],
-      ['Boring', 0.5, 0.9],
+      ['Bowling', 0.5, 0.9],
       ['the', 1.0, 1.1],
       ['smith', 1.1, 1.6],
     )
@@ -108,6 +108,30 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
     expect(
       alignWords(['three', 'words'], words(['3', 0.0, 0.3], ['words', 0.3, 0.9]), 1.0).ratio,
     ).toBe(1)
+  })
+})
+
+describe('alignWords, names Whisper spells its own way', () => {
+  const text = "This was theirs, you know. Aren and Lysa's."
+  const heardAs = (...said: string[]) =>
+    words(...said.map((w, i): [string, number, number] => [w, i, i + 0.5]))
+
+  it('counts a word heard in its place with a spelling one letter off, and takes its times', () => {
+    const heard = heardAs('This', 'was', 'theirs,', 'you', 'know,', 'Arn', 'and', "Lisa's.")
+    const { timed, ratio } = alignWords(text.split(' '), heard, 9)
+    expect(ratio).toBe(1)
+    expect(timed[5]).toEqual({ word: 'Aren', start: 5, end: 5.5 })
+  })
+
+  it('does not count a short word heard as another, or a word two letters off', () => {
+    expect(alignWords(['it', 'was', 'late'], heardAs('it', 'has', 'late'), 3).ratio).toBe(2 / 3)
+    expect(alignWords(['the', 'Malakar'], heardAs('the', 'Malacore'), 2).ratio).toBe(1 / 2)
+  })
+
+  it('pairs words only where as many were heard as shown between matches', () => {
+    expect(alignWords(['Aren', 'and', 'Lysa'], heardAs('Arn', 'Ren', 'and', 'Lysa'), 4).ratio).toBe(
+      2 / 3,
+    )
   })
 })
 

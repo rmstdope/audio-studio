@@ -117,11 +117,32 @@ export function matchingBlocks(a: string[], b: string[]): Block[] {
   return merged
 }
 
+/** Whether two words are at most one letter apart (one added, removed or changed). */
+function oneLetterApart(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false
+  let i = 0
+  while (i < a.length && a[i] === b[i]) i++
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1)
+  return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1)
+}
+
+/**
+ * Whether a heard word is the shown one spelled Whisper's way, as it spells an invented name
+ * ("Aren" as "Arn"): one letter apart, and not a short word, where that is another word ("was",
+ * "has").
+ */
+function spelledAlike(want: string, got: string): boolean {
+  return Math.max(want.length, got.length) >= 4 && oneLetterApart(want, got)
+}
+
 /**
  * Every shown word with a start and end from Whisper's words (narrate.py `align`): words matched
  * to a heard word take its times; unmatched words share the gap between their matched neighbours
- * evenly. `said` is the same words as actually said (see `saidWords`), compared in place of the
- * shown ones. Returns the timed words and the share of words that were heard.
+ * evenly. Between two matches with as many words heard as shown, a word heard in its place with a
+ * spelling one letter off (`spelledAlike`) counts as matched too, unlike narrate.py, so a name
+ * Whisper spells its own way is not taken for a word missed. `said` is the same words as actually
+ * said (see `saidWords`), compared in place of the shown ones. Returns the timed words and the
+ * share of words that were heard.
  */
 export function alignWords(
   tokens: string[],
@@ -132,11 +153,20 @@ export function alignWords(
   const want = (said && said.length === tokens.length ? said : tokens).map(norm)
   const got = heard.map((w) => norm(w.word))
   const times: ([number, number] | null)[] = tokens.map(() => null)
+  let [wantFrom, gotFrom] = [0, 0]
   for (const [a, b, size] of matchingBlocks(want, got)) {
+    if (a - wantFrom === b - gotFrom) {
+      for (let k = 0; k < a - wantFrom; k++) {
+        if (!spelledAlike(want[wantFrom + k]!, got[gotFrom + k]!)) continue
+        const w = heard[gotFrom + k]!
+        times[wantFrom + k] = [w.start, w.end]
+      }
+    }
     for (let k = 0; k < size; k++) {
       const w = heard[b + k]!
       times[a + k] = [w.start, w.end]
     }
+    ;[wantFrom, gotFrom] = [a + size, b + size]
   }
   const matched = times.filter((t) => t !== null).length
 

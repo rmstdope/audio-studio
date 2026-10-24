@@ -417,7 +417,9 @@ An audition is for a character, not for a part: the result applies to every part
 3. **Generate** queues one job per line. For each line:
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
    2. TTS each chunk (WAV), join them with a short gap;
-   3. transcribe with Whisper, align the words to the shown text, compute the heard ratio;
+   3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the
+      share of shown words heard; a word heard in its place one letter off, as Whisper spells an
+      invented name, "Aren" as "Arn", counts as heard if it has at least four letters);
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
    5. encode MP3 into the clips folder, update the manifest and lock entries, write both.
 4. Fish requests run `parallel` at a time; Whisper runs one at a time (one GPU). The page polls the
