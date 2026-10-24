@@ -45,8 +45,23 @@ export async function ruleOutVoices(
   voices: { id: string; title: string }[],
   at = new Date(),
 ): Promise<void> {
-  if (!voices.length) return
-  await change(projectFile, characterId, (ruled) => ruleOut(ruled, voices, at.toISOString()))
+  await updateRuledOut(projectFile, characterId, { out: voices }, at)
+}
+
+/**
+ * Rules `out` out and allows `allowed` again, for a character known to be in the project. Writes
+ * only when that changes something.
+ */
+export async function updateRuledOut(
+  projectFile: string,
+  characterId: string,
+  { out = [], allowed = [] }: { out?: { id: string; title: string }[]; allowed?: string[] },
+  at = new Date(),
+): Promise<void> {
+  if (!out.length && !allowed.length) return
+  await change(projectFile, characterId, (ruled) =>
+    allowAgain(ruleOut(ruled, out, at.toISOString()), allowed),
+  )
 }
 
 /**
@@ -66,14 +81,19 @@ export async function allowVoices(
   return { ok: true, voices: listRuledOut(left) }
 }
 
-/** Applies `edit` to the saved voices and saves the result; none left removes the file. */
+/**
+ * Applies `edit` to the saved voices and saves the result, if it changed anything; none left
+ * removes the file.
+ */
 function change(
   projectFile: string,
   characterId: string,
   edit: (ruled: RuledOut) => RuledOut,
 ): Promise<RuledOut> {
   return writes.run(`${projectFile}\n${characterId}`, async () => {
-    const next = edit(await read(projectFile, characterId))
+    const before = await read(projectFile, characterId)
+    const next = edit(before)
+    if (JSON.stringify(next.voices) === JSON.stringify(before.voices)) return before
     const root = dirname(projectFile)
     const file = characterFile(RULED_OUT_DIR, characterId)
     if (Object.keys(next.voices).length) {

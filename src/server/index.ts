@@ -170,7 +170,6 @@ export function startServer({
 }: ServerOptions) {
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
-  /** A session action's answer: the session as the page shows it; 404 for an unknown character. */
   /** A character's ruled-out voices as an answer: 404 for an unknown character, 409 for a broken project. */
   async function ruledOut(pending: Promise<RuledOutResult>): Promise<Response> {
     const result = await pending
@@ -178,6 +177,7 @@ export function startServer({
     return Response.json(result, { status: result.ok ? 200 : 409 })
   }
 
+  /** A session action's answer: the session as the page shows it; 404 for an unknown character. */
   async function answer(
     characterId: string,
     pending: Promise<SessionResult>,

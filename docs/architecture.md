@@ -114,12 +114,16 @@ audio-studio/
 │   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
 │   │   ├── align.ts             Whisper words → per-word timings, heard ratio (narrate.py's)
 │   │   ├── audition.ts          audition state machine: rounds, keep/drop, finalist
+│   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
 │   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates for a character; changes to the cast, one at a time
+│   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
+│   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
+│   │   ├── takes.ts             audition takes: recorded once, cached by what they are made of
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
 │   │   ├── audio.ts             encode MP3 with ffmpeg, level its loudness (as level.py)
 │   │   ├── files.ts             read resources, write atomically, lock formatting
@@ -330,7 +334,12 @@ the truth.
 
 ### 8.1 Audition (casting a voice)
 
-Every character has a **character page** (`#/characters/<id>`), the one place about it: its cast
+This is the audition being built in step 9 (§12). Built so far: ruled-out voices (9.1), listed on
+the audition page for now. Until the shortlist board (9.2) lands, an audition still runs in rounds
+of Keep and Drop, a round going on with the voices not dropped until one is left to cast; a
+dropped voice is ruled out as below.
+
+Every character has a **character page** (`#/characters/<id>`, from 9.3), the one place about it: its cast
 voice (Fish's details, its take and Fish's sample, its id and a link to Fish), its lines per part,
 its delivery (the style cue) and casting brief (search keywords and audition phrase), the voices
 ruled out for it, and the audition in progress, if there is one. An audition is started, resumed
@@ -353,7 +362,7 @@ and discarded from there; the page itself shows no candidates.
 
 An audition is for a character, not for a part: the result applies to every part it speaks in.
 
-- **To hear** holds the candidates being listened to, best match first. **Bring in N more** adds
+- From 9.2: **To hear** holds the candidates being listened to, best match first. **Bring in N more** adds
   the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
   **Bring in a specific voice** adds one by its Fish id or URL.
 - **Drop** takes a voice out of the audition at once and rules it out for the character: no later
@@ -368,7 +377,8 @@ An audition is for a character, not for a part: the result applies to every part
   voices of an audition, can come back in a later one.
 - **Pause** leaves the audition as it is (it is saved after every change) for the character page;
   **Stop audition** ends it without casting, after saying what that means. Its dropped voices
-  stay ruled out.
+  stay ruled out. (Until then, Drop is the round's verdict, and the cast voice is never ruled
+  out.)
 - **Search** queries Fish for the whole keyword phrase and each of its words, several pages each,
   pools the results, keeps voices whose title, description or tags contain the keywords, and ranks
   by match, then popularity (the search `fish_tts.py` already does, ported). Ruled-out voices,

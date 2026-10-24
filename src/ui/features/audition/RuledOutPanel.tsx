@@ -13,6 +13,8 @@ export function RuledOutPanel({ characterId, name }: { characterId: string; name
   const ruledOut = useRuledOut(characterId)
   const allow = useAllowVoices(characterId)
   const [all, setAll] = useState(false)
+  // Forget all asks once more first: the list cannot be got back.
+  const [confirming, setConfirming] = useState(false)
   const voices = ruledOut.data?.ok ? ruledOut.data.voices : []
   const shown = all ? voices : voices.slice(0, SHOWN)
   // The voice being allowed again (null: all of them), while it is.
@@ -48,16 +50,31 @@ export function RuledOutPanel({ characterId, name }: { characterId: string; name
           {all ? 'Show fewer' : `Show all ${voices.length}`}
         </button>
       )}
-      {voices.length > 0 && (
-        <button
-          className="btn"
-          type="button"
-          disabled={allow.isPending}
-          onClick={() => allow.mutate(null)}
-        >
-          {pending === null ? 'Forgetting…' : 'Forget all ruled-out voices'}
-        </button>
-      )}
+      {voices.length > 0 &&
+        (confirming ? (
+          <div className="keyword-add">
+            <button
+              className="btn"
+              type="button"
+              disabled={allow.isPending}
+              onClick={() => allow.mutate(null, { onSettled: () => setConfirming(false) })}
+            >
+              {pending === null ? 'Forgetting…' : `Forget all ${voices.length}`}
+            </button>
+            <button className="btn btn-ghost" type="button" onClick={() => setConfirming(false)}>
+              Keep them
+            </button>
+          </div>
+        ) : (
+          <button
+            className="btn"
+            type="button"
+            disabled={allow.isPending}
+            onClick={() => setConfirming(true)}
+          >
+            Forget all ruled-out voices
+          </button>
+        ))}
       {ruledOut.isError && <span className="adopt-error">{ruledOut.error.message}</span>}
       {allow.isError && <span className="adopt-error">{allow.error.message}</span>}
     </div>

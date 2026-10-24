@@ -68,6 +68,12 @@ describe('ruled-out voices, saved', () => {
     expect(readdirSync(join(projectFile, '..', RULED_OUT_DIR))).toEqual([])
   })
 
+  it('names what is wrong with a broken project file', async () => {
+    const projectFile = join(tempRepo({ ...files, 'audio-studio.json': '{' }), 'audio-studio.json')
+    expect(await ruledOutVoices(projectFile, 'mira')).toMatchObject({ ok: false })
+    expect(await allowVoices(projectFile, 'mira', 'all')).toMatchObject({ ok: false })
+  })
+
   it('answers an unknown character with null', async () => {
     const projectFile = project()
     expect(await ruledOutVoices(projectFile, 'nobody')).toBeNull()

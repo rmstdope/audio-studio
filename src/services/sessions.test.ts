@@ -341,6 +341,22 @@ describe('ruled-out voices in an audition', () => {
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
   })
 
+  it('keeps the two files in step when verdicts on a voice are given at once', async () => {
+    for (const order of [['drop', null] as const, [null, 'drop'] as const]) {
+      const { projectFile } = await started()
+      await Promise.all(order.map((verdict) => judge(projectFile, 'mira', 'a', verdict)))
+      const saved = await sessionFor(projectFile, 'mira')
+      const dropped = saved?.ok && saved.session?.verdicts.a === 'drop'
+      expect(await ruledOutIds(projectFile, 'mira')).toEqual(dropped ? ['a'] : [])
+    }
+  })
+
+  it('never rules out the current voice', async () => {
+    const { projectFile } = await started()
+    await judge(projectFile, 'mira', 'cur', 'drop')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+
   it('rules out nothing for a voice not in the round', async () => {
     const { projectFile } = await started()
     await judge(projectFile, 'mira', 'g', 'drop')
@@ -370,5 +386,12 @@ describe('ruled-out voices in an audition', () => {
     const added = await addVoiceById(projectFile, 'mira', 'a', fishFor)
     expect(added?.ok && added.session.pool.at(-1)).toBe('a')
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+
+  it('keeps a voice dropped in this audition ruled out when it is asked for by id', async () => {
+    const { projectFile } = await started()
+    await judge(projectFile, 'mira', 'a', 'drop')
+    expect(await addVoiceById(projectFile, 'mira', 'a', fishFor)).toMatchObject({ reason: 'seen' })
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
   })
 })

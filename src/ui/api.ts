@@ -449,8 +449,10 @@ export function useSessionAction(characterId: string) {
     },
     onSuccess: (view) => {
       if (!view.ok) return
-      // A drop rules a voice out, taking it back or adding a voice by id allows it again.
+      // A drop rules a voice out, taking it back or adding a voice by id allows it again; the
+      // candidates shown once the audition ends leave out what is ruled out.
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
+      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
       // An answer without the recorded lines (after a verdict) keeps the ones shown.
       client.setQueryData<SessionView>(['session', characterId], (old) =>
         view.recorded === undefined && old?.ok ? { ...view, recorded: old.recorded } : view,
@@ -519,10 +521,14 @@ export function useAllowVoices(characterId: string) {
       if (!response.ok && response.status !== 409) {
         throw new Error(`allowing voices again answered ${response.status}`)
       }
-      return (await response.json()) as NonNullable<RuledOutResult>
+      const result = (await response.json()) as NonNullable<RuledOutResult>
+      if (!result.ok) {
+        throw new Error(result.problems.map((p) => `${p.file}: ${p.message}`).join('; '))
+      }
+      return result
     },
     onSuccess: (result) => {
-      if (result.ok) client.setQueryData(['ruled-out', characterId], result)
+      client.setQueryData(['ruled-out', characterId], result)
       void client.invalidateQueries({ queryKey: ['candidates', characterId] })
     },
   })

@@ -305,6 +305,7 @@ describe('server', () => {
     expect(await all.json()).toEqual({ ok: true, voices: [] })
     await send('DELETE', '/api/auditions/narrator')
     expect((await fetch(url('/api/characters/nobody/ruled-out'))).status).toBe(404)
+    expect((await send('DELETE', '/api/characters/nobody/ruled-out/w1')).status).toBe(404)
     expect((await send('DELETE', '/api/characters/narrator/ruled-out/not%20an%20id')).status).toBe(
       400,
     )
