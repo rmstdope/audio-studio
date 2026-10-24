@@ -294,8 +294,9 @@ function spelledBy(word: string, words: string[]): number {
  * The shown words `from` to `to` that whole-word matching left unmatched, against the heard words
  * `hFrom` to `hTo` between the same matches, compared by their parts: the parts first matched
  * exactly, then, between those, a compound heard apart or words heard as one, and, while the
- * words line up one to one, a name heard in its place one letter off (`spelledAlike`). Gives each
- * shown word whose parts were all heard the span of their times.
+ * words line up one to one, a name heard in its place one letter off (`spelledAlike`); where as
+ * many words were heard as shown, also a word pronounced otherwise that Whisper wrote as shown.
+ * Gives each shown word whose parts were all heard the span of their times.
  */
 function alignGap(
   tokens: string[],
@@ -307,8 +308,8 @@ function alignGap(
   times: ([number, number] | null)[],
 ): void {
   // As narrate.py's matching and main did: where as many words were heard as shown, a name heard
-  // in its place one letter off, word for word, or a word pronounced otherwise that Whisper wrote
-  // as shown ("II" for "Act II:" said "Act Two:").
+  // in its place one letter off, word for word; and, unlike narrate.py, a word pronounced otherwise
+  // that Whisper wrote as shown ("II" for "Act II:" said "Act Two:").
   const shownWords: number[] = []
   for (let i = from; i < to; i++) if (norm(said[i]!)) shownWords.push(i)
   const heardWords: number[] = []
@@ -407,8 +408,8 @@ function alignGap(
  * Every shown word with a start and end from Whisper's words (narrate.py `align`): words matched
  * to a heard word take its times; unmatched words share the gap between their matched neighbours
  * evenly. Unlike narrate.py, the words whole-word matching leaves unmatched are compared by their
- * parts, split at hyphens and dashes on both sides, with compounds and names forgiven
- * (`alignGap`); such a word is heard when all its parts are. `said` is the same words as actually
+ * parts, split at hyphens and dashes on both sides, with compounds, names and words written as
+ * shown though said otherwise forgiven (`alignGap`); such a word is heard when all its parts are. `said` is the same words as actually
  * said (see `saidWords`), compared in place of the shown ones; `names` are the known names (see
  * `knownNames`). Returns the timed words, the share of words that were heard, and the indices of
  * the shown words that were not (`missed`).
