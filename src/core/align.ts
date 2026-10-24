@@ -198,10 +198,11 @@ function soundOf(word: string): string {
 /**
  * Whether a heard word is a name as Whisper spells it ("Aren" as "Arn"): the shown word is
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
- * is) unless it is a known name, of at least four letters as said (apostrophes and a possessive 's not
- * counted) and nothing else, and the heard one is one letter apart, as spelled or as they sound
- * (`soundOf`, where that leaves four letters). Lowercase words, short ones and numbers are left
- * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
+ * is) unless it is a known name, of at least four letters as said (apostrophes and a possessive
+ * 's not counted) and nothing else, and the heard one is one letter apart, as spelled or as they
+ * sound (`soundOf`, where that leaves four letters). Lowercase words, short ones and numbers are
+ * left out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and
+ * 1985).
  */
 function spelledAlike(
   shown: string,
