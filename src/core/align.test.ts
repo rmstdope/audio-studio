@@ -247,6 +247,42 @@ describe('alignWords, words joined by hyphens and dashes', () => {
   })
 })
 
+describe('alignWords, ampersands', () => {
+  it('reads an ampersand as "and", heard on its own or joined to a word', () => {
+    const shown = 'A & L'.split(' ')
+    expect(alignWords(shown, words([' A', 0, 0.4], [' &L.', 0.5, 1]), 2).ratio).toBe(1)
+    expect(
+      alignWords(shown, words([' A', 0, 0.4], [' and', 0.5, 0.7], [' L', 0.8, 1]), 2).ratio,
+    ).toBe(1)
+    expect(
+      alignWords('A and L'.split(' '), words([' A', 0, 0.4], [' &', 0.5, 0.6]), 2).missed,
+    ).toEqual([2])
+  })
+
+  it('gives the parts of a heard word joined by an ampersand an even share of its time', () => {
+    const { timed } = alignWords('A & L'.split(' '), words([' A', 0, 0.4], [' &L.', 0.5, 1]), 2)
+    expect(timed.slice(1)).toEqual([
+      { word: '&', start: 0.5, end: 0.75 },
+      { word: 'L', start: 0.75, end: 1 },
+    ])
+  })
+
+  it('gives an ampersand heard with punctuation all of its time', () => {
+    const heard = words([' A', 0, 1], [' &.', 1, 2], [' L', 2, 3])
+    expect(alignWords('A & L'.split(' '), heard, 3).timed[1]).toEqual({
+      word: '&',
+      start: 1,
+      end: 2,
+    })
+  })
+
+  it('still misses an ampersand the voice left out', () => {
+    expect(alignWords('A & L'.split(' '), words([' A', 0, 0.4], [' L', 0.5, 1]), 2).missed).toEqual(
+      [1],
+    )
+  })
+})
+
 describe('alignWords, quoted speech', () => {
   it("takes the two spellings of a possessive after s for one (Sorceress's, Sorceress')", () => {
     const heard = words(['You', 0, 1], ['received', 1, 2], ["Sorceress'", 2, 3], ['Truth.', 3, 4])
@@ -255,6 +291,15 @@ describe('alignWords, quoted speech', () => {
     expect(alignWords(["Sorceress'", 'Truth.'], back, 2).ratio).toBe(1)
     const its = words(['it', 0, 1], ['is', 1, 2])
     expect(alignWords(["it's", 'is'], its, 2).missed).toEqual([0])
+  })
+
+  it("takes a plural possessive and a singular one for the same word (founders', founder's)", () => {
+    const shown = "From the founders' line, to the next.".split(' ')
+    const heard = "From the founder's line to the next.".split(' ')
+    const timed = (said: string[]) =>
+      words(...said.map((w, i): [string, number, number] => [w, i, i + 1]))
+    expect(alignWords(shown, timed(heard), 7).ratio).toBe(1)
+    expect(alignWords(heard, timed(shown), 7).ratio).toBe(1)
   })
 
   it('counts a plural possessive heard without its apostrophe', () => {
@@ -355,11 +400,27 @@ describe('alignWords, names Whisper spells its own way', () => {
       alignWords(['I', 'will', 'never', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
     ).toBe(3 / 4)
     expect(alignWords(['see', 'Kai', 'came'], heardAs('see', 'Kaid', 'came'), 3).ratio).toBe(2 / 3)
-    expect(alignWords(['see', "Kai's", 'cat'], heardAs('see', 'Kais', 'cat'), 3).ratio).toBe(2 / 3)
+    expect(alignWords(['see', "Kai's", 'cat'], heardAs('see', "Kaid's", 'cat'), 3).ratio).toBe(
+      2 / 3,
+    )
     expect(alignWords(['the', 'Malakar'], heardAs('the', 'Malacore'), 2).ratio).toBe(1 / 2)
     expect(
       alignWords(['I', 'will', 'NEVER', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
     ).toBe(3 / 4)
+  })
+
+  it('measures a name by its letters as said, its possessive not counted', () => {
+    const heard = heardAs('so', 'Kaiya', 'waits')
+    expect(alignWords(['so', 'Kai', 'waits'], heard, 3, ['so', 'Kaiyah', 'waits']).ratio).toBe(1)
+    const its = heardAs('so', "Kaiya's", 'waits')
+    expect(alignWords(['so', "Kai's", 'waits'], its, 3, ['so', "Kaiyah's", 'waits']).ratio).toBe(1)
+    expect(
+      alignWords(['so', 'Kaiyah', 'waits'], heardAs('so', 'Kaia', 'waits'), 3, [
+        'so',
+        'Kai',
+        'waits',
+      ]).ratio,
+    ).toBe(2 / 3)
   })
 
   it('does not count a number one digit off', () => {
@@ -409,6 +470,61 @@ describe('alignWords, names Whisper spells its own way', () => {
     expect(missed('the night came', 'the nite came')).toEqual([1])
     expect(missed("the leaf Mira's blend", 'the leaf mirrors blend')).toEqual([2])
     expect(missed('then Malakar came', 'then Malacore came')).toEqual([1])
+  })
+
+  it('counts a known name heard with other vowels, its consonants the same (Elior as Ilyar)', () => {
+    const shown = 'Welcome back, young Elior. Need something else?'.split(' ')
+    const heard = heardAs(...'Welcome back young Ilyar. Need something else?'.split(' '))
+    expect(alignWords(shown, heard, 9).missed).toEqual([3])
+    expect(alignWords(shown, heard, 9, undefined, new Set(['elior'])).ratio).toBe(1)
+  })
+
+  it('does not count a known name with a consonant lost or changed, or of one consonant', () => {
+    const names = new Set(['elior', 'aria', 'malakar'])
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, names).missed
+    expect(missed('then Elior came', 'then Elia came')).toEqual([1])
+    expect(missed('then Malakar came', 'then Molokan came')).toEqual([1])
+    expect(missed('then Aria came', 'then Oreo came')).toEqual([1])
+  })
+
+  it('does not count a word, or several, with the vowels of a known name in other places', () => {
+    const names = new Set(['mira', 'lysa', 'aren', 'elior', 'lyria', 'kael'])
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, names).missed
+    for (const [name, said] of [
+      ['Mira', 'more'],
+      ['Mira', 'Omar'],
+      ['Lysa', 'also'],
+      ['Lysa', 'lose a'],
+      ['Aren', 'iron'],
+      ['Aren', 'Ronnie'],
+      ['Aren', 'a rain'],
+      ['Elior', 'a lair'],
+      ['Elior', 'all your'],
+      ['Lyria', 'lure'],
+      ['Lyria', 'a lie or'],
+      ['Kael', 'cool'],
+      ['Kael', 'Kyle'],
+    ]) {
+      expect([name, said, missed(`then ${name} came`, `then ${said} came`)]).toEqual([
+        name,
+        said,
+        [1],
+      ])
+    }
+  })
+
+  it('does not count a word Whisper capitalised only to start a sentence', () => {
+    const names = new Set(['mira', 'aren', 'lysa', 'elior'])
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, names).missed
+    expect(missed('Mira, wait here.', 'More, wait here.')).toEqual([0])
+    expect(missed('Aren, go now.', 'Iron, go now.')).toEqual([0])
+    expect(missed('Lysa, come back.', 'Lose, come back.')).toEqual([0])
+    expect(missed('and Mira, wait', 'and. More, wait')).toEqual([1])
+    expect(missed('Elior, wait.', 'Ilyar, wait.')).toEqual([0])
+    expect(missed('so, Elior, wait.', 'so, Ilyar, wait.')).toEqual([])
   })
 
   it('pairs words only where as many were heard as shown between matches', () => {

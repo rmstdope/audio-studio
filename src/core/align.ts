@@ -29,16 +29,19 @@ const NUMBERS = new Map(
 
 /**
  * A word without case or punctuation (narrate.py `_plain`). Apostrophes stay inside a word
- * ("don't", "Lysa's") but not at its ends, where they are single quotes around speech ("'You",
- * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. The two ways
- * of writing a possessive after s are one ("Sorceress's" and "Sorceress'" are "sorceress").
+ * ("don't") but not at its ends, where they are single quotes around speech ("'You",
+ * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. A possessive
+ * is one word however it is written, since Whisper cannot hear which: "Sorceress's" and
+ * "Sorceress'" are "sorceress", "founder's" and "founders'" are "founders". An ampersand is the
+ * word "and" ("&L." is "andl", two words heard as one: see `alignGap`).
  */
 function plain(word: string): string {
   return word
     .toLowerCase()
+    .replace(/&/g, 'and')
     .replace(/[^a-z0-9']/g, '')
     .replace(/^'+|'+$/g, '')
-    .replace(/s's$/, 's')
+    .replace(/s?'s$/, 's')
 }
 
 /** A word for comparison: plain, small numbers as digits, since Whisper writes "1" (`_norm`). */
@@ -147,12 +150,12 @@ export function knownNames(cast: {
 
 /** A word plain, without a possessive 's: what a name is looked up by ("Aren's" is "aren"). */
 function bare(word: string): string {
-  return norm(word).replace(/'s$/, '')
+  return norm(word.replace(/'s(?=[^A-Za-z0-9]*$)/i, ''))
 }
 
-/** Whether a plain word is letters and apostrophes only, `min` letters or more in its stem. */
+/** Whether a plain word is letters and apostrophes only, `min` letters or more. */
 function isWord(word: string, min = 0): boolean {
-  return /^[a-z']+$/.test(word) && word.replace(/'s$/, '').replace(/'/g, '').length >= min
+  return /^[a-z']+$/.test(word) && word.replace(/'/g, '').length >= min
 }
 
 /** Whether two words are one letter apart: one added, removed or changed. */
@@ -197,25 +200,55 @@ function soundOf(word: string): string {
 /**
  * Whether a heard word is a name as Whisper spells it ("Aren" as "Arn"): the shown word is
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
- * is) unless it is a known name, of at least four letters (apostrophes and a possessive 's not
- * counted) and nothing else, and the heard one is one letter apart, as spelled or as they sound
- * (`soundOf`, where that leaves four letters). Lowercase words, short ones and numbers are left
- * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
+ * is) unless it is a known name, of at least four letters as said (apostrophes and a possessive
+ * 's not counted) and nothing else, and the heard one is one letter apart, as spelled or as they
+ * sound (`soundOf`, where that leaves four letters), or, for a known name heard as one word
+ * Whisper wrote as a name (`asName`), only its vowels other as they sound (`vowelsApart`).
+ * Lowercase words, short ones and numbers are left out, where one letter makes another word
+ * ("never" and "ever", "was" and "has", 1984 and 1985).
  */
 function spelledAlike(
   shown: string,
   atStart: boolean,
-  want: string,
+  said: string,
   got: string,
   names: ReadonlySet<string>,
+  asName = false,
 ): boolean {
-  if (!/^[^A-Za-z0-9]*[A-Z]/.test(shown) || !/[a-z]/.test(shown)) return false
-  if (atStart && !names.has(bare(shown))) return false
-  if (!isWord(want, 4) || !isWord(got)) return false
+  const want = norm(said)
+  if (!capitalised(shown) || !/[a-z]/.test(shown)) return false
+  const known = names.has(bare(shown))
+  if (atStart && !known) return false
+  if (!isWord(bare(said), 4) || !isWord(want) || !isWord(got)) return false
   if (oneLetterApart(want, got)) return true
   // As they sound, only while that leaves four letters: fewer, and one off is another name.
   const [a, b] = [soundOf(want), soundOf(got)]
-  return Math.min(a.length, b.length) >= 4 && (a === b || oneLetterApart(a, b))
+  if (Math.min(a.length, b.length) >= 4 && (a === b || oneLetterApart(a, b))) return true
+  // A known name with other vowels ("Elior" as "Ilyar"), heard as one word Whisper wrote as a name.
+  return known && asName && vowelsApart(a, b)
+}
+
+/** Whether a word starts with a capital, past any quotes or brackets. */
+function capitalised(word: string): boolean {
+  return /^[^A-Za-z0-9]*[A-Z]/.test(word)
+}
+
+/**
+ * Whether Whisper wrote the `i`th of `words` as a name: capitalised where no sentence of its
+ * starts, since it capitalises every word that does ("More, wait" is no name).
+ */
+function writtenAsName(words: string[], i: number): boolean {
+  return capitalised(words[i]!) && !startsSentence(words, i)
+}
+
+/**
+ * Whether two words as they sound differ only in their vowels, one for one ("elior" and "iliar"),
+ * and have two consonants or more, which tell the word.
+ */
+function vowelsApart(x: string, y: string): boolean {
+  const vowel = (c: string) => 'aeiou'.includes(c)
+  if (x.length !== y.length || x.replace(/[aeiou]/g, '').length < 2) return false
+  return [...x].every((c, k) => c === y[k] || (vowel(c) && vowel(y[k]!)))
 }
 
 /** Hyphens and dashes, which join words written without spaces ("resin-sweet", "leaf—Mira's"). */
@@ -226,6 +259,8 @@ interface Piece {
   token: number
   shown: string
   want: string
+  /** As said, before it is compared. */
+  said: string
   /** As compared for a compound: plain, number words left as words ("every one" is "everyone"). */
   spelled: string
   /** Whether it starts a sentence (only a word's first part can). */
@@ -244,6 +279,7 @@ function piecesOf(tokens: string[], said: string[], from: number, to: number): P
     token,
     shown,
     want: norm(word),
+    said: word,
     spelled: plain(word),
     atStart,
   })
@@ -312,6 +348,7 @@ function alignGap(
   // that Whisper wrote as shown ("II" for "Act II:" said "Act Two:").
   const shownWords: number[] = []
   for (let i = from; i < to; i++) if (norm(said[i]!)) shownWords.push(i)
+  const written = heard.map((w) => w.word.trim())
   const heardWords: number[] = []
   for (let j = hFrom; j < hTo; j++) if (norm(heard[j]!.word)) heardWords.push(j)
   if (shownWords.length === heardWords.length) {
@@ -319,7 +356,8 @@ function alignGap(
       const w = heard[heardWords[k]!]!
       const atStart = startsSentence(tokens, i)
       const asShown = norm(w.word) === norm(tokens[i]!)
-      if (asShown || spelledAlike(tokens[i]!, atStart, norm(said[i]!), norm(w.word), names)) {
+      const asName = writtenAsName(written, heardWords[k]!)
+      if (asShown || spelledAlike(tokens[i]!, atStart, said[i]!, norm(w.word), names, asName)) {
         times[i] = [w.start, w.end]
       }
     })
@@ -327,6 +365,8 @@ function alignGap(
 
   const pieces = piecesOf(tokens, said, from, to)
   const parts = heardParts(heard.slice(hFrom, hTo))
+  // The heard words before the gap, then its parts, to tell where Whisper starts a sentence.
+  const partsWritten = [...written.slice(0, hFrom), ...parts.map((p) => p.word.trim())]
   if (!pieces.length || !parts.length) return
   const want = pieces.map((p) => p.want)
   const got = parts.map((w) => norm(w.word))
@@ -361,7 +401,8 @@ function alignGap(
     if (!guess || n < 1) return null
     const piece = pieces[s]!
     const spelled = got.slice(h, h + n).join('')
-    if (!spelledAlike(piece.shown, piece.atStart, want[s]!, spelled, names)) return null
+    const asName = n === 1 && writtenAsName(partsWritten, hFrom + h)
+    if (!spelledAlike(piece.shown, piece.atStart, piece.said, spelled, names, asName)) return null
     return { shown: 1, heard: n, apply: () => take(s, h, h + n - 1) }
   }
 
@@ -409,10 +450,10 @@ function alignGap(
  * to a heard word take its times; unmatched words share the gap between their matched neighbours
  * evenly. Unlike narrate.py, the words whole-word matching leaves unmatched are compared by their
  * parts, split at hyphens and dashes on both sides, with compounds, names and words written as
- * shown though said otherwise forgiven (`alignGap`); such a word is heard when all its parts are. `said` is the same words as actually
- * said (see `saidWords`), compared in place of the shown ones; `names` are the known names (see
- * `knownNames`). Returns the timed words, the share of words that were heard, and the indices of
- * the shown words that were not (`missed`).
+ * shown though said otherwise forgiven (`alignGap`); such a word is heard when all its parts are.
+ * `said` is the same words as actually said (see `saidWords`), compared in place of the shown
+ * ones; `names` are the known names (see `knownNames`). Returns the timed words, the share of
+ * words that were heard, and the indices of the shown words that were not (`missed`).
  */
 export function alignWords(
   tokens: string[],

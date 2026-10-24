@@ -471,6 +471,40 @@ export async function removeOrphans(
   })
 }
 
+/** An accepted line, or why it was not. Null for an unknown part or line. */
+export type AcceptResult =
+  | { ok: true; key: string }
+  | { ok: false; reason: 'not-weak'; message: string }
+  | { ok: false; problems: Problem[] }
+  | ProjectFailure
+  | null
+
+/**
+ * Accepts a weak line's clip as it is: its lock entry is marked `accepted`, so the line no longer
+ * shows as weak, until it is recorded again (recording writes a new entry). Only a line weak now,
+ * read afresh in the part's turn, is accepted.
+ */
+export async function acceptLine(
+  projectFile: string,
+  partId: string,
+  key: string,
+): Promise<AcceptResult> {
+  return inPartTurn(projectFile, partId, async (): Promise<AcceptResult> => {
+    const read = await readPart(projectFile, partId)
+    if (!read || !read.ok) return read
+    if (read.problems.length) return { ok: false, problems: read.problems }
+    const state = planPart(read.input).lines.find((l) => l.key === key)
+    if (!state) return null
+    const entry = read.input.lock[key]
+    if (state.status !== 'weak' || !entry) {
+      return { ok: false, reason: 'not-weak', message: 'Only a weak line can be accepted.' }
+    }
+    const lock = { ...read.input.lock, [key]: { ...entry, accepted: true } }
+    await writeAtomic(dirname(projectFile), read.paths.lockPath, formatEntriesPerLine(lock))
+    return { ok: true, key }
+  })
+}
+
 /** A measured clip, or why it was not measured. Null for an unknown part or line. */
 export type MeasureResult =
   | { ok: true; key: string; heard: number; duration: number }

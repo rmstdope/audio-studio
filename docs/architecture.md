@@ -278,6 +278,8 @@ made from. Written one entry per line, keys sorted, so a re-recorded clip is a o
 
 `parts` are short hashes of the inputs that are not kept in the clear, so the planner can say which
 one changed. `heard` and `takes` are absent, and `adopted` is true, for clips made before the studio.
+`accepted` is true when the user accepted a weak clip as it is (Accept on the lines page); recording
+the line again writes a new entry without it.
 
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
@@ -316,7 +318,7 @@ The **planner** gives every line one status:
 | Status      | Meaning                                                                | Action when generating              |
 | ----------- | ---------------------------------------------------------------------- | ----------------------------------- |
 | `ok`        | clip exists, fingerprint matches                                       | none                                |
-| `weak`      | up to date, but the best take was heard below `minHeard`               | offered for a retake, not automatic |
+| `weak`      | up to date, but the best take was heard below `minHeard`, not accepted | offered for a retake, not automatic |
 | `stale`     | clip exists, fingerprint differs; the UI names the inputs that changed | re-record                           |
 | `missing`   | no clip, or its file is absent on disk                                 | record                              |
 | `untracked` | clip exists but has no lock entry: made before the studio              | none; offered for adoption          |
@@ -424,27 +426,32 @@ An audition is for a character, not for a part: the result applies to every part
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the share
       of shown words heard). Alignment is narrate.py's, with these departures. Words are compared
       without single quotes at their ends ("'You" and "will.'" are "you" and "will"; apostrophes
-      inside a word, "don't", stay), and a possessive after s is one word however it is written
-      ("Sorceress's" and "Sorceress'"). Words are matched whole first, as narrate.py does; the shown
-      and heard words left between two matches are then compared by their parts, split at hyphens
-      and dashes on both sides (punctuation beside a dash is no part), and a compound written as one
-      word matches the same word heard as two, or the other way round ("silverleaf" and "silver
-      leaf", "every one" and "everyone"); a joined word counts as heard when all its parts are, and
-      a word pronounced in other parts than shown is compared whole, as said; a word pronounced
-      otherwise that Whisper wrote as shown counts too, word for word where as many words were heard
-      as shown ("II" for "Act II:", said "Act Two:"). And a name heard in its place one letter off
-      (word for word where as many words were heard as shown, or by parts while they line up one to
-      one, Whisper's parts joined: "El-eor" for "El-ee-or"), as Whisper spells an invented name
-      ("Aren" as "Arn"), or one letter off as it sounds where that leaves four letters or more (ch
-      as k between vowels, c as s before e, i and y and else as k, ck and q as k, igh as i, ph as f,
-      y as i, z as s, doubled letters as one: "Malakar" as "Malachar", "Lifelight" as "LifeLite"),
-      counts as heard and takes the heard word's times. Only a capitalised shown word of four
-      letters or more (a possessive 's not counted), nothing but letters and not all capitals,
-      qualifies; where a sentence starts (after . ! ? … or a colon, opening a quote, single or
-      double, or after a dash inside a word) only a known name: a one-word character id of the cast
-      ("aren", not "ancient tree spirit") or pronunciation. Lowercase words, short ones, numbers and
-      other sentence-initial words must match exactly. A title-case word mid-sentence ("The Call")
-      is taken for a name;
+      inside a word, "don't", stay), and a possessive is one word however it is written, as Whisper
+      cannot hear which ("Sorceress's" and "Sorceress'", "founder's" and "founders'"); an ampersand
+      is the word "and" (Whisper's "A &L." matches "A & L" as words heard as one, below). Words are
+      matched whole first, as narrate.py does; the shown and heard words left between two matches
+      are then compared by their parts, split at hyphens and dashes on both sides (punctuation
+      beside a dash is no part), and a compound written as one word matches the same word heard as
+      two, or the other way round ("silverleaf" and "silver leaf", "every one" and "everyone"); a
+      joined word counts as heard when all its parts are, and a word pronounced in other parts than
+      shown is compared whole, as said; a word pronounced otherwise that Whisper wrote as shown
+      counts too, word for word where as many words were heard as shown ("II" for "Act II:", said
+      "Act Two:"). And a name heard in its place one letter off (word for word where as many words
+      were heard as shown, or by parts while they line up one to one, Whisper's parts joined:
+      "El-eor" for "El-ee-or"), as Whisper spells an invented name ("Aren" as "Arn"), or one letter
+      off as it sounds where that leaves four letters or more (ch as k between vowels, c as s before
+      e, i and y and else as k, ck and q as k, igh as i, ph as f, y as i, z as s, doubled letters as
+      one: "Malakar" as "Malachar", "Lifelight" as "LifeLite"), or, for a known name heard as one
+      word Whisper wrote capitalised where it starts no sentence (it capitalises every word that
+      does), as it sounds with only its vowels other, one for one, where two consonants or more tell
+      it ("Elior" as "Ilyar", not "Mira" as "more", "More, wait" or "Omar"), counts as heard and
+      takes the heard word's times. Only a capitalised shown word of four letters or more as said (a
+      possessive 's not counted), nothing but letters and not all capitals, qualifies; where a
+      sentence starts (after . ! ? … or a colon, opening a quote, single or double, or after a dash
+      inside a word) only a known name: a one-word character id of the cast ("aren", not "ancient
+      tree spirit") or pronunciation. Lowercase words, short ones, numbers and other
+      sentence-initial words must match exactly. A title-case word mid-sentence ("The Call") is
+      taken for a name;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
    5. encode MP3 into the clips folder, update the manifest and lock entries, write both; then
       keep what Whisper heard of the take in the cache if it was heard below full (forgotten
@@ -460,8 +467,10 @@ An audition is for a character, not for a part: the result applies to every part
 
 - Edit a character's style cue or keywords, a line's cue, or the pronunciation table (built):
   saved at once, and affected lines show as stale.
-- Retake a single line (built: Record, or Retake for a weak one). Re-timing one line, or clips
-  already measured, waits until it is needed: measuring covers clips never checked (§8.2).
+- Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
+  (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again).
+  Re-timing one line, or clips already measured, waits until it is needed: measuring covers clips
+  never checked (§8.2).
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
@@ -524,6 +533,7 @@ GET    /api/credit                               the Fish account's API credit (
 GET    /api/parts/:part                          the part, every line with its status and reason
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
+POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
@@ -618,7 +628,7 @@ Small, independently useful increments:
       word timings in the manifest, the heard share and takes in the lock. `quality.transcriber:
 "none"` records one unchecked take, as before.
    2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when
-      asked; clips never checked (adopted from narrate.py, or recorded unchecked) measured
+      asked, or accepted as they are (Accept, until recorded again); clips never checked (adopted from narrate.py, or recorded unchecked) measured
       without new audio (narrate.py `--retime`): the clip decoded to WAV, its length from that and
       what Whisper hears in that WAV (not the MP3, which Whisper hears slightly differently), so
       the timings match narrate.py's exactly; a poorly heard clip shows as weak. (Since then,
