@@ -91,23 +91,21 @@ function grouped(word: string, alike: SoundAlike): string {
 
 /**
  * A word as `norm` gives it, with the British spellings Whisper writes the American way spelled
- * so: -our as -or after three letters or more ("colour", "neighbours", "armoury"; not "our",
- * "your", "flour"), -re as -er after a consonant ("centre", "sombre"; not "were", "fire"), a
- * doubled l before -er, -ed, -ing or -ous after a vowel with another before it ("traveller",
- * "cancelled"; not "spelled", "called"), and -ise and -yse as -ize and -yze after four letters or
- * more ("realise", "analyse"; not "rise"). Both sides are spelled so, so a word that changes
- * though it is not British still matches itself.
+ * so: -our as -or after two letters or more ("colour", "odours", "armoury"; not "our", "your",
+ * "four"), -re as -er after a consonant ("centre", "sombre"; not "were", "fire", nor "timbre",
+ * which is not "timber"), a doubled l after a or e with another vowel before, before -er, -ed,
+ * -ing or -ous ("traveller", "duelled"; not "spelled", "called", nor "refilled", which is not
+ * "refiled"), and -ise and -yse as -ize and -yze after four letters or more ("realise",
+ * "analyse"; not "rise"). Only plain words, not contractions. Both sides are spelled so, so a word
+ * that changes though it is not British still matches itself.
  */
 function american(word: string): string {
-  if (!/^[a-z']+$/.test(word)) return word
+  if (!/^[a-z]+$/.test(word)) return word
   return word
-    .replace(
-      /^([a-z]{3,})our(?=(s|ed|ing|ite|ites|able|ably|ful|y|ies|er|ers|less|hood|ly)?(?:'?s)?$)/,
-      '$1or',
-    )
-    .replace(/^([a-z]*[aeiou][a-z]*[^aeiou])re(s?)$/, '$1er$2')
-    .replace(/^([a-z]*[aeiou][^aeiou]+[aeiou])ll(?=(er|ers|ed|ing|ous)$)/, '$1l')
-    .replace(/^([a-z]{4,})([iy])s(?=(e|es|ed|ing|ation|ations)$)/, '$1$2z')
+    .replace(/^([a-z]{2,})our(?=(?:s|ed|ing|ite|able|ably|ful|y|ies|er|less|hood|ly)?s?$)/, '$1or')
+    .replace(/^(?!timbres?$)([a-z]*[aeiou][a-z]*[^aeiou])re(s?)$/, '$1er$2')
+    .replace(/^([a-z]*[aeiou][^aeiou]*[ae])ll(?=(?:er|ed|ing|ous)s?$)/, '$1l')
+    .replace(/^([a-z]{4,}[iy])s(?=(?:e|es|ed|ing|ations?)$)/, '$1z')
 }
 
 /** A matching block: `[a, b, size]`, as Python's `SequenceMatcher.get_matching_blocks`. */
