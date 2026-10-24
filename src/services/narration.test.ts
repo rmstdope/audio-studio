@@ -10,7 +10,7 @@ import type { Encoder } from './audio'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
 import type { Transcriber } from './transcriber'
-import { measureLine, recordLine, removeOrphans } from './narration'
+import { acceptLine, measureLine, recordLine, removeOrphans } from './narration'
 import { inPartTurn } from './partFiles'
 import { adoptPart, loadPart } from './workspace'
 
@@ -941,5 +941,49 @@ describe('recordLine, a draft finishing after a final recording', () => {
     })
     expect(again).toMatchObject({ ok: true })
     expect(requests.map((r) => r.model)).toContain('s2-pro')
+  })
+})
+
+describe('acceptLine', () => {
+  const heardHalf: Transcriber = {
+    transcribe: async () => [{ start: 0, end: 1, words: [{ word: 'Welcom', start: 0, end: 0.5 }] }],
+    close() {},
+  }
+  const lockOf = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+
+  async function recordedWith(transcriber: Transcriber) {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const again = () =>
+      recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+        encode: keepWav,
+        limiter: createLimiter(),
+        transcriber,
+      })
+    await again()
+    return { root, projectFile, again }
+  }
+
+  it('accepts a weak line as it is, until it is recorded again', async () => {
+    const { root, projectFile, again } = await recordedWith(heardHalf)
+    expect(await acceptLine(projectFile, 'act1', 'k4')).toEqual({ ok: true, key: 'k4' })
+    expect(lockOf(root).k4).toMatchObject({ heard: 0, accepted: true })
+    const loaded = await loadPart(projectFile, 'act1')
+    expect(loaded?.ok && loaded.part.lines.find((l) => l.key === 'k4')).toMatchObject({
+      status: 'ok',
+      accepted: true,
+    })
+    await again()
+    expect(lockOf(root).k4.accepted).toBeUndefined()
+  })
+
+  it('accepts only a weak line', async () => {
+    const { projectFile } = await recordedWith(heardHalf)
+    expect(await acceptLine(projectFile, 'act1', 'k1')).toMatchObject({
+      ok: false,
+      reason: 'not-weak',
+    })
+    expect(await acceptLine(projectFile, 'act1', 'nope')).toBeNull()
   })
 })

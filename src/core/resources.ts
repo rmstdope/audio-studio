@@ -102,6 +102,8 @@ export const LockEntrySchema = z.looseObject({
   takes: z.number().int().min(1).optional(),
   /** True when the clip was made before the studio, and taken as it was. */
   adopted: z.boolean().optional(),
+  /** True when the user accepted the clip as it is, though heard below the bar: not weak. */
+  accepted: z.boolean().optional(),
   at: z.string(),
 })
 

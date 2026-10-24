@@ -19,7 +19,7 @@ import { createJobs } from '../services/jobs'
 import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
-import { measureLine, recordLine, removeOrphans } from '../services/narration'
+import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import { recordTake, takeFile } from '../services/takes'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
@@ -359,6 +359,13 @@ export function startServer({
       '/api/parts/:part/lines/:key/heard': {
         GET: guard(async (request) => {
           const result = await heardFor(projectFile, request.params.part, request.params.key)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/lines/:key/accept': {
+        POST: fromOwnPage(async (request) => {
+          const result = await acceptLine(projectFile, request.params.part, request.params.key)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

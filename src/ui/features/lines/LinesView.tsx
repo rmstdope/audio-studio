@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
-import { clipUrl, usePart, useRecordLines, useSetCue } from '../../api'
+import { clipUrl, useAccept, usePart, useRecordLines, useSetCue } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
@@ -30,6 +30,14 @@ export function LinesView({ part }: { part: PartSummary }) {
   const detail = usePart(part.id, part.dialog === 'ok')
   const { playing, toggle } = useClipPlayer()
   const recorder = useRecordLines(part.id)
+  const accept = useAccept(part.id)
+  // Why the last line accepted was not, shown on its row.
+  const refused = (key: string): string | null => {
+    if (accept.variables !== key) return null
+    if (accept.error) return accept.error.message
+    if (!accept.data || accept.data.ok) return null
+    return 'message' in accept.data ? accept.data.message : 'The line could not be accepted.'
+  }
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
   const [search, setSearch] = useState('')
@@ -269,9 +277,25 @@ export function LinesView({ part }: { part: PartSummary }) {
                                   : 'Record'}
                             </button>
                           ))}
+                        {line.status === 'weak' &&
+                          recorder.toConfirm[line.key] === undefined &&
+                          !recorder.recording.has(line.key) && (
+                            <button
+                              type="button"
+                              className="btn"
+                              title="Keep this take as it is: the line no longer shows as weak, until it is recorded again"
+                              disabled={accept.isPending && accept.variables === line.key}
+                              onClick={() => accept.mutate(line.key)}
+                            >
+                              Accept
+                            </button>
+                          )}
                       </div>
                       {recorder.errors[line.key] && (
                         <span className="adopt-error row-error">{recorder.errors[line.key]}</span>
+                      )}
+                      {refused(line.key) && (
+                        <span className="adopt-error row-error">{refused(line.key)}</span>
                       )}
                     </td>
                   </tr>
