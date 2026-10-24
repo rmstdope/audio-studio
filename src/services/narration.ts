@@ -16,6 +16,8 @@ import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import { LockSchema, ManifestSchema, type Lock, type Manifest } from '../core/resources'
+import { FREE_MODELS } from '../core/project'
+import { createBudget, type Budget } from '../core/spend'
 import { spokenPieces } from '../core/spoken'
 import { joinWavs } from '../core/wav'
 import type { FishFactory } from './auditions'
@@ -38,12 +40,21 @@ export type RecordResult =
   | { ok: true; key: string; skipped: true }
   | {
       ok: false
-      reason: 'uncast' | 'no-key' | 'fish' | 'audio' | 'transcribe' | 'encode' | 'write'
+      reason: 'uncast' | 'no-key' | 'spend' | 'fish' | 'audio' | 'transcribe' | 'encode' | 'write'
       message: string
     }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
+
+/** The budget of a recording given none: the free model only. */
+const FREE_ONLY = createBudget({ model: FREE_MODELS[0], dollars: 0 })
+
+/** Text as Fish counts it for billing: UTF-8 bytes. */
+const utf8 = new TextEncoder()
+
+/** A request to Fish refused by the recording's budget. */
+class SpendRefused extends Error {}
 
 /** Recordings in progress, by project, part and line. */
 const recordings = new Map<string, Promise<RecordResult>>()
@@ -60,6 +71,11 @@ export interface RecordOptions {
   onlyIfNeeded?: boolean
   /** With `onlyIfNeeded`: weak lines need recording too (the user chose to retake them). */
   retakeWeak?: boolean
+  /**
+   * What the recording may spend: the confirmed model and dollars, charged before every request
+   * to Fish at that moment's price. Without it only the free model can be used.
+   */
+  budget?: Budget
   /** Checks each take (unless the project's `quality.transcriber` is "none"); none: unchecked. */
   transcriber?: Transcriber | null
 }
@@ -93,6 +109,7 @@ export async function recordLine(
     onlyIfNeeded = false,
     retakeWeak = false,
     transcriber = null,
+    budget = FREE_ONLY,
   }: RecordOptions,
 ): Promise<RecordResult> {
   const read = await readPart(projectFile, partId)
@@ -148,6 +165,9 @@ export async function recordLine(
           narration.quality.chunkLimit,
         )
         for (const text of texts) {
+          // Charged before it is sent: nothing beyond what was confirmed reaches Fish.
+          const refused = budget.spend(inputs.model, utf8.encode(text).length, new Date())
+          if (refused) throw new SpendRefused(refused)
           spoken.push(
             await fish.tts({
               text,
@@ -163,7 +183,8 @@ export async function recordLine(
         return spoken
       })
     } catch (error) {
-      return { ok: false, failure: { ok: false, reason: 'fish', message: messageOf(error) } }
+      const reason = error instanceof SpendRefused ? 'spend' : 'fish'
+      return { ok: false, failure: { ok: false, reason, message: messageOf(error) } }
     }
     try {
       return { ok: true, clip: joinWavs(pieces, GAP_SECONDS) }

@@ -198,8 +198,9 @@ an id and a title.
   dialog is extracted.
 - `env` names the file holding `FISH_AUDIO_API_KEY`. The environment variable wins if set.
 - `characters` is one file for the whole project, not a per-part path (see §6).
-- `models` names the Fish model for each stage (see §8.4). For now all three must be the free model;
-  the project file is rejected with a clear message if a paid one is named.
+- `models` names the Fish model for each stage (see §8.4). `audition` must be the free model for
+  now; `draft` and `final` may name any model whose price the studio knows. Anything else is
+  rejected with a clear message.
 
 ---
 
@@ -406,7 +407,12 @@ generation while the script and cast still change) and `final` (the recording th
   has confirmed the most it can cost (every line needing every take, priced when asked), and the
   account's credit covers it: the server works the ceiling out itself and refuses a request without
   a confirmation at least that high (answering with the ceiling to confirm), or when the credit is
-  short or unknown. There is no separate final step yet: a draft is the final recording.
+  short or unknown. The confirmed dollars become the recording's budget: charged before every
+  request to Fish, at that moment's price, it refuses another model than the one confirmed and
+  anything beyond what is left, so nothing changed meanwhile (the project's model, a cue, the
+  takes, a promotion ending) spends more than was agreed; without a budget only the free model
+  can be used. What running recordings may still spend is held back from the credit. There is no
+  separate final step yet: a draft is the final recording.
 - **Later:** with a paid `final` model, **Final generation** re-records every clip in a part whose
   lock says it was made with another model. It is a normal plan (§8.2) with the cost in dollars and a
   confirmation, and a clip made with the final model shows as `final` in the line table. Because the
@@ -422,7 +428,8 @@ Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's stat
 `GET /api/characters/:id/candidates` (voices matching the character's keywords, with its current
 voice, the audition phrase and the takes already recorded), `PATCH /api/characters/:id`
 (keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`
-`POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock),
+`POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
+`{ confirmedCost }` on a paid model, else 409 with the ceiling to confirm),
 `GET /api/parts/:part/plan?speaker=&weak=1` (what generating would do, weak lines included if
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure, speaker, keys, orphans,
 retakeWeak }`: start a generation or a measuring, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
@@ -454,7 +461,9 @@ POST   /api/auditions/:id/next                   the next round with the voices 
 POST   /api/auditions/:id/more                   a round's worth of new candidates
 POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write the last voice left to cast.json
-POST   /api/parts/:part/jobs                     run a plan (one job per part at a time)
+POST   /api/parts/:part/jobs                     run a plan (one job per part at a time); a paid
+                                                 one with { confirmedCost }, else 409 with
+                                                 { reason: confirm | credit | price, ceiling }
 GET    /api/parts/:part/jobs/latest              the part's latest job
 GET    /api/jobs/:id                             a job's progress (polled while it runs)
 DELETE /api/jobs/:id                             cancel

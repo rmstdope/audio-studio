@@ -94,7 +94,11 @@ export function planGeneration(
     bytes,
     model,
     cost: price === undefined ? null : (bytes / 1_000_000) * price,
-    ceiling: price === undefined ? null : (bytes / 1_000_000) * price * takes,
+    ceiling: costCeiling(
+      { lines: toRecord },
+      toRecord.map((line) => line.key),
+      { model, sent, takes, at },
+    ),
     takes,
     checked,
   }

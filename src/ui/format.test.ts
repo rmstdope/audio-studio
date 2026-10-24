@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'bun:test'
-import { compact, longTitle, plural, shortTitle, tintFor, voiceLabel, dollars } from './format'
+import {
+  compact,
+  longTitle,
+  plural,
+  shortTitle,
+  tintFor,
+  voiceLabel,
+  centsUp,
+  dollars,
+} from './format'
 
 describe('titles', () => {
   it('splits a title at its colon', () => {
@@ -54,5 +63,19 @@ describe('dollars', () => {
     expect(dollars(0)).toBe('$0.00')
     expect(dollars(0.0004)).toBe('under $0.01')
     expect(dollars(-5)).toBe('-$5.00')
+  })
+})
+
+describe('centsUp', () => {
+  it('rounds an amount up to the next cent, so what is shown covers what is agreed', () => {
+    expect(centsUp(0.0097)).toBe(0.01)
+    expect(centsUp(0.0149)).toBe(0.02)
+    expect(centsUp(1.9003949999999998)).toBe(1.91)
+    expect(centsUp(0.42)).toBe(0.42)
+    expect(centsUp(0)).toBe(0)
+    expect(centsUp(0.4200000001)).toBe(0.43)
+    for (const amount of [0.0097, 0.123456, 1.9003949999999998, 0.07, 3.3]) {
+      expect(centsUp(amount)).toBeGreaterThanOrEqual(amount)
+    }
   })
 })

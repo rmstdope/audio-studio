@@ -1,3 +1,5 @@
+import { priceOf } from './prices'
+
 /** Why a paid job may not start yet: what the page must do about it. */
 export type SpendProblem =
   | { reason: 'confirm'; ceiling: number; message: string }
@@ -44,4 +46,47 @@ export function spendProblem({
     }
   }
   return null
+}
+
+/**
+ * What one confirmed recording may still spend: the model it was confirmed for, and the dollars
+ * left. Checked right before every request to Fish, priced at that moment, so nothing changed
+ * after the confirmation (the model, the text, the takes, a promotion ending) can spend more.
+ */
+export interface Budget {
+  readonly model: string
+  /** Dollars left to spend. */
+  readonly left: number
+  /**
+   * Takes `bytes` of text on `model` at `at` out of the budget: null if it fits, else why not (and
+   * nothing is taken).
+   */
+  spend(model: string, bytes: number, at: Date): string | null
+}
+
+/** Below this, a difference in dollars is rounding, not money (sums of per-piece prices). */
+const ROUNDING = 1e-9
+
+/** A budget for `model` with `dollars` to spend (none, for the free model). */
+export function createBudget({ model, dollars }: { model: string; dollars: number }): Budget {
+  let left = dollars
+  return {
+    model,
+    get left() {
+      return left
+    },
+    spend(asked, bytes, at) {
+      if (asked !== model) {
+        return `the project now names ${asked}, but ${model} was confirmed; plan again`
+      }
+      const price = priceOf(asked, at)
+      if (price === undefined) return `the price of ${asked} is unknown`
+      const cost = (bytes / 1_000_000) * price
+      if (cost > left + ROUNDING) {
+        return `this would go past the confirmed budget (${usd(Math.max(left, 0))} left); plan again`
+      }
+      left -= cost
+      return null
+    },
+  }
 }

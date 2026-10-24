@@ -22,6 +22,7 @@ import type { RecordResult } from '../services/narration'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { AuditionTakesResult, TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
+import { centsUp } from './format'
 import { withAuditionTakes, withTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
@@ -524,7 +525,8 @@ export function useRecordLines(partId: string) {
         }
         const result = (await response.json()) as NonNullable<RecordResult> | SpendAnswer
         if (!result.ok && 'ceiling' in result) {
-          setToConfirm((now) => ({ ...now, [key]: result.ceiling }))
+          // Shown and sent rounded up to the cent, so the amount agreed covers the cost.
+          setToConfirm((now) => ({ ...now, [key]: centsUp(result.ceiling) }))
         } else if (!result.ok) {
           const message = 'message' in result ? result.message : 'the part’s files need fixing'
           setErrors((now) => ({ ...now, [key]: message }))
@@ -638,6 +640,8 @@ export function useJobActions(partId: string) {
       return body
     },
     onSuccess: (job) => client.setQueryData(['job', partId], job),
+    // Refused (the cost changed, a promotion ended): the plan shows what to confirm now.
+    onError: () => client.invalidateQueries({ queryKey: ['plan', partId] }),
   })
   const cancel = useMutation({
     mutationFn: async (id: string) => {

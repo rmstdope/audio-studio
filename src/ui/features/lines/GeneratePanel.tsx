@@ -3,7 +3,7 @@ import type { StaleReason } from '../../../core/fingerprint'
 import { displayName } from '../../../core/summary'
 import { useJob, useJobActions, usePlan } from '../../api'
 import { Problems } from '../../components/Problems'
-import { dollars, plural } from '../../format'
+import { centsUp, dollars, plural } from '../../format'
 import { REASON } from '../../status'
 
 /**
@@ -125,6 +125,8 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
   }
   const { plan: p } = answer
   const paid = p.keys.length > 0 && (p.ceiling ?? 0) > 0
+  // What "Pay up to" shows and sends: the most it can cost, rounded up to the cent.
+  const agreed = centsUp(p.ceiling ?? 0)
   const nothing = p.keys.length === 0 && (p.orphans.length === 0 || !removeOrphans)
   // The previous plan, shown while the new one loads: nothing is started from it.
   const waiting = plan.isPlaceholderData
@@ -167,7 +169,7 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
                   speaker,
                   keys: p.keys,
                   orphans: removeOrphans ? p.orphans : [],
-                  confirmedCost: paid ? (p.ceiling ?? undefined) : undefined,
+                  confirmedCost: paid ? agreed : undefined,
                 },
                 {
                   onSuccess: (started) => {
@@ -181,7 +183,7 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
             {start.isPending
               ? 'Starting…'
               : confirming
-                ? `Pay up to ${dollars(p.ceiling ?? 0)}`
+                ? `Pay up to ${dollars(agreed)}`
                 : 'Generate'}
           </button>
         </div>

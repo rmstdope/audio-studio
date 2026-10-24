@@ -117,6 +117,28 @@ describe('jobs', () => {
   })
 })
 
+describe('jobs, ending', () => {
+  it('says when a job has ended, done or cancelled, once', async () => {
+    const jobs = createJobs()
+    const ended: string[] = []
+    const job = jobs.start({
+      part: 'act1',
+      speaker: null,
+      keys: ['a', 'b'],
+      orphans: [],
+      parallel: 1,
+      record: async (key) => (await tick(), { ok: true, key, duration: 1 }),
+      removeOrphans: async () => 0,
+      onEnd: () => ended.push('act1'),
+    })
+    if ('error' in job) throw new Error(job.error)
+    jobs.cancel(job.id)
+    expect(ended).toEqual([])
+    await finished(() => jobs.get(job.id))
+    expect(ended).toEqual(['act1'])
+  })
+})
+
 describe('jobs, edge cases', () => {
   const base = {
     part: 'act1',

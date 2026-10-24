@@ -48,6 +48,8 @@ export interface JobOptions {
   /** Does one line: records it, or measures its clip. */
   record: (key: string) => Promise<StepResult>
   removeOrphans: (keys: string[]) => Promise<number>
+  /** Called once the job has ended, done or cancelled (to release what it held). */
+  onEnd?: () => void
 }
 
 /** The generation jobs of a server: started, followed and cancelled by id. */
@@ -167,6 +169,7 @@ async function run(job: Running, options: JobOptions): Promise<void> {
   }
   state.status = state.status === 'running' ? 'done' : 'cancelled'
   state.finishedAt = new Date().toISOString()
+  options.onEnd?.()
 }
 
 /** Why a line's recording failed, or null when it did not. */

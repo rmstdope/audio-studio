@@ -1,3 +1,4 @@
+import { createBudget } from '../core/spend'
 import { describe, expect, it } from 'bun:test'
 import { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
@@ -661,5 +662,71 @@ describe('measureLine, edge cases', () => {
       ok: false,
       reason: 'not-recorded',
     })
+  })
+})
+
+describe('recordLine, a paid model', () => {
+  /** The test project with a paid draft model. */
+  function paidRepo() {
+    const paid = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    paid.narration.models = { draft: 's2-pro' }
+    return tempRepo({ ...files, 'audio-studio.json': paid })
+  }
+
+  it('sends nothing to Fish without a budget for it', async () => {
+    const root = paidRepo()
+    const { fish, requests } = fakeFish()
+    const result = await recordLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'k1',
+      async () => fish,
+      {
+        encode: keepWav,
+        limiter: createLimiter(),
+      },
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'spend' })
+    expect(requests).toHaveLength(0)
+  })
+
+  it('spends from the budget it is given, and stops where the budget ends', async () => {
+    const root = paidRepo()
+    const projectFile = join(root, 'audio-studio.json')
+    const options = { encode: keepWav, limiter: createLimiter() }
+    const short = await recordLine(projectFile, 'act1', 'k1', async () => fakeFish().fish, {
+      ...options,
+      budget: createBudget({ model: 's2-pro', dollars: 0.0000001 }),
+    })
+    expect(short).toMatchObject({ ok: false, reason: 'spend' })
+    const { fish, requests } = fakeFish()
+    const budget = createBudget({ model: 's2-pro', dollars: 1 })
+    expect(
+      await recordLine(projectFile, 'act1', 'k1', async () => fish, { ...options, budget }),
+    ).toMatchObject({ ok: true })
+    expect(requests).toHaveLength(1)
+    expect(budget.left).toBeLessThan(1)
+  })
+
+  it('refuses a model changed after the budget was given', async () => {
+    const root = paidRepo()
+    const { fish, requests } = fakeFish()
+    const result = await recordLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'k1',
+      async () => fish,
+      {
+        encode: keepWav,
+        limiter: createLimiter(),
+        budget: createBudget({ model: 's2.1-pro-free', dollars: 0 }),
+      },
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'spend',
+      message: expect.stringContaining('s2-pro'),
+    })
+    expect(requests).toHaveLength(0)
   })
 })
