@@ -66,7 +66,7 @@ export function soundAlikes(extra: readonly (readonly string[])[] = []): SoundAl
     return up === word ? word : root(up)
   }
   for (const group of [...SOUND_ALIKE, ...extra]) {
-    const [first, ...rest] = group.map(norm).filter(Boolean)
+    const [first, ...rest] = group.map(norm).filter(Boolean).map(american)
     if (!first) continue
     for (const word of rest) {
       const [a, b] = [root(first), root(word)]
@@ -83,9 +83,31 @@ function key(word: string, alike: SoundAlike): string {
   return grouped(norm(word), alike)
 }
 
-/** A word as `norm` gives it, as the word of its sound-alike group, if it has one. */
+/** A word as `norm` gives it, spelled the American way, as the word of its sound-alike group. */
 function grouped(word: string, alike: SoundAlike): string {
-  return alike.get(word) ?? word
+  const us = american(word)
+  return alike.get(us) ?? us
+}
+
+/**
+ * A word as `norm` gives it, with the British spellings Whisper writes the American way spelled
+ * so: -our as -or after three letters or more ("colour", "neighbours", "armoury"; not "our",
+ * "your", "flour"), -re as -er after a consonant ("centre", "sombre"; not "were", "fire"), a
+ * doubled l before -er, -ed, -ing or -ous after a vowel with another before it ("traveller",
+ * "cancelled"; not "spelled", "called"), and -ise and -yse as -ize and -yze after four letters or
+ * more ("realise", "analyse"; not "rise"). Both sides are spelled so, so a word that changes
+ * though it is not British still matches itself.
+ */
+function american(word: string): string {
+  if (!/^[a-z']+$/.test(word)) return word
+  return word
+    .replace(
+      /^([a-z]{3,})our(?=(s|ed|ing|ite|ites|able|ably|ful|y|ies|er|ers|less|hood|ly)?(?:'?s)?$)/,
+      '$1or',
+    )
+    .replace(/^([a-z]*[aeiou][a-z]*[^aeiou])re(s?)$/, '$1er$2')
+    .replace(/^([a-z]*[aeiou][^aeiou]+[aeiou])ll(?=(er|ers|ed|ing|ous)$)/, '$1l')
+    .replace(/^([a-z]{4,})([iy])s(?=(e|es|ed|ing|ation|ations)$)/, '$1$2z')
 }
 
 /** A matching block: `[a, b, size]`, as Python's `SequenceMatcher.get_matching_blocks`. */

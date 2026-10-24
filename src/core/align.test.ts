@@ -582,6 +582,39 @@ describe('alignWords, words that sound the same', () => {
   })
 })
 
+describe('alignWords, British spellings Whisper writes the American way', () => {
+  const heardAs = (line: string) =>
+    words(...line.split(' ').map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const align = (shown: string, heard: string) =>
+    alignWords(shown.split(' '), heardAs(heard), 9).ratio
+
+  it('counts traveller as traveler, and colour, centre, realise and analyse alike', () => {
+    expect(align('A traveller—', 'A traveler!')).toBe(1)
+    expect(
+      align(
+        'They travelled, cancelling marvellous plans.',
+        'They traveled, canceling marvelous plans.',
+      ),
+    ).toBe(1)
+    expect(
+      align("The colours of our neighbour's armoury.", "The colors of our neighbor's armory."),
+    ).toBe(1)
+    expect(align('An honourable, favourite flavour.', 'An honorable, favorite flavor.')).toBe(1)
+    expect(align('The sombre centre of theatres.', 'The somber center of theaters.')).toBe(1)
+    expect(
+      align('I realise they organised it; analyse it.', 'I realize they organized it; analyze it.'),
+    ).toBe(1)
+  })
+
+  it('leaves words that only look alike apart', () => {
+    expect(align('our hour', 'or her')).toBe(0)
+    expect(align('your flour', 'yor flor')).toBe(0)
+    expect(align('were here', 'wer her')).toBe(0)
+    expect(align('spelled called yelling', 'speled caled yeling')).toBe(0)
+    expect(align('size rise', 'sizz rize')).toBe(0)
+  })
+})
+
 describe('knownNames', () => {
   it('gives the one-word names of the cast and of its pronunciations, plain', () => {
     const names = knownNames({
