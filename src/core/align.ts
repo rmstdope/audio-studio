@@ -203,24 +203,43 @@ interface Piece {
 }
 
 /**
- * The parts of the shown words, split at hyphens and dashes; a word that is only a dash is one
- * empty part, which nobody says. The parts as said replace the shown ones; a word said in other
- * parts than shown is one part, as said.
+ * The parts of the shown words, split at hyphens and dashes, punctuation beside a dash left out
+ * ("thought—\"" is "thought"); a word that is only punctuation is one empty part, which nobody
+ * says. The parts as said replace the shown ones; a word said in other parts than shown is one
+ * part, as said.
  */
 function piecesOf(tokens: string[], said: string[]): Piece[] {
+  const partsOf = (word: string) => word.split(JOINS).filter((part) => norm(part))
   return tokens.flatMap((token, i) => {
-    const shown = token.split(JOINS).filter(Boolean)
-    const spoken = said[i]!.split(JOINS).filter(Boolean)
+    const shown = partsOf(token)
+    const spoken = partsOf(said[i]!)
     const atStart = startsSentence(tokens, i)
+    if (!shown.length && !spoken.length) return [{ token: i, shown: token, want: '', atStart }]
     // Said in other parts than shown ("Elior" as "El-ee-or"): the word as said, whole.
-    if (spoken.length !== shown.length)
+    if (spoken.length !== shown.length) {
       return [{ token: i, shown: token, want: norm(said[i]!), atStart }]
-    if (!shown.length) return [{ token: i, shown: token, want: '', atStart: false }]
+    }
     return spoken.map((part, k) => ({
       token: i,
       shown: shown[k]!,
       want: norm(part),
       atStart: k === 0 && atStart,
+    }))
+  })
+}
+
+/**
+ * Whisper's words split at hyphens and dashes as the shown ones are, each part an even share of
+ * the word's time; punctuation it wrote on its own is left out.
+ */
+function heardParts(heard: HeardWord[]): HeardWord[] {
+  return heard.flatMap((w) => {
+    const parts = w.word.split(JOINS).filter((part) => norm(part))
+    const step = (w.end - w.start) / Math.max(parts.length, 1)
+    return parts.map((word, k) => ({
+      word,
+      start: w.start + step * k,
+      end: w.start + step * (k + 1),
     }))
   })
 }
@@ -241,12 +260,13 @@ function spelledBy(word: string, words: string[]): number {
 /**
  * Every shown word with a start and end from Whisper's words (narrate.py `align`): words matched
  * to a heard word take its times; unmatched words share the gap between their matched neighbours
- * evenly. Between two matches with as many words heard as shown (not counting punctuation, like a
- * dash, that nobody says), a name heard in its place one letter off (`spelledAlike`; `names` are
- * the known ones, see `knownNames`) counts as matched too, unlike narrate.py, so a name Whisper
- * spells its own way is not taken for a word missed. `said` is the same words as actually said
- * (see `saidWords`), compared in place of the shown ones. Returns the timed words, the share of
- * words that were heard, and the indices of the shown words that were not (`missed`).
+ * evenly. Unlike narrate.py, words joined by hyphens and dashes are compared by their parts, on
+ * both sides (`piecesOf`, `heardParts`), and a shown word is heard when all its parts are. In the
+ * gaps between matches, a compound heard apart or words heard as one count as matched, and, while
+ * the gap's words line up one to one, a name heard in its place one letter off (`spelledAlike`;
+ * `names` are the known ones, see `knownNames`). `said` is the same words as actually said (see
+ * `saidWords`), compared in place of the shown ones. Returns the timed words, the share of words
+ * that were heard, and the indices of the shown words that were not (`missed`).
  */
 export function alignWords(
   tokens: string[],
@@ -257,63 +277,111 @@ export function alignWords(
 ): { timed: TimedWord[]; ratio: number; missed: number[] } {
   const pieces = piecesOf(tokens, said && said.length === tokens.length ? said : tokens)
   const want = pieces.map((p) => p.want)
-  const got = heard.map((w) => norm(w.word))
+  const parts = heardParts(heard)
+  const got = parts.map((w) => norm(w.word))
   const at: ([number, number] | null)[] = pieces.map(() => null)
   const take = (p: number, from: HeardWord, to: HeardWord = from) => (at[p] = [from.start, to.end])
   let wantFrom = 0
   let gotFrom = 0
   for (const [a, b, size] of matchingBlocks(want, got)) {
-    // The parts of the gap before this match, punctuation left out, paired in order: a compound
-    // heard apart or words heard as one ("silver leaf" for "silverleaf", "resin-sweet" for
-    // "resin sweet"), and, where as many are left on both sides, a name spelled one letter off.
+    // The parts of the gap before this match, the empty ones left out, paired in order.
     const shownAt: number[] = []
     for (let p = wantFrom; p < a; p++) if (want[p]) shownAt.push(p)
     const heardAt: number[] = []
-    for (let j = gotFrom; j < b; j++) if (got[j]) heardAt.push(j)
-    let s = 0
-    let h = 0
-    while (s < shownAt.length && h < heardAt.length) {
-      const p = shownAt[s]!
+    for (let j = gotFrom; j < b; j++) heardAt.push(j)
+
+    /**
+     * How the shown part `s` of the gap pairs with the heard ones from `h`: a compound heard
+     * apart ("silver leaf" for "silverleaf"), words heard as one ("silverleaf" for "silver
+     * leaf"), or, unless only `compounds` are asked for, a name spelled one letter off, heard as
+     * one part or more ("El-eor" for "El-ee-or") where as many are left on both sides after it.
+     * Null if it does not pair there.
+     */
+    const pairing = (
+      s: number,
+      h: number,
+      compounds = false,
+    ): { shown: number; heard: number; apply(): void } | null => {
+      const p = shownAt[s]
+      if (p === undefined || h >= heardAt.length) return null
       const j = heardAt[h]!
       const apart = spelledBy(
         want[p]!,
         heardAt.slice(h).map((k) => got[k]!),
       )
+      if (apart) {
+        return {
+          shown: 1,
+          heard: apart,
+          apply: () => take(p, parts[j]!, parts[heardAt[h + apart - 1]!]!),
+        }
+      }
       const together = spelledBy(
         got[j]!,
         shownAt.slice(s).map((q) => want[q]!),
       )
-      if (apart) {
-        take(p, heard[j]!, heard[heardAt[h + apart - 1]!]!)
-        s += 1
-        h += apart
-      } else if (together) {
+      if (together) {
         // The heard word's time shared evenly by the shown parts it spells.
-        const { start, end } = heard[j]!
+        const { start, end } = parts[j]!
         const step = (end - start) / together
-        for (let n = 0; n < together; n++) {
-          at[shownAt[s + n]!] = [start + step * n, start + step * (n + 1)]
+        const apply = () => {
+          for (let n = 0; n < together; n++) {
+            at[shownAt[s + n]!] = [start + step * n, start + step * (n + 1)]
+          }
         }
-        s += together
+        return { shown: together, heard: 1, apply }
+      }
+      const n = heardAt.length - h - (shownAt.length - s - 1)
+      if (compounds || n < 1) return null
+      const spelled = heardAt
+        .slice(h, h + n)
+        .map((k) => got[k]!)
+        .join('')
+      const piece = pieces[p]!
+      if (!spelledAlike(piece.shown, piece.atStart, want[p]!, spelled, names)) return null
+      return { shown: 1, heard: n, apply: () => take(p, parts[j]!, parts[heardAt[h + n - 1]!]!) }
+    }
+
+    let s = 0
+    let h = 0
+    // Once the gap's words no longer line up one to one, names are not guessed at any more.
+    let lined = true
+    while (s < shownAt.length && h < heardAt.length) {
+      const here = pairing(s, h, !lined)
+      if (here) {
+        here.apply()
+        s += here.shown
+        h += here.heard
+      } else if (pairing(s + 1, h, true)) {
+        s += 1 // A shown part not heard.
+      } else if (pairing(s, h + 1, true)) {
+        h += 1 // A heard word not shown.
+      } else if (shownAt.length - s > heardAt.length - h) {
+        s += 1
+        lined = false
+      } else if (shownAt.length - s < heardAt.length - h) {
         h += 1
-      } else if (shownAt.length - s === heardAt.length - h) {
-        const piece = pieces[p]!
-        if (spelledAlike(piece.shown, piece.atStart, want[p]!, got[j]!, names)) take(p, heard[j]!)
+        lined = false
+      } else {
         s += 1
         h += 1
-      } else break
+      }
     }
-    for (let k = 0; k < size; k++) take(a + k, heard[b + k]!)
+    for (let k = 0; k < size; k++) take(a + k, parts[b + k]!)
     wantFrom = a + size
     gotFrom = b + size
   }
 
-  // A shown word is heard when all its parts are, and spans the parts that were.
-  const times: ([number, number] | null)[] = tokens.map(() => null)
+  // A shown word is heard when all its parts are, and spans them; one partly heard is spread
+  // between its neighbours like one not heard.
   const heardAll = tokens.map(() => true)
   pieces.forEach((piece, p) => {
+    if (!at[p]) heardAll[piece.token] = false
+  })
+  const times: ([number, number] | null)[] = tokens.map(() => null)
+  pieces.forEach((piece, p) => {
     const span = at[p]
-    if (!span) return void (heardAll[piece.token] = false)
+    if (!span || !heardAll[piece.token]) return
     const now = times[piece.token]
     times[piece.token] = now ? [Math.min(now[0], span[0]), Math.max(now[1], span[1])] : span
   })

@@ -149,6 +149,34 @@ describe('alignWords, words joined by hyphens and dashes', () => {
     )
   })
 
+  it('leaves punctuation beside a dash out of the parts', () => {
+    const ratio = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).ratio
+    expect(ratio('I thought—" she said.', 'I thought, she said.')).toBe(1)
+    expect(ratio('"—and then', 'and then')).toBe(1)
+    expect(ratio('Wait—! Now.', 'Wait! Now.')).toBe(1)
+    expect(ratio('well—... yes', 'well... yes')).toBe(1)
+  })
+
+  it('matches a joined word heard as written, numbers too, beside a word misheard', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('old one-eyed Borin', 'old one-eyed Borin')).toEqual([])
+    expect(missed('twenty-one men', 'twenty-one men')).toEqual([])
+    expect(missed('the bright resin-sweet stems', 'the white resin-sweet stems')).toEqual([1])
+    expect(missed('the bright silverleaf grows', 'the white silver leaf grows')).toEqual([1])
+    expect(missed('the silverleaf bright grows', 'the silver leaf white grows')).toEqual([2])
+  })
+
+  it('spreads a joined word partly heard between its neighbours, as one not heard', () => {
+    const { timed } = alignWords(
+      ['a', 'silverleaf—Mira', 'b'],
+      heardAs('a', 'silver', 'leaf', 'mirrors', 'b'),
+      5,
+    )
+    expect(timed[1]).toEqual({ word: 'silverleaf—Mira', start: 0.5, end: 4 })
+  })
+
   it('still counts a dash on its own, which nobody says, as not heard', () => {
     expect(alignWords(['wait', '—', 'now'], heardAs('wait', 'now'), 2).missed).toEqual([1])
   })
