@@ -1,30 +1,32 @@
 import { z } from 'zod'
 import { VoiceSchema, type Candidate, type Voice } from './voiceSearch'
 
-/** What the user thinks of a voice in this round. */
-export type Verdict = 'keep' | 'drop'
+/** Where a voice on the board is: up to hear, or on the shortlist. */
+const PlaceSchema = z.enum(['toHear', 'shortlist'])
+
+/** Where a voice on the board is: up to hear, or on the shortlist. */
+export type Place = z.infer<typeof PlaceSchema>
 
 /**
- * An audition in progress for one character: the voices in the current round, verdicts on them,
- * the voices dropped in earlier rounds, and the candidates waiting to be brought in. Every voice
- * shown is kept in `voices`, so a saved session can be shown again without searching Fish. Saved
- * sessions are checked against this schema when read back.
+ * An audition in progress for one character: the voices up to hear, the shortlist the cast is
+ * chosen from, the voices dropped in it (each with where it was, so the last drop can be undone),
+ * and the candidates waiting to be brought in. Every voice shown is kept in `voices`, so a saved
+ * session can be shown again without searching Fish. Saved sessions are checked against this
+ * schema when read back; one of an earlier version is no longer an audition in progress.
  */
 export const AuditionSessionSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   character: z.string(),
   /** The keywords the candidates were found with. */
   keywords: z.array(z.string()),
-  /** The character's voice when the audition started, if any; it takes part in round 1. */
+  /** The character's voice when the audition started, if any; it starts on the shortlist. */
   current: z.string().nullable(),
-  round: z.number().int().min(1),
-  /** Earlier rounds and how many voices each had. */
-  rounds: z.array(z.object({ round: z.number().int(), voices: z.number().int() })),
-  /** The voices in this round, in the order shown. */
-  pool: z.array(z.string()),
-  verdicts: z.record(z.string(), z.enum(['keep', 'drop'])),
-  /** Voices dropped in earlier rounds; they never come back in this audition. */
-  dropped: z.array(z.string()),
+  /** The voices that can be cast, in the order shortlisted. */
+  shortlist: z.array(z.string()),
+  /** The voices being listened to, in the order shown. */
+  toHear: z.array(z.string()),
+  /** Voices dropped in this audition, the latest last, and where each was. */
+  dropped: z.array(z.object({ id: z.string(), from: PlaceSchema })),
   /** Ranked candidates not brought in yet. */
   queue: z.array(z.string()),
   voices: z.record(z.string(), VoiceSchema),
@@ -35,7 +37,7 @@ export const AuditionSessionSchema = z.object({
 /** An audition in progress for one character. */
 export type AuditionSession = z.infer<typeof AuditionSessionSchema>
 
-/** The first round: the current voice (if any) and the top `perRound` candidates; the rest queue. */
+/** The start: the current voice (if any) on the shortlist, the top `perRound` candidates to hear. */
 export function startSession(options: {
   character: string
   keywords: string[]
@@ -54,14 +56,12 @@ export function startSession(options: {
   if (current) voices[current.id] = current
   const ids = ranked.map((c) => c.voice.id)
   return {
-    version: 1,
+    version: 2,
     character,
     keywords,
     current: current?.id ?? null,
-    round: 1,
-    rounds: [],
-    pool: [...(current ? [current.id] : []), ...ids.slice(0, perRound)],
-    verdicts: {},
+    shortlist: current ? [current.id] : [],
+    toHear: ids.slice(0, perRound),
     dropped: [],
     queue: ids.slice(perRound),
     voices,
@@ -69,48 +69,54 @@ export function startSession(options: {
   }
 }
 
-/** The session with a verdict set (or cleared with null) on a voice in this round. */
-export function setVerdict(
-  session: AuditionSession,
-  voice: string,
-  verdict: Verdict | null,
-): AuditionSession {
-  if (!session.pool.includes(voice)) return session
-  const { [voice]: _old, ...verdicts } = session.verdicts
-  return { ...session, verdicts: verdict ? { ...verdicts, [voice]: verdict } : verdicts }
-}
-
-/** The voices of this round not dropped. */
-export function remaining(session: AuditionSession): string[] {
-  return session.pool.filter((voice) => session.verdicts[voice] !== 'drop')
-}
-
-/** Whether the next round can start: something was dropped, and something is left. */
-export function canMoveOn(session: AuditionSession): boolean {
-  const left = remaining(session).length
-  return left > 0 && left < session.pool.length
-}
-
-/** The next round, with the voices not dropped; unchanged if it cannot start (`canMoveOn`). */
-export function nextRound(session: AuditionSession): AuditionSession {
-  if (!canMoveOn(session)) return session
-  const dropped = session.pool.filter((voice) => session.verdicts[voice] === 'drop')
+/** The session with a voice moved from those to hear to the end of the shortlist. */
+export function shortlist(session: AuditionSession, voice: string): AuditionSession {
+  if (!session.toHear.includes(voice)) return session
   return {
     ...session,
-    round: session.round + 1,
-    rounds: [...session.rounds, { round: session.round, voices: session.pool.length }],
-    pool: remaining(session),
-    verdicts: {},
-    dropped: [...session.dropped, ...dropped],
+    toHear: session.toHear.filter((v) => v !== voice),
+    shortlist: [...session.shortlist, voice],
   }
 }
 
-/** The session with up to `count` more candidates brought in from the queue. */
+/** The session with a voice moved off the shortlist, to the front of those to hear. */
+export function unlist(session: AuditionSession, voice: string): AuditionSession {
+  if (!session.shortlist.includes(voice)) return session
+  return {
+    ...session,
+    shortlist: session.shortlist.filter((v) => v !== voice),
+    toHear: [voice, ...session.toHear],
+  }
+}
+
+/** The session with a voice taken off the board (to hear or shortlisted) and counted as dropped. */
+export function drop(session: AuditionSession, voice: string): AuditionSession {
+  const from = placeOf(session, voice)
+  if (!from) return session
+  return {
+    ...session,
+    [from]: session[from].filter((v) => v !== voice),
+    dropped: [...session.dropped, { id: voice, from }],
+  }
+}
+
+/** The session with the last drop undone: that voice back where it was (at the front of it). */
+export function undoDrop(session: AuditionSession): AuditionSession {
+  const last = session.dropped.at(-1)
+  if (!last) return session
+  return {
+    ...session,
+    [last.from]: [last.id, ...session[last.from]],
+    dropped: session.dropped.slice(0, -1),
+  }
+}
+
+/** The session with up to `count` more candidates brought in from the queue, to hear. */
 export function bringMore(session: AuditionSession, count: number): AuditionSession {
   if (!session.queue.length || count < 1) return session
   return {
     ...session,
-    pool: [...session.pool, ...session.queue.slice(0, count)],
+    toHear: [...session.toHear, ...session.queue.slice(0, count)],
     queue: session.queue.slice(count),
   }
 }
@@ -132,28 +138,33 @@ export function queueMore(session: AuditionSession, candidates: Candidate[]): Au
   }
 }
 
-/** The session with a voice brought into this round by id; unchanged if it was seen before. */
+/**
+ * The session with a voice brought in by id, at the front of those to hear: from the queue, one
+ * dropped earlier, or a new one. Unchanged if the voice is on the board already.
+ */
 export function addVoice(session: AuditionSession, voice: Voice): AuditionSession {
-  if (seen(session, voice.id) && !session.queue.includes(voice.id)) return session
+  if (placeOf(session, voice.id)) return session
   return {
     ...session,
-    pool: [...session.pool, voice.id],
+    toHear: [voice.id, ...session.toHear],
     queue: session.queue.filter((id) => id !== voice.id),
+    dropped: session.dropped.filter((d) => d.id !== voice.id),
     voices: { ...session.voices, [voice.id]: voice },
   }
 }
 
-/** The one voice left in this round, or null while there are more (or none). */
-export function finalist(session: AuditionSession): string | null {
-  const left = remaining(session)
-  return left.length === 1 ? left[0]! : null
+/** Where a voice is on the board, or null if it is not on it. */
+export function placeOf(session: AuditionSession, voice: string): Place | null {
+  if (session.toHear.includes(voice)) return 'toHear'
+  if (session.shortlist.includes(voice)) return 'shortlist'
+  return null
 }
 
-/** Every voice the session has shown or queued, the dropped ones included. */
+/** Whether the session has shown, queued or dropped the voice, or it is the current one. */
 export function seen(session: AuditionSession, voice: string): boolean {
   return (
-    session.pool.includes(voice) ||
-    session.dropped.includes(voice) ||
+    placeOf(session, voice) !== null ||
+    session.dropped.some((d) => d.id === voice) ||
     session.queue.includes(voice) ||
     session.current === voice
   )

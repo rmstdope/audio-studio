@@ -21,17 +21,16 @@ import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { measureLine, recordLine, removeOrphans } from '../services/narration'
 import { auditionTakes, recordTake, takeFile } from '../services/takes'
-import { nextRound } from '../core/audition'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
-  castFinalist,
-  changeSession,
+  castVoice,
   discardSession,
-  judge,
   moreVoices,
+  moveVoice,
   sessionFor,
   startAudition,
+  undoLastDrop,
   viewOf,
   type SessionResult,
 } from '../services/sessions'
@@ -131,9 +130,9 @@ const RecordBody = z
 /** What a Fish voice id may look like: letters, digits, `_` and `-`. */
 const VOICE_ID = /^[\w-]{1,64}$/
 
-const VerdictBody = z.object({
+const MoveBody = z.object({
   voice: z.string().regex(VOICE_ID),
-  verdict: z.enum(['keep', 'drop']).nullable(),
+  move: z.enum(['shortlist', 'unlist', 'drop']),
 })
 
 const TakeBody = z.object({ voice: z.string().regex(VOICE_ID) })
@@ -596,23 +595,23 @@ export function startServer({
           answer(request.params.id, startAudition(projectFile, request.params.id, fishFor)),
         ),
       },
-      '/api/auditions/:id/verdict': {
+      '/api/auditions/:id/move': {
         POST: fromOwnPage(async (request) => {
-          const body = VerdictBody.safeParse(await request.json().catch(() => null))
+          const body = MoveBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
             return Response.json(
-              { error: "expected { voice, verdict: 'keep' | 'drop' | null }" },
+              { error: "expected { voice, move: 'shortlist' | 'unlist' | 'drop' }" },
               { status: 400 },
             )
           }
-          const { voice, verdict } = body.data
+          const { voice, move } = body.data
           const { id } = request.params
-          return answer(id, judge(projectFile, id, voice, verdict))
+          return answer(id, moveVoice(projectFile, id, voice, move), { recorded: false })
         }),
       },
-      '/api/auditions/:id/next': {
+      '/api/auditions/:id/undo': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, changeSession(projectFile, request.params.id, nextRound), {
+          answer(request.params.id, undoLastDrop(projectFile, request.params.id), {
             recorded: false,
           }),
         ),
@@ -632,7 +631,9 @@ export function startServer({
       },
       '/api/auditions/:id/cast': {
         POST: fromOwnPage(async (request) => {
-          const result = await castFinalist(projectFile, request.params.id)
+          const body = TakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
+          const result = await castVoice(projectFile, request.params.id, body.data.voice)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

@@ -102,7 +102,7 @@ export function useAdopt(partId: string) {
 
 /**
  * Voices found for a character's audition. Cached for a while: each search asks Fish many times.
- * Off while an audition round is shown, which does not need it.
+ * Off while the audition board is shown, which does not need it.
  */
 export function useCandidates(characterId: string, enabled = true) {
   return useQuery({
@@ -167,11 +167,11 @@ export function useSetPhrase(characterId: string) {
 }
 
 /**
- * Reloads what a character's audition shows after its phrase or style changed: the round, and the
+ * Reloads what a character's audition shows after its phrase or style changed: the board, and the
  * takes of the voices shown, without searching Fish's library again.
  */
 async function refreshAudition(client: QueryClient, characterId: string) {
-  // A round shows the phrase and its takes too; reloading it asks Fish nothing.
+  // The board shows the phrase and its takes too; reloading it asks Fish nothing.
   void client.invalidateQueries({ queryKey: ['session', characterId] })
   const key = ['candidates', characterId]
   const shown = client.getQueryData<NonNullable<CandidatesResult>>(key)
@@ -421,15 +421,16 @@ export function useSession(characterId: string) {
   })
 }
 
-/** What a session action sends: the path after the session's (`start`, `verdict`, …), and a body. */
+/** What a session action sends: the path after the session's (`start`, `move`, …), and a body. */
 export interface SessionAction {
-  action: 'start' | 'verdict' | 'next' | 'more' | 'add' | 'discard'
+  action: 'start' | 'move' | 'undo' | 'more' | 'add' | 'discard'
   body?: unknown
 }
 
 /**
- * Changes a character's audition (start, verdicts, next round, more voices, add by id, discard)
- * and shows the answer. Actions run one after another, in the order asked.
+ * Changes a character's audition (start, shortlist, unlist or drop a voice, undo the last drop,
+ * more voices, add by id, stop) and shows the answer. Actions run one after another, in the order
+ * asked.
  */
 export function useSessionAction(characterId: string) {
   const client = useQueryClient()
@@ -447,31 +448,57 @@ export function useSessionAction(characterId: string) {
       }
       return (await response.json()) as SessionView
     },
-    onSuccess: (view) => {
+    onSuccess: (view, { action, body }) => {
       if (!view.ok) return
-      // A drop rules a voice out, taking it back or adding a voice by id allows it again; the
-      // candidates shown once the audition ends leave out what is ruled out.
+      // A drop rules a voice out, undoing it or adding a voice by id allows it again; the
+      // candidates shown once the audition ends leave out what is ruled out. A drop shows at
+      // once, before the list is read again.
+      const dropped = action === 'move' ? droppedBy(body) : null
+      if (dropped && view.session && dropped !== view.session.current) {
+        const title = view.session.voices[dropped]?.title ?? dropped
+        client.setQueryData<NonNullable<RuledOutResult>>(['ruled-out', characterId], (old) =>
+          old?.ok && !old.voices.some((v) => v.id === dropped)
+            ? {
+                ...old,
+                voices: [{ id: dropped, title, at: new Date().toISOString() }, ...old.voices],
+              }
+            : old,
+        )
+      }
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
       void client.invalidateQueries({ queryKey: ['candidates', characterId] })
-      // An answer without the recorded lines (after a verdict) keeps the ones shown.
-      client.setQueryData<SessionView>(['session', characterId], (old) =>
-        view.recorded === undefined && old?.ok ? { ...view, recorded: old.recorded } : view,
-      )
+      // An answer without the recorded lines (after a move on the board) keeps the ones shown;
+      // takes recorded while the answer was on its way are kept too.
+      client.setQueryData<SessionView>(['session', characterId], (old) => {
+        if (!old?.ok) return view
+        const recorded = view.recorded ?? old.recorded
+        if (!view.audition || !old.audition) return { ...view, recorded }
+        const { takes } = withAuditionTakes<Viewed>(old as Viewed, view.audition, view.takes)
+        return { ...view, takes, recorded }
+      })
     },
   })
 }
 
+/** The voice a move drops, if it is a drop. */
+function droppedBy(body: unknown): string | null {
+  const move = body as { voice?: unknown; move?: unknown } | undefined
+  return move?.move === 'drop' && typeof move.voice === 'string' ? move.voice : null
+}
+
 /**
- * Casts the one voice left in a character's audition. Afterwards the project, its parts (whose
- * lines are now stale) and the character's candidates are loaded again.
+ * Casts a shortlisted voice, ending the audition. Afterwards the project, its parts (whose lines
+ * are now stale) and the character's candidates are loaded again.
  */
 export function useCast(characterId: string) {
   const client = useQueryClient()
   return useMutation({
     scope: { id: `session-${characterId}` },
-    mutationFn: async () => {
+    mutationFn: async (voice: string) => {
       const response = await fetch(`/api/auditions/${encodeURIComponent(characterId)}/cast`, {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ voice }),
       })
       if (!response.ok && response.status !== 409) {
         throw new Error(`casting answered ${response.status}`)

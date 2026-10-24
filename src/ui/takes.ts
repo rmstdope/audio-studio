@@ -19,7 +19,8 @@ export function withTake<T extends WithTakes>(
 
 /**
  * The candidates with the audition phrase and takes from a fresh lookup. When the phrase is the
- * one already shown, takes recorded since the lookup was read are kept too.
+ * one already shown, takes recorded since the lookup was read are kept too; where both have a
+ * take of a voice, the fresh one wins.
  */
 export function withAuditionTakes<T extends WithTakes>(
   candidates: T,
@@ -27,5 +28,5 @@ export function withAuditionTakes<T extends WithTakes>(
   takes: Record<string, string>,
 ): T {
   const same = audition.spoken === candidates.audition.spoken
-  return { ...candidates, audition, takes: same ? { ...takes, ...candidates.takes } : takes }
+  return { ...candidates, audition, takes: same ? { ...candidates.takes, ...takes } : takes }
 }
