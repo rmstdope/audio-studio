@@ -850,11 +850,28 @@ describe('server, a paid draft model', () => {
   })
 })
 
+/** A promise and the function that settles it: lets a test hold a fake's call until it says so. */
+function gate() {
+  let open!: () => void
+  const opened = new Promise<void>((resolve) => (open = resolve))
+  return { open, opened }
+}
+
+/** Waits until `check` holds, looking every few milliseconds; fails after two seconds. */
+async function until(check: () => boolean) {
+  const giveUp = Date.now() + 2000
+  while (!check()) {
+    if (Date.now() > giveUp) throw new Error('waited in vain')
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+}
+
 describe('server, paid recording and what changes meanwhile', () => {
-  // One line at a time, so the project can change between the job's lines.
   const oneAtATime = { ...(projectJson().narration as object), quality: { parallel: 1 } }
-  const freeRoot = tempRepo({
-    'audio-studio.json': projectJson({ narration: oneAtATime }),
+  const freeProject = projectJson({ narration: oneAtATime })
+  const paidProject = projectJson({ narration: { ...oneAtATime, models: { draft: 's2-pro' } } })
+  const root = tempRepo({
+    'audio-studio.json': freeProject,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': ['a', 'b', 'c', 'd'].map((key) => ({
       key,
@@ -862,110 +879,155 @@ describe('server, paid recording and what changes meanwhile', () => {
       text: `Line ${key}.`,
     })),
   })
-  const projectFile = join(freeRoot, 'audio-studio.json')
+  const projectFile = join(root, 'audio-studio.json')
   let credit = 10
-  const models: string[] = []
-  const slow: FishClient = {
+  let creditGate: Promise<void> | null = null
+  /** Each request to Fish waits at its own gate, opened by the test. */
+  const requests: { model: string; gate: ReturnType<typeof gate> }[] = []
+  const held: FishClient = {
     ...fish,
     async credit() {
+      if (creditGate) await creditGate
       return credit
     },
     async tts(request) {
-      models.push(request.model)
-      await new Promise((resolve) => setTimeout(resolve, 60))
+      const waiting = gate()
+      requests.push({ model: request.model, gate: waiting })
+      await waiting.opened
       return fish.tts(request)
     },
   }
-  const server = startServer({ projectFile, port: 0, fish: slow, encode, transcriber: null })
+  const server = startServer({ projectFile, port: 0, fish: held, encode, transcriber: null })
   afterAll(() => server.stop(true))
   const at = (path: string) => new URL(path, server.url)
   const own = { origin: server.url.origin, 'content-type': 'application/json' }
-  const paidProject = projectJson({ narration: { ...oneAtATime, models: { draft: 's2-pro' } } })
+  const post = (path: string, body: unknown) =>
+    fetch(at(path), { method: 'POST', headers: own, body: JSON.stringify(body) })
+  const jobState = async (id: string) => (await fetch(at(`/api/jobs/${id}`))).json()
+  /** Opens every request's gate, now and as they come, until the job ends. */
+  async function letThrough(id: string) {
+    for (;;) {
+      for (const request of requests) request.gate.open()
+      const state = await jobState(id)
+      if (state.status !== 'running' && state.status !== 'cancelling') return state
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+  }
+  const ceilingOf = async (key: string) =>
+    (await (await post(`/api/parts/act1/lines/${key}/record`, {})).json()).ceiling as number
 
   it('never sends a paid request in a job confirmed for the free model', async () => {
-    const started = await (
-      await fetch(at('/api/parts/act1/jobs'), {
-        method: 'POST',
-        headers: own,
-        body: JSON.stringify({ speaker: null, keys: ['a', 'b', 'c', 'd'], orphans: [] }),
-      })
+    const job = await (
+      await post('/api/parts/act1/jobs', { speaker: null, keys: ['a', 'b', 'c', 'd'], orphans: [] })
     ).json()
-    await new Promise((resolve) => setTimeout(resolve, 80))
+    await until(() => requests.length === 1)
     writeFileSync(projectFile, JSON.stringify(paidProject))
-    let state = started
-    while (state.status === 'running') {
-      await new Promise((resolve) => setTimeout(resolve, 20))
-      state = await (await fetch(at(`/api/jobs/${started.id}`))).json()
-    }
-    expect(models.filter((m) => m !== 's2.1-pro-free')).toEqual([])
-    expect(state.failed.length).toBeGreaterThan(0)
+    const state = await letThrough(job.id)
+    expect(requests.map((r) => r.model)).toEqual(['s2.1-pro-free'])
+    expect(state.failed).toHaveLength(3)
     expect(state.failed[0].message).toContain('s2-pro')
+    requests.length = 0
   })
 
   it('refuses a line whose plan cannot be made, sending nothing', async () => {
-    writeFileSync(join(freeRoot, 'tts/cast.json'), '{ broken')
-    const before = models.length
-    const answer = await fetch(at('/api/parts/act1/lines/a/record'), {
-      method: 'POST',
-      headers: own,
-      body: '{}',
-    })
+    writeFileSync(join(root, 'tts/cast.json'), '{ broken')
+    const answer = await post('/api/parts/act1/lines/a/record', {})
     expect(answer.status).toBe(409)
     expect((await answer.json()).problems).toBeDefined()
-    expect(models.length).toBe(before)
+    expect(requests).toHaveLength(0)
     writeFileSync(
-      join(freeRoot, 'tts/cast.json'),
+      join(root, 'tts/cast.json'),
       JSON.stringify({ speakers: { narrator: { voice: 'v1' } } }),
     )
   })
 
   it('refuses a paid job the credit does not cover', async () => {
-    writeFileSync(projectFile, JSON.stringify(paidProject))
     const { plan } = await (await fetch(at('/api/parts/act1/plan'))).json()
     credit = plan.ceiling / 2
-    const answer = await fetch(at('/api/parts/act1/jobs'), {
-      method: 'POST',
-      headers: own,
-      body: JSON.stringify({
-        speaker: null,
-        keys: plan.keys,
-        orphans: [],
-        confirmedCost: plan.ceiling,
-      }),
+    const answer = await post('/api/parts/act1/jobs', {
+      speaker: null,
+      keys: plan.keys,
+      orphans: [],
+      confirmedCost: plan.ceiling,
     })
     expect(answer.status).toBe(409)
     expect(await answer.json()).toMatchObject({ reason: 'credit' })
     credit = 10
   })
 
-  it('holds back what a running recording may still spend from the credit', async () => {
-    const one = async (key: string) => {
-      const asked = await (
-        await fetch(at(`/api/parts/act1/lines/${key}/record`), {
-          method: 'POST',
-          headers: own,
-          body: '{}',
-        })
-      ).json()
-      return asked.ceiling as number
-    }
-    const [ca, cb] = [await one('a'), await one('b')]
+  it('holds back what a running recording may spend, while it runs', async () => {
+    const [ca, cb] = [await ceilingOf('a'), await ceilingOf('b')]
     credit = ca + cb / 2
-    const first = fetch(at('/api/parts/act1/lines/a/record'), {
-      method: 'POST',
-      headers: own,
-      body: JSON.stringify({ confirmedCost: ca }),
-    })
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    const first = post('/api/parts/act1/lines/a/record', { confirmedCost: ca })
+    await until(() => requests.length === 1)
     const second = await (
-      await fetch(at('/api/parts/act1/lines/b/record'), {
-        method: 'POST',
-        headers: own,
-        body: JSON.stringify({ confirmedCost: cb }),
-      })
+      await post('/api/parts/act1/lines/b/record', { confirmedCost: cb })
     ).json()
     expect(second).toMatchObject({ ok: false, reason: 'credit' })
+    requests[0]!.gate.open()
     expect(await (await first).json()).toMatchObject({ ok: true })
+    requests.length = 0
+    credit = 10
+  })
+
+  it('lets two recordings asked for at once not both count on the same credit', async () => {
+    const [cb, cc] = [await ceilingOf('b'), await ceilingOf('c')]
+    credit = Math.max(cb, cc) * 1.5
+    const slowCredit = gate()
+    creditGate = slowCredit.opened
+    const both = [
+      post('/api/parts/act1/lines/b/record', { confirmedCost: cb }),
+      post('/api/parts/act1/lines/c/record', { confirmedCost: cc }),
+    ]
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    slowCredit.open()
+    creditGate = null
+    // Let every request through as it comes, until both have answered.
+    let settled = false
+    const answering = Promise.all(both.map(async (answer) => (await answer).json())).finally(
+      () => (settled = true),
+    )
+    while (!settled) {
+      for (const request of requests) request.gate.open()
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    const answers = await answering
+    expect(answers.filter((answer) => answer.ok)).toHaveLength(1)
+    expect(answers.filter((answer) => answer.reason === 'credit')).toHaveLength(1)
+    requests.length = 0
+    credit = 10
+  })
+
+  it('holds back nothing for a job that is refused, and frees a job’s credit when it ends', async () => {
+    const { plan } = await (await fetch(at('/api/parts/act1/plan'))).json()
+    credit = plan.ceiling * 1.5
+    const job = await (
+      await post('/api/parts/act1/jobs', {
+        speaker: null,
+        keys: plan.keys,
+        orphans: [],
+        confirmedCost: plan.ceiling,
+      })
+    ).json()
+    expect(job.status).toBe('running')
+    credit = plan.ceiling * 3
+    const again = await post('/api/parts/act1/jobs', {
+      speaker: null,
+      keys: plan.keys,
+      orphans: [],
+      confirmedCost: plan.ceiling,
+    })
+    expect(again.status).toBe(409)
+    await letThrough(job.id)
+    requests.length = 0
+    // Nothing is held back now: the whole credit is there for a line again.
+    const line = await ceilingOf('a')
+    credit = line
+    const recorded = post('/api/parts/act1/lines/a/record', { confirmedCost: line })
+    await until(() => requests.length === 1)
+    requests[0]!.gate.open()
+    expect(await (await recorded).json()).toMatchObject({ ok: true })
+    requests.length = 0
     credit = 10
   })
 })

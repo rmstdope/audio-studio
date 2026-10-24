@@ -13,7 +13,6 @@ import { createLimiter } from '../services/limit'
 import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
-import { createSerial } from '../services/serial'
 import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
@@ -209,28 +208,32 @@ export function startServer({
     ceiling: number | null,
     confirmed?: number,
   ): Promise<{ budget: Budget } | { problem: SpendProblem }> {
-    // One at a time, so two recordings checked together cannot both count on the same credit.
-    return spendTurn.run('spend', async () => {
-      const problem = await (async () => {
-        if (ceiling === null || ceiling === 0) return spendProblem({ ceiling, confirmed })
-        const asked = spendProblem({ ceiling, confirmed })
-        if (asked && asked.reason !== 'credit') return asked
-        const credit = await creditOf()
-        // What running recordings may still spend is not there to promise again.
-        const free = credit.ok ? credit.credit - reserved() : null
-        return spendProblem({ ceiling, confirmed, credit: free })
-      })()
+    const asked = spendProblem({ ceiling, confirmed })
+    if (asked && asked.reason !== 'credit') return Promise.resolve({ problem: asked })
+    // Free: nothing to hold back, so no need to wait for anyone else's credit check.
+    if (!ceiling) return Promise.resolve({ budget: createBudget({ model, dollars: 0 }) })
+    // The budget is what was confirmed, rounded to cents at most a cent above the ceiling; the
+    // credit is checked against that whole budget.
+    const dollars = Math.min(confirmed ?? ceiling, ceiling + 0.01)
+    return (async () => {
+      const credit = await creditOf()
+      // From here to adding the budget nothing awaits, so two recordings asked for at once cannot
+      // both count on the same credit: the second sees the first's budget held back.
+      const free = credit.ok ? credit.credit - reserved() : null
+      const problem = spendProblem({ ceiling: dollars, confirmed: dollars, credit: free })
       if (problem) return { problem }
-      const budget = createBudget({ model, dollars: ceiling ? (confirmed ?? 0) : 0 })
+      const budget = createBudget({ model, dollars })
       budgets.add(budget)
       return { budget }
-    })
+    })()
   }
 
-  /** The budgets of the recordings running now, and what they may still spend. */
+  /**
+   * The budgets of the recordings running now. All they were given is held back from the credit
+   * until they end: Fish may bill a request some time after it was charged to its budget.
+   */
   const budgets = new Set<Budget>()
-  const reserved = () => [...budgets].reduce((sum, budget) => sum + budget.left, 0)
-  const spendTurn = createSerial()
+  const reserved = () => [...budgets].reduce((sum, budget) => sum + budget.dollars, 0)
 
   /** The take checker: the one given (tests), else the process's one Whisper worker. */
   async function transcriberFor(): Promise<Transcriber | null> {
@@ -395,6 +398,7 @@ export function startServer({
           const { budget } = admitted
           // Checked with no await before the job starts, so a refresh cannot slip in between.
           if (isRefreshing(projectFile, part)) {
+            budgets.delete(budget)
             return Response.json(
               { error: 'The dialog is being refreshed; generate when it is done.' },
               { status: 409 },
@@ -421,6 +425,8 @@ export function startServer({
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys),
             onEnd: () => budgets.delete(budget),
           })
+          // Not started (another job runs for the part): nothing is held back for it.
+          if ('error' in job) budgets.delete(budget)
           return Response.json(job, { status: 'error' in job ? 409 : 200 })
         }),
       },

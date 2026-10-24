@@ -6,6 +6,9 @@ export type SpendProblem =
   | { reason: 'credit'; message: string }
   | { reason: 'price'; message: string }
 
+/** Below this, a difference in dollars is rounding, not money (sums of per-piece prices). */
+const ROUNDING = 1e-9
+
 /** An amount in dollars, as messages write it. */
 function usd(amount: number): string {
   return `$${amount.toFixed(2)}`
@@ -29,7 +32,8 @@ export function spendProblem({
     return { reason: 'price', message: 'The model’s price is unknown, so nothing is recorded.' }
   }
   if (ceiling === 0) return null
-  if (confirmed === undefined || confirmed < ceiling) {
+  // A confirmation in whole cents may sit a rounding hair below a ceiling worked out in floats.
+  if (confirmed === undefined || confirmed + ROUNDING < ceiling) {
     return {
       reason: 'confirm',
       ceiling,
@@ -55,6 +59,8 @@ export function spendProblem({
  */
 export interface Budget {
   readonly model: string
+  /** The dollars it was given. */
+  readonly dollars: number
   /** Dollars left to spend. */
   readonly left: number
   /**
@@ -64,14 +70,12 @@ export interface Budget {
   spend(model: string, bytes: number, at: Date): string | null
 }
 
-/** Below this, a difference in dollars is rounding, not money (sums of per-piece prices). */
-const ROUNDING = 1e-9
-
 /** A budget for `model` with `dollars` to spend (none, for the free model). */
 export function createBudget({ model, dollars }: { model: string; dollars: number }): Budget {
   let left = dollars
   return {
     model,
+    dollars,
     get left() {
       return left
     },

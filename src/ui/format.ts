@@ -62,5 +62,7 @@ export function centsUp(amount: number): number {
   // taken only when it still covers the amount, so the result is never less than the amount.
   let cents = Math.ceil(amount * 100)
   if ((cents - 1) / 100 >= amount) cents -= 1
+  // amount * 100 can itself round down onto a whole cent (0.35000000000000003 * 100 is 35).
+  if (cents / 100 < amount) cents += 1
   return cents / 100
 }

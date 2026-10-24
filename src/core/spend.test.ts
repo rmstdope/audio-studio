@@ -17,6 +17,14 @@ describe('spendProblem', () => {
     expect(spendProblem({ ceiling: 0.42, confirmed: 0.42, credit: 10 })).toBeNull()
   })
 
+  it('takes a confirmation a rounding hair below the ceiling, as cents round it', () => {
+    const ceiling = (3500 / 1e6) * 50 * 2
+    expect(spendProblem({ ceiling, confirmed: 0.35, credit: 10 })).toBeNull()
+    expect(spendProblem({ ceiling, confirmed: 0.34, credit: 10 })).toMatchObject({
+      reason: 'confirm',
+    })
+  })
+
   it('refuses a paid job the credit does not cover, or when the credit is unknown', () => {
     expect(spendProblem({ ceiling: 0.42, confirmed: 0.42, credit: 0.4 })).toMatchObject({
       reason: 'credit',
@@ -66,5 +74,14 @@ describe('createBudget', () => {
     expect(
       createBudget({ model: 'brand-new', dollars: 5 }).spend('brand-new', 1, at),
     ).not.toBeNull()
+  })
+})
+
+describe('createBudget, its dollars', () => {
+  it('keeps the dollars it was given, whatever is left', () => {
+    const budget = createBudget({ model: 's2-pro', dollars: 1 })
+    budget.spend('s2-pro', 1000, new Date('2026-10-24T12:00:00Z'))
+    expect(budget.dollars).toBe(1)
+    expect(budget.left).toBeLessThan(1)
   })
 })

@@ -74,6 +74,9 @@ describe('centsUp', () => {
     expect(centsUp(0.42)).toBe(0.42)
     expect(centsUp(0)).toBe(0)
     expect(centsUp(0.4200000001)).toBe(0.43)
+    // A cost a hair above a whole cent in floating point, as the review found.
+    const hair = (3500 / 1e6) * 50 * 2
+    expect(centsUp(hair)).toBeGreaterThanOrEqual(hair)
     for (const amount of [0.0097, 0.123456, 1.9003949999999998, 0.07, 3.3]) {
       expect(centsUp(amount)).toBeGreaterThanOrEqual(amount)
     }

@@ -411,7 +411,9 @@ generation while the script and cast still change) and `final` (the recording th
   request to Fish, at that moment's price, it refuses another model than the one confirmed and
   anything beyond what is left, so nothing changed meanwhile (the project's model, a cue, the
   takes, a promotion ending) spends more than was agreed; without a budget only the free model
-  can be used. What running recordings may still spend is held back from the credit. There is no
+  can be used. All that running recordings were given is held back from the credit until they
+  end (Fish may bill a request after it was charged); a recording refused after it was admitted,
+  and a job when it ends, give theirs back. There is no
   separate final step yet: a draft is the final recording.
 - **Later:** with a paid `final` model, **Final generation** re-records every clip in a part whose
   lock says it was made with another model. It is a normal plan (§8.2) with the cost in dollars and a
