@@ -242,8 +242,15 @@ describe('alignWords, words joined by hyphens and dashes', () => {
     expect(r('so Lyria waits', 'so Leer-ee-a waits', 'so LEER-ee-a waits')).toBe(1)
   })
 
-  it('still counts a dash on its own, which nobody says, as not heard', () => {
-    expect(alignWords(['wait', '—', 'now'], heardAs('wait', 'now'), 2).missed).toEqual([1])
+  it('leaves out a dash or an ellipsis on its own, which nobody says, but times it', () => {
+    const { ratio, missed, timed } = alignWords(['wait', '—', 'now'], heardAs('wait', 'now'), 2)
+    expect([ratio, missed]).toEqual([1, []])
+    expect(timed[1]).toEqual({ word: '—', start: 0.5, end: 1 })
+    const shown = 'Malakar, our friend —'.split(' ')
+    const heard = heardAs('Malachar,', 'our', 'friend')
+    expect(alignWords(shown, heard, 4, undefined, new Set(['malakar'])).ratio).toBe(1)
+    expect(alignWords(['…', '-', '—'], [], 1).ratio).toBe(1)
+    expect(alignWords(['wait', '…', 'now'], heardAs('wait'), 2).ratio).toBe(1 / 2)
   })
 })
 
@@ -391,7 +398,7 @@ describe('alignWords, names Whisper spells its own way', () => {
   })
 
   it('counts it past a dash or an ellipsis, shown or heard, which nobody says', () => {
-    expect(alignWords(['wait', '—', 'Aren'], heardAs('wait', 'Arn'), 2).ratio).toBe(2 / 3)
+    expect(alignWords(['wait', '—', 'Aren'], heardAs('wait', 'Arn'), 2).ratio).toBe(1)
     expect(alignWords(['wait', 'Aren'], heardAs('wait', '...', 'Arn'), 3).ratio).toBe(1)
   })
 
@@ -432,7 +439,7 @@ describe('alignWords, names Whisper spells its own way', () => {
   it('says which shown words were not heard', () => {
     const heard = heardAs('This', 'was', 'you', 'know,', 'Arn', 'and', "Lysa's.")
     expect(alignWords(text.split(' '), heard, 9, undefined, cast).missed).toEqual([2])
-    expect(alignWords(['wait', '—', 'Aren'], heardAs('wait', 'Arn'), 2).missed).toEqual([1])
+    expect(alignWords(['wait', '—', 'now'], heardAs('wait'), 2).missed).toEqual([2])
   })
 
   it('counts a name Whisper spelled by its sound (Malachar, LifeLite)', () => {

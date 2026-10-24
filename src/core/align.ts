@@ -477,8 +477,10 @@ export function alignWords(
     wantFrom = a + size
     gotFrom = b + size
   }
-  const missed = tokens.flatMap((_, k) => (times[k] ? [] : [k]))
-  const matched = tokens.length - missed.length
+  // Only words count: a dash or an ellipsis on its own ("—", "…") has nothing to hear.
+  const words = tokens.flatMap((_, k) => (norm(spoken[k]!) ? [k] : []))
+  const missed = words.filter((k) => !times[k])
+  const matched = words.length - missed.length
 
   let i = 0
   while (i < tokens.length) {
@@ -504,7 +506,7 @@ export function alignWords(
     timed.push({ word, start: pyRound(start), end: pyRound(end) })
     last = start
   })
-  return { timed, ratio: tokens.length ? matched / tokens.length : 1, missed }
+  return { timed, ratio: words.length ? matched / words.length : 1, missed }
 }
 
 /**
