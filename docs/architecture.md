@@ -424,8 +424,8 @@ An audition is for a character, not for a part: the result applies to every part
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the
       share of shown words heard). Alignment is narrate.py's, with three departures. Words are
       compared without single quotes at their ends ("'You" and "will.'" are "you" and "will";
-      apostrophes inside a word, "don't", stay), and a possessive after s is one word however it is
-      written ("Sorceress's" and "Sorceress'"). Words are matched whole first, as narrate.py does;
+      apostrophes inside a word, "don't", stay), and a possessive is one word however it is written,
+      as Whisper cannot hear which ("Sorceress's" and "Sorceress'", "founder's" and "founders'"). Words are matched whole first, as narrate.py does;
       the shown and heard words left between two matches are then compared by their parts, split at
       hyphens and dashes on both sides (punctuation beside a dash is no part), and a compound
       written as one word matches the same word heard as two, or the other way round ("silverleaf"

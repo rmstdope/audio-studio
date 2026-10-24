@@ -30,15 +30,16 @@ const NUMBERS = new Map(
 /**
  * A word without case or punctuation (narrate.py `_plain`). Apostrophes stay inside a word
  * ("don't", "Lysa's") but not at its ends, where they are single quotes around speech ("'You",
- * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. The two ways
- * of writing a possessive after s are one ("Sorceress's" and "Sorceress'" are "sorceress").
+ * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. A possessive
+ * is one word however it is written, since Whisper cannot hear which: "Sorceress's" and
+ * "Sorceress'" are "sorceress", "founder's" and "founders'" are "founders".
  */
 function plain(word: string): string {
   return word
     .toLowerCase()
     .replace(/[^a-z0-9']/g, '')
     .replace(/^'+|'+$/g, '')
-    .replace(/s's$/, 's')
+    .replace(/s?'s$/, 's')
 }
 
 /** A word for comparison: plain, small numbers as digits, since Whisper writes "1" (`_norm`). */
@@ -147,12 +148,12 @@ export function knownNames(cast: {
 
 /** A word plain, without a possessive 's: what a name is looked up by ("Aren's" is "aren"). */
 function bare(word: string): string {
-  return norm(word).replace(/'s$/, '')
+  return norm(word.replace(/'s(?=[^A-Za-z0-9]*$)/, ''))
 }
 
-/** Whether a plain word is letters and apostrophes only, `min` letters or more in its stem. */
+/** Whether a plain word is letters and apostrophes only, `min` letters or more. */
 function isWord(word: string, min = 0): boolean {
-  return /^[a-z']+$/.test(word) && word.replace(/'s$/, '').replace(/'/g, '').length >= min
+  return /^[a-z']+$/.test(word) && word.replace(/'/g, '').length >= min
 }
 
 /** Whether two words are one letter apart: one added, removed or changed. */
@@ -211,7 +212,7 @@ function spelledAlike(
 ): boolean {
   if (!/^[^A-Za-z0-9]*[A-Z]/.test(shown) || !/[a-z]/.test(shown)) return false
   if (atStart && !names.has(bare(shown))) return false
-  if (!isWord(want, 4) || !isWord(got)) return false
+  if (!isWord(bare(shown), 4) || !isWord(want) || !isWord(got)) return false
   if (oneLetterApart(want, got)) return true
   // As they sound, only while that leaves four letters: fewer, and one off is another name.
   const [a, b] = [soundOf(want), soundOf(got)]
