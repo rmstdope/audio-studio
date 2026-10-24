@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import {
   alignWords,
   heardWords,
+  knownNames,
   pyRound,
   saidWords,
   type HeardSegment,
@@ -270,7 +271,13 @@ export async function recordLine(
       } else {
         try {
           const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav)
-          const aligned = alignWords(tokens, heardWords(segments, clip.seconds), clip.seconds, said)
+          const aligned = alignWords(
+            tokens,
+            heardWords(segments, clip.seconds),
+            clip.seconds,
+            said,
+            knownNames(cast),
+          )
           // Rounded as the lock keeps it, so the line's status agrees with this decision.
           attempt = { clip, timed: aligned.timed, heard: pyRound(aligned.ratio) }
         } catch (error) {
@@ -506,7 +513,8 @@ export async function measureLine(
     // The decoded WAV, as narrate.py --retime transcribes it, so the timings come out the same.
     const segments = await transcribeWav(transcriber, narration.quality.whisperModel, decoded.wav)
     const said = saidWords(line.text, read.input.cast.pronounce)
-    aligned = alignWords(line.text.split(' '), heardWords(segments, seconds), seconds, said)
+    const words = heardWords(segments, seconds)
+    aligned = alignWords(line.text.split(' '), words, seconds, said, knownNames(read.input.cast))
   } catch (error) {
     return { ok: false, reason: 'transcribe', message: messageOf(error) }
   }

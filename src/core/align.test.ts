@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   alignWords,
   heardWords,
+  knownNames,
   matchingBlocks,
   pyRound,
   saidWords,
@@ -115,10 +116,13 @@ describe('alignWords, names Whisper spells its own way', () => {
   const text = "This was theirs, you know. Aren and Lysa's."
   const heardAs = (...said: string[]) =>
     words(...said.map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const cast = new Set(['aren'])
 
-  it('counts a name heard in its place one letter off, taking its times and no other', () => {
-    const heard = heardAs('This', 'was', 'theirs,', 'you', 'know,', 'Arn', 'and', "Lisa's.")
-    const { timed, ratio } = alignWords(text.split(' '), heard, 9)
+  it('counts a known name heard one letter off, taking its times and no other', () => {
+    const heard = heardAs('This', 'was', 'theirs,', 'you', 'know,', 'Arn', 'and', "Lysa's.")
+    // "Aren" starts a sentence here, so it counts as a known name only.
+    expect(alignWords(text.split(' '), heard, 9).ratio).toBe(7 / 8)
+    const { timed, ratio } = alignWords(text.split(' '), heard, 9, undefined, cast)
     expect(ratio).toBe(1)
     expect(timed.slice(4, 7)).toEqual([
       { word: 'know.', start: 4, end: 4.5 },
@@ -127,24 +131,42 @@ describe('alignWords, names Whisper spells its own way', () => {
     ])
   })
 
-  it('counts one at the start of the line, and one compared as said', () => {
-    expect(alignWords(['Aren', 'went', 'home'], heardAs('Arn', 'went', 'home'), 3).ratio).toBe(1)
-    expect(alignWords(['"Aren', 'went'], heardAs('Arn', 'went'), 2).ratio).toBe(1)
+  it('counts a known name at the start of a sentence, but no other word there', () => {
+    const start = (shown: string[], heard: string[], names?: ReadonlySet<string>) =>
+      alignWords(shown, heardAs(...heard), 9, undefined, names).ratio
+    expect(start(['Aren', 'went', 'home'], ['Arn', 'went', 'home'], cast)).toBe(1)
+    expect(start(['Aren', 'went', 'home'], ['Arn', 'went', 'home'])).toBe(2 / 3)
+    expect(start(['Where', 'is', 'he?'], ['There', 'is', 'he?'], cast)).toBe(2 / 3)
     expect(
-      alignWords(['Aren', 'waits'], heardAs('Ahrn', 'waits'), 2, ['Ahren', 'waits']).ratio,
+      start(['We', 'ran.', 'Here', 'they', 'come.'], ['We', 'ran.', 'Her', 'they', 'come.']),
+    ).toBe(4 / 5)
+    expect(start(['"Never', 'again,"', 'she', 'said.'], ['Ever', 'again,', 'she', 'said.'])).toBe(
+      3 / 4,
+    )
+    expect(start(['"Aren', 'went'], ['Arn', 'went'], cast)).toBe(1)
+  })
+
+  it('counts one mid-sentence, unknown, compared as said', () => {
+    expect(
+      alignWords(['know,', 'Aren', 'waits'], heardAs('know,', 'Ahrn', 'waits'), 3, [
+        'know,',
+        'Ahren',
+        'waits',
+      ]).ratio,
     ).toBe(1)
   })
 
-  it('counts it past a dash or an ellipsis, which nobody hears', () => {
+  it('counts it past a dash or an ellipsis, shown or heard, which nobody says', () => {
     expect(alignWords(['wait', '—', 'Aren'], heardAs('wait', 'Arn'), 2).ratio).toBe(2 / 3)
-    expect(alignWords(['...', 'Aren'], heardAs('Arn'), 1).ratio).toBe(1 / 2)
+    expect(alignWords(['wait', 'Aren'], heardAs('wait', '...', 'Arn'), 3).ratio).toBe(1)
   })
 
-  it('does not count a lowercase word, a shown word under four letters, or two letters off', () => {
+  it('does not count a lowercase word, a name under four letters, or two letters off', () => {
     expect(
       alignWords(['I', 'will', 'never', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
     ).toBe(3 / 4)
-    expect(alignWords(['Kai', 'came'], heardAs('Kaid', 'came'), 2).ratio).toBe(1 / 2)
+    expect(alignWords(['see', 'Kai', 'came'], heardAs('see', 'Kaid', 'came'), 3).ratio).toBe(2 / 3)
+    expect(alignWords(['see', "Kai's", 'cat'], heardAs('see', 'Kais', 'cat'), 3).ratio).toBe(2 / 3)
     expect(alignWords(['the', 'Malakar'], heardAs('the', 'Malacore'), 2).ratio).toBe(1 / 2)
   })
 
@@ -155,9 +177,20 @@ describe('alignWords, names Whisper spells its own way', () => {
   })
 
   it('pairs words only where as many were heard as shown between matches', () => {
-    expect(alignWords(['Aren', 'and', 'Lysa'], heardAs('Arn', 'Ren', 'and', 'Lysa'), 4).ratio).toBe(
-      2 / 3,
-    )
+    expect(
+      alignWords(['and', 'Aren', 'and', 'Lysa'], heardAs('and', 'Arn', 'Ren', 'and', 'Lysa'), 5)
+        .ratio,
+    ).toBe(3 / 4)
+  })
+})
+
+describe('knownNames', () => {
+  it('gives the words of the cast’s names and of its pronunciations, plain', () => {
+    const names = knownNames({
+      speakers: { aren: {}, 'unmasked sorceress': {} },
+      pronounce: { Lyria: 'LEER-ee-a', 'Act I:': 'Act One:' },
+    })
+    expect([...names].sort()).toEqual(['act', 'aren', 'i', 'lyria', 'sorceress', 'unmasked'])
   })
 })
 

@@ -394,6 +394,14 @@ describe('recordLine, checked with Whisper', () => {
     expect(lock.k1).toMatchObject({ heard: 1, takes: 1 })
   })
 
+  it('hears a known name Whisper spells one letter off, at the start of the line', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const result = await recordChecked(root, hearing(['El-eor', 'wakes', 'up.']), fish)
+    expect(result).toEqual({ ok: true, key: 'k1', duration: 1, heard: 1, takes: 1 })
+    expect(requests).toHaveLength(1)
+  })
+
   it('takes again while a take is heard poorly, keeping the first good one', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
