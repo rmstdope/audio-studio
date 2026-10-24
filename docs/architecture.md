@@ -422,9 +422,12 @@ An audition is for a character, not for a part: the result applies to every part
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
    2. TTS each chunk (WAV), join them with a short gap;
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the
-      share of shown words heard). Alignment is narrate.py's, with two departures. Words are
+      share of shown words heard). Alignment is narrate.py's, with three departures. Words are
       compared without single quotes at their ends ("'You" and "will.'" are "you" and "will";
-      apostrophes inside a word, "don't", stay). And a name heard in its place one letter off, as
+      apostrophes inside a word, "don't", stay). Words joined by hyphens or dashes are compared by
+      their parts, and a compound written as one word matches the same word heard as two, or the
+      other way round ("silverleaf" and "silver leaf", "resin sweet" and "resin-sweet"); a joined
+      word counts as heard when all its parts are. And a name heard in its place one letter off, as
       Whisper spells an invented name ("Aren" as "Arn"), counts as heard and takes the heard word's
       times. Only a capitalised shown word of four letters or more (a possessive 's not counted),
       nothing but letters and not all capitals, qualifies; where a sentence starts (after . ! ? … or

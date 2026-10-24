@@ -112,6 +112,48 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
   })
 })
 
+describe('alignWords, words joined by hyphens and dashes', () => {
+  const heardAs = (...said: string[]) =>
+    words(...said.map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const text = "Bundles of resin-sweet stems and silverleaf—Mira's blends for steadying wounds."
+
+  it('compares the parts of joined words, and a compound heard as two words', () => {
+    const heard = heardAs(
+      ..."bundles of resin sweet stems and silver leaf, Mira's blends for steadying wounds.".split(
+        ' ',
+      ),
+    )
+    const { timed, ratio } = alignWords(text.split(' '), heard, 20)
+    expect(ratio).toBe(1)
+    expect(timed[2]).toEqual({ word: 'resin-sweet', start: 2, end: 3.5 })
+    expect(timed[5]).toEqual({ word: "silverleaf—Mira's", start: 6, end: 8.5 })
+  })
+
+  it('misses a joined word when one of its parts is not heard', () => {
+    const heard = heardAs(
+      ...'bundles of resin sweet stems and silver leaf, mirrors blends for steadying wounds.'.split(
+        ' ',
+      ),
+    )
+    const { ratio, missed } = alignWords(text.split(' '), heard, 20)
+    expect(missed).toEqual([5])
+    expect(ratio).toBe(9 / 10)
+  })
+
+  it('compares a compound heard joined, or as one word, with the words shown apart', () => {
+    expect(alignWords(['resin', 'sweet', 'stems'], heardAs('resin-sweet', 'stems'), 3).ratio).toBe(
+      1,
+    )
+    expect(alignWords(['silver', 'leaf', 'blends'], heardAs('silverleaf', 'blends'), 3).ratio).toBe(
+      1,
+    )
+  })
+
+  it('still counts a dash on its own, which nobody says, as not heard', () => {
+    expect(alignWords(['wait', '—', 'now'], heardAs('wait', 'now'), 2).missed).toEqual([1])
+  })
+})
+
 describe('alignWords, quoted speech', () => {
   it('counts a plural possessive heard without its apostrophe', () => {
     expect(
