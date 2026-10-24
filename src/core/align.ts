@@ -199,8 +199,8 @@ function soundOf(word: string): string {
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
  * is) unless it is a known name, of at least four letters (apostrophes and a possessive 's not
  * counted) and nothing else, and the heard one is one letter apart, as spelled or as they sound
- * (`soundOf`, where that leaves four letters), or, for a known name, the same consonants as they
- * sound, in the same order, with other vowels. Lowercase words, short ones and numbers are left
+ * (`soundOf`, where that leaves four letters), or, for a known name heard as one word Whisper
+ * capitalised (`written`), only its vowels other as they sound (`vowelsApart`). Lowercase words, short ones and numbers are left
  * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
  */
 function spelledAlike(
@@ -209,17 +209,28 @@ function spelledAlike(
   want: string,
   got: string,
   names: ReadonlySet<string>,
+  written?: string,
 ): boolean {
   if (!/^[^A-Za-z0-9]*[A-Z]/.test(shown) || !/[a-z]/.test(shown)) return false
-  if (atStart && !names.has(bare(shown))) return false
+  const known = names.has(bare(shown))
+  if (atStart && !known) return false
   if (!isWord(want, 4) || !isWord(got)) return false
   if (oneLetterApart(want, got)) return true
   // As they sound, only while that leaves four letters: fewer, and one off is another name.
   const [a, b] = [soundOf(want), soundOf(got)]
   if (Math.min(a.length, b.length) >= 4 && (a === b || oneLetterApart(a, b))) return true
-  // A known name with other vowels ("Elior" as "Ilyar"), while two consonants or more tell it.
-  const consonants = (word: string) => word.replace(/[aeiou]/g, '')
-  return names.has(bare(shown)) && consonants(a).length >= 2 && consonants(a) === consonants(b)
+  // A known name with other vowels ("Elior" as "Ilyar"), heard as one word Whisper wrote as a name.
+  return known && !!written && /^[^A-Za-z0-9]*[A-Z]/.test(written) && vowelsApart(a, b)
+}
+
+/**
+ * Whether two words as they sound differ only in their vowels, one for one ("elior" and "iliar"),
+ * and have two consonants or more, which tell the word.
+ */
+function vowelsApart(x: string, y: string): boolean {
+  const vowel = (c: string) => 'aeiou'.includes(c)
+  if (x === y || x.length !== y.length || x.replace(/[aeiou]/g, '').length < 2) return false
+  return [...x].every((c, k) => c === y[k] || (vowel(c) && vowel(y[k]!)))
 }
 
 /** Hyphens and dashes, which join words written without spaces ("resin-sweet", "leaf—Mira's"). */
@@ -320,7 +331,7 @@ function alignGap(
     shownWords.forEach((i, k) => {
       const w = heard[heardWords[k]!]!
       const atStart = startsSentence(tokens, i)
-      if (spelledAlike(tokens[i]!, atStart, norm(said[i]!), norm(w.word), names)) {
+      if (spelledAlike(tokens[i]!, atStart, norm(said[i]!), norm(w.word), names, w.word)) {
         times[i] = [w.start, w.end]
       }
     })
@@ -362,7 +373,8 @@ function alignGap(
     if (!guess || n < 1) return null
     const piece = pieces[s]!
     const spelled = got.slice(h, h + n).join('')
-    if (!spelledAlike(piece.shown, piece.atStart, want[s]!, spelled, names)) return null
+    const written = n === 1 ? parts[h]!.word : undefined
+    if (!spelledAlike(piece.shown, piece.atStart, want[s]!, spelled, names, written)) return null
     return { shown: 1, heard: n, apply: () => take(s, h, h + n - 1) }
   }
 

@@ -411,6 +411,33 @@ describe('alignWords, names Whisper spells its own way', () => {
     expect(missed('then Aria came', 'then Oreo came')).toEqual([1])
   })
 
+  it('does not count a word, or several, with the vowels of a known name in other places', () => {
+    const names = new Set(['mira', 'lysa', 'aren', 'elior', 'lyria', 'kael'])
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, names).missed
+    for (const [name, said] of [
+      ['Mira', 'more'],
+      ['Mira', 'Omar'],
+      ['Lysa', 'also'],
+      ['Lysa', 'lose a'],
+      ['Aren', 'iron'],
+      ['Aren', 'Ronnie'],
+      ['Aren', 'a rain'],
+      ['Elior', 'a lair'],
+      ['Elior', 'all your'],
+      ['Lyria', 'lure'],
+      ['Lyria', 'a lie or'],
+      ['Kael', 'cool'],
+      ['Kael', 'Kyle'],
+    ]) {
+      expect([name, said, missed(`then ${name} came`, `then ${said} came`)]).toEqual([
+        name,
+        said,
+        [1],
+      ])
+    }
+  })
+
   it('pairs words only where as many were heard as shown between matches', () => {
     expect(
       alignWords(['and', 'Aren', 'and', 'Lysa'], heardAs('and', 'Arn', 'Ren', 'and', 'Lysa'), 5)
