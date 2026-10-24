@@ -11,9 +11,20 @@ import { REASON } from '../../status'
  * to retake if asked, the orphans, the model and its cost), then the job's progress with Cancel,
  * then what it did. Clips never checked by Whisper can be measured instead, without new audio.
  */
-export function GeneratePanel({ partId, speaker }: { partId: string; speaker: string | null }) {
+export function GeneratePanel({
+  partId,
+  speaker,
+  models,
+}: {
+  partId: string
+  speaker: string | null
+  /** The draft and final models: a final step is offered only when they differ. */
+  models: { draft: string; final: string }
+}) {
   const [retakeWeak, setRetakeWeak] = useState(false)
-  const plan = usePlan(partId, speaker, retakeWeak)
+  const [stage, setStage] = useState<'draft' | 'final'>('draft')
+  const hasFinal = models.final !== models.draft
+  const plan = usePlan(partId, speaker, retakeWeak, hasFinal ? stage : 'draft')
   const job = useJob(partId)
   const { start, cancel } = useJobActions(partId)
   // A paid plan's Generate asks once more; a different plan clears the question.
@@ -35,7 +46,7 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
   // The orphan box only ever confirms the orphans shown: a different set clears it.
   const orphanSet = plan.data?.ok ? plan.data.plan.orphans.join('\n') : ''
   const ceilingShown = plan.data?.ok ? plan.data.plan.ceiling : null
-  useEffect(() => setConfirming(false), [ceilingShown, speaker, retakeWeak])
+  useEffect(() => setConfirming(false), [ceilingShown, speaker, retakeWeak, stage])
   useEffect(() => setRemoveOrphans(false), [orphanSet])
 
   if (current && (running || shownJob === current.id)) {
@@ -137,10 +148,15 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
       <div className="generate-head">
         <div>
           <span className="label">
-            Generate · {speaker ? displayName(speaker) : 'every character'}
+            {stage === 'final' && hasFinal ? 'Final recording' : 'Generate'} ·{' '}
+            {speaker ? displayName(speaker) : 'every character'}
           </span>
           <strong>
-            {p.keys.length ? `Record ${plural(p.keys.length, 'line')}` : 'Every line is recorded'}
+            {p.keys.length
+              ? `Record ${plural(p.keys.length, 'line')}`
+              : p.final
+                ? 'Every line is final'
+                : 'Every line is recorded'}
           </strong>
         </div>
         <div className="header-actions">
@@ -165,6 +181,7 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
               start.mutate(
                 {
                   kind: 'record',
+                  stage: hasFinal ? stage : 'draft',
                   retakeWeak,
                   speaker,
                   keys: p.keys,
@@ -188,9 +205,34 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
           </button>
         </div>
       </div>
-      {(p.missing > 0 || reasons.length > 0) && (
+      {hasFinal && (
+        <div className="stage-switch" role="radiogroup" aria-label="Which recording">
+          {(['draft', 'final'] as const).map((which) => (
+            <label key={which} className={stage === which ? 'on' : ''}>
+              <input
+                type="radio"
+                name={`stage-${partId}`}
+                checked={stage === which}
+                onChange={() => setStage(which)}
+              />
+              {which === 'draft' ? 'Draft' : 'Final'} <span className="mono">{models[which]}</span>
+            </label>
+          ))}
+        </div>
+      )}
+      {stage === 'final' && hasFinal && (
+        <span className="muted">
+          The final recording records every line whose clip was not made with {models.final} yet;
+          draft plans leave final clips alone.
+        </span>
+      )}
+      {(p.missing > 0 || reasons.length > 0 || p.drafted > 0 || p.untracked > 0) && (
         <ul className="plan-list">
           {p.missing > 0 && <li>{plural(p.missing, 'missing line')}</li>}
+          {p.drafted > 0 && <li>{plural(p.drafted, 'drafted line')}, recorded again</li>}
+          {p.untracked > 0 && (
+            <li>{plural(p.untracked, 'clip')} made before the studio, recorded again</li>
+          )}
           {reasons.map(([reason, n]) => (
             <li key={reason}>
               {plural(n, 'line')}: {REASON[reason]}

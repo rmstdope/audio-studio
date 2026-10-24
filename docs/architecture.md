@@ -414,12 +414,18 @@ generation while the script and cast still change) and `final` (the recording th
   can be used. All that running recordings were given is held back from the credit until they
   end (Fish may bill a request after it was charged); a recording refused after it was admitted,
   and a job when it ends, give theirs back. There is no
-  separate final step yet: a draft is the final recording.
-- **Later:** with a paid `final` model, **Final generation** re-records every clip in a part whose
-  lock says it was made with another model. It is a normal plan (§8.2) with the cost in dollars and a
-  confirmation, and a clip made with the final model shows as `final` in the line table. Because the
-  model is part of the fingerprint, nothing else is needed to find these clips. A paid `audition`
-  or `draft` model works the same way, with its cost shown before each audition round or plan.
+  separate step for auditions yet: they are always free.
+- **Final recording** (built): when `final` names another model than `draft`, the Generate panel
+  offers **Draft** and **Final**. The final plan records every cast line whose clip was not made
+  with the final model yet (missing, stale, drafted, untracked), with the final model, priced and
+  confirmed like any paid job. A clip is up to date if its lock matches the inputs with either
+  model; one made with the final model is marked `final` in the line table, and draft plans
+  leave it alone. A final clip whose inputs change (a cue, the text) matches neither and goes
+  stale like any other, and the draft plan records it again with the draft model (so a paid clip
+  edited afterwards becomes a draft one until the next final recording). A weak final clip is
+  retaken only with the final model: from its row, or by the final plan when asked. With one
+  model for both, there is no final step: a final plan or recording is a draft one. A paid
+  `audition` model is still to come, with its cost per round.
 
 ---
 
@@ -450,7 +456,7 @@ POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
 POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
-GET    /api/parts/:part/plan?speaker=&weak=1     scope → plan (no side effects)
+GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
@@ -463,7 +469,8 @@ POST   /api/auditions/:id/next                   the next round with the voices 
 POST   /api/auditions/:id/more                   a round's worth of new candidates
 POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write the last voice left to cast.json
-POST   /api/parts/:part/jobs                     run a plan (one job per part at a time); a paid
+POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
+                                                 part at a time); a paid
                                                  one with { confirmedCost }, else 409 with
                                                  { reason: confirm | credit | price, ceiling }
 GET    /api/parts/:part/jobs/latest              the part's latest job
@@ -594,7 +601,8 @@ Small, independently useful increments:
       stays free); a paid job or line asks to "Pay up to $X" with a second click, X being the most
       it can cost, and the server refuses one without that confirmation or beyond the credit
       (`core/spend.ts`).
-   3. **Final generation** (§8.4).
+   3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
+      models differ; final clips marked in the line table and left alone by draft plans.
 
 ---
 

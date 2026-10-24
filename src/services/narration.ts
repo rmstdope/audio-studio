@@ -72,6 +72,11 @@ export interface RecordOptions {
   /** With `onlyIfNeeded`: weak lines need recording too (the user chose to retake them). */
   retakeWeak?: boolean
   /**
+   * Which model records: the `draft` one (default), or the `final` one. With `onlyIfNeeded`, a
+   * final recording needs every line whose clip is not final yet.
+   */
+  stage?: 'draft' | 'final'
+  /**
    * What the recording may spend: the confirmed model and dollars, charged before every request
    * to Fish at that moment's price. Without it only the free model can be used.
    */
@@ -110,6 +115,7 @@ export async function recordLine(
     retakeWeak = false,
     transcriber = null,
     budget = FREE_ONLY,
+    stage = 'draft',
   }: RecordOptions,
 ): Promise<RecordResult> {
   const read = await readPart(projectFile, partId)
@@ -119,7 +125,31 @@ export async function recordLine(
   if (!line) return null
   const { cast, cues } = read.input
   const { narration } = read.project
-  const inputs = clipInputs(line, cast.speakers[line.speaker], cues, cast.pronounce, narration)
+  // With one model for both, there is no final step: a "final" recording is a draft one.
+  const final = stage === 'final' && narration.models.final !== narration.models.draft
+  const model = final ? narration.models.final : narration.models.draft
+  // In a draft recording: the fingerprint the line would have as a final clip, so one that lands
+  // meanwhile is never overwritten.
+  const finalInputs =
+    !final && narration.models.final !== narration.models.draft
+      ? clipInputs(
+          line,
+          cast.speakers[line.speaker],
+          cues,
+          cast.pronounce,
+          narration,
+          narration.models.final,
+        )
+      : null
+  const finalFp = finalInputs ? fingerprint(finalInputs).fp : null
+  const inputs = clipInputs(
+    line,
+    cast.speakers[line.speaker],
+    cues,
+    cast.pronounce,
+    narration,
+    model,
+  )
   if (!inputs) {
     return {
       ok: false,
@@ -138,7 +168,8 @@ export async function recordLine(
   }
 
   // The same line asked for again while it is being recorded shares that recording.
-  const id = `${projectFile}\n${partId}\n${key}`
+  // Per model too: a final recording never takes a draft one's result as its own.
+  const id = `${projectFile}\n${partId}\n${key}\n${model}`
   const running = recordings.get(id)
   if (running) return running
   const recording = record()
@@ -201,7 +232,8 @@ export async function recordLine(
       // finished meanwhile has written its files before leaving, so it is seen here.
       const fresh = await readPart(projectFile, partId)
       if (!fresh || !fresh.ok) return fresh
-      const status = planPart(fresh.input).lines.find((l) => l.key === key)?.status
+      const now = planPart(fresh.input).lines.find((l) => l.key === key)
+      const status = now?.status
       if (status === 'uncast') {
         return {
           ok: false,
@@ -209,7 +241,11 @@ export async function recordLine(
           message: `${line.speaker} has no voice yet; cast one first.`,
         }
       }
-      const needed = status === 'missing' || status === 'stale' || (retakeWeak && status === 'weak')
+      const weak = status === 'weak' && retakeWeak
+      const needed = final
+        ? !now?.final || weak
+        : // A final clip is never taken back to the draft model by a retake.
+          status === 'missing' || status === 'stale' || (weak && !now?.final)
       if (!needed) {
         return { ok: true, key, skipped: true }
       }
@@ -265,34 +301,41 @@ export async function recordLine(
     const duration = pyRound(clip.seconds)
     const { fp, parts } = fingerprint(inputs)
     try {
-      const problems = await inPartTurn(projectFile, partId, async () => {
-        // Read again in the part's turn: other lines may have been written meanwhile.
-        const found: Problem[] = []
-        const manifest = await manifestNow(root, paths.manifestPath, found)
-        const lock = await lockNow(root, paths.lockPath, found)
-        if (!manifest || !lock) return found
-        manifest[key] = {
-          file,
-          speaker: line.speaker,
-          duration,
-          words: best.timed,
-        }
-        lock[key] = {
-          fp,
-          voice: inputs.voice,
-          model: inputs.model,
-          parts,
-          takes,
-          ...(best.heard === null ? {} : { heard: best.heard }),
-          at: new Date().toISOString(),
-        }
-        // The lock last: if anything fails before it, the line shows as stale (its old lock entry)
-        // or untracked (none), never as up to date.
-        await rename(temporary, target)
-        await writeAtomic(root, paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
-        await writeAtomic(root, paths.lockPath, formatEntriesPerLine(lock))
-        return []
-      })
+      const problems = await inPartTurn(
+        projectFile,
+        partId,
+        async (): Promise<Problem[] | 'final'> => {
+          // Read again in the part's turn: other lines may have been written meanwhile.
+          const found: Problem[] = []
+          const manifest = await manifestNow(root, paths.manifestPath, found)
+          const lock = await lockNow(root, paths.lockPath, found)
+          if (!manifest || !lock) return found
+          // A final clip of the line landed while this draft was made: it is kept, paid for.
+          if (finalFp && lock[key]?.fp === finalFp) return 'final'
+          manifest[key] = {
+            file,
+            speaker: line.speaker,
+            duration,
+            words: best.timed,
+          }
+          lock[key] = {
+            fp,
+            voice: inputs.voice,
+            model: inputs.model,
+            parts,
+            takes,
+            ...(best.heard === null ? {} : { heard: best.heard }),
+            at: new Date().toISOString(),
+          }
+          // The lock last: if anything fails before it, the line shows as stale (its old lock entry)
+          // or untracked (none), never as up to date.
+          await rename(temporary, target)
+          await writeAtomic(root, paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
+          await writeAtomic(root, paths.lockPath, formatEntriesPerLine(lock))
+          return []
+        },
+      )
+      if (problems === 'final') return { ok: true, key, skipped: true }
       if (problems.length) return { ok: false, problems }
       return best.heard === null
         ? { ok: true, key, duration }

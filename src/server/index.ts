@@ -96,6 +96,8 @@ const JobBody = z
   .object({
     /** Record lines (default), or measure clips with Whisper without new audio. */
     kind: z.enum(['record', 'measure']).default('record'),
+    /** Record with the draft model (default), or the final recording with the final one. */
+    stage: z.enum(['draft', 'final']).default('draft'),
     /** Retake the weak lines among `keys` (only when the user ticked it). */
     retakeWeak: z.boolean().default(false),
     speaker: z.string().min(1).max(200).nullable(),
@@ -116,7 +118,13 @@ function parseOrNull(text: string): unknown {
 }
 
 /** Recording one line: the most the user agreed to spend on it, for a paid model. */
-const RecordBody = z.object({ confirmedCost: z.number().nonnegative().optional() }).strict()
+const RecordBody = z
+  .object({
+    confirmedCost: z.number().nonnegative().optional(),
+    /** Record with the final model (a final clip recorded again), or the draft one (default). */
+    stage: z.enum(['draft', 'final']).default('draft'),
+  })
+  .strict()
 
 const VerdictBody = z.object({
   voice: z.string().regex(/^[\w-]{1,64}$/),
@@ -252,17 +260,25 @@ export function startServer({
     return setPhrase(projectFile, id, change.phrase)
   }
 
-  async function planFor(part: string, speaker?: string, includeWeak = false) {
+  async function planFor(
+    part: string,
+    speaker?: string,
+    includeWeak = false,
+    asked: 'draft' | 'final' = 'draft',
+  ) {
     const read = await readPart(projectFile, part)
     if (!read) return null
     if (!read.ok) return read
     if (read.problems.length) return { ok: false as const, problems: read.problems }
     const { narration } = read.project
+    // With one model for both, there is no final step: the final plan is the draft one.
+    const stage =
+      asked === 'final' && narration.models.final !== narration.models.draft ? 'final' : 'draft'
     const { pronounce } = read.input.cast
     const state = planPart(read.input)
     const pricing = {
       at: new Date(),
-      model: narration.models.draft,
+      model: narration.models[stage],
       // What is sent: each piece of a line with its cue and the cast's pronunciations.
       sent: (line: LineState) =>
         spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
@@ -273,6 +289,7 @@ export function startServer({
       speaker,
       checked: narration.quality.transcriber !== 'none',
       includeWeak,
+      final: stage === 'final',
     })
     // The most recording these lines can cost, priced as the plan was.
     const ceilingOf = (keys: string[]) => costCeiling(state, keys, pricing)
@@ -333,10 +350,10 @@ export function startServer({
           const text = await request.text()
           const body = RecordBody.safeParse(parseOrNull(text || '{}'))
           if (!body.success) {
-            return Response.json({ error: 'expected { confirmedCost? }' }, { status: 400 })
+            return Response.json({ error: 'expected { confirmedCost?, stage? }' }, { status: 400 })
           }
           // Fails closed: without a plan, nothing is priced, so nothing is recorded.
-          const planned = await planFor(part, undefined, true)
+          const planned = await planFor(part, undefined, true, body.data.stage)
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const admitted = await admit(
@@ -352,6 +369,7 @@ export function startServer({
               encode,
               limiter: fishWork,
               transcriber: await transcriberFor(),
+              stage: body.data.stage,
               budget: admitted.budget,
             })
             if (!result) return notFound()
@@ -365,7 +383,8 @@ export function startServer({
         GET: guard(async (request) => {
           const query = new URL(request.url).searchParams
           const speaker = query.get('speaker') || undefined
-          const plan = await planFor(request.params.part, speaker, query.get('weak') === '1')
+          const stage = query.get('stage') === 'final' ? 'final' : 'draft'
+          const plan = await planFor(request.params.part, speaker, query.get('weak') === '1', stage)
           return plan ? Response.json(plan) : notFound()
         }),
       },
@@ -374,13 +393,17 @@ export function startServer({
           const body = JobBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
             return Response.json(
-              { error: 'expected { kind, speaker, keys, orphans, retakeWeak }' },
+              {
+                error:
+                  'expected { kind, stage, speaker, keys, orphans, retakeWeak, confirmedCost }',
+              },
               { status: 400 },
             )
           }
           const { part } = request.params
           const { retakeWeak } = body.data
-          const planned = await planFor(part, body.data.speaker ?? undefined, retakeWeak)
+          const { stage } = body.data
+          const planned = await planFor(part, body.data.speaker ?? undefined, retakeWeak, stage)
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const { plan, parallel } = planned
@@ -423,6 +446,7 @@ export function startServer({
                     limiter: fishWork,
                     onlyIfNeeded: true,
                     retakeWeak,
+                    stage,
                     budget,
                     transcriber: await transcriberFor(),
                   }),

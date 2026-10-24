@@ -33,11 +33,12 @@ export function clipInputs(
   cues: Record<string, string>,
   pronounce: Record<string, string>,
   narration: Project['narration'],
+  model: string = narration.models.draft,
 ): ClipInputs | null {
   if (!character?.voice) return null
   const { tts, output, quality } = narration
   return {
-    model: narration.models.draft,
+    model,
     voice: character.voice,
     cue: cueFor(cues, line.key) ?? character.style ?? '',
     text: line.text,

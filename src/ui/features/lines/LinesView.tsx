@@ -137,7 +137,11 @@ export function LinesView({ part }: { part: PartSummary }) {
         </div>
       </div>
 
-      <GeneratePanel partId={loaded.id} speaker={speaker || null} />
+      <GeneratePanel
+        partId={loaded.id}
+        speaker={speaker || null}
+        models={{ draft: loaded.draftModel, final: loaded.finalModel }}
+      />
 
       {filter === 'orphans' ? (
         <OrphanTable part={loaded.id} orphans={loaded.orphans} playing={playing} toggle={toggle} />
@@ -161,6 +165,11 @@ export function LinesView({ part }: { part: PartSummary }) {
                 <tr key={line.key}>
                   <td>
                     <StatusPill status={line.status} />
+                    {line.final && (
+                      <span className="final-badge" title="Made with the final model">
+                        final
+                      </span>
+                    )}
                   </td>
                   <td>
                     <div className="line-cell">
@@ -200,7 +209,11 @@ export function LinesView({ part }: { part: PartSummary }) {
                               className="btn btn-primary row-record"
                               title="The most this line can cost on your Fish account (every take)"
                               onClick={() =>
-                                void recorder.record(line.key, recorder.toConfirm[line.key])
+                                void recorder.record(
+                                  line.key,
+                                  recorder.toConfirm[line.key],
+                                  line.final ? 'final' : 'draft',
+                                )
                               }
                             >
                               Pay up to {dollars(recorder.toConfirm[line.key]!)}
@@ -218,7 +231,14 @@ export function LinesView({ part }: { part: PartSummary }) {
                             type="button"
                             className="btn row-record"
                             disabled={recorder.recording.has(line.key)}
-                            onClick={() => void recorder.record(line.key)}
+                            // A final clip is recorded again with the final model, never downgraded.
+                            onClick={() =>
+                              void recorder.record(
+                                line.key,
+                                undefined,
+                                line.final ? 'final' : 'draft',
+                              )
+                            }
                           >
                             {recorder.recording.has(line.key)
                               ? 'Recording…'

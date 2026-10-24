@@ -730,3 +730,169 @@ describe('recordLine, a paid model', () => {
     expect(requests).toHaveLength(0)
   })
 })
+
+describe('recordLine, the final recording', () => {
+  /** The test project with a paid final model, the draft one free. */
+  function finalRepo() {
+    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    withFinal.narration.models = { final: 's2-pro' }
+    return tempRepo({ ...files, 'audio-studio.json': withFinal })
+  }
+  const budget = () => createBudget({ model: 's2-pro', dollars: 1 })
+
+  it('records with the final model, and the clip is final', async () => {
+    const root = finalRepo()
+    const projectFile = join(root, 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const result = await recordLine(projectFile, 'act1', 'k1', async () => fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+      stage: 'final',
+      budget: budget(),
+    })
+    expect(result).toMatchObject({ ok: true })
+    expect(requests.map((r) => r.model)).toEqual(['s2-pro'])
+    const part = await loadPart(projectFile, 'act1')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')).toMatchObject({
+      status: 'ok',
+      final: true,
+    })
+  })
+
+  it('records an up-to-date draft clip again in a final job, but not a final one', async () => {
+    const root = finalRepo()
+    const projectFile = join(root, 'audio-studio.json')
+    const options = { encode: keepWav, limiter: createLimiter() }
+    await recordLine(projectFile, 'act1', 'k1', async () => fakeFish().fish, options)
+    const { fish, requests } = fakeFish()
+    const final = { ...options, stage: 'final' as const, onlyIfNeeded: true, budget: budget() }
+    expect(await recordLine(projectFile, 'act1', 'k1', async () => fish, final)).toMatchObject({
+      ok: true,
+    })
+    expect(requests).toHaveLength(1)
+    expect(await recordLine(projectFile, 'act1', 'k1', async () => fish, final)).toEqual({
+      ok: true,
+      key: 'k1',
+      skipped: true,
+    })
+    expect(requests).toHaveLength(1)
+  })
+})
+
+describe('recordLine, stages kept apart', () => {
+  const options = { encode: keepWav, limiter: createLimiter() }
+
+  it('records as a draft when the final model is the draft one', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await recordLine(projectFile, 'act1', 'k1', async () => fakeFish().fish, options)
+    const { fish, requests } = fakeFish()
+    const again = await recordLine(projectFile, 'act1', 'k1', async () => fish, {
+      ...options,
+      stage: 'final',
+      onlyIfNeeded: true,
+    })
+    expect(again).toEqual({ ok: true, key: 'k1', skipped: true })
+    expect(requests).toHaveLength(0)
+  })
+
+  it('does not take a weak final clip back to the draft model in a draft job', async () => {
+    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    withFinal.narration.models = { final: 's2-pro' }
+    const root = tempRepo({ ...files, 'audio-studio.json': withFinal })
+    const projectFile = join(root, 'audio-studio.json')
+    const poor: Transcriber = { transcribe: async () => [], close() {} }
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+      ...options,
+      stage: 'final',
+      transcriber: poor,
+      budget: createBudget({ model: 's2-pro', dollars: 1 }),
+    })
+    const { fish, requests } = fakeFish()
+    const draft = await recordLine(projectFile, 'act1', 'k4', async () => fish, {
+      ...options,
+      onlyIfNeeded: true,
+      retakeWeak: true,
+      transcriber: poor,
+    })
+    expect(draft).toEqual({ ok: true, key: 'k4', skipped: true })
+    expect(requests).toHaveLength(0)
+  })
+
+  it('does not share a draft recording with a final one of the same line', async () => {
+    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    withFinal.narration.models = { final: 's2-pro' }
+    const root = tempRepo({ ...files, 'audio-studio.json': withFinal })
+    const projectFile = join(root, 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    await Promise.all([
+      recordLine(projectFile, 'act1', 'k1', async () => fish, options),
+      recordLine(projectFile, 'act1', 'k1', async () => fish, {
+        ...options,
+        stage: 'final',
+        onlyIfNeeded: true,
+        budget: createBudget({ model: 's2-pro', dollars: 1 }),
+      }),
+    ])
+    expect(requests.map((r) => r.model).sort()).toEqual(['s2-pro', 's2.1-pro-free'])
+    const part = await loadPart(projectFile, 'act1')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.final).toBe(true)
+  })
+})
+
+describe('recordLine, a draft finishing after a final recording', () => {
+  const options = { encode: keepWav, limiter: createLimiter() }
+  function finalRepo() {
+    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    withFinal.narration.models = { final: 's2-pro' }
+    return tempRepo({ ...files, 'audio-studio.json': withFinal })
+  }
+
+  it('does not overwrite a final clip that landed meanwhile', async () => {
+    const root = finalRepo()
+    const projectFile = join(root, 'audio-studio.json')
+    const { fish } = fakeFish()
+    let release!: () => void
+    const draftMayAnswer = new Promise<void>((resolve) => (release = resolve))
+    const slowDraft: FishClient = {
+      ...fish,
+      async tts(request) {
+        if (request.model === 's2.1-pro-free') await draftMayAnswer
+        return fish.tts(request)
+      },
+    }
+    const draft = recordLine(projectFile, 'act1', 'k1', async () => slowDraft, options)
+    const final = await recordLine(projectFile, 'act1', 'k1', async () => slowDraft, {
+      ...options,
+      stage: 'final',
+      budget: createBudget({ model: 's2-pro', dollars: 1 }),
+    })
+    expect(final).toMatchObject({ ok: true })
+    release()
+    expect(await draft).toEqual({ ok: true, key: 'k1', skipped: true })
+    const part = await loadPart(projectFile, 'act1')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.final).toBe(true)
+  })
+
+  it('retakes a weak final clip in a final job asked to retake weak lines', async () => {
+    const root = finalRepo()
+    const projectFile = join(root, 'audio-studio.json')
+    const poor: Transcriber = { transcribe: async () => [], close() {} }
+    const final = {
+      ...options,
+      stage: 'final' as const,
+      transcriber: poor,
+      budget: createBudget({ model: 's2-pro', dollars: 1 }),
+    }
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, final)
+    const { fish, requests } = fakeFish()
+    const again = await recordLine(projectFile, 'act1', 'k4', async () => fish, {
+      ...final,
+      onlyIfNeeded: true,
+      retakeWeak: true,
+      budget: createBudget({ model: 's2-pro', dollars: 1 }),
+    })
+    expect(again).toMatchObject({ ok: true })
+    expect(requests.map((r) => r.model)).toContain('s2-pro')
+  })
+})

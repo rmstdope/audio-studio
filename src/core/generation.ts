@@ -13,6 +13,10 @@ export interface GenerationPlan {
    * none when takes are not checked.
    */
   unmeasured: string[]
+  /** In a final plan: clips up to date with the draft model, recorded again with the final one. */
+  drafted: number
+  /** Clips the studio has no record of (made before it), recorded again in a final plan. */
+  untracked: number
   missing: number
   /** Stale lines by the reasons they are stale (a line can count under several). */
   stale: Partial<Record<StaleReason, number>>
@@ -30,6 +34,8 @@ export interface GenerationPlan {
   ceiling: number | null
   /** Takes a line may need at most (when a take is not heard well enough). */
   takes: number
+  /** Whether this is the final recording (every line not final yet, with the final model). */
+  final: boolean
   /** Whether takes are checked with Whisper. */
   checked: boolean
 }
@@ -50,6 +56,7 @@ export function planGeneration(
     takes = 1,
     checked = false,
     includeWeak = false,
+    final = false,
     at,
   }: {
     model: string
@@ -62,6 +69,11 @@ export function planGeneration(
     checked?: boolean
     /** Retake the weak lines too. */
     includeWeak?: boolean
+    /**
+     * The final recording: every cast line whose clip is not final yet, with `model` (the final
+     * one), whatever its status.
+     */
+    final?: boolean
     /** When the plan is priced: prices change, promotions end. */
     at: Date
   },
@@ -69,7 +81,13 @@ export function planGeneration(
   const inScope = (who: string | null) => !speaker || who === speaker
   const lines = state.lines.filter((line) => inScope(line.speaker))
   const recordable = new Set(['missing', 'stale', ...(includeWeak ? ['weak'] : [])])
-  const toRecord = lines.filter((line) => recordable.has(line.status))
+  const toRecord = lines.filter((line) =>
+    final
+      ? // Everything not final yet; a weak final clip only when asked.
+        line.status !== 'uncast' && (!line.final || (includeWeak && line.status === 'weak'))
+      : // A final clip is never taken back to the draft model by a retake.
+        recordable.has(line.status) && !(line.final && line.status === 'weak'),
+  )
   const stale: Partial<Record<StaleReason, number>> = {}
   for (const line of toRecord) {
     for (const reason of line.reasons) stale[reason] = (stale[reason] ?? 0) + 1
@@ -81,13 +99,22 @@ export function planGeneration(
   const price = priceOf(model, at)
   return {
     keys: toRecord.map((line) => line.key),
-    weak: lines.filter((line) => line.status === 'weak').map((line) => line.key),
+    // The weak lines a retake would add: not final ones in a draft plan (never taken back to the
+    // draft model), only final ones in a final plan (the others are in it anyway).
+    weak: lines
+      .filter((line) => line.status === 'weak' && line.final === final)
+      .map((line) => line.key),
     unmeasured: checked
       ? lines
           .filter((line) => line.status === 'ok' && line.file && line.heard === null)
           .map((line) => line.key)
       : [],
     missing: toRecord.filter((line) => line.status === 'missing').length,
+    drafted: final
+      ? toRecord.filter((line) => !line.final && (line.status === 'ok' || line.status === 'weak'))
+          .length
+      : 0,
+    untracked: toRecord.filter((line) => line.status === 'untracked').length,
     stale,
     uncast: [...new Set(lines.filter((l) => l.status === 'uncast').map((l) => l.speaker))],
     orphans: state.orphans.filter((o) => inScope(o.speaker)).map((o) => o.key),
@@ -101,6 +128,7 @@ export function planGeneration(
     ),
     takes,
     checked,
+    final,
   }
 }
 
