@@ -1,6 +1,9 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
-/** A question asked in the page before acting: what will happen, and the ways on. */
+/**
+ * A question asked in the page before acting: what will happen, and the ways on. It scrolls into
+ * view when it opens, as the button that opened it may be far down the page.
+ */
 export function Confirm({
   title,
   effects,
@@ -17,8 +20,14 @@ export function Confirm({
   onBack: () => void
   children: ReactNode
 }) {
+  const panel = useRef<HTMLElement>(null)
+  useEffect(() => {
+    // A statement, not the result: browsers may return a promise from scrollIntoView, which
+    // React would take for a cleanup function.
+    panel.current?.scrollIntoView({ block: 'start' })
+  }, [])
   return (
-    <section className="panel confirm" role="alertdialog" aria-label={title}>
+    <section ref={panel} className="panel confirm" role="alertdialog" aria-label={title}>
       <h2 className="section-title">{title}</h2>
       <ul className="confirm-effects">
         {effects.map((effect) => (
