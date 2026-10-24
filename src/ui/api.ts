@@ -24,7 +24,7 @@ import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import { centsUp } from './format'
-import { withAuditionTakes, withTake } from './takes'
+import { withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
 /** A successful answer about a character's cast voice. */
@@ -104,9 +104,10 @@ export function useAdopt(partId: string) {
  * A character's cast voice as Fish knows it, its take and the audition phrase, for its page.
  * Cached for a while: it asks Fish each time.
  */
-export function useCharacterVoice(characterId: string) {
+export function useCharacterVoice(characterId: string, voiceId: string | null) {
   return useQuery({
-    queryKey: ['voice', characterId],
+    // Keyed by the voice too: a voice cast since (in the file, or by an audition) is asked anew.
+    queryKey: ['voice', characterId, voiceId],
     queryFn: () =>
       getJson<NonNullable<CharacterVoiceResult>>(
         `/api/characters/${encodeURIComponent(characterId)}/voice`,
@@ -349,8 +350,8 @@ export function useSetCue(partId: string) {
 
 /**
  * Records audition takes: `record(voice)` asks the server for the take and adds it to the board
- * and the cast voice in the cache, without asking Fish for anything else. `recording` holds the voices in progress,
- * `errors` what went wrong per voice.
+ * and the cast voice in the cache, without asking Fish for anything else. `recording` holds the
+ * voices in progress, `errors` what went wrong per voice.
  */
 export function useTakes(characterId: string) {
   const client = useQueryClient()
@@ -372,10 +373,9 @@ export function useTakes(characterId: string) {
         }
         const result = (await response.json()) as NonNullable<TakeResult>
         if (result.ok) {
-          client.setQueryData<NonNullable<CharacterVoiceResult>>(['voice', characterId], (old) =>
-            old?.ok && old.audition.spoken === result.spoken && voice === old.id
-              ? ({ ...old, take: result.key } satisfies Voiced)
-              : old,
+          client.setQueriesData<NonNullable<CharacterVoiceResult>>(
+            { queryKey: ['voice', characterId] },
+            (old) => (old?.ok ? withVoiceTake<Voiced>(old, voice, result) : old),
           )
           client.setQueryData<SessionView>(['session', characterId], (old) =>
             old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,

@@ -132,7 +132,7 @@ export type CharacterVoiceResult =
       /** The cast voice as Fish knows it; null when uncast, or when Fish did not say (`lookup`). */
       voice: Voice | null
       /** Why Fish's details of the cast voice are missing, or null. */
-      lookup: string | null
+      lookup: { reason: 'no-key' | 'fish'; message: string } | null
       /** The key of the cast voice's take of the audition phrase, if recorded. */
       take: string | null
       /** What the character says in a take. */
@@ -175,11 +175,12 @@ export async function characterVoice(
   if (!id) return answer
   const take = recordedTakes(dirname(projectFile), project, audition, [id])[id] ?? null
   const fish = await fishFor(dirname(projectFile), project)
-  if (!fish) return { ...answer, take, lookup: NO_KEY }
+  if (!fish) return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_KEY } }
   try {
     return { ...answer, take, voice: await fish.getVoice(id) }
   } catch (error) {
-    return { ...answer, take, lookup: error instanceof Error ? error.message : String(error) }
+    const message = error instanceof Error ? error.message : String(error)
+    return { ...answer, take, lookup: { reason: 'fish' as const, message } }
   }
 }
 

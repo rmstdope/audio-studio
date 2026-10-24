@@ -133,6 +133,7 @@ export function AuditionView({
               {started && 'problems' in started && (
                 <Problems title="The audition could not start" problems={started.problems} />
               )}
+              {start.isError && <span className="adopt-error">{start.error.message}</span>}
             </div>
           )}
         </section>

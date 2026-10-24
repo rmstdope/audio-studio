@@ -188,10 +188,16 @@ describe('characterVoice', () => {
     const projectFile = join(root, 'audio-studio.json')
     const keyless = await characterVoice(projectFile, 'grandmother', async () => null)
     expect(keyless).toMatchObject({ ok: true, voice: null })
-    expect(keyless?.ok && keyless.lookup).toContain('FISH_AUDIO_API_KEY')
+    expect(keyless?.ok && keyless.lookup?.reason).toBe('no-key')
+    expect(keyless?.ok && keyless.lookup?.message).toContain('FISH_AUDIO_API_KEY')
     const failing: FishClient = { ...fish, getVoice: () => Promise.reject(new Error('busy')) }
     const failed = await characterVoice(projectFile, 'grandmother', async () => failing)
-    expect(failed).toMatchObject({ ok: true, id: 'cur', voice: null, lookup: 'busy' })
+    expect(failed).toMatchObject({
+      ok: true,
+      id: 'cur',
+      voice: null,
+      lookup: { reason: 'fish', message: 'busy' },
+    })
   })
 
   it('reports a broken cast, and answers an unknown character with null', async () => {

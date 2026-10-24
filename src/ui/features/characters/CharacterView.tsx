@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditionSession } from '../../../core/audition'
-import type { Problem } from '../../../core/project'
 import type { CharacterSummary, ProjectSummary } from '../../../core/summary'
 import type { CharacterVoiceResult } from '../../../services/auditions'
 import {
@@ -12,7 +11,8 @@ import {
   useSessionAction,
   useTakes,
 } from '../../api'
-import { droppedRuledOut, stopEffects } from '../../board'
+import { stopEffectsFor } from '../../board'
+import { Confirm } from '../../components/Confirm'
 import { HeadphonesIcon, PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusBar } from '../../components/StatusBar'
@@ -20,9 +20,13 @@ import { useClipPlayer } from '../../components/useClipPlayer'
 import { compact, plural, shortTitle, tintFor, voiceLabel } from '../../format'
 import { routeHref } from '../../route'
 import { linesSummary, speakerCounts } from '../../status'
+import { takeToRecord } from '../../takes'
 import { voiceUrl } from '../../voiceId'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { KeywordsEditor, PhraseEditor, StyleEditor } from './BriefEditors'
+
+/** A successful answer about a character's cast voice. */
+type Voiced = Extract<NonNullable<CharacterVoiceResult>, { ok: true }>
 
 /**
  * A character's page, the one place about it: its cast voice (Fish's details, its take and
@@ -38,7 +42,7 @@ export function CharacterView({
 }) {
   const character = summary.characters.find((c) => c.id === characterId)
   const session = useSession(characterId)
-  const voice = useCharacterVoice(characterId)
+  const voice = useCharacterVoice(characterId, character?.voice ?? null)
   const start = useSessionAction(characterId)
   const { playing, toggle } = useClipPlayer()
 
@@ -56,13 +60,14 @@ export function CharacterView({
   const titles = new Map(summary.parts.map((p) => [p.id, shortTitle(p.title)]))
   const view = session.data?.ok ? session.data : null
   const inProgress = view?.session ?? null
-  const answer = voice.data?.ok ? voice.data : null
+  // An answer about the voice cast now: one about an earlier voice is not shown.
+  const answer = voice.data?.ok && voice.data.id === character.voice ? voice.data : null
   const failed = start.data && !start.data.ok ? start.data : null
   const audition = routeHref({ view: 'audition', character: character.id })
 
   return (
     <>
-      <header className="page-header character-header">
+      <header className="page-header">
         <div className="audition-who">
           <div className="avatar" style={tintFor(character.id)} aria-hidden="true">
             {character.name.charAt(0)}
@@ -85,36 +90,45 @@ export function CharacterView({
             <HeadphonesIcon /> Resume audition
           </a>
         ) : (
-          <button
-            className="btn btn-primary"
-            type="button"
-            disabled={start.isPending || session.isPending}
-            onClick={() =>
-              start.mutate(
-                { action: 'start' },
-                { onSuccess: (result) => result.ok && (window.location.hash = audition) },
-              )
-            }
-          >
-            <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
-          </button>
+          // Only once it is known that no audition is going on: starting would replace one.
+          view && (
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={start.isPending}
+              onClick={() =>
+                start.mutate(
+                  { action: 'start' },
+                  { onSuccess: (result) => result.ok && (window.location.hash = audition) },
+                )
+              }
+            >
+              <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
+            </button>
+          )
         )}
       </header>
+      {session.isError && (
+        <span className="adopt-error">Could not read the audition: {session.error.message}</span>
+      )}
+      {session.data && !session.data.ok && 'problems' in session.data && (
+        <Problems title="The audition could not be read" problems={session.data.problems} />
+      )}
       {failed && 'problems' in failed && (
         <Problems title="The audition could not start" problems={failed.problems} />
       )}
       {failed && 'message' in failed && <span className="adopt-error">{failed.message}</span>}
+      {start.isError && <span className="adopt-error">{start.error.message}</span>}
+      {voice.isError && (
+        <span className="adopt-error">Could not load the voice: {voice.error.message}</span>
+      )}
+      {voice.data && !voice.data.ok && 'problems' in voice.data && (
+        <Problems title="The cast could not be read" problems={voice.data.problems} />
+      )}
 
       <div className="audition">
         <div className="audition-main">
-          <VoicePanel
-            character={character}
-            answer={answer}
-            error={voice.isError ? voice.error.message : null}
-            problems={voice.data && !voice.data.ok ? voice.data.problems : null}
-            playing={playing}
-            toggle={toggle}
-          />
+          <VoicePanel character={character} answer={answer} playing={playing} toggle={toggle} />
           <section className="panel character-lines" aria-label="Lines">
             <div className="section-head">
               <h2 className="section-title">Lines</h2>
@@ -138,14 +152,13 @@ export function CharacterView({
         </div>
 
         <aside className="audition-brief">
-          {inProgress && view && (
+          {inProgress && (
             <InProgress
               characterId={character.id}
               name={character.name}
               lines={character.totalLines}
               session={inProgress}
               href={audition}
-              current={voiceLabel(character)}
             />
           )}
           <section className="panel brief-panel" aria-label="Delivery">
@@ -177,15 +190,12 @@ export function CharacterView({
 function VoicePanel({
   character,
   answer,
-  error,
-  problems,
   playing,
   toggle,
 }: {
   character: CharacterSummary
-  answer: Extract<NonNullable<CharacterVoiceResult>, { ok: true }> | null
-  error: string | null
-  problems: Problem[] | null
+  /** What the server says about the voice cast now; null until it has. */
+  answer: Voiced | null
   playing: string | null
   toggle: (id: string, url: string) => void
 }) {
@@ -193,12 +203,13 @@ function VoicePanel({
   const id = character.voice
   // The take is asked for once per phrase, so one the page cannot show is not asked again.
   const asked = useRef(new Set<string>())
-  const wanted = answer && id && !answer.take ? `${answer.audition.spoken}\n${id}` : null
+  const wanted = answer ? takeToRecord(answer, id) : null
+  const { record } = recorder
   useEffect(() => {
     if (!wanted || !id || asked.current.has(wanted)) return
     asked.current.add(wanted)
-    void recorder.record(id)
-  }, [wanted, id, recorder])
+    void record(id)
+  }, [wanted, id, record])
 
   if (!id) {
     return (
@@ -241,11 +252,9 @@ function VoicePanel({
       )}
       {answer?.lookup && (
         <span className="muted">
-          Fish Audio could not give this voice’s details: {answer.lookup}
+          Fish Audio could not give this voice’s details: {answer.lookup.message}
         </span>
       )}
-      {error && <span className="adopt-error">Could not load the voice: {error}</span>}
-      {problems && <Problems title="The cast could not be read" problems={problems} />}
       <div className="voice-listen">
         <div className="listen-box">
           {take ? (
@@ -262,7 +271,7 @@ function VoicePanel({
               className="btn btn-small"
               type="button"
               disabled={recorder.recording.has(id) || !answer}
-              onClick={() => void recorder.record(id)}
+              onClick={() => void record(id)}
             >
               {recorder.recording.has(id) ? 'Recording…' : 'Record'}
             </button>
@@ -273,7 +282,7 @@ function VoicePanel({
           </span>
         </div>
         <div className="listen-box">
-          {sample ? (
+          {sample && (
             <button
               type="button"
               className="icon-btn"
@@ -282,7 +291,7 @@ function VoicePanel({
             >
               {playing === `sample:${id}` ? <PauseIcon /> : <PlayIcon />}
             </button>
-          ) : null}
+          )}
           <span>
             <strong>Fish sample</strong>
             <span className="muted sample-text" title={sample?.text}>
@@ -336,26 +345,18 @@ function InProgress({
   lines,
   session,
   href,
-  current,
 }: {
   characterId: string
   name: string
   lines: number
   session: AuditionSession
   href: string
-  current: string
 }) {
   const act = useSessionAction(characterId)
   const ruledOut = useRuledOut(characterId)
   const [asking, setAsking] = useState(false)
   const ruledIds = ruledOut.data?.ok ? ruledOut.data.voices.map((v) => v.id) : null
-  const effects = stopEffects({
-    name,
-    current: session.current ? current : null,
-    lines,
-    dropped: droppedRuledOut(session.dropped, ruledIds, session.current).length,
-    shortlisted: session.shortlist.filter((v) => v !== session.current).length,
-  })
+  const failed = act.data && !act.data.ok ? act.data : null
   return (
     <section className="panel in-progress" aria-label="Audition in progress">
       <span className="label">Audition in progress</span>
@@ -363,27 +364,21 @@ function InProgress({
         {plural(session.shortlist.length, 'voice')} shortlisted, {session.toHear.length} to hear.
       </span>
       {asking ? (
-        <>
-          <strong>Stop without casting?</strong>
-          <ul className="confirm-effects">
-            {effects.map((effect) => (
-              <li key={effect}>{effect}</li>
-            ))}
-          </ul>
-          <div className="confirm-actions">
-            <button className="btn btn-ghost" type="button" onClick={() => setAsking(false)}>
-              Keep it
-            </button>
-            <button
-              className="btn btn-primary"
-              type="button"
-              disabled={act.isPending}
-              onClick={() => act.mutate({ action: 'discard' })}
-            >
-              Stop audition
-            </button>
-          </div>
-        </>
+        <Confirm
+          title="Stop without casting?"
+          effects={stopEffectsFor(session, { name, lines, ruledOut: ruledIds })}
+          back="Keep it"
+          onBack={() => setAsking(false)}
+        >
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={act.isPending}
+            onClick={() => act.mutate({ action: 'discard' })}
+          >
+            Stop audition
+          </button>
+        </Confirm>
       ) : (
         <div className="confirm-actions">
           <button className="btn btn-ghost" type="button" onClick={() => setAsking(true)}>
@@ -394,6 +389,10 @@ function InProgress({
           </a>
         </div>
       )}
+      {failed && 'problems' in failed && (
+        <Problems title="The audition could not be stopped" problems={failed.problems} />
+      )}
+      {failed && 'message' in failed && <span className="adopt-error">{failed.message}</span>}
       {act.isError && <span className="adopt-error">{act.error.message}</span>}
     </section>
   )

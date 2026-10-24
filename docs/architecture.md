@@ -339,12 +339,14 @@ This is the audition being built in step 9 (§12). Built so far: ruled-out voice
 shortlist board (9.2) and the character page (9.3); hearing the character's recorded lines on
 its page comes with 9.4.
 
-Every character has a **character page** (`#/characters/<id>`), the one place about
-it: its cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish), its
-lines per part, its delivery (the style cue) and casting brief (search keywords and audition
-phrase), the voices ruled out for it, and the audition in progress, if there is one. An audition
-is started, resumed
-and discarded from there; the page itself shows no candidates.
+Every character has a **character page** (`#/characters/<id>`), the one place about it: its
+cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish; the take
+records by itself when missing), its lines per part, its delivery (the style cue) and casting
+brief (search keywords and audition phrase), the voices ruled out for it, and the audition in
+progress, if there is one. An audition is started, resumed and stopped from there; the page
+shows no candidates. The **audition page** (`#/characters/<id>/audition`) shows the board, with
+the phrase and style the takes are recorded with beside it and the keywords the audition started
+with; with no audition in progress, it offers to start one.
 
 ```
  keywords ──► search Fish's library, leaving out ruled-out voices ──► ranked candidates

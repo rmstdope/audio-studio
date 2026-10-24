@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { withAuditionTakes, withTake } from './takes'
+import { takeToRecord, withAuditionTakes, withTake, withVoiceTake } from './takes'
 
 const candidates = {
   ok: true as const,
@@ -35,5 +35,40 @@ describe('withAuditionTakes', () => {
     const audition = { phrase: 'Other.', own: true, spoken: '[warm] Other.' }
     const fresh = withAuditionTakes(candidates, audition, { c: 'key-c' })
     expect(fresh).toMatchObject({ audition, takes: { c: 'key-c' } })
+  })
+})
+
+const voiced = {
+  ok: true as const,
+  id: 'v1' as string | null,
+  voice: null,
+  lookup: null as { reason: 'no-key' | 'fish'; message: string } | null,
+  take: null as string | null,
+  audition: { phrase: 'New.', own: true, spoken: '[warm] New.' },
+  language: 'en',
+}
+
+describe('withVoiceTake', () => {
+  it('adds a take of the cast voice saying the phrase shown', () => {
+    expect(withVoiceTake(voiced, 'v1', { key: 'k', spoken: '[warm] New.' }).take).toBe('k')
+  })
+
+  it('leaves out a take of another voice, or of a phrase changed meanwhile', () => {
+    expect(withVoiceTake(voiced, 'v2', { key: 'k', spoken: '[warm] New.' })).toBe(voiced)
+    expect(withVoiceTake(voiced, 'v1', { key: 'k', spoken: '[warm] Old.' })).toBe(voiced)
+  })
+})
+
+describe('takeToRecord', () => {
+  it('asks for the cast voice’s take when it has none, once per phrase', () => {
+    expect(takeToRecord(voiced, 'v1')).toBe('[warm] New.\nv1')
+    expect(takeToRecord({ ...voiced, take: 'k' }, 'v1')).toBeNull()
+  })
+
+  it('asks nothing for another voice than the one cast now, or without a key', () => {
+    expect(takeToRecord(voiced, 'v2')).toBeNull()
+    expect(takeToRecord({ ...voiced, id: null }, null)).toBeNull()
+    const keyless = { ...voiced, lookup: { reason: 'no-key' as const, message: 'Set the key.' } }
+    expect(takeToRecord(keyless, 'v1')).toBeNull()
   })
 })

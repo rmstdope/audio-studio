@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AuditionSession } from '../../../core/audition'
 import type { Problem } from '../../../core/project'
 import type { SessionView } from '../../../services/sessions'
@@ -7,11 +7,12 @@ import {
   castEffects,
   droppedRuledOut,
   isRuledOut,
-  stopEffects,
+  stopEffectsFor,
   takesToRecord,
   undoFor,
 } from '../../board'
 import { CheckIcon, CrossIcon } from '../../components/icons'
+import { Confirm } from '../../components/Confirm'
 import { Problems } from '../../components/Problems'
 import { routeHref } from '../../route'
 import { voiceIdFrom } from '../../voiceId'
@@ -222,13 +223,7 @@ export function ShortlistBoard({
       {asking?.kind === 'stop' && (
         <Confirm
           title="Stop without casting?"
-          effects={stopEffects({
-            name,
-            current,
-            lines,
-            dropped,
-            shortlisted: session.shortlist.filter((v) => v !== session.current).length,
-          })}
+          effects={stopEffectsFor(session, { name, lines, ruledOut: ruledIds })}
           onBack={() => setAsking(null)}
           note="To come back to it later instead, pause: the audition stays as it is."
         >
@@ -346,37 +341,4 @@ function Failure({
   if (!result || result.ok) return null
   if (result.problems) return <Problems title={title} problems={result.problems} />
   return result.message ? <span className="adopt-error">{result.message}</span> : null
-}
-
-/** A question asked in the page before acting: what will happen, and the ways on. */
-function Confirm({
-  title,
-  effects,
-  note,
-  onBack,
-  children,
-}: {
-  title: string
-  effects: string[]
-  note?: string
-  onBack: () => void
-  children: ReactNode
-}) {
-  return (
-    <section className="panel confirm" role="alertdialog" aria-label={title}>
-      <h2 className="section-title">{title}</h2>
-      <ul className="confirm-effects">
-        {effects.map((effect) => (
-          <li key={effect}>{effect}</li>
-        ))}
-      </ul>
-      {note && <span className="muted">{note}</span>}
-      <div className="confirm-actions">
-        <button className="btn btn-ghost" type="button" onClick={onBack}>
-          Back to the audition
-        </button>
-        {children}
-      </div>
-    </section>
-  )
 }

@@ -479,7 +479,7 @@ describe('server, without an API key', () => {
     expect(await started.json()).toMatchObject({ ok: false, reason: 'no-key' })
     const voice = await (await fetch(new URL('/api/characters/narrator/voice', other.url))).json()
     expect(voice).toMatchObject({ ok: true, voice: null })
-    expect(voice.lookup).toContain('FISH_AUDIO_API_KEY')
+    expect(voice.lookup).toMatchObject({ reason: 'no-key' })
   })
 
   it('says when Fish cannot tell the credit', async () => {

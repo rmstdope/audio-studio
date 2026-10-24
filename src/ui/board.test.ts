@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'bun:test'
-import { castEffects, droppedRuledOut, stopEffects, takesToRecord, undoFor } from './board'
+import {
+  castEffects,
+  droppedRuledOut,
+  stopEffects,
+  stopEffectsFor,
+  takesToRecord,
+  undoFor,
+} from './board'
 
 describe('takesToRecord', () => {
   it('records the voices shown without a take, once, and not again after it failed', () => {
@@ -127,5 +134,28 @@ describe('undoFor', () => {
     expect(undoFor('a', dropped)).toBeNull()
     expect(undoFor(null, dropped)).toBeNull()
     expect(undoFor('b', [])).toBeNull()
+  })
+})
+
+describe('stopEffectsFor', () => {
+  it('says what stopping an audition does, from the session and the ruled-out voices', () => {
+    const session = {
+      current: 'cur',
+      shortlist: ['cur', 'b'],
+      dropped: [
+        { id: 'a', from: 'toHear' as const },
+        { id: 'c', from: 'toHear' as const },
+      ],
+      voices: { cur: { title: 'Gentle Granny' } },
+    }
+    expect(stopEffectsFor(session, { name: 'Grandmother', lines: 3, ruledOut: ['a'] })).toEqual(
+      stopEffects({
+        name: 'Grandmother',
+        current: 'Gentle Granny',
+        lines: 3,
+        dropped: 1,
+        shortlisted: 1,
+      }),
+    )
   })
 })
