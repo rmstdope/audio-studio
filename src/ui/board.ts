@@ -138,3 +138,20 @@ export function undoFor(
 ): string | null {
   return droppedHere !== null && dropped.at(-1)?.id === droppedHere ? droppedHere : null
 }
+
+/** What stopping an audition does, from its session and the voices ruled out now. */
+export function stopEffectsFor(
+  session: Pick<AuditionSession, 'current' | 'shortlist' | 'dropped'> & {
+    voices: Record<string, { title: string }>
+  },
+  { name, lines, ruledOut }: { name: string; lines: number; ruledOut: string[] | null },
+): string[] {
+  const { current } = session
+  return stopEffects({
+    name,
+    current: current ? session.voices[current]?.title || 'Untitled voice' : null,
+    lines,
+    dropped: droppedRuledOut(session.dropped, ruledOut, current).length,
+    shortlisted: session.shortlist.filter((v) => v !== current).length,
+  })
+}

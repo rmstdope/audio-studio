@@ -145,14 +145,14 @@ describe('server', () => {
     expect(cast.speakers.narrator.audition).toEqual({ keywords: ['warm'] })
   })
 
-  it('finds candidates for a character with its keywords', async () => {
-    const body = await (await fetch(url('/api/characters/narrator/candidates'))).json()
-    expect(body).toMatchObject({ ok: true, keywords: ['warm'] })
-    expect(body.candidates.map((c: { voice: { id: string } }) => c.voice.id)).toEqual(['w1'])
+  it('gives a character’s cast voice, its take and the audition phrase', async () => {
+    const body = await (await fetch(url('/api/characters/narrator/voice'))).json()
+    expect(body).toMatchObject({ ok: true, take: null, language: 'en' })
+    expect(body.audition.spoken).toBeString()
   })
 
   it('answers an unknown character with 404', async () => {
-    expect((await fetch(url('/api/characters/nobody/candidates'))).status).toBe(404)
+    expect((await fetch(url('/api/characters/nobody/voice'))).status).toBe(404)
     const patch = await fetch(url('/api/characters/nobody'), {
       method: 'PATCH',
       headers: { origin: server.url.origin, 'content-type': 'application/json' },
@@ -279,10 +279,6 @@ describe('server', () => {
     expect([...new Uint8Array(await take.arrayBuffer())]).toEqual([0x49, 0x44, 0x33])
     expect((await fetch(url('/api/takes/nope.mp3'))).status).toBe(404)
     expect((await fetch(url(`/api/takes/${body.key}`))).status).toBe(404)
-    const audition = await (
-      await fetch(url('/api/characters/narrator/audition?voices=w1,other'))
-    ).json()
-    expect(audition).toMatchObject({ ok: true, takes: { w1: body.key } })
   })
 
   it('rules out a dropped voice, lists it, and allows one or all again', async () => {
@@ -454,10 +450,8 @@ describe('server, with problems', () => {
     expect(readFileSync(join(broken, 'tts/cast.json'), 'utf8')).toBe('{ broken')
   })
 
-  it('reports the broken cast when asked for candidates', async () => {
-    const body = await (
-      await fetch(new URL('/api/characters/narrator/candidates', other.url))
-    ).json()
+  it('reports the broken cast when asked for the voice', async () => {
+    const body = await (await fetch(new URL('/api/characters/narrator/voice', other.url))).json()
     expect(body.ok).toBe(false)
     expect(body.problems[0].file).toBe('tts/cast.json')
   })
@@ -478,10 +472,14 @@ describe('server, without an API key', () => {
   afterAll(() => other.stop(true))
 
   it('says there is no API key', async () => {
-    const body = await (
-      await fetch(new URL('/api/characters/narrator/candidates', other.url))
-    ).json()
-    expect(body).toMatchObject({ ok: false, reason: 'no-key' })
+    const started = await fetch(new URL('/api/auditions/narrator/start', other.url), {
+      method: 'POST',
+      headers: { origin: other.url.origin },
+    })
+    expect(await started.json()).toMatchObject({ ok: false, reason: 'no-key' })
+    const voice = await (await fetch(new URL('/api/characters/narrator/voice', other.url))).json()
+    expect(voice).toMatchObject({ ok: true, voice: null })
+    expect(voice.lookup).toMatchObject({ reason: 'no-key' })
   })
 
   it('says when Fish cannot tell the credit', async () => {

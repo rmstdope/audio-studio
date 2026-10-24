@@ -1,7 +1,7 @@
 import { dirname } from 'node:path'
 import { z } from 'zod'
 import {
-  findCandidates,
+  characterVoice,
   setKeywords,
   setPhrase,
   setPronunciations,
@@ -20,7 +20,7 @@ import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { measureLine, recordLine, removeOrphans } from '../services/narration'
-import { auditionTakes, recordTake, takeFile } from '../services/takes'
+import { recordTake, takeFile } from '../services/takes'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -566,16 +566,6 @@ export function startServer({
           return Response.json(result, { status: 'problems' in result ? 409 : 200 })
         }),
       },
-      '/api/characters/:id/audition': {
-        GET: guard(async (request) => {
-          const voices = (new URL(request.url).searchParams.get('voices') ?? '')
-            .split(',')
-            .filter((voice) => VOICE_ID.test(voice))
-            .slice(0, 50)
-          const result = await auditionTakes(projectFile, request.params.id, voices)
-          return result ? Response.json(result) : notFound()
-        }),
-      },
       '/api/auditions/:id': {
         GET: guard(async (request) => {
           const { id } = request.params
@@ -659,9 +649,9 @@ export function startServer({
           return file ? new Response(Bun.file(file)) : notFound()
         }),
       },
-      '/api/characters/:id/candidates': {
+      '/api/characters/:id/voice': {
         GET: guard(async (request) => {
-          const result = await findCandidates(projectFile, request.params.id, fishFor)
+          const result = await characterVoice(projectFile, request.params.id, fishFor)
           return result ? Response.json(result) : notFound()
         }),
       },

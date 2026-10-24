@@ -61,3 +61,22 @@ export function percent(value: number | null): string {
 export function seconds(value: number | null): string {
   return value === null ? '—' : `${value.toFixed(1)}s`
 }
+
+/** What a character's lines need, in words: `2 stale · 1 missing`, or `all up to date`. */
+export function linesSummary(counts: Partial<Record<LineStatus, number>>): string {
+  const parts = (['missing', 'stale', 'weak', 'untracked'] as const)
+    .filter((s) => counts[s])
+    .map((s) => `${counts[s]} ${STATUS[s].label.toLowerCase()}`)
+  return parts.length ? parts.join(' · ') : 'all up to date'
+}
+
+/** How many of a speaker's lines have each status. */
+export function speakerCounts(
+  lines: LineState[],
+  speaker: string,
+): Partial<Record<LineStatus, number>> {
+  const counts: Partial<Record<LineStatus, number>> = {}
+  for (const line of lines)
+    if (line.speaker === speaker) counts[line.status] = (counts[line.status] ?? 0) + 1
+  return counts
+}

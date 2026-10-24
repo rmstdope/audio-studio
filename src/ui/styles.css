@@ -1048,6 +1048,92 @@ a.btn {
   font-size: 12px;
 }
 
+/* Character page */
+
+.page-header > .btn {
+  align-self: center;
+}
+
+.brief-panel,
+.voice-panel,
+.character-lines,
+.in-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.voice-name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-name strong {
+  font-size: 20px;
+}
+
+.voice-listen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.listen-box {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.listen-box > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.voice-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.part-lines {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) minmax(120px, auto);
+  gap: 14px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--inset);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.part-lines:hover {
+  background: var(--raised);
+}
+
+.in-progress {
+  border-color: var(--accent-soft-line);
+  background: var(--accent-soft-bg);
+}
+
+.in-progress .label {
+  color: var(--accent-soft-ink);
+}
+
 /* Audition board */
 
 .board {

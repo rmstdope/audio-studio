@@ -1,18 +1,18 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AuditionSession } from '../../../core/audition'
-import type { Problem } from '../../../core/project'
 import type { SessionView } from '../../../services/sessions'
 import { useCast, useRuledOut, useSessionAction, useTakes, type SessionAction } from '../../api'
 import {
   castEffects,
   droppedRuledOut,
   isRuledOut,
-  stopEffects,
+  stopEffectsFor,
   takesToRecord,
   undoFor,
 } from '../../board'
 import { CheckIcon, CrossIcon } from '../../components/icons'
-import { Problems } from '../../components/Problems'
+import { Confirm } from '../../components/Confirm'
+import { Failure } from '../../components/Failure'
 import { routeHref } from '../../route'
 import { voiceIdFrom } from '../../voiceId'
 import { VoiceCard } from './VoiceCard'
@@ -180,7 +180,10 @@ export function ShortlistBoard({
           )}
         </span>
         <span className="spacer" />
-        <a className="btn btn-ghost" href={routeHref({ view: 'characters' })}>
+        <a
+          className="btn btn-ghost"
+          href={routeHref({ view: 'character', character: characterId })}
+        >
           Pause
         </a>
         <button className="btn" type="button" onClick={() => setAsking({ kind: 'stop' })}>
@@ -219,17 +222,11 @@ export function ShortlistBoard({
       {asking?.kind === 'stop' && (
         <Confirm
           title="Stop without casting?"
-          effects={stopEffects({
-            name,
-            current,
-            lines,
-            dropped,
-            shortlisted: session.shortlist.filter((v) => v !== session.current).length,
-          })}
+          effects={stopEffectsFor(session, { name, lines, ruledOut: ruledIds })}
           onBack={() => setAsking(null)}
           note="To come back to it later instead, pause: the audition stays as it is."
         >
-          <a className="btn" href={routeHref({ view: 'characters' })}>
+          <a className="btn" href={routeHref({ view: 'character', character: characterId })}>
             Pause instead
           </a>
           <button
@@ -329,51 +326,5 @@ export function ShortlistBoard({
         </div>
       )}
     </div>
-  )
-}
-
-/** Why an action did nothing, if it did: the problems with the files, or the server's message. */
-function Failure({
-  title,
-  result,
-}: {
-  title: string
-  result: { ok: boolean; problems?: Problem[]; message?: string } | undefined
-}) {
-  if (!result || result.ok) return null
-  if (result.problems) return <Problems title={title} problems={result.problems} />
-  return result.message ? <span className="adopt-error">{result.message}</span> : null
-}
-
-/** A question asked in the page before acting: what will happen, and the ways on. */
-function Confirm({
-  title,
-  effects,
-  note,
-  onBack,
-  children,
-}: {
-  title: string
-  effects: string[]
-  note?: string
-  onBack: () => void
-  children: ReactNode
-}) {
-  return (
-    <section className="panel confirm" role="alertdialog" aria-label={title}>
-      <h2 className="section-title">{title}</h2>
-      <ul className="confirm-effects">
-        {effects.map((effect) => (
-          <li key={effect}>{effect}</li>
-        ))}
-      </ul>
-      {note && <span className="muted">{note}</span>}
-      <div className="confirm-actions">
-        <button className="btn btn-ghost" type="button" onClick={onBack}>
-          Back to the audition
-        </button>
-        {children}
-      </div>
-    </section>
   )
 }

@@ -14,21 +14,21 @@ import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { RefreshResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
-import type { CandidatesResult, CharacterChange } from '../services/auditions'
+import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
 import type { Problem } from '../core/project'
 import type { JobState } from '../services/jobs'
 import type { RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { CastResult, SessionView } from '../services/sessions'
-import type { AuditionTakesResult, TakeResult } from '../services/takes'
+import type { TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import { centsUp } from './format'
-import { withAuditionTakes, withTake } from './takes'
+import { isAbout, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
-/** A successful candidates answer. */
-type Found = Extract<NonNullable<CandidatesResult>, { ok: true }>
+/** A successful answer about a character's cast voice. */
+export type Voiced = Extract<NonNullable<CharacterVoiceResult>, { ok: true }>
 
 /** A session view with a phrase to record takes of. */
 type Viewed = Extract<SessionView, { ok: true }> & { audition: AuditionText }
@@ -101,25 +101,30 @@ export function useAdopt(partId: string) {
 }
 
 /**
- * Voices found for a character's audition. Cached for a while: each search asks Fish many times.
- * Off while the audition board is shown, which does not need it.
+ * A character's cast voice as Fish knows it, its take and the audition phrase, for its page.
+ * Cached for a while: it asks Fish each time.
  */
-export function useCandidates(characterId: string, enabled = true) {
+export function useCharacterVoice(characterId: string, voiceId: string | null, enabled = true) {
   return useQuery({
     enabled,
-    queryKey: ['candidates', characterId],
+    // Keyed by the voice too: a voice cast since (in the file, or by an audition) is asked anew.
+    queryKey: ['voice', characterId, voiceId],
     queryFn: () =>
-      getJson<NonNullable<CandidatesResult>>(
-        `/api/characters/${encodeURIComponent(characterId)}/candidates`,
+      getJson<NonNullable<CharacterVoiceResult>>(
+        `/api/characters/${encodeURIComponent(characterId)}/voice`,
       ),
-    staleTime: 10 * 60 * 1000,
+    // An answer about another voice (the file changed between) is asked again at once.
+    staleTime: (query) => {
+      const data = query.state.data
+      return data?.ok && !isAbout(data, voiceId) ? 0 : 10 * 60 * 1000
+    },
     refetchOnWindowFocus: false,
   })
 }
 
 /**
- * Saves a character's audition keywords, then searches again with them. Saves for one character
- * run one after another, so a quick second edit is never overtaken by the first.
+ * Saves a character's audition keywords (the next audition searches with them). Saves for one
+ * character run one after another, so a quick second edit is never overtaken by the first.
  */
 export function useSetKeywords(characterId: string) {
   const client = useQueryClient()
@@ -137,11 +142,8 @@ export function useSetKeywords(characterId: string) {
       return (await response.json()) as NonNullable<CharacterChange>
     },
     // Stay pending until the project (which holds the saved keywords) is reloaded, so the chips
-    // never fall back to the old list; the search reruns on its own time.
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
-      return client.invalidateQueries({ queryKey: ['project'] })
-    },
+    // never fall back to the old list.
+    onSuccess: () => client.invalidateQueries({ queryKey: ['project'] }),
   })
 }
 
@@ -167,24 +169,14 @@ export function useSetPhrase(characterId: string) {
 }
 
 /**
- * Reloads what a character's audition shows after its phrase or style changed: the board, and the
- * takes of the voices shown, without searching Fish's library again.
+ * Reloads what shows a character's audition phrase after it or the style changed: the board and
+ * the cast voice, with their takes. Neither searches Fish's library.
  */
 async function refreshAudition(client: QueryClient, characterId: string) {
-  // The board shows the phrase and its takes too; reloading it asks Fish nothing.
-  void client.invalidateQueries({ queryKey: ['session', characterId] })
-  const key = ['candidates', characterId]
-  const shown = client.getQueryData<NonNullable<CandidatesResult>>(key)
-  if (!shown?.ok) return client.invalidateQueries({ queryKey: key })
-  const voices = [shown.current?.id, ...shown.candidates.map((c) => c.voice.id)]
-  const query = encodeURIComponent(voices.filter(Boolean).join(','))
-  const fresh = await getJson<NonNullable<AuditionTakesResult>>(
-    `/api/characters/${encodeURIComponent(characterId)}/audition?voices=${query}`,
-  ).catch(() => null)
-  if (!fresh?.ok) return client.invalidateQueries({ queryKey: key })
-  client.setQueryData<NonNullable<CandidatesResult>>(key, (old) =>
-    old?.ok ? withAuditionTakes<Found>(old, fresh.audition, fresh.takes) : old,
-  )
+  await Promise.all([
+    client.invalidateQueries({ queryKey: ['session', characterId] }),
+    client.invalidateQueries({ queryKey: ['voice', characterId] }),
+  ])
 }
 
 /** Saves a character's style cue (empty to remove it); its lines and audition takes follow it. */
@@ -241,7 +233,9 @@ export function useSetPronunciations() {
       if (saved.ok) {
         void client.invalidateQueries({ queryKey: ['part'] })
         void client.invalidateQueries({ queryKey: ['plan'] })
-        void client.invalidateQueries({ queryKey: ['candidates'] })
+        // The phrase as said changes, and so do the takes of it.
+        void client.invalidateQueries({ queryKey: ['session'] })
+        void client.invalidateQueries({ queryKey: ['voice'] })
       }
       // The panel shows the saved table once the project has it.
       await client.invalidateQueries({ queryKey: ['project'] })
@@ -360,9 +354,9 @@ export function useSetCue(partId: string) {
 }
 
 /**
- * Records audition takes: `record(voice)` asks the server for the take and adds it to the
- * candidates in the cache, without searching Fish again. `recording` holds the voices in progress,
- * `errors` what went wrong per voice.
+ * Records audition takes: `record(voice)` asks the server for the take and adds it to the board
+ * and the cast voice in the cache, without asking Fish for anything else. `recording` holds the
+ * voices in progress, `errors` what went wrong per voice.
  */
 export function useTakes(characterId: string) {
   const client = useQueryClient()
@@ -384,8 +378,9 @@ export function useTakes(characterId: string) {
         }
         const result = (await response.json()) as NonNullable<TakeResult>
         if (result.ok) {
-          client.setQueryData<NonNullable<CandidatesResult>>(['candidates', characterId], (old) =>
-            old?.ok ? withTake<Found>(old, voice, result) : old,
+          client.setQueriesData<NonNullable<CharacterVoiceResult>>(
+            { queryKey: ['voice', characterId] },
+            (old) => (old?.ok ? withVoiceTake<Voiced>(old, voice, result) : old),
           )
           client.setQueryData<SessionView>(['session', characterId], (old) =>
             old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,
@@ -414,8 +409,9 @@ export function useTakes(characterId: string) {
 }
 
 /** A character's audition in progress, with the phrase and the takes of the voices in it. */
-export function useSession(characterId: string) {
+export function useSession(characterId: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ['session', characterId],
     queryFn: () => getJson<SessionView>(`/api/auditions/${encodeURIComponent(characterId)}`),
   })
@@ -450,9 +446,8 @@ export function useSessionAction(characterId: string) {
     },
     onSuccess: (view, { action, body }) => {
       if (!view.ok) return
-      // A drop rules a voice out, undoing it or adding a voice by id allows it again; the
-      // candidates shown once the audition ends leave out what is ruled out. A drop shows at
-      // once, before the list is read again.
+      // A drop rules a voice out, undoing it or adding a voice by id allows it again. A drop
+      // shows at once, before the list is read again.
       const dropped = action === 'move' ? droppedBy(body) : null
       if (dropped && view.session && dropped !== view.session.current) {
         const title = view.session.voices[dropped]?.title ?? dropped
@@ -466,7 +461,6 @@ export function useSessionAction(characterId: string) {
         )
       }
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
-      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
       // An answer without the recorded lines (after a move on the board) keeps the ones shown;
       // takes recorded while the answer was on its way are kept too.
       client.setQueryData<SessionView>(['session', characterId], (old) => {
@@ -488,7 +482,7 @@ function droppedBy(body: unknown): string | null {
 
 /**
  * Casts a shortlisted voice, ending the audition. Afterwards the project, its parts (whose lines
- * are now stale) and the character's candidates are loaded again.
+ * are now stale) and the character's cast voice are loaded again.
  */
 export function useCast(characterId: string) {
   const client = useQueryClient()
@@ -517,7 +511,7 @@ export function useCast(characterId: string) {
       client.setQueryData<SessionView>(['session', characterId], () => ended)
       void client.invalidateQueries({ queryKey: ['project'] })
       void client.invalidateQueries({ queryKey: ['part'] })
-      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
+      void client.invalidateQueries({ queryKey: ['voice', characterId] })
     },
   })
 }
@@ -543,8 +537,8 @@ function okRuledOut(result: NonNullable<RuledOutResult>) {
 }
 
 /**
- * Allows ruled-out voices again: one by its id, or every one (null), forgetting them all. Searches for the
- * character may show them again, so its candidates are searched again.
+ * Allows ruled-out voices again: one by its id, or every one (null), forgetting them all. Later
+ * searches for the character may show them again.
  */
 export function useAllowVoices(characterId: string) {
   const client = useQueryClient()
@@ -561,7 +555,6 @@ export function useAllowVoices(characterId: string) {
     },
     onSuccess: (result) => {
       client.setQueryData(['ruled-out', characterId], result)
-      void client.invalidateQueries({ queryKey: ['candidates', characterId] })
     },
   })
 }

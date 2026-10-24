@@ -91,7 +91,9 @@ export function Sidebar({
           className="nav-item"
           href={routeHref({ view: 'characters' })}
           aria-current={
-            route.view === 'characters' || route.view === 'audition' ? 'page' : undefined
+            route.view === 'characters' || route.view === 'character' || route.view === 'audition'
+              ? 'page'
+              : undefined
           }
         >
           <PeopleIcon /> <span className="grow">All characters</span>

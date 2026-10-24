@@ -1,9 +1,8 @@
 import type { LineStatus } from '../../core/planner'
 import type { CharacterSummary } from '../../core/summary'
 import { plural, tintFor, voiceLabel } from '../format'
-import { STATUS } from '../status'
+import { linesSummary, STATUS } from '../status'
 import { routeHref } from '../route'
-import { HeadphonesIcon } from './icons'
 import { StatusBar } from './StatusBar'
 
 /** The badge a card shows: cast state first, then what needs doing. */
@@ -22,14 +21,6 @@ function badgeFor(
 
 function pick(status: LineStatus) {
   return { color: STATUS[status].color, bg: STATUS[status].bg }
-}
-
-/** What a character's lines need, in words: `2 stale · 1 missing`, or `all up to date`. */
-function summaryFor(counts: Partial<Record<LineStatus, number>>): string {
-  const parts = (['missing', 'stale', 'weak', 'untracked'] as const)
-    .filter((s) => counts[s])
-    .map((s) => `${counts[s]} ${STATUS[s].label.toLowerCase()}`)
-  return parts.length ? parts.join(' · ') : 'all up to date'
 }
 
 /** A character's cast entry: voice, style cue, where it speaks and, in a part, how its lines stand. */
@@ -76,7 +67,7 @@ export function CharacterCard({
         <div className="card-status">
           <div className="card-status-text">
             <span>{plural(lines, 'line')}</span>
-            <span>{summaryFor(counts)}</span>
+            <span>{linesSummary(counts)}</span>
           </div>
           <StatusBar counts={counts} height={5} />
         </div>
@@ -90,9 +81,9 @@ export function CharacterCard({
         ))}
         <a
           className="btn card-action"
-          href={routeHref({ view: 'audition', character: character.id })}
+          href={routeHref({ view: 'character', character: character.id })}
         >
-          <HeadphonesIcon /> Audition
+          Open
         </a>
       </div>
     </article>

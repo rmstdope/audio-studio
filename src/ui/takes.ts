@@ -1,12 +1,12 @@
-/** The part of a candidates answer that takes belong to. */
+/** The part of an answer about the board that takes belong to. */
 interface WithTakes {
   audition: { spoken: string }
   takes: Record<string, string>
 }
 
 /**
- * The candidates with a newly recorded take added, if it is a take of the phrase they show; a
- * take of a phrase changed since it was asked for is left out, so the old words never play as new.
+ * The answer with a newly recorded take added, if it is a take of the phrase it shows; a take of
+ * a phrase changed since it was asked for is left out, so the old words never play as new.
  */
 export function withTake<T extends WithTakes>(
   candidates: T,
@@ -18,7 +18,7 @@ export function withTake<T extends WithTakes>(
 }
 
 /**
- * The candidates with the audition phrase and takes from a fresh lookup. When the phrase is the
+ * The answer with the audition phrase and takes from a fresh lookup. When the phrase is the
  * one already shown, takes recorded since the lookup was read are kept too; where both have a
  * take of a voice, the fresh one wins.
  */
@@ -29,4 +29,43 @@ export function withAuditionTakes<T extends WithTakes>(
 ): T {
   const same = audition.spoken === candidates.audition.spoken
   return { ...candidates, audition, takes: same ? { ...candidates.takes, ...takes } : takes }
+}
+
+/** The part of an answer about a character's cast voice that its take belongs to. */
+interface VoiceTake {
+  /** The cast voice's id, null when uncast. */
+  id: string | null
+  take: string | null
+  audition: { spoken: string }
+  lookup: { reason: string } | null
+}
+
+/**
+ * The cast voice's answer with a newly recorded take of it, if the take is of that voice and of
+ * the phrase shown.
+ */
+export function withVoiceTake<T extends VoiceTake>(
+  answer: T,
+  voice: string,
+  take: { key: string; spoken: string },
+): T {
+  if (voice !== answer.id || take.spoken !== answer.audition.spoken) return answer
+  return { ...answer, take: take.key }
+}
+
+/**
+ * What the character page asks to record by itself: the cast voice's take of the phrase shown,
+ * when there is none, as a key to ask for it once by (phrase and voice). Nothing for an answer
+ * about another voice than `castId` (an older one), or without an API key.
+ */
+export function takeToRecord(answer: VoiceTake, castId: string | null): string | null {
+  if (!castId || answer.id !== castId || answer.take || answer.lookup?.reason === 'no-key') {
+    return null
+  }
+  return `${answer.audition.spoken}\n${castId}`
+}
+
+/** Whether an answer about a character's cast voice is about `voiceId`, the voice cast now. */
+export function isAbout(answer: { id: string | null }, voiceId: string | null): boolean {
+  return answer.id === voiceId
 }
