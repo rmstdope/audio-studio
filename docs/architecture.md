@@ -424,7 +424,7 @@ An audition is for a character, not for a part: the result applies to every part
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
    2. TTS each chunk (WAV), join them with a short gap;
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the share
-      of shown words heard; a dash or an ellipsis on its own, which nobody says, is no word and is
+      of shown words heard; punctuation on its own ("—", "…"), which nobody says, is no word and is
       only timed). Alignment is narrate.py's, with these departures. Words are compared without
       single quotes at their ends ("'You" and "will.'" are "you" and "will"; apostrophes inside a
       word, "don't", stay), and a possessive is one word however it is written, as Whisper cannot
