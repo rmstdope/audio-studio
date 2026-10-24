@@ -24,6 +24,7 @@ describe('ProjectSchema', () => {
       final: 's2.1-pro-free',
     })
     expect(project.narration.quality.minHeard).toBe(0.9)
+    expect(project.narration.quality.soundAlike).toEqual([])
     expect(project.narration.output).toEqual({
       codec: 'mp3',
       bitrate: '64k',
@@ -77,6 +78,19 @@ describe('ProjectSchema', () => {
     const narration = base.narration as Record<string, unknown>
     const found = problems({ ...base, narration: { ...narration, quality: { chunkLimit: 10 } } })
     expect(found.map((p) => p.path)).toEqual(['narration.quality.chunkLimit'])
+  })
+
+  it('takes groups of two words or more that sound the same', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    const alike = (soundAlike: unknown) => ({
+      ...base,
+      narration: { ...narration, quality: { soundAlike } },
+    })
+    expect(parse(alike([['Lyria', 'Leer-ia']])).success).toBe(true)
+    expect(problems(alike([['alone']])).map((p) => p.path)).toEqual([
+      'narration.quality.soundAlike[0]',
+    ])
   })
 
   it('requires {part} in part paths', () => {

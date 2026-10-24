@@ -8,6 +8,7 @@ import {
   knownNames,
   pyRound,
   saidWords,
+  soundAlikes,
   type HeardSegment,
   type TimedWord,
 } from '../core/align'
@@ -277,7 +278,8 @@ export async function recordLine(
         try {
           const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav)
           const words = heardWords(segments, clip.seconds)
-          const aligned = alignWords(tokens, words, clip.seconds, said, knownNames(cast))
+          const alike = soundAlikes(narration.quality.soundAlike)
+          const aligned = alignWords(tokens, words, clip.seconds, said, knownNames(cast), alike)
           // Rounded as the lock keeps it, so the line's status agrees with this decision.
           attempt = {
             clip,
@@ -574,7 +576,9 @@ export async function measureLine(
     const segments = await transcribeWav(transcriber, narration.quality.whisperModel, decoded.wav)
     const said = saidWords(line.text, read.input.cast.pronounce)
     const heardNow = heardWords(segments, seconds)
-    aligned = alignWords(line.text.split(' '), heardNow, seconds, said, knownNames(read.input.cast))
+    const names = knownNames(read.input.cast)
+    const alike = soundAlikes(narration.quality.soundAlike)
+    aligned = alignWords(line.text.split(' '), heardNow, seconds, said, names, alike)
     words = heardNow.map((w) => w.word.trim())
   } catch (error) {
     return { ok: false, reason: 'transcribe', message: messageOf(error) }

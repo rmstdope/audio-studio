@@ -3,6 +3,7 @@ import {
   alignWords,
   heardWords,
   knownNames,
+  soundAlikes,
   matchingBlocks,
   pyRound,
   saidWords,
@@ -541,6 +542,38 @@ describe('alignWords, names Whisper spells its own way', () => {
       alignWords(['and', 'Aren', 'and', 'Lysa'], heardAs('and', 'Arn', 'Ren', 'and', 'Lysa'), 5)
         .ratio,
     ).toBe(3 / 4)
+  })
+})
+
+describe('alignWords, words that sound the same', () => {
+  const heardAs = (line: string) =>
+    words(...line.split(' ').map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const align = (shown: string, heard: string, alike = soundAlikes()) =>
+    alignWords(shown.split(' '), heardAs(heard), 9, undefined, new Set(), alike)
+
+  it('counts a word heard as another that sounds the same (inn as in, weakly as weekly)', () => {
+    expect(align('Rest at the inn.', 'Rest at the in.').ratio).toBe(1)
+    expect(align('He comes weekly.', 'He comes weakly.').ratio).toBe(1)
+    expect(align("They're over there.", 'Their over their.').ratio).toBe(1)
+    expect(align('Go to the well, two of you.', 'Go two the well, to of you.').ratio).toBe(1)
+    expect(align('I have 2 coins.', 'I have too coins.').ratio).toBe(1)
+    expect(align('A grey cloak.', 'A gray cloak.').ratio).toBe(1)
+  })
+
+  it('does not count a word that sounds otherwise', () => {
+    expect(align('Rest at the inn.', 'Rest at the an.').missed).toEqual([3])
+    expect(align('He comes weekly.', 'He comes weekly.', new Map()).ratio).toBe(1)
+    expect(align('Rest at the inn.', 'Rest at the in.', new Map()).missed).toEqual([3])
+  })
+
+  it("adds a project's own groups to the built-in ones, joining groups that share a word", () => {
+    const alike = soundAlikes([
+      ['Lyria', 'Liria'],
+      ['inn', 'Inne'],
+    ])
+    expect(align('Ask Lyria.', 'Ask Liria.', alike).ratio).toBe(1)
+    expect(align('the in', 'the Inne', alike).ratio).toBe(1)
+    expect(align('weekly', 'weakly', alike).ratio).toBe(1)
   })
 })
 

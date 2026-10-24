@@ -547,6 +547,31 @@ describe('measureLine', () => {
     expect(lock.k4.heard).toBe(1)
   })
 
+  it('counts a word heard as one the project says sounds the same', async () => {
+    const own = projectJson()
+    ;(own.narration as { quality?: unknown }).quality = {
+      chunkLimit: 100,
+      soundAlike: [['Welcome', 'Wellcum']],
+    }
+    const root = tempRepo({ ...files, 'audio-studio.json': own })
+    const projectFile = join(root, 'audio-studio.json')
+    await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+    })
+    const wellcum: Transcriber = {
+      transcribe: async () => [
+        { start: 0, end: 1, words: [{ word: 'Wellcum.', start: 0, end: 0.6 }] },
+      ],
+      close() {},
+    }
+    const result = await measureLine(projectFile, 'act1', 'k4', {
+      ...measureOptions,
+      transcriber: wellcum,
+    })
+    expect(result).toMatchObject({ ok: true, heard: 1 })
+  })
+
   it('keeps what Whisper heard of a measured clip heard poorly', async () => {
     const { root, projectFile } = await recorded()
     const half: Transcriber = {
