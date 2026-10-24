@@ -27,9 +27,16 @@ const NUMBERS = new Map(
     .map((word, n): [string, string] => [word, String(n)]),
 )
 
-/** A word without case or punctuation (narrate.py `_plain`). */
+/**
+ * A word without case or punctuation (narrate.py `_plain`). Apostrophes stay inside a word
+ * ("don't", "Lysa's") but not at its ends, where they are single quotes around speech ("'You",
+ * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word.
+ */
 function plain(word: string): string {
-  return word.toLowerCase().replace(/[^a-z0-9']/g, '')
+  return word
+    .toLowerCase()
+    .replace(/[^a-z0-9']/g, '')
+    .replace(/^'+|'+$/g, '')
 }
 
 /** A word for comparison: plain, small numbers as digits, since Whisper writes "1" (`_norm`). */
@@ -160,7 +167,7 @@ function oneLetterApart(x: string, y: string): boolean {
  * a colon (a title's "Act I: The Call"), or one opening a quote.
  */
 function startsSentence(tokens: string[], i: number): boolean {
-  return i === 0 || /^["“‘(]/.test(tokens[i]!) || /[.!?…:]["'”’)\]]*$/.test(tokens[i - 1]!)
+  return i === 0 || /^["“‘'(]/.test(tokens[i]!) || /[.!?…:]["'”’)\]]*$/.test(tokens[i - 1]!)
 }
 
 /**
