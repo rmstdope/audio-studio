@@ -357,6 +357,20 @@ describe('alignWords, names Whisper spells its own way', () => {
     ).toBe(3 / 4)
   })
 
+  it('measures a name by its letters as said, its possessive not counted', () => {
+    const heard = heardAs('so', 'Kaiya', 'waits')
+    expect(alignWords(['so', 'Kai', 'waits'], heard, 3, ['so', 'Kaiyah', 'waits']).ratio).toBe(1)
+    const its = heardAs('so', "Kaiya's", 'waits')
+    expect(alignWords(['so', "Kai's", 'waits'], its, 3, ['so', "Kaiyah's", 'waits']).ratio).toBe(1)
+    expect(
+      alignWords(['so', 'Kaiyah', 'waits'], heardAs('so', 'Kaia', 'waits'), 3, [
+        'so',
+        'Kai',
+        'waits',
+      ]).ratio,
+    ).toBe(2 / 3)
+  })
+
   it('does not count a number one digit off', () => {
     expect(
       alignWords(['In', '1984', 'it', 'fell'], heardAs('In', '1985', 'it', 'fell'), 4).ratio,

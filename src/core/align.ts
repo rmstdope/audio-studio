@@ -29,7 +29,7 @@ const NUMBERS = new Map(
 
 /**
  * A word without case or punctuation (narrate.py `_plain`). Apostrophes stay inside a word
- * ("don't", "Lysa's") but not at its ends, where they are single quotes around speech ("'You",
+ * ("don't") but not at its ends, where they are single quotes around speech ("'You",
  * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. A possessive
  * is one word however it is written, since Whisper cannot hear which: "Sorceress's" and
  * "Sorceress'" are "sorceress", "founder's" and "founders'" are "founders".
@@ -148,7 +148,7 @@ export function knownNames(cast: {
 
 /** A word plain, without a possessive 's: what a name is looked up by ("Aren's" is "aren"). */
 function bare(word: string): string {
-  return norm(word.replace(/'s(?=[^A-Za-z0-9]*$)/, ''))
+  return norm(word.replace(/'s(?=[^A-Za-z0-9]*$)/i, ''))
 }
 
 /** Whether a plain word is letters and apostrophes only, `min` letters or more. */
@@ -198,7 +198,7 @@ function soundOf(word: string): string {
 /**
  * Whether a heard word is a name as Whisper spells it ("Aren" as "Arn"): the shown word is
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
- * is) unless it is a known name, of at least four letters (apostrophes and a possessive 's not
+ * is) unless it is a known name, of at least four letters as said (apostrophes and a possessive 's not
  * counted) and nothing else, and the heard one is one letter apart, as spelled or as they sound
  * (`soundOf`, where that leaves four letters). Lowercase words, short ones and numbers are left
  * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
@@ -206,13 +206,14 @@ function soundOf(word: string): string {
 function spelledAlike(
   shown: string,
   atStart: boolean,
-  want: string,
+  said: string,
   got: string,
   names: ReadonlySet<string>,
 ): boolean {
+  const want = norm(said)
   if (!/^[^A-Za-z0-9]*[A-Z]/.test(shown) || !/[a-z]/.test(shown)) return false
   if (atStart && !names.has(bare(shown))) return false
-  if (!isWord(bare(shown), 4) || !isWord(want) || !isWord(got)) return false
+  if (!isWord(bare(said), 4) || !isWord(want) || !isWord(got)) return false
   if (oneLetterApart(want, got)) return true
   // As they sound, only while that leaves four letters: fewer, and one off is another name.
   const [a, b] = [soundOf(want), soundOf(got)]
@@ -227,6 +228,8 @@ interface Piece {
   token: number
   shown: string
   want: string
+  /** As said, before it is compared. */
+  said: string
   /** As compared for a compound: plain, number words left as words ("every one" is "everyone"). */
   spelled: string
   /** Whether it starts a sentence (only a word's first part can). */
@@ -245,6 +248,7 @@ function piecesOf(tokens: string[], said: string[], from: number, to: number): P
     token,
     shown,
     want: norm(word),
+    said: word,
     spelled: plain(word),
     atStart,
   })
@@ -317,7 +321,7 @@ function alignGap(
     shownWords.forEach((i, k) => {
       const w = heard[heardWords[k]!]!
       const atStart = startsSentence(tokens, i)
-      if (spelledAlike(tokens[i]!, atStart, norm(said[i]!), norm(w.word), names)) {
+      if (spelledAlike(tokens[i]!, atStart, said[i]!, norm(w.word), names)) {
         times[i] = [w.start, w.end]
       }
     })
@@ -359,7 +363,7 @@ function alignGap(
     if (!guess || n < 1) return null
     const piece = pieces[s]!
     const spelled = got.slice(h, h + n).join('')
-    if (!spelledAlike(piece.shown, piece.atStart, want[s]!, spelled, names)) return null
+    if (!spelledAlike(piece.shown, piece.atStart, piece.said, spelled, names)) return null
     return { shown: 1, heard: n, apply: () => take(s, h, h + n - 1) }
   }
 
