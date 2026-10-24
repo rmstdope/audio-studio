@@ -22,6 +22,7 @@ import type { JobState } from '../services/jobs'
 import type { HeardResult } from '../services/heard'
 import type { AcceptResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
+import type { SoundAlikeChange } from '../services/soundAlike'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
@@ -111,6 +112,27 @@ function partQuery(partId: string) {
 export function useParts(partIds: string[]) {
   return useQueries({
     queries: partIds.map(partQuery),
+  })
+}
+
+/** Saves the project's own words that sound the same, then reloads the project. */
+export function useSetSoundAlike() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'sound-alike' },
+    mutationFn: async (change: { groups: string[][]; was: string[][] }) => {
+      const response = await fetch('/api/sound-alike', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(change),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the words that sound the same answered ${response.status}`)
+      }
+      return (await response.json()) as SoundAlikeChange
+    },
+    // Refused or not, the page shows the file's groups again: a refusal may mean they changed.
+    onSuccess: () => client.invalidateQueries({ queryKey: ['project'] }),
   })
 }
 

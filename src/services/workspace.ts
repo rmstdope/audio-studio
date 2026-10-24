@@ -100,7 +100,14 @@ export async function loadWorkspace(projectFile: string): Promise<
     ok: true,
     project,
     cast,
-    summary: summarize({ project, root, dialogs, cast, problems }),
+    summary: summarize({
+      project,
+      projectFile: basename(projectFile),
+      root,
+      dialogs,
+      cast,
+      problems,
+    }),
   }
 }
 

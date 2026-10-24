@@ -461,6 +461,38 @@ describe('server, accepting a weak line', () => {
   })
 })
 
+describe('server, words that sound the same', () => {
+  const ownRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+  })
+  const server = startServer({
+    projectFile: join(ownRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const patch = (body: unknown, origin: string | null = server.url.origin) =>
+    fetch(new URL('/api/sound-alike', server.url), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
+      body: JSON.stringify(body),
+    })
+
+  it('saves the groups from its own page, and the project then lists them', async () => {
+    const groups = [['Lyria', 'Liria']]
+    expect((await patch({ groups, was: [] }, 'http://evil.test')).status).toBe(403)
+    expect((await patch({ groups: 'Lyria' })).status).toBe(400)
+    const saved = await patch({ groups, was: [] })
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await patch({ groups: [], was: [] })).status).toBe(409)
+    const project = await (await fetch(new URL('/api/project', server.url))).json()
+    expect(project.summary.soundAlike).toEqual(groups)
+  })
+})
+
 describe('allowedHosts', () => {
   it('names both addresses with the port', () => {
     expect(allowedHosts(4801)).toEqual(['127.0.0.1:4801', 'localhost:4801'])

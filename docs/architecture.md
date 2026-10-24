@@ -103,6 +103,7 @@ audio-studio/
 │   │   ├── resources.ts         schemas for script, cast, cues, manifest, lock
 │   │   ├── spoken.ts            text sent to Fish: cue + pronunciations + chunking
 │   │   ├── pronounce.ts         the pronunciation table's rules (cleaning, problems)
+│   │   ├── soundAlikeEdit.ts    the project's sound-alike groups as edited (rows, problems)
 │   │   ├── prices.ts            Fish's prices per model, promotions with their end
 │   │   ├── spend.ts             whether a paid recording may start (confirmed, covered)
 │   │   ├── changes.ts           git status output parsed and grouped by part
@@ -125,6 +126,7 @@ audio-studio/
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
+│   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
 │   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
 │   │   ├── takes.ts             audition takes: recorded once, cached by what they are made of
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
@@ -213,7 +215,8 @@ an id and a title.
   rejected with a clear message.
 - `quality.soundAlike` lists the game's own words that sound the same (one word each, with letters),
   a group each, added to the studio's built-in English ones (`core/soundAlike.ts`: "in" and "inn",
-  "weekly" and "weakly", "there", "their" and "they're", …); see §8.2. Optional, empty by default.
+  "weekly" and "weakly", "there", "their" and "they're", …); see §8.2. Optional, empty by default;
+  edited on the characters page (§8.3).
 
 ---
 
@@ -478,6 +481,12 @@ An audition is for a character, not for a part: the result applies to every part
 
 - Edit a character's style cue or keywords, a line's cue, or the pronunciation table (built):
   saved at once, and affected lines show as stale.
+- Edit the project's own words that sound the same (built: the Words that sound the same panel on
+  the characters page, under Pronunciations): one group a row, words separated by commas, saved
+  as a whole in the project file's `narration.quality.soundAlike`, refused if the file's groups
+  changed since editing began. The project file is otherwise only read; the save keeps the rest of
+  it, in its own indentation (a hand-compacted object is written out). Takes already recorded keep
+  their heard share; the groups count from the next take on.
 - Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
   (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again).
   Re-timing one line, or clips already measured, waits until it is needed: measuring covers clips
@@ -553,6 +562,7 @@ GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no si
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
+PATCH  /api/sound-alike                          the project's sound-alike groups ({ groups, was })
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
 GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
 DELETE /api/characters/:id/ruled-out             forget them all

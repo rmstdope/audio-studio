@@ -11,7 +11,15 @@ function lines(...speakers: string[]): Line[] {
 }
 
 function input(overrides: Partial<SummaryInput> = {}): SummaryInput {
-  return { project, root: '/repo', dialogs: {}, cast: null, problems: [], ...overrides }
+  return {
+    project,
+    projectFile: 'audio-studio.json',
+    root: '/repo',
+    dialogs: {},
+    cast: null,
+    problems: [],
+    ...overrides,
+  }
 }
 
 describe('summarize', () => {
@@ -98,6 +106,19 @@ describe('summarize, pronunciations', () => {
       ['Eldoria', 'El-door-ia'],
     ])
     expect(summarize(input()).pronounce).toBeNull()
+  })
+})
+
+describe('summarize, words that sound the same', () => {
+  it("gives the project's own groups and the file they are saved in", () => {
+    const json = projectJson()
+    ;(json.narration as { quality?: unknown }).quality = { soundAlike: [['Lyria', 'Liria']] }
+    const own = ProjectSchema.parse(json)
+    expect(summarize(input({ project: own }))).toMatchObject({
+      soundAlike: [['Lyria', 'Liria']],
+      projectFile: 'audio-studio.json',
+    })
+    expect(summarize(input()).soundAlike).toEqual([])
   })
 })
 

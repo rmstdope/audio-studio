@@ -48,12 +48,18 @@ export interface ProjectSummary {
   canRefresh: boolean
   /** The pronunciation table in file order; null when the cast cannot be read. */
   pronounce: Pronunciation[] | null
+  /** The project's own words that sound the same, a group each (`quality.soundAlike`). */
+  soundAlike: string[][]
+  /** The project file's name, where `soundAlike` is saved. */
+  projectFile: string
   problems: Problem[]
 }
 
 /** The inputs of `summarize`: the parsed project and what was read from its resources. */
 export interface SummaryInput {
   project: Project
+  /** The project file's name. */
+  projectFile: string
   root: string
   dialogs: Record<string, DialogState>
   cast: Cast | null
@@ -71,6 +77,7 @@ export function displayName(id: string): string {
  */
 export function summarize({
   project,
+  projectFile,
   root,
   dialogs,
   cast,
@@ -125,6 +132,8 @@ export function summarize({
     characters: characters.sort((a, b) => b.totalLines - a.totalLines || a.id.localeCompare(b.id)),
     canRefresh: Boolean(narration.refreshDialog),
     pronounce: cast ? Object.entries(cast.pronounce) : null,
+    soundAlike: narration.quality.soundAlike,
+    projectFile,
     problems,
   }
 }
