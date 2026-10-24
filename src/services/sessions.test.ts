@@ -376,6 +376,30 @@ describe('ruled-out voices in an audition', () => {
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
   })
 
+  it('knows the cast voice when Fish cannot look it up, and never rules it out', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const forgetful: FishClient = {
+      ...fish,
+      getVoice: (id) => (id === 'cur' ? Promise.reject(new Error('busy')) : fish.getVoice(id)),
+    }
+    const result = await startAudition(projectFile, 'mira', async () => forgetful)
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.session.current).toBe('cur')
+    expect(result.session.shortlist).toEqual(['cur'])
+    expect(result.session.voices.cur?.id).toBe('cur')
+    await moveVoice(projectFile, 'mira', 'cur', 'drop')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+
+  it('brings back a dropped voice without asking Fish', async () => {
+    const { projectFile } = await started()
+    await moveVoice(projectFile, 'mira', 'a', 'drop')
+    const noFish = async () => null
+    const back = await addVoiceById(projectFile, 'mira', 'a', noFish)
+    expect(back?.ok && back.session.toHear[0]).toBe('a')
+  })
+
   it('rules out nothing for a voice not on the board', async () => {
     const { projectFile } = await started()
     await moveVoice(projectFile, 'mira', 'g', 'drop')

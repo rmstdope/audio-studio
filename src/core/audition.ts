@@ -2,7 +2,10 @@ import { z } from 'zod'
 import { VoiceSchema, type Candidate, type Voice } from './voiceSearch'
 
 /** Where a voice on the board is: up to hear, or on the shortlist. */
-export type Place = 'toHear' | 'shortlist'
+const PlaceSchema = z.enum(['toHear', 'shortlist'])
+
+/** Where a voice on the board is: up to hear, or on the shortlist. */
+export type Place = z.infer<typeof PlaceSchema>
 
 /**
  * An audition in progress for one character: the voices up to hear, the shortlist the cast is
@@ -23,7 +26,7 @@ export const AuditionSessionSchema = z.object({
   /** The voices being listened to, in the order shown. */
   toHear: z.array(z.string()),
   /** Voices dropped in this audition, the latest last, and where each was. */
-  dropped: z.array(z.object({ id: z.string(), from: z.enum(['toHear', 'shortlist']) })),
+  dropped: z.array(z.object({ id: z.string(), from: PlaceSchema })),
   /** Ranked candidates not brought in yet. */
   queue: z.array(z.string()),
   voices: z.record(z.string(), VoiceSchema),

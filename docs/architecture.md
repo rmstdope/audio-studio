@@ -385,7 +385,8 @@ An audition is for a character, not for a part: the result applies to every part
   by match, then popularity (the search `fish_tts.py` already does, ported). Ruled-out voices,
   voices the audition has shown, and the current voice are left out of new candidates.
 - **Takes** use `models.audition` (for now the free model, so an audition costs nothing, and takes
-  record by themselves for every voice shown; a paid audition model will ask first). Each voice
+  record by themselves for every voice shown, each once; one that fails is recorded again only
+  when asked; a paid audition model will ask first). Each voice
   also offers Fish's own sample clip.
 - **Phrase**: the project's standard phrase, the character's own phrase, or any of their lines
   picked from the script of any part ("hear it say something it will actually say").

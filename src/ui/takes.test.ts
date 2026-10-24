@@ -26,6 +26,11 @@ describe('withAuditionTakes', () => {
     expect(fresh.takes).toEqual({ a: 'key-a', c: 'key-c' })
   })
 
+  it('takes the fresh take where both have one for the voice', () => {
+    const fresh = withAuditionTakes(candidates, candidates.audition, { a: 'key-a2' })
+    expect(fresh.takes).toEqual({ a: 'key-a2' })
+  })
+
   it('takes only the fresh takes for a new phrase', () => {
     const audition = { phrase: 'Other.', own: true, spoken: '[warm] Other.' }
     const fresh = withAuditionTakes(candidates, audition, { c: 'key-c' })

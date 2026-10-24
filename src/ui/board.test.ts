@@ -32,7 +32,7 @@ describe('castEffects', () => {
     ).toEqual([
       '35 recorded lines go stale (Act I: 26, Act III: 9). They record again the next time you generate.',
       'Gentle Granny is no longer Grandmother’s voice. It is not ruled out: it can come back in a later audition.',
-      'The audition ends. The 3 voices you dropped stay ruled out; the 6 you did not hear are not.',
+      'The audition ends. The 3 voices you dropped stay ruled out; the 6 still to hear or waiting are not.',
     ])
   })
 

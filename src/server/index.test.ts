@@ -355,7 +355,8 @@ describe('server', () => {
     const listed = await (
       await post('/api/auditions/narrator/move', { voice: 'w1', move: 'shortlist' })
     ).json()
-    expect(listed.session.shortlist).toEqual(['w1'])
+    // The cast voice (one Fish cannot look up here) starts on the shortlist.
+    expect(listed.session.shortlist).toEqual(['v1', 'w1'])
     expect((await post('/api/auditions/narrator/cast')).status).toBe(400)
     expect((await post('/api/auditions/narrator/cast', { voice: 'not an id' })).status).toBe(400)
     const cast = await (await post('/api/auditions/narrator/cast', { voice: 'w1' })).json()

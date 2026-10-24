@@ -17,7 +17,7 @@ import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
-import type { Candidate } from '../core/voiceSearch'
+import type { Candidate, Voice } from '../core/voiceSearch'
 import { findCandidates, setVoice, type FishFactory } from './auditions'
 import { characterFile, readJson, writeAtomic } from './files'
 import { updateRuledOut } from './ruledOut'
@@ -72,16 +72,34 @@ export function startAudition(
   return sessionWrites.run(key(projectFile, characterId), async () => {
     const found = await findCandidates(projectFile, characterId, fishFor)
     if (!found || !found.ok) return found
+    const { voice, voiceName } = found.character
+    // Fish not finding the cast voice just now does not make the character uncast.
+    const current = found.current ?? (voice ? unknownVoice(voice, voiceName) : null)
     const session = startSession({
       character: characterId,
       keywords: found.keywords,
-      current: found.current,
+      current,
       candidates: found.candidates,
       perRound: found.perRound,
     })
     await writeSession(projectFile, characterId, session)
     return { ok: true, session }
   })
+}
+
+/** A voice known only by its id (and the name the cast gives it), when Fish does not answer. */
+function unknownVoice(id: string, name: string | null): Voice {
+  return {
+    id,
+    title: name ?? '',
+    description: '',
+    tags: [],
+    languages: [],
+    uses: 0,
+    likes: 0,
+    author: '',
+    sample: null,
+  }
 }
 
 /**
@@ -218,8 +236,9 @@ export async function addVoiceById(
       if (placeOf(session, voiceId)) {
         return { ok: false, reason: 'seen', message: 'That voice is in this audition already.' }
       }
-      const queued = session.queue.includes(voiceId) ? session.voices[voiceId] : undefined
-      if (queued) return addVoice(session, queued)
+      // A voice the audition knows (queued or dropped) needs no asking Fish.
+      const known = session.voices[voiceId]
+      if (known) return addVoice(session, known)
       const fish = await fishFor(dirname(projectFile), opened.project)
       if (!fish) {
         return { ok: false, reason: 'no-key', message: 'Set FISH_AUDIO_API_KEY to look voices up.' }

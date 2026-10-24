@@ -37,7 +37,7 @@ export function castEffects({
   titles: Map<string, string>
   /** Voices dropped in this audition and still ruled out. */
   dropped: number
-  /** Voices to hear, and queued, not heard yet. */
+  /** Voices still to hear, and queued. */
   unheard: number
 }): string[] {
   const lines = replacing ? recorded.reduce((sum, a) => sum + a.lines, 0) : 0
@@ -59,7 +59,9 @@ export function castEffects({
       `the ${dropped === 1 ? 'voice' : `${dropped} voices`} you dropped ` +
         `${dropped === 1 ? 'stays' : 'stay'} ruled out`,
     // Only worth saying beside the dropped ones, which are ruled out.
-    dropped && unheard && `the ${unheard} you did not hear ${unheard === 1 ? 'is' : 'are'} not`,
+    dropped &&
+      unheard &&
+      `the ${unheard} still to hear or waiting ${unheard === 1 ? 'is' : 'are'} not`,
   ]
     .filter(Boolean)
     .join('; ')
@@ -121,9 +123,12 @@ export function droppedRuledOut(
   ruledOut: string[] | null,
   current: string | null,
 ): string[] {
-  return dropped
-    .map((d) => d.id)
-    .filter((id) => id !== current && (ruledOut === null || ruledOut.includes(id)))
+  return dropped.map((d) => d.id).filter((id) => isRuledOut(id, ruledOut, current))
+}
+
+/** Whether a voice is ruled out: never the cast voice; any other while the list is not known. */
+export function isRuledOut(id: string, ruledOut: string[] | null, current: string | null): boolean {
+  return id !== current && (ruledOut === null || ruledOut.includes(id))
 }
 
 /** The voice whose drop the page can offer to undo: the one it dropped, while that is the last. */

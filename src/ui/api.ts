@@ -448,10 +448,23 @@ export function useSessionAction(characterId: string) {
       }
       return (await response.json()) as SessionView
     },
-    onSuccess: (view) => {
+    onSuccess: (view, { action, body }) => {
       if (!view.ok) return
       // A drop rules a voice out, undoing it or adding a voice by id allows it again; the
-      // candidates shown once the audition ends leave out what is ruled out.
+      // candidates shown once the audition ends leave out what is ruled out. A drop shows at
+      // once, before the list is read again.
+      const dropped = action === 'move' ? droppedBy(body) : null
+      if (dropped && view.session && dropped !== view.session.current) {
+        const title = view.session.voices[dropped]?.title ?? dropped
+        client.setQueryData<NonNullable<RuledOutResult>>(['ruled-out', characterId], (old) =>
+          old?.ok && !old.voices.some((v) => v.id === dropped)
+            ? {
+                ...old,
+                voices: [{ id: dropped, title, at: new Date().toISOString() }, ...old.voices],
+              }
+            : old,
+        )
+      }
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
       void client.invalidateQueries({ queryKey: ['candidates', characterId] })
       // An answer without the recorded lines (after a move on the board) keeps the ones shown;
@@ -465,6 +478,12 @@ export function useSessionAction(characterId: string) {
       })
     },
   })
+}
+
+/** The voice a move drops, if it is a drop. */
+function droppedBy(body: unknown): string | null {
+  const move = body as { voice?: unknown; move?: unknown } | undefined
+  return move?.move === 'drop' && typeof move.voice === 'string' ? move.voice : null
 }
 
 /**

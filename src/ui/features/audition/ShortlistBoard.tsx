@@ -3,7 +3,14 @@ import type { AuditionSession } from '../../../core/audition'
 import type { Problem } from '../../../core/project'
 import type { SessionView } from '../../../services/sessions'
 import { useCast, useRuledOut, useSessionAction, useTakes, type SessionAction } from '../../api'
-import { castEffects, droppedRuledOut, stopEffects, takesToRecord, undoFor } from '../../board'
+import {
+  castEffects,
+  droppedRuledOut,
+  isRuledOut,
+  stopEffects,
+  takesToRecord,
+  undoFor,
+} from '../../board'
 import { CheckIcon, CrossIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { routeHref } from '../../route'
@@ -87,8 +94,10 @@ export function ShortlistBoard({
     const id = voiceIdFrom(voiceId)
     if (!id) return setIdError('That is not a Fish voice id or voice URL.')
     setIdError(null)
-    run({ action: 'add', body: { voice: id } }, () => setDroppedHere(null))
-    setVoiceId('')
+    run({ action: 'add', body: { voice: id } }, () => {
+      setDroppedHere(null)
+      setVoiceId('')
+    })
   }
 
   const card = (id: string, listed: boolean) => {
@@ -289,7 +298,7 @@ export function ShortlistBoard({
               setIdError(null)
             }}
           />
-          <button className="btn" type="submit" disabled={!voiceId.trim()}>
+          <button className="btn" type="submit" disabled={!voiceId.trim() || act.isPending}>
             Bring in
           </button>
         </form>
@@ -305,7 +314,7 @@ export function ShortlistBoard({
         <div className="toast" role="status">
           <span>
             Dropped <strong>{title(undoable)}</strong>.
-            {ruledIds === null || ruledIds.includes(undoable)
+            {isRuledOut(undoable, ruledIds, session.current)
               ? ` It won’t come back for ${name}.`
               : ''}
           </span>
