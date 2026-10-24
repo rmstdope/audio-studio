@@ -362,7 +362,7 @@ and discarded from there; the page itself shows no candidates.
 
 An audition is for a character, not for a part: the result applies to every part it speaks in.
 
-- **To hear** holds the candidates being listened to, best match first. **Bring in N more** adds
+- **To hear** holds the candidates being listened to, best match first. **Bring in more** adds
   the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
   **Bring in a specific voice** adds one by its Fish id or URL.
 - **Drop** takes a voice out of the audition at once and rules it out for the character: no later

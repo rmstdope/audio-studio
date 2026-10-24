@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { AuditionSession } from '../../../core/audition'
+import type { Problem } from '../../../core/project'
 import type { SessionView } from '../../../services/sessions'
-import { useCast, useSessionAction, useTakes, type SessionAction } from '../../api'
-import { castEffects, stopEffects, takesToRecord } from '../../board'
+import { useCast, useRuledOut, useSessionAction, useTakes, type SessionAction } from '../../api'
+import { castEffects, droppedRuledOut, stopEffects, takesToRecord, undoFor } from '../../board'
 import { CheckIcon, CrossIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { routeHref } from '../../route'
@@ -15,7 +16,7 @@ type Asking = { kind: 'cast'; voice: string } | { kind: 'stop' } | null
 /**
  * An audition as one board: the shortlist the cast is chosen from, the voices to hear with Drop
  * and Shortlist on each, and ways to bring in more. Takes record by themselves (the audition
- * model is free). A drop can be undone; casting and stopping say what they will do first.
+ * model is free). A drop can be undone; casting, keeping and stopping say what they do first.
  */
 export function ShortlistBoard({
   characterId,
@@ -43,16 +44,12 @@ export function ShortlistBoard({
   const { session, takes, audition } = view
   const act = useSessionAction(characterId)
   const recorder = useTakes(characterId)
+  const ruledOut = useRuledOut(characterId)
   const [asking, setAsking] = useState<Asking>(null)
-  // The voice this page dropped last, while its drop can still be undone here.
-  const [undoable, setUndoable] = useState<string | null>(null)
+  // The voice this page dropped last; its drop can be undone while it is the last one.
+  const [droppedHere, setDroppedHere] = useState<string | null>(null)
   const [voiceId, setVoiceId] = useState('')
   const [idError, setIdError] = useState<string | null>(null)
-  const failed = act.data && !act.data.ok ? act.data : null
-  // Once a search finds nothing new, no later one will (it leaves out everything seen so far).
-  const [exhausted, setExhausted] = useState(false)
-  if (!exhausted && failed && 'reason' in failed && failed.reason === 'exhausted')
-    setExhausted(true)
 
   // Every take is asked for once per phrase, so a take the cache cannot show is not asked again.
   const asked = useRef(new Set<string>())
@@ -70,27 +67,27 @@ export function ShortlistBoard({
     // `missing` is new on every render; what it holds is what matters.
   }, [missing.join(',')])
 
-  const run = (action: SessionAction) => {
+  const run = (action: SessionAction, onDone?: () => void) => {
     setAsking(null)
-    act.mutate(action)
+    act.mutate(action, { onSuccess: (result) => result.ok && onDone?.() })
   }
-  const move = (voice: string, to: 'shortlist' | 'unlist' | 'drop') => {
-    setUndoable(to === 'drop' ? voice : null)
-    run({ action: 'move', body: { voice, move: to } })
-  }
-  const lastDrop = session.dropped.at(-1)?.id
-  const showUndo = undoable !== null && undoable === lastDrop
+  const move = (voice: string, to: 'shortlist' | 'unlist' | 'drop') =>
+    run({ action: 'move', body: { voice, move: to } }, () =>
+      setDroppedHere(to === 'drop' ? voice : null),
+    )
+  const undoable = undoFor(droppedHere, session.dropped)
   const title = (id: string) => session.voices[id]?.title || 'Untitled voice'
   const current = session.current ? title(session.current) : null
-  const castFailed = cast.data && !cast.data.ok ? cast.data : null
+  const ruledIds = ruledOut.data?.ok ? ruledOut.data.voices.map((v) => v.id) : null
+  // Dropped and still ruled out: one allowed again from the list since is not counted.
+  const dropped = droppedRuledOut(session.dropped, ruledIds, session.current).length
 
   const addById = (event: FormEvent) => {
     event.preventDefault()
     const id = voiceIdFrom(voiceId)
     if (!id) return setIdError('That is not a Fish voice id or voice URL.')
     setIdError(null)
-    setUndoable(null)
-    run({ action: 'add', body: { voice: id } })
+    run({ action: 'add', body: { voice: id } }, () => setDroppedHere(null))
     setVoiceId('')
   }
 
@@ -116,7 +113,7 @@ export function ShortlistBoard({
           <>
             <button
               type="button"
-              className="btn verdict-drop"
+              className="btn btn-drop"
               disabled={act.isPending}
               onClick={() => move(id, 'drop')}
             >
@@ -136,9 +133,7 @@ export function ShortlistBoard({
                   type="button"
                   className={`btn${isCurrent ? '' : ' btn-primary'}`}
                   disabled={cast.isPending}
-                  onClick={() =>
-                    isCurrent ? cast.mutate(id) : setAsking({ kind: 'cast', voice: id })
-                  }
+                  onClick={() => setAsking({ kind: 'cast', voice: id })}
                 >
                   {isCurrent ? 'Keep this voice' : `Cast as ${name}`}
                 </button>
@@ -146,7 +141,7 @@ export function ShortlistBoard({
             ) : (
               <button
                 type="button"
-                className="btn verdict-keep"
+                className="btn btn-shortlist"
                 disabled={act.isPending}
                 onClick={() => move(id, 'shortlist')}
               >
@@ -158,6 +153,9 @@ export function ShortlistBoard({
       />
     )
   }
+
+  const casting = asking?.kind === 'cast' ? asking.voice : null
+  const keeping = casting !== null && casting === session.current
 
   return (
     <div className="board">
@@ -181,16 +179,20 @@ export function ShortlistBoard({
         </button>
       </div>
 
-      {asking?.kind === 'cast' && (
+      {casting !== null && (
         <Confirm
-          title={`Cast ${title(asking.voice)} as ${name}?`}
+          title={
+            keeping
+              ? `Keep ${title(casting)} as ${name}’s voice?`
+              : `Cast ${title(casting)} as ${name}?`
+          }
           effects={castEffects({
             name,
-            voice: title(asking.voice),
             current,
+            replacing: !keeping,
             recorded: view.recorded ?? [],
             titles,
-            dropped: session.dropped.length,
+            dropped,
             unheard: session.toHear.length + session.queue.length,
           })}
           onBack={() => setAsking(null)}
@@ -199,9 +201,9 @@ export function ShortlistBoard({
             className="btn btn-primary"
             type="button"
             disabled={cast.isPending}
-            onClick={() => cast.mutate(asking.voice, { onSettled: () => setAsking(null) })}
+            onClick={() => cast.mutate(casting, { onSettled: () => setAsking(null) })}
           >
-            {cast.isPending ? 'Casting…' : `Cast ${title(asking.voice)}`}
+            {cast.isPending ? 'Casting…' : keeping ? 'Keep it' : `Cast ${title(casting)}`}
           </button>
         </Confirm>
       )}
@@ -212,7 +214,7 @@ export function ShortlistBoard({
             name,
             current,
             lines,
-            dropped: session.dropped.length,
+            dropped,
             shortlisted: session.shortlist.filter((v) => v !== session.current).length,
           })}
           onBack={() => setAsking(null)}
@@ -257,12 +259,8 @@ export function ShortlistBoard({
           <div className="cards">{session.toHear.map((id) => card(id, false))}</div>
         ) : (
           <div className="empty-state">
-            <strong>{exhausted ? 'Nobody left to hear' : 'No voices to hear'}</strong>
-            <span>
-              {exhausted
-                ? `Every voice matching ${session.keywords.map((k) => `“${k}”`).join(', ')} has been heard. Cast one from the shortlist, change the keywords and start again, or bring in a specific voice.`
-                : 'Bring in more voices matching the keywords, or a specific voice.'}
-            </span>
+            <strong>No voices to hear</strong>
+            <span>Bring in more voices matching the keywords, or a specific voice.</span>
           </div>
         )}
       </section>
@@ -271,10 +269,10 @@ export function ShortlistBoard({
         <button
           className="btn"
           type="button"
-          disabled={act.isPending || exhausted}
-          onClick={() => (setUndoable(null), run({ action: 'more' }))}
+          disabled={act.isPending}
+          onClick={() => run({ action: 'more' }, () => setDroppedHere(null))}
         >
-          {exhausted ? 'No more voices found' : 'Bring in more'}
+          Bring in more
         </button>
         <span className="spacer" />
         <form className="add-voice" onSubmit={addById}>
@@ -296,32 +294,26 @@ export function ShortlistBoard({
           </button>
         </form>
         {idError && <span className="adopt-error">{idError}</span>}
-        {failed && 'problems' in failed && (
-          <Problems title="The audition could not go on" problems={failed.problems} />
-        )}
-        {failed && 'message' in failed && <span className="adopt-error">{failed.message}</span>}
-        {castFailed && 'problems' in castFailed && (
-          <Problems title="The voice could not be cast" problems={castFailed.problems} />
-        )}
-        {castFailed && 'message' in castFailed && (
-          <span className="adopt-error">{castFailed.message}</span>
-        )}
+        <Failure title="The audition could not go on" result={act.data} />
+        <Failure title="The voice could not be cast" result={cast.data} />
         {(act.isError || cast.isError) && (
           <span className="adopt-error">{(act.error ?? cast.error)?.message}</span>
         )}
       </div>
 
-      {showUndo && (
+      {undoable && (
         <div className="toast" role="status">
           <span>
             Dropped <strong>{title(undoable)}</strong>.
-            {undoable === session.current ? '' : ` It won’t come back for ${name}.`}
+            {ruledIds === null || ruledIds.includes(undoable)
+              ? ` It won’t come back for ${name}.`
+              : ''}
           </span>
           <button
             className="btn btn-small"
             type="button"
             disabled={act.isPending}
-            onClick={() => (setUndoable(null), run({ action: 'undo' }))}
+            onClick={() => run({ action: 'undo' }, () => setDroppedHere(null))}
           >
             Undo
           </button>
@@ -329,6 +321,19 @@ export function ShortlistBoard({
       )}
     </div>
   )
+}
+
+/** Why an action did nothing, if it did: the problems with the files, or the server's message. */
+function Failure({
+  title,
+  result,
+}: {
+  title: string
+  result: { ok: boolean; problems?: Problem[]; message?: string } | undefined
+}) {
+  if (!result || result.ok) return null
+  if (result.problems) return <Problems title={title} problems={result.problems} />
+  return result.message ? <span className="adopt-error">{result.message}</span> : null
 }
 
 /** A question asked in the page before acting: what will happen, and the ways on. */

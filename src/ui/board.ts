@@ -1,3 +1,4 @@
+import type { AuditionSession } from '../core/audition'
 import type { Appearance } from '../core/summary'
 import { plural } from './format'
 
@@ -17,8 +18,8 @@ export function takesToRecord(
 /** What casting a voice does, in sentences, for the page to ask before casting. */
 export function castEffects({
   name,
-  voice,
   current,
+  replacing,
   recorded,
   titles,
   dropped,
@@ -26,20 +27,20 @@ export function castEffects({
 }: {
   /** The character's name. */
   name: string
-  /** The title of the voice being cast. */
-  voice: string
   /** The title of the character's voice now, if it has one. */
   current: string | null
-  /** The character's recorded lines per part, all stale once cast. */
+  /** Whether the voice cast is another than the character's voice now. */
+  replacing: boolean
+  /** The character's recorded lines per part, all stale once cast (none when not replacing). */
   recorded: Appearance[]
   /** Short part titles by id. */
   titles: Map<string, string>
-  /** Voices dropped in this audition. */
+  /** Voices dropped in this audition and still ruled out. */
   dropped: number
   /** Voices to hear, and queued, not heard yet. */
   unheard: number
 }): string[] {
-  const lines = recorded.reduce((sum, a) => sum + a.lines, 0)
+  const lines = replacing ? recorded.reduce((sum, a) => sum + a.lines, 0) : 0
   const effects: string[] = []
   if (lines) {
     const where = recorded.map((a) => `${titles.get(a.part) ?? a.part}: ${a.lines}`).join(', ')
@@ -48,7 +49,7 @@ export function castEffects({
         `${lines === 1 ? 'It records' : 'They record'} again the next time you generate.`,
     )
   }
-  if (current && current !== voice) {
+  if (current && replacing) {
     effects.push(
       `${current} is no longer ${name}’s voice. It is not ruled out: it can come back in a later audition.`,
     )
@@ -84,7 +85,7 @@ export function stopEffects({
   current: string | null
   /** The character's lines, in every part. */
   lines: number
-  /** Voices dropped in this audition. */
+  /** Voices dropped in this audition and still ruled out. */
   dropped: number
   /** Voices on the shortlist other than the current one. */
   shortlisted: number
@@ -92,7 +93,9 @@ export function stopEffects({
   const effects = [
     current
       ? `Nothing changes in the cast: ${name} keeps ${current}.`
-      : `${name} stays uncast: ${plural(lines, 'line')} cannot be recorded until it has a voice.`,
+      : lines
+        ? `${name} stays uncast: ${plural(lines, 'line')} cannot be recorded until it has a voice.`
+        : `${name} stays uncast.`,
   ]
   if (dropped) {
     effects.push(
@@ -107,4 +110,26 @@ export function stopEffects({
     )
   }
   return effects
+}
+
+/**
+ * The voices dropped in the audition that are still ruled out: not the cast voice (never ruled
+ * out), nor one allowed again since. With the ruled-out voices not known yet, every other drop.
+ */
+export function droppedRuledOut(
+  dropped: AuditionSession['dropped'],
+  ruledOut: string[] | null,
+  current: string | null,
+): string[] {
+  return dropped
+    .map((d) => d.id)
+    .filter((id) => id !== current && (ruledOut === null || ruledOut.includes(id)))
+}
+
+/** The voice whose drop the page can offer to undo: the one it dropped, while that is the last. */
+export function undoFor(
+  droppedHere: string | null,
+  dropped: AuditionSession['dropped'],
+): string | null {
+  return droppedHere !== null && dropped.at(-1)?.id === droppedHere ? droppedHere : null
 }

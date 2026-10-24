@@ -102,7 +102,7 @@ export function useAdopt(partId: string) {
 
 /**
  * Voices found for a character's audition. Cached for a while: each search asks Fish many times.
- * Off while an audition round is shown, which does not need it.
+ * Off while the audition board is shown, which does not need it.
  */
 export function useCandidates(characterId: string, enabled = true) {
   return useQuery({
@@ -167,11 +167,11 @@ export function useSetPhrase(characterId: string) {
 }
 
 /**
- * Reloads what a character's audition shows after its phrase or style changed: the round, and the
+ * Reloads what a character's audition shows after its phrase or style changed: the board, and the
  * takes of the voices shown, without searching Fish's library again.
  */
 async function refreshAudition(client: QueryClient, characterId: string) {
-  // A round shows the phrase and its takes too; reloading it asks Fish nothing.
+  // The board shows the phrase and its takes too; reloading it asks Fish nothing.
   void client.invalidateQueries({ queryKey: ['session', characterId] })
   const key = ['candidates', characterId]
   const shown = client.getQueryData<NonNullable<CandidatesResult>>(key)
@@ -454,10 +454,15 @@ export function useSessionAction(characterId: string) {
       // candidates shown once the audition ends leave out what is ruled out.
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
       void client.invalidateQueries({ queryKey: ['candidates', characterId] })
-      // An answer without the recorded lines (after a verdict) keeps the ones shown.
-      client.setQueryData<SessionView>(['session', characterId], (old) =>
-        view.recorded === undefined && old?.ok ? { ...view, recorded: old.recorded } : view,
-      )
+      // An answer without the recorded lines (after a move on the board) keeps the ones shown;
+      // takes recorded while the answer was on its way are kept too.
+      client.setQueryData<SessionView>(['session', characterId], (old) => {
+        if (!old?.ok) return view
+        const recorded = view.recorded ?? old.recorded
+        if (!view.audition || !old.audition) return { ...view, recorded }
+        const { takes } = withAuditionTakes<Viewed>(old as Viewed, view.audition, view.takes)
+        return { ...view, takes, recorded }
+      })
     },
   })
 }

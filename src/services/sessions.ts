@@ -97,7 +97,7 @@ export function changeSession(
   change: (
     session: AuditionSession,
   ) => AuditionSession | SessionFailure | Promise<AuditionSession | SessionFailure>,
-  alongside?: (session: AuditionSession) => Promise<unknown>,
+  alongside?: (session: AuditionSession, before: AuditionSession) => Promise<unknown>,
 ): Promise<SessionResult> {
   return sessionWrites.run(key(projectFile, characterId), async () => {
     const known = await knownCharacter(projectFile, characterId)
@@ -113,7 +113,7 @@ export function changeSession(
     const changed = await change(session)
     if ('ok' in changed) return changed
     if (changed === session) return { ok: true, session }
-    await alongside?.(changed)
+    await alongside?.(changed, session)
     await writeSession(projectFile, characterId, changed)
     return { ok: true, session: changed }
   })
@@ -148,15 +148,10 @@ export function moveVoice(
 
 /** Undoes the last drop: the voice goes back where it was, and is no longer ruled out. */
 export function undoLastDrop(projectFile: string, characterId: string): Promise<SessionResult> {
-  let undone: string | undefined
-  return changeSession(
-    projectFile,
-    characterId,
-    (s) => ((undone = s.dropped.at(-1)?.id), undoDrop(s)),
-    async () => {
-      if (undone) await updateRuledOut(projectFile, characterId, { allowed: [undone] })
-    },
-  )
+  return changeSession(projectFile, characterId, undoDrop, async (_session, before) => {
+    const undone = before.dropped.at(-1)?.id
+    if (undone) await updateRuledOut(projectFile, characterId, { allowed: [undone] })
+  })
 }
 
 /**
@@ -197,7 +192,7 @@ export async function moreVoices(
         ok: false,
         reason: 'exhausted',
         message:
-          'No more voices found for these keywords. Try other keywords, or add one by its id.',
+          'No more voices found for these keywords. Try other keywords, or bring in a specific voice.',
       }
     }
     return bringMore(next, perRound)

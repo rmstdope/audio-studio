@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { castEffects, stopEffects, takesToRecord } from './board'
+import { castEffects, droppedRuledOut, stopEffects, takesToRecord, undoFor } from './board'
 
 describe('takesToRecord', () => {
   it('records the voices shown without a take, once, and not again after it failed', () => {
@@ -19,8 +19,8 @@ describe('castEffects', () => {
     expect(
       castEffects({
         name: 'Grandmother',
-        voice: 'Velvet Nana',
         current: 'Gentle Granny',
+        replacing: true,
         recorded: [
           { part: 'act1', lines: 26 },
           { part: 'act3', lines: 9 },
@@ -40,8 +40,8 @@ describe('castEffects', () => {
     expect(
       castEffects({
         name: 'Mira',
-        voice: 'Warm',
         current: null,
+        replacing: false,
         recorded: [],
         titles,
         dropped: 0,
@@ -75,5 +75,57 @@ describe('stopEffects', () => {
       'The Miller stays uncast: 14 lines cannot be recorded until it has a voice.',
       'The voice you dropped stays ruled out. You can allow it again from the list of ruled-out voices.',
     ])
+  })
+})
+
+describe('castEffects, keeping the voice', () => {
+  it('says the old voice goes by whether it is replaced, not by its title', () => {
+    const effects = (replacing: boolean) =>
+      castEffects({
+        name: 'Mira',
+        current: 'Narrator',
+        replacing,
+        recorded: [],
+        titles,
+        dropped: 1,
+        unheard: 0,
+      })
+    expect(effects(true)[0]).toBe(
+      'Narrator is no longer Mira’s voice. It is not ruled out: it can come back in a later audition.',
+    )
+    expect(effects(false)).toEqual(['The audition ends. The voice you dropped stays ruled out.'])
+  })
+})
+
+describe('stopEffects, without lines', () => {
+  it('says only that a character with no voice stays uncast', () => {
+    expect(
+      stopEffects({ name: 'Mira', current: null, lines: 0, dropped: 0, shortlisted: 0 }),
+    ).toEqual(['Mira stays uncast.'])
+  })
+})
+
+describe('droppedRuledOut', () => {
+  it('gives the voices dropped in the audition that are still ruled out, never the cast one', () => {
+    const dropped = [
+      { id: 'a', from: 'toHear' as const },
+      { id: 'b', from: 'toHear' as const },
+      { id: 'cur', from: 'shortlist' as const },
+    ]
+    expect(droppedRuledOut(dropped, ['b', 'z'], 'cur')).toEqual(['b'])
+    expect(droppedRuledOut(dropped, null, 'cur')).toEqual(['a', 'b'])
+  })
+})
+
+describe('undoFor', () => {
+  it('offers to undo the drop this page made, while it is the last one', () => {
+    const dropped = [
+      { id: 'a', from: 'toHear' as const },
+      { id: 'b', from: 'shortlist' as const },
+    ]
+    expect(undoFor('b', dropped)).toBe('b')
+    expect(undoFor('a', dropped)).toBeNull()
+    expect(undoFor(null, dropped)).toBeNull()
+    expect(undoFor('b', [])).toBeNull()
   })
 })

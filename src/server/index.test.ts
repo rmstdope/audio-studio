@@ -338,9 +338,13 @@ describe('server', () => {
     const started = await (await post('/api/auditions/narrator/start')).json()
     expect(started.session.toHear).toEqual(['w1'])
     expect(started.audition.spoken).toContain('Once upon a time.')
-    expect((await post('/api/auditions/narrator/move', { voice: 'w1', move: 'keep' })).status).toBe(
-      400,
-    )
+    for (const body of [
+      { voice: 'w1', move: 'keep' },
+      { move: 'drop' },
+      { voice: '../x', move: 'drop' },
+    ]) {
+      expect((await post('/api/auditions/narrator/move', body)).status).toBe(400)
+    }
     const dropped = await (
       await post('/api/auditions/narrator/move', { voice: 'w1', move: 'drop' })
     ).json()
@@ -353,6 +357,7 @@ describe('server', () => {
     ).json()
     expect(listed.session.shortlist).toEqual(['w1'])
     expect((await post('/api/auditions/narrator/cast')).status).toBe(400)
+    expect((await post('/api/auditions/narrator/cast', { voice: 'not an id' })).status).toBe(400)
     const cast = await (await post('/api/auditions/narrator/cast', { voice: 'w1' })).json()
     expect(cast).toMatchObject({ ok: true, voice: { id: 'w1', name: 'Warm' }, changed: true })
     const saved = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))

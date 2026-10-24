@@ -36,8 +36,8 @@ export function AuditionView({
 }) {
   const character = summary.characters.find((c) => c.id === characterId)
   const sessionQuery = useSession(characterId)
-  const inRound = Boolean(sessionQuery.data?.ok && sessionQuery.data.session)
-  const candidates = useCandidates(characterId, sessionQuery.isSuccess && !inRound)
+  const onBoard = Boolean(sessionQuery.data?.ok && sessionQuery.data.session)
+  const candidates = useCandidates(characterId, sessionQuery.isSuccess && !onBoard)
   const takes = useTakes(characterId)
   const start = useSessionAction(characterId)
   const cast = useCast(characterId)
@@ -64,17 +64,17 @@ export function AuditionView({
     onRecord: () => void takes.record(voice),
   })
   // The current voice and the top of the list: the voices an audition would start with.
-  const roundVoices = ok
+  const startVoices = ok
     ? [
         ...(ok.current ? [ok.current.id] : []),
         ...ok.candidates.slice(0, ok.perRound).map((c) => c.voice.id),
       ]
     : []
-  const toRecord = roundVoices.filter((v) => !ok?.takes[v] && !takes.recording.has(v))
+  const toRecord = startVoices.filter((v) => !ok?.takes[v] && !takes.recording.has(v))
   const view = sessionQuery.data?.ok ? sessionQuery.data : null
-  const round = view?.session ? { ...view, session: view.session } : null
+  const board = view?.session ? { ...view, session: view.session } : null
   const casted = cast.data?.ok ? cast.data : null
-  const phrase = round?.audition ?? ok?.audition ?? null
+  const phrase = board?.audition ?? ok?.audition ?? null
   const started = start.data && !start.data.ok ? start.data : null
 
   return (
@@ -119,12 +119,12 @@ export function AuditionView({
           {casted && <CastBanner result={casted} summary={summary} name={character.name} />}
           {sessionQuery.isError ? (
             <p className="panel muted">Could not load the audition: {sessionQuery.error.message}</p>
-          ) : round ? (
+          ) : board ? (
             <ShortlistBoard
               characterId={character.id}
               name={character.name}
               lines={character.totalLines}
-              view={round}
+              view={board}
               playing={playing}
               toggle={toggle}
               cast={cast}
@@ -158,7 +158,7 @@ export function AuditionView({
                       {plural(result.candidates.length, 'voice')} matching the keywords, best first
                     </span>
                   )}
-                  {roundVoices.length > 0 && (
+                  {startVoices.length > 0 && (
                     <button
                       className="btn btn-primary"
                       type="button"
@@ -172,7 +172,7 @@ export function AuditionView({
                       {start.isPending ? 'Starting…' : 'Start audition'}
                     </button>
                   )}
-                  {roundVoices.length > 0 && (
+                  {startVoices.length > 0 && (
                     <button
                       className="btn section-action"
                       type="button"

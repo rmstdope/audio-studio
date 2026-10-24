@@ -59,6 +59,7 @@
   --accent-soft-line: #5a3218;
   --success-bg: #0f2219;
   --chip-hover: #262a35;
+  --shadow: 0 12px 32px rgb(0 0 0 / 45%);
   --radius: 14px;
   --font: 'Geist', system-ui, -apple-system, sans-serif;
   --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -1105,25 +1106,25 @@ a.btn {
   border-color: var(--kept-line);
 }
 
-.verdict {
+.card-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.verdict .btn {
+.card-actions .btn {
   flex: 1;
   align-self: auto;
   justify-content: center;
 }
 
-.verdict-keep {
+.btn-shortlist {
   background: var(--keep-on-bg);
   border-color: var(--keep-on-line);
   color: var(--ok-ink);
 }
 
-.verdict-drop:hover {
+.btn-drop:hover {
   background: var(--drop-on-bg);
   border-color: var(--drop-on-line);
   color: var(--danger-ink);
@@ -1142,7 +1143,7 @@ a.btn {
   border-radius: 12px;
   background: var(--raised-hover);
   border: 1px solid var(--line-strong);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+  box-shadow: var(--shadow);
   z-index: 10;
 }
 

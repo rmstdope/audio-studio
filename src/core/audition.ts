@@ -157,7 +157,7 @@ export function placeOf(session: AuditionSession, voice: string): Place | null {
   return null
 }
 
-/** Every voice the session has shown or queued, the dropped ones included. */
+/** Whether the session has shown, queued or dropped the voice, or it is the current one. */
 export function seen(session: AuditionSession, voice: string): boolean {
   return (
     placeOf(session, voice) !== null ||

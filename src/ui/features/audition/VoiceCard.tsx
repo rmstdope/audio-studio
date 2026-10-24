@@ -111,7 +111,7 @@ export function VoiceCard({
           <span className="muted">No sample from Fish</span>
         )}
       </div>
-      {actions && <div className="verdict">{actions}</div>}
+      {actions && <div className="card-actions">{actions}</div>}
       <span className="mono muted voice-id">{voice.id}</span>
     </article>
   )
