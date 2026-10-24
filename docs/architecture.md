@@ -424,15 +424,18 @@ An audition is for a character, not for a part: the result applies to every part
    3. transcribe with Whisper, align the words to the shown text, compute the heard ratio (the
       share of shown words heard). Alignment is narrate.py's, with three departures. Words are
       compared without single quotes at their ends ("'You" and "will.'" are "you" and "will";
-      apostrophes inside a word, "don't", stay). Words joined by hyphens or dashes are compared by
-      their parts, and a compound written as one word matches the same word heard as two, or the
-      other way round ("silverleaf" and "silver leaf", "resin sweet" and "resin-sweet"); a joined
-      word counts as heard when all its parts are. And a name heard in its place one letter off, as
-      Whisper spells an invented name ("Aren" as "Arn"), counts as heard and takes the heard word's
-      times. Only a capitalised shown word of four letters or more (a possessive 's not counted),
-      nothing but letters and not all capitals, qualifies; where a sentence starts (after . ! ? … or
-      a colon, or opening a quote, single or double) only a known name: a one-word character id of
-      the cast ("aren", not "ancient tree spirit") or pronunciation. Lowercase words, short ones,
+      apostrophes inside a word, "don't", stay). Words are matched whole first, as narrate.py does;
+      the shown and heard words left between two matches are then compared by their parts, split at
+      hyphens and dashes on both sides (punctuation beside a dash is no part), and a compound
+      written as one word matches the same word heard as two, or the other way round ("silverleaf"
+      and "silver leaf", "every one" and "everyone"); a joined word counts as heard when all its
+      parts are, and a word pronounced in other parts than shown is compared whole, as said. And,
+      while those words line up one to one, a name heard in its place one letter off, as Whisper
+      spells an invented name ("Aren" as "Arn"), counts as heard and takes the heard word's times.
+      Only a capitalised shown word of four letters or more (a possessive 's not counted), nothing
+      but letters and not all capitals, qualifies; where a sentence starts (after . ! ? … or a
+      colon, or opening a quote, single or double) only a known name: a one-word character id of the
+      cast ("aren", not "ancient tree spirit") or pronunciation. Lowercase words, short ones,
       numbers and other sentence-initial words must match exactly. A title-case word mid-sentence
       ("The Call") is taken for a name;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;

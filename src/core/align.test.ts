@@ -177,6 +177,36 @@ describe('alignWords, words joined by hyphens and dashes', () => {
     expect(timed[1]).toEqual({ word: 'silverleaf—Mira', start: 0.5, end: 4 })
   })
 
+  it('matches whole words first, so a part does not take a word heard on its own', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('a well-known well', 'a wellknown well')).toEqual([])
+    expect(missed('Goodbye, goodbye.', 'Good-bye, goodbye.')).toEqual([])
+    expect(missed('silverleaf leaf', 'silver-leaf leaf')).toEqual([])
+    expect(missed('wait — now', 'wait — now')).toEqual([])
+  })
+
+  it('joins words with number words in them', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('every one of them', 'everyone of them')).toEqual([])
+    expect(missed('anyone can come', 'any one can come')).toEqual([])
+  })
+
+  it('looks past a word heard that is not shown, and a word shown not heard', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    expect(missed('we saw silverleaf today', 'we saw um silver leaf today')).toEqual([])
+    expect(missed('we saw bright silverleaf today', 'we saw silver leaf today')).toEqual([2])
+  })
+
+  it('forgives a name Whisper wrote in parts, and one pronounced in other parts', () => {
+    const r = (shown: string, said: string, as?: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, as?.split(' ')).ratio
+    expect(r('so Elior waits', 'so El-eor waits', 'so El-ee-or waits')).toBe(1)
+    expect(r('so Lyria waits', 'so Leer-ee-a waits', 'so LEER-ee-a waits')).toBe(1)
+  })
+
   it('still counts a dash on its own, which nobody says, as not heard', () => {
     expect(alignWords(['wait', '—', 'now'], heardAs('wait', 'now'), 2).missed).toEqual([1])
   })
