@@ -13,7 +13,7 @@ import {
   useTakes,
   type Voiced,
 } from '../../api'
-import { stopEffectsFor } from '../../board'
+import { sampleClip, stopEffectsFor, takeClip } from '../../board'
 import { Confirm } from '../../components/Confirm'
 import { Failure } from '../../components/Failure'
 import { HeadphonesIcon, PauseIcon, PlayIcon } from '../../components/icons'
@@ -272,10 +272,10 @@ function VoicePanel({
             <button
               type="button"
               className="icon-btn take-play"
-              aria-label={playing === `take:${id}` ? 'Stop' : 'Play the take'}
-              onClick={() => toggle(`take:${id}`, takeUrl(take))}
+              aria-label={playing === takeClip(id) ? 'Stop' : 'Play the take'}
+              onClick={() => toggle(takeClip(id), takeUrl(take))}
             >
-              {playing === `take:${id}` ? <PauseIcon /> : <PlayIcon />}
+              {playing === takeClip(id) ? <PauseIcon /> : <PlayIcon />}
             </button>
           ) : (
             <button
@@ -297,10 +297,10 @@ function VoicePanel({
             <button
               type="button"
               className="icon-btn"
-              aria-label={playing === `sample:${id}` ? 'Stop' : 'Play Fish’s sample'}
-              onClick={() => toggle(`sample:${id}`, sample.audio)}
+              aria-label={playing === sampleClip(id) ? 'Stop' : 'Play Fish’s sample'}
+              onClick={() => toggle(sampleClip(id), sample.audio)}
             >
-              {playing === `sample:${id}` ? <PauseIcon /> : <PlayIcon />}
+              {playing === sampleClip(id) ? <PauseIcon /> : <PlayIcon />}
             </button>
           )}
           <span>

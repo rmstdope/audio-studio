@@ -24,7 +24,7 @@ export function AuditionView({
   const sessionQuery = useSession(characterId, Boolean(character))
   const start = useSessionAction(characterId)
   const cast = useCast(characterId)
-  const { playing, toggle } = useClipPlayer()
+  const { playing, toggle, stop } = useClipPlayer()
 
   if (!character) {
     return (
@@ -96,6 +96,7 @@ export function AuditionView({
               view={board}
               playing={playing}
               toggle={toggle}
+              stop={stop}
               cast={cast}
               titles={titles}
             />
