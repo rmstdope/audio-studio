@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { compact, longTitle, plural, shortTitle, tintFor, voiceLabel } from './format'
+import { compact, longTitle, plural, shortTitle, tintFor, voiceLabel, dollars } from './format'
 
 describe('titles', () => {
   it('splits a title at its colon', () => {
@@ -44,5 +44,15 @@ describe('compact', () => {
       '112k',
       '1.3M',
     ])
+  })
+})
+
+describe('dollars', () => {
+  it('writes an amount in US dollars, cents shown, a fraction of a cent as such', () => {
+    expect(dollars(25)).toBe('$25.00')
+    expect(dollars(12.3456)).toBe('$12.35')
+    expect(dollars(0)).toBe('$0.00')
+    expect(dollars(0.0004)).toBe('under $0.01')
+    expect(dollars(-5)).toBe('-$5.00')
   })
 })

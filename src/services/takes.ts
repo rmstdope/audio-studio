@@ -8,6 +8,7 @@ import type { FishFactory } from './auditions'
 import { writeAtomic } from './files'
 import type { Limiter } from './limit'
 import { loadWorkspace } from './workspace'
+import { NO_KEY } from './fish'
 
 /** Where audition takes are kept, in the project's tool cache (gitignored by the consumer). */
 export const TAKES_DIR = '.audio-studio/takes'
@@ -56,7 +57,7 @@ export async function recordTake(
     return {
       ok: false,
       reason: 'no-key',
-      message: 'Set FISH_AUDIO_API_KEY in the project’s env file, or in the environment.',
+      message: NO_KEY,
     }
   }
   const { tts, models, quality } = project.narration

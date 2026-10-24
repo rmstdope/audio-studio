@@ -21,6 +21,9 @@ function voice(id: string, title: string, uses = 0): Voice {
 function fakeFish(voices: Voice[], pageSize = 100) {
   const queries: VoiceQuery[] = []
   const client: FishClient = {
+    async credit() {
+      return 25
+    },
     async listVoices(query) {
       queries.push(query)
       const hits = voices.filter((v) => v.title.toLowerCase().includes(query.title ?? ''))

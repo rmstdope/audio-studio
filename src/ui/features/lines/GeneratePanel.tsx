@@ -3,7 +3,7 @@ import type { StaleReason } from '../../../core/fingerprint'
 import { displayName } from '../../../core/summary'
 import { useJob, useJobActions, usePlan } from '../../api'
 import { Problems } from '../../components/Problems'
-import { plural } from '../../format'
+import { dollars, plural } from '../../format'
 import { REASON } from '../../status'
 
 /**
@@ -219,10 +219,10 @@ export function GeneratePanel({ partId, speaker }: { partId: string; speaker: st
       )}
       <span className="muted plan-facts">
         {p.model} · {formatBytes(p.bytes)} of text ·{' '}
-        {p.cost === null ? 'price unknown' : p.cost ? `about $${p.cost.toFixed(2)}` : 'free'} ·{' '}
+        {p.cost === null ? 'price unknown' : p.cost ? `about ${dollars(p.cost)}` : 'free'} ·{' '}
         {p.checked
           ? `each take checked with Whisper, up to ${plural(p.takes, 'take')} a line${
-              p.cost ? ` (at most about $${(p.cost * p.takes).toFixed(2)})` : ''
+              p.cost ? ` (at most about ${dollars(p.cost * p.takes)})` : ''
             } · `
           : 'takes not checked · '}
         files are written in place; commit them when you are happy

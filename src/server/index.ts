@@ -1,3 +1,4 @@
+import { dirname } from 'node:path'
 import { z } from 'zod'
 import {
   findCandidates,
@@ -30,9 +31,16 @@ import {
   viewOf,
   type SessionResult,
 } from '../services/sessions'
-import { fishFromEnv, type FishClient } from '../services/fish'
+import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
-import { adoptPart, clipFile, loadPart, loadProject, readPart } from '../services/workspace'
+import {
+  adoptPart,
+  clipFile,
+  loadPart,
+  loadProject,
+  openProject,
+  readPart,
+} from '../services/workspace'
 import index from '../ui/index.html'
 
 /** How to start the studio's server. */
@@ -150,6 +158,30 @@ export function startServer({
   /** Generation jobs, one per part at a time. */
   const jobs = createJobs()
 
+  /** The account's remaining credit, or why it cannot be read. */
+  async function creditOf(): Promise<CreditResult> {
+    const opened = await openProject(projectFile)
+    if (!opened.ok)
+      return { ok: false, reason: 'project', message: 'The project file cannot be read.' }
+    const client = await fishFor(dirname(projectFile), opened.project)
+    if (!client) {
+      return {
+        ok: false,
+        reason: 'no-key',
+        message: NO_KEY,
+      }
+    }
+    try {
+      return { ok: true, credit: await client.credit() }
+    } catch (error) {
+      return {
+        ok: false,
+        reason: 'fish',
+        message: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
+
   /** The take checker: the one given (tests), else the process's one Whisper worker. */
   async function transcriberFor(): Promise<Transcriber | null> {
     return transcriber !== undefined ? transcriber : sharedWhisper()
@@ -171,6 +203,7 @@ export function startServer({
     const { narration } = read.project
     const { pronounce } = read.input.cast
     const plan = planGeneration(planPart(read.input), {
+      at: new Date(),
       model: narration.models.draft,
       speaker,
       // What is sent: each piece of a line with its cue and the cast's pronunciations.
@@ -355,6 +388,9 @@ export function startServer({
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
+      },
+      '/api/credit': {
+        GET: guard(async () => Response.json(await creditOf())),
       },
       '/api/changes': {
         GET: guard(async () => Response.json(await gitChanges(projectFile))),

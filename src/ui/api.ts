@@ -11,6 +11,7 @@ import {
 import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
+import type { CreditResult } from '../services/fish'
 import type { RefreshResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
 import type { CandidatesResult, CharacterChange } from '../services/auditions'
@@ -58,6 +59,20 @@ export function useChanges() {
     queryKey: ['changes'],
     queryFn: () => getJson<ChangesResult>('/api/changes'),
     refetchInterval: 5000,
+  })
+}
+
+/**
+ * The Fish account's remaining credit. It changes only when money is spent or added, so it is read
+ * again after recording and every five minutes, not on every return to the window.
+ */
+export function useCredit() {
+  return useQuery({
+    queryKey: ['credit'],
+    queryFn: () => getJson<CreditResult>('/api/credit'),
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -509,6 +524,7 @@ export function useRecordLines(partId: string) {
       } finally {
         // The line stays "recording" until its new status is shown, so it is never offered twice.
         void client.invalidateQueries({ queryKey: ['plan', partId] })
+        void client.invalidateQueries({ queryKey: ['credit'] })
         await client.invalidateQueries({ queryKey: ['part', partId] })
         setRecording((now) => {
           const next = new Set(now)
@@ -565,6 +581,10 @@ export function useJob(partId: string) {
       if (job && (running || before?.status !== job.status)) {
         void client.invalidateQueries({ queryKey: ['part', partId] })
         void client.invalidateQueries({ queryKey: ['plan', partId] })
+      }
+      // A finished job may have spent credit.
+      if (job && !running && before?.status !== job.status) {
+        void client.invalidateQueries({ queryKey: ['credit'] })
       }
       return job
     },

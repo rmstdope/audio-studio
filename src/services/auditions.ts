@@ -13,7 +13,7 @@ import { CastSchema, type Cast, type Character } from '../core/resources'
 import type { CharacterSummary } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
-import type { FishClient } from './fish'
+import { NO_KEY, type FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
 import { auditionFor, castProblems, phrasePath, recordedTakes } from './takes'
 import { createSerial } from './serial'
@@ -75,7 +75,7 @@ export async function findCandidates(
     return {
       ok: false,
       reason: 'no-key',
-      message: 'Set FISH_AUDIO_API_KEY in the project’s env file, or in the environment.',
+      message: NO_KEY,
     }
   }
   const { language } = project.narration.audition

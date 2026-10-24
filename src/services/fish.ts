@@ -36,7 +36,20 @@ export interface FishClient {
   getVoice(id: string): Promise<Voice>
   /** The text spoken in the voice, as MP3 (or WAV when asked). */
   tts(request: TtsRequest): Promise<Uint8Array>
+  /**
+   * The account's remaining API credit (what paid models are billed from). Fish documents it as a
+   * string without a unit; it is taken to be US dollars, as the prices are.
+   */
+  credit(): Promise<number>
 }
+
+/** What the studio says when there is no Fish Audio API key. */
+export const NO_KEY = 'Set FISH_AUDIO_API_KEY in the project’s env file, or in the environment.'
+
+/** The account's remaining API credit in dollars, or why it is not known. */
+export type CreditResult =
+  | { ok: true; credit: number }
+  | { ok: false; reason: 'no-key' | 'fish' | 'project'; message: string }
 
 /** Fish Audio answered with an error. */
 export class FishError extends Error {
@@ -138,6 +151,17 @@ export function createFishClient(
       })
       const page = ApiPageSchema.parse(body)
       return { total: page.total, items: page.items.map(toVoice) }
+    },
+    async credit() {
+      const { credit } = z
+        .looseObject({ credit: z.string() })
+        .parse(await get('/wallet/self/api-credit'))
+      // A plain decimal amount only: Number() would read "" as 0 and "0x10" as 16.
+      const dollars = /^-?\d+(\.\d+)?$/.test(credit) ? Number(credit) : NaN
+      if (!Number.isFinite(dollars)) {
+        throw new Error(`Fish gave a credit that is not an amount: "${credit}"`)
+      }
+      return dollars
     },
     async getVoice(id) {
       return toVoice(ApiVoiceSchema.parse(await get(`/model/${encodeURIComponent(id)}`)))

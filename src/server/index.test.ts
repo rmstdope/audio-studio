@@ -16,6 +16,9 @@ const root = tempRepo({
   'audio/act1/a.mp3': 'ID3-not-really-audio',
 })
 const fish: FishClient = {
+  async credit() {
+    return 25
+  },
   async listVoices() {
     return {
       total: 1,
@@ -212,6 +215,10 @@ describe('server', () => {
     expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe('{\n  "a": "[sad]"\n}\n')
     expect((await move(null)).status).toBe(404)
     writeFileSync(join(root, 'tts/act1/cues.json'), '{}\n')
+  })
+
+  it('tells the account’s credit', async () => {
+    expect(await (await fetch(url('/api/credit'))).json()).toEqual({ ok: true, credit: 25 })
   })
 
   it('says what git sees of the project, here no repository', async () => {
@@ -425,6 +432,33 @@ describe('server, without an API key', () => {
     const body = await (
       await fetch(new URL('/api/characters/narrator/candidates', other.url))
     ).json()
+    expect(body).toMatchObject({ ok: false, reason: 'no-key' })
+  })
+
+  it('says when Fish cannot tell the credit', async () => {
+    const down = startServer({
+      projectFile: join(root, 'audio-studio.json'),
+      port: 0,
+      fish: {
+        ...fish,
+        credit: () => Promise.reject(new Error('Fish Audio answered 401: invalid key')),
+      },
+      transcriber: null,
+    })
+    try {
+      const body = await (await fetch(new URL('/api/credit', down.url))).json()
+      expect(body).toEqual({
+        ok: false,
+        reason: 'fish',
+        message: 'Fish Audio answered 401: invalid key',
+      })
+    } finally {
+      down.stop(true)
+    }
+  })
+
+  it('has no credit to tell without a key', async () => {
+    const body = await (await fetch(new URL('/api/credit', other.url))).json()
     expect(body).toMatchObject({ ok: false, reason: 'no-key' })
   })
 })

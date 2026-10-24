@@ -1,13 +1,6 @@
 import type { StaleReason } from './fingerprint'
 import type { LineState, Orphan } from './planner'
-
-/** US dollars per million UTF-8 bytes of text sent, per Fish model (as RetroQuest's fish_tts.py lists). */
-export const PRICE_PER_MILLION_BYTES: Record<string, number> = {
-  's2.1-pro-free': 0,
-  's2.1-pro': 15,
-  's2-pro': 15,
-  'drama-3': 50,
-}
+import { priceOf } from './prices'
 
 /** What generating a part (or one character in it) would do. */
 export interface GenerationPlan {
@@ -55,6 +48,7 @@ export function planGeneration(
     takes = 1,
     checked = false,
     includeWeak = false,
+    at,
   }: {
     model: string
     speaker?: string
@@ -66,6 +60,8 @@ export function planGeneration(
     checked?: boolean
     /** Retake the weak lines too. */
     includeWeak?: boolean
+    /** When the plan is priced: prices change, promotions end. */
+    at: Date
   },
 ): GenerationPlan {
   const inScope = (who: string | null) => !speaker || who === speaker
@@ -80,7 +76,7 @@ export function planGeneration(
     (sum, line) => sum + sent(line).reduce((s, text) => s + encoder.encode(text).length, 0),
     0,
   )
-  const price = PRICE_PER_MILLION_BYTES[model]
+  const price = priceOf(model, at)
   return {
     keys: toRecord.map((line) => line.key),
     weak: lines.filter((line) => line.status === 'weak').map((line) => line.key),
