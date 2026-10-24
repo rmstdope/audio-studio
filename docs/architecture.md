@@ -45,7 +45,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 retroquest/                      ← user runs `audio-studio` here
 ├── audio-studio.json            ← project file (committed)
 ├── .env                         ← FISH_AUDIO_API_KEY (gitignored, already exists)
-├── .audio-studio/               ← tool state: takes, auditions, ruled-out voices (gitignored)
+├── .audio-studio/               ← tool state: takes, auditions, ruled-out voices, what was heard
 ├── tts/cast.json                ← character resource, shared by all parts (read + written)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
@@ -115,6 +115,7 @@ audio-studio/
 │   │   ├── align.ts             Whisper words → word timings, heard ratio (narrate.py's, + names)
 │   │   ├── audition.ts          the audition board: to hear, shortlist, drop and undo
 │   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
+│   │   ├── heard.ts             what Whisper heard of a part's lines below full, as saved
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
@@ -123,6 +124,7 @@ audio-studio/
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
+│   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
 │   │   ├── takes.ts             audition takes: recorded once, cached by what they are made of
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
 │   │   ├── audio.ts             encode MP3 with ffmpeg, level its loudness (as level.py)
@@ -280,8 +282,10 @@ one changed. `heard` and `takes` are absent, and `adopted` is true, for clips ma
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
 **Cache** (`.audio-studio/`, gitignored): the tool's own state, none of it the game's: audition
-takes, audition sessions in progress and the voices ruled out per character. Deleting it loses
-nothing the game needs; it forgets paused auditions and ruled-out voices.
+takes, audition sessions in progress, the voices ruled out per character, and what Whisper heard
+of each kept take heard below full (`.audio-studio/heard/<part>-<hash>.json`: per line, the lock
+entry's time, the text it was checked against, Whisper's words and the shown words it missed). Deleting it loses nothing the game
+needs; it forgets paused auditions, ruled-out voices and what was heard.
 
 All JSON is written with stable key order and the same layout the file already has, through a
 temporary file and a rename, so diffs stay small and a crash never leaves a half-written file.
@@ -427,7 +431,11 @@ An audition is for a character, not for a part: the result applies to every part
       Lowercase words, short ones, numbers and other sentence-initial words must match exactly. A
       title-case word mid-sentence ("The Call") is taken for a name;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
-   5. encode MP3 into the clips folder, update the manifest and lock entries, write both.
+   5. encode MP3 into the clips folder, update the manifest and lock entries, write both; then
+      keep what Whisper heard of the take in the cache if it was heard below full (forgotten
+      when heard in full). Measuring a clip keeps it the same way. On the lines page, a score
+      below 100% opens the line's text with the missed words marked beside what Whisper heard.
+      A take checked before this was kept says so, and a retake keeps it.
 4. Fish requests run `parallel` at a time; Whisper runs one at a time (one GPU). The page polls the
    job's progress every second while it runs. A job can be cancelled: no new line starts, lines
    under way finish, and finished clips are kept, because each is written as it completes.
@@ -500,6 +508,7 @@ GET    /api/project                              project, parts
 GET    /api/credit                               the Fish account's API credit (dollars)
 GET    /api/parts/:part                          the part, every line with its status and reason
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
+GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
@@ -671,6 +680,11 @@ Small, independently useful increments:
       audition page shows only the board; the list of matching voices before an audition is gone.
    4. **Hear it in the game** (built): the character's recorded lines on its page, part by part
       in dialog order, with cue and status, played one by one or all in turn.
+10. **What was heard**, in two pull requests:
+    1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
+       when it is checked; the lines page shows it beside the text, missed words marked.
+    2. **Listen again**: a line checked before that has Whisper hear its clip again, from the
+       comparison, keeping what it heard.
 
 ---
 

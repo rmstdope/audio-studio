@@ -19,6 +19,7 @@ import type { CharacterChange, CharacterVoiceResult } from '../services/audition
 import type { GenerationPlan } from '../core/generation'
 import type { Problem } from '../core/project'
 import type { JobState } from '../services/jobs'
+import type { HeardResult } from '../services/heard'
 import type { RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { CastResult, SessionView } from '../services/sessions'
@@ -82,6 +83,20 @@ export function useCredit() {
 /** A part with the state of every line's clip. */
 export function usePart(partId: string, enabled = true) {
   return useQuery({ ...partQuery(partId), enabled })
+}
+
+/**
+ * What Whisper heard of a line's kept take, for comparing with its text. Asked again whenever it is
+ * shown, and after the part's lines are recorded, since a retake replaces it.
+ */
+export function useHeard(partId: string, key: string) {
+  return useQuery({
+    queryKey: ['heard', partId, key],
+    queryFn: () =>
+      getJson<NonNullable<HeardResult>>(
+        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/heard`,
+      ),
+  })
 }
 
 /** How a part is asked for and cached, the same for one part as for several. */
@@ -622,6 +637,7 @@ export function useRecordLines(partId: string) {
         // The line stays "recording" until its new status is shown, so it is never offered twice.
         void client.invalidateQueries({ queryKey: ['plan', partId] })
         void client.invalidateQueries({ queryKey: ['credit'] })
+        void client.invalidateQueries({ queryKey: ['heard', partId] })
         await client.invalidateQueries({ queryKey: ['part', partId] })
         setRecording((now) => {
           const next = new Set(now)
@@ -694,6 +710,7 @@ export function useJob(partId: string) {
       if (job && (running || before?.status !== job.status)) {
         void client.invalidateQueries({ queryKey: ['part', partId] })
         void client.invalidateQueries({ queryKey: ['plan', partId] })
+        void client.invalidateQueries({ queryKey: ['heard', partId] })
       }
       // A finished job may have spent credit.
       if (job && !running && before?.status !== job.status) {
