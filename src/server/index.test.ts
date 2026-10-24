@@ -882,11 +882,13 @@ describe('server, paid recording and what changes meanwhile', () => {
   const projectFile = join(root, 'audio-studio.json')
   let credit = 10
   let creditGate: Promise<void> | null = null
+  let creditCalls = 0
   /** Each request to Fish waits at its own gate, opened by the test. */
   const requests: { model: string; gate: ReturnType<typeof gate> }[] = []
   const held: FishClient = {
     ...fish,
     async credit() {
+      creditCalls++
       if (creditGate) await creditGate
       return credit
     },
@@ -975,11 +977,13 @@ describe('server, paid recording and what changes meanwhile', () => {
     credit = Math.max(cb, cc) * 1.5
     const slowCredit = gate()
     creditGate = slowCredit.opened
+    const calls = creditCalls
     const both = [
       post('/api/parts/act1/lines/b/record', { confirmedCost: cb }),
       post('/api/parts/act1/lines/c/record', { confirmedCost: cc }),
     ]
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    // Both are waiting for the credit before it comes: they are truly asked for at once.
+    await until(() => creditCalls === calls + 2)
     slowCredit.open()
     creditGate = null
     // Let every request through as it comes, until both have answered.
@@ -1029,5 +1033,104 @@ describe('server, paid recording and what changes meanwhile', () => {
     expect(await (await recorded).json()).toMatchObject({ ok: true })
     requests.length = 0
     credit = 10
+  })
+
+  it('holds back all a running recording was given, not only what it has not spent yet', async () => {
+    const [ca, cb] = [await ceilingOf('a'), await ceilingOf('b')]
+    const first = post('/api/parts/act1/lines/a/record', { confirmedCost: ca })
+    // Charged and sent, but not yet answered: its budget has less left than it was given.
+    await until(() => requests.length === 1)
+    credit = ca + cb - ca / 4
+    const second = await (
+      await post('/api/parts/act1/lines/b/record', { confirmedCost: cb })
+    ).json()
+    expect(second).toMatchObject({ ok: false, reason: 'credit' })
+    requests[0]!.gate.open()
+    await first
+    requests.length = 0
+    credit = 10
+  })
+
+  it('counts a recording that ended while the credit was being read', async () => {
+    const [ca, cb] = [await ceilingOf('a'), await ceilingOf('b')]
+    // A runs; B asks for the credit, which comes only after A has ended and given its budget
+    // back: the credit read may still count A's money as there.
+    credit = ca + cb / 2
+    const first = post('/api/parts/act1/lines/a/record', { confirmedCost: ca })
+    await until(() => requests.length === 1)
+    const slowCredit = gate()
+    creditGate = slowCredit.opened
+    const calls = creditCalls
+    const second = post('/api/parts/act1/lines/b/record', { confirmedCost: cb })
+    await until(() => creditCalls === calls + 1)
+    requests[0]!.gate.open()
+    await first
+    slowCredit.open()
+    creditGate = null
+    // Let any request through, so a wrong admission shows as a failure rather than a wait.
+    let settled = false
+    const answer = second.then((response) => response.json()).finally(() => (settled = true))
+    while (!settled) {
+      for (const request of requests) request.gate.open()
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(await answer).toMatchObject({ ok: false, reason: 'credit' })
+    requests.length = 0
+    credit = 10
+  })
+})
+
+describe('server, a paid job refused for a refresh', () => {
+  const json = projectJson({
+    narration: { ...(projectJson().narration as object), models: { draft: 's2-pro' } },
+  })
+  ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
+  const root = tempRepo({
+    'audio-studio.json': json,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
+  })
+  let credit = 10
+  const account: FishClient = {
+    ...fish,
+    async credit() {
+      return credit
+    },
+  }
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+
+  it('holds nothing back for it afterwards', async () => {
+    const { plan } = await (await fetch(at('/api/parts/act1/plan'))).json()
+    credit = plan.ceiling
+    const refreshing = fetch(at('/api/parts/act1/refresh'), { method: 'POST', headers: own })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    const refused = await fetch(at('/api/parts/act1/jobs'), {
+      method: 'POST',
+      headers: own,
+      body: JSON.stringify({
+        speaker: null,
+        keys: ['a'],
+        orphans: [],
+        confirmedCost: plan.ceiling,
+      }),
+    })
+    expect(refused.status).toBe(409)
+    expect((await refused.json()).error).toContain('refresh')
+    await refreshing
+    const line = await fetch(at('/api/parts/act1/lines/a/record'), {
+      method: 'POST',
+      headers: own,
+      body: JSON.stringify({ confirmedCost: plan.ceiling }),
+    })
+    expect(await line.json()).toMatchObject({ ok: true, key: 'a' })
   })
 })

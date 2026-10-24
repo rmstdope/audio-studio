@@ -216,10 +216,13 @@ export function startServer({
     // credit is checked against that whole budget.
     const dollars = Math.min(confirmed ?? ceiling, ceiling + 0.01)
     return (async () => {
+      // A recording that ends while the credit is read may not be billed in that reading yet:
+      // what was held back when it was asked for is still counted.
+      const heldWhenAsked = new Set(budgets)
       const credit = await creditOf()
       // From here to adding the budget nothing awaits, so two recordings asked for at once cannot
       // both count on the same credit: the second sees the first's budget held back.
-      const free = credit.ok ? credit.credit - reserved() : null
+      const free = credit.ok ? credit.credit - reserved(heldWhenAsked) : null
       const problem = spendProblem({ ceiling: dollars, confirmed: dollars, credit: free })
       if (problem) return { problem }
       const budget = createBudget({ model, dollars })
@@ -233,7 +236,8 @@ export function startServer({
    * until they end: Fish may bill a request some time after it was charged to its budget.
    */
   const budgets = new Set<Budget>()
-  const reserved = () => [...budgets].reduce((sum, budget) => sum + budget.dollars, 0)
+  const reserved = (also: Set<Budget> = new Set()) =>
+    [...new Set([...budgets, ...also])].reduce((sum, budget) => sum + budget.dollars, 0)
 
   /** The take checker: the one given (tests), else the process's one Whisper worker. */
   async function transcriberFor(): Promise<Transcriber | null> {
