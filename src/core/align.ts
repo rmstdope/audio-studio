@@ -118,25 +118,113 @@ export function matchingBlocks(a: string[], b: string[]): Block[] {
 }
 
 /**
+ * The known names, plain: the cast's one-word character ids and pronunciations ("aren", "Lyria").
+ * Ids of several words describe a character ("ancient tree spirit") and are left out, so their
+ * words are not taken for names. A known name counts as one even where a sentence starts (see
+ * `alignWords`).
+ */
+export function knownNames(cast: {
+  speakers: Record<string, unknown>
+  pronounce: Record<string, string>
+}): Set<string> {
+  const names = [...Object.keys(cast.speakers), ...Object.keys(cast.pronounce)]
+  return new Set(
+    names
+      .filter((name) => !/\s/.test(name))
+      .map(bare)
+      .filter(Boolean),
+  )
+}
+
+/** A word plain, without a possessive 's: what a name is looked up by ("Aren's" is "aren"). */
+function bare(word: string): string {
+  return norm(word).replace(/'s$/, '')
+}
+
+/** Whether a plain word is letters and apostrophes only, `min` letters or more in its stem. */
+function isWord(word: string, min = 0): boolean {
+  return /^[a-z']+$/.test(word) && word.replace(/'s$/, '').replace(/'/g, '').length >= min
+}
+
+/** Whether two words are one letter apart: one added, removed or changed. */
+function oneLetterApart(x: string, y: string): boolean {
+  if (x === y || Math.abs(x.length - y.length) > 1) return false
+  let i = 0
+  while (x[i] === y[i]) i++
+  const [longer, shorter] = x.length >= y.length ? [x, y] : [y, x]
+  return longer.slice(i + 1) === shorter.slice(x.length === y.length ? i + 1 : i)
+}
+
+/**
+ * Whether a shown word starts a sentence: the line's first, one after a word ending in . ! ? … or
+ * a colon (a title's "Act I: The Call"), or one opening a quote.
+ */
+function startsSentence(tokens: string[], i: number): boolean {
+  return i === 0 || /^["“‘(]/.test(tokens[i]!) || /[.!?…:]["'”’)\]]*$/.test(tokens[i - 1]!)
+}
+
+/**
+ * Whether a heard word is a name as Whisper spells it ("Aren" as "Arn"): the shown word is
+ * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
+ * is) unless it is a known name, of at least four letters (apostrophes and a possessive 's not
+ * counted) and nothing else, and the heard one is one letter apart. Lowercase words, short ones
+ * and numbers are left out, where one letter makes another word ("never" and "ever", "was" and
+ * "has", 1984 and 1985).
+ */
+function spelledAlike(
+  tokens: string[],
+  i: number,
+  want: string,
+  got: string,
+  names: ReadonlySet<string>,
+): boolean {
+  const shown = tokens[i]!
+  if (!/^[^A-Za-z0-9]*[A-Z]/.test(shown) || !/[a-z]/.test(shown)) return false
+  if (startsSentence(tokens, i) && !names.has(bare(shown))) return false
+  return isWord(want, 4) && isWord(got) && oneLetterApart(want, got)
+}
+
+/**
  * Every shown word with a start and end from Whisper's words (narrate.py `align`): words matched
  * to a heard word take its times; unmatched words share the gap between their matched neighbours
- * evenly. `said` is the same words as actually said (see `saidWords`), compared in place of the
- * shown ones. Returns the timed words and the share of words that were heard.
+ * evenly. Between two matches with as many words heard as shown (not counting punctuation, like a
+ * dash, that nobody says), a name heard in its place one letter off (`spelledAlike`; `names` are
+ * the known ones, see `knownNames`) counts as matched too, unlike narrate.py, so a name Whisper
+ * spells its own way is not taken for a word missed. `said` is the same words as actually said
+ * (see `saidWords`), compared in place of the shown ones. Returns the timed words and the share of
+ * words that were heard.
  */
 export function alignWords(
   tokens: string[],
   heard: HeardWord[],
   duration: number,
   said?: string[],
+  names: ReadonlySet<string> = new Set(),
 ): { timed: TimedWord[]; ratio: number } {
   const want = (said && said.length === tokens.length ? said : tokens).map(norm)
   const got = heard.map((w) => norm(w.word))
   const times: ([number, number] | null)[] = tokens.map(() => null)
+  let wantFrom = 0
+  let gotFrom = 0
   for (const [a, b, size] of matchingBlocks(want, got)) {
+    // The words of the gap before this match, punctuation left out, paired in order.
+    const shownAt: number[] = []
+    for (let i = wantFrom; i < a; i++) if (want[i]) shownAt.push(i)
+    const heardAt: number[] = []
+    for (let j = gotFrom; j < b; j++) if (got[j]) heardAt.push(j)
+    if (shownAt.length === heardAt.length) {
+      shownAt.forEach((i, k) => {
+        const j = heardAt[k]!
+        if (spelledAlike(tokens, i, want[i]!, got[j]!, names))
+          times[i] = [heard[j]!.start, heard[j]!.end]
+      })
+    }
     for (let k = 0; k < size; k++) {
       const w = heard[b + k]!
       times[a + k] = [w.start, w.end]
     }
+    wantFrom = a + size
+    gotFrom = b + size
   }
   const matched = times.filter((t) => t !== null).length
 

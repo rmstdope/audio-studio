@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   alignWords,
   heardWords,
+  knownNames,
   matchingBlocks,
   pyRound,
   saidWords,
@@ -52,7 +53,7 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
     const heard = words(
       ['I', 0.0, 0.2],
       ['am', 0.2, 0.4],
-      ['Boring', 0.5, 0.9],
+      ['Bowling', 0.5, 0.9],
       ['the', 1.0, 1.1],
       ['smith', 1.1, 1.6],
     )
@@ -108,6 +109,95 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
     expect(
       alignWords(['three', 'words'], words(['3', 0.0, 0.3], ['words', 0.3, 0.9]), 1.0).ratio,
     ).toBe(1)
+  })
+})
+
+describe('alignWords, names Whisper spells its own way', () => {
+  const text = "This was theirs, you know. Aren and Lysa's."
+  const heardAs = (...said: string[]) =>
+    words(...said.map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const cast = new Set(['aren'])
+
+  it('counts a known name heard one letter off, taking its times and no other', () => {
+    const heard = heardAs('This', 'was', 'theirs,', 'you', 'know,', 'Arn', 'and', "Lysa's.")
+    // "Aren" starts a sentence here, so it counts as a known name only.
+    expect(alignWords(text.split(' '), heard, 9).ratio).toBe(7 / 8)
+    const { timed, ratio } = alignWords(text.split(' '), heard, 9, undefined, cast)
+    expect(ratio).toBe(1)
+    expect(timed.slice(4, 7)).toEqual([
+      { word: 'know.', start: 4, end: 4.5 },
+      { word: 'Aren', start: 5, end: 5.5 },
+      { word: 'and', start: 6, end: 6.5 },
+    ])
+  })
+
+  it('counts a known name at the start of a sentence, but no other word there', () => {
+    const start = (shown: string[], heard: string[], names?: ReadonlySet<string>) =>
+      alignWords(shown, heardAs(...heard), 9, undefined, names).ratio
+    expect(start(['Aren', 'went', 'home'], ['Arn', 'went', 'home'], cast)).toBe(1)
+    expect(start(['Aren', 'went', 'home'], ['Arn', 'went', 'home'])).toBe(2 / 3)
+    expect(start(['Where', 'is', 'he?'], ['There', 'is', 'he?'], cast)).toBe(2 / 3)
+    expect(
+      start(['We', 'ran.', 'Here', 'they', 'come.'], ['We', 'ran.', 'Her', 'they', 'come.']),
+    ).toBe(4 / 5)
+    expect(start(['"Never', 'again,"', 'she', 'said.'], ['Ever', 'again,', 'she', 'said.'])).toBe(
+      3 / 4,
+    )
+    expect(start(['"Aren', 'went'], ['Arn', 'went'], cast)).toBe(1)
+    expect(start(["Aren's", 'sword', 'shines.'], ["Arn's", 'sword', 'shines.'], cast)).toBe(1)
+    expect(
+      start(['Act', 'I:', 'There', 'and', 'back'], ['Act', 'I:', 'Where', 'and', 'back']),
+    ).toBe(4 / 5)
+  })
+
+  it('counts one mid-sentence, unknown, compared as said', () => {
+    expect(
+      alignWords(['know,', 'Aren', 'waits'], heardAs('know,', 'Ahrn', 'waits'), 3, [
+        'know,',
+        'Ahren',
+        'waits',
+      ]).ratio,
+    ).toBe(1)
+  })
+
+  it('counts it past a dash or an ellipsis, shown or heard, which nobody says', () => {
+    expect(alignWords(['wait', '—', 'Aren'], heardAs('wait', 'Arn'), 2).ratio).toBe(2 / 3)
+    expect(alignWords(['wait', 'Aren'], heardAs('wait', '...', 'Arn'), 3).ratio).toBe(1)
+  })
+
+  it('does not count a lowercase or all-caps word, a name under four letters, or two letters off', () => {
+    expect(
+      alignWords(['I', 'will', 'never', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
+    ).toBe(3 / 4)
+    expect(alignWords(['see', 'Kai', 'came'], heardAs('see', 'Kaid', 'came'), 3).ratio).toBe(2 / 3)
+    expect(alignWords(['see', "Kai's", 'cat'], heardAs('see', 'Kais', 'cat'), 3).ratio).toBe(2 / 3)
+    expect(alignWords(['the', 'Malakar'], heardAs('the', 'Malacore'), 2).ratio).toBe(1 / 2)
+    expect(
+      alignWords(['I', 'will', 'NEVER', 'go'], heardAs('I', 'will', 'ever', 'go'), 4).ratio,
+    ).toBe(3 / 4)
+  })
+
+  it('does not count a number one digit off', () => {
+    expect(
+      alignWords(['In', '1984', 'it', 'fell'], heardAs('In', '1985', 'it', 'fell'), 4).ratio,
+    ).toBe(3 / 4)
+  })
+
+  it('pairs words only where as many were heard as shown between matches', () => {
+    expect(
+      alignWords(['and', 'Aren', 'and', 'Lysa'], heardAs('and', 'Arn', 'Ren', 'and', 'Lysa'), 5)
+        .ratio,
+    ).toBe(3 / 4)
+  })
+})
+
+describe('knownNames', () => {
+  it('gives the one-word names of the cast and of its pronunciations, plain', () => {
+    const names = knownNames({
+      speakers: { aren: {}, 'unmasked sorceress': {}, 'ancient tree spirit': {} },
+      pronounce: { Lyria: 'LEER-ee-a', 'Act I:': 'Act One:' },
+    })
+    expect([...names].sort()).toEqual(['aren', 'lyria'])
   })
 })
 
