@@ -84,8 +84,10 @@ export function startAudition(
 
 /**
  * Applies `change` to the character's saved session and saves the result; a change may instead
- * say why it did nothing, and then nothing is saved. `afterSave` runs before the next change to
- * the session may start, so what it writes follows the session's changes in their order.
+ * say why it did nothing, and then nothing is saved; a change that changes nothing saves nothing
+ * either. `alongside` writes what goes with the change (the ruled-out voices), before the session
+ * and before the next change may start: what it writes follows the session's changes in their
+ * order, and if it fails, the session is left as it was.
  */
 export function changeSession(
   projectFile: string,
@@ -93,7 +95,7 @@ export function changeSession(
   change: (
     session: AuditionSession,
   ) => AuditionSession | SessionFailure | Promise<AuditionSession | SessionFailure>,
-  afterSave?: (session: AuditionSession) => Promise<void>,
+  alongside?: (session: AuditionSession) => Promise<unknown>,
 ): Promise<SessionResult> {
   return sessionWrites.run(key(projectFile, characterId), async () => {
     const known = await knownCharacter(projectFile, characterId)
@@ -108,8 +110,9 @@ export function changeSession(
     }
     const changed = await change(session)
     if ('ok' in changed) return changed
+    if (changed === session) return { ok: true, session }
+    await alongside?.(changed)
     await writeSession(projectFile, characterId, changed)
-    await afterSave?.(changed)
     return { ok: true, session: changed }
   })
 }

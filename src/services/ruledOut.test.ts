@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { allowVoices, RULED_OUT_DIR, ruledOutIds, ruledOutVoices, ruleOutVoices } from './ruledOut'
+import { allowVoices, RULED_OUT_DIR, ruledOutIds, ruledOutVoices, updateRuledOut } from './ruledOut'
+
+/** Rules voices out, as a drop does. */
+const ruleOutVoices = (
+  projectFile: string,
+  characterId: string,
+  voices: { id: string; title: string }[],
+  at?: Date,
+) => updateRuledOut(projectFile, characterId, { out: voices }, at)
 
 const files = {
   'audio-studio.json': projectJson(),
@@ -66,6 +74,31 @@ describe('ruled-out voices, saved', () => {
     expect(await allowVoices(projectFile, 'mira', 'all')).toEqual({ ok: true, voices: [] })
     expect(existsSync(join(projectFile, '..', RULED_OUT_DIR))).toBe(true)
     expect(readdirSync(join(projectFile, '..', RULED_OUT_DIR))).toEqual([])
+  })
+
+  it('writes nothing when nothing changes', async () => {
+    const projectFile = project()
+    const dir = join(projectFile, '..', RULED_OUT_DIR)
+    await allowVoices(projectFile, 'mira', 'all')
+    expect(existsSync(dir)).toBe(false)
+    await ruleOutVoices(
+      projectFile,
+      'mira',
+      [{ id: 'a', title: 'A' }],
+      new Date('2026-10-24T10:00:00Z'),
+    )
+    const file = join(dir, readdirSync(dir)[0]!)
+    writeFileSync(file, readFileSync(file, 'utf8') + ' ')
+    const before = statSync(file).mtimeMs
+    await ruleOutVoices(
+      projectFile,
+      'mira',
+      [{ id: 'a', title: 'A' }],
+      new Date('2026-10-24T11:00:00Z'),
+    )
+    await updateRuledOut(projectFile, 'mira', { allowed: ['b'] })
+    expect(readFileSync(file, 'utf8')).toEndWith('\n ')
+    expect(statSync(file).mtimeMs).toBe(before)
   })
 
   it('names what is wrong with a broken project file', async () => {

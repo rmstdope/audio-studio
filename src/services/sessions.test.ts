@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
@@ -15,8 +15,16 @@ import {
   sessionFor,
   startAudition,
 } from './sessions'
-import { ruledOutIds, ruleOutVoices } from './ruledOut'
+import { allowVoices, ruledOutIds, updateRuledOut } from './ruledOut'
 import { setKeywords } from './auditions'
+
+/** Rules voices out, as a drop does. */
+const ruleOutVoices = (
+  projectFile: string,
+  characterId: string,
+  voices: { id: string; title: string }[],
+  at?: Date,
+) => updateRuledOut(projectFile, characterId, { out: voices }, at)
 
 function voice(id: string, title = `Warm ${id}`, uses = 10): Voice {
   return {
@@ -349,6 +357,24 @@ describe('ruled-out voices in an audition', () => {
       const dropped = saved?.ok && saved.session?.verdicts.a === 'drop'
       expect(await ruledOutIds(projectFile, 'mira')).toEqual(dropped ? ['a'] : [])
     }
+  })
+
+  it('changes nothing when the ruled-out voices cannot be saved', async () => {
+    const { root, projectFile } = await started()
+    writeFileSync(join(root, '.audio-studio/ruled-out'), 'in the way')
+    await expect(judge(projectFile, 'mira', 'a', 'drop')).rejects.toThrow()
+    const saved = await sessionFor(projectFile, 'mira')
+    expect(saved?.ok && saved.session?.verdicts).toEqual({})
+  })
+
+  it('keeps a voice dropped in the round dropped when it is allowed again from the list', async () => {
+    const { projectFile } = await started()
+    await judge(projectFile, 'mira', 'a', 'drop')
+    await allowVoices(projectFile, 'mira', ['a'])
+    await judge(projectFile, 'mira', 'b', 'keep')
+    const saved = await sessionFor(projectFile, 'mira')
+    expect(saved?.ok && saved.session?.verdicts.a).toBe('drop')
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
   })
 
   it('never rules out the current voice', async () => {

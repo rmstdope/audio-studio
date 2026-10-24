@@ -499,11 +499,20 @@ export function useCast(characterId: string) {
 export function useRuledOut(characterId: string) {
   return useQuery({
     queryKey: ['ruled-out', characterId],
-    queryFn: () =>
-      getJson<NonNullable<RuledOutResult>>(
-        `/api/characters/${encodeURIComponent(characterId)}/ruled-out`,
-      ),
+    queryFn: async () => {
+      const path = `/api/characters/${encodeURIComponent(characterId)}/ruled-out`
+      const response = await fetch(path)
+      if (!response.ok && response.status !== 409)
+        throw new Error(`${path} answered ${response.status}`)
+      return okRuledOut((await response.json()) as NonNullable<RuledOutResult>)
+    },
   })
+}
+
+/** Ruled-out voices, or an error naming what is wrong with the project. */
+function okRuledOut(result: NonNullable<RuledOutResult>) {
+  if (!result.ok) throw new Error(result.problems.map((p) => `${p.file}: ${p.message}`).join('; '))
+  return result
 }
 
 /**
@@ -521,11 +530,7 @@ export function useAllowVoices(characterId: string) {
       if (!response.ok && response.status !== 409) {
         throw new Error(`allowing voices again answered ${response.status}`)
       }
-      const result = (await response.json()) as NonNullable<RuledOutResult>
-      if (!result.ok) {
-        throw new Error(result.problems.map((p) => `${p.file}: ${p.message}`).join('; '))
-      }
-      return result
+      return okRuledOut((await response.json()) as NonNullable<RuledOutResult>)
     },
     onSuccess: (result) => {
       client.setQueryData(['ruled-out', characterId], result)

@@ -38,28 +38,17 @@ export async function ruledOutIds(projectFile: string, characterId: string): Pro
   return Object.keys((await read(projectFile, characterId)).voices)
 }
 
-/** Rules voices out for a character (it is known to be in the project). */
-export async function ruleOutVoices(
-  projectFile: string,
-  characterId: string,
-  voices: { id: string; title: string }[],
-  at = new Date(),
-): Promise<void> {
-  await updateRuledOut(projectFile, characterId, { out: voices }, at)
-}
-
 /**
  * Rules `out` out and allows `allowed` again, for a character known to be in the project. Writes
- * only when that changes something.
+ * only when that changes something. Gives the voices ruled out now.
  */
 export async function updateRuledOut(
   projectFile: string,
   characterId: string,
   { out = [], allowed = [] }: { out?: { id: string; title: string }[]; allowed?: string[] },
   at = new Date(),
-): Promise<void> {
-  if (!out.length && !allowed.length) return
-  await change(projectFile, characterId, (ruled) =>
+): Promise<RuledOut> {
+  return change(projectFile, characterId, (ruled) =>
     allowAgain(ruleOut(ruled, out, at.toISOString()), allowed),
   )
 }
@@ -75,9 +64,10 @@ export async function allowVoices(
 ): Promise<RuledOutResult> {
   const known = await knownCharacter(projectFile, characterId)
   if (known !== true) return known
-  const left = await change(projectFile, characterId, (ruled) =>
-    ids === 'all' ? emptyRuledOut(characterId) : allowAgain(ruled, ids),
-  )
+  const left =
+    ids === 'all'
+      ? await change(projectFile, characterId, () => emptyRuledOut(characterId))
+      : await updateRuledOut(projectFile, characterId, { allowed: ids })
   return { ok: true, voices: listRuledOut(left) }
 }
 

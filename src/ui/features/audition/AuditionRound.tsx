@@ -40,6 +40,8 @@ export function AuditionRound({
   const dropped = session.pool.length - remaining(session).length
   const undecided = session.pool.length - kept - dropped
   const winner = finalist(session)
+  // Dropped in earlier rounds; the cast voice is never ruled out.
+  const ruledOut = session.dropped.filter((v) => v !== session.current).length
   const toRecord = remaining(session).filter((v) => !takes[v] && !recorder.recording.has(v))
   const failed = act.data && !act.data.ok ? act.data : null
   // Once a search finds nothing new, no later one will (it leaves out everything seen so far).
@@ -118,8 +120,8 @@ export function AuditionRound({
           <strong>{hint}</strong>
           {castNote && <span className="cast-note">{castNote}</span>}
           <span className="muted">
-            Dropped voices are ruled out: no later audition for this character shows them again
-            {session.dropped.length ? ` (${session.dropped.length} so far)` : ''}.
+            Dropped voices, other than the cast one, are ruled out: no later audition for this
+            character shows them again{ruledOut ? ` (${ruledOut} so far)` : ''}.
           </span>
         </div>
         <div className="round-actions">

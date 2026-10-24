@@ -339,10 +339,11 @@ the audition page for now. Until the shortlist board (9.2) lands, an audition st
 of Keep and Drop, a round going on with the voices not dropped until one is left to cast; a
 dropped voice is ruled out as below.
 
-Every character has a **character page** (`#/characters/<id>`, from 9.3), the one place about it: its cast
-voice (Fish's details, its take and Fish's sample, its id and a link to Fish), its lines per part,
-its delivery (the style cue) and casting brief (search keywords and audition phrase), the voices
-ruled out for it, and the audition in progress, if there is one. An audition is started, resumed
+Every character has a **character page** (`#/characters/<id>`, from 9.3), the one place about
+it: its cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish), its
+lines per part, its delivery (the style cue) and casting brief (search keywords and audition
+phrase), the voices ruled out for it, and the audition in progress, if there is one. An audition
+is started, resumed
 and discarded from there; the page itself shows no candidates.
 
 ```
