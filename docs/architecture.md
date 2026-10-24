@@ -344,9 +344,10 @@ brief (search keywords and audition phrase), the voices ruled out for it, the au
 progress, if there is one, and **Hear it in the game**: its recorded lines with their part, cue
 and status, as the game plays them, one by one or all in turn (the first five shown until asked
 for all; any other play stops the list; a clip that fails is skipped). An audition is started,
-resumed and stopped from there; the page shows no candidates. The **audition page** (`#/characters/<id>/audition`) shows the board, with
-the phrase and style the takes are recorded with beside it and the keywords the audition started
-with; with no audition in progress, it offers to start one.
+resumed and stopped from there; the page shows no candidates. The **audition page**
+(`#/characters/<id>/audition`) shows the board, with the phrase and style the takes are recorded
+with beside it and the keywords the audition started with; with no audition in progress, it
+offers to start one.
 
 ```
  keywords ──► search Fish's library, leaving out ruled-out voices ──► ranked candidates
