@@ -453,7 +453,8 @@ function alignGap(
  * shown though said otherwise forgiven (`alignGap`); such a word is heard when all its parts are.
  * `said` is the same words as actually said (see `saidWords`), compared in place of the shown
  * ones; `names` are the known names (see `knownNames`). Returns the timed words, the share of
- * words that were heard, and the indices of the shown words that were not (`missed`).
+ * words that were heard (punctuation on its own, "—" or "…", is no word: it is only timed), and
+ * the indices of the shown words that were not (`missed`).
  */
 export function alignWords(
   tokens: string[],
@@ -477,8 +478,11 @@ export function alignWords(
     wantFrom = a + size
     gotFrom = b + size
   }
-  const missed = tokens.flatMap((_, k) => (times[k] ? [] : [k]))
-  const matched = tokens.length - missed.length
+  // Only words count: punctuation on its own ("—", "…") has nothing to hear. Letters outside a
+  // to z, which compare as nothing, still make a word.
+  const words = want.flatMap((w, k) => (w || /[\p{L}\p{N}]/u.test(spoken[k]!) ? [k] : []))
+  const missed = words.filter((k) => !times[k])
+  const matched = words.length - missed.length
 
   let i = 0
   while (i < tokens.length) {
@@ -504,7 +508,7 @@ export function alignWords(
     timed.push({ word, start: pyRound(start), end: pyRound(end) })
     last = start
   })
-  return { timed, ratio: tokens.length ? matched / tokens.length : 1, missed }
+  return { timed, ratio: words.length ? matched / words.length : 1, missed }
 }
 
 /**
