@@ -45,6 +45,7 @@ describe('statusDetail', () => {
       'heard 80%, accepted',
     )
     expect(statusDetail(line({ status: 'ok', heard: 0.8 }), 0.9)).toBe('')
+    expect(statusDetail(line({ status: 'ok', heard: 0.8, accepted: true }), 0.75)).toBe('')
   })
 
   it('gives the heard share of a weak line against the project’s bar', () => {

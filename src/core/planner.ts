@@ -113,7 +113,7 @@ export function planPart(input: PlanInput): PartState {
       status,
       reasons,
       heard: file ? (entry?.heard ?? null) : null,
-      accepted: Boolean(file && entry?.accepted),
+      accepted: status === 'ok' && Boolean(entry?.accepted),
       duration: file ? (clip?.duration ?? null) : null,
       file,
     }

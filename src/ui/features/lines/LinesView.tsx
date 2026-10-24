@@ -31,6 +31,13 @@ export function LinesView({ part }: { part: PartSummary }) {
   const { playing, toggle } = useClipPlayer()
   const recorder = useRecordLines(part.id)
   const accept = useAccept(part.id)
+  // Why the last line accepted was not, shown on its row.
+  const refused = (key: string): string | null => {
+    if (accept.variables !== key) return null
+    if (accept.error) return accept.error.message
+    if (!accept.data || accept.data.ok) return null
+    return 'message' in accept.data ? accept.data.message : 'The line could not be accepted.'
+  }
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
   const [search, setSearch] = useState('')
@@ -277,7 +284,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                               type="button"
                               className="btn"
                               title="Keep this take as it is: the line no longer shows as weak, until it is recorded again"
-                              disabled={accept.isPending}
+                              disabled={accept.isPending && accept.variables === line.key}
                               onClick={() => accept.mutate(line.key)}
                             >
                               Accept
@@ -286,6 +293,9 @@ export function LinesView({ part }: { part: PartSummary }) {
                       </div>
                       {recorder.errors[line.key] && (
                         <span className="adopt-error row-error">{recorder.errors[line.key]}</span>
+                      )}
+                      {refused(line.key) && (
+                        <span className="adopt-error row-error">{refused(line.key)}</span>
                       )}
                     </td>
                   </tr>

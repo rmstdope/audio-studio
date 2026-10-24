@@ -461,8 +461,9 @@ An audition is for a character, not for a part: the result applies to every part
 - Edit a character's style cue or keywords, a line's cue, or the pronunciation table (built):
   saved at once, and affected lines show as stale.
 - Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
-  (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again). Re-timing one line, or clips
-  already measured, waits until it is needed: measuring covers clips never checked (§8.2).
+  (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again).
+  Re-timing one line, or clips already measured, waits until it is needed: measuring covers clips
+  never checked (§8.2).
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
@@ -620,7 +621,7 @@ Small, independently useful increments:
       word timings in the manifest, the heard share and takes in the lock. `quality.transcriber:
 "none"` records one unchecked take, as before.
    2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when
-      asked; clips never checked (adopted from narrate.py, or recorded unchecked) measured
+      asked, or accepted as they are (Accept, until recorded again); clips never checked (adopted from narrate.py, or recorded unchecked) measured
       without new audio (narrate.py `--retime`): the clip decoded to WAV, its length from that and
       what Whisper hears in that WAV (not the MP3, which Whisper hears slightly differently), so
       the timings match narrate.py's exactly; a poorly heard clip shows as weak. (Since then,

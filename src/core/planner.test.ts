@@ -110,6 +110,13 @@ describe('planPart', () => {
     expect(state.counts.weak).toBe(0)
   })
 
+  it('says a clip was accepted only while it is up to date', () => {
+    const slower = { ...narration, tts: { ...narration.tts, speed: 0.9 } }
+    const lock = { ...trackedLock, n1: entryFor(lines[0]!, cast, { heard: 0.8, accepted: true }) }
+    const state = planPart(input({ lock, narration: slower }))
+    expect(state.lines[0]).toMatchObject({ status: 'stale', accepted: false })
+  })
+
   it('lists clips and cues whose line left the dialog', () => {
     const state = planPart(
       input({
