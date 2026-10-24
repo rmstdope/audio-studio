@@ -30,13 +30,15 @@ const NUMBERS = new Map(
 /**
  * A word without case or punctuation (narrate.py `_plain`). Apostrophes stay inside a word
  * ("don't", "Lysa's") but not at its ends, where they are single quotes around speech ("'You",
- * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word.
+ * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. The two ways
+ * of writing a possessive after s are one ("Sorceress's" and "Sorceress'" are "sorceress").
  */
 function plain(word: string): string {
   return word
     .toLowerCase()
     .replace(/[^a-z0-9']/g, '')
     .replace(/^'+|'+$/g, '')
+    .replace(/s's$/, 's')
 }
 
 /** A word for comparison: plain, small numbers as digits, since Whisper writes "1" (`_norm`). */
