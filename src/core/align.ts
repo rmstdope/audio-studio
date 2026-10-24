@@ -199,7 +199,8 @@ function soundOf(word: string): string {
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
  * is) unless it is a known name, of at least four letters (apostrophes and a possessive 's not
  * counted) and nothing else, and the heard one is one letter apart, as spelled or as they sound
- * (`soundOf`, where that leaves four letters). Lowercase words, short ones and numbers are left
+ * (`soundOf`, where that leaves four letters), or, for a known name, the same consonants as they
+ * sound, in the same order, with other vowels. Lowercase words, short ones and numbers are left
  * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
  */
 function spelledAlike(
@@ -215,7 +216,10 @@ function spelledAlike(
   if (oneLetterApart(want, got)) return true
   // As they sound, only while that leaves four letters: fewer, and one off is another name.
   const [a, b] = [soundOf(want), soundOf(got)]
-  return Math.min(a.length, b.length) >= 4 && (a === b || oneLetterApart(a, b))
+  if (Math.min(a.length, b.length) >= 4 && (a === b || oneLetterApart(a, b))) return true
+  // A known name with other vowels ("Elior" as "Ilyar"), while two consonants or more tell it.
+  const consonants = (word: string) => word.replace(/[aeiou]/g, '')
+  return names.has(bare(shown)) && consonants(a).length >= 2 && consonants(a) === consonants(b)
 }
 
 /** Hyphens and dashes, which join words written without spaces ("resin-sweet", "leaf—Mira's"). */

@@ -436,7 +436,9 @@ An audition is for a character, not for a part: the result applies to every part
       as Whisper spells an invented name ("Aren" as "Arn"), or one letter off as it sounds where
       that leaves four letters or more (ch as k between vowels, c as s before e, i and y and else as
       k, ck and q as k, igh as i, ph as f, y as i, z as s, doubled letters as one: "Malakar" as
-      "Malachar", "Lifelight" as "LifeLite"), counts as heard and takes the heard word's times. Only
+      "Malachar", "Lifelight" as "LifeLite"), or, for a known name, with the same consonants as
+      it sounds and other vowels, where two consonants or more tell it ("Elior" as "Ilyar"), counts
+      as heard and takes the heard word's times. Only
       a capitalised shown word of four letters or more (a possessive 's not counted), nothing but
       letters and not all capitals, qualifies; where a sentence starts (after . ! ? … or a colon,
       opening a quote, single or double, or after a dash inside a word) only a known name: a

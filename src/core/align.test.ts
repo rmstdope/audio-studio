@@ -395,6 +395,22 @@ describe('alignWords, names Whisper spells its own way', () => {
     expect(missed('then Malakar came', 'then Malacore came')).toEqual([1])
   })
 
+  it('counts a known name heard with other vowels, its consonants the same (Elior as Ilyar)', () => {
+    const shown = 'Welcome back, young Elior. Need something else?'.split(' ')
+    const heard = heardAs(...'Welcome back young Ilyar. Need something else?'.split(' '))
+    expect(alignWords(shown, heard, 9).missed).toEqual([3])
+    expect(alignWords(shown, heard, 9, undefined, new Set(['elior'])).ratio).toBe(1)
+  })
+
+  it('does not count a known name with a consonant lost or changed, or of one consonant', () => {
+    const names = new Set(['elior', 'aria', 'malakar'])
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9, undefined, names).missed
+    expect(missed('then Elior came', 'then Elia came')).toEqual([1])
+    expect(missed('then Malakar came', 'then Molokan came')).toEqual([1])
+    expect(missed('then Aria came', 'then Oreo came')).toEqual([1])
+  })
+
   it('pairs words only where as many were heard as shown between matches', () => {
     expect(
       alignWords(['and', 'Aren', 'and', 'Lysa'], heardAs('and', 'Arn', 'Ren', 'and', 'Lysa'), 5)
