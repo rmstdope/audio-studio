@@ -644,7 +644,7 @@ Small, independently useful increments:
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in
-      `.audio-studio/ruled-out/`, left out of every later search for it; listed on the audition
+      `.audio-studio/ruled-out/`, left out of every later search for it; listed on the character
       page, each allowed again or all forgotten.
    2. **Shortlist board** (built): voices to hear, Drop (gone at once, the last undone from a
       notice) and Shortlist, bring in more or a specific voice (also one dropped before), cast any

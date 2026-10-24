@@ -24,11 +24,11 @@ import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import { centsUp } from './format'
-import { withAuditionTakes, withTake, withVoiceTake } from './takes'
+import { isAbout, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
 /** A successful answer about a character's cast voice. */
-type Voiced = Extract<NonNullable<CharacterVoiceResult>, { ok: true }>
+export type Voiced = Extract<NonNullable<CharacterVoiceResult>, { ok: true }>
 
 /** A session view with a phrase to record takes of. */
 type Viewed = Extract<SessionView, { ok: true }> & { audition: AuditionText }
@@ -104,15 +104,20 @@ export function useAdopt(partId: string) {
  * A character's cast voice as Fish knows it, its take and the audition phrase, for its page.
  * Cached for a while: it asks Fish each time.
  */
-export function useCharacterVoice(characterId: string, voiceId: string | null) {
+export function useCharacterVoice(characterId: string, voiceId: string | null, enabled = true) {
   return useQuery({
+    enabled,
     // Keyed by the voice too: a voice cast since (in the file, or by an audition) is asked anew.
     queryKey: ['voice', characterId, voiceId],
     queryFn: () =>
       getJson<NonNullable<CharacterVoiceResult>>(
         `/api/characters/${encodeURIComponent(characterId)}/voice`,
       ),
-    staleTime: 10 * 60 * 1000,
+    // An answer about another voice (the file changed between) is asked again at once.
+    staleTime: (query) => {
+      const data = query.state.data
+      return data?.ok && !isAbout(data, voiceId) ? 0 : 10 * 60 * 1000
+    },
     refetchOnWindowFocus: false,
   })
 }
@@ -404,8 +409,9 @@ export function useTakes(characterId: string) {
 }
 
 /** A character's audition in progress, with the phrase and the takes of the voices in it. */
-export function useSession(characterId: string) {
+export function useSession(characterId: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ['session', characterId],
     queryFn: () => getJson<SessionView>(`/api/auditions/${encodeURIComponent(characterId)}`),
   })

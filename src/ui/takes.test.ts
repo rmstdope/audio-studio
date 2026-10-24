@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { takeToRecord, withAuditionTakes, withTake, withVoiceTake } from './takes'
+import { isAbout, takeToRecord, withAuditionTakes, withTake, withVoiceTake } from './takes'
 
 const candidates = {
   ok: true as const,
@@ -70,5 +70,13 @@ describe('takeToRecord', () => {
     expect(takeToRecord({ ...voiced, id: null }, null)).toBeNull()
     const keyless = { ...voiced, lookup: { reason: 'no-key' as const, message: 'Set the key.' } }
     expect(takeToRecord(keyless, 'v1')).toBeNull()
+  })
+})
+
+describe('isAbout', () => {
+  it('tells an answer about the voice cast now from one about an earlier voice', () => {
+    expect(isAbout({ id: 'v1' }, 'v1')).toBe(true)
+    expect(isAbout({ id: 'v1' }, 'v2')).toBe(false)
+    expect(isAbout({ id: null }, null)).toBe(true)
   })
 })

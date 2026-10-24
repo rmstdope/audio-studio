@@ -2,7 +2,7 @@ import type { ProjectSummary } from '../../../core/summary'
 import type { CastResult } from '../../../services/sessions'
 import { useCast, useSession, useSessionAction } from '../../api'
 import { CheckIcon } from '../../components/icons'
-import { Problems } from '../../components/Problems'
+import { Failure } from '../../components/Failure'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { plural, shortTitle } from '../../format'
 import { routeHref } from '../../route'
@@ -21,7 +21,7 @@ export function AuditionView({
   characterId: string
 }) {
   const character = summary.characters.find((c) => c.id === characterId)
-  const sessionQuery = useSession(characterId)
+  const sessionQuery = useSession(characterId, Boolean(character))
   const start = useSessionAction(characterId)
   const cast = useCast(characterId)
   const { playing, toggle } = useClipPlayer()
@@ -42,7 +42,6 @@ export function AuditionView({
   const view = sessionQuery.data?.ok ? sessionQuery.data : null
   const board = view?.session ? { ...view, session: view.session } : null
   const casted = cast.data?.ok ? cast.data : null
-  const started = start.data && !start.data.ok ? start.data : null
 
   return (
     <>
@@ -102,6 +101,8 @@ export function AuditionView({
             />
           ) : sessionQuery.isPending ? (
             <p className="muted">Opening the audition…</p>
+          ) : !view ? (
+            <Failure title="The audition could not be read" result={sessionQuery.data} />
           ) : (
             <div className="empty-state">
               <strong>
@@ -127,12 +128,7 @@ export function AuditionView({
                   </button>
                 )}
               </span>
-              {started && 'message' in started && (
-                <span className="adopt-error">{started.message}</span>
-              )}
-              {started && 'problems' in started && (
-                <Problems title="The audition could not start" problems={started.problems} />
-              )}
+              <Failure title="The audition could not start" result={start.data} />
               {start.isError && <span className="adopt-error">{start.error.message}</span>}
             </div>
           )}

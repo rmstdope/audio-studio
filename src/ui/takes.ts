@@ -64,3 +64,8 @@ export function takeToRecord(answer: VoiceTake, castId: string | null): string |
   }
   return `${answer.audition.spoken}\n${castId}`
 }
+
+/** Whether an answer about a character's cast voice is about `voiceId`, the voice cast now. */
+export function isAbout(answer: { id: string | null }, voiceId: string | null): boolean {
+  return answer.id === voiceId
+}

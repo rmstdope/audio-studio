@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AuditionSession } from '../../../core/audition'
-import type { Problem } from '../../../core/project'
 import type { SessionView } from '../../../services/sessions'
 import { useCast, useRuledOut, useSessionAction, useTakes, type SessionAction } from '../../api'
 import {
@@ -13,7 +12,7 @@ import {
 } from '../../board'
 import { CheckIcon, CrossIcon } from '../../components/icons'
 import { Confirm } from '../../components/Confirm'
-import { Problems } from '../../components/Problems'
+import { Failure } from '../../components/Failure'
 import { routeHref } from '../../route'
 import { voiceIdFrom } from '../../voiceId'
 import { VoiceCard } from './VoiceCard'
@@ -328,17 +327,4 @@ export function ShortlistBoard({
       )}
     </div>
   )
-}
-
-/** Why an action did nothing, if it did: the problems with the files, or the server's message. */
-function Failure({
-  title,
-  result,
-}: {
-  title: string
-  result: { ok: boolean; problems?: Problem[]; message?: string } | undefined
-}) {
-  if (!result || result.ok) return null
-  if (result.problems) return <Problems title={title} problems={result.problems} />
-  return result.message ? <span className="adopt-error">{result.message}</span> : null
 }
