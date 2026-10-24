@@ -171,16 +171,22 @@ function startsSentence(tokens: string[], i: number): boolean {
 }
 
 /**
- * A word as it sounds, roughly: common spellings of one sound made the same ("Malachar" and
- * "Malakar", "LifeLite" and "Lifelight" one letter apart, "Phyllis" and "Filis" alike), so a name
- * Whisper spells by its sound is told from one it misheard.
+ * A word as it sounds, roughly: common spellings of one sound made the same, so a name Whisper
+ * spells by its sound ("Malachar" for "Malakar", "Sesily" for "Cecily") is told from one it
+ * misheard. Only the spellings that are safe in names: ch as k only between vowels (not the ch of
+ * "church"), c as s before e, i and y, else as k, and ck, q as k, igh as i, ph as f, y as i, z as s,
+ * doubled letters as one.
  */
 function soundOf(word: string): string {
   return word
     .replace(/'/g, '')
     .replace(/igh/g, 'i')
     .replace(/ph/g, 'f')
-    .replace(/ch|ck|c|q/g, 'k')
+    .replace(/ck/g, 'k')
+    .replace(/([aeiou])ch(?=[aeiou])/g, '$1k')
+    .replace(/c(?=[eiy])/g, 's')
+    .replace(/c(?!h)/g, 'k')
+    .replace(/q/g, 'k')
     .replace(/y/g, 'i')
     .replace(/z/g, 's')
     .replace(/(.)\1+/g, '$1')
@@ -190,9 +196,9 @@ function soundOf(word: string): string {
  * Whether a heard word is a name as Whisper spells it ("Aren" as "Arn"): the shown word is
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
  * is) unless it is a known name, of at least four letters (apostrophes and a possessive 's not
- * counted) and nothing else, and the heard one is one letter apart as they sound (`soundOf`).
- * Lowercase words, short ones and numbers are left out, where one letter makes another word ("never" and "ever", "was" and
- * "has", 1984 and 1985).
+ * counted) and nothing else, and the heard one is one letter apart, as spelled or as they sound
+ * (`soundOf`, where that leaves four letters). Lowercase words, short ones and numbers are left
+ * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
  */
 function spelledAlike(
   shown: string,
@@ -204,8 +210,10 @@ function spelledAlike(
   if (!/^[^A-Za-z0-9]*[A-Z]/.test(shown) || !/[a-z]/.test(shown)) return false
   if (atStart && !names.has(bare(shown))) return false
   if (!isWord(want, 4) || !isWord(got)) return false
+  if (oneLetterApart(want, got)) return true
+  // As they sound, only while that leaves four letters: fewer, and one off is another name.
   const [a, b] = [soundOf(want), soundOf(got)]
-  return a === b || oneLetterApart(a, b)
+  return Math.min(a.length, b.length) >= 4 && (a === b || oneLetterApart(a, b))
 }
 
 /** Hyphens and dashes, which join words written without spaces ("resin-sweet", "leaf—Mira's"). */

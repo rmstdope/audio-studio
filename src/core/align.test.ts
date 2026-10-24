@@ -357,6 +357,25 @@ describe('alignWords, names Whisper spells its own way', () => {
     ).toEqual([])
     expect(missed('The Lifelight Elixir is gone.', 'The LifeLite Elixir is gone.')).toEqual([])
     expect(missed('then Phyllis came', 'then Filis came')).toEqual([])
+    expect(missed('then Cecily came', 'then Sesily came')).toEqual([])
+    expect(missed('then Ella came', 'then Elle came')).toEqual([])
+  })
+
+  it('does not take short names, soft c or the ch of church for sound-alikes', () => {
+    const missed = (shown: string, said: string) =>
+      alignWords(shown.split(' '), heardAs(...said.split(' ')), 9).missed
+    for (const [shown, said] of [
+      ['Emma', 'Eva'],
+      ['Miss', 'Mrs'],
+      ['Chuck', 'Cook'],
+      ['Lucy', 'Luke'],
+      ['Grace', 'Drake'],
+      ['Charlie', 'Carly'],
+      ['Church', 'Kirk'],
+      ['Mitch', 'Mick'],
+    ]) {
+      expect(missed(`then ${shown} came`, `then ${said} came`)).toEqual([1])
+    }
   })
 
   it('does not count a sound-alike lowercase word, or a name two sounds off', () => {
