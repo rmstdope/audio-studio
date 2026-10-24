@@ -32,11 +32,13 @@ const NUMBERS = new Map(
  * ("don't") but not at its ends, where they are single quotes around speech ("'You",
  * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. A possessive
  * is one word however it is written, since Whisper cannot hear which: "Sorceress's" and
- * "Sorceress'" are "sorceress", "founder's" and "founders'" are "founders".
+ * "Sorceress'" are "sorceress", "founder's" and "founders'" are "founders". An ampersand is the
+ * word "and" ("&L." is "andl", two words heard as one: see `alignGap`).
  */
 function plain(word: string): string {
   return word
     .toLowerCase()
+    .replace(/&/g, 'and')
     .replace(/[^a-z0-9']/g, '')
     .replace(/^'+|'+$/g, '')
     .replace(/s?'s$/, 's')

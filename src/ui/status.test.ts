@@ -13,6 +13,7 @@ function line(overrides: Partial<LineState>): LineState {
     status: 'ok',
     reasons: [],
     heard: null,
+    accepted: false,
     duration: null,
     file: null,
     ...overrides,
@@ -37,6 +38,14 @@ describe('statusDetail', () => {
     expect(statusDetail(line({ status: 'stale', reasons: ['voice', 'pronunciation'] }), 0.9)).toBe(
       'voice changed, pronunciation changed',
     )
+  })
+
+  it('says a line heard below the bar was accepted as it is', () => {
+    expect(statusDetail(line({ status: 'ok', heard: 0.8, accepted: true }), 0.9)).toBe(
+      'heard 80%, accepted',
+    )
+    expect(statusDetail(line({ status: 'ok', heard: 0.8 }), 0.9)).toBe('')
+    expect(statusDetail(line({ status: 'ok', heard: 0.8, accepted: true }), 0.75)).toBe('')
   })
 
   it('gives the heard share of a weak line against the project’s bar', () => {

@@ -278,6 +278,8 @@ made from. Written one entry per line, keys sorted, so a re-recorded clip is a o
 
 `parts` are short hashes of the inputs that are not kept in the clear, so the planner can say which
 one changed. `heard` and `takes` are absent, and `adopted` is true, for clips made before the studio.
+`accepted` is true when the user accepted a weak clip as it is (Accept on the lines page); recording
+the line again writes a new entry without it.
 
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
@@ -316,7 +318,7 @@ The **planner** gives every line one status:
 | Status      | Meaning                                                                | Action when generating              |
 | ----------- | ---------------------------------------------------------------------- | ----------------------------------- |
 | `ok`        | clip exists, fingerprint matches                                       | none                                |
-| `weak`      | up to date, but the best take was heard below `minHeard`               | offered for a retake, not automatic |
+| `weak`      | up to date, but the best take was heard below `minHeard`, not accepted | offered for a retake, not automatic |
 | `stale`     | clip exists, fingerprint differs; the UI names the inputs that changed | re-record                           |
 | `missing`   | no clip, or its file is absent on disk                                 | record                              |
 | `untracked` | clip exists but has no lock entry: made before the studio              | none; offered for adoption          |
@@ -425,7 +427,8 @@ An audition is for a character, not for a part: the result applies to every part
       of shown words heard). Alignment is narrate.py's, with three departures. Words are compared
       without single quotes at their ends ("'You" and "will.'" are "you" and "will"; apostrophes
       inside a word, "don't", stay), and a possessive is one word however it is written, as Whisper
-      cannot hear which ("Sorceress's" and "Sorceress'", "founder's" and "founders'"). Words are
+      cannot hear which ("Sorceress's" and "Sorceress'", "founder's" and "founders'"); an ampersand
+      is the word "and" (Whisper's "A &L." matches "A & L" as words heard as one, below). Words are
       matched whole first, as narrate.py does; the shown and heard words left between two matches
       are then compared by their parts, split at hyphens and dashes on both sides (punctuation
       beside a dash is no part), and a compound written as one word matches the same word heard as
@@ -459,8 +462,10 @@ An audition is for a character, not for a part: the result applies to every part
 
 - Edit a character's style cue or keywords, a line's cue, or the pronunciation table (built):
   saved at once, and affected lines show as stale.
-- Retake a single line (built: Record, or Retake for a weak one). Re-timing one line, or clips
-  already measured, waits until it is needed: measuring covers clips never checked (§8.2).
+- Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
+  (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again).
+  Re-timing one line, or clips already measured, waits until it is needed: measuring covers clips
+  never checked (§8.2).
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
@@ -523,6 +528,7 @@ GET    /api/credit                               the Fish account's API credit (
 GET    /api/parts/:part                          the part, every line with its status and reason
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
+POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
@@ -617,7 +623,7 @@ Small, independently useful increments:
       word timings in the manifest, the heard share and takes in the lock. `quality.transcriber:
 "none"` records one unchecked take, as before.
    2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when
-      asked; clips never checked (adopted from narrate.py, or recorded unchecked) measured
+      asked, or accepted as they are (Accept, until recorded again); clips never checked (adopted from narrate.py, or recorded unchecked) measured
       without new audio (narrate.py `--retime`): the clip decoded to WAV, its length from that and
       what Whisper hears in that WAV (not the MP3, which Whisper hears slightly differently), so
       the timings match narrate.py's exactly; a poorly heard clip shows as weak. (Since then,
