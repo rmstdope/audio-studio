@@ -18,6 +18,7 @@ function line(
     text,
     cue: '',
     ownCue: false,
+    final: false,
     status,
     reasons,
     heard: null,
@@ -168,5 +169,23 @@ describe('costCeiling', () => {
       plan.ceiling!,
       12,
     )
+  })
+})
+
+describe('planGeneration, the final recording', () => {
+  it('records every cast line whose clip is not final yet, with the final model', () => {
+    const lines: LineState[] = [
+      { ...line('a', 'mira', 'ok'), file: 'a.mp3', final: true },
+      { ...line('b', 'mira', 'ok'), file: 'b.mp3' },
+      { ...line('c', 'mira', 'weak'), file: 'c.mp3' },
+      line('d', 'mira', 'missing'),
+      { ...line('e', 'mira', 'untracked'), file: 'e.mp3' },
+      line('f', 'tilda', 'uncast'),
+    ]
+    const plan = planGeneration({ lines, orphans: [] }, { at: AT, model: 's2-pro', final: true })
+    expect(plan.keys).toEqual(['b', 'c', 'd', 'e'])
+    expect(plan.model).toBe('s2-pro')
+    expect(plan.final).toBe(true)
+    expect(planGeneration({ lines, orphans: [] }, { at: AT, model: 's2-pro' }).keys).toEqual(['d'])
   })
 })

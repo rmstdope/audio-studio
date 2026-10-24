@@ -107,6 +107,8 @@ export interface PartDetail extends PartState {
   minHeard: number
   /** The model lines are recorded with (the project's draft stage). */
   draftModel: string
+  /** The model of the final recording; the same as the draft one when there is no final step. */
+  finalModel: string
   problems: Problem[]
 }
 
@@ -127,6 +129,7 @@ export async function loadPart(projectFile: string, partId: string): Promise<Par
       ...read.paths,
       minHeard: project.narration.quality.minHeard,
       draftModel: project.narration.models.draft,
+      finalModel: project.narration.models.final,
       problems,
       ...planPart(input),
     },

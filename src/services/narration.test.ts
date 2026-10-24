@@ -730,3 +730,51 @@ describe('recordLine, a paid model', () => {
     expect(requests).toHaveLength(0)
   })
 })
+
+describe('recordLine, the final recording', () => {
+  /** The test project with a paid final model, the draft one free. */
+  function finalRepo() {
+    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    withFinal.narration.models = { final: 's2-pro' }
+    return tempRepo({ ...files, 'audio-studio.json': withFinal })
+  }
+  const budget = () => createBudget({ model: 's2-pro', dollars: 1 })
+
+  it('records with the final model, and the clip is final', async () => {
+    const root = finalRepo()
+    const projectFile = join(root, 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const result = await recordLine(projectFile, 'act1', 'k1', async () => fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+      stage: 'final',
+      budget: budget(),
+    })
+    expect(result).toMatchObject({ ok: true })
+    expect(requests.map((r) => r.model)).toEqual(['s2-pro'])
+    const part = await loadPart(projectFile, 'act1')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')).toMatchObject({
+      status: 'ok',
+      final: true,
+    })
+  })
+
+  it('records an up-to-date draft clip again in a final job, but not a final one', async () => {
+    const root = finalRepo()
+    const projectFile = join(root, 'audio-studio.json')
+    const options = { encode: keepWav, limiter: createLimiter() }
+    await recordLine(projectFile, 'act1', 'k1', async () => fakeFish().fish, options)
+    const { fish, requests } = fakeFish()
+    const final = { ...options, stage: 'final' as const, onlyIfNeeded: true, budget: budget() }
+    expect(await recordLine(projectFile, 'act1', 'k1', async () => fish, final)).toMatchObject({
+      ok: true,
+    })
+    expect(requests).toHaveLength(1)
+    expect(await recordLine(projectFile, 'act1', 'k1', async () => fish, final)).toEqual({
+      ok: true,
+      key: 'k1',
+      skipped: true,
+    })
+    expect(requests).toHaveLength(1)
+  })
+})

@@ -72,6 +72,11 @@ export interface RecordOptions {
   /** With `onlyIfNeeded`: weak lines need recording too (the user chose to retake them). */
   retakeWeak?: boolean
   /**
+   * Which model records: the `draft` one (default), or the `final` one. With `onlyIfNeeded`, a
+   * final recording needs every line whose clip is not final yet.
+   */
+  stage?: 'draft' | 'final'
+  /**
    * What the recording may spend: the confirmed model and dollars, charged before every request
    * to Fish at that moment's price. Without it only the free model can be used.
    */
@@ -110,6 +115,7 @@ export async function recordLine(
     retakeWeak = false,
     transcriber = null,
     budget = FREE_ONLY,
+    stage = 'draft',
   }: RecordOptions,
 ): Promise<RecordResult> {
   const read = await readPart(projectFile, partId)
@@ -119,7 +125,15 @@ export async function recordLine(
   if (!line) return null
   const { cast, cues } = read.input
   const { narration } = read.project
-  const inputs = clipInputs(line, cast.speakers[line.speaker], cues, cast.pronounce, narration)
+  const model = narration.models[stage]
+  const inputs = clipInputs(
+    line,
+    cast.speakers[line.speaker],
+    cues,
+    cast.pronounce,
+    narration,
+    model,
+  )
   if (!inputs) {
     return {
       ok: false,
@@ -201,7 +215,8 @@ export async function recordLine(
       // finished meanwhile has written its files before leaving, so it is seen here.
       const fresh = await readPart(projectFile, partId)
       if (!fresh || !fresh.ok) return fresh
-      const status = planPart(fresh.input).lines.find((l) => l.key === key)?.status
+      const now = planPart(fresh.input).lines.find((l) => l.key === key)
+      const status = now?.status
       if (status === 'uncast') {
         return {
           ok: false,
@@ -209,7 +224,10 @@ export async function recordLine(
           message: `${line.speaker} has no voice yet; cast one first.`,
         }
       }
-      const needed = status === 'missing' || status === 'stale' || (retakeWeak && status === 'weak')
+      const needed =
+        stage === 'final'
+          ? !now?.final
+          : status === 'missing' || status === 'stale' || (retakeWeak && status === 'weak')
       if (!needed) {
         return { ok: true, key, skipped: true }
       }

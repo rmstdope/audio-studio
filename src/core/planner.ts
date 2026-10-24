@@ -25,6 +25,8 @@ export interface LineState {
   cue: string
   /** Whether that is the line's own cue (from the part's cues), not its character's style. */
   ownCue: boolean
+  /** Whether the clip was made with the final model (when it differs from the draft one). */
+  final: boolean
   status: LineStatus
   reasons: StaleReason[]
   heard: number | null
@@ -71,12 +73,19 @@ export function planPart(input: PlanInput): PartState {
     const clip = manifest[line.key]
     const file = clip && files.has(clip.file) ? clip.file : null
     const entry = lock[line.key]
+    // A clip made with the final model is up to date too: draft plans leave it alone.
+    const { draft, final: finalModel } = narration.models
+    const finalInputs =
+      finalModel !== draft
+        ? clipInputs(line, character, cues, cast.pronounce, narration, finalModel)
+        : null
+    const final = Boolean(entry && file && finalInputs && entry.fp === fingerprint(finalInputs).fp)
     let status: LineStatus
     let reasons: StaleReason[] = []
     if (!inputs) status = 'uncast'
     else if (!file) status = 'missing'
     else if (!entry) status = 'untracked'
-    else if (entry.fp !== fingerprint(inputs).fp) {
+    else if (!final && entry.fp !== fingerprint(inputs).fp) {
       status = 'stale'
       reasons = staleReasons(entry, inputs)
     } else if (entry.heard !== undefined && entry.heard < narration.quality.minHeard)
@@ -89,6 +98,7 @@ export function planPart(input: PlanInput): PartState {
       text: line.text,
       cue: inputs?.cue ?? cueFor(cues, line.key) ?? character?.style ?? '',
       ownCue: cueFor(cues, line.key) !== undefined,
+      final,
       status,
       reasons,
       heard: file ? (entry?.heard ?? null) : null,

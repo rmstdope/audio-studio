@@ -30,6 +30,8 @@ export interface GenerationPlan {
   ceiling: number | null
   /** Takes a line may need at most (when a take is not heard well enough). */
   takes: number
+  /** Whether this is the final recording (every line not final yet, with the final model). */
+  final: boolean
   /** Whether takes are checked with Whisper. */
   checked: boolean
 }
@@ -50,6 +52,7 @@ export function planGeneration(
     takes = 1,
     checked = false,
     includeWeak = false,
+    final = false,
     at,
   }: {
     model: string
@@ -62,6 +65,11 @@ export function planGeneration(
     checked?: boolean
     /** Retake the weak lines too. */
     includeWeak?: boolean
+    /**
+     * The final recording: every cast line whose clip is not final yet, with `model` (the final
+     * one), whatever its status.
+     */
+    final?: boolean
     /** When the plan is priced: prices change, promotions end. */
     at: Date
   },
@@ -69,7 +77,9 @@ export function planGeneration(
   const inScope = (who: string | null) => !speaker || who === speaker
   const lines = state.lines.filter((line) => inScope(line.speaker))
   const recordable = new Set(['missing', 'stale', ...(includeWeak ? ['weak'] : [])])
-  const toRecord = lines.filter((line) => recordable.has(line.status))
+  const toRecord = lines.filter((line) =>
+    final ? line.status !== 'uncast' && !line.final : recordable.has(line.status),
+  )
   const stale: Partial<Record<StaleReason, number>> = {}
   for (const line of toRecord) {
     for (const reason of line.reasons) stale[reason] = (stale[reason] ?? 0) + 1
@@ -101,6 +111,7 @@ export function planGeneration(
     ),
     takes,
     checked,
+    final,
   }
 }
 

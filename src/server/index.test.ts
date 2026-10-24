@@ -1134,3 +1134,87 @@ describe('server, a paid job refused for a refresh', () => {
     expect(await line.json()).toMatchObject({ ok: true, key: 'a' })
   })
 })
+
+describe('server, the final recording', () => {
+  const withFinal = projectJson({
+    narration: { ...(projectJson().narration as object), models: { final: 's2-pro' } },
+  })
+  const root = tempRepo({
+    'audio-studio.json': withFinal,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'narrator', text: 'Once upon a time.' },
+      { key: 'b', speaker: 'narrator', text: 'There was a fox.' },
+    ],
+  })
+  const models: string[] = []
+  const account: FishClient = {
+    ...fish,
+    async credit() {
+      return 10
+    },
+    async tts(request) {
+      models.push(request.model)
+      return fish.tts(request)
+    },
+  }
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const finish = async (id: string) => {
+    let state = await (await fetch(at(`/api/jobs/${id}`))).json()
+    while (state.status === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      state = await (await fetch(at(`/api/jobs/${id}`))).json()
+    }
+    return state
+  }
+
+  it('plans and records the final recording with the final model, each spend confirmed', async () => {
+    // Drafted first, for free.
+    const draft = await (await fetch(at('/api/parts/act1/plan'))).json()
+    const drafted = await (
+      await fetch(at('/api/parts/act1/jobs'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify({ speaker: null, keys: draft.plan.keys, orphans: [] }),
+      })
+    ).json()
+    await finish(drafted.id)
+    expect(models.every((m) => m === 's2.1-pro-free')).toBe(true)
+
+    const { plan } = await (await fetch(at('/api/parts/act1/plan?stage=final'))).json()
+    expect(plan).toMatchObject({ final: true, model: 's2-pro', keys: ['a', 'b'] })
+    expect(plan.ceiling).toBeGreaterThan(0)
+    const start = (confirmedCost?: number) =>
+      fetch(at('/api/parts/act1/jobs'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify({
+          stage: 'final',
+          speaker: null,
+          keys: plan.keys,
+          orphans: [],
+          confirmedCost,
+        }),
+      })
+    expect(await (await start()).json()).toMatchObject({ reason: 'confirm' })
+    const job = await (await start(plan.ceiling)).json()
+    expect(await finish(job.id)).toMatchObject({ status: 'done', failed: [] })
+    expect(models.filter((m) => m === 's2-pro')).toHaveLength(2)
+    const part = await (await fetch(at('/api/parts/act1'))).json()
+    expect(part.part.lines.map((l: { final: boolean }) => l.final)).toEqual([true, true])
+    // The draft plan leaves final clips alone; the final plan has nothing left.
+    expect((await (await fetch(at('/api/parts/act1/plan'))).json()).plan.keys).toEqual([])
+    expect((await (await fetch(at('/api/parts/act1/plan?stage=final'))).json()).plan.keys).toEqual(
+      [],
+    )
+  })
+})

@@ -137,7 +137,11 @@ export function LinesView({ part }: { part: PartSummary }) {
         </div>
       </div>
 
-      <GeneratePanel partId={loaded.id} speaker={speaker || null} />
+      <GeneratePanel
+        partId={loaded.id}
+        speaker={speaker || null}
+        models={{ draft: loaded.draftModel, final: loaded.finalModel }}
+      />
 
       {filter === 'orphans' ? (
         <OrphanTable part={loaded.id} orphans={loaded.orphans} playing={playing} toggle={toggle} />
@@ -161,6 +165,11 @@ export function LinesView({ part }: { part: PartSummary }) {
                 <tr key={line.key}>
                   <td>
                     <StatusPill status={line.status} />
+                    {line.final && (
+                      <span className="final-badge" title="Made with the final model">
+                        final
+                      </span>
+                    )}
                   </td>
                   <td>
                     <div className="line-cell">

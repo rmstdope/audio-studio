@@ -220,6 +220,18 @@ describe('review fixes', () => {
     expect(result?.ok && result.part.minHeard).toBe(0.9)
   })
 
+  it('gives the models of the draft and the final recording', async () => {
+    const withFinal = projectJson({
+      narration: { ...(projectJson().narration as object), models: { final: 's2-pro' } },
+    })
+    const root = tempRepo({ ...files, 'audio-studio.json': withFinal })
+    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    expect(result?.ok && [result.part.draftModel, result.part.finalModel]).toEqual([
+      's2.1-pro-free',
+      's2-pro',
+    ])
+  })
+
   it('reports a dialog key that could not be a file name', async () => {
     const root = tempRepo({
       ...files,

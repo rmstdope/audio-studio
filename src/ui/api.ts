@@ -567,20 +567,28 @@ export type PlanAnswer =
   | ProjectFailure
 
 /** The generation plan for a part, or one speaker in it (null for all); weak lines retaken if asked. */
-export function usePlan(partId: string, speaker: string | null, weak = false) {
+export function usePlan(
+  partId: string,
+  speaker: string | null,
+  weak = false,
+  stage: 'draft' | 'final' = 'draft',
+) {
   return useQuery({
-    queryKey: ['plan', partId, speaker, weak],
+    queryKey: ['plan', partId, speaker, weak, stage],
     queryFn: () => {
       const params = new URLSearchParams()
       if (speaker) params.set('speaker', speaker)
       if (weak) params.set('weak', '1')
+      if (stage === 'final') params.set('stage', 'final')
       const query = params.size ? `?${params}` : ''
       return getJson<PlanAnswer>(`/api/parts/${encodeURIComponent(partId)}/plan${query}`)
     },
     // Ticking the retake box asks for another plan: keep showing the last one for the same scope
-    // meanwhile (its buttons wait), but never another speaker's.
+    // meanwhile (its buttons wait), but never another speaker's or stage's.
     placeholderData: (previous, query) =>
-      query?.queryKey[2] === speaker ? keepPreviousData(previous) : undefined,
+      query?.queryKey[2] === speaker && query?.queryKey[4] === stage
+        ? keepPreviousData(previous)
+        : undefined,
   })
 }
 
@@ -622,6 +630,7 @@ export function useJobActions(partId: string) {
   const start = useMutation({
     mutationFn: async (options: {
       kind: JobState['kind']
+      stage?: 'draft' | 'final'
       retakeWeak?: boolean
       /** The most the user agreed to spend, for a paid model. */
       confirmedCost?: number

@@ -149,3 +149,38 @@ describe('planPart, cues', () => {
     for (const line of state.lines) expect(line).toMatchObject({ cue: '[warm]', ownCue: false })
   })
 })
+
+describe('planPart, clips made with the final model', () => {
+  const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+  /** A lock entry for `line` as made with `model`. */
+  function madeWith(line: Line, model: string): LockEntry {
+    const inputs = clipInputs(
+      line,
+      cast.speakers[line.speaker],
+      {},
+      cast.pronounce,
+      withFinal,
+      model,
+    )!
+    const { fp, parts } = fingerprint(inputs)
+    return { fp, voice: inputs.voice, model, parts, at: 'then' }
+  }
+
+  it('counts a final clip as up to date, and says it is final', () => {
+    const lock = { n1: madeWith(lines[0]!, 's2-pro'), m1: madeWith(lines[1]!, 's2.1-pro-free') }
+    const state = planPart(input({ lock, narration: withFinal }))
+    expect(state.lines[0]).toMatchObject({ status: 'ok', final: true })
+    expect(state.lines[1]).toMatchObject({ status: 'ok', final: false })
+  })
+
+  it('knows no final clip while final and draft are the same model', () => {
+    const state = planPart(input({ lock: trackedLock }))
+    expect(state.lines[0]).toMatchObject({ status: 'ok', final: false })
+  })
+
+  it('finds a final clip stale when its inputs change', () => {
+    const lock = { n1: madeWith(lines[0]!, 's2-pro') }
+    const state = planPart(input({ lock, narration: withFinal, cues: { n1: '[sad]' } }))
+    expect(state.lines[0]).toMatchObject({ status: 'stale', final: false })
+  })
+})
