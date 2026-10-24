@@ -335,15 +335,14 @@ the truth.
 
 ### 8.1 Audition (casting a voice)
 
-This is the audition being built in step 9 (§12). Built so far: ruled-out voices (9.1), the
-shortlist board (9.2) and the character page (9.3); hearing the character's recorded lines on
-its page comes with 9.4.
+This is the audition built in step 9 (§12).
 
 Every character has a **character page** (`#/characters/<id>`), the one place about it: its
 cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish; the take
 records by itself when missing), its lines per part, its delivery (the style cue) and casting
-brief (search keywords and audition phrase), the voices ruled out for it, and the audition in
-progress, if there is one. An audition is started, resumed and stopped from there; the page
+brief (search keywords and audition phrase), the voices ruled out for it, the audition in
+progress, if there is one, and **Hear it in the game**: its recorded lines with their part and
+cue, as the game plays them, one by one or all in turn. An audition is started, resumed and stopped from there; the page
 shows no candidates. The **audition page** (`#/characters/<id>/audition`) shows the board, with
 the phrase and style the takes are recorded with beside it and the keywords the audition started
 with; with no audition in progress, it offers to start one.
@@ -655,8 +654,8 @@ Small, independently useful increments:
       and sample, its page on Fish), the lines per part, delivery and casting brief, ruled-out
       voices, and the audition in progress (resume, or stop after saying what it means). The
       audition page shows only the board; the list of matching voices before an audition is gone.
-   4. **Hear it in the game**: the character's recorded lines on its page, played one by one or in
-      turn.
+   4. **Hear it in the game** (built): the character's recorded lines on its page, part by part
+      in dialog order, with cue and status, played one by one or all in turn.
 
 ---
 

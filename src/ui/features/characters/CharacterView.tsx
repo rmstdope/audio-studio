@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { AuditionSession } from '../../../core/audition'
 import type { CharacterSummary, ProjectSummary } from '../../../core/summary'
 import {
+  clipUrl,
   takeUrl,
   useCharacterVoice,
   usePart,
+  useParts,
   useRuledOut,
   useSession,
   useSessionAction,
@@ -17,10 +19,11 @@ import { Failure } from '../../components/Failure'
 import { HeadphonesIcon, PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusBar } from '../../components/StatusBar'
-import { useClipPlayer } from '../../components/useClipPlayer'
+import { useClipPlayer, type Clip } from '../../components/useClipPlayer'
 import { compact, plural, shortTitle, tintFor, voiceLabel } from '../../format'
 import { routeHref } from '../../route'
-import { linesSummary, speakerCounts } from '../../status'
+import { recordedLinesOf } from '../../inGame'
+import { linesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
 import { voiceUrl } from '../../voiceId'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
@@ -42,7 +45,8 @@ export function CharacterView({
   const session = useSession(characterId, Boolean(character))
   const voice = useCharacterVoice(characterId, character?.voice ?? null, Boolean(character))
   const start = useSessionAction(characterId)
-  const { playing, toggle } = useClipPlayer()
+  const player = useClipPlayer()
+  const { playing, toggle } = player
 
   if (!character) {
     return (
@@ -144,6 +148,17 @@ export function CharacterView({
               </span>
             )}
           </section>
+          {character.appearances.length > 0 && (
+            <InTheGame
+              speaker={character.id}
+              name={character.name}
+              parts={character.appearances.map((a) => ({
+                id: a.part,
+                title: titles.get(a.part) ?? a.part,
+              }))}
+              player={player}
+            />
+          )}
         </div>
 
         <aside className="audition-brief">
@@ -308,6 +323,97 @@ function VoicePanel({
           Open on Fish Audio ↗
         </a>
       </div>
+    </section>
+  )
+}
+
+/** How many recorded lines are listed before "All N lines". */
+const SHOWN_LINES = 5
+
+/**
+ * The character's recorded lines, as the game plays them: each with its part and cue, played one
+ * by one or all in turn, the first few shown until asked for all.
+ */
+function InTheGame({
+  speaker,
+  name,
+  parts,
+  player,
+}: {
+  speaker: string
+  name: string
+  parts: { id: string; title: string }[]
+  player: ReturnType<typeof useClipPlayer>
+}) {
+  const loaded = useParts(parts.map((p) => p.id))
+  const [all, setAll] = useState(false)
+  const lines = recordedLinesOf(
+    parts.map((p, i) => {
+      const data = loaded[i]?.data
+      return { ...p, lines: data?.ok ? data.part.lines : null }
+    }),
+    speaker,
+  )
+  const clips: Clip[] = lines.map((l) => ({ id: l.id, url: clipUrl(l.part, l.file) }))
+  const shown = all ? lines : lines.slice(0, SHOWN_LINES)
+  const pending = loaded.some((q) => q.isPending)
+  return (
+    <section className="panel in-game" aria-label="Hear it in the game">
+      <div className="section-head">
+        <h2 className="section-title">Hear it in the game</h2>
+        <span className="muted">
+          {lines.length
+            ? `${plural(lines.length, 'recorded line')}, as the game plays them`
+            : pending
+              ? 'Loading…'
+              : `None of ${name}’s lines is recorded yet.`}
+        </span>
+      </div>
+      {shown.length > 0 && (
+        <ol className="in-game-lines">
+          {shown.map((l) => (
+            <li key={l.id}>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={player.playing === l.id ? 'Stop' : `Play “${l.text}”`}
+                onClick={() => player.toggle(l.id, clipUrl(l.part, l.file))}
+              >
+                {player.playing === l.id ? <PauseIcon /> : <PlayIcon />}
+              </button>
+              <span className="in-game-text">
+                <span>{l.text}</span>
+                <span className="muted mono">
+                  {l.title}
+                  {l.cue ? ` · ${l.cue}` : ''}
+                </span>
+              </span>
+              <span
+                className="badge"
+                style={{ color: STATUS[l.status].color, background: STATUS[l.status].bg }}
+              >
+                {STATUS[l.status].label}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {lines.length > 0 && (
+        <div className="confirm-actions in-game-actions">
+          {lines.length > SHOWN_LINES && (
+            <button className="btn btn-ghost" type="button" onClick={() => setAll(!all)}>
+              {all ? 'Show fewer' : `All ${lines.length} lines`}
+            </button>
+          )}
+          <button
+            className="btn"
+            type="button"
+            onClick={() => (player.inTurn ? player.stop() : player.playInTurn(clips))}
+          >
+            {player.inTurn ? 'Stop' : 'Play all in turn'}
+          </button>
+        </div>
+      )}
     </section>
   )
 }

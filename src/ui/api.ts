@@ -3,6 +3,7 @@ import {
   useIsMutating,
   useMutation,
   useMutationState,
+  useQueries,
   useQuery,
   useQueryClient,
   type MutationState,
@@ -84,6 +85,16 @@ export function usePart(partId: string, enabled = true) {
     queryKey: ['part', partId],
     queryFn: () => getJson<NonNullable<PartResult>>(`/api/parts/${encodeURIComponent(partId)}`),
     enabled,
+  })
+}
+
+/** Several parts, as `usePart` loads each (sharing its cache), in the order given. */
+export function useParts(partIds: string[]) {
+  return useQueries({
+    queries: partIds.map((partId) => ({
+      queryKey: ['part', partId],
+      queryFn: () => getJson<NonNullable<PartResult>>(`/api/parts/${encodeURIComponent(partId)}`),
+    })),
   })
 }
 

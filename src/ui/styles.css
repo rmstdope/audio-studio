@@ -1134,6 +1134,49 @@ a.btn {
   color: var(--accent-soft-ink);
 }
 
+.in-game {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.in-game-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.in-game-lines li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.in-game-lines li:last-child {
+  border-bottom: none;
+}
+
+.in-game-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.in-game-text .mono {
+  font-size: 12px;
+}
+
+.in-game-actions {
+  justify-content: flex-start;
+}
+
 /* Audition board */
 
 .board {
