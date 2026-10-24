@@ -13,6 +13,7 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     status: 'missing',
     reasons: [],
     heard: null,
+    accepted: false,
     duration: null,
     file: null,
     ...overrides,

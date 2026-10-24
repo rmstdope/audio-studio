@@ -48,7 +48,10 @@ export function statusDetail(line: LineState, minHeard: number): string {
     case 'uncast':
       return `${line.speaker} has no voice yet`
     case 'ok':
-      return ''
+      // Said while the clip is below the bar; above it (the bar lowered since) it is just ok.
+      return line.accepted && line.heard !== null && line.heard < minHeard
+        ? `heard ${percent(line.heard)}, accepted`
+        : ''
   }
 }
 
