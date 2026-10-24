@@ -97,6 +97,22 @@ describe('alignWords (ported from narrate.py and its tests)', () => {
     expect(alignWords(text.split(' '), heard, 30, saidWords(text, pronounce)).ratio).toBe(1)
   })
 
+  it('counts a word pronounced otherwise that Whisper wrote as shown (Act II for Act Two)', () => {
+    const text = 'Act II: The Gathering Storm'
+    const said = saidWords(text, { 'Act II:': 'Act Two:' })
+    const heardAs = (line: string) =>
+      words(...line.split(' ').map((w, i): [string, number, number] => [w, i, i + 0.5]))
+    expect(alignWords(text.split(' '), heardAs('Act II The Gathering Storm'), 9, said).ratio).toBe(
+      1,
+    )
+    expect(alignWords(text.split(' '), heardAs('Act 2: The Gathering Storm'), 9, said).ratio).toBe(
+      1,
+    )
+    expect(
+      alignWords(text.split(' '), heardAs('Act III The Gathering Storm'), 9, said).missed,
+    ).toEqual([1])
+  })
+
   it('falls back to the shown words when a pronunciation changes the word count', () => {
     expect(saidWords('Malakar waits', { Malakar: 'Mala kar' })).toEqual(['Malakar', 'waits'])
   })

@@ -307,7 +307,8 @@ function alignGap(
   times: ([number, number] | null)[],
 ): void {
   // As narrate.py's matching and main did: where as many words were heard as shown, a name heard
-  // in its place one letter off, word for word.
+  // in its place one letter off, word for word, or a word pronounced otherwise that Whisper wrote
+  // as shown ("II" for "Act II:" said "Act Two:").
   const shownWords: number[] = []
   for (let i = from; i < to; i++) if (norm(said[i]!)) shownWords.push(i)
   const heardWords: number[] = []
@@ -316,7 +317,8 @@ function alignGap(
     shownWords.forEach((i, k) => {
       const w = heard[heardWords[k]!]!
       const atStart = startsSentence(tokens, i)
-      if (spelledAlike(tokens[i]!, atStart, norm(said[i]!), norm(w.word), names)) {
+      const asShown = norm(w.word) === norm(tokens[i]!)
+      if (asShown || spelledAlike(tokens[i]!, atStart, norm(said[i]!), norm(w.word), names)) {
         times[i] = [w.start, w.end]
       }
     })
