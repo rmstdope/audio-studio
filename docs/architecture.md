@@ -414,14 +414,18 @@ generation while the script and cast still change) and `final` (the recording th
   can be used. All that running recordings were given is held back from the credit until they
   end (Fish may bill a request after it was charged); a recording refused after it was admitted,
   and a job when it ends, give theirs back. There is no
-  separate final step yet: a draft is the final recording.
+  separate step for auditions yet: they are always free.
 - **Final recording** (built): when `final` names another model than `draft`, the Generate panel
   offers **Draft** and **Final**. The final plan records every cast line whose clip was not made
   with the final model yet (missing, stale, drafted, untracked), with the final model, priced and
   confirmed like any paid job. A clip is up to date if its lock matches the inputs with either
   model; one made with the final model is marked `final` in the line table, and draft plans
   leave it alone. A final clip whose inputs change (a cue, the text) matches neither and goes
-  stale like any other. A paid `audition` model is still to come, with its cost per round.
+  stale like any other, and the draft plan records it again with the draft model (so a paid clip
+  edited afterwards becomes a draft one until the next final recording). A weak final clip is
+  retaken only with the final model: from its row, or by the final plan when asked. With one
+  model for both, there is no final step: a final plan or recording is a draft one. A paid
+  `audition` model is still to come, with its cost per round.
 
 ---
 

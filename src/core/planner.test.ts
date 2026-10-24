@@ -181,6 +181,27 @@ describe('planPart, clips made with the final model', () => {
   it('finds a final clip stale when its inputs change', () => {
     const lock = { n1: madeWith(lines[0]!, 's2-pro') }
     const state = planPart(input({ lock, narration: withFinal, cues: { n1: '[sad]' } }))
-    expect(state.lines[0]).toMatchObject({ status: 'stale', final: false })
+    // Stale for its cue only: the final model is still a model it may be made with.
+    expect(state.lines[0]).toMatchObject({ status: 'stale', final: false, reasons: ['cue'] })
+  })
+})
+
+describe('planPart, a weak final clip', () => {
+  it('is weak and final', () => {
+    const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    const inputs = clipInputs(
+      lines[0]!,
+      cast.speakers.narrator,
+      {},
+      cast.pronounce,
+      withFinal,
+      's2-pro',
+    )!
+    const { fp, parts } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', parts, at: 'then', heard: 0.5 } }
+    expect(planPart(input({ lock, narration: withFinal })).lines[0]).toMatchObject({
+      status: 'weak',
+      final: true,
+    })
   })
 })

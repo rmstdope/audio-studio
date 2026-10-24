@@ -118,7 +118,13 @@ function parseOrNull(text: string): unknown {
 }
 
 /** Recording one line: the most the user agreed to spend on it, for a paid model. */
-const RecordBody = z.object({ confirmedCost: z.number().nonnegative().optional() }).strict()
+const RecordBody = z
+  .object({
+    confirmedCost: z.number().nonnegative().optional(),
+    /** Record with the final model (a final clip recorded again), or the draft one (default). */
+    stage: z.enum(['draft', 'final']).default('draft'),
+  })
+  .strict()
 
 const VerdictBody = z.object({
   voice: z.string().regex(/^[\w-]{1,64}$/),
@@ -258,13 +264,16 @@ export function startServer({
     part: string,
     speaker?: string,
     includeWeak = false,
-    stage: 'draft' | 'final' = 'draft',
+    asked: 'draft' | 'final' = 'draft',
   ) {
     const read = await readPart(projectFile, part)
     if (!read) return null
     if (!read.ok) return read
     if (read.problems.length) return { ok: false as const, problems: read.problems }
     const { narration } = read.project
+    // With one model for both, there is no final step: the final plan is the draft one.
+    const stage =
+      asked === 'final' && narration.models.final !== narration.models.draft ? 'final' : 'draft'
     const { pronounce } = read.input.cast
     const state = planPart(read.input)
     const pricing = {
@@ -344,7 +353,7 @@ export function startServer({
             return Response.json({ error: 'expected { confirmedCost? }' }, { status: 400 })
           }
           // Fails closed: without a plan, nothing is priced, so nothing is recorded.
-          const planned = await planFor(part, undefined, true)
+          const planned = await planFor(part, undefined, true, body.data.stage)
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const admitted = await admit(
@@ -360,6 +369,7 @@ export function startServer({
               encode,
               limiter: fishWork,
               transcriber: await transcriberFor(),
+              stage: body.data.stage,
               budget: admitted.budget,
             })
             if (!result) return notFound()

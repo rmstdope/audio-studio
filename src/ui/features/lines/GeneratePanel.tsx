@@ -226,9 +226,13 @@ export function GeneratePanel({
           draft plans leave final clips alone.
         </span>
       )}
-      {(p.missing > 0 || reasons.length > 0) && (
+      {(p.missing > 0 || reasons.length > 0 || p.drafted > 0 || p.untracked > 0) && (
         <ul className="plan-list">
           {p.missing > 0 && <li>{plural(p.missing, 'missing line')}</li>}
+          {p.drafted > 0 && <li>{plural(p.drafted, 'drafted line')}, recorded again</li>}
+          {p.untracked > 0 && (
+            <li>{plural(p.untracked, 'clip')} made before the studio, recorded again</li>
+          )}
           {reasons.map(([reason, n]) => (
             <li key={reason}>
               {plural(n, 'line')}: {REASON[reason]}

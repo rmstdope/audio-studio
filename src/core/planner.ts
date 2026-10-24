@@ -87,7 +87,11 @@ export function planPart(input: PlanInput): PartState {
     else if (!entry) status = 'untracked'
     else if (!final && entry.fp !== fingerprint(inputs).fp) {
       status = 'stale'
-      reasons = staleReasons(entry, inputs)
+      // Made with the final model: stale for what changed besides the model it may be made with.
+      reasons = staleReasons(
+        entry,
+        finalInputs && entry.model === finalModel ? finalInputs : inputs,
+      )
     } else if (entry.heard !== undefined && entry.heard < narration.quality.minHeard)
       status = 'weak'
     else status = 'ok'

@@ -509,7 +509,7 @@ export function useRecordLines(partId: string) {
   const forget = (key: string) => setToConfirm(({ [key]: _gone, ...rest }) => rest)
 
   const record = useCallback(
-    async (key: string, confirmedCost?: number) => {
+    async (key: string, confirmedCost?: number, stage: 'draft' | 'final' = 'draft') => {
       setRecording((now) => new Set(now).add(key))
       setErrors(({ [key]: _gone, ...rest }) => rest)
       forget(key)
@@ -518,7 +518,10 @@ export function useRecordLines(partId: string) {
         const response = await fetch(path, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(confirmedCost === undefined ? {} : { confirmedCost }),
+          body: JSON.stringify({
+            stage,
+            ...(confirmedCost === undefined ? {} : { confirmedCost }),
+          }),
         })
         if (!response.ok && response.status !== 409) {
           throw new Error(`recording answered ${response.status}`)

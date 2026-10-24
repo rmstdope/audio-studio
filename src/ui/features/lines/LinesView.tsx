@@ -209,7 +209,11 @@ export function LinesView({ part }: { part: PartSummary }) {
                               className="btn btn-primary row-record"
                               title="The most this line can cost on your Fish account (every take)"
                               onClick={() =>
-                                void recorder.record(line.key, recorder.toConfirm[line.key])
+                                void recorder.record(
+                                  line.key,
+                                  recorder.toConfirm[line.key],
+                                  line.final ? 'final' : 'draft',
+                                )
                               }
                             >
                               Pay up to {dollars(recorder.toConfirm[line.key]!)}
@@ -227,7 +231,14 @@ export function LinesView({ part }: { part: PartSummary }) {
                             type="button"
                             className="btn row-record"
                             disabled={recorder.recording.has(line.key)}
-                            onClick={() => void recorder.record(line.key)}
+                            // A final clip is recorded again with the final model, never downgraded.
+                            onClick={() =>
+                              void recorder.record(
+                                line.key,
+                                undefined,
+                                line.final ? 'final' : 'draft',
+                              )
+                            }
                           >
                             {recorder.recording.has(line.key)
                               ? 'Recording…'

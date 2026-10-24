@@ -189,3 +189,54 @@ describe('planGeneration, the final recording', () => {
     expect(planGeneration({ lines, orphans: [] }, { at: AT, model: 's2-pro' }).keys).toEqual(['d'])
   })
 })
+
+describe('planGeneration, final clips kept final', () => {
+  const lines: LineState[] = [
+    { ...line('a', 'mira', 'weak'), file: 'a.mp3', final: true },
+    { ...line('b', 'mira', 'weak'), file: 'b.mp3' },
+    { ...line('c', 'mira', 'ok'), file: 'c.mp3' },
+    { ...line('d', 'mira', 'untracked'), file: 'd.mp3' },
+    line('e', 'mira', 'missing'),
+  ]
+  const state = { lines, orphans: [] }
+
+  it('never retakes a final clip in a draft plan', () => {
+    expect(planGeneration(state, { at: AT, model: 'x', includeWeak: true }).keys).toEqual([
+      'b',
+      'e',
+    ])
+  })
+
+  it('retakes a weak final clip in a final plan only when asked', () => {
+    expect(planGeneration(state, { at: AT, model: 's2-pro', final: true }).keys).toEqual([
+      'b',
+      'c',
+      'd',
+      'e',
+    ])
+    expect(
+      planGeneration(state, { at: AT, model: 's2-pro', final: true, includeWeak: true }).keys,
+    ).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  it('names in a final plan the drafted and untracked clips it records again', () => {
+    expect(planGeneration(state, { at: AT, model: 's2-pro', final: true })).toMatchObject({
+      drafted: 2,
+      untracked: 1,
+      missing: 1,
+    })
+  })
+})
+
+describe('planGeneration, the weak lines offered', () => {
+  const lines: LineState[] = [
+    { ...line('a', 'mira', 'weak'), file: 'a.mp3', final: true },
+    { ...line('b', 'mira', 'weak'), file: 'b.mp3' },
+  ]
+  it('offers to retake only the weak lines the plan would not record anyway', () => {
+    expect(planGeneration({ lines, orphans: [] }, { at: AT, model: 'x' }).weak).toEqual(['b'])
+    expect(
+      planGeneration({ lines, orphans: [] }, { at: AT, model: 's2-pro', final: true }).weak,
+    ).toEqual(['a'])
+  })
+})

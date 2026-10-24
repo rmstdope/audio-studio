@@ -125,7 +125,9 @@ export async function recordLine(
   if (!line) return null
   const { cast, cues } = read.input
   const { narration } = read.project
-  const model = narration.models[stage]
+  // With one model for both, there is no final step: a "final" recording is a draft one.
+  const final = stage === 'final' && narration.models.final !== narration.models.draft
+  const model = final ? narration.models.final : narration.models.draft
   const inputs = clipInputs(
     line,
     cast.speakers[line.speaker],
@@ -152,7 +154,8 @@ export async function recordLine(
   }
 
   // The same line asked for again while it is being recorded shares that recording.
-  const id = `${projectFile}\n${partId}\n${key}`
+  // Per model too: a final recording never takes a draft one's result as its own.
+  const id = `${projectFile}\n${partId}\n${key}\n${model}`
   const running = recordings.get(id)
   if (running) return running
   const recording = record()
@@ -224,10 +227,11 @@ export async function recordLine(
           message: `${line.speaker} has no voice yet; cast one first.`,
         }
       }
-      const needed =
-        stage === 'final'
-          ? !now?.final
-          : status === 'missing' || status === 'stale' || (retakeWeak && status === 'weak')
+      const weak = status === 'weak' && retakeWeak
+      const needed = final
+        ? !now?.final || weak
+        : // A final clip is never taken back to the draft model by a retake.
+          status === 'missing' || status === 'stale' || (weak && !now?.final)
       if (!needed) {
         return { ok: true, key, skipped: true }
       }

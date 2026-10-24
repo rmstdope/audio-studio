@@ -105,7 +105,7 @@ export interface PartDetail extends PartState {
   manifestPath: string
   /** The share of words a take must be heard at to count as good (the project's `minHeard`). */
   minHeard: number
-  /** The model lines are recorded with (the project's draft stage). */
+  /** The model everyday plans record with (the project's draft stage). */
   draftModel: string
   /** The model of the final recording; the same as the draft one when there is no final step. */
   finalModel: string

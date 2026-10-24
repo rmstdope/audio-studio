@@ -1217,4 +1217,49 @@ describe('server, the final recording', () => {
       [],
     )
   })
+
+  it('records a final clip again from its row with the final model, its cost confirmed', async () => {
+    const before = models.length
+    const asked = await (
+      await fetch(at('/api/parts/act1/lines/a/record'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify({ stage: 'final' }),
+      })
+    ).json()
+    expect(asked).toMatchObject({ ok: false, reason: 'confirm' })
+    const done = await (
+      await fetch(at('/api/parts/act1/lines/a/record'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify({ stage: 'final', confirmedCost: asked.ceiling }),
+      })
+    ).json()
+    expect(done).toMatchObject({ ok: true })
+    expect(models.slice(before)).toEqual(['s2-pro'])
+  })
+})
+
+describe('server, a final stage without a final model', () => {
+  const root = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+
+  it('plans the final stage as the draft one', async () => {
+    const draft = await (await fetch(new URL('/api/parts/act1/plan', server.url))).json()
+    const final = await (
+      await fetch(new URL('/api/parts/act1/plan?stage=final', server.url))
+    ).json()
+    expect(final.plan).toMatchObject({ final: false, keys: draft.plan.keys })
+  })
 })
