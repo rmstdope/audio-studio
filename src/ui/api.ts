@@ -20,7 +20,7 @@ import type { GenerationPlan } from '../core/generation'
 import type { Problem } from '../core/project'
 import type { JobState } from '../services/jobs'
 import type { HeardResult } from '../services/heard'
-import type { RecordResult } from '../services/narration'
+import type { AcceptResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult } from '../services/takes'
@@ -111,6 +111,21 @@ function partQuery(partId: string) {
 export function useParts(partIds: string[]) {
   return useQueries({
     queries: partIds.map(partQuery),
+  })
+}
+
+/** Accepts a weak line's clip as it is, then reloads the part (the line is no longer weak). */
+export function useAccept(partId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) =>
+      postJson<AcceptResult>(
+        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/accept`,
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      return client.invalidateQueries({ queryKey: ['part', partId] })
+    },
   })
 }
 

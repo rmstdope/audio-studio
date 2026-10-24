@@ -5,7 +5,8 @@ import { cueFor, type Cast, type Cues, type Line, type Lock, type Manifest } fro
 /**
  * Where a line's clip stands:
  * - `ok`: the clip matches the line and its settings
- * - `weak`: it matches, but its best take was heard below the quality bar
+ * - `weak`: it matches, but its best take was heard below the quality bar (and the user has not
+ *   accepted it as it is)
  * - `stale`: it was made from other inputs (`reasons` says which)
  * - `missing`: there is no clip
  * - `untracked`: there is a clip, but nothing says what it was made from (made before the studio)
@@ -30,6 +31,8 @@ export interface LineState {
   status: LineStatus
   reasons: StaleReason[]
   heard: number | null
+  /** Whether the user accepted the clip though it was heard below the bar. */
+  accepted: boolean
   duration: number | null
   file: string | null
 }
@@ -92,7 +95,11 @@ export function planPart(input: PlanInput): PartState {
         entry,
         finalInputs && entry.model === finalModel ? finalInputs : inputs,
       )
-    } else if (entry.heard !== undefined && entry.heard < narration.quality.minHeard)
+    } else if (
+      entry.heard !== undefined &&
+      entry.heard < narration.quality.minHeard &&
+      !entry.accepted
+    )
       status = 'weak'
     else status = 'ok'
     counts[status]++
@@ -106,6 +113,7 @@ export function planPart(input: PlanInput): PartState {
       status,
       reasons,
       heard: file ? (entry?.heard ?? null) : null,
+      accepted: Boolean(file && entry?.accepted),
       duration: file ? (clip?.duration ?? null) : null,
       file,
     }

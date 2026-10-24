@@ -102,6 +102,14 @@ describe('planPart', () => {
     expect(state.lines[0]).toMatchObject({ status: 'weak', heard: 0.8 })
   })
 
+  it('takes a weak clip the user accepted as ok, saying it was accepted', () => {
+    const lock = { ...trackedLock, n1: entryFor(lines[0]!, cast, { heard: 0.8, accepted: true }) }
+    const state = planPart(input({ lock }))
+    expect(state.lines[0]).toMatchObject({ status: 'ok', heard: 0.8, accepted: true })
+    expect(state.lines[1]).toMatchObject({ status: 'ok', accepted: false })
+    expect(state.counts.weak).toBe(0)
+  })
+
   it('lists clips and cues whose line left the dialog', () => {
     const state = planPart(
       input({

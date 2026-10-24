@@ -48,7 +48,7 @@ export function statusDetail(line: LineState, minHeard: number): string {
     case 'uncast':
       return `${line.speaker} has no voice yet`
     case 'ok':
-      return ''
+      return line.accepted ? `heard ${percent(line.heard)}, accepted` : ''
   }
 }
 

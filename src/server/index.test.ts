@@ -423,6 +423,44 @@ describe('server', () => {
   })
 })
 
+describe('server, accepting a weak line', () => {
+  const weakRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'narrator', text: 'Once upon a time.' },
+      { key: 'b', speaker: 'narrator', text: 'Twice.' },
+    ],
+  })
+  const projectFile = join(weakRoot, 'audio-studio.json')
+  const halfHeard = {
+    transcribe: async () => [{ start: 0, end: 0.9, words: [{ word: 'Once', start: 0, end: 0.3 }] }],
+    close() {},
+  }
+  const server = startServer({ projectFile, port: 0, fish, encode, transcriber: halfHeard })
+  afterAll(() => server.stop(true))
+  const accept = (key: string, origin: string | null = server.url.origin) =>
+    fetch(new URL(`/api/parts/act1/lines/${key}/accept`, server.url), {
+      method: 'POST',
+      headers: origin ? { origin } : {},
+    })
+
+  it('accepts a weak line from its own page only, and no other line', async () => {
+    await recordLine(projectFile, 'act1', 'a', async () => fish, {
+      encode,
+      limiter: createLimiter(),
+      transcriber: halfHeard,
+    })
+    expect((await accept('a', 'http://evil.test')).status).toBe(403)
+    expect((await accept('b')).status).toBe(409)
+    expect((await accept('nope')).status).toBe(404)
+    const answer = await accept('a')
+    expect([answer.status, await answer.json()]).toEqual([200, { ok: true, key: 'a' }])
+    const part = await (await fetch(new URL('/api/parts/act1', server.url))).json()
+    expect(part.part.lines[0]).toMatchObject({ status: 'ok', accepted: true })
+  })
+})
+
 describe('allowedHosts', () => {
   it('names both addresses with the port', () => {
     expect(allowedHosts(4801)).toEqual(['127.0.0.1:4801', 'localhost:4801'])

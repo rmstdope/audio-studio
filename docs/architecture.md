@@ -278,6 +278,8 @@ made from. Written one entry per line, keys sorted, so a re-recorded clip is a o
 
 `parts` are short hashes of the inputs that are not kept in the clear, so the planner can say which
 one changed. `heard` and `takes` are absent, and `adopted` is true, for clips made before the studio.
+`accepted` is true when the user accepted a weak clip as it is (Accept on the lines page); recording
+the line again writes a new entry without it.
 
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
@@ -316,7 +318,7 @@ The **planner** gives every line one status:
 | Status      | Meaning                                                                | Action when generating              |
 | ----------- | ---------------------------------------------------------------------- | ----------------------------------- |
 | `ok`        | clip exists, fingerprint matches                                       | none                                |
-| `weak`      | up to date, but the best take was heard below `minHeard`               | offered for a retake, not automatic |
+| `weak`      | up to date, but the best take was heard below `minHeard`, not accepted | offered for a retake, not automatic |
 | `stale`     | clip exists, fingerprint differs; the UI names the inputs that changed | re-record                           |
 | `missing`   | no clip, or its file is absent on disk                                 | record                              |
 | `untracked` | clip exists but has no lock entry: made before the studio              | none; offered for adoption          |
@@ -458,7 +460,8 @@ An audition is for a character, not for a part: the result applies to every part
 
 - Edit a character's style cue or keywords, a line's cue, or the pronunciation table (built):
   saved at once, and affected lines show as stale.
-- Retake a single line (built: Record, or Retake for a weak one). Re-timing one line, or clips
+- Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
+  (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again). Re-timing one line, or clips
   already measured, waits until it is needed: measuring covers clips never checked (§8.2).
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
@@ -522,6 +525,7 @@ GET    /api/credit                               the Fish account's API credit (
 GET    /api/parts/:part                          the part, every line with its status and reason
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
+POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)

@@ -22,6 +22,7 @@ function line(
     status,
     reasons,
     heard: null,
+    accepted: false,
     duration: null,
     file: null,
   }

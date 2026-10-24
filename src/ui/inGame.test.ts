@@ -13,6 +13,7 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     status: 'ok',
     reasons: [],
     heard: null,
+    accepted: false,
     duration: null,
     file: `${key}.mp3`,
     ...overrides,
