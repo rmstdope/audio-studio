@@ -296,6 +296,7 @@ export function useSetStyle(characterId: string) {
 export function useSetSpeed(characterId: string) {
   const client = useQueryClient()
   return useMutation({
+    scope: { id: `speed-${characterId}` },
     mutationFn: async (speed: number | null) => {
       const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
         method: 'PATCH',

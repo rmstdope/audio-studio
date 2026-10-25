@@ -364,7 +364,7 @@ This is the audition built in step 9 (§12).
 
 Every character has a **character page** (`#/characters/<id>`), the one place about it: its
 cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish; the take
-records by itself when missing), its lines per part, its delivery (the style cue) and casting
+records by itself when missing), its lines per part, its delivery (the style cue and its own speed) and casting
 brief (search keywords and audition phrase), the voices ruled out for it, the audition in
 progress, if there is one, and **Hear it in the game**: its recorded lines with their part, cue
 and status, as the game plays them, one by one or all in turn (the first five shown until asked

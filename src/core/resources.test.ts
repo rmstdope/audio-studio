@@ -23,6 +23,13 @@ describe('CastSchema', () => {
       message: expect.stringContaining('__proto__'),
     })
   })
+
+  it('refuses a speed Fish cannot speak at', () => {
+    const slow = CastSchema.safeParse({ speakers: { a: { speed: 0.2 } } })
+    const fast = CastSchema.safeParse({ speakers: { a: { speed: 2.5 } } })
+    expect(slow.success || fast.success).toBe(false)
+    expect(CastSchema.safeParse({ speakers: { a: { speed: 1.5 } } }).success).toBe(true)
+  })
 })
 
 describe('ttsFor', () => {
@@ -32,12 +39,5 @@ describe('ttsFor', () => {
     expect(ttsFor(tts, {})).toEqual(tts)
     expect(ttsFor(tts, undefined)).toEqual(tts)
     expect(ttsFor(tts, { speed: 0.85 })).toEqual({ ...tts, speed: 0.85 })
-  })
-
-  it('refuses a speed Fish cannot speak at', () => {
-    const slow = CastSchema.safeParse({ speakers: { a: { speed: 0.2 } } })
-    const fast = CastSchema.safeParse({ speakers: { a: { speed: 2.5 } } })
-    expect(slow.success || fast.success).toBe(false)
-    expect(CastSchema.safeParse({ speakers: { a: { speed: 1.5 } } }).success).toBe(true)
   })
 })

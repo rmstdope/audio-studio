@@ -126,14 +126,7 @@ async function speak(
     const cached = await limiter.run(key, quality.parallel, async () => {
       // Another request may have recorded it while this one waited: never pay for it twice.
       if (existsSync(file)) return true
-      const audio = await fish.tts({
-        text: spoken,
-        voice,
-        model: models.audition,
-        temperature: tts.temperature,
-        topP: tts.topP,
-        speed: tts.speed,
-      })
+      const audio = await fish.tts({ text: spoken, voice, model: models.audition, ...tts })
       if (!audio.length) throw new Error('Fish Audio sent no audio')
       await writeAtomic(root, takePath(key), audio)
       return false

@@ -218,12 +218,15 @@ export function SpeedEditor({
           inputMode="decimal"
           min={SPEED.min}
           max={SPEED.max}
-          step={0.05}
+          // Any value in range, as the schema takes it: a step would refuse 0.93 at the submit.
+          step="any"
           placeholder={String(projectSpeed)}
           value={shown}
           onChange={(e) => {
             if (save.data || save.error) save.reset()
-            setDraft(e.target.value)
+            // Text the browser cannot read as a number ("1,2" in some locales) comes as an empty
+            // value: kept as not a number, so it is never saved as the project's speed.
+            setDraft(e.target.validity.badInput ? 'not a number' : e.target.value)
           }}
         />
         <button
