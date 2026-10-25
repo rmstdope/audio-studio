@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { problemsFrom } from './project'
-import { CastSchema, ttsFor } from './resources'
+import { CastSchema, projectCast, ttsFor, voiceOf } from './resources'
 
 describe('CastSchema', () => {
   it('explains a pronunciation without the word it replaces', () => {
@@ -39,5 +39,74 @@ describe('ttsFor', () => {
     expect(ttsFor(tts, {})).toEqual(tts)
     expect(ttsFor(tts, undefined)).toEqual(tts)
     expect(ttsFor(tts, { speed: 0.85 })).toEqual({ ...tts, speed: 0.85 })
+  })
+})
+
+describe('a character per language', () => {
+  const cast = CastSchema.parse({
+    speakers: {
+      gran: {
+        voice: 'en-voice',
+        voiceName: 'Gentle Granny',
+        style: '[warm]',
+        speed: 0.9,
+        audition: { keywords: ['warm'], phrase: 'Come in.' },
+        languages: {
+          sv: { voice: 'sv-voice', voiceName: 'Varm Mormor', speed: 0.95, phrase: 'Kom in.' },
+        },
+      },
+      mira: { voice: 'm-voice', voiceName: 'Mira' },
+    },
+  })
+
+  it('reads the language voices of a character', () => {
+    expect(cast.speakers.gran?.languages?.sv?.voice).toBe('sv-voice')
+  })
+
+  it('refuses a language speed Fish cannot speak at', () => {
+    expect(
+      CastSchema.safeParse({ speakers: { a: { languages: { sv: { speed: 3 } } } } }).success,
+    ).toBe(false)
+  })
+
+  it('gives the source language the top-level fields', () => {
+    expect(voiceOf(cast.speakers.gran!, 'en', 'en')).toEqual({
+      voice: 'en-voice',
+      voiceName: 'Gentle Granny',
+      speed: 0.9,
+      phrase: 'Come in.',
+    })
+  })
+
+  it('gives another language its own fields, and nothing of the source language', () => {
+    expect(voiceOf(cast.speakers.gran!, 'sv', 'en')).toEqual({
+      voice: 'sv-voice',
+      voiceName: 'Varm Mormor',
+      speed: 0.95,
+      phrase: 'Kom in.',
+    })
+    expect(voiceOf(cast.speakers.mira!, 'sv', 'en')).toEqual({
+      voice: null,
+      voiceName: null,
+      speed: null,
+      phrase: null,
+    })
+  })
+
+  it('projects the cast: the source language is as it is', () => {
+    expect(projectCast(cast, 'en', 'en')).toBe(cast)
+  })
+
+  it('projects the cast into a language: its voice, speed and phrase in the top-level places', () => {
+    const sv = projectCast(cast, 'sv', 'en')
+    expect(sv.speakers.gran).toMatchObject({
+      voice: 'sv-voice',
+      voiceName: 'Varm Mormor',
+      speed: 0.95,
+      style: '[warm]',
+      audition: { keywords: ['warm'], phrase: 'Kom in.' },
+    })
+    expect(sv.speakers.mira?.voice).toBeUndefined()
+    expect(sv.pronounce).toEqual(cast.pronounce)
   })
 })

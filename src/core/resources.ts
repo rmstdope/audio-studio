@@ -24,6 +24,15 @@ export const DialogSchema = z.array(LineSchema).superRefine((lines, context) => 
 /** The speeds Fish speaks at: half to double. */
 export const SPEED = { min: 0.5, max: 2 }
 
+/** A character's casting in one language other than the source: its voice, speed and phrase there. */
+export const LanguageVoiceSchema = z.looseObject({
+  voice: z.string().min(1).optional(),
+  voiceName: z.string().optional(),
+  speed: z.number().min(SPEED.min).max(SPEED.max).optional(),
+  /** The character's own audition phrase in this language. */
+  phrase: z.string().optional(),
+})
+
 /**
  * One character in the project-wide cast. Unknown fields are kept, so writing the cast back
  * never drops what another tool put there.
@@ -40,6 +49,11 @@ export const CharacterSchema = z.looseObject({
       phrase: z.string().nullable().optional(),
     })
     .optional(),
+  /**
+   * The casting in the languages other than the source language, whose voice, speed and phrase
+   * are the fields above; by language code.
+   */
+  languages: z.record(z.string(), LanguageVoiceSchema).optional(),
 })
 
 /**
@@ -74,6 +88,62 @@ export const CastSchema = z.looseObject({
   speakers: z.record(z.string(), CharacterSchema).default({}),
   pronounce: PronounceSchema.default({}),
 })
+
+/** A character's casting in one language: nulls where it has none. */
+export interface LanguageCasting {
+  voice: string | null
+  voiceName: string | null
+  speed: number | null
+  phrase: string | null
+}
+
+/**
+ * A character's voice, speed and own audition phrase in `language`: the source language's are the
+ * entry's own fields, another language's are under `languages`.
+ */
+export function voiceOf(
+  character: Character | undefined,
+  language: string,
+  source: string,
+): LanguageCasting {
+  const own =
+    language === source
+      ? {
+          voice: character?.voice,
+          voiceName: character?.voiceName,
+          speed: character?.speed,
+          phrase: character?.audition?.phrase?.trim() || undefined,
+        }
+      : (character?.languages?.[language] ?? {})
+  return {
+    voice: own.voice ?? null,
+    voiceName: own.voiceName ?? null,
+    speed: own.speed ?? null,
+    phrase: own.phrase?.trim() || null,
+  }
+}
+
+/**
+ * The cast as `language` sees it: every character with that language's voice, speed and phrase in
+ * the fields the planner and the takes read. The source language sees the cast as it is.
+ */
+export function projectCast(cast: Cast, language: string, source: string): Cast {
+  if (language === source) return cast
+  const speakers = Object.fromEntries(
+    Object.entries(cast.speakers).map(([id, entry]) => {
+      const { voice, voiceName, speed, phrase } = voiceOf(entry, language, source)
+      const { voice: _v, voiceName: _n, speed: _s, languages: _l, audition, ...rest } = entry
+      const projected: Character = { ...rest }
+      if (voice) projected.voice = voice
+      if (voiceName) projected.voiceName = voiceName
+      if (speed !== null) projected.speed = speed
+      const own = { ...audition, phrase }
+      if (audition || phrase) projected.audition = own
+      return [id, projected]
+    }),
+  )
+  return { ...cast, speakers }
+}
 
 /**
  * The settings a character is spoken with: the project's, with the character's own speed when it
