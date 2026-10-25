@@ -1434,16 +1434,12 @@ a.btn {
   border: 1px solid var(--own-line);
 }
 
-.bar-error {
+/* Fish's reason beside the Try again button. */
+.own-error {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  padding: 10px 14px;
-  border: 1px solid var(--drop-on-line);
-  border-radius: var(--radius);
-  background: var(--danger-bg);
-  color: var(--danger-ink);
 }
 
 .card-actions {

@@ -167,7 +167,7 @@ describe('your own voices', () => {
     expect(again.yours).toEqual(['m3', 'm4'])
     expect(again.shortlist).toEqual(['m1'])
     expect(again.voices.m1?.own).toBe(true)
-    expect(setOwnVoices(again, [mine('m1'), mine('m2'), mine('m3'), mine('m4')])).toEqual(again)
+    expect(setOwnVoices(again, [mine('m1'), mine('m2'), mine('m3'), mine('m4')])).toBe(again)
   })
 
   it('keeps an own voice ruled out in an earlier audition out of Your voices', () => {

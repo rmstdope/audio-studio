@@ -16,9 +16,12 @@ import {
   sessionFor,
   startAudition,
   undoLastDrop,
+  viewOf,
 } from './sessions'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { setKeywords } from './auditions'
+import { createLimiter } from './limit'
+import { recordTake } from './takes'
 
 /** Rules voices out, as a drop does. */
 const ruleOutVoices = (
@@ -449,11 +452,23 @@ describe('refreshOwnVoices', () => {
     const { projectFile } = await started()
     const first = await refreshOwnVoices(projectFile, 'mira', fishFor)
     expect(first?.ok && first.session.yours).toEqual(['m1'])
+    const kept = await sessionFor(projectFile, 'mira')
+    expect(kept?.ok && kept.session?.voices.m1?.own).toBe(true)
     ownVoices = [mine('m1'), mine('m2')]
     const again = await refreshOwnVoices(projectFile, 'mira', fishFor)
     expect(again?.ok && again.session.yours).toEqual(['m1', 'm2'])
     const saved = await sessionFor(projectFile, 'mira')
     expect(saved?.ok && saved.session?.yours).toEqual(['m1', 'm2'])
+    ownVoices = []
+  })
+
+  it('shows the take of an own voice with the board', async () => {
+    ownVoices = [mine('m1')]
+    const { projectFile } = await started()
+    const result = await refreshOwnVoices(projectFile, 'mira', fishFor)
+    await recordTake(projectFile, 'mira', 'm1', fishFor, createLimiter())
+    const view = await viewOf(projectFile, 'mira', result!)
+    expect(view.ok && Object.keys(view.takes)).toEqual(['m1'])
     ownVoices = []
   })
 

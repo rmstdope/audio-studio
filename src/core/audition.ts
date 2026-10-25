@@ -77,8 +77,8 @@ export function startSession(options: {
 
 /**
  * The session with the user's own voices: all of them in Your voices (an own voice the search
- * found leaves To hear and the queue), except those already shortlisted, dropped or ruled out for the character. Each is marked
- * as own wherever it is, the current voice included. Voices gone from the account leave the section.
+ * found leaves To hear and the queue), except those already shortlisted, dropped or ruled out
+ * for the character. Each is marked as own wherever it is, the current voice included. Voices gone from the account leave the section.
  */
 export function setOwnVoices(
   session: AuditionSession,
@@ -91,7 +91,7 @@ export function setOwnVoices(
   const keep = session.yours.filter((id) => known.has(id))
   const added = ids.filter((id) => !placed.has(id) && !keep.includes(id))
   const marked = Object.fromEntries(own.map((v) => [v.id, { ...v, own: true }]))
-  return {
+  const next = {
     ...session,
     yours: [...keep, ...added],
     mine: ids,
@@ -99,6 +99,8 @@ export function setOwnVoices(
     queue: session.queue.filter((id) => !known.has(id)),
     voices: { ...session.voices, ...marked },
   }
+  // Nothing new: the same session, so nothing is written again.
+  return JSON.stringify(next) === JSON.stringify(session) ? session : next
 }
 
 /** The session with a voice moved from Your voices or those to hear to the end of the shortlist. */

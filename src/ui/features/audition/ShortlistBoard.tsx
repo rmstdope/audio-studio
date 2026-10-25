@@ -289,8 +289,10 @@ export function ShortlistBoard({
           )}
         </div>
         {own.error && (
-          <div className="bar-error" role="alert">
-            <span>Fish didn’t send your own voices: {own.error.replace(/\.$/, '')}.</span>
+          <div className="own-error" role="alert">
+            <span className="adopt-error">
+              Fish didn’t send your own voices: {own.error.replace(/\.$/, '')}.
+            </span>
             <button
               className="btn btn-small"
               type="button"

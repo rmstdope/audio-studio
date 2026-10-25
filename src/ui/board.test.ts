@@ -181,7 +181,8 @@ describe('ownSectionState', () => {
     expect(ownSectionState({ yours: [], mine: [] }, { fetched: false, error: null })).toBe(
       'loading',
     )
-    expect(ownSectionState(some, { fetched: false, error: null })).toBe('cards')
+    // On a resume too: the earlier fetch's voices wait for Fish's answer, as the acceptance says.
+    expect(ownSectionState(some, { fetched: false, error: null })).toBe('loading')
   })
   it('says the account has none once Fish answered with none', () => {
     expect(ownSectionState({ yours: [], mine: [] }, { fetched: true, error: null })).toBe('none')
@@ -191,7 +192,7 @@ describe('ownSectionState', () => {
       'allUsed',
     )
     expect(ownSectionState({ yours: [], mine: ['m1'] }, { fetched: false, error: null })).toBe(
-      'allUsed',
+      'loading',
     )
   })
   it('shows the voices, and the error, when Fish could not be asked again', () => {

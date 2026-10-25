@@ -634,17 +634,10 @@ export function useOwnVoices(characterId: string) {
       }
       return (await response.json()) as SessionView
     },
+    // Not the answer itself: moves made meanwhile may have been answered after it, so the
+    // board is read again, in the server's order.
     onSuccess: (view) => {
-      if (!view.ok) return
-      client.setQueryData<SessionView>(['session', characterId], (old) => {
-        if (!old?.ok) return view
-        // Moves made meanwhile are in the answer; keep the recorded lines and takes shown.
-        return {
-          ...view,
-          recorded: view.recorded ?? old.recorded,
-          takes: { ...old.takes, ...view.takes },
-        }
-      })
+      if (view.ok) void client.invalidateQueries({ queryKey: ['session', characterId] })
     },
   })
   const failure = mutation.data && !mutation.data.ok ? mutation.data : null
