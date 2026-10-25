@@ -305,7 +305,12 @@ describe('a part in several languages', () => {
   }
   const files = {
     'audio-studio.json': project(['en', 'sv', 'de']),
-    'tts/cast.json': { speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } } },
+    'tts/cast.json': {
+      speakers: {
+        narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } },
+        mira: { voice: 'v2', languages: { sv: { voice: 'v2-sv' } } },
+      },
+    },
     'tts/act1/en/script.json': script,
     'tts/act1/sv/script.json': [
       { key: 'a', speaker: 'narrator', text: 'En gång.' },
@@ -331,6 +336,29 @@ describe('a part in several languages', () => {
       ['z', 'missing', 'Bara här.', null],
     ])
     expect(part.clipsPath).toBe('audio/act1/sv')
+  })
+
+  it('plans a language with the voices cast for it, not the source language’s', async () => {
+    const cast = { speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } } }
+    const { part } = await open('sv', 'act1', { 'tts/cast.json': cast })
+    expect(part.lines.map((l) => [l.key, l.status])).toEqual([
+      ['a', 'uncast'],
+      ['b', 'untranslated'],
+      ['z', 'uncast'],
+    ])
+    expect((await open('en', 'act1', { 'tts/cast.json': cast })).part.lines[0]?.status).toBe(
+      'missing',
+    )
+  })
+
+  it('reads every language’s dialog into the summary, a missing one is no problem', async () => {
+    const root = tempRepo(files)
+    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    if (!loaded.ok) throw new Error('expected a summary')
+    const narrator = loaded.summary.characters.find((c) => c.id === 'narrator')!
+    expect(narrator.languages.sv).toMatchObject({ voice: 'v1-sv', totalLines: 1 })
+    expect(narrator.languages.de).toMatchObject({ voice: null, totalLines: 0 })
+    expect(loaded.summary.problems.map((p) => p.file)).not.toContain('tts/act1/de/script.json')
   })
 
   it('reads the source language when none is asked for, or one is not declared', async () => {

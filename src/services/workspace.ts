@@ -19,6 +19,7 @@ import {
   DialogSchema,
   LockSchema,
   ManifestSchema,
+  projectCast,
   type Cast,
 } from '../core/resources'
 import { summarize, type DialogState, type ProjectSummary } from '../core/summary'
@@ -105,6 +106,14 @@ export async function loadWorkspace(projectFile: string): Promise<
   for (const part of project.narration.parts) {
     dialogs[part.id] = await readDialog(root, project, part, problems)
   }
+  // The other languages' dialogs say where a character speaks in each; a missing one is no problem.
+  const languageDialogs: Record<string, Record<string, DialogState>> = {}
+  for (const language of project.narration.languages.slice(1)) {
+    languageDialogs[language] = {}
+    for (const part of project.narration.parts) {
+      languageDialogs[language][part.id] = await readDialog(root, project, part, problems, language)
+    }
+  }
   return {
     ok: true,
     project,
@@ -114,6 +123,7 @@ export async function loadWorkspace(projectFile: string): Promise<
       projectFile: basename(projectFile),
       root,
       dialogs,
+      languageDialogs,
       cast,
       problems,
     }),
@@ -350,7 +360,11 @@ export async function readPart(
     input: {
       lines: dialog.status === 'ok' ? dialog.lines : [],
       ...(source?.status === 'ok' ? { source: source.lines } : {}),
-      cast: cast ?? { speakers: {}, pronounce: {} },
+      cast: projectCast(
+        cast ?? { speakers: {}, pronounce: {} },
+        language,
+        project.narration.languages[0]!,
+      ),
       cues: cues ?? {},
       lock: lock ?? {},
       manifest: manifest ?? {},
