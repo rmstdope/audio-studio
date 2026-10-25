@@ -215,7 +215,7 @@ export function startServer({
   async function answer(
     characterId: string,
     pending: Promise<SessionResult>,
-    options: { recorded?: boolean } = {},
+    options: { recorded?: boolean; language?: string } = {},
   ): Promise<Response> {
     const result = await pending
     if (!result) return notFound()
@@ -300,11 +300,11 @@ export function startServer({
 
   /** What generating a part (or one speaker in it) would do, or why it can't be planned. */
   /** Saves the one field of a character a PATCH changes. */
-  function changeCharacter(id: string, change: z.infer<typeof CharacterBody>) {
+  function changeCharacter(id: string, change: z.infer<typeof CharacterBody>, language?: string) {
     if ('keywords' in change) return setKeywords(projectFile, id, change.keywords)
     if ('style' in change) return setStyle(projectFile, id, change.style)
-    if ('speed' in change) return setSpeed(projectFile, id, change.speed)
-    return setPhrase(projectFile, id, change.phrase)
+    if ('speed' in change) return setSpeed(projectFile, id, change.speed, language)
+    return setPhrase(projectFile, id, change.phrase, language)
   }
 
   async function planFor(
@@ -583,7 +583,7 @@ export function startServer({
             )
           }
           const { id } = request.params
-          const result = await changeCharacter(id, body.data)
+          const result = await changeCharacter(id, body.data, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -729,7 +729,14 @@ export function startServer({
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { id } = request.params
-          const result = await recordTake(projectFile, id, body.data.voice, fishFor, fishWork)
+          const result = await recordTake(
+            projectFile,
+            id,
+            body.data.voice,
+            fishFor,
+            fishWork,
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: 'problems' in result ? 409 : 200 })
         }),
@@ -737,25 +744,39 @@ export function startServer({
       '/api/auditions/:id': {
         GET: guard(async (request) => {
           const { id } = request.params
-          const result = await sessionFor(projectFile, id)
-          return result ? Response.json(await viewOf(projectFile, id, result)) : notFound()
+          const language = languageOf(request)
+          const result = await sessionFor(projectFile, id, language)
+          return result
+            ? Response.json(await viewOf(projectFile, id, result, { language }))
+            : notFound()
         }),
         DELETE: fromOwnPage(async (request) => {
           const { id } = request.params
-          const discarded = await discardSession(projectFile, id)
+          const language = languageOf(request)
+          const discarded = await discardSession(projectFile, id, language)
           if (!discarded) return notFound()
           if (discarded !== true) return Response.json(discarded, { status: 409 })
-          return Response.json(await viewOf(projectFile, id, { ok: true, session: null }))
+          return Response.json(
+            await viewOf(projectFile, id, { ok: true, session: null }, { language }),
+          )
         }),
       },
       '/api/auditions/:id/start': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, startAudition(projectFile, request.params.id, fishFor)),
+          answer(
+            request.params.id,
+            startAudition(projectFile, request.params.id, fishFor, languageOf(request)),
+            { language: languageOf(request) },
+          ),
         ),
       },
       '/api/auditions/:id/own': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, refreshOwnVoices(projectFile, request.params.id, fishFor)),
+          answer(
+            request.params.id,
+            refreshOwnVoices(projectFile, request.params.id, fishFor, languageOf(request)),
+            { language: languageOf(request) },
+          ),
         ),
       },
       '/api/auditions/:id/move': {
@@ -769,19 +790,29 @@ export function startServer({
           }
           const { voice, move } = body.data
           const { id } = request.params
-          return answer(id, moveVoice(projectFile, id, voice, move), { recorded: false })
+          const language = languageOf(request)
+          return answer(id, moveVoice(projectFile, id, voice, move, language), {
+            recorded: false,
+            language,
+          })
         }),
       },
       '/api/auditions/:id/undo': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, undoLastDrop(projectFile, request.params.id), {
-            recorded: false,
-          }),
+          answer(
+            request.params.id,
+            undoLastDrop(projectFile, request.params.id, languageOf(request)),
+            { recorded: false, language: languageOf(request) },
+          ),
         ),
       },
       '/api/auditions/:id/more': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, moreVoices(projectFile, request.params.id, fishFor)),
+          answer(
+            request.params.id,
+            moreVoices(projectFile, request.params.id, fishFor, languageOf(request)),
+            { language: languageOf(request) },
+          ),
         ),
       },
       '/api/auditions/:id/add': {
@@ -789,22 +820,32 @@ export function startServer({
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { id } = request.params
-          return answer(id, addVoiceById(projectFile, id, body.data.voice, fishFor))
+          const language = languageOf(request)
+          return answer(id, addVoiceById(projectFile, id, body.data.voice, fishFor, language), {
+            language,
+          })
         }),
       },
       '/api/auditions/:id/cast': {
         POST: fromOwnPage(async (request) => {
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
-          const result = await castVoice(projectFile, request.params.id, body.data.voice)
+          const result = await castVoice(
+            projectFile,
+            request.params.id,
+            body.data.voice,
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
       '/api/characters/:id/ruled-out': {
-        GET: guard(async (request) => ruledOut(ruledOutVoices(projectFile, request.params.id))),
+        GET: guard(async (request) =>
+          ruledOut(ruledOutVoices(projectFile, request.params.id, languageOf(request))),
+        ),
         DELETE: fromOwnPage((request) =>
-          ruledOut(allowVoices(projectFile, request.params.id, 'all')),
+          ruledOut(allowVoices(projectFile, request.params.id, 'all', languageOf(request))),
         ),
       },
       '/api/characters/:id/ruled-out/:voice': {
@@ -812,7 +853,7 @@ export function startServer({
           const { id, voice } = request.params
           if (!VOICE_ID.test(voice))
             return Response.json({ error: 'not a voice id' }, { status: 400 })
-          return ruledOut(allowVoices(projectFile, id, [voice]))
+          return ruledOut(allowVoices(projectFile, id, [voice], languageOf(request)))
         }),
       },
       '/api/takes/:file': {
@@ -824,7 +865,12 @@ export function startServer({
       },
       '/api/characters/:id/voice': {
         GET: guard(async (request) => {
-          const result = await characterVoice(projectFile, request.params.id, fishFor)
+          const result = await characterVoice(
+            projectFile,
+            request.params.id,
+            fishFor,
+            languageOf(request),
+          )
           return result ? Response.json(result) : notFound()
         }),
       },
