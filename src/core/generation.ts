@@ -50,7 +50,7 @@ const encoder = new TextEncoder()
 /**
  * What generating would do, for the whole part or one speaker in it: record every missing and
  * stale line (and the weak ones, if asked), and offer to remove the orphans. Also lists the clips
- * that could be measured with Whisper without new audio.
+ * that could be measured with Whisper without new audio, and the weak lines it could check again.
  */
 export function planGeneration(
   state: { lines: LineState[]; orphans: Orphan[] },

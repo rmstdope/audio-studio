@@ -522,6 +522,8 @@ export interface MeasureOptions {
   transcriber: Transcriber | null
   /** Check a clip Whisper already checked again (Check again), with the rules of today. */
   again?: boolean
+  /** In a job: a line that no longer needs it when its turn comes is skipped, not refused. */
+  onlyIfNeeded?: boolean
   decode?: (file: string) => Promise<{ wav: Uint8Array; seconds: number }>
 }
 
@@ -529,14 +531,14 @@ export interface MeasureOptions {
  * Measures a recorded clip without new audio (narrate.py `--retime`): its length from the decoded
  * audio, what Whisper hears in it, the words aligned. The manifest gets the word timings and
  * length, the lock how well the clip is heard, so a clip heard poorly shows as weak. Only
- * up-to-date clips never measured are, or, `again`, weak lines, scored with the rules of today; nothing is written if the clip was recorded again
- * meanwhile (its lock entry's time changed).
+ * up-to-date clips never measured are, or, `again`, weak lines, scored with the rules of today;
+ * nothing is written if the clip was recorded again meanwhile (its lock entry's time changed).
  */
 export async function measureLine(
   projectFile: string,
   partId: string,
   key: string,
-  { transcriber, decode = decodeClip, again = false }: MeasureOptions,
+  { transcriber, decode = decodeClip, again = false, onlyIfNeeded = false }: MeasureOptions,
 ): Promise<MeasureResult> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
@@ -559,6 +561,8 @@ export async function measureLine(
   const checked = before?.heard !== undefined
   const fits = again ? state?.status === 'weak' : state?.status === 'ok' && !checked
   if (!fits || !entry || !before) {
+    // Accepted, checked or recorded again since the job began: nothing left to do for it.
+    if (onlyIfNeeded && state) return { ok: true, key, skipped: true }
     return {
       ok: false,
       reason: 'not-recorded',

@@ -892,6 +892,13 @@ describe.skipIf(!Bun.which('ffmpeg'))('server, measuring clips', () => {
     ).json()
     expect(job.kind).toBe('check')
     expect(await finish(job.id)).toMatchObject({ status: 'done', done: 1, failed: [] })
+    // Only the weak lines of the server's own plan are taken.
+    const other = await fetch(at('/api/parts/act1/jobs'), {
+      method: 'POST',
+      headers: own,
+      body: JSON.stringify({ kind: 'check', speaker: null, keys: ['b'], orphans: [] }),
+    })
+    expect([other.status, await other.json()]).toEqual([409, { error: 'There is nothing to do.' }])
   })
 
   it('checks a weak line again from its own page, and no line it cannot', async () => {
