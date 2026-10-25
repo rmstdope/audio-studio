@@ -897,6 +897,9 @@ Small, independently useful increments:
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
+   What a paid account could still have (paid auditions and extra takes, the `s1` retirement, your own voices,
+   cloning and design, the rate tier, a spend log) is in `docs/paid-account.md`, not planned yet.
+
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in
       `.audio-studio/ruled-out/`, left out of every later search for it; listed on the character
