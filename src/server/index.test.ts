@@ -2485,6 +2485,9 @@ describe('server, the spending record', () => {
     const now = await spending()
     expect(now.count).toBe(before + 1)
     expect(now.rows[0]).toMatchObject({ lines: 1, planned: 1, state: 'done' })
+  })
+})
+
 describe('designing a voice', () => {
   const repo = tempRepo({
     'audio-studio.json': projectJson(),
