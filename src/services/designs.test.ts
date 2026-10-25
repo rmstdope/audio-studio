@@ -231,3 +231,46 @@ describe('castDesign', () => {
     expect(fish.created).toEqual([])
   })
 })
+
+describe('designs per language', () => {
+  const base = projectJson()
+  const several = {
+    ...files,
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+      },
+    },
+    'tts/act1/script.json': undefined,
+    'tts/act1/en/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
+    'tts/act1/sv/script.json': [{ key: 'a1', speaker: 'mira', text: 'Välkommen.' }],
+  }
+
+  it('keeps the designs and the last description of each language apart', async () => {
+    const projectFile = join(tempRepo(several), 'audio-studio.json')
+    const { fishFor, designed } = fishThat()
+    await designVoices(projectFile, 'mira', 'en voice', fishFor, encode, 'en')
+    await designVoices(projectFile, 'mira', 'sv voice', fishFor, encode, 'sv')
+    expect(designed.map((d) => d.language)).toEqual(['en', 'sv'])
+    expect(await designsFor(projectFile, 'mira', 'en')).toEqual({
+      ok: true,
+      description: 'en voice',
+    })
+    expect(await designsFor(projectFile, 'mira', 'sv')).toEqual({
+      ok: true,
+      description: 'sv voice',
+    })
+    expect(Object.keys((await readDesigns(projectFile, 'mira', 'sv')).voices).length).toBe(4)
+    const swedish = await startAudition(projectFile, 'mira', fishFor, 'sv')
+    expect(swedish?.ok && swedish.session.designed.length).toBe(4)
+  })
+})
