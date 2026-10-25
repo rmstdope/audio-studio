@@ -147,6 +147,20 @@ describe('loadPart', () => {
     const result = await loadPart(join(root, 'audio-studio.json'), 'act2')
     expect(result?.ok && [result.part.dialog, result.part.lines.length]).toEqual(['missing', 0])
   })
+
+  it('counts no clip or cue as orphaned while the dialog cannot be read', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': '[not json',
+      'tts/act1/cues.json': { a: '[softly]' },
+    })
+    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    if (!result?.ok) throw new Error('expected the part to load')
+    const { part } = result
+    expect(part.dialog).toBe('invalid')
+    expect(part.problems.map((p) => p.file)).toContain('tts/act1/script.json')
+    expect([part.orphans, part.orphanCues]).toEqual([[], []])
+  })
 })
 
 describe('adoptPart', () => {
