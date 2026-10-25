@@ -1101,7 +1101,9 @@ describe('server, a paid draft model', () => {
       expect(body).toMatchObject({ ok: false, reason: 'confirm' })
       // 17 bytes of text at $15 per million: one take, not the three a recording is held to.
       expect(body.ceiling).toBeCloseTo((17 / 1_000_000) * 15, 12)
-      expect((await takeAgain(body.ceiling / 2)).status).toBe(409)
+      const small = await takeAgain(body.ceiling / 2)
+      expect(small.status).toBe(409)
+      expect(await small.json()).toMatchObject({ ok: false, reason: 'confirm' })
       expect(spoken).toBe(before)
       credit = body.ceiling / 2
       expect(await (await takeAgain(body.ceiling)).json()).toMatchObject({
@@ -1117,6 +1119,31 @@ describe('server, a paid draft model', () => {
       expect(spoken).toBe(before + 1)
       const listed = await (await fetch(takes())).json()
       expect(listed.takes).toHaveLength(1)
+    })
+
+    it('records nothing when the account’s credit is unknown', async () => {
+      const before = spoken
+      const was = account.credit
+      account.credit = async () => {
+        throw new Error('Fish is down')
+      }
+      try {
+        const answer = await takeAgain(1)
+        expect(answer.status).toBe(409)
+        expect(await answer.json()).toMatchObject({
+          ok: false,
+          reason: 'credit',
+          message: 'The account’s credit is unknown, so nothing is recorded.',
+        })
+        expect(spoken).toBe(before)
+      } finally {
+        account.credit = was
+      }
+    })
+
+    it('answers a body it cannot read with 400', async () => {
+      const bad = await fetch(takes(), { method: 'POST', headers: own, body: '{ not json' })
+      expect(bad.status).toBe(400)
     })
 
     it('refuses a request from another page', async () => {

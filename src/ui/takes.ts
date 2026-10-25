@@ -75,17 +75,15 @@ export function isAbout(answer: { id: string | null }, voiceId: string | null): 
 }
 
 /** The words of a line's takes list for its draft model: free, or paid and so asking first. */
-export function extraTakeWords(model: string): { paid: boolean; empty: string; hover: string } {
+export function extraTakeWords(model: string): { empty: string; hover: string } {
   if ((FREE_MODELS as readonly string[]).includes(model)) {
     return {
-      paid: false,
       empty:
         'No extra takes yet. Another take records the line once more, with the free model, to compare with the clip; it costs nothing and changes nothing until you use it.',
       hover: 'Record the line once more, with the free model, into the cache',
     }
   }
   return {
-    paid: true,
     empty: `No extra takes yet. Another take records the line once more with the draft model, ${model}, which is paid: it asks what it can cost before it spends, and changes nothing until you use it.`,
     hover: `Record the line once more, with the paid draft model ${model}, into the cache; asks before it spends`,
   }

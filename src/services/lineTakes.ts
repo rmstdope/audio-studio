@@ -58,7 +58,8 @@ export async function listLineTakes(
 /**
  * Records one more take of a line into the tool cache, with the draft model, charged to `budget`
  * (a zero one for the free model; a paid model's is what the user confirmed), checked by Whisper
- * when the project checks takes. The take is kept as a WAV beside what was made of it; nothing of the game's is written
+ * when the project checks takes. The take is kept as a WAV beside what was made of it; nothing
+ * of the game's is written
  * until the user chooses it (`useLineTake`).
  */
 export async function takeLine(

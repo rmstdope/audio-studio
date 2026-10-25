@@ -96,7 +96,6 @@ describe('extraTakeWords', () => {
       'No extra takes yet. Another take records the line once more, with the free model, to compare with the clip; it costs nothing and changes nothing until you use it.',
     )
     expect(words.hover).toBe('Record the line once more, with the free model, into the cache')
-    expect(words.paid).toBe(false)
   })
 
   it('names a paid draft model, and says it asks before it spends', () => {
@@ -107,7 +106,6 @@ describe('extraTakeWords', () => {
     expect(words.hover).toBe(
       'Record the line once more, with the paid draft model s2.1-pro, into the cache; asks before it spends',
     )
-    expect(words.paid).toBe(true)
   })
 })
 

@@ -536,8 +536,8 @@ An audition is for a character, not for a part: the result applies to every part
   when it starts: filtering afterwards does not change it, and Stop stays offered. The row
   playing is marked and kept in view; a clip that fails is skipped.
 - Extra takes of a line (built: **Takes** on its row, opening a list under it): **Another take**
-  has Fish speak the line once more with the draft model, checked by Whisper when the project checks takes, and kept in the tool cache as a
-  WAV with its score and timings; nothing of the game's is written. Each take is played, compared
+  has Fish speak the line once more with the draft model, checked by Whisper when the project
+  checks takes, and kept in the tool cache as a WAV with its score and timings; nothing of the game's is written. Each take is played, compared
   by score and length, and **Use this take** makes it the line's clip, encoded and written with the
   manifest and lock exactly as a recording is (the same `commitClip`), or dropped. A take made from
   other inputs than today's (the cue, text, voice or settings changed) is marked stale: heard, not
@@ -547,7 +547,8 @@ An audition is for a character, not for a part: the result applies to every part
   draft model Another take first asks what it can cost (the same `admit` as Record, priced for one
   take, not the `quality.takes` a recording is held to): **Pay up to $X** and **Cancel** replace the
   button, every take asks again, and nothing of the ask is kept; the take is charged to the budget
-  confirmed, so no more than that reaches Fish. Whisper's best is not always the best read; this lets the ear decide.
+  confirmed, so no more than that reaches Fish. Whisper's best is not always the best read; this
+  lets the ear decide.
 - Keys on the lines table (built): a row takes focus (Tab, or a click); j/k and the arrows
   move, space or Enter plays, f plays from there, r records or retakes, a accepts, h shows what
   was heard, c edits the cue, n the note, t opens the takes. A hint under the table lists them. Nothing while typing
@@ -900,7 +901,7 @@ Small, independently useful increments:
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
-   What a paid account could still have (paid auditions and extra takes, the `s1` retirement, your own voices,
+   What a paid account could still have (paid auditions, the `s1` retirement, your own voices,
    cloning and design, the rate tier, a spend log) is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:
