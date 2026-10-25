@@ -2201,3 +2201,113 @@ a.btn {
     justify-content: flex-end;
   }
 }
+
+.clone-open {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+}
+
+/* In the play row, the button is at the right; the form or card spans the whole row. */
+.voice-listen > .clone-open {
+  justify-content: flex-end;
+  align-self: center;
+}
+
+.voice-listen > .clone-form,
+.voice-listen > .clone-card {
+  grid-column: 1 / -1;
+}
+
+.clone-form,
+.clone-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--inset);
+  border: 1px solid var(--line-strong);
+  min-width: 0;
+}
+
+.clone-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clone-drop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--line-strong);
+  font-size: 13px;
+}
+
+.clone-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.clone-files li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+
+.clone-files li.left-out .clone-file-name {
+  text-decoration: line-through;
+  color: var(--faint);
+}
+
+.clone-file-name {
+  flex: 1 1 12ch;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clone-permit {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+}
+
+.clone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clone-card-voice {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.clone-card .block {
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .clone-card-buttons {
+    flex-direction: column;
+  }
+
+  .clone-card-buttons .btn {
+    width: 100%;
+  }
+}

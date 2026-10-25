@@ -51,6 +51,59 @@ describe('createFishClient', () => {
     await expect(createFishClient('k', { fetch }).listOwnVoices()).rejects.toThrow('nope')
   })
 
+  it('makes a private voice from recordings with a multipart request', async () => {
+    const { fetch, requests } = fakeFetch(apiVoice)
+    const client = createFishClient('secret', { fetch })
+    const voice = await client.createVoice({
+      title: 'Elior',
+      files: [
+        { name: 'a.wav', type: 'audio/wav', bytes: new Uint8Array([1, 2]) },
+        { name: 'b.mp3', type: 'audio/mpeg', bytes: new Uint8Array([3]) },
+      ],
+    })
+    const request = requests[0]!
+    expect(request.method).toBe('POST')
+    expect(new URL(request.url).pathname).toBe('/model')
+    expect(request.headers.get('authorization')).toBe('Bearer secret')
+    const form = await request.formData()
+    expect(form.get('type')).toBe('tts')
+    expect(form.get('title')).toBe('Elior')
+    expect(form.get('visibility')).toBe('private')
+    expect(form.get('train_mode')).toBe('fast')
+    const sent = form.getAll('voices') as File[]
+    expect(sent.map((f) => f.name)).toEqual(['a.wav', 'b.mp3'])
+    expect(voice.id).toBe('v1')
+  })
+
+  it('says how long it waited, and that the voice may exist, when Fish does not answer', async () => {
+    const fetch = (async () => {
+      throw new DOMException('timed out', 'TimeoutError')
+    }) as unknown as typeof globalThis.fetch
+    const client = createFishClient('secret', { fetch, timeoutMs: 1000 })
+    const error = await client
+      .createVoice({
+        title: 'x',
+        files: [{ name: 'a.wav', type: 'audio/wav', bytes: new Uint8Array() }],
+      })
+      .catch((e: unknown) => e)
+    expect((error as Error).message).toBe(
+      'Fish Audio did not answer within 3 s; the voice may still have been made on your account',
+    )
+  })
+
+  it('gives Fish’s own message when it refuses to make the voice', async () => {
+    const { fetch } = fakeFetch({ message: 'Audio too short' }, 400)
+    const client = createFishClient('secret', { fetch })
+    const error = await client
+      .createVoice({
+        title: 'x',
+        files: [{ name: 'a.wav', type: 'audio/wav', bytes: new Uint8Array() }],
+      })
+      .catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(FishError)
+    expect((error as FishError).detail).toBe('Audio too short')
+  })
+
   it('lists voices with the query and the key, as the studio’s Voice', async () => {
     const { fetch, requests } = fakeFetch({ total: 1, items: [apiVoice] })
     const client = createFishClient('secret', { fetch })

@@ -43,6 +43,17 @@ export interface FishClient {
    * string without a unit; it is taken to be US dollars, as the prices are.
    */
   credit(): Promise<number>
+  /**
+   * Makes a private voice on the account from recordings (1 to 20, each 10 seconds or more), and
+   * gives it as Fish describes it. Fish refusing is a `FishError` with its own message.
+   */
+  createVoice(request: CreateVoiceRequest): Promise<Voice>
+}
+
+/** A request to make a private voice from recordings. */
+export interface CreateVoiceRequest {
+  title: string
+  files: { name: string; type: string; bytes: Uint8Array }[]
 }
 
 /** What the studio says when there is no Fish Audio API key. */
@@ -205,6 +216,44 @@ export function createFishClient(
     },
     async getVoice(id) {
       return toVoice(ApiVoiceSchema.parse(await get(`/model/${encodeURIComponent(id)}`)))
+    },
+    async createVoice({ title, files }) {
+      // Uploading and training take longer than a lookup: a stuck request still gives up.
+      return timed(async () => {
+        const form = new FormData()
+        form.set('type', 'tts')
+        form.set('title', title)
+        form.set('visibility', 'private')
+        form.set('train_mode', 'fast')
+        for (const file of files) {
+          form.append(
+            'voices',
+            new File([new Uint8Array(file.bytes)], file.name, { type: file.type }),
+          )
+        }
+        const limit = timeoutMs * 3
+        try {
+          const response = await fetch(new URL('/model', baseUrl), {
+            signal: AbortSignal.timeout(limit),
+            method: 'POST',
+            headers: { authorization: `Bearer ${apiKey}` },
+            body: form,
+          })
+          if (!response.ok) throw new FishError(response.status, await errorMessage(response))
+          return toVoice(ApiVoiceSchema.parse(await response.json()))
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            (error.name === 'TimeoutError' || error.name === 'AbortError')
+          ) {
+            // Said here, not by `timed`: the limit is longer, and Fish may have made the voice.
+            throw new Error(
+              `Fish Audio did not answer within ${limit / 1000} s; the voice may still have been made on your account`,
+            )
+          }
+          throw error
+        }
+      })
     },
     async tts({ text, voice, model, temperature, topP, speed, format = 'mp3' }) {
       return timed(async () => {

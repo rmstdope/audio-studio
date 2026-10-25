@@ -8,6 +8,7 @@ import {
   addVoiceById,
   auditionMoney,
   recordSpent,
+  castOwnVoice,
   castVoice,
   changeSession,
   discardSession,
@@ -58,6 +59,7 @@ const fish: FishClient = {
   async listOwnVoices() {
     return ownVoices
   },
+  createVoice: () => Promise.reject(new Error('not used')),
   async credit() {
     return 25
   },
@@ -271,6 +273,54 @@ describe('addVoiceById', () => {
       reason: 'fish',
       message: 'no such voice',
     })
+  })
+})
+
+describe('castOwnVoice', () => {
+  const own = { id: 'mine', name: 'My Mira' }
+
+  it('casts a voice no audition holds, and says which recorded lines go stale', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const result = await castOwnVoice(projectFile, 'mira', own)
+    expect(result).toEqual({
+      ok: true,
+      voice: own,
+      changed: true,
+      stale: [{ part: 'act1', lines: 1 }],
+    })
+    expect(
+      JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).speakers.mira,
+    ).toMatchObject({
+      voice: 'mine',
+      voiceName: 'My Mira',
+      style: '[low]',
+    })
+  })
+
+  it('ends an audition going on, as casting does', async () => {
+    const { projectFile } = await started()
+    await castOwnVoice(projectFile, 'mira', own)
+    expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
+  })
+
+  it('changes nothing for the voice already cast', async () => {
+    const projectFile = join(tempRepo(files), 'audio-studio.json')
+    expect(await castOwnVoice(projectFile, 'mira', { id: 'cur', name: 'Old' })).toMatchObject({
+      ok: true,
+      changed: false,
+      stale: [],
+    })
+  })
+
+  it('says when the project will not load', async () => {
+    const projectFile = join(tempRepo({ 'audio-studio.json': '{' }), 'audio-studio.json')
+    expect(await castOwnVoice(projectFile, 'mira', own)).toMatchObject({ ok: false })
+  })
+
+  it('knows no character it was not asked about', async () => {
+    const projectFile = join(tempRepo(files), 'audio-studio.json')
+    expect(await castOwnVoice(projectFile, 'nobody', own)).toBeNull()
   })
 })
 
