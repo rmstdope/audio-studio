@@ -2412,3 +2412,8 @@ a.btn {
   background: var(--danger-bg);
   color: var(--danger-ink);
 }
+
+.spending-table td.mono,
+.spending-table td:first-child {
+  white-space: nowrap;
+}

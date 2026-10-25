@@ -113,6 +113,7 @@ audio-studio/
 │   │   ├── soundAlikeEdit.ts    the project's sound-alike groups as edited (rows, problems)
 │   │   ├── prices.ts            Fish's prices per model, promotions with their end
 │   │   ├── spend.ts             whether a paid recording may start (confirmed, covered)
+│   │   ├── spending.ts          paid recordings as saved, and the page's totals and rows
 │   │   ├── changes.ts           git status output parsed and grouped by part
 │   │   ├── dialogDiff.ts        what a refreshed dialog added, removed and changed
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
