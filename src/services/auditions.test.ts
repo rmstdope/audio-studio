@@ -609,6 +609,24 @@ describe('setPronunciations', () => {
     })
   })
 
+  it('does not reorder another language’s number key by saving a table', async () => {
+    const root = tempRepo({
+      ...withTable,
+      'audio-studio.json': languageProject(),
+      'tts/cast.json': {
+        speakers: { grandmother: { voice: 'cur' } },
+        pronounce: { Eldoria: 'x', '10': 'ten' },
+      },
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    const before = readFileSync(join(root, 'tts/cast.json'), 'utf8')
+    expect(await setPronunciations(projectFile, [['Kom', 'Komm']], [], 'sv')).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/cast.json', path: 'pronounce' }],
+    })
+    expect(readFileSync(join(root, 'tts/cast.json'), 'utf8')).toBe(before)
+  })
+
   it('keeps a character change made at the same time', async () => {
     const root = tempRepo(withTable)
     const projectFile = join(root, 'audio-studio.json')

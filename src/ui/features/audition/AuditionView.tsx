@@ -66,7 +66,11 @@ export function AuditionView({
     return (
       <div className="empty-state">
         <strong>No character called “{characterId}”</strong>
-        <a className="btn" href={routeHref({ view: 'characters' })} style={{ alignSelf: 'center' }}>
+        <a
+          className="btn"
+          href={routeHref({ view: 'characters', ...(queried ? { language: queried } : {}) })}
+          style={{ alignSelf: 'center' }}
+        >
           All characters
         </a>
       </div>
@@ -89,8 +93,10 @@ export function AuditionView({
       <header className="page-header">
         <div>
           <span className="crumbs">
-            <a href={routeHref({ view: 'characters' })}>Characters</a> /{' '}
-            <a href={page}>{character.name}</a> / Audition
+            <a href={routeHref({ view: 'characters', ...(queried ? { language: queried } : {}) })}>
+              Characters
+            </a>{' '}
+            / <a href={page}>{character.name}</a> / Audition
           </span>
           <h1>
             Audition for {character.name}

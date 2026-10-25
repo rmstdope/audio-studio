@@ -108,7 +108,17 @@ export function Sidebar({
       <nav className="nav sidebar-foot" aria-label="Project">
         <a
           className="nav-item"
-          href={routeHref({ view: 'characters' })}
+          href={routeHref({
+            view: 'characters',
+            language:
+              route.view === 'part' ||
+              route.view === 'lines' ||
+              route.view === 'characters' ||
+              route.view === 'character' ||
+              route.view === 'audition'
+                ? route.language
+                : undefined,
+          })}
           aria-current={
             route.view === 'characters' || route.view === 'character' || route.view === 'audition'
               ? 'page'

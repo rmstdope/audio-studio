@@ -467,30 +467,42 @@ async function writeCharacter(
   return writeCast(projectFile, (cast, parsed, path) => {
     // A number-like pronunciation among others: parsing has already lost the file's order, so
     // writing would change the order they apply in. The table itself can be fixed on its own.
-    const tables: [string, string[]][] = [
-      ['pronounce', Object.keys(parsed.pronounce)],
-      ...Object.entries(parsed.languages ?? {}).map(([language, own]): [string, string[]] => [
-        `languages.${language}.pronounce`,
-        Object.keys(own.pronounce ?? {}),
-      ]),
-    ]
-    for (const [where, keys] of tables) {
-      const reordered = keys.filter((k) => INTEGER_LIKE.test(k))
-      if (reordered.length && keys.length > 1) {
-        const message =
-          `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move to the ` +
-          'top if the studio wrote this file, changing the order pronunciations apply in. Make ' +
-          'the key longer under Pronunciations on All characters, e.g. "Act 10" or "10 " (any key ' +
-          'that is not a plain number keeps its place).'
-        return [{ file: path, path: where, message }]
-      }
-    }
+    const reordered = reorderedTable(parsed, path)
+    if (reordered) return reordered
     const speakers = { ...cast.speakers }
     const { narration } = loaded.project
     const which = { language: declaredLanguage(narration, asked), source: narration.languages[0]! }
     speakers[characterId] = change(speakers[characterId] ?? {}, which)
     return { ...cast, speakers }
   })
+}
+
+/**
+ * The problem with a pronunciation table that writing the cast would reorder (a number-like key
+ * among others: parsing has already lost the file's order), in any table but `except`'s (the one
+ * being saved, which is checked on its own); null when none would be.
+ */
+function reorderedTable(parsed: Cast, path: string, except?: string): Problem[] | null {
+  const tables: [string, string[]][] = [
+    ['pronounce', Object.keys(parsed.pronounce)],
+    ...Object.entries(parsed.languages ?? {}).map(([language, own]): [string, string[]] => [
+      `languages.${language}.pronounce`,
+      Object.keys(own.pronounce ?? {}),
+    ]),
+  ]
+  for (const [where, keys] of tables) {
+    if (where === except) continue
+    const numbers = keys.filter((k) => INTEGER_LIKE.test(k))
+    if (numbers.length && keys.length > 1) {
+      const message =
+        `the pronunciation of ${numbers.map((k) => `"${k}"`).join(', ')} would move to the ` +
+        'top if the studio wrote this file, changing the order pronunciations apply in. Make ' +
+        'the key longer under Pronunciations on All characters, e.g. "Act 10" or "10 " (any key ' +
+        'that is not a plain number keeps its place).'
+      return [{ file: path, path: where, message }]
+    }
+  }
+  return null
 }
 
 /** The cast as it is in the file: only `speakers` and `pronounce` are known, the rest is kept. */
@@ -553,6 +565,9 @@ export function setPronunciations(
       }
       const why = pronounceProblem(clean)
       if (why) return problem(why)
+      // The other tables are written back as parsed: none may be reordered by it.
+      const reordered = reorderedTable(parsed, path, where)
+      if (reordered) return reordered
       if (!own) return { ...raw, pronounce: Object.fromEntries(clean) }
       const { languages: had = {} } = raw as { languages?: Record<string, Record<string, unknown>> }
       const { pronounce: _was, ...rest } = had[which] ?? {}

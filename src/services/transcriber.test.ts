@@ -27,6 +27,13 @@ describe('createWhisperWorker', () => {
     expect(b[0]!.words!.map((w) => w.word)).toEqual(['here'])
   })
 
+  it('tells the worker the language to hear, and nothing when there is none', async () => {
+    const heard = async (language?: string) =>
+      (await worker.transcribe('tiny', '/clips/language.wav', language))[0]!.words![0]!.word
+    expect(await heard('sv')).toBe('sv')
+    expect(await heard()).toBe('none')
+  })
+
   it('passes on the worker’s error, and keeps working', async () => {
     await expect(worker.transcribe('tiny', '/clips/fail.wav')).rejects.toThrow(
       'Whisper: RuntimeError: bad audio',

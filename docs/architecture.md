@@ -358,7 +358,9 @@ lines (`.audio-studio/notes/<part>-<hash>.json`: "too fast", "retake after the r
 machine only, so a teammate does not see them), and what Whisper heard
 of each kept take heard below full (`.audio-studio/heard/<part>-<hash>.json`: per line, the lock
 entry's time, the text it was checked against, Whisper's words and the shown words it missed). Deleting it loses nothing the game
-needs; it forgets paused auditions, ruled-out voices, notes and what was heard.
+needs; it forgets paused auditions, ruled-out voices, notes and what was heard. Notes, what was
+heard and a line's extra takes are kept per language: the source language's under the part's own
+name, another's under the part's name with the language (`partCacheName`).
 
 All JSON is written with stable key order and the same layout the file already has, through a
 temporary file and a rename, so diffs stay small and a crash never leaves a half-written file.
@@ -829,7 +831,11 @@ spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DE
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
 `DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
 voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
-not declared), and casting changes that language only. The rest is the plan:
+not declared), and casting changes that language only. So does every route under
+`/api/parts/:part` that reads or writes a language's files (its lines' heard, note, check, accept,
+record, try, takes and take files, cues and their moves, the plan, adopt, jobs and `jobs/latest`),
+and `PATCH /api/pronounce` and `PATCH /api/sound-alike`, which save that language's own table or
+groups. The rest is the plan:
 
 ```
 GET    /api/project                              project, parts
@@ -857,7 +863,7 @@ GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no si
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, speed, keywords, phrase
 PATCH  /api/pronounce?language=                   a language's pronunciation table ({ table, was }: whole)
-PATCH  /api/sound-alike                          the project's sound-alike groups ({ groups, was })
+PATCH  /api/sound-alike?language=                 a language's sound-alike groups ({ groups, was })
 PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
 GET    /api/spending                             paid recordings: totals per part, running ones live, or the record's problems
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
@@ -877,10 +883,10 @@ POST   /api/characters/:id/cast-voice            cast a voice no audition holds 
 GET    /api/characters/:id/designs               the description the design box starts with
 POST   /api/characters/:id/design                have Fish design voices ({ description, spendUpTo: 0.01 }); 409 until the cost is confirmed and covered
 POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
-                                                 part at a time); a paid
+                                                 part and language at a time); a paid
                                                  one with { confirmedCost }, else 409 with
                                                  { reason: confirm | credit | price, ceiling }
-GET    /api/parts/:part/jobs/latest              the part's latest job
+GET    /api/parts/:part/jobs/latest              the part's latest job in the language asked for
 GET    /api/jobs/:id                             a job's progress (polled while it runs)
 DELETE /api/jobs/:id                             cancel
 POST   /api/characters/:id/takes             record a take (own page only)
@@ -1093,14 +1099,14 @@ Small, independently useful increments:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's
        progress, untranslated lines, read only (no recording yet).
-    2. **Record a part's lines per language** (built): recording, Whisper's check (told the
+    2. **Cast each character per language** (built): a voice, speed and phrase per language in the
+       cast, an audition and ruled-out voices per language, a language switch on a character's
+       page and its audition, and a chip on a card for each language without a voice.
+    3. **Record a part's lines per language** (built): recording, Whisper's check (told the
        language in a project with several), measuring, accepting, extra takes, orphans and jobs
        (one per part and language) work in every declared language, into its own clips, manifest and
        lock; cues follow the source language's; pronunciations and words that sound the same are
        per language; the overview, All characters and the cards follow the language switch.
-    3. **Cast each character per language** (built): a voice, speed and phrase per language in the
-       cast, an audition and ruled-out voices per language, a language switch on a character's
-       page and its audition, and a chip on a card for each language without a voice.
 
 ---
 

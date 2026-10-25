@@ -265,7 +265,11 @@ export function startServer({
     return Response.json(view, { status: view.ok ? 200 : 409 })
   }
 
-  /** The language a request means, as the project declares it (the source language's if unknown). */
+  /**
+   * The language a request means, as the project declares it (the source language's if unknown).
+   * Jobs need the code itself, as they are kept by part and language; the services given the
+   * raw `?language=` settle it themselves.
+   */
   async function languageFor(request: Request): Promise<string | undefined> {
     const opened = await openProject(projectFile)
     return opened.ok ? declaredLanguage(opened.project.narration, languageOf(request)) : undefined

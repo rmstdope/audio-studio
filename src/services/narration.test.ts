@@ -1223,9 +1223,13 @@ describe('recording in a language besides the source', () => {
       language: 'sv',
     })
     expect(new Set(asked)).toEqual(new Set(['sv']))
-    const heard = await heardFor(projectFile(root), 'act1', 'k1', 'sv')
-    expect(heard).toMatchObject({ ok: true })
-    expect(existsSync(join(root, HEARD_DIR, 'act1.json'))).toBe(false)
+    // Heard below full, so it is kept: under the language's own name, never the source's.
+    const kept = await heardFor(projectFile(root), 'act1', 'k1', 'sv')
+    expect(kept).toMatchObject({ ok: true, heard: { text: 'Elior vaknar.' } })
+    expect(await heardFor(projectFile(root), 'act1', 'k1')).toMatchObject({
+      ok: true,
+      heard: null,
+    })
   })
 
   it('tells Whisper no language in a project with one language', async () => {
