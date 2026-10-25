@@ -5,7 +5,7 @@ import { DESIGN_COUNT, descriptionState, isDesignId, previewText, savedName } fr
 import { addDesigns, listDesigns, removeDesign } from '../core/designs'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
-import type { Encoder } from './audio'
+import { ffmpegEncoder, type Encoder } from './audio'
 import type { FishFactory } from './auditions'
 import { changeDesigns, designId, designPreviewPath, readDesigns } from './designStore'
 import { FishError, NO_KEY } from './fish'
@@ -43,7 +43,7 @@ export async function designVoices(
   characterId: string,
   description: string,
   fishFor: FishFactory,
-  encode: Encoder,
+  encode: Encoder = ffmpegEncoder,
   at: Date = new Date(),
 ): Promise<DesignResult> {
   const loaded = await loadWorkspace(projectFile)

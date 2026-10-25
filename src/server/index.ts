@@ -40,6 +40,8 @@ import {
   useLineTake,
 } from '../services/lineTakes'
 import { cloneVoice } from '../services/cloneVoice'
+import { DESIGN_MODEL, DESIGN_PRICE, isDesignId } from '../core/design'
+import { castDesign, designVoices, designsFor } from '../services/designs'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -200,6 +202,10 @@ const AmountBody = z.object({ amount: z.number().positive().max(10_000) }).stric
 
 /** Starting an audition; a paid audition model needs the amount its sitting may spend. */
 const StartBody = z.object({ spendUpTo: z.number().positive().max(10_000).optional() }).strict()
+/** Designing voices: the description, and the most the user agreed to spend on the design. */
+const DesignBody = z
+  .object({ description: z.string(), spendUpTo: z.number().positive().max(10_000).optional() })
+  .strict()
 /** What casting a voice made from recordings sends: the voice and the name to cast it under. */
 const CastOwnBody = z.object({ voice: z.string().regex(VOICE_ID), name: z.string().trim().min(1) })
 
@@ -1149,6 +1155,39 @@ export function startServer({
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
+      '/api/characters/:id/designs': {
+        GET: guard(async (request) => {
+          const result = await designsFor(projectFile, request.params.id)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/characters/:id/design': {
+        POST: fromOwnPage(async (request) => {
+          const body = DesignBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { description, spendUpTo? }' }, { status: 400 })
+          }
+          const { id } = request.params
+          if ((await designsFor(projectFile, id)) === null) return notFound()
+          // Held back from the credit while Fish designs; Fish bills a request that works.
+          const got = await admit(DESIGN_MODEL, DESIGN_PRICE, body.data.spendUpTo)
+          if ('problem' in got) return Response.json({ ok: false, ...got.problem }, { status: 409 })
+          try {
+            const result = await designVoices(
+              projectFile,
+              id,
+              body.data.description,
+              fishFor,
+              encode,
+            )
+            if (!result) return notFound()
+            return Response.json(result, { status: 'added' in result ? 200 : 409 })
+          } finally {
+            budgets.delete(got.budget)
+          }
+        }),
+      },
       '/api/characters/:id/cast-voice': {
         POST: fromOwnPage(async (request) => {
           const body = CastOwnBody.safeParse(await request.json().catch(() => null))
@@ -1171,12 +1210,12 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
-          const result = await castVoice(
-            projectFile,
-            request.params.id,
-            body.data.voice,
-            languageOf(request),
-          )
+          const { voice } = body.data
+          const language = languageOf(request)
+          // A designed voice is saved to the account first; Fish makes no voice from a design.
+          const result = isDesignId(voice)
+            ? await castDesign(projectFile, request.params.id, voice, fishFor, language)
+            : await castVoice(projectFile, request.params.id, voice, language)
           if (!result) return notFound()
           if (result.ok) endSitting(await sittingKey(request.params.id, request))
           return Response.json(result, { status: result.ok ? 200 : 409 })
