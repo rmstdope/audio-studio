@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { knownLanguage, languageName } from './languages'
+import { capitalisesNouns, knownLanguage, languageName } from './languages'
 
 describe('languageName', () => {
   it('names a language in itself, capitalised', () => {
@@ -17,5 +17,15 @@ describe('knownLanguage', () => {
     expect(knownLanguage('Swedish')).toBe(false)
     expect(knownLanguage('')).toBe(false)
     expect(knownLanguage('a/b')).toBe(false)
+  })
+})
+
+describe('capitalisesNouns', () => {
+  it('is German, with or without a region, and no other language', () => {
+    expect(capitalisesNouns('de')).toBe(true)
+    expect(capitalisesNouns('de-CH')).toBe(true)
+    expect(capitalisesNouns('en')).toBe(false)
+    expect(capitalisesNouns('sv')).toBe(false)
+    expect(capitalisesNouns('dsb')).toBe(false)
   })
 })

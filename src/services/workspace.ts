@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { soundAlikes, type SoundAlike } from '../core/align'
-import { languageName } from '../core/languages'
+import { capitalisesNouns, languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
 import { adoptUntracked, planPart, type PartState, type PlanInput } from '../core/planner'
@@ -326,6 +326,8 @@ export interface Ears {
   /** The code of the language spoken; absent in a project with one language, where Whisper recognises it. */
   language: string | undefined
   alike: SoundAlike
+  /** Whether the language capitalises its nouns, so only a known name is a name (`capitalisesNouns`). */
+  capitalNouns: boolean
 }
 
 /** Everything read about a part, for planning it or acting on it. */
@@ -416,6 +418,7 @@ export async function readPart(
       language: project.narration.languages.length > 1 ? language : undefined,
       // Its numbers as words; the built-in groups are English words and apply to English only.
       alike: soundAlikes(soundAlikeOf(project.narration, language), language),
+      capitalNouns: capitalisesNouns(language),
     },
     project,
     part,

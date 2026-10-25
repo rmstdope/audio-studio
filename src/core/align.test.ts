@@ -545,6 +545,29 @@ describe('alignWords, names Whisper spells its own way', () => {
   })
 })
 
+describe('alignWords, a language that capitalises its nouns', () => {
+  const heardAs = (...said: string[]) =>
+    words(...said.map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const german = (shown: string[], heard: string[], names?: ReadonlySet<string>) =>
+    alignWords(shown, heardAs(...heard), 9, undefined, names, undefined, true).ratio
+
+  it('does not count a noun heard one letter off as a name', () => {
+    const shown = ['Der', 'grosse', 'Hund', 'bellt.']
+    expect(german(shown, ['Der', 'grosse', 'Hand', 'bellt.'])).toBe(3 / 4)
+    expect(german(['Die', 'Hunde-Leine', 'hält.'], ['Die', 'Hande', 'Leine', 'hält.'])).toBe(2 / 3)
+    // In a language that does not, the same word is taken for a name.
+    expect(alignWords(shown, heardAs('Der', 'grosse', 'Hand', 'bellt.'), 9).ratio).toBe(1)
+  })
+
+  it('still counts a known name heard one letter off', () => {
+    const cast = new Set(['aren'])
+    expect(
+      german(['Der', 'grosse', 'Aren', 'bellt.'], ['Der', 'grosse', 'Arn', 'bellt.'], cast),
+    ).toBe(1)
+    expect(german(['Die', 'Aren-Leine'], ['Die', 'Arn', 'Leine'], cast)).toBe(1)
+  })
+})
+
 describe('alignWords, words that sound the same', () => {
   const heardAs = (line: string) =>
     words(...line.split(' ').map((w, i): [string, number, number] => [w, i, i + 0.5]))

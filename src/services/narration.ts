@@ -387,7 +387,11 @@ export async function checkTake(
   line: Line,
   cast: Cast,
   narration: Project['narration'],
-  ears: Ears = { language: undefined, alike: soundAlikes(narration.quality.soundAlike) },
+  ears: Ears = {
+    language: undefined,
+    alike: soundAlikes(narration.quality.soundAlike),
+    capitalNouns: false,
+  },
 ): Promise<Take> {
   const tokens = line.text.split(' ')
   if (!checker) {
@@ -402,7 +406,15 @@ export async function checkTake(
   )
   const words = heardWords(segments, clip.seconds)
   const said = saidWords(line.text, cast.pronounce)
-  const aligned = alignWords(tokens, words, clip.seconds, said, knownNames(cast), ears.alike)
+  const aligned = alignWords(
+    tokens,
+    words,
+    clip.seconds,
+    said,
+    knownNames(cast),
+    ears.alike,
+    ears.capitalNouns,
+  )
   return {
     clip,
     timed: aligned.timed,
@@ -748,7 +760,15 @@ export async function measureLine(
     const heardNow = heardWords(segments, seconds)
     const names = knownNames(read.input.cast)
     const alike = read.ears.alike
-    aligned = alignWords(line.text.split(' '), heardNow, seconds, said, names, alike)
+    aligned = alignWords(
+      line.text.split(' '),
+      heardNow,
+      seconds,
+      said,
+      names,
+      alike,
+      read.ears.capitalNouns,
+    )
     words = heardNow.map((w) => w.word.trim())
   } catch (error) {
     return { ok: false, reason: 'transcribe', message: messageOf(error) }

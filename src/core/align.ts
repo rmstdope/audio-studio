@@ -260,13 +260,14 @@ function soundOf(word: string): string {
 /**
  * Whether a heard word is a name as Whisper spells it ("Aren" as "Arn"): the shown word is
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
- * is) unless it is a known name, of at least four letters as said (apostrophes and a possessive
- * 's not counted) and nothing else, and the heard one is one letter apart, as spelled or as they
- * sound (`soundOf`, where that leaves four letters), or, for a known name heard as one word
- * Whisper wrote as a name (`asName`), only its vowels other as they sound (`vowelsApart`).
- * Lowercase words, short ones and numbers, in digits or in words ("Three" is no "Tree"), are left
- * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
- * Letters of any alphabet count; the rules of `soundOf` and `vowelsApart` are English spellings.
+ * is) nor in a language that capitalises its nouns (`capitalNouns`) unless it is a known name, of
+ * at least four letters as said (apostrophes and a possessive 's not counted) and nothing else,
+ * and the heard one is one letter apart, as spelled or as they sound (`soundOf`, where that leaves
+ * four letters), or, for a known name heard as one word Whisper wrote as a name (`asName`), only
+ * its vowels other as they sound (`vowelsApart`). Lowercase words, short ones and numbers, in
+ * digits or in words ("Three" is no "Tree"), are left out, where one letter makes another word
+ * ("never" and "ever", "was" and "has", 1984 and 1985). Letters of any alphabet count; the rules
+ * of `soundOf` and `vowelsApart` are English spellings.
  */
 function spelledAlike(
   shown: string,
@@ -276,13 +277,14 @@ function spelledAlike(
   names: ReadonlySet<string>,
   alike: SoundAlike,
   asName = false,
+  capitalNouns = false,
 ): boolean {
   const want = plain(said)
   if (!capitalised(shown) || !/\p{Ll}/u.test(shown)) return false
   // A number word ("Three", "Vier") is no name: its group leads with its digits.
   if (/^\d+$/.test(grouped(want, alike))) return false
   const known = names.has(bare(shown))
-  if (atStart && !known) return false
+  if ((atStart || capitalNouns) && !known) return false
   if (!isWord(bare(said), 4) || !isWord(want) || !isWord(got)) return false
   if (oneLetterApart(want, got)) return true
   // As they sound, only while that leaves four letters: fewer, and one off is another name.
@@ -410,6 +412,7 @@ function alignGap(
   [from, to]: [number, number],
   [hFrom, hTo]: [number, number],
   times: ([number, number] | null)[],
+  capitalNouns: boolean,
 ): void {
   // As narrate.py's matching and main did: where as many words were heard as shown, a name heard
   // in its place one letter off, word for word; and, unlike narrate.py, a word pronounced otherwise
@@ -427,7 +430,16 @@ function alignGap(
       const asName = writtenAsName(written, heardWords[k]!)
       if (
         asShown ||
-        spelledAlike(tokens[i]!, atStart, said[i]!, plain(w.word), names, alike, asName)
+        spelledAlike(
+          tokens[i]!,
+          atStart,
+          said[i]!,
+          plain(w.word),
+          names,
+          alike,
+          asName,
+          capitalNouns,
+        )
       ) {
         times[i] = [w.start, w.end]
       }
@@ -497,7 +509,18 @@ function alignGap(
     const piece = pieces[s]!
     const spelled = heardNorm.slice(h, h + n).join('')
     const asName = n === 1 && writtenAsName(partsWritten, hFrom + h)
-    if (!spelledAlike(piece.shown, piece.atStart, piece.said, spelled, names, alike, asName))
+    if (
+      !spelledAlike(
+        piece.shown,
+        piece.atStart,
+        piece.said,
+        spelled,
+        names,
+        alike,
+        asName,
+        capitalNouns,
+      )
+    )
       return null
     return { shown: 1, heard: n, apply: () => take(s, h, h + n - 1) }
   }
@@ -549,9 +572,11 @@ function alignGap(
  * shown though said otherwise forgiven (`alignGap`); such a word is heard when all its parts are.
  * `said` is the same words as actually said (see `saidWords`), compared in place of the shown ones;
  * `names` are the known names (see `knownNames`), `alike` the words that sound the same, matched as
- * one wherever words are matched exactly (see `soundAlikes`). Returns the timed words, the share of
- * words that were heard (punctuation on its own, "—" or "…", is no word: it is only timed), and the
- * indices of the shown words that were not (`missed`).
+ * one wherever words are matched exactly (see `soundAlikes`), and `capitalNouns` whether the line's
+ * language capitalises its nouns (see `capitalisesNouns`), where only a known name is forgiven one
+ * letter off. Returns the timed words, the share of words that were heard (punctuation on its own,
+ * "—" or "…", is no word: it is only timed), and the indices of the shown words that were not
+ * (`missed`).
  */
 export function alignWords(
   tokens: string[],
@@ -560,6 +585,7 @@ export function alignWords(
   said?: string[],
   names: ReadonlySet<string> = new Set(),
   alike: SoundAlike = BUILT_IN,
+  capitalNouns = false,
 ): { timed: TimedWord[]; ratio: number; missed: number[] } {
   const spoken = said && said.length === tokens.length ? said : tokens
   const want = spoken.map((w) => key(w, alike))
@@ -568,7 +594,7 @@ export function alignWords(
   let wantFrom = 0
   let gotFrom = 0
   for (const [a, b, size] of matchingBlocks(want, got)) {
-    alignGap(tokens, spoken, heard, names, alike, [wantFrom, a], [gotFrom, b], times)
+    alignGap(tokens, spoken, heard, names, alike, [wantFrom, a], [gotFrom, b], times, capitalNouns)
     for (let k = 0; k < size; k++) {
       const w = heard[b + k]!
       times[a + k] = [w.start, w.end]
