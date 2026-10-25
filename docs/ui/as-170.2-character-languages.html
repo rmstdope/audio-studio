@@ -1,0 +1,1119 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Casting per language</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --chip: #1a1d26;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --stale: #ffc24b;
+        --stale-bg: #2d2412;
+        --missing: #8fb5ff;
+        --missing-bg: #142033;
+        --weak: #ff94a8;
+        --weak-bg: #2e1720;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .note {
+        background: #1d1a10;
+        border-bottom: 1px solid #3a3420;
+        color: #e8d9a8;
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+      .shell {
+        display: flex;
+        min-height: 100vh;
+      }
+      .sidebar {
+        flex: 0 0 240px;
+        background: var(--sidebar);
+        border-right: 1px solid #1e212a;
+        padding: 20px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .brand {
+        font-weight: 600;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: var(--accent);
+      }
+      .box {
+        padding: 12px;
+        border-radius: 12px;
+        background: #151821;
+        border: 1px solid #222632;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nav .label {
+        padding: 0 10px 6px;
+      }
+      .ni {
+        padding: 9px 10px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 13.5px;
+        display: flex;
+        gap: 10px;
+      }
+      .ni.on {
+        background: var(--chip);
+        color: var(--text);
+      }
+      .ni .g {
+        flex: 1;
+      }
+      .ni .m {
+        font:
+          11px ui-monospace,
+          monospace;
+        color: var(--faint);
+      }
+      .content {
+        flex: 1;
+        min-width: 0;
+        padding: 28px 36px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .hdr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .crumbs {
+        font-size: 12.5px;
+        color: var(--faint);
+      }
+      h1 {
+        font-size: 30px;
+        font-weight: 600;
+        margin: 6px 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .tab {
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        color: var(--muted);
+      }
+      .tab.on {
+        background: var(--chip);
+        border-color: var(--line-strong);
+        color: var(--text);
+      }
+      .cnt {
+        font:
+          11.5px ui-monospace,
+          monospace;
+        color: var(--faint);
+      }
+      .filters {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .field {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .sel,
+      .search {
+        font-size: 13px;
+        color: var(--text);
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        min-height: 36px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .search {
+        width: 180px;
+        color: var(--faint);
+      }
+      .btn {
+        font-size: 13px;
+        padding: 8px 12px;
+        border-radius: 9px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .seg {
+        display: inline-flex;
+        padding: 3px;
+        border-radius: 11px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        gap: 2px;
+      }
+      .seg span {
+        padding: 7px 14px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .seg .on {
+        background: var(--chip);
+        color: var(--text);
+        box-shadow: inset 0 0 0 1px var(--line-strong);
+      }
+      .tb {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--sidebar);
+        overflow: hidden;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        font-weight: 500;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 12px;
+        border-bottom: 1px solid #181b22;
+        vertical-align: top;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 4px 9px;
+        border-radius: 99px;
+      }
+      .pill:before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 9px;
+        background: currentColor;
+      }
+      .ok {
+        color: var(--ok);
+        background: var(--ok-bg);
+      }
+      .stale {
+        color: var(--stale);
+        background: var(--stale-bg);
+      }
+      .missing {
+        color: var(--missing);
+        background: var(--missing-bg);
+      }
+      .weak {
+        color: var(--weak);
+        background: var(--weak-bg);
+      }
+      .sp {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .tx {
+        color: #d5d9e1;
+        line-height: 1.45;
+        display: block;
+        margin-top: 4px;
+      }
+      .ref {
+        display: block;
+        margin-top: 4px;
+        font-size: 12.5px;
+        color: var(--faint);
+        line-height: 1.4;
+      }
+      .ref b {
+        font-weight: 500;
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-right: 6px;
+        color: #6f7686;
+      }
+      .ib {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+      }
+      .panel {
+        padding: 20px 22px;
+        border-radius: 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+      .bar {
+        height: 6px;
+        width: 60px;
+        border-radius: 9px;
+        background: #1b1e27;
+        overflow: hidden;
+        display: inline-block;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--ok);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 20px;
+        align-items: start;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      .pnl {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sh {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .chip {
+        font-size: 11.5px;
+        padding: 2px 8px;
+        border-radius: 99px;
+        background: var(--chip);
+        color: var(--muted);
+        border: 1px solid var(--line-strong);
+      }
+      .chip.okc {
+        background: var(--ok-bg);
+        color: var(--ok);
+        border-color: transparent;
+      }
+      .chip.prog {
+        background: var(--missing-bg);
+        color: var(--missing);
+        border-color: transparent;
+      }
+      .chip.none {
+        color: var(--faint);
+      }
+      .who {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .av {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: #4b3a6b;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        font-weight: 600;
+      }
+      .lbox {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--raised);
+        flex: 1;
+        min-width: 180px;
+      }
+      .lbox span {
+        display: flex;
+        flex-direction: column;
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .bi {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 13px;
+      }
+      .primary {
+        background: var(--accent);
+        color: #1a0d05;
+        border-color: transparent;
+        font-weight: 600;
+      }
+      .btn.small {
+        min-height: 28px;
+        font-size: 12.5px;
+        padding: 0 10px;
+      }
+      .lang {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: var(--raised);
+      }
+      .lang .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .pl {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .pl:last-child {
+        border: 0;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 11px;
+        padding: 1px 6px;
+        border-radius: 5px;
+        background: var(--chip);
+        color: var(--muted);
+        margin-right: 4px;
+      }
+      .cap {
+        font-size: 12px;
+        color: var(--faint);
+        margin: 0;
+      }
+      .variant {
+        font:
+          12px ui-monospace,
+          monospace;
+        color: var(--accent);
+        margin: 0 0 -12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      A character’s page with several languages: a switch in the header, as on the Lines page;
+      everything except the style follows the chosen language. Below: the same page with no Deutsch
+      voice yet, the cards on All characters, and the agreed details.
+    </div>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark"></div>
+          Audio Studio
+        </div>
+        <div class="box">
+          <span class="label">Project</span><strong>RetroQuest</strong
+          ><span class="mono faint" style="font-size: 11px">~/repos/retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="label">Workspace</span>
+          <div class="ni on"><span class="g">Narration</span></div>
+          <div class="ni"><span class="g">Music</span><span class="m">Soon</span></div>
+        </div>
+        <div class="nav">
+          <span class="label">Acts</span>
+          <div class="ni">
+            <span class="m">1</span><span class="g">Act I: The Call to Adventure</span>
+          </div>
+          <div class="ni"><span class="m">2</span><span class="g">Act II</span></div>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <div class="ni on"><span class="g">All characters</span><span class="m">14</span></div>
+          <div class="ni"><span class="g">Changes</span></div>
+          <div class="ni"><span class="g">Setup</span></div>
+        </div>
+      </aside>
+      <main class="content">
+        <style>
+          .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 14px;
+          }
+          .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          }
+          .ch {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+          }
+          .ch .av {
+            width: 36px;
+            height: 36px;
+            font-size: 15px;
+            border-radius: 10px;
+          }
+          .ct {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            font-size: 13px;
+          }
+          .ct .mono {
+            color: var(--faint);
+            font-size: 12px;
+          }
+          .badge {
+            font-size: 11.5px;
+            padding: 2px 8px;
+            border-radius: 99px;
+          }
+          .b-ok {
+            background: var(--ok-bg);
+            color: var(--ok);
+          }
+          .b-st {
+            background: var(--stale-bg);
+            color: var(--stale);
+          }
+          .b-un {
+            background: #22252e;
+            color: var(--muted);
+          }
+          .cue {
+            font:
+              12px ui-monospace,
+              monospace;
+            color: var(--muted);
+          }
+          .foot {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+          }
+          .foot .btn {
+            margin-left: auto;
+            min-height: 28px;
+            font-size: 12.5px;
+          }
+          .lm {
+            display: flex;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--muted);
+            flex-wrap: wrap;
+          }
+          .lm b {
+            font-weight: 500;
+            color: var(--text);
+          }
+          .lm .no {
+            color: var(--faint);
+          }
+          .wrn {
+            font-size: 11.5px;
+            padding: 2px 8px;
+            border-radius: 99px;
+            background: var(--stale-bg);
+            color: var(--stale);
+            align-self: flex-start;
+          }
+          .sheet section {
+            margin-bottom: 6px;
+          }
+          .blk {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          }
+          .blk h3 {
+            margin: 0;
+            font-size: 13px;
+            color: var(--accent);
+            font-weight: 600;
+          }
+          .addr {
+            font:
+              12px ui-monospace,
+              monospace;
+            background: var(--raised);
+            border: 1px solid var(--line-strong);
+            border-radius: 8px;
+            padding: 6px 10px;
+            color: var(--muted);
+          }
+          .dialog {
+            background: var(--raised);
+            border: 1px solid var(--line-strong);
+            border-radius: 12px;
+            padding: 16px;
+            max-width: 460px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          }
+        </style>
+        <p class="variant">1 · Grandmother’s page in Svenska, cast</p>
+        <header class="hdr">
+          <div class="who">
+            <div class="av">G</div>
+            <div>
+              <span class="crumbs">Characters / Grandmother</span>
+              <h1>Grandmother</h1>
+              <span class="muted">34 lines in 2 acts · one voice per language in every act</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+            <div class="seg" role="tablist" aria-label="Language" style="flex-wrap: wrap">
+              <span class="" title="Gentle Granny">English <span class="cnt">Cast</span></span
+              ><span class="on" title="Varm Mormor">Svenska <span class="cnt">Cast</span></span
+              ><span class="" title="No Deutsch voice yet"
+                >Deutsch <span class="cnt">No voice</span></span
+              >
+            </div>
+            <span class="btn primary">🎧 Start audition</span>
+          </div>
+        </header>
+        <div class="grid">
+          <div class="col">
+            <section class="pnl">
+              <div class="sh">
+                <span class="label">Voice · Svenska</span><span class="chip okc">Cast</span>
+              </div>
+              <div>
+                <strong style="font-size: 17px">Varm Mormor</strong><br /><span
+                  class="muted"
+                  style="font-size: 13px"
+                  >by elsa_b · 41k uses · 2.3k likes</span
+                >
+              </div>
+              <p class="muted" style="margin: 0; font-size: 13px">
+                Äldre kvinna, lugn och varm berättarröst.
+              </p>
+              <div class="row">
+                <div class="lbox">
+                  <span class="ib">▶</span
+                  ><span
+                    ><strong>Take</strong
+                    ><span class="muted">The audition phrase, in Grandmother’s style</span></span
+                  >
+                </div>
+                <div class="lbox">
+                  <span class="ib">▶</span
+                  ><span
+                    ><strong>Fish sample</strong
+                    ><span class="muted">“Det var en gång en liten by…”</span></span
+                  >
+                </div>
+              </div>
+              <div class="sh">
+                <span class="mono faint" style="font-size: 12px">5a0f…c19e</span
+                ><a style="color: var(--accent); font-size: 13px">Open on Fish Audio ↗</a>
+              </div>
+            </section>
+            <section class="pnl">
+              <div class="sh">
+                <h2 class="h2">Lines</h2>
+                <span class="muted" style="font-size: 13px">in Svenska</span>
+              </div>
+              <div class="pl">
+                <span>Act I</span><span class="mono faint">20 lines · 18 up to date</span>
+              </div>
+              <div class="pl">
+                <span>Act II</span><span class="mono faint">14 lines · 0 up to date</span>
+              </div>
+            </section>
+            <section class="pnl">
+              <div class="sh">
+                <h2 class="h2">Hear it in the game</h2>
+                <span class="muted" style="font-size: 13px"
+                  >18 recorded lines, as the game plays them</span
+                >
+              </div>
+              <div class="pl">
+                <span><span class="ib">▶</span> Kom in ur regnet, barn. Sätt dig vid elden.</span
+                ><span class="faint">Act I</span>
+              </div>
+              <div class="pl">
+                <span><span class="ib">▶</span> Din farfar gick samma väg, en gång.</span
+                ><span class="faint">Act I</span>
+              </div>
+            </section>
+          </div>
+          <div class="col">
+            <section class="pnl">
+              <span class="label">Delivery</span>
+              <div class="bi">
+                <span class="faint">Style</span
+                ><span class="mono">[warm, gentle, a little worried]</span
+                ><span class="cap">The same in every language.</span>
+              </div>
+              <div class="bi">
+                <span class="faint">Speed · Svenska</span><span class="mono">0.95×</span
+                ><span class="cap">English 0.9× · Deutsch 1.0× (project’s speed)</span>
+              </div>
+            </section>
+            <section class="pnl">
+              <span class="label">Casting brief · Svenska</span>
+              <div class="bi">
+                <span class="faint">Keywords</span
+                ><span
+                  ><span class="tag">elderly female</span><span class="tag">warm</span
+                  ><span class="tag">storyteller</span><br /><span class="cap"
+                    >The same in every language; the search looks only at Svenska voices.</span
+                  ></span
+                >
+              </div>
+              <div class="bi">
+                <span class="faint">Audition phrase</span
+                ><span
+                  >“Kom in ur regnet, barn. Sätt dig vid elden, så ska jag berätta hur allt
+                  började.”<br /><span class="cap">Grandmother’s own Svenska phrase.</span></span
+                >
+              </div>
+              <div class="bi"><span class="faint">Language</span><span class="mono">sv</span></div>
+            </section>
+            <section class="pnl">
+              <span class="label">Ruled out · Svenska</span
+              ><span style="font-size: 13px"
+                >Sagotant <span class="faint">· dropped 12 Oct</span></span
+              ><span style="font-size: 13px"
+                >Nordic Elder <span class="faint">· dropped 12 Oct</span></span
+              >
+            </section>
+          </div>
+        </div>
+        <hr style="border: 0; border-top: 1px dashed var(--line-strong); width: 100%" />
+        <p class="variant">2 · The same page in Deutsch, no voice yet</p>
+        <header class="hdr">
+          <div class="who">
+            <div class="av">G</div>
+            <div>
+              <span class="crumbs">Characters / Grandmother</span>
+              <h1>Grandmother</h1>
+              <span class="muted">34 lines in 2 acts · one voice per language in every act</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+            <div class="seg" role="tablist" aria-label="Language" style="flex-wrap: wrap">
+              <span class="" title="Gentle Granny">English <span class="cnt">Cast</span></span
+              ><span class="" title="Varm Mormor">Svenska <span class="cnt">Cast</span></span
+              ><span class="on" title="No Deutsch voice yet"
+                >Deutsch <span class="cnt">No voice</span></span
+              >
+            </div>
+            <span class="btn primary">🎧 Start audition</span>
+          </div>
+        </header>
+        <div class="grid">
+          <div class="col">
+            <section class="pnl">
+              <span class="label">Voice · Deutsch</span><strong>No Deutsch voice yet</strong
+              ><span class="muted" style="font-size: 13px"
+                >Start an audition to find one. Gentle Granny (English) and Varm Mormor (Svenska)
+                start on its shortlist, so you can hear them speak Deutsch too. Until then
+                Grandmother’s Deutsch lines cannot be recorded.</span
+              >
+            </section>
+            <section class="pnl">
+              <div class="sh">
+                <h2 class="h2">Lines</h2>
+                <span class="muted" style="font-size: 13px">in Deutsch</span>
+              </div>
+              <div class="pl">
+                <span>Act I</span><span class="mono faint">20 lines · none recorded</span>
+              </div>
+              <div class="pl">
+                <span>Act II</span><span class="mono faint">no Deutsch dialog yet</span>
+              </div>
+            </section>
+          </div>
+          <div class="col">
+            <section class="pnl">
+              <span class="label">Delivery</span>
+              <div class="bi">
+                <span class="faint">Style</span
+                ><span class="mono">[warm, gentle, a little worried]</span>
+              </div>
+              <div class="bi"><span class="faint">Speed</span><span class="mono">0.9×</span></div>
+              <p class="cap">The same in every language.</p>
+            </section>
+            <section class="pnl">
+              <span class="label">Casting brief · Deutsch</span>
+              <div class="bi">
+                <span class="faint">Keywords</span
+                ><span
+                  ><span class="tag">elderly female</span><span class="tag">warm</span
+                  ><span class="tag">storyteller</span></span
+                ><span class="cap"
+                  >The same in every language; the search looks only at Deutsch voices.</span
+                >
+              </div>
+              <div class="bi">
+                <span class="faint">Audition phrase</span
+                ><span>“Komm herein aus dem Regen, Kind. Setz dich ans Feuer.”</span
+                ><span class="cap"
+                  >Her longest Deutsch line, until you choose another.
+                  <a style="color: var(--accent)">Change</a></span
+                >
+              </div>
+              <div class="bi"><span class="faint">Language</span><span class="mono">de</span></div>
+            </section>
+            <section class="pnl">
+              <span class="label">Ruled out · Deutsch</span
+              ><span class="muted" style="font-size: 13px">No voices ruled out in Deutsch.</span>
+            </section>
+          </div>
+        </div>
+        <hr style="border: 0; border-top: 1px dashed var(--line-strong); width: 100%" />
+        <p class="variant">3 · All characters: a chip only for a missing voice</p>
+        <header class="hdr">
+          <div>
+            <span class="crumbs">Narration</span>
+            <h1>All characters</h1>
+            <span class="muted">14 characters · English, Svenska, Deutsch</span>
+          </div>
+        </header>
+        <div class="cards">
+          <article class="card">
+            <div class="ch">
+              <div class="av">G</div>
+              <div class="ct">
+                <strong>Grandmother</strong><span class="mono">Gentle Granny</span>
+              </div>
+              <span class="badge b-ok">Cast</span>
+            </div>
+            <span class="wrn">No Deutsch voice</span
+            ><span class="cue">[warm, gentle, a little worried]</span>
+            <div class="foot">
+              <span class="faint" style="font-size: 12px">34 lines</span
+              ><span class="chip">Act II</span><span class="btn">Open</span>
+            </div>
+          </article>
+          <article class="card">
+            <div class="ch">
+              <div class="av">M</div>
+              <div class="ct"><strong>Mira</strong><span class="mono">Bright Lass</span></div>
+              <span class="badge b-ok">Cast</span>
+            </div>
+            <span class="cue">[warm, gentle, a little worried]</span>
+            <div class="foot">
+              <span class="faint" style="font-size: 12px">34 lines</span
+              ><span class="chip">Act II</span><span class="btn">Open</span>
+            </div>
+          </article>
+          <article class="card">
+            <div class="ch">
+              <div class="av">B</div>
+              <div class="ct"><strong>Blacksmith</strong><span class="mono">No voice</span></div>
+              <span class="badge b-un">Uncast</span>
+            </div>
+            <span class="cue">[warm, gentle, a little worried]</span>
+            <div class="foot">
+              <span class="faint" style="font-size: 12px">34 lines</span
+              ><span class="chip">Act II</span><span class="btn">Open</span>
+            </div>
+          </article>
+        </div>
+        <hr style="border: 0; border-top: 1px dashed var(--line-strong); width: 100%" />
+        <header class="hdr">
+          <div>
+            <span class="crumbs">Agreed details</span>
+            <h1>The rest of it</h1>
+          </div>
+        </header>
+        <div class="sheet" style="display: flex; flex-direction: column; gap: 14px">
+          <section class="pnl blk">
+            <h3>1 · The header, with an audition in progress in Svenska</h3>
+            <div class="hdr">
+              <div class="who">
+                <div class="av">G</div>
+                <div>
+                  <span class="crumbs">Characters / Grandmother</span>
+                  <h1>Grandmother</h1>
+                  <span class="muted"
+                    >34 lines in 2 acts · one voice per language in every act</span
+                  >
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+                <div class="seg" style="flex-wrap: wrap">
+                  <span title="Gentle Granny">English <span class="cnt">Cast</span></span
+                  ><span class="on" title="Audition in progress"
+                    >Svenska <span class="cnt">Audition</span></span
+                  ><span title="No Deutsch voice yet"
+                    >Deutsch <span class="cnt">No voice</span></span
+                  >
+                </div>
+                <span class="btn primary">🎧 Resume audition</span>
+              </div>
+            </div>
+            <p class="cap">
+              The switch says Cast, Audition (one in progress) or No voice. Hover: the voice’s name,
+              “Audition in progress”, or “No Deutsch voice yet”. The button acts on the chosen
+              language: Start audition, or Resume audition. Each language’s audition is separate;
+              you can leave one paused and start another.
+            </p>
+          </section>
+          <section class="pnl blk">
+            <h3>2 · Only English declared</h3>
+            <p class="cap" style="font-size: 13px; color: var(--muted)">
+              No switch. The page, the audition and the cards are exactly as today.
+            </p>
+          </section>
+          <section class="pnl blk">
+            <h3>3 · The audition page in Svenska</h3>
+            <div>
+              <span class="crumbs">Characters / Grandmother / Audition</span>
+              <h1 style="font-size: 24px">Audition for Grandmother in Svenska</h1>
+            </div>
+            <div class="row">
+              <div class="lbox">
+                <span class="ib">▶</span
+                ><span><strong>Varm Mormor</strong><span class="muted">Cast now</span></span>
+              </div>
+              <div class="lbox">
+                <span class="ib">▶</span
+                ><span
+                  ><strong>Gentle Granny</strong><span class="muted">Her English voice</span></span
+                >
+              </div>
+            </div>
+            <p class="cap">
+              The shortlist starts with her Svenska voice (“Cast now”) and the voices she has in
+              other languages (“Her English voice”, “Her Deutsch voice”), all saying the Svenska
+              phrase.
+            </p>
+          </section>
+          <section class="pnl blk">
+            <h3>4 · Casting in Svenska</h3>
+            <div class="dialog">
+              <strong>Cast Gentle Granny as Grandmother’s Svenska voice?</strong
+              ><span class="muted" style="font-size: 13px"
+                >18 Svenska lines go stale and need recording again: Act I 18. Her English and
+                Deutsch lines are not touched.</span
+              >
+              <div class="row">
+                <span class="btn primary">Cast Gentle Granny</span><span class="btn">Cancel</span>
+              </div>
+            </div>
+            <p class="cap">
+              Afterwards: “Saved to the Svenska cast for every act. 18 lines are now stale and need
+              recording again.”
+            </p>
+          </section>
+          <section class="pnl blk">
+            <h3>5 · No lines in that language, and no phrase</h3>
+            <div class="bi">
+              <span class="faint">Audition phrase</span
+              ><span class="faint">None in Deutsch yet</span
+              ><span class="cap"
+                >Grandmother has no Deutsch lines to borrow one from. Write a Deutsch phrase to
+                start an audition. <a style="color: var(--accent)">Write a phrase</a></span
+              >
+            </div>
+            <span
+              class="btn primary"
+              style="opacity: 0.45; align-self: flex-start"
+              title="Write a Deutsch audition phrase first"
+              >🎧 Start audition</span
+            >
+          </section>
+          <section class="pnl blk">
+            <h3>6 · Same voice as another character, per language</h3>
+            <p class="status-note" style="margin: 0; font-size: 13px; color: var(--stale)">
+              ⚠ Also the Svenska voice of <u>Mira</u>. Characters in one voice are hard to tell
+              apart in a scene.
+            </p>
+            <p class="cap">
+              Only voices shared within the same language are noted; her English voice being her
+              Svenska voice too is not a warning.
+            </p>
+          </section>
+          <section class="pnl blk">
+            <h3>7 · Speed, phrase and keywords</h3>
+            <div class="bi">
+              <span class="faint">Speed · Deutsch</span
+              ><span class="mono">1.0× <span class="faint">project’s speed</span></span
+              ><span class="cap">English 0.9× · Svenska 0.95×</span>
+            </div>
+            <div class="bi">
+              <span class="faint">Audition phrase</span
+              ><span>“Komm herein aus dem Regen, Kind. Setz dich ans Feuer.”</span
+              ><span class="cap">Her longest Deutsch line, until you choose another.</span>
+            </div>
+            <div class="bi">
+              <span class="faint">Keywords</span
+              ><span class="cap"
+                >The same in every language; the search looks only at Deutsch voices.</span
+              >
+            </div>
+          </section>
+          <section class="pnl blk">
+            <h3>8 · Narrow window</h3>
+            <div
+              style="
+                max-width: 360px;
+                border: 1px dashed var(--line-strong);
+                border-radius: 10px;
+                padding: 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+              "
+            >
+              <div class="who">
+                <div class="av">G</div>
+                <div>
+                  <span class="crumbs">Characters / Grandmother</span>
+                  <h1>Grandmother</h1>
+                  <span class="muted">34 lines in 2 acts · one voice in every act</span>
+                </div>
+              </div>
+              <div class="seg" style="flex-wrap: wrap">
+                <span title="Gentle Granny">English <span class="cnt">Cast</span></span
+                ><span class="on" title="Audition in progress"
+                  >Svenska <span class="cnt">Audition</span></span
+                ><span title="No Deutsch voice yet">Deutsch <span class="cnt">No voice</span></span>
+              </div>
+              <span class="btn primary" style="align-self: flex-start">🎧 Resume audition</span>
+            </div>
+            <p class="cap">
+              The switch wraps under the name, and the button under the switch. Every language stays
+              visible; it never becomes a menu. The side panels move under the main ones, as today.
+            </p>
+          </section>
+          <section class="pnl blk">
+            <h3>9 · Keyboard</h3>
+            <p class="cap">
+              As on the Lines page: the switch is reachable with Tab, before the button; arrow keys
+              move between languages; group label “Language” for screen readers; switching keeps
+              focus on the switch; no shortcut.
+            </p>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
