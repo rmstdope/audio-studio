@@ -730,6 +730,83 @@ describe('server, retiring models', () => {
   })
 })
 
+describe('server, choosing the stages’ models', () => {
+  const base = projectJson()
+  ;(base.narration as Record<string, unknown>).models = {
+    audition: 's2.1-pro-free',
+    draft: 's2.1-pro-free',
+    final: 's2.1-pro-free',
+  }
+  const modelsRoot = tempRepo({
+    'audio-studio.json': base,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  const slow: FishClient = {
+    ...fish,
+    async tts(request) {
+      await gate
+      return fish.tts(request)
+    },
+  }
+  const modelServer = startServer({
+    projectFile: join(modelsRoot, 'audio-studio.json'),
+    port: 0,
+    fish: slow,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => modelServer.stop(true))
+  const at = (path: string) => new URL(path, modelServer.url)
+  const put = (stage: string, body: unknown, origin: string | null = modelServer.url.origin) =>
+    fetch(at(`/api/models/${stage}`), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
+      body: JSON.stringify(body),
+    })
+
+  it('shows the models, the dialog and nothing going on', async () => {
+    const view = await (await fetch(at('/api/models'))).json()
+    expect(view).toMatchObject({
+      ok: true,
+      file: 'audio-studio.json',
+      models: { draft: 's2.1-pro-free' },
+      dialog: { lines: 1 },
+      busy: null,
+    })
+  })
+
+  it('saves a model from its own page only, and the plan then uses it', async () => {
+    const body = { model: 's2.1-pro', was: 's2.1-pro-free' }
+    expect((await put('draft', body, 'http://evil.test')).status).toBe(403)
+    expect((await put('nope', body)).status).toBe(404)
+    expect((await put('draft', { model: 's2.1-pro' })).status).toBe(400)
+    const saved = await put('draft', body)
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await put('draft', body)).status).toBe(409)
+    const plan = await (await fetch(at('/api/parts/act1/plan'))).json()
+    expect(plan.plan.model).toBe('s2.1-pro')
+    expect((await put('draft', { model: 'mystery', was: 's2.1-pro' })).status).toBe(409)
+  })
+
+  it('refuses a change while a part is recording, and names it', async () => {
+    expect((await put('draft', { model: 's2.1-pro-free', was: 's2.1-pro' })).status).toBe(200)
+    const started = await fetch(at('/api/parts/act1/jobs'), {
+      method: 'POST',
+      headers: { origin: modelServer.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ speaker: null, keys: ['a'], orphans: [] }),
+    })
+    expect(started.status).toBe(200)
+    const view = await (await fetch(at('/api/models'))).json()
+    expect(view.busy).toEqual({ kind: 'recording', name: 'Act I' })
+    const refused = await put('final', { model: 'drama-3', was: 's2.1-pro-free' })
+    expect(refused.status).toBe(409)
+    release()
+  })
+})
+
 describe('server, paid auditions in two languages', () => {
   const base = projectJson()
   const root = tempRepo({

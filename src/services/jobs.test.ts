@@ -263,3 +263,26 @@ describe('jobs, cancel with every line under way', () => {
     expect(removeCalled).toBe(false)
   })
 })
+
+describe('jobs, active', () => {
+  it('lists the parts with a job running, and none once it ended', async () => {
+    const jobs = createJobs()
+    expect(jobs.active()).toEqual([])
+    const job = jobs.start({
+      part: 'act2',
+      speaker: null,
+      keys: ['a'],
+      orphans: [],
+      parallel: 1,
+      record: async (key) => {
+        await tick(20)
+        return { ok: true, key, duration: 1 }
+      },
+      removeOrphans: async () => 0,
+    })
+    if ('error' in job) throw new Error(job.error)
+    expect(jobs.active()).toEqual(['act2'])
+    await finished(() => jobs.get(job.id))
+    expect(jobs.active()).toEqual([])
+  })
+})
