@@ -1753,3 +1753,53 @@ describe('server, a paid audition ended with takes queued', () => {
     expect(answers.filter((a) => a.reason === 'no-sitting')).toHaveLength(2)
   })
 })
+
+describe('server, a paid audition with a take in flight', () => {
+  const paid = projectJson({
+    narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
+  })
+  const root = tempRepo({
+    'audio-studio.json': paid,
+    'tts/cast.json': { speakers: { gran: { voice: 'cur' }, kid: { voice: 'k1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
+  })
+  let calls = 0
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  const account: FishClient = {
+    ...fish,
+    credit: async () => 0.011,
+    async tts() {
+      calls++
+      await gate
+      return new Uint8Array([1])
+    },
+  }
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: own,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('still holds what a take in flight cost, which Fish’s credit does not show yet', async () => {
+    expect((await send('POST', '/api/auditions/gran/start', { spendUpTo: 0.01 })).status).toBe(200)
+    const take = send('POST', '/api/characters/gran/takes', { voice: 'v1', board: true })
+    while (calls === 0) await new Promise((resolve) => setTimeout(resolve, 5))
+    // Credit 0.011, 0.01 held: only 0.001 is free, though gran's sitting has already been charged.
+    const refused = await send('POST', '/api/auditions/kid/start', { spendUpTo: 0.0015 })
+    expect(await refused.json()).toMatchObject({ ok: false, reason: 'credit' })
+    release()
+    await take
+  })
+})

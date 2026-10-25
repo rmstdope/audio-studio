@@ -301,7 +301,10 @@ export function startServer({
    * it was charged), but only what is left of a sitting, which lasts a whole audition: what it
    * spent is already out of the credit Fish reports.
    */
-  const held = (budget: Budget) => (isSitting(budget) ? budget.left : budget.dollars)
+  const held = (budget: Budget) =>
+    isSitting(budget) ? budget.left + (inFlight.get(budget) ?? 0) : budget.dollars
+  /** What takes sent but not finished cost, per sitting: Fish's credit may not show it yet. */
+  const inFlight = new Map<Budget, number>()
   const isSitting = (budget: Budget) => [...sittings.values()].includes(budget)
 
   /**
@@ -314,7 +317,10 @@ export function startServer({
   /** Ends a character's sitting: what was left is not kept, and the credit is free again. */
   function endSitting(characterId: string) {
     const budget = sittings.get(characterId)
-    if (budget) budgets.delete(budget)
+    if (budget) {
+      budgets.delete(budget)
+      inFlight.delete(budget)
+    }
     sittings.delete(characterId)
   }
 
@@ -759,6 +765,14 @@ export function startServer({
             board,
             budget,
             open: () => budget !== undefined && sittings.get(id) === budget,
+            flight: (dollars) => {
+              if (!budget) return () => undefined
+              inFlight.set(budget, (inFlight.get(budget) ?? 0) + dollars)
+              return () => {
+                const now = inFlight.get(budget)
+                if (now !== undefined) inFlight.set(budget, Math.max(now - dollars, 0))
+              }
+            },
             charged: async (dollars) => void (await recordSpent(projectFile, id, dollars)),
           })
           if (!result) return notFound()
@@ -826,7 +840,8 @@ export function startServer({
           if (isPaid(money.model, new Date())) {
             const got = await admit(money.model, body.data.amount, body.data.amount)
             if ('problem' in got) return sittingAnswer(id, got.problem)
-            // Resuming is a fresh sitting; what the last one had left is not kept.
+            // Resuming is a fresh sitting; what the last one had left is not kept. It was held
+            // while the new amount was checked, which is less than one take (a used-up sitting).
             endSitting(id)
             sittings.set(id, got.budget)
           }

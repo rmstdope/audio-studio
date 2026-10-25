@@ -109,12 +109,8 @@ describe('needsResumeBox', () => {
 })
 
 describe('takeCaches', () => {
-  it('keeps board takes and page takes apart on a paid model', () => {
-    expect(takeCaches(true, true)).toEqual({ voice: false, session: true })
-    expect(takeCaches(false, true)).toEqual({ voice: true, session: false })
-  })
-  it('feeds both when the model is free, as the takes are the same', () => {
-    expect(takeCaches(true, false)).toEqual({ voice: true, session: true })
-    expect(takeCaches(false, false)).toEqual({ voice: true, session: true })
+  it('keeps board takes and the cast voice’s page takes apart, whatever the model', () => {
+    expect(takeCaches(true)).toEqual({ voice: false, session: true })
+    expect(takeCaches(false)).toEqual({ voice: true, session: false })
   })
 })

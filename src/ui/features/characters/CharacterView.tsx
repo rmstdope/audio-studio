@@ -276,7 +276,7 @@ function VoicePanel({
   /** The audition model when it is a paid one: the cast voice's take is on the free model all the same. */
   paidModel: string | null
 }) {
-  const recorder = useTakes(character.id, false, paidModel !== null)
+  const recorder = useTakes(character.id)
   const id = character.voice
   // The take is asked for once per phrase, so one the page cannot show is not asked again.
   const asked = useRef(new Set<string>())

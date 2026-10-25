@@ -39,6 +39,11 @@ export interface TakeOptions {
   charged?: (dollars: number) => void | Promise<void>
   /** Whether the sitting `budget` belongs to is still going on; checked when the take is charged. */
   open?: () => boolean
+  /**
+   * Told when a charged take is sent, with its cost; the answer is called when it is done. Lets
+   * the server hold that money back from the credit while Fish may not have billed it yet.
+   */
+  flight?: (dollars: number) => () => void
 }
 
 /**
@@ -180,6 +185,7 @@ async function speak(
         if (waits) return true
       }
       const cost = before - (budget?.left ?? 0)
+      const landed = cost > 0 ? options.flight?.(cost) : undefined
       try {
         const audio = await fish.tts({ text: spoken, voice, model, ...tts })
         if (!audio.length) throw new Error('Fish Audio sent no audio')
@@ -188,6 +194,8 @@ async function speak(
         // Nothing was made, so nothing is charged.
         budget?.refund(cost)
         throw error
+      } finally {
+        landed?.()
       }
       // What it cost is noted for the page; failing to note it does not unmake the take.
       if (cost > 0) {

@@ -89,12 +89,12 @@ export function needsResumeBox(
 }
 
 /**
- * Which cached answers a recorded take is added to: the cast voice's page answer, and the
- * audition board's. On a paid model the board's takes (audition model) and the page's (free
- * model) are different takes and stay apart; on a free model they are the same take.
+ * Which cached answer a recorded take is added to: the audition board's for a board take, the
+ * cast voice's page answer for the page's. They may be different takes (audition model against
+ * the free one), so neither feeds the other; the other is read from the server when needed.
  */
-export function takeCaches(board: boolean, paid: boolean): { voice: boolean; session: boolean } {
-  return { voice: !board || !paid, session: board || !paid }
+export function takeCaches(board: boolean): { voice: boolean; session: boolean } {
+  return { voice: !board, session: board }
 }
 
 /** How a take went, for the voices waiting for money. */

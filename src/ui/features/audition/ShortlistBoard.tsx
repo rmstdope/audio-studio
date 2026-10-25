@@ -65,11 +65,7 @@ export function ShortlistBoard({
   const { session, takes, audition } = view
   const act = useSessionAction(characterId)
   const sittingQuery = useSitting(characterId)
-  const recorder = useTakes(
-    characterId,
-    true,
-    sittingQuery.data?.ok ? sittingQuery.data.paid : false,
-  )
+  const recorder = useTakes(characterId, true)
   const sittingActions = useSittingActions(characterId)
   const ruledOut = useRuledOut(characterId)
   const [asking, setAsking] = useState<Asking>(null)

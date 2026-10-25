@@ -499,12 +499,11 @@ export function useSetCue(partId: string) {
  * Records audition takes: `record(voice)` asks the server for the take and adds it to the board
  * and the cast voice in the cache, without asking Fish for anything else. `board` says the takes
  * are the audition board's (on the audition model, paid from the sitting); the cast voice's on
- * its page are on the free model; with a `paid` audition model the two are different takes and
- * each goes only to its own cached answer (`takeCaches`). `recording` holds the voices in progress, `errors` what went
+ * its page are on the free model; each goes only to its own cached answer (`takeCaches`). `recording` holds the voices in progress, `errors` what went
  * wrong per voice, `waiting` the voices whose take waits for more money (`retryWaiting` asks for
  * them again).
  */
-export function useTakes(characterId: string, board = false, paid = false) {
+export function useTakes(characterId: string, board = false) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -526,7 +525,7 @@ export function useTakes(characterId: string, board = false, paid = false) {
         const result = (await response.json()) as NonNullable<TakeResult>
         if (result.ok) {
           setWaiting((now) => waitingAfter(now, voice, 'recorded'))
-          const caches = takeCaches(board, paid)
+          const caches = takeCaches(board)
           if (caches.voice) {
             client.setQueriesData<NonNullable<CharacterVoiceResult>>(
               { queryKey: ['voice', characterId] },
@@ -560,7 +559,7 @@ export function useTakes(characterId: string, board = false, paid = false) {
         })
       }
     },
-    [board, characterId, client, paid],
+    [board, characterId, client],
   )
 
   const retryWaiting = useCallback(() => {
