@@ -1528,3 +1528,53 @@ describe('server, a final stage without a final model', () => {
     expect(final.plan).toMatchObject({ final: false, keys: draft.plan.keys })
   })
 })
+
+describe('server, a part in another language', () => {
+  const base = projectJson()
+  const many = tempRepo({
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+      },
+    },
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+    'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'En gång.' }],
+    'audio/act1/sv/a.mp3': 'swedish-clip',
+    'audio/act1/sv/manifest.json': { a: { file: 'a.mp3' } },
+  })
+  const swedish = startServer({
+    projectFile: join(many, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => swedish.stop(true))
+  const get = (path: string) => fetch(new URL(path, swedish.url))
+
+  it('lists the languages in the project summary', async () => {
+    const body = await (await get('/api/project')).json()
+    expect(body.summary.languages).toEqual([
+      { id: 'en', name: 'English' },
+      { id: 'sv', name: 'Svenska' },
+    ])
+  })
+
+  it('serves a part in the language asked for, and its clips from that language', async () => {
+    const body = await (await get('/api/parts/act1?language=sv')).json()
+    expect(body.part.language).toBe('sv')
+    expect(body.part.lines[0]).toMatchObject({ text: 'En gång.', english: 'Once.' })
+    expect(await (await get('/api/parts/act1/clips/a.mp3?language=sv')).text()).toBe('swedish-clip')
+    expect((await get('/api/parts/act1/clips/a.mp3')).status).toBe(404)
+  })
+})

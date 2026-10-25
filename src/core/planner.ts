@@ -14,13 +14,7 @@ import { cueFor, type Cast, type Cues, type Line, type Lock, type Manifest } fro
  * - `untranslated`: the line is in the source language but has no text in this one
  */
 export type LineStatus =
-  | 'ok'
-  | 'weak'
-  | 'stale'
-  | 'missing'
-  | 'untracked'
-  | 'uncast'
-  | 'untranslated'
+  'ok' | 'weak' | 'stale' | 'missing' | 'untracked' | 'uncast' | 'untranslated'
 
 /** Every status, in the order the UI lists them. */
 export const LINE_STATUSES: LineStatus[] = [

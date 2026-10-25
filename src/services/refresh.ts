@@ -120,7 +120,7 @@ async function refresh(
     }
   }
   const root = dirname(projectFile)
-  const dialogPath = partPathFor(narration.paths.dialog, part.id)
+  const dialogPath = partPathFor(narration.paths.dialog, part.id, narration.languages[0])
   const before = await readLines(root, dialogPath)
 
   const command = partPathFor(narration.refreshDialog, part.id)

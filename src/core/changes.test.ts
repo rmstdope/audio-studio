@@ -123,3 +123,27 @@ describe('projectPaths', () => {
     })
   })
 })
+
+describe('projectPaths with several languages', () => {
+  it('lists every language’s files, and the source language’s clips folder', () => {
+    const many = ProjectSchema.parse(
+      projectJson({
+        narration: {
+          ...(projectJson().narration as object),
+          languages: ['en', 'sv'],
+          paths: {
+            dialog: 'tts/{part}/{language}/script.json',
+            cues: 'tts/{part}/{language}/cues.json',
+            lock: 'tts/{part}/{language}/lock.json',
+            clips: 'audio/{part}/{language}',
+            manifest: 'audio/{part}/{language}/manifest.json',
+          },
+        },
+      }),
+    )
+    const part = projectPaths(many, 'audio-studio.json').parts[0]!
+    expect(part.clips).toBe('audio/act1/en/')
+    expect(Object.keys(part.files)).toContain('tts/act1/sv/script.json')
+    expect(Object.keys(part.files)).toHaveLength(8)
+  })
+})

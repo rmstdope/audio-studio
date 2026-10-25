@@ -164,6 +164,10 @@ const MoveBody = z.object({
 
 const TakeBody = z.object({ voice: z.string().regex(VOICE_ID) })
 
+/** The `?language=` a request names, if any: the services fall back to the source language. */
+const languageOf = (request: Request) =>
+  new URL(request.url).searchParams.get('language') ?? undefined
+
 const notFound = () => Response.json({ error: 'not found' }, { status: 404 })
 
 const forbidden = (error: string) => Response.json({ error }, { status: 403 })
@@ -372,7 +376,7 @@ export function startServer({
       },
       '/api/parts/:part': {
         GET: guard(async (request) => {
-          const result = await loadPart(projectFile, request.params.part)
+          const result = await loadPart(projectFile, request.params.part, languageOf(request))
           return result ? Response.json(result) : notFound()
         }),
       },
@@ -552,7 +556,12 @@ export function startServer({
       },
       '/api/parts/:part/clips/:file': {
         GET: guard(async (request) => {
-          const file = await clipFile(projectFile, request.params.part, request.params.file)
+          const file = await clipFile(
+            projectFile,
+            request.params.part,
+            request.params.file,
+            languageOf(request),
+          )
           return file ? new Response(Bun.file(file)) : notFound()
         }),
       },

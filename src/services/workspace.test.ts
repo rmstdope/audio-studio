@@ -290,3 +290,76 @@ describe('projectFileProblem', () => {
     expect(findProjectFile(root)).not.toBe(join(root, 'audio-studio.json'))
   })
 })
+
+describe('a part in several languages', () => {
+  const paths = {
+    dialog: 'tts/{part}/{language}/script.json',
+    cues: 'tts/{part}/{language}/cues.json',
+    lock: 'tts/{part}/{language}/narration.lock.json',
+    clips: 'audio/{part}/{language}',
+    manifest: 'audio/{part}/{language}/manifest.json',
+  }
+  function project(languages: string[]) {
+    const base = projectJson()
+    return { ...base, narration: { ...(base.narration as object), languages, paths } }
+  }
+  const files = {
+    'audio-studio.json': project(['en', 'sv', 'de']),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } } },
+    'tts/act1/en/script.json': script,
+    'tts/act1/sv/script.json': [
+      { key: 'a', speaker: 'narrator', text: 'En gång.' },
+      { key: 'z', speaker: 'mira', text: 'Bara här.' },
+    ],
+    'audio/act1/sv/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
+    'audio/act1/sv/a.mp3': 'x',
+    'tts/act2/en/script.json': '[not json',
+  }
+  const open = async (language?: string, part = 'act1', extra = {}) => {
+    const root = tempRepo({ ...files, ...extra })
+    const result = await loadPart(join(root, 'audio-studio.json'), part, language)
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    return { root, part: result.part }
+  }
+
+  it('reads the chosen language’s lines, with the source text beside them', async () => {
+    const { part } = await open('sv')
+    expect(part.language).toBe('sv')
+    expect(part.lines.map((l) => [l.key, l.status, l.text, l.english])).toEqual([
+      ['a', 'untracked', 'En gång.', 'Once.'],
+      ['b', 'untranslated', '', 'Welcome.'],
+      ['z', 'missing', 'Bara här.', null],
+    ])
+    expect(part.clipsPath).toBe('audio/act1/sv')
+  })
+
+  it('reads the source language when none is asked for, or one is not declared', async () => {
+    for (const asked of [undefined, 'fr']) {
+      const { part } = await open(asked)
+      expect(part.language).toBe('en')
+      expect(part.lines.map((l) => l.status)).toEqual(['missing', 'missing'])
+    }
+  })
+
+  it('counts every language: up to date out of all its lines, no dialog, unreadable', async () => {
+    const { part } = await open('sv')
+    expect(part.languages).toEqual([
+      { id: 'en', name: 'English', dialog: 'ok', upToDate: 0, total: 2 },
+      { id: 'sv', name: 'Svenska', dialog: 'ok', upToDate: 0, total: 3 },
+      { id: 'de', name: 'Deutsch', dialog: 'missing', upToDate: 0, total: 0 },
+    ])
+    const act2 = await open('en', 'act2')
+    expect(act2.part.languages.find((l) => l.id === 'en')!.dialog).toBe('invalid')
+    expect(act2.part.dialog).toBe('invalid')
+  })
+
+  it('serves a clip from the language’s folder', async () => {
+    const { root } = await open()
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await clipFile(projectFile, 'act1', 'a.mp3', 'sv')).toBe(
+      join(root, 'audio/act1/sv/a.mp3'),
+    )
+    expect(await clipFile(projectFile, 'act1', 'a.mp3', 'en')).toBeNull()
+    expect(await clipFile(projectFile, 'act1', 'a.mp3', 'fr')).toBeNull()
+  })
+})

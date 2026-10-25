@@ -57,17 +57,21 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
   return {
     own: [normal(projectPath), normal(narration.characters)],
     parts: narration.parts.map((part) => {
-      const at = (template: string) => normal(partPathFor(template, part.id))
+      const at = (template: string, language: string) =>
+        normal(partPathFor(template, part.id, language))
+      const source = narration.languages[0]!
       return {
         id: part.id,
         title: part.title,
-        files: {
-          [at(narration.paths.dialog)]: 'dialog',
-          [at(narration.paths.cues)]: 'cues',
-          [at(narration.paths.lock)]: 'lock',
-          [at(narration.paths.manifest)]: 'manifest',
-        },
-        clips: `${at(narration.paths.clips)}/`,
+        files: Object.fromEntries(
+          narration.languages.flatMap((language) => [
+            [at(narration.paths.dialog, language), 'dialog'],
+            [at(narration.paths.cues, language), 'cues'],
+            [at(narration.paths.lock, language), 'lock'],
+            [at(narration.paths.manifest, language), 'manifest'],
+          ]),
+        ),
+        clips: `${at(narration.paths.clips, source)}/`,
       }
     }),
   }
