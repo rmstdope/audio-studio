@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
@@ -18,7 +18,7 @@ function speedPage() {
   document.body.append(container)
   const root = createRoot(container)
   const client = new QueryClient()
-  const show = (language: string, label: string) =>
+  const show = (language: string, label: string, speed: number | null = null) =>
     act(() =>
       root.render(
         createElement(
@@ -26,7 +26,7 @@ function speedPage() {
           { client },
           createElement(SpeedEditor, {
             characterId: 'ada',
-            speed: null,
+            speed,
             projectSpeed: 1,
             language,
             label,
@@ -41,24 +41,47 @@ function speedPage() {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, text)
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
-  return { container, show, field, type, unmount: () => act(() => root.unmount()) }
+  const save = () =>
+    act(async () => {
+      container.querySelector<HTMLButtonElement>('button[type=submit]')!.click()
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+  return { container, show, field, type, save, unmount: () => act(() => root.unmount()) }
 }
 
 describe('SpeedEditor', () => {
   let page: ReturnType<typeof speedPage>
-  beforeAll(() => {
-    page = speedPage()
+  const realFetch = globalThis.fetch
+  afterEach(async () => {
+    globalThis.fetch = realFetch
+    await page.unmount()
   })
-  afterAll(() => page.unmount())
 
   it('leaves an unsaved speed with its language when the page switches language', async () => {
+    page = speedPage()
     await page.show('sv', 'Speed · Svenska')
     await page.type('95')
     expect(page.field().value).toBe('95')
     expect(page.container.textContent).toContain('A speed is a number from')
 
-    await page.show('de', 'Speed · Deutsch')
-    expect(page.field().value).toBe('')
+    await page.show('de', 'Speed · Deutsch', 1.2)
+    expect(page.field().value).toBe('1.2')
     expect(page.container.textContent).not.toContain('A speed is a number from')
+  })
+
+  it('leaves a refused save with its language when the page switches language', async () => {
+    globalThis.fetch = (async () =>
+      Response.json(
+        { ok: false, problems: [{ file: 'cast.json', path: 'ada', message: 'refused here' }] },
+        { status: 409 },
+      )) as unknown as typeof fetch
+    page = speedPage()
+    await page.show('sv', 'Speed · Svenska')
+    await page.type('0.9')
+    await page.save()
+    expect(page.container.textContent).toContain('The speed could not be saved')
+
+    await page.show('de', 'Speed · Deutsch')
+    expect(page.container.textContent).not.toContain('The speed could not be saved')
   })
 })
