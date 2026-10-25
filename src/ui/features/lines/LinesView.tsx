@@ -115,7 +115,12 @@ export function LinesView({ part }: { part: PartSummary }) {
     const target = event.target as HTMLElement
     const row = target.closest<HTMLTableRowElement>('tr[data-key]')
     if (!row) return
-    const action = lineKeyAction(event.key, isTyping(target.tagName))
+    const action = lineKeyAction({
+      key: event.key,
+      modifier: event.metaKey || event.ctrlKey || event.altKey,
+      typing: isTyping(target.tagName),
+      onButton: target !== row,
+    })
     if (!action) return
     const key = row.dataset.key!
     const line = lines.find((l) => l.key === key)
@@ -470,9 +475,9 @@ export function LinesView({ part }: { part: PartSummary }) {
         <p className="keys-hint muted">
           On a row:{' '}
           {LINE_KEYS.map((k, i) => (
-            <span key={k.keys}>
+            <span key={k.action}>
               {i > 0 && ' · '}
-              <kbd>{k.keys}</kbd> {k.does}
+              <kbd>{k.shown}</kbd> {k.does}
             </span>
           ))}
         </p>

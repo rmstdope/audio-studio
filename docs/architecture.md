@@ -530,9 +530,10 @@ An audition is for a character, not for a part: the result applies to every part
   when it starts: filtering afterwards does not change it, and Stop stays offered. The row
   playing is marked and kept in view; a clip that fails is skipped.
 - Keys on the lines table (built): a row takes focus (Tab, or a click); j/k and the arrows
-  move, space plays, f plays from there, r records or retakes, a accepts, h shows what was
-  heard, c edits the cue, n the note. A hint under the table lists them. Nothing while typing in
-  a field.
+  move, space or Enter plays, f plays from there, r records or retakes, a accepts, h shows what
+  was heard, c edits the cue, n the note. A hint under the table lists them. Nothing while typing
+  in a field, nothing with Cmd, Ctrl or Alt held (the browser's shortcuts stay its own), and on a
+  button in the row space and Enter are the button's.
 - A note on a line (built): a note to oneself under the line's text on the lines page ("too
   fast"), edited in place, with a **With a note** filter; kept in the tool cache, not committed.
   A note on a line that left the dialog is kept but not shown. A notes file that cannot be read
