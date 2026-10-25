@@ -24,6 +24,7 @@ export function castEffects({
   titles,
   dropped,
   unheard,
+  auditioning = true,
 }: {
   /** The character's name. */
   name: string
@@ -39,6 +40,8 @@ export function castEffects({
   dropped: number
   /** Voices still to hear, and queued. */
   unheard: number
+  /** Whether an audition is going on, which casting ends (false: casting from the character's page). */
+  auditioning?: boolean
 }): string[] {
   const lines = replacing ? recorded.reduce((sum, a) => sum + a.lines, 0) : 0
   const effects: string[] = []
@@ -65,6 +68,7 @@ export function castEffects({
   ]
     .filter(Boolean)
     .join('; ')
+  if (!auditioning) return effects
   effects.push(
     after
       ? `The audition ends. ${after.charAt(0).toUpperCase()}${after.slice(1)}.`

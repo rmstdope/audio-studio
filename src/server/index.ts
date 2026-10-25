@@ -35,10 +35,12 @@ import {
   takeLine,
   useLineTake,
 } from '../services/lineTakes'
+import { cloneVoice } from '../services/cloneVoice'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
   auditionMoney,
+  castOwnVoice,
   castVoice,
   discardSession,
   moreVoices,
@@ -190,6 +192,9 @@ const AmountBody = z.object({ amount: z.number().positive().max(10_000) }).stric
 
 /** Starting an audition; a paid audition model needs the amount its sitting may spend. */
 const StartBody = z.object({ spendUpTo: z.number().positive().max(10_000).optional() }).strict()
+/** What casting a voice made from recordings sends: the voice and the name to cast it under. */
+const CastOwnBody = z.object({ voice: z.string().regex(VOICE_ID), name: z.string().trim().min(1) })
+
 /** The `?language=` a request names, if any: the services fall back to the source language. */
 const languageOf = (request: Request) =>
   new URL(request.url).searchParams.get('language') ?? undefined
@@ -447,6 +452,8 @@ export function startServer({
     port,
     // Recording a line or a batch of takes can take well over Bun's default 10 s; never cut it off.
     idleTimeout: 0,
+    // Cloning a voice sends up to 20 recordings, which pass Bun's default 128 MiB as WAV.
+    maxRequestBodySize: 1024 * 1024 * 1024,
     development: development ? { hmr: true, console: true } : false,
     routes: {
       '/': index,
@@ -971,6 +978,41 @@ export function startServer({
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { id } = request.params
           return answer(id, addVoiceById(projectFile, id, body.data.voice, fishFor))
+        }),
+      },
+      '/api/characters/:id/clone-voice': {
+        POST: fromOwnPage(async (request) => {
+          const form = await request.formData().catch(() => null)
+          const title = form?.get('title')
+          if (!form || typeof title !== 'string') {
+            return Response.json(
+              { error: 'expected a form with title and voices' },
+              { status: 400 },
+            )
+          }
+          const voices = form.getAll('voices').filter((v): v is File => v instanceof File)
+          const files = await Promise.all(
+            voices.map(async (v) => ({
+              name: v.name,
+              type: v.type || 'application/octet-stream',
+              bytes: new Uint8Array(await v.arrayBuffer()),
+            })),
+          )
+          const result = await cloneVoice(projectFile, request.params.id, { title, files }, fishFor)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/characters/:id/cast-voice': {
+        POST: fromOwnPage(async (request) => {
+          const body = CastOwnBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { voice, name }' }, { status: 400 })
+          }
+          const { voice, name } = body.data
+          const result = await castOwnVoice(projectFile, request.params.id, { id: voice, name })
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
       '/api/auditions/:id/cast': {

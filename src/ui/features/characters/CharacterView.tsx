@@ -35,6 +35,7 @@ import { needsResumeBox } from '../../sitting'
 import { voiceUrl } from '../../voiceId'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
+import { CloneVoice } from './CloneVoice'
 import { KeywordsEditor, PhraseEditor, SpeedEditor, StyleEditor } from './BriefEditors'
 
 /**
@@ -181,6 +182,12 @@ export function CharacterView({
             toggle={toggle}
             sharedWith={sharesVoiceWith(summary.characters, character.id)}
             paidModel={money?.paid ? money.model : null}
+            parts={character.appearances.map((a) => ({
+              id: a.part,
+              title: titles.get(a.part) ?? a.part,
+            }))}
+            inProgress={inProgress}
+            sessionKnown={view !== null && !session.isFetching}
           />
           <section className="panel character-lines" aria-label="Lines">
             <div className="section-head">
@@ -265,6 +272,9 @@ function VoicePanel({
   toggle,
   sharedWith,
   paidModel,
+  parts,
+  inProgress,
+  sessionKnown,
 }: {
   character: CharacterSummary
   /** What the server says about the voice cast now; null until it has. */
@@ -275,6 +285,12 @@ function VoicePanel({
   sharedWith: CharacterSummary[]
   /** The audition model when it is a paid one: the cast voice's take is on the free model all the same. */
   paidModel: string | null
+  /** The character's parts, for what casting a cloned voice makes stale. */
+  parts: { id: string; title: string }[]
+  /** The audition going on, if any. */
+  inProgress: AuditionSession | null
+  /** Whether the audition has been read: only then is it known whether one is going on. */
+  sessionKnown: boolean
 }) {
   const recorder = useTakes(character.id)
   const id = character.voice
@@ -288,14 +304,28 @@ function VoicePanel({
     void record(id)
   }, [wanted, id, record])
 
+  const clone = (
+    <CloneVoice
+      characterId={character.id}
+      name={character.name}
+      currentTitle={id ? answer?.voice?.title || voiceLabel(character) : null}
+      parts={parts}
+      inProgress={inProgress}
+      sessionKnown={sessionKnown}
+      playing={playing}
+      toggle={toggle}
+    />
+  )
   if (!id) {
     return (
       <section className="panel voice-panel" aria-label="Voice">
         <span className="label">Voice</span>
         <strong>No voice yet</strong>
         <span className="muted">
-          Start an audition to find one. Until then {character.name}’s lines cannot be recorded.
+          Start an audition to find one, or clone one from recordings you have. Until then{' '}
+          {character.name}’s lines cannot be recorded.
         </span>
+        {clone}
       </section>
     )
   }
@@ -402,6 +432,7 @@ function VoicePanel({
             </span>
           </span>
         </div>
+        {clone}
       </div>
       {recorder.errors[id] && <span className="adopt-error">{recorder.errors[id]}</span>}
       <div className="voice-foot">

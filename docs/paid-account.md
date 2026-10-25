@@ -34,6 +34,8 @@ voices** section (§8.1). Bringing a private voice in by its id (`getVoice`, an 
 
 ## Voice cloning
 
+_Built (as-5gk.5): offered to every account; a private voice that Fish will not speak with on the account says so on its card (the free-model question is answered there, not before)._
+
 Creating a private voice from recorded speech: `POST /model` with `multipart/form-data`, fields
 `type=tts`, `title`, `visibility=private`, `train_mode=fast` and the audio as `voices` (1 to 20
 files). Fish asks for at least 10 seconds a clip and suggests a minute or two for fidelity. Its

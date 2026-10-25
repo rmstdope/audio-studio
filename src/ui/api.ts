@@ -29,6 +29,7 @@ import type { SetupResult } from '../services/setup'
 import type { NoteChange } from '../services/notes'
 import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../services/lineTakes'
 import type { CastResult, SessionView } from '../services/sessions'
+import type { CloneResult } from '../services/cloneVoice'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import type { SittingView } from '../core/sitting'
@@ -739,6 +740,78 @@ export function useCast(characterId: string) {
       void client.invalidateQueries({ queryKey: ['part'] })
       void client.invalidateQueries({ queryKey: ['voice', characterId] })
       void client.invalidateQueries({ queryKey: ['sitting', characterId] })
+    },
+  })
+}
+
+/**
+ * Makes a private voice on the user's Fish account from the recordings and the name (the page has
+ * judged the files; the server checks again). The answer says what was made, or why not.
+ */
+export function useCloneVoice(characterId: string) {
+  return useMutation({
+    mutationFn: async ({ title, files }: { title: string; files: File[] }) => {
+      const form = new FormData()
+      form.set('title', title)
+      for (const file of files) form.append('voices', file, file.name)
+      const response = await fetch(
+        `/api/characters/${encodeURIComponent(characterId)}/clone-voice`,
+        {
+          method: 'POST',
+          body: form,
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`cloning answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CloneResult>
+    },
+  })
+}
+
+/** Has the voice say the character's audition phrase; the take's key, or why there is none. */
+export async function recordVoiceTake(
+  characterId: string,
+  voice: string,
+): Promise<NonNullable<TakeResult>> {
+  const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}/takes`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ voice }),
+  })
+  if (!response.ok && response.status !== 409)
+    throw new Error(`recording answered ${response.status}`)
+  return (await response.json()) as NonNullable<TakeResult>
+}
+
+/**
+ * Casts a voice no audition holds (one just made from recordings) for the character, ending an
+ * audition going on. Afterwards the project, its parts and the cast voice are loaded again.
+ */
+export function useCastOwnVoice(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `session-${characterId}` },
+    mutationFn: async (voice: { id: string; name: string }) => {
+      const response = await fetch(
+        `/api/characters/${encodeURIComponent(characterId)}/cast-voice`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ voice: voice.id, name: voice.name }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`casting answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CastResult>
+    },
+    onSuccess: (result) => {
+      if (!result.ok) return
+      void client.invalidateQueries({ queryKey: ['session', characterId] })
+      void client.invalidateQueries({ queryKey: ['project'] })
+      void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['voice', characterId] })
     },
   })
 }

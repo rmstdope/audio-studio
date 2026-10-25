@@ -131,7 +131,7 @@ audio-studio/
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
-│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit)
+│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
@@ -403,6 +403,14 @@ a failure leaves the session as it was. The session keeps them in `yours` (the s
 "Yours" badge and blue border on the shortlist and as the cast voice. Shortlist, Unlist (back to
 Your voices) and Drop (ruled out like any voice) work as elsewhere; an own voice ruled out is not
 put back by a later fetch.
+The Voice panel also offers **Clone a voice from recordings**, to every account (whether a private
+voice speaks on the free model is unverified, so the sample on the new voice's card says when it
+does not). The form opens in the panel: a name, 1 to 20 recordings (their length read in the
+browser; under 10 seconds or not audio is left out before sending), a permission tick. The
+recordings go to `POST /api/characters/:id/clone-voice`, which makes a private voice on the Fish
+account (`FishClient.createVoice`) and writes nothing to the project. The card then offers to cast
+the voice (`POST /api/characters/:id/cast-voice`, with the usual confirmation), to bring it into
+the audition (the existing `start` and `add`), or to leave it on the Fish account.
 
 ```
  keywords ──► search Fish's library, leaving out ruled-out voices ──► ranked candidates
@@ -792,6 +800,8 @@ POST   /api/auditions/:id/undo                   undo the last drop
 POST   /api/auditions/:id/more                   more candidates to hear
 POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json
+POST   /api/characters/:id/clone-voice           a private voice on the Fish account from recordings (multipart: title, voices)
+POST   /api/characters/:id/cast-voice            cast a voice no audition holds ({ voice, name }); ends an audition going on
 POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
                                                  part at a time); a paid
                                                  one with { confirmedCost }, else 409 with
@@ -945,6 +955,8 @@ Small, independently useful increments:
 
    Paid auditions are built (§8.1: a budget per sitting). What a paid account could still have (the `s1` retirement,
    cloning and design, the rate tier, a spend log) is in `docs/paid-account.md`, not planned yet.
+   What a paid account could still have (paid auditions, the `s1` retirement, your own voices,
+   voice design, the rate tier, a spend log; cloning is built, as-5gk.5) is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in

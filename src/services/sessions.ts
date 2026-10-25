@@ -349,15 +349,43 @@ export function castVoice(
       }
     }
     const voice = { id: winner, name: session.voices[winner]?.title ?? winner }
-    const changed = winner !== character.voice
-    const stale = changed ? await recordedLines(projectFile, characterId) : []
-    if (changed) {
-      const written = await setVoice(projectFile, characterId, voice)
-      if (!written || !written.ok) return written
-    }
-    await rm(sessionPath(projectFile, characterId), { force: true })
-    return { ok: true, voice, changed, stale }
+    return writeCast(projectFile, characterId, character.voice, voice)
   })
+}
+
+/**
+ * Casts a voice that is on no audition's shortlist, such as one just made from the user's own
+ * recordings. Like casting from an audition it ends the audition going on, if any.
+ */
+export function castOwnVoice(
+  projectFile: string,
+  characterId: string,
+  voice: { id: string; name: string },
+): Promise<CastResult> {
+  return sessionWrites.run(key(projectFile, characterId), async () => {
+    const loaded = await loadWorkspace(projectFile)
+    if (!loaded.ok) return loaded
+    const character = loaded.summary.characters.find((c) => c.id === characterId)
+    if (!character) return null
+    return writeCast(projectFile, characterId, character.voice, voice)
+  })
+}
+
+/** Writes the voice to the cast unless it is the one cast now, and ends the audition. */
+async function writeCast(
+  projectFile: string,
+  characterId: string,
+  current: string | null | undefined,
+  voice: { id: string; name: string },
+): Promise<CastResult> {
+  const changed = voice.id !== current
+  const stale = changed ? await recordedLines(projectFile, characterId) : []
+  if (changed) {
+    const written = await setVoice(projectFile, characterId, voice)
+    if (!written || !written.ok) return written
+  }
+  await rm(sessionPath(projectFile, characterId), { force: true })
+  return { ok: true, voice, changed, stale }
 }
 
 /** Ends the character's audition without casting; null for an unknown character. */

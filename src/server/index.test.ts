@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
-import type { FishClient } from '../services/fish'
+import { FishError, type FishClient } from '../services/fish'
 import { createLimiter } from '../services/limit'
 import { recordLine } from '../services/narration'
 import { allowedHosts, startServer } from './index'
@@ -19,6 +19,7 @@ const fish: FishClient = {
   async listOwnVoices() {
     return []
   },
+  createVoice: () => Promise.reject(new Error('not used')),
   async credit() {
     return 25
   },
@@ -1076,6 +1077,7 @@ describe('server, a paid draft model', () => {
   let spoken = 0
   const account: FishClient = {
     ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1265,6 +1267,7 @@ describe('server, paid recording and what changes meanwhile', () => {
   const requests: { model: string; gate: ReturnType<typeof gate> }[] = []
   const held: FishClient = {
     ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       creditCalls++
       if (creditGate) await creditGate
@@ -1471,6 +1474,7 @@ describe('server, a paid job refused for a refresh', () => {
   let credit = 10
   const account: FishClient = {
     ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1528,6 +1532,7 @@ describe('server, the final recording', () => {
   const models: string[] = []
   const account: FishClient = {
     ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 10
     },
@@ -1964,5 +1969,103 @@ describe('server, a part in another language', () => {
     expect(body.part.lines[0]).toMatchObject({ text: 'En gång.', english: 'Once.' })
     expect(await (await get('/api/parts/act1/clips/a.mp3?language=sv')).text()).toBe('swedish-clip')
     expect((await get('/api/parts/act1/clips/a.mp3')).status).toBe(404)
+  })
+})
+
+describe('cloning a voice', () => {
+  const repo = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const made: { title: FormDataEntryValue | null; names: string[] }[] = []
+  const cloning = startServer({
+    projectFile: join(repo, 'audio-studio.json'),
+    port: 0,
+    fish: {
+      ...fish,
+      async createVoice({ title, files }) {
+        if (title === 'Refused') throw new FishError(400, 'Audio too short')
+        made.push({ title, names: files.map((f) => f.name) })
+        return {
+          id: 'f'.repeat(32),
+          title,
+          description: '',
+          tags: [],
+          languages: [],
+          uses: 0,
+          likes: 0,
+          author: '',
+          sample: null,
+        }
+      },
+    },
+    transcriber: null,
+  })
+  afterAll(() => cloning.stop(true))
+  const send = (path: string, body: BodyInit, headers: Record<string, string> = {}) =>
+    fetch(new URL(path, cloning.url), {
+      method: 'POST',
+      body,
+      headers: { origin: cloning.url.origin, ...headers },
+    })
+  const form = (title: string, names: string[]) => {
+    const data = new FormData()
+    data.set('title', title)
+    for (const name of names) data.append('voices', new File([new Uint8Array([1, 2])], name))
+    return data
+  }
+
+  it('sends the recordings to Fish and gives the voice made', async () => {
+    const response = await send(
+      '/api/characters/narrator/clone-voice',
+      form('Nora', ['a.wav', 'b.wav']),
+    )
+    expect(await response.json()).toEqual({ ok: true, voice: { id: 'f'.repeat(32), name: 'Nora' } })
+    expect(made).toEqual([{ title: 'Nora', names: ['a.wav', 'b.wav'] }])
+  })
+
+  it('gives Fish’s refusal with a 409, and refuses a body that is not the form', async () => {
+    const refused = await send('/api/characters/narrator/clone-voice', form('Refused', ['a.wav']))
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toEqual({ ok: false, reason: 'fish', message: 'Audio too short' })
+    const bad = await send('/api/characters/narrator/clone-voice', '{}', {
+      'content-type': 'application/json',
+    })
+    expect(bad.status).toBe(400)
+  })
+
+  it('refuses another page, and an unknown character', async () => {
+    const other = await send('/api/characters/narrator/clone-voice', form('Nora', ['a.wav']), {
+      origin: 'https://evil.example',
+    })
+    expect(other.status).toBe(403)
+    const unknown = await send('/api/characters/nobody/clone-voice', form('Nora', ['a.wav']))
+    expect(unknown.status).toBe(404)
+  })
+
+  it('refuses to cast from another page or with a body that names no voice', async () => {
+    const json = { 'content-type': 'application/json' }
+    const other = await send('/api/characters/narrator/cast-voice', '{}', {
+      ...json,
+      origin: 'https://evil.example',
+    })
+    expect(other.status).toBe(403)
+    expect((await send('/api/characters/narrator/cast-voice', '{}', json)).status).toBe(400)
+  })
+
+  it('casts the voice made without an audition', async () => {
+    const response = await send(
+      '/api/characters/narrator/cast-voice',
+      JSON.stringify({ voice: 'f'.repeat(32), name: 'Nora' }),
+      { 'content-type': 'application/json' },
+    )
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      voice: { name: 'Nora' },
+      changed: true,
+    })
+    const cast = JSON.parse(readFileSync(join(repo, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.narrator).toMatchObject({ voice: 'f'.repeat(32), voiceName: 'Nora' })
   })
 })

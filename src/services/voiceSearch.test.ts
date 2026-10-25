@@ -24,6 +24,7 @@ function fakeFish(voices: Voice[], pageSize = 100) {
     async listOwnVoices() {
       return []
     },
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 25
     },

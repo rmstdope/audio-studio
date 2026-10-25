@@ -29,6 +29,7 @@ function fakeFish() {
     async listOwnVoices() {
       return []
     },
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 25
     },
@@ -461,6 +462,7 @@ describe('takes on a paid audition model', () => {
   it('gives the money back when Fish fails', async () => {
     const projectFile = join(tempRepo(paid), 'audio-studio.json')
     const failing: FishClient = {
+      createVoice: () => Promise.reject(new Error('not used')),
       credit: async () => 25,
       listVoices: () => Promise.reject(new Error('not used')),
       listOwnVoices: () => Promise.reject(new Error('not used')),
