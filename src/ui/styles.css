@@ -797,6 +797,29 @@ a.btn {
   background: var(--panel);
 }
 
+.table tr[tabindex]:focus-visible {
+  outline: none;
+}
+.table tr[tabindex]:focus-visible td {
+  background: var(--raised);
+}
+.table tr[tabindex]:focus-visible td:first-child {
+  box-shadow: inset 3px 0 0 var(--line-strong);
+}
+
+.keys-hint {
+  font-size: 12px;
+  margin: 0;
+}
+.keys-hint kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--inset);
+}
+
 .table tr.playing td {
   background: var(--accent-soft-bg);
 }
