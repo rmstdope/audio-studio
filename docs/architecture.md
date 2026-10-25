@@ -604,14 +604,14 @@ An audition is for a character, not for a part: the result applies to every part
       sentence starts (after . ! ? … or a colon, opening a quote, single or double, or after a dash
       inside a word), and anywhere in German (`de`), which capitalises every noun ("Hund" heard as
       "Hand" is missed), only a known name: a one-word character id of the cast ("aren", not
-      "ancient tree spirit") or pronunciation. Lowercase words, short ones, numbers (in digits or in words:
-      "Act Three" heard as "Act Tree" is missed) and other sentence-initial words must match
+      "ancient tree spirit") or pronunciation. Lowercase words, short ones, numbers (in digits or in
+      words: "Act Three" heard as "Act Tree" is missed) and other sentence-initial words must match
       exactly. Words are compared in any alphabet, letters and their marks kept ("får" is not "för",
       Russian ё read as е), and a name in any alphabet is guessed the same way ("Лирия" as
       "Лирья"); the as-it-sounds spellings are English ones. The numbers 0 to 99 of `en`, `sv`,
       `de`, `el` and `ru`, in their common forms ("en" and "ett", "одну"), are words that sound the
-      same as their digits, in the part's own language (`core/numbers.ts`). A title-case word mid-sentence ("The Call") is
-      taken for a name;
+      same as their digits, in the part's own language (`core/numbers.ts`). A title-case word
+      mid-sentence ("The Call") is taken for a name, outside German;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
    5. encode MP3 into the clips folder, update the manifest and lock entries, write both; then
       keep what Whisper heard of the take in the cache if it was heard below full (forgotten

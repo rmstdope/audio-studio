@@ -260,13 +260,14 @@ function soundOf(word: string): string {
 /**
  * Whether a heard word is a name as Whisper spells it ("Aren" as "Arn"): the shown word is
  * capitalised (not all capitals, which is emphasis), not where a sentence starts (where every word
- * is) nor in a language that capitalises its nouns (`capitalNouns`) unless it is a known name, of at least four letters as said (apostrophes and a possessive
- * 's not counted) and nothing else, and the heard one is one letter apart, as spelled or as they
- * sound (`soundOf`, where that leaves four letters), or, for a known name heard as one word
- * Whisper wrote as a name (`asName`), only its vowels other as they sound (`vowelsApart`).
- * Lowercase words, short ones and numbers, in digits or in words ("Three" is no "Tree"), are left
- * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
- * Letters of any alphabet count; the rules of `soundOf` and `vowelsApart` are English spellings.
+ * is) nor in a language that capitalises its nouns (`capitalNouns`) unless it is a known name, of
+ * at least four letters as said (apostrophes and a possessive 's not counted) and nothing else,
+ * and the heard one is one letter apart, as spelled or as they sound (`soundOf`, where that leaves
+ * four letters), or, for a known name heard as one word Whisper wrote as a name (`asName`), only
+ * its vowels other as they sound (`vowelsApart`). Lowercase words, short ones and numbers, in
+ * digits or in words ("Three" is no "Tree"), are left out, where one letter makes another word
+ * ("never" and "ever", "was" and "has", 1984 and 1985). Letters of any alphabet count; the rules
+ * of `soundOf` and `vowelsApart` are English spellings.
  */
 function spelledAlike(
   shown: string,
@@ -573,9 +574,9 @@ function alignGap(
  * `names` are the known names (see `knownNames`), `alike` the words that sound the same, matched as
  * one wherever words are matched exactly (see `soundAlikes`), and `capitalNouns` whether the line's
  * language capitalises its nouns (see `capitalisesNouns`), where only a known name is forgiven one
- * letter off. Returns the timed words, the share of
- * words that were heard (punctuation on its own, "—" or "…", is no word: it is only timed), and the
- * indices of the shown words that were not (`missed`).
+ * letter off. Returns the timed words, the share of words that were heard (punctuation on its own,
+ * "—" or "…", is no word: it is only timed), and the indices of the shown words that were not
+ * (`missed`).
  */
 export function alignWords(
   tokens: string[],
