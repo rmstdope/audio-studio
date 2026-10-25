@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isPriced } from './prices'
+import { SOUND_ALIKE_WORD } from './soundAlikeEdit'
 
 /** Fish Audio's free model: the only one for auditions, for now. */
 export const FREE_MODELS = ['s2.1-pro-free'] as const
@@ -109,9 +110,7 @@ const NarrationSchema = z
          */
         soundAlike: z
           .array(
-            z
-              .array(z.string().regex(/^\S*[\p{L}\p{N}]\S*$/u, 'expected one word, with letters'))
-              .min(2),
+            z.array(z.string().regex(SOUND_ALIKE_WORD, 'expected one word, with letters')).min(2),
           )
           .default([]),
       })

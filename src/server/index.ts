@@ -20,6 +20,7 @@ import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
+import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile } from '../services/takes'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
@@ -83,6 +84,10 @@ const CharacterBody = z.union([
 /** The whole pronunciation table, and the one the page showed (to refuse a stale page). */
 const Table = z.array(z.tuple([z.string().max(1_000), z.string().max(1_000)])).max(2_000)
 const PronounceBody = z.object({ table: Table, was: Table }).strict()
+
+/** The project's own sound-alike groups, and the ones the editing began from. */
+const Groups = z.array(z.array(z.string().max(200)).max(50)).max(1000)
+const SoundAlikeBody = z.object({ groups: Groups, was: Groups }).strict()
 
 /** Where an orphaned cue goes: a line key, or null to remove it. */
 const MoveCueBody = z.object({ to: z.string().min(1).max(200).nullable() }).strict()
@@ -558,6 +563,16 @@ export function startServer({
           }
           const result = await setPronunciations(projectFile, body.data.table, body.data.was)
           if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/sound-alike': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = SoundAlikeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { groups, was }' }, { status: 400 })
+          }
+          const result = await setSoundAlike(projectFile, body.data.groups, body.data.was)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
