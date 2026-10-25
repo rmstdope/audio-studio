@@ -1,4 +1,10 @@
-import { clipInputs, fingerprint, staleReasons, type StaleReason } from './fingerprint'
+import {
+  clipInputs,
+  fingerprint,
+  fingerprintMatches,
+  staleReasons,
+  type StaleReason,
+} from './fingerprint'
 import type { Project } from './project'
 import { cueFor, type Cast, type Cues, type Line, type Lock, type Manifest } from './resources'
 
@@ -136,13 +142,13 @@ export function planPart(input: PlanInput): PartState {
       finalModel !== draft
         ? clipInputs(line, character, cues, cast.pronounce, narration, finalModel)
         : null
-    const final = Boolean(entry && file && finalInputs && entry.fp === fingerprint(finalInputs).fp)
+    const final = Boolean(entry && file && finalInputs && fingerprintMatches(entry, finalInputs))
     let status: LineStatus
     let reasons: StaleReason[] = []
     if (!inputs) status = 'uncast'
     else if (!file) status = 'missing'
     else if (!entry) status = 'untracked'
-    else if (!final && entry.fp !== fingerprint(inputs).fp) {
+    else if (!final && !fingerprintMatches(entry, inputs)) {
       status = 'stale'
       // Made with the final model: stale for what changed besides the model it may be made with.
       reasons = staleReasons(

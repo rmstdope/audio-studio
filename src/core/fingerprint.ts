@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { Project } from './project'
 import { cueFor, ttsFor, type Character, type LockEntry } from './resources'
+import { REPLACEMENT_MODEL, RETIRED_MODEL } from './retirement'
 import { saidText } from './spoken'
 
 /** Everything that changes a clip's audio. Two clips with the same inputs sound the same. */
@@ -73,6 +74,23 @@ export function fingerprint(inputs: ClipInputs): { fp: string; parts: InputHashe
 }
 
 /**
+ * Whether a clip made with `made` is as good as one made with `now`: the same model, or `s1` and
+ * `s2.1-pro`, which Fish serves and bills as one from its retirement on.
+ */
+export function sameModel(made: string, now: string): boolean {
+  return made === now || (made === RETIRED_MODEL && now === REPLACEMENT_MODEL)
+}
+
+/** Whether the lock entry's fingerprint is the one these inputs give, `s1` clips counting as `s2.1-pro`. */
+export function fingerprintMatches(entry: LockEntry, inputs: ClipInputs): boolean {
+  if (entry.fp === fingerprint(inputs).fp) return true
+  return (
+    inputs.model === REPLACEMENT_MODEL &&
+    entry.fp === fingerprint({ ...inputs, model: RETIRED_MODEL }).fp
+  )
+}
+
+/**
  * Which inputs differ between the clip in the lock and the line now. A changed pronunciation shows
  * only when the words themselves are the same, since new words change how they are said too.
  */
@@ -80,7 +98,7 @@ export function staleReasons(entry: LockEntry, inputs: ClipInputs): StaleReason[
   const { parts } = fingerprint(inputs)
   const reasons: StaleReason[] = []
   if (entry.voice !== inputs.voice) reasons.push('voice')
-  if (entry.model !== inputs.model) reasons.push('model')
+  if (!sameModel(entry.model, inputs.model)) reasons.push('model')
   if (entry.parts.cue !== parts.cue) reasons.push('cue')
   if (entry.parts.text !== parts.text) reasons.push('text')
   else if (entry.parts.said !== parts.said) reasons.push('pronunciation')
