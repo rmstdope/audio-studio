@@ -23,6 +23,7 @@ import type { HeardResult } from '../services/heard'
 import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { SoundAlikeChange } from '../services/soundAlike'
+import type { SetupResult } from '../services/setup'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
@@ -692,6 +693,21 @@ export function useTryCue(partId: string) {
       }
       return (await response.json()) as NonNullable<TryResult>
     },
+  })
+}
+
+/**
+ * The setup checks: what the studio needs on this machine and in the project, each with a fix.
+ * Asked for once in a while (the sidebar shows the count on every page, and the check asks Fish),
+ * or afresh each time the Setup page opens (`fresh`): the user installs things meanwhile.
+ */
+export function useSetup(fresh = false) {
+  return useQuery({
+    queryKey: ['setup'],
+    queryFn: () => getJson<SetupResult>('/api/setup'),
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: fresh ? 'always' : true,
   })
 }
 

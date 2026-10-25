@@ -1800,6 +1800,53 @@ a.btn {
   padding: 6px 8px;
 }
 
+.setup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.setup-check {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.setup-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.setup-state.ok {
+  color: var(--ok);
+}
+.setup-state.problem {
+  color: var(--warn);
+}
+.setup-state.off {
+  color: var(--faint);
+}
+.setup-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.setup-fix {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  width: fit-content;
+}
+.setup-problems {
+  color: var(--warn);
+}
+
 .project-credit {
   font-size: 12px;
 }

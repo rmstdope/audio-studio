@@ -125,6 +125,7 @@ audio-studio/
 │   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
 │   │   ├── heard.ts             what Whisper heard of a part's lines below full, as saved
 │   │   ├── soundAlike.ts        English words that sound the same, matched as one
+│   │   ├── setup.ts             what the machine and project lack, from facts, with a fix each
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
@@ -135,7 +136,8 @@ audio-studio/
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
 │   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
-│   │   ├── takes.ts             audition takes: recorded once, cached by what they are made of
+│   │   ├── takes.ts             audition takes and tries: recorded once, cached by what they are made of
+│   │   ├── setup.ts             the facts for the setup checks: tools on the PATH, the key, Fish
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
 │   │   ├── audio.ts             encode MP3 with ffmpeg, level its loudness (as level.py)
 │   │   ├── files.ts             read resources, write atomically, lock formatting
@@ -682,6 +684,7 @@ spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DE
 ```
 GET    /api/project                              project, parts
 GET    /api/credit                               the Fish account's API credit (dollars)
+GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish)
 GET    /api/parts/:part                          the part, every line with its status and reason
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
@@ -731,9 +734,13 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 
 - An invalid project file or resource opens the UI on an error page that names the file, the path
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
-- Missing tools (`ffmpeg`, `uv`) and a missing API key are checked at start and shown as a setup
-  checklist. So far: the CLI warns when ffmpeg is missing, and recording says so; the checklist in
-  the UI comes later.
+- Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
+  ffmpeg, uv for Whisper (off when `quality.transcriber` is `none`; a problem off Apple silicon),
+  the Fish key in the environment or the env file, whether Fish answers (the server's credit
+  lookup, only with a key) and the optional `refreshDialog`, each with what to do about it.
+  Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
+  the problems from a check at most five minutes old and never on a window focus, so the studio
+  does not ask Fish more than it did. The CLI still warns about ffmpeg, and recording says so.
 - Writes outside the project root throw. Deleting clips (orphans) always needs confirmation.
 - Fish errors (no credit, voice removed) mark the line as failed with the reason; the rest of the
   job carries on. Too many requests at once (429: Fish allows 5 at a time until $100 has been
@@ -877,6 +884,7 @@ Small, independently useful increments:
        row playing marked and kept in view (§8.3).
     3. **A character's speed** (built): `speed` in the cast, edited on the character page; its
        lines, takes and tries spoken at it, and its lines stale when it changes (§6, §7).
+    4. **Setup page** (built): what the machine and the project lack, with the fix for each (§10).
 11. **What was heard**, in two pull requests:
     1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
        when it is checked; the lines page shows it beside the text, missed words marked.

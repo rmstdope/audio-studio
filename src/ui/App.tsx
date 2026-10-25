@@ -7,6 +7,7 @@ import { CharacterView } from './features/characters/CharacterView'
 import { CharactersView } from './features/characters/CharactersView'
 import { LinesView } from './features/lines/LinesView'
 import { PartOverview } from './features/overview/PartOverview'
+import { SetupView } from './features/setup/SetupView'
 import { useRoute } from './route'
 
 /** The studio: loads the project and shows the page for the current route. */
@@ -68,6 +69,8 @@ export function App() {
         )}
         {route.view === 'changes' ? (
           <ChangesView summary={summary} />
+        ) : route.view === 'setup' ? (
+          <SetupView />
         ) : route.view === 'characters' ? (
           <CharactersView summary={summary} />
         ) : route.view === 'character' ? (

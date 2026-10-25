@@ -9,17 +9,19 @@ export type Route =
   | { view: 'lines'; part: string }
   | { view: 'characters' }
   | { view: 'changes' }
+  | { view: 'setup' }
   | { view: 'character'; character: string }
   | { view: 'audition'; character: string }
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines`, `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition`, `#/changes`; anything else is the default
- * part.
+ * `#/characters/mira`, `#/characters/mira/audition`, `#/changes`, `#/setup`; anything else is the
+ * default part.
  */
 export function parseRoute(hash: string): Route {
   const [, first, second, third] = hash.replace(/^#/, '').split('/')
   if (first === 'changes') return { view: 'changes' }
+  if (first === 'setup') return { view: 'setup' }
   if (first === 'characters') {
     if (!second) return { view: 'characters' }
     const character = decodeURIComponent(second)
@@ -36,6 +38,7 @@ export function parseRoute(hash: string): Route {
 export function routeHref(route: Route): string {
   if (route.view === 'characters') return '#/characters'
   if (route.view === 'changes') return '#/changes'
+  if (route.view === 'setup') return '#/setup'
   if (route.view === 'character') return `#/characters/${encodeURIComponent(route.character)}`
   if (route.view === 'audition')
     return `#/characters/${encodeURIComponent(route.character)}/audition`
