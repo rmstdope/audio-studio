@@ -56,6 +56,7 @@ import {
 import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
 import { heardFor } from '../services/heard'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
+import { declaredLanguage } from '../core/project'
 import {
   adoptPart,
   cacheNameFor,
@@ -251,6 +252,12 @@ export function startServer({
     return Response.json(view, { status: view.ok ? 200 : 409 })
   }
 
+  /** The language a request means, as the project declares it (the source language's if unknown). */
+  async function languageFor(request: Request): Promise<string | undefined> {
+    const opened = await openProject(projectFile)
+    return opened.ok ? declaredLanguage(opened.project.narration, languageOf(request)) : undefined
+  }
+
   /** Fish TTS requests (audition takes and lines alike): `quality.parallel` at a time, each once. */
   const fishWork = createLimiter()
   /** Generation jobs, one per part at a time. */
@@ -404,8 +411,9 @@ export function startServer({
     speaker?: string,
     includeWeak = false,
     asked: 'draft' | 'final' = 'draft',
+    language?: string,
   ) {
-    const read = await readPart(projectFile, part)
+    const read = await readPart(projectFile, part, language)
     if (!read) return null
     if (!read.ok) return read
     if (read.problems.length) return { ok: false as const, problems: read.problems }
@@ -481,14 +489,24 @@ export function startServer({
       },
       '/api/parts/:part/adopt': {
         POST: fromOwnPage(async (request) => {
-          const result = await adoptPart(projectFile, request.params.part)
+          const result = await adoptPart(
+            projectFile,
+            request.params.part,
+            new Date(),
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
       '/api/parts/:part/lines/:key/heard': {
         GET: guard(async (request) => {
-          const result = await heardFor(projectFile, request.params.part, request.params.key)
+          const result = await heardFor(
+            projectFile,
+            request.params.part,
+            request.params.key,
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -498,7 +516,7 @@ export function startServer({
           const body = NoteBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { note }' }, { status: 400 })
           const { part, key } = request.params
-          const result = await setNote(projectFile, part, key, body.data.note)
+          const result = await setNote(projectFile, part, key, body.data.note, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -507,14 +525,23 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const { part, key } = request.params
           const transcriber = await transcriberFor()
-          const result = await measureLine(projectFile, part, key, { transcriber, again: true })
+          const result = await measureLine(projectFile, part, key, {
+            transcriber,
+            again: true,
+            language: languageOf(request),
+          })
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
       '/api/parts/:part/lines/:key/accept': {
         POST: fromOwnPage(async (request) => {
-          const result = await acceptLine(projectFile, request.params.part, request.params.key)
+          const result = await acceptLine(
+            projectFile,
+            request.params.part,
+            request.params.key,
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -528,7 +555,7 @@ export function startServer({
             return Response.json({ error: 'expected { confirmedCost?, stage? }' }, { status: 400 })
           }
           // Fails closed: without a plan, nothing is priced, so nothing is recorded.
-          const planned = await planFor(part, undefined, true, body.data.stage)
+          const planned = await planFor(part, undefined, true, body.data.stage, languageOf(request))
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const admitted = await admit(
@@ -546,6 +573,7 @@ export function startServer({
               transcriber: await transcriberFor(),
               stage: body.data.stage,
               budget: admitted.budget,
+              language: languageOf(request),
             })
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -559,7 +587,13 @@ export function startServer({
           const query = new URL(request.url).searchParams
           const speaker = query.get('speaker') || undefined
           const stage = query.get('stage') === 'final' ? 'final' : 'draft'
-          const plan = await planFor(request.params.part, speaker, query.get('weak') === '1', stage)
+          const plan = await planFor(
+            request.params.part,
+            speaker,
+            query.get('weak') === '1',
+            stage,
+            languageOf(request),
+          )
           return plan ? Response.json(plan) : notFound()
         }),
       },
@@ -578,7 +612,14 @@ export function startServer({
           const { part } = request.params
           const { retakeWeak } = body.data
           const { stage } = body.data
-          const planned = await planFor(part, body.data.speaker ?? undefined, retakeWeak, stage)
+          const language = await languageFor(request)
+          const planned = await planFor(
+            part,
+            body.data.speaker ?? undefined,
+            retakeWeak,
+            stage,
+            language,
+          )
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const { plan, parallel } = planned
@@ -612,6 +653,7 @@ export function startServer({
           const job = jobs.start({
             kind: body.data.kind,
             part,
+            language,
             speaker: body.data.speaker,
             keys,
             orphans,
@@ -622,6 +664,7 @@ export function startServer({
                     transcriber: await transcriberFor(),
                     again: kind === 'check',
                     onlyIfNeeded: true,
+                    language,
                   })
                 : recordLine(projectFile, part, key, fishFor, {
                     encode,
@@ -631,8 +674,9 @@ export function startServer({
                     stage,
                     budget,
                     transcriber: await transcriberFor(),
+                    language,
                   }),
-            removeOrphans: (keys) => removeOrphans(projectFile, part, keys),
+            removeOrphans: (keys) => removeOrphans(projectFile, part, keys, language),
             onEnd: () => budgets.delete(budget),
           })
           // Not started (another job runs for the part): nothing is held back for it.
@@ -641,7 +685,9 @@ export function startServer({
         }),
       },
       '/api/parts/:part/jobs/latest': {
-        GET: guard((request) => Response.json(jobs.latest(request.params.part))),
+        GET: guard(async (request) =>
+          Response.json(jobs.latest(request.params.part, await languageFor(request))),
+        ),
       },
       '/api/jobs/:id': {
         GET: guard((request) => {
@@ -685,8 +731,7 @@ export function startServer({
       '/api/parts/:part/refresh': {
         POST: fromOwnPage(async (request) => {
           // A job reads the dialog as it records: refreshing under it would fail its lines.
-          const job = jobs.latest(request.params.part)
-          if (job && (job.status === 'running' || job.status === 'cancelling')) {
+          if (jobs.running(request.params.part)) {
             const message = 'A generation is running for this part; refresh when it is done.'
             return Response.json({ ok: false, reason: 'busy', message }, { status: 409 })
           }
@@ -700,7 +745,7 @@ export function startServer({
           const body = MoveCueBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { to }' }, { status: 400 })
           const { part, key } = request.params
-          const result = await moveCue(projectFile, part, key, body.data.to)
+          const result = await moveCue(projectFile, part, key, body.data.to, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -720,7 +765,12 @@ export function startServer({
           if (!body.success) {
             return Response.json({ error: 'expected { table, was }' }, { status: 400 })
           }
-          const result = await setPronunciations(projectFile, body.data.table, body.data.was)
+          const result = await setPronunciations(
+            projectFile,
+            body.data.table,
+            body.data.was,
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -731,7 +781,12 @@ export function startServer({
           if (!body.success) {
             return Response.json({ error: 'expected { groups, was }' }, { status: 400 })
           }
-          const result = await setSoundAlike(projectFile, body.data.groups, body.data.was)
+          const result = await setSoundAlike(
+            projectFile,
+            body.data.groups,
+            body.data.was,
+            languageOf(request),
+          )
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
@@ -748,7 +803,7 @@ export function startServer({
       '/api/parts/:part/lines/:key/takes': {
         GET: guard(async (request) => {
           const { part, key } = request.params
-          const result = await listLineTakes(projectFile, part, key)
+          const result = await listLineTakes(projectFile, part, key, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -760,7 +815,7 @@ export function startServer({
             return Response.json({ error: 'expected { confirmedCost? }' }, { status: 400 })
           }
           // Fails closed, as recording does: a take is priced for one request per piece.
-          const planned = await planFor(part, undefined, false, 'draft')
+          const planned = await planFor(part, undefined, false, 'draft', languageOf(request))
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
           const admitted = await admit(
@@ -776,6 +831,7 @@ export function startServer({
               limiter: fishWork,
               transcriber: await transcriberFor(),
               budget: admitted.budget,
+              language: languageOf(request),
             })
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -788,13 +844,15 @@ export function startServer({
         GET: guard(async (request) => {
           const { part, key, file } = request.params
           const id = /^([0-9a-f]{16})\.wav$/.exec(file)?.[1]
-          const found = id ? await lineTakeFile(projectFile, part, key, id) : null
+          const found = id
+            ? await lineTakeFile(projectFile, part, key, id, languageOf(request))
+            : null
           return found ? new Response(Bun.file(found)) : notFound()
         }),
         DELETE: fromOwnPage(async (request) => {
           const { part, key, file } = request.params
           if (!/^[0-9a-f]{16}$/.test(file)) return notFound()
-          const result = await dropLineTake(projectFile, part, key, file)
+          const result = await dropLineTake(projectFile, part, key, file, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -803,7 +861,10 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const { part, key, id } = request.params
           if (!/^[0-9a-f]{16}$/.test(id)) return notFound()
-          const result = await useLineTake(projectFile, part, key, id, { encode })
+          const result = await useLineTake(projectFile, part, key, id, {
+            encode,
+            language: languageOf(request),
+          })
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -813,7 +874,15 @@ export function startServer({
           const body = CueBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { cue }' }, { status: 400 })
           const { part, key } = request.params
-          const result = await tryLine(projectFile, part, key, body.data.cue, fishFor, fishWork)
+          const result = await tryLine(
+            projectFile,
+            part,
+            key,
+            body.data.cue,
+            fishFor,
+            fishWork,
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -823,7 +892,7 @@ export function startServer({
           const body = CueBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { cue }' }, { status: 400 })
           const { part, key } = request.params
-          const result = await setCue(projectFile, part, key, body.data.cue)
+          const result = await setCue(projectFile, part, key, body.data.cue, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

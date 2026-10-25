@@ -1,7 +1,7 @@
 import { languageName } from './languages'
-import { partPathFor, phraseProblem, type Problem, type Project } from './project'
+import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
-import { voiceOf, type Cast, type Line } from './resources'
+import { pronounceOf, voiceOf, type Cast, type Line } from './resources'
 
 /** What reading a part's dialog gave: its lines, no file yet, or a file that failed validation. */
 export type DialogState =
@@ -93,6 +93,11 @@ export interface ProjectSummary {
   pronounce: Pronunciation[] | null
   /** The project's own words that sound the same, a group each (`quality.soundAlike`). */
   soundAlike: string[][]
+  /**
+   * What is kept per language, by code: its pronunciations (null when the cast cannot be read)
+   * and its words that sound the same. The source language's are the two fields above.
+   */
+  perLanguage: Record<string, { pronounce: Pronunciation[] | null; soundAlike: string[][] }>
   /** The draft and final recording models (`models.draft`, `models.final`). */
   models: { draft: string; final: string }
   /** The project's speaking speed (`tts.speed`), which a character may have its own in place of. */
@@ -233,6 +238,15 @@ export function summarize({
     canRefresh: Boolean(narration.refreshDialog),
     pronounce: cast ? Object.entries(cast.pronounce) : null,
     soundAlike: narration.quality.soundAlike,
+    perLanguage: Object.fromEntries(
+      narration.languages.map((language) => [
+        language,
+        {
+          pronounce: cast ? Object.entries(pronounceOf(cast, language, source)) : null,
+          soundAlike: soundAlikeOf(narration, language),
+        },
+      ]),
+    ),
     models: { draft: narration.models.draft, final: narration.models.final },
     speed: narration.tts.speed,
     projectFile,

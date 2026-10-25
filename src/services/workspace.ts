@@ -283,10 +283,11 @@ export async function adoptPart(
   projectFile: string,
   partId: string,
   now: Date = new Date(),
+  language?: string,
 ): Promise<AdoptResult> {
   // In the part's turn, reading the part afresh: a line recorded meanwhile keeps its lock entry.
   return inPartTurn(projectFile, partId, async () => {
-    const read = await readPart(projectFile, partId)
+    const read = await readPart(projectFile, partId, language)
     if (!read || !read.ok) return read
     if (read.problems.length) return { ok: false, problems: read.problems }
     const { lock, adopted } = adoptUntracked(read.input, now.toISOString())
