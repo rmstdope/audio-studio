@@ -57,6 +57,9 @@ describe('focusAfter', () => {
     expect(focusAfter({ phase: 'asking', to: 'a' }, { phase: 'idle' })).toBe('menu')
     expect(focusAfter({ phase: 'switching', to: 'a' }, { phase: 'idle' })).toBe('menu')
   })
+  it('returns it to the menu after a save with nothing at stake: the menu was disabled meanwhile', () => {
+    expect(focusAfter({ phase: 'saving', to: 'a' }, { phase: 'idle' })).toBe('menu')
+  })
   it('puts it on Try again when the save failed, and keeps it there on a retry', () => {
     const failed: RowState = { phase: 'failed', to: 'a', reason: 'r', asked: true }
     expect(focusAfter({ phase: 'switching', to: 'a' }, failed)).toBe('retry')

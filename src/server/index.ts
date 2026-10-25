@@ -288,18 +288,19 @@ export function startServer({
   /** Generation jobs, one per part at a time. */
   const jobs = createJobs()
 
-  /** The characters whose audition is asking Fish now, with how many requests each has out. */
-  const auditing = new Map<string, number>()
+  /** What is asking Fish now outside a job: a part's line being recorded or tried, a character's audition. */
+  const going = new Map<string, number>()
 
-  /** Runs one request of an audition, which counts as an audition going on until it answers. */
-  async function whileAuditing<T>(characterId: string, run: () => Promise<T>): Promise<T> {
-    auditing.set(characterId, (auditing.get(characterId) ?? 0) + 1)
+  /** Runs one request that records or auditions, which counts as going on until it answers. */
+  async function whileGoing<T>(kind: 'part' | 'character', id: string, run: () => Promise<T>) {
+    const key = `${kind}:${id}`
+    going.set(key, (going.get(key) ?? 0) + 1)
     try {
       return await run()
     } finally {
-      const left = (auditing.get(characterId) ?? 1) - 1
-      if (left > 0) auditing.set(characterId, left)
-      else auditing.delete(characterId)
+      const left = (going.get(key) ?? 1) - 1
+      if (left > 0) going.set(key, left)
+      else going.delete(key)
     }
   }
 
@@ -309,9 +310,11 @@ export function startServer({
     if (!opened.ok) return null
     const { parts } = opened.project.narration
     const titleOf = (id: string) => parts.find((p) => p.id === id)?.title ?? id
-    const recording = jobs.active()[0] ?? spendLog.running()[0]?.part
+    const underway = (kind: 'part' | 'character') =>
+      [...going.keys()].find((key) => key.startsWith(`${kind}:`))?.slice(kind.length + 1)
+    const recording = jobs.active()[0] ?? spendLog.running()[0]?.part ?? underway('part')
     if (recording !== undefined) return { kind: 'recording', name: titleOf(recording) }
-    const [character] = auditing.keys()
+    const character = underway('character')
     if (character === undefined) return null
     const loaded = await loadProject(projectFile)
     const name = loaded.ok ? loaded.summary.characters.find((c) => c.id === character)?.name : null
@@ -655,15 +658,17 @@ export function startServer({
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
           try {
-            const result = await loggedOne(planned, part, admitted.budget, async () =>
-              recordLine(projectFile, part, key, fishFor, {
-                encode,
-                limiter: fishWork,
-                transcriber: await transcriberFor(),
-                stage: body.data.stage,
-                budget: admitted.budget,
-                language: languageOf(request),
-              }),
+            const result = await whileGoing('part', part, () =>
+              loggedOne(planned, part, admitted.budget, async () =>
+                recordLine(projectFile, part, key, fishFor, {
+                  encode,
+                  limiter: fishWork,
+                  transcriber: await transcriberFor(),
+                  stage: body.data.stage,
+                  budget: admitted.budget,
+                  language: languageOf(request),
+                }),
+              ),
             )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -1010,13 +1015,15 @@ export function startServer({
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
           try {
-            const result = await loggedOne(planned, part, admitted.budget, async () =>
-              takeLine(projectFile, part, key, fishFor, {
-                limiter: fishWork,
-                transcriber: await transcriberFor(),
-                budget: admitted.budget,
-                language: languageOf(request),
-              }),
+            const result = await whileGoing('part', part, () =>
+              loggedOne(planned, part, admitted.budget, async () =>
+                takeLine(projectFile, part, key, fishFor, {
+                  limiter: fishWork,
+                  transcriber: await transcriberFor(),
+                  budget: admitted.budget,
+                  language: languageOf(request),
+                }),
+              ),
             )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -1059,14 +1066,8 @@ export function startServer({
           const body = CueBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { cue }' }, { status: 400 })
           const { part, key } = request.params
-          const result = await tryLine(
-            projectFile,
-            part,
-            key,
-            body.data.cue,
-            fishFor,
-            fishWork,
-            languageOf(request),
+          const result = await whileGoing('part', part, () =>
+            tryLine(projectFile, part, key, body.data.cue, fishFor, fishWork, languageOf(request)),
           )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -1092,28 +1093,30 @@ export function startServer({
           const { voice, board } = body.data
           const sitting = await sittingKey(id, request)
           const budget = board ? sittings.get(sitting) : undefined
-          const result = await recordTake(
-            projectFile,
-            id,
-            voice,
-            fishFor,
-            fishWork,
-            {
-              board,
-              budget,
-              open: () => budget !== undefined && sittings.get(sitting) === budget,
-              flight: (dollars) => {
-                if (!budget) return () => undefined
-                inFlight.set(budget, (inFlight.get(budget) ?? 0) + dollars)
-                return () => {
-                  const now = inFlight.get(budget)
-                  if (now !== undefined) inFlight.set(budget, Math.max(now - dollars, 0))
-                }
+          const result = await whileGoing('character', id, () =>
+            recordTake(
+              projectFile,
+              id,
+              voice,
+              fishFor,
+              fishWork,
+              {
+                board,
+                budget,
+                open: () => budget !== undefined && sittings.get(sitting) === budget,
+                flight: (dollars) => {
+                  if (!budget) return () => undefined
+                  inFlight.set(budget, (inFlight.get(budget) ?? 0) + dollars)
+                  return () => {
+                    const now = inFlight.get(budget)
+                    if (now !== undefined) inFlight.set(budget, Math.max(now - dollars, 0))
+                  }
+                },
+                charged: async (dollars) =>
+                  void (await recordSpent(projectFile, id, dollars, languageOf(request))),
               },
-              charged: async (dollars) =>
-                void (await recordSpent(projectFile, id, dollars, languageOf(request))),
-            },
-            languageOf(request),
+              languageOf(request),
+            ),
           )
           if (!result) return notFound()
           return Response.json(result, { status: 'problems' in result ? 409 : 200 })
@@ -1168,7 +1171,7 @@ export function startServer({
             endSitting(await sittingKey(id, request))
             sittings.set(await sittingKey(id, request), admitted)
           }
-          const started = await whileAuditing(id, () =>
+          const started = await whileGoing('character', id, () =>
             startAudition(projectFile, id, fishFor, languageOf(request)),
           )
           // An audition that did not start has no sitting.
@@ -1266,7 +1269,7 @@ export function startServer({
         POST: fromOwnPage((request) =>
           answer(
             request.params.id,
-            whileAuditing(request.params.id, () =>
+            whileGoing('character', request.params.id, () =>
               moreVoices(projectFile, request.params.id, fishFor, languageOf(request)),
             ),
             { language: languageOf(request) },
@@ -1281,7 +1284,7 @@ export function startServer({
           const language = languageOf(request)
           return answer(
             id,
-            whileAuditing(id, () =>
+            whileGoing('character', id, () =>
               addVoiceById(projectFile, id, body.data.voice, fishFor, language),
             ),
             {

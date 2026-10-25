@@ -59,7 +59,6 @@ export function focusAfter(was: RowState, now: RowState): 'confirm' | 'menu' | '
   if (was.phase === now.phase) return null
   if (now.phase === 'asking') return 'confirm'
   if (now.phase === 'failed') return 'retry'
-  if (now.phase === 'idle' && (was.phase === 'asking' || was.phase === 'switching')) return 'menu'
-  if (now.phase === 'idle' && was.phase === 'failed') return 'menu'
+  if (now.phase === 'idle') return 'menu'
   return null
 }

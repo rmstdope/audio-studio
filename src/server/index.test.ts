@@ -807,6 +807,67 @@ describe('server, choosing the stages’ models', () => {
   })
 })
 
+describe('server, models while a line or an audition take is going on', () => {
+  const base = projectJson()
+  const lineRoot = tempRepo({
+    'audio-studio.json': base,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  let release: () => void = () => {}
+  let gate = Promise.resolve()
+  const arm = () => {
+    gate = new Promise<void>((resolve) => (release = resolve))
+  }
+  const slow: FishClient = {
+    ...fish,
+    async tts(request) {
+      await gate
+      return fish.tts(request)
+    },
+  }
+  const lineServer = startServer({
+    projectFile: join(lineRoot, 'audio-studio.json'),
+    port: 0,
+    fish: slow,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => lineServer.stop(true))
+  const at = (path: string) => new URL(path, lineServer.url)
+  const busy = async () => (await (await fetch(at('/api/models'))).json()).busy
+
+  it('names the part while one line is recorded', async () => {
+    arm()
+    const own = { origin: lineServer.url.origin, 'content-type': 'application/json' }
+    const recording = fetch(at('/api/parts/act1/lines/a/record'), {
+      method: 'POST',
+      headers: own,
+      body: '{}',
+    })
+    for (let i = 0; i < 100 && !(await busy()); i++) await new Promise((r) => setTimeout(r, 10))
+    expect(await busy()).toEqual({ kind: 'recording', name: 'Act I' })
+    release()
+    await recording
+    expect(await busy()).toBeNull()
+  })
+
+  it('names the character while an audition take is recorded', async () => {
+    arm()
+    const own = { origin: lineServer.url.origin, 'content-type': 'application/json' }
+    const taking = fetch(at('/api/characters/narrator/takes'), {
+      method: 'POST',
+      headers: own,
+      body: JSON.stringify({ voice: 'w1' }),
+    })
+    for (let i = 0; i < 100 && !(await busy()); i++) await new Promise((r) => setTimeout(r, 10))
+    expect(await busy()).toEqual({ kind: 'auditioning', name: 'Narrator' })
+    release()
+    await taking
+    expect(await busy()).toBeNull()
+  })
+})
+
 describe('server, paid auditions in two languages', () => {
   const base = projectJson()
   const root = tempRepo({
