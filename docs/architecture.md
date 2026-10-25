@@ -305,10 +305,12 @@ the line again writes a new entry without it.
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
 **Cache** (`.audio-studio/`, gitignored): the tool's own state, none of it the game's: audition
-takes, audition sessions in progress, the voices ruled out per character, and what Whisper heard
+takes, audition sessions in progress, the voices ruled out per character, the user's notes on
+lines (`.audio-studio/notes/<part>-<hash>.json`: "too fast", "retake after the rewrite"; on this
+machine only, so a teammate does not see them), and what Whisper heard
 of each kept take heard below full (`.audio-studio/heard/<part>-<hash>.json`: per line, the lock
 entry's time, the text it was checked against, Whisper's words and the shown words it missed). Deleting it loses nothing the game
-needs; it forgets paused auditions, ruled-out voices and what was heard.
+needs; it forgets paused auditions, ruled-out voices, notes and what was heard.
 
 All JSON is written with stable key order and the same layout the file already has, through a
 temporary file and a rename, so diffs stay small and a crash never leaves a half-written file.
@@ -527,6 +529,8 @@ An audition is for a character, not for a part: the result applies to every part
   in dialog order, every speaker; a row's **from here** button starts there. The list is fixed
   when it starts: filtering afterwards does not change it, and Stop stays offered. The row
   playing is marked and kept in view; a clip that fails is skipped.
+- A note on a line (built): a note to oneself under the line's text on the lines page ("too
+  fast"), edited in place, with a **With a note** filter; kept in the tool cache, not committed.
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
@@ -690,6 +694,7 @@ GET    /api/parts/:part                          the part, every line with its s
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
 POST   /api/parts/:part/lines/:key/try           hear the line with a cue ({ cue }): a take, nothing saved
+PATCH  /api/parts/:part/lines/:key/note          the user's note on the line ({ note }; empty removes)
 POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
 POST   /api/parts/:part/refresh                  run refreshDialog
@@ -888,6 +893,7 @@ Small, independently useful increments:
     4. **Setup page** (built): what the machine and the project lack, with the fix for each (§10).
     5. **Shared voices** (built): a character cast with another's voice says so on its page, card
        and the characters page; it may be meant, so it is a note, not a problem.
+    6. **Notes on lines** (built): a note to oneself per line, in the tool cache (§6, §8.3).
 11. **What was heard**, in two pull requests:
     1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
        when it is checked; the lines page shows it beside the text, missed words marked.

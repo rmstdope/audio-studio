@@ -330,6 +330,24 @@ describe('server', () => {
     expect([...new Uint8Array(await take.arrayBuffer())]).toEqual([0x49, 0x44, 0x33])
   })
 
+  it('keeps a note on a line, from the studio’s own page only', async () => {
+    const patch = (key: string, body: unknown, origin = server.url.origin) =>
+      fetch(url(`/api/parts/act1/lines/${key}/note`), {
+        method: 'PATCH',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    expect((await patch('a', { note: 'x' }, 'https://evil.example')).status).toBe(403)
+    expect((await patch('a', { note: 3 })).status).toBe(400)
+    expect((await patch('nope', { note: 'x' })).status).toBe(404)
+    expect((await patch('a', { note: 'too fast' })).status).toBe(200)
+    const part = await (await fetch(url('/api/parts/act1'))).json()
+    expect(part.part.notes).toEqual({ a: 'too fast' })
+    expect((await patch('a', { note: '' })).status).toBe(200)
+    const after = await (await fetch(url('/api/parts/act1'))).json()
+    expect(after.part.notes).toEqual({})
+  })
+
   it('records a take, from the studio’s own page only, and serves it', async () => {
     const record = (origin: string) =>
       fetch(url('/api/characters/narrator/takes'), {

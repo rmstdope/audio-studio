@@ -847,6 +847,46 @@ a.btn {
   font-size: 12px;
 }
 
+.note-button,
+.note-add {
+  all: unset;
+  cursor: pointer;
+  font-size: 12px;
+  width: fit-content;
+}
+.note-button {
+  color: var(--warn);
+  border-bottom: 1px dashed var(--warn);
+}
+.note-add {
+  color: var(--faint);
+  opacity: 0;
+}
+.table tr:hover .note-add,
+.table tr:focus-within .note-add,
+.note-add:focus-visible {
+  opacity: 1;
+}
+.note-add:hover,
+.note-button:hover {
+  color: var(--accent);
+}
+.note-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 520px;
+}
+.note-edit input {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 7px 10px;
+}
+
 .heard-btn {
   font: inherit;
   color: var(--status-weak);

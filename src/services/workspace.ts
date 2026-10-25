@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
+import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
 import { adoptUntracked, planPart, type PartState, type PlanInput } from '../core/planner'
 import {
   PROJECT_FILE,
@@ -20,7 +21,14 @@ import {
   type Cast,
 } from '../core/resources'
 import { summarize, type DialogState, type ProjectSummary } from '../core/summary'
-import { formatEntriesPerLine, listFiles, readJson, readResource, writeAtomic } from './files'
+import {
+  characterFile,
+  formatEntriesPerLine,
+  listFiles,
+  readJson,
+  readResource,
+  writeAtomic,
+} from './files'
 import { inPartTurn } from './partFiles'
 
 /** The project file in `start` or the nearest directory above it that has one; null if none. */
@@ -112,6 +120,17 @@ export async function loadWorkspace(projectFile: string): Promise<
 }
 
 /** One part with the state of every clip in it. */
+/** Where the user's notes on each part's lines are kept, in the project's tool cache. */
+export const NOTES_DIR = '.audio-studio/notes'
+
+/** The notes on a part's lines; none if there is no file, or it does not fit (a hand edit). */
+export async function readNotes(root: string, partId: string): Promise<Notes> {
+  const json = await readJson(resolveInRoot(root, characterFile(NOTES_DIR, partId)))
+  if (json.status !== 'ok') return emptyNotes(partId)
+  const parsed = NotesSchema.safeParse(json.value)
+  return parsed.success && parsed.data.part === partId ? parsed.data : emptyNotes(partId)
+}
+
 export interface PartDetail extends PartState {
   id: string
   title: string
@@ -126,6 +145,8 @@ export interface PartDetail extends PartState {
   draftModel: string
   /** The model of the final recording; the same as the draft one when there is no final step. */
   finalModel: string
+  /** The user's notes on lines, by key (the studio's own, from the tool cache). */
+  notes: Record<string, string>
   problems: Problem[]
 }
 
@@ -147,6 +168,7 @@ export async function loadPart(projectFile: string, partId: string): Promise<Par
       minHeard: project.narration.quality.minHeard,
       draftModel: project.narration.models.draft,
       finalModel: project.narration.models.final,
+      notes: (await readNotes(dirname(projectFile), part.id)).lines,
       problems,
       ...planPart(input),
     },
