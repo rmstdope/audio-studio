@@ -244,6 +244,18 @@ describe('server', () => {
     writeFileSync(join(root, 'tts/act1/cues.json'), '{}\n')
   })
 
+  it('checks the setup', async () => {
+    const body = await (await fetch(url('/api/setup'))).json()
+    expect(body.ok).toBe(true)
+    expect(body.checks.map((c: { id: string }) => c.id)).toEqual([
+      'ffmpeg',
+      'whisper',
+      'key',
+      'fish',
+      'refresh',
+    ])
+  })
+
   it('tells the account’s credit', async () => {
     expect(await (await fetch(url('/api/credit'))).json()).toEqual({ ok: true, credit: 25 })
   })

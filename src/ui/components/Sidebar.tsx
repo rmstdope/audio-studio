@@ -1,7 +1,15 @@
 import type { ProjectSummary } from '../../core/summary'
-import { useChanges, useCredit } from '../api'
+import { useChanges, useCredit, useSetup } from '../api'
 import { routeHref, type Route } from '../route'
-import { MicIcon, MusicIcon, PeopleIcon, SpeakerIcon, WaveIcon, ChangesIcon } from './icons'
+import {
+  MicIcon,
+  MusicIcon,
+  PeopleIcon,
+  SpeakerIcon,
+  WaveIcon,
+  ChangesIcon,
+  CheckIcon,
+} from './icons'
 import { dollars, longTitle, plural } from '../format'
 
 /** The studio's navigation: project, workspaces, the parts, and the project-wide characters. */
@@ -16,6 +24,10 @@ export function Sidebar({
 }) {
   const changes = useChanges()
   const credit = useCredit()
+  const setup = useSetup()
+  const problems = setup.data?.ok
+    ? setup.data.checks.filter((c) => c.state === 'problem').length
+    : 0
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -106,6 +118,18 @@ export function Sidebar({
         >
           <ChangesIcon /> <span className="grow">Changes</span>
           {changes.data?.ok && <span className="meta">{changes.data.groups.total}</span>}
+        </a>
+        <a
+          className="nav-item"
+          href={routeHref({ view: 'setup' })}
+          aria-current={route.view === 'setup' ? 'page' : undefined}
+        >
+          <CheckIcon /> <span className="grow">Setup</span>
+          {problems > 0 && (
+            <span className="meta setup-problems" title={plural(problems, 'thing') + ' to fix'}>
+              {problems}
+            </span>
+          )}
         </a>
       </nav>
     </aside>

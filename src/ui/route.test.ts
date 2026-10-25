@@ -29,6 +29,11 @@ describe('parseRoute', () => {
     expect(routeHref({ view: 'character', character: 'old mira' })).toBe('#/characters/old%20mira')
   })
 
+  it('reads the setup page', () => {
+    expect(parseRoute('#/setup')).toEqual({ view: 'setup' })
+    expect(routeHref({ view: 'setup' })).toBe('#/setup')
+  })
+
   it('reads the characters view', () => {
     expect(parseRoute('#/characters')).toEqual({ view: 'characters' })
   })

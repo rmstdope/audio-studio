@@ -24,6 +24,7 @@ import { isRefreshing, refreshDialog } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile, tryLine } from '../services/takes'
+import { checkSetup } from '../services/setup'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -577,6 +578,9 @@ export function startServer({
       },
       '/api/credit': {
         GET: guard(async () => Response.json(await creditOf())),
+      },
+      '/api/setup': {
+        GET: guard(async () => Response.json(await checkSetup(projectFile, fishFor))),
       },
       '/api/changes': {
         GET: guard(async () => Response.json(await gitChanges(projectFile))),

@@ -682,6 +682,7 @@ spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DE
 ```
 GET    /api/project                              project, parts
 GET    /api/credit                               the Fish account's API credit (dollars)
+GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish)
 GET    /api/parts/:part                          the part, every line with its status and reason
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
@@ -731,9 +732,11 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 
 - An invalid project file or resource opens the UI on an error page that names the file, the path
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
-- Missing tools (`ffmpeg`, `uv`) and a missing API key are checked at start and shown as a setup
-  checklist. So far: the CLI warns when ffmpeg is missing, and recording says so; the checklist in
-  the UI comes later.
+- Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
+  ffmpeg, uv for Whisper (off when `quality.transcriber` is `none`; a problem off Apple silicon),
+  the Fish key in the environment or the env file, whether Fish answers (asked once, for the
+  credit, only with a key) and the optional `refreshDialog`, each with what to do about it. The
+  sidebar counts the problems. Checked when the page opens; the CLI still warns about ffmpeg.
 - Writes outside the project root throw. Deleting clips (orphans) always needs confirmation.
 - Fish errors (no credit, voice removed) mark the line as failed with the reason; the rest of the
   job carries on. Too many requests at once (429: Fish allows 5 at a time until $100 has been
@@ -877,6 +880,7 @@ Small, independently useful increments:
        row playing marked and kept in view (§8.3).
     3. **A character's speed** (built): `speed` in the cast, edited on the character page; its
        lines, takes and tries spoken at it, and its lines stale when it changes (§6, §7).
+    4. **Setup page** (built): what the machine and the project lack, with the fix for each (§10).
 11. **What was heard**, in two pull requests:
     1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
        when it is checked; the lines page shows it beside the text, missed words marked.

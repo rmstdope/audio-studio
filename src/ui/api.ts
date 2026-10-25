@@ -23,6 +23,7 @@ import type { HeardResult } from '../services/heard'
 import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { SoundAlikeChange } from '../services/soundAlike'
+import type { SetupResult } from '../services/setup'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
@@ -692,6 +693,16 @@ export function useTryCue(partId: string) {
       }
       return (await response.json()) as NonNullable<TryResult>
     },
+  })
+}
+
+/** The setup checks: what the studio needs on this machine and in the project, each with a fix. */
+export function useSetup() {
+  return useQuery({
+    queryKey: ['setup'],
+    queryFn: () => getJson<SetupResult>('/api/setup'),
+    // Checked again when the page is opened or regains focus: the user installs things meanwhile.
+    staleTime: 0,
   })
 }
 
