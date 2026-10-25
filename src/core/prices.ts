@@ -23,3 +23,28 @@ export function priceOf(model: string, at: Date): number | undefined {
 export function isPriced(model: string): boolean {
   return Object.hasOwn(PRICES, model)
 }
+
+/** Every model the studio knows a price for, in the order the Models menus list them. */
+export function pricedModels(): string[] {
+  return Object.keys(PRICES)
+}
+
+/**
+ * A model's list price and, while it runs at `at`, its promotion (the price and the moment it
+ * ends); undefined for a model not listed.
+ */
+export function priceDetail(
+  model: string,
+  at: Date,
+): { price: number; promotion?: { price: number; until: Date } } | undefined {
+  const entry = Object.hasOwn(PRICES, model) ? PRICES[model] : undefined
+  if (!entry) return undefined
+  const { promotion } = entry
+  if (promotion && at < new Date(promotion.until)) {
+    return {
+      price: entry.price,
+      promotion: { price: promotion.price, until: new Date(promotion.until) },
+    }
+  }
+  return { price: entry.price }
+}
