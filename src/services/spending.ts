@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 import type { Problem } from '../core/project'
-import { SpendingSchema, type Recording } from '../core/spending'
+import type { Budget } from '../core/spend'
+import { SpendingSchema, type Outcome, type Recording, type Running } from '../core/spending'
 import { readResource, writeAtomic } from './files'
 import { createSerial } from './serial'
 
@@ -39,4 +41,84 @@ export function appendRecording(projectFile: string, recording: Recording): Prom
     )
     return { ok: true, recordings }
   })
+}
+
+/** A paid recording being followed: tell it how it ended. */
+export interface Followed {
+  /** Saves the recording, if it cost anything, and stops showing it as running. */
+  end(result: { lines: number; outcome: Outcome }): Promise<void>
+}
+
+/** What a recording reports while it runs. */
+export interface Progress {
+  /** Lines recorded so far. */
+  lines: number
+}
+
+/**
+ * The paid recordings of one studio: the running ones, in memory and read live, and the finished
+ * ones, saved to the record as each ends. Free recordings (a budget given no dollars) are not
+ * followed, and a recording that cost nothing is not saved.
+ */
+export interface SpendLog {
+  /**
+   * Starts following a recording of `planned` lines charged to `budget`; `progress` is read
+   * whenever the page asks.
+   */
+  follow(options: {
+    part: string
+    language: string
+    model: string
+    stage: 'draft' | 'final'
+    planned: number
+    budget: Budget
+    progress: () => Progress
+  }): Followed
+  /** The recordings going on now. */
+  running(): Running[]
+}
+
+/** A spend log saving into the project's record. */
+export function createSpendLog(projectFile: string): SpendLog {
+  const live = new Map<string, () => Running>()
+  return {
+    follow({ part, language, model, stage, planned, budget, progress }) {
+      if (budget.dollars <= 0) return { end: async () => {} }
+      const id = randomUUID()
+      const at = new Date().toISOString()
+      live.set(id, () => ({
+        id,
+        at,
+        part,
+        language,
+        model,
+        planned,
+        lines: progress().lines,
+        cost: budget.spent,
+      }))
+      return {
+        async end({ lines, outcome }) {
+          try {
+            if (budget.spent > 0) {
+              await appendRecording(projectFile, {
+                id,
+                at,
+                part,
+                language,
+                model,
+                stage,
+                lines,
+                planned,
+                cost: budget.spent,
+                outcome,
+              })
+            }
+          } finally {
+            live.delete(id)
+          }
+        },
+      }
+    },
+    running: () => [...live.values()].map((read) => read()),
+  }
 }
