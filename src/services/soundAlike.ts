@@ -1,15 +1,11 @@
-import { readFile } from 'node:fs/promises'
-import { basename, dirname } from 'node:path'
+import { basename } from 'node:path'
 import { ProjectSchema, problemsFrom, type Problem } from '../core/project'
 import { cleanGroups, groupsProblem, sameGroups } from '../core/soundAlikeEdit'
-import { writeAtomic } from './files'
-import { createSerial } from './serial'
+import { openProject, projectWrites, saveProject } from './projectFile'
 import type { ProjectFailure } from './workspace'
 
 /** A saved list of sound-alike groups, or why it was not saved. */
 export type SoundAlikeChange = { ok: true } | { ok: false; problems: Problem[] } | ProjectFailure
-
-const writes = createSerial()
 
 const PATH = 'narration.quality.soundAlike'
 
@@ -28,33 +24,17 @@ export function setSoundAlike(
   was: string[][],
 ): Promise<SoundAlikeChange> {
   const clean = cleanGroups(groups)
-  return writes.run(projectFile, async () => {
+  return projectWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const { raw, project } = opened
     const file = basename(projectFile)
-    const failure = (message: string): ProjectFailure => ({
-      ok: false,
-      file,
-      problems: [{ file, path: '', message }],
-    })
-    let text: string
-    let raw: unknown
-    try {
-      text = await readFile(projectFile, 'utf8')
-    } catch (error) {
-      return failure(`could not be read (${(error as Error).message})`)
-    }
-    try {
-      raw = JSON.parse(text)
-    } catch (error) {
-      return failure(`not valid JSON: ${(error as Error).message}`)
-    }
-    const current = ProjectSchema.safeParse(raw)
-    if (!current.success) return { ok: false, file, problems: problemsFrom(file, current.error) }
 
     const problem = (message: string): SoundAlikeChange => ({
       ok: false,
       problems: [{ file, path: PATH, message }],
     })
-    if (!sameGroups(current.data.narration.quality.soundAlike, was)) {
+    if (!sameGroups(project.narration.quality.soundAlike, was)) {
       return problem(
         'the words that sound the same in the file changed since editing began; discard your changes to see them',
       )
@@ -74,14 +54,7 @@ export function setSoundAlike(
     const parsed = ProjectSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
 
-    const indent = /\n([ \t]+)"/.exec(text)?.[1] ?? '  '
-    const eol = text.includes('\r\n') ? '\r\n' : '\n'
-    const json = layout(raw, indent, clean)
-    await writeAtomic(
-      dirname(projectFile),
-      file,
-      json.replace(/\n/g, eol) + (/\n$/.test(text) ? eol : ''),
-    )
+    await saveProject(projectFile, opened, (indent) => layout(raw, indent, clean))
     return { ok: true }
   })
 }

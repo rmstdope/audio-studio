@@ -23,7 +23,8 @@ Fish retires `s1` on 31 December 2026; after that, requests for it are served an
 `s2.1-pro` at the same price. `core/prices.ts` lists `s1` with no end date. The studio should warn
 when the project file names `s1` for `draft` or `final`, and offer to switch it. The project file
 is changed in one place only today (`narration.quality.soundAlike`, see `CLAUDE.md`), so changing
-`models` there is a new rule for the consumer repository and needs agreeing first.
+`models` there was a new rule for the consumer repository; it is built (bead as-5gk.3) and written
+into `CLAUDE.md` and `docs/architecture.md`.
 
 ## Your own voices in casting
 

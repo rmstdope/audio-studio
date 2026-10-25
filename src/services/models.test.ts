@@ -1,0 +1,91 @@
+import { describe, expect, it } from 'bun:test'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { projectJson, tempRepo } from '../../test/helpers'
+import { switchRetiredModels } from './models'
+import { setSoundAlike } from './soundAlike'
+
+function projectWith(models: Record<string, string>) {
+  const project = projectJson()
+  ;(project.narration as { models?: unknown }).models = models
+  return project
+}
+
+function repo(project: Record<string, unknown>, indent: number | string = 2) {
+  const root = tempRepo({})
+  const projectFile = join(root, 'audio-studio.json')
+  writeFileSync(projectFile, `${JSON.stringify(project, null, indent)}\n`)
+  return { projectFile, read: () => readFileSync(projectFile, 'utf8') }
+}
+
+describe('switchRetiredModels', () => {
+  it('rewrites both models and nothing else, in the file’s own indentation', async () => {
+    const project = projectWith({ audition: 's2.1-pro-free', draft: 's1', final: 's1' })
+    const { projectFile, read } = repo(project, 4)
+    expect(await switchRetiredModels(projectFile, ['draft', 'final'])).toEqual({ ok: true })
+    const switched = projectWith({
+      audition: 's2.1-pro-free',
+      draft: 's2.1-pro',
+      final: 's2.1-pro',
+    })
+    expect(read()).toBe(`${JSON.stringify(switched, null, 4)}\n`)
+  })
+
+  it('leaves a model that is not s1 alone', async () => {
+    const { projectFile, read } = repo(projectWith({ draft: 's1', final: 's2-pro' }))
+    expect(await switchRetiredModels(projectFile, ['draft'])).toEqual({ ok: true })
+    expect(JSON.parse(read()).narration.models).toEqual({ draft: 's2.1-pro', final: 's2-pro' })
+  })
+
+  it('keeps the line endings and a missing last newline', async () => {
+    const root = tempRepo({})
+    const projectFile = join(root, 'audio-studio.json')
+    const project = projectWith({ final: 's1' })
+    writeFileSync(projectFile, JSON.stringify(project, null, 2).replace(/\n/g, '\r\n'))
+    expect(await switchRetiredModels(projectFile, ['final'])).toEqual({ ok: true })
+    const text = readFileSync(projectFile, 'utf8')
+    expect(text.split('\n').every((l, i, all) => i === all.length - 1 || l.endsWith('\r'))).toBe(
+      true,
+    )
+    expect(text.endsWith('}')).toBe(true)
+    expect(JSON.parse(text).narration.models.final).toBe('s2.1-pro')
+  })
+
+  it('refuses when the models on s1 in the file are not the ones agreed to, writing nothing', async () => {
+    const { projectFile, read } = repo(projectWith({ draft: 's1', final: 's1' }))
+    const before = read()
+    for (const takes of [['draft'], ['final'], []] as const) {
+      expect(await switchRetiredModels(projectFile, [...takes])).toMatchObject({
+        ok: false,
+        problems: [{ file: 'audio-studio.json', path: 'narration.models' }],
+      })
+    }
+    expect(read()).toBe(before)
+  })
+
+  it('refuses when nothing is on s1 any more', async () => {
+    const { projectFile, read } = repo(projectWith({ draft: 's2.1-pro', final: 's2.1-pro' }))
+    const before = read()
+    expect(await switchRetiredModels(projectFile, ['draft'])).toMatchObject({ ok: false })
+    expect(read()).toBe(before)
+  })
+
+  it('writes nothing to a project file that cannot be used', async () => {
+    const { projectFile, read } = repo({ name: 'broken' })
+    const before = read()
+    expect(await switchRetiredModels(projectFile, ['draft'])).toMatchObject({ ok: false })
+    expect(read()).toBe(before)
+  })
+
+  it('does not lose either of two saves made together', async () => {
+    const { projectFile, read } = repo(projectWith({ draft: 's1', final: 's1' }))
+    const results = await Promise.all([
+      switchRetiredModels(projectFile, ['draft', 'final']),
+      setSoundAlike(projectFile, [['inn', 'Inne']], []),
+    ])
+    expect(results).toEqual([{ ok: true }, { ok: true }])
+    const narration = JSON.parse(read()).narration
+    expect(narration.models).toEqual({ draft: 's2.1-pro', final: 's2.1-pro' })
+    expect(narration.quality.soundAlike).toEqual([['inn', 'Inne']])
+  })
+})
