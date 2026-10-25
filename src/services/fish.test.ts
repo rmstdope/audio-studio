@@ -191,19 +191,21 @@ describe('rate limit', () => {
     expect(waits).toEqual([1000, 2000, 4000])
   })
 
-  it('gives up after the last wait, with Fish’s answer', async () => {
+  it('gives up after the last wait, with Fish’s answer and what to do', async () => {
     const waits: number[] = []
     const sleep = async (ms: number) => {
       waits.push(ms)
     }
     const { fetch, calls } = limitedFetch(100)
     const failing = createFishClient('k', { fetch, sleep }).tts(request)
-    await expect(failing).rejects.toThrow('Fish Audio answered 429: Too many requests')
+    await expect(failing).rejects.toThrow(
+      'Fish Audio answered 429: Too many requests (7 tries over a minute): lower quality.parallel, or wait for other work on this key',
+    )
     expect(waits).toEqual([1000, 2000, 4000, 8000, 16000, 32000])
     expect(calls()).toBe(7)
   })
 
-  it('asks again for searches too, and not for other refusals', async () => {
+  it('asks again for searches too', async () => {
     const sleep = async () => {}
     let calls = 0
     const fetch = (async () => {
@@ -219,7 +221,10 @@ describe('rate limit', () => {
     })
     expect(page.total).toBe(0)
     expect(calls).toBe(2)
+  })
 
+  it('does not ask again after another refusal', async () => {
+    const sleep = async () => {}
     let refusals = 0
     const refusing = (async () => {
       refusals++

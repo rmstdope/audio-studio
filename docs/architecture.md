@@ -720,9 +720,12 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 - Writes outside the project root throw. Deleting clips (orphans) always needs confirmation.
 - Fish errors (no credit, voice removed) mark the line as failed with the reason; the rest of the
   job carries on. Too many requests at once (429: Fish allows 5 at a time until $100 has been
-  paid in, 15 until $1,000, then 50; it sends no `Retry-After`) is not an error: the client asks
-  again after 1 s, then 2, 4, 8, 16 and 32 s, and only then gives up. `quality.parallel` counts
-  lines, and audition takes record beside them, so the limit can be met even below it.
+  paid in, 15 until $1,000, then 50, as its pricing page said on 2026-10-25; it sends no
+  `Retry-After`) is not an error: the client asks again after 1 s, then 2, 4, 8, 16 and 32 s, and
+  only then gives up, saying to lower `quality.parallel` or wait for other work on the key. The
+  studio itself never has more than `quality.parallel` TTS requests in flight (one limiter for
+  lines and audition takes alike), so a 429 means `parallel` is set above the tier, or something
+  else uses the same key.
 - The studio never runs `git add`, `commit` or `push`.
 
 ---

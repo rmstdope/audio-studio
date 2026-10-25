@@ -55,9 +55,10 @@ export type CreditResult =
 export class FishError extends Error {
   constructor(
     readonly status: number,
-    message: string,
+    /** Fish's own message, without the status. */
+    readonly detail: string,
   ) {
-    super(`Fish Audio answered ${status}: ${message}`)
+    super(`Fish Audio answered ${status}: ${detail}`)
     this.name = 'FishError'
   }
 }
@@ -121,12 +122,12 @@ export function createFishClient(
 ): FishClient {
   /**
    * A request that gives up after `timeoutMs`, saying so, so a stuck request never blocks a job;
-   * and that is asked again, after a wait that doubles each time, when Fish answers 429 (too many
-   * requests at once for the account's tier; Fish sends no Retry-After). The last of the waits
-   * is 32 s; after that the 429 is thrown like any refusal.
+   * and that is asked again, after each of `RETRY_WAITS`, when Fish answers 429 (too many
+   * requests at once for the account's tier; Fish sends no Retry-After). After the last wait the
+   * 429 is thrown like any refusal, saying what to do about it.
    */
   async function timed<T>(request: () => Promise<T>): Promise<T> {
-    for (let wait = RETRY_WAITS[0]!; ; wait *= 2) {
+    for (let attempt = 0; ; attempt++) {
       try {
         return await request()
       } catch (error) {
@@ -136,9 +137,16 @@ export function createFishClient(
         ) {
           throw new Error(`Fish Audio did not answer within ${timeoutMs / 1000} s`)
         }
-        if (error instanceof FishError && error.status === 429 && RETRY_WAITS.includes(wait)) {
-          await sleep(wait)
-          continue
+        if (error instanceof FishError && error.status === 429) {
+          const wait = RETRY_WAITS[attempt]
+          if (wait !== undefined) {
+            await sleep(wait)
+            continue
+          }
+          throw new FishError(
+            429,
+            `${error.detail} (${attempt + 1} tries over a minute): lower quality.parallel, or wait for other work on this key`,
+          )
         }
         throw error
       }
