@@ -5,6 +5,7 @@ import {
   setKeywords,
   setPhrase,
   setPronunciations,
+  setSpeed,
   setStyle,
   type FishFactory,
 } from '../services/auditions'
@@ -14,6 +15,7 @@ import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
+import { SPEED } from '../core/resources'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { moveCue, setCue } from '../services/cues'
@@ -74,11 +76,15 @@ function sharedWhisper(): Transcriber {
   return state.audioStudioWhisper
 }
 
-/** A change to a character: its keywords, or its own audition phrase (null for the standard one). */
+/**
+ * A change to a character: its keywords, its own audition phrase (null for the standard one), its
+ * style, or its own speed (null for the project's).
+ */
 const CharacterBody = z.union([
   z.object({ keywords: z.array(z.string()).max(20) }).strict(),
   z.object({ phrase: z.string().max(10_000).nullable() }).strict(),
   z.object({ style: z.string().max(1_000) }).strict(),
+  z.object({ speed: z.number().min(SPEED.min).max(SPEED.max).nullable() }).strict(),
 ])
 
 /** The whole pronunciation table, and the one the page showed (to refuse a stale page). */
@@ -277,6 +283,7 @@ export function startServer({
   function changeCharacter(id: string, change: z.infer<typeof CharacterBody>) {
     if ('keywords' in change) return setKeywords(projectFile, id, change.keywords)
     if ('style' in change) return setStyle(projectFile, id, change.style)
+    if ('speed' in change) return setSpeed(projectFile, id, change.speed)
     return setPhrase(projectFile, id, change.phrase)
   }
 
@@ -534,7 +541,7 @@ export function startServer({
             return Response.json(
               {
                 error:
-                  'expected { keywords: string[] }, { phrase: string | null } or { style: string }',
+                  'expected { keywords: string[] }, { phrase: string | null }, { style: string } or { speed: number | null }',
               },
               { status: 400 },
             )

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { projectJson } from '../../test/helpers'
 import { ProjectSchema } from './project'
 import { auditionText, takeKey } from './takes'
+import { ttsFor } from './resources'
 
 const narration = ProjectSchema.parse(projectJson()).narration
 
@@ -25,6 +26,11 @@ describe('auditionText', () => {
 })
 
 describe('takeKey', () => {
+  it('differs for a character with its own speed', () => {
+    const own = { ...base, tts: ttsFor(narration.tts, { speed: 0.9 }) }
+    expect(takeKey(own)).not.toBe(takeKey(base))
+  })
+
   const base = { model: 's2.1-pro-free', voice: 'v1', spoken: '[warm] Hello.', tts: narration.tts }
 
   it('is sixteen hex characters, the same for the same inputs', () => {

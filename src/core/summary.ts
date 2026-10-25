@@ -30,6 +30,8 @@ export interface CharacterSummary {
   voice: string | null
   voiceName: string | null
   style: string
+  /** The character's own speaking speed, or null for the project's. */
+  speed: number | null
   keywords: string[]
   appearances: Appearance[]
   totalLines: number
@@ -50,6 +52,8 @@ export interface ProjectSummary {
   pronounce: Pronunciation[] | null
   /** The project's own words that sound the same, a group each (`quality.soundAlike`). */
   soundAlike: string[][]
+  /** The project's speaking speed (`tts.speed`), which a character may have its own in place of. */
+  speed: number
   /** The project file's name, where `soundAlike` is saved. */
   projectFile: string
   problems: Problem[]
@@ -116,6 +120,7 @@ export function summarize({
       voice: entry?.voice ?? null,
       voiceName: entry?.voiceName ?? null,
       style: entry?.style ?? '',
+      speed: entry?.speed ?? null,
       keywords: entry?.audition?.keywords ?? [],
       appearances: seen,
       totalLines: seen.reduce((sum, a) => sum + a.lines, 0),
@@ -133,6 +138,7 @@ export function summarize({
     canRefresh: Boolean(narration.refreshDialog),
     pronounce: cast ? Object.entries(cast.pronounce) : null,
     soundAlike: narration.quality.soundAlike,
+    speed: narration.tts.speed,
     projectFile,
     problems,
   }

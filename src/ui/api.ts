@@ -292,6 +292,36 @@ export function useSetStyle(characterId: string) {
   })
 }
 
+/** Saves a character's own speed (null: the project's), then reloads what it changes. */
+export function useSetSpeed(characterId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `speed-${characterId}` },
+    mutationFn: async (speed: number | null) => {
+      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ speed }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the speed answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CharacterChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      // Every line of the character is spoken at the speed: statuses change everywhere, and the
+      // audition takes are recorded anew.
+      void client.invalidateQueries({ queryKey: ['part'] })
+      void client.invalidateQueries({ queryKey: ['plan'] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        refreshAudition(client, characterId),
+      ])
+    },
+  })
+}
+
 /**
  * Saves the whole pronunciation table; `was` is the table shown, so a page that is out of date is
  * refused instead of overwriting someone's change. Every part's lines follow it.

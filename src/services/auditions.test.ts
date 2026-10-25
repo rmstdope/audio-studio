@@ -9,6 +9,7 @@ import {
   setKeywords,
   setPhrase,
   setPronunciations,
+  setSpeed,
   setStyle,
   setVoice,
 } from './auditions'
@@ -407,6 +408,28 @@ describe('setVoice', () => {
     await setVoice(join(root, 'audio-studio.json'), 'grandmother', { id: 'v', name: 'New' })
     const cast = readFileSync(join(root, 'tts/cast.json'), 'utf8')
     expect(cast).toContain('"grandmother": { "style": "[w]", "voice": "v", "voiceName": "New" }')
+  })
+})
+
+describe('setSpeed', () => {
+  it('saves a character’s own speed, and removes it when cleared', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setSpeed(projectFile, 'grandmother', 0.85)).toEqual({ ok: true })
+    let cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother).toEqual({
+      voice: 'cur',
+      style: '[warm]',
+      audition: { keywords: ['warm'] },
+      speed: 0.85,
+    })
+    expect(await setSpeed(projectFile, 'grandmother', null)).toEqual({ ok: true })
+    cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.grandmother).toEqual({
+      voice: 'cur',
+      style: '[warm]',
+      audition: { keywords: ['warm'] },
+    })
   })
 })
 

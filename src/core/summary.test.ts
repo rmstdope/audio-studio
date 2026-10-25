@@ -59,6 +59,7 @@ describe('summarize', () => {
         voice: 'v1',
         voiceName: null,
         style: '[warm]',
+        speed: null,
         keywords: [],
         appearances: [
           { part: 'act1', lines: 2 },

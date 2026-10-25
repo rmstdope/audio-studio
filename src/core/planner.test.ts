@@ -90,6 +90,16 @@ describe('planPart', () => {
     expect(state.lines[1]!.status).toBe('ok')
   })
 
+  it('speaks a character at its own speed, a change of which is a settings change', () => {
+    const quick: Cast = {
+      ...cast,
+      speakers: { ...cast.speakers, mira: { ...cast.speakers.mira, speed: 1.2 } },
+    }
+    const state = planPart(input({ lock: trackedLock, cast: quick }))
+    expect(state.lines[1]).toMatchObject({ status: 'stale', reasons: ['settings'] })
+    expect(state.lines[0]!.status).toBe('ok')
+  })
+
   it('names changed generation settings', () => {
     const slower = { ...narration, tts: { ...narration.tts, speed: 0.9 } }
     const state = planPart(input({ lock: trackedLock, narration: slower }))

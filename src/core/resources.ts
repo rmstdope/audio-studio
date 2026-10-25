@@ -21,6 +21,9 @@ export const DialogSchema = z.array(LineSchema).superRefine((lines, context) => 
   }
 })
 
+/** The speeds Fish speaks at: half to double. */
+export const SPEED = { min: 0.5, max: 2 }
+
 /**
  * One character in the project-wide cast. Unknown fields are kept, so writing the cast back
  * never drops what another tool put there.
@@ -29,6 +32,8 @@ export const CharacterSchema = z.looseObject({
   voice: z.string().min(1).optional(),
   voiceName: z.string().optional(),
   style: z.string().optional(),
+  /** The character's own speaking speed, in place of the project's `tts.speed`. */
+  speed: z.number().min(SPEED.min).max(SPEED.max).optional(),
   audition: z
     .looseObject({
       keywords: z.array(z.string()).optional(),
@@ -69,6 +74,18 @@ export const CastSchema = z.looseObject({
   speakers: z.record(z.string(), CharacterSchema).default({}),
   pronounce: PronounceSchema.default({}),
 })
+
+/**
+ * The settings a character is spoken with: the project's, with the character's own speed when it
+ * has one. Used wherever Fish is asked to speak, and in the fingerprint, so a changed speed makes
+ * the character's lines stale.
+ */
+export function ttsFor(
+  tts: { temperature: number; topP: number; speed: number },
+  character: Pick<Character, 'speed'> | undefined,
+): { temperature: number; topP: number; speed: number } {
+  return character?.speed === undefined ? tts : { ...tts, speed: character.speed }
+}
 
 /** A part's delivery cues: line key → a cue that replaces the character's style for that line. */
 export const CuesSchema = z.record(z.string(), z.string())
