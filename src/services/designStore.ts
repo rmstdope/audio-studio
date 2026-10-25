@@ -6,6 +6,7 @@ import { resolveInRoot } from '../core/paths'
 import { characterFile, readJson, writeAtomic } from './files'
 import { createSerial } from './serial'
 import { TAKES_DIR } from './takes'
+import { cacheNameFor } from './workspace'
 
 /** Where the voices designed per character are kept, in the project's tool cache. */
 export const DESIGNS_DIR = '.audio-studio/designs'
@@ -29,9 +30,17 @@ export function designPreviewPath(id: string): string {
   return `${TAKES_DIR}/${designTakeKey(id)}.mp3`
 }
 
-/** The designs kept for a character; none if there is no file, or it does not fit. */
-export async function readDesigns(projectFile: string, characterId: string): Promise<Designs> {
-  const file = resolveInRoot(dirname(projectFile), characterFile(DESIGNS_DIR, characterId))
+/**
+ * The designs kept for a character in a language (the source language's when none is named);
+ * none if there is no file, or it does not fit.
+ */
+export async function readDesigns(
+  projectFile: string,
+  characterId: string,
+  language?: string,
+): Promise<Designs> {
+  const name = await cacheNameFor(projectFile, characterId, language)
+  const file = resolveInRoot(dirname(projectFile), characterFile(DESIGNS_DIR, name))
   const json = await readJson(file)
   if (json.status !== 'ok') return emptyDesigns(characterId)
   const parsed = DesignsSchema.safeParse(json.value)
@@ -40,19 +49,24 @@ export async function readDesigns(projectFile: string, characterId: string): Pro
     : emptyDesigns(characterId)
 }
 
-/** Applies `edit` to a character's designs and saves the result (if it changed), one at a time. */
-export function changeDesigns(
+/**
+ * Applies `edit` to a character's designs in a language and saves the result (if it changed), one
+ * at a time.
+ */
+export async function changeDesigns(
   projectFile: string,
   characterId: string,
   edit: (designs: Designs) => Designs,
+  language?: string,
 ): Promise<Designs> {
-  return writes.run(`${projectFile}\n${characterId}`, async () => {
-    const before = await readDesigns(projectFile, characterId)
+  const name = await cacheNameFor(projectFile, characterId, language)
+  return writes.run(`${projectFile}\n${name}`, async () => {
+    const before = await readDesigns(projectFile, characterId, language)
     const next = edit(before)
     if (JSON.stringify(next) === JSON.stringify(before)) return before
     await writeAtomic(
       dirname(projectFile),
-      characterFile(DESIGNS_DIR, characterId),
+      characterFile(DESIGNS_DIR, name),
       `${JSON.stringify(next, null, 1)}\n`,
     )
     return next

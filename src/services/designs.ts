@@ -11,23 +11,27 @@ import { changeDesigns, designId, designPreviewPath, readDesigns } from './desig
 import { FishError, NO_KEY } from './fish'
 import { ruledOutIds } from './ruledOut'
 import { castOwnVoice, changeSession, sessionFor, type CastResult } from './sessions'
-import { auditionFor, castProblems } from './takes'
+import { auditionIn, castProblems } from './takes'
 import { knownCharacter, loadWorkspace, type ProjectFailure } from './workspace'
 
 /** The description to start the design box with, or why it cannot be read. Null for an unknown character. */
 export async function designsFor(
   projectFile: string,
   characterId: string,
+  language?: string,
 ): Promise<{ ok: true; description: string | null } | ProjectFailure | null> {
   const known = await knownCharacter(projectFile, characterId)
   if (known !== true) return known
-  return { ok: true, description: (await readDesigns(projectFile, characterId)).description }
+  return {
+    ok: true,
+    description: (await readDesigns(projectFile, characterId, language)).description,
+  }
 }
 
 /** Designs made, or why not. Null for an unknown character. */
 export type DesignResult =
   | { ok: true; added: number }
-  | { ok: false; reason: 'invalid' | 'no-key' | 'fish' | 'failed'; message: string }
+  | { ok: false; reason: 'invalid' | 'no-key' | 'no-phrase' | 'fish' | 'failed'; message: string }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
@@ -35,7 +39,7 @@ export type DesignResult =
 /**
  * Has Fish design voices from a description, each saying the character's audition phrase, and
  * keeps them for the character: their previews among the takes, the voices and the description in
- * the character's designs. If an audition is going on they join its board. Nothing is kept when
+ * the character's designs for the language. If an audition is going on they join its board. Nothing is kept when
  * Fish fails (it bills nothing then). The caller has admitted the cost.
  */
 export async function designVoices(
@@ -44,6 +48,7 @@ export async function designVoices(
   description: string,
   fishFor: FishFactory,
   encode: Encoder = ffmpegEncoder,
+  asked?: string,
   at: Date = new Date(),
 ): Promise<DesignResult> {
   const loaded = await loadWorkspace(projectFile)
@@ -60,17 +65,31 @@ export async function designVoices(
       message: state.tooLong ?? 'Describe the voice you want first.',
     }
   }
+  // The preview says the audition phrase of the language: without one there is nothing to say.
+  const seen = auditionIn(project, cast, summary, characterId, asked)
+  if (seen.audition.phrase === null) {
+    return {
+      ok: false,
+      reason: 'no-phrase',
+      message: 'There is no audition phrase to design with; write one first.',
+    }
+  }
   const root = dirname(projectFile)
   const fish = await fishFor(root, project)
   if (!fish) return { ok: false, reason: 'no-key', message: NO_KEY }
   // The last description sent, kept before Fish answers: the box opens with it again after a failure.
-  await changeDesigns(projectFile, characterId, (designs) => ({ ...designs, description: text }))
+  await changeDesigns(
+    projectFile,
+    characterId,
+    (designs) => ({ ...designs, description: text }),
+    asked,
+  )
   const stamp = at.toISOString()
   try {
     const candidates = await fish.designVoice({
       instruction: text,
-      referenceText: previewText(auditionFor(cast, characterId, project).phrase),
-      language: project.narration.audition.language || null,
+      referenceText: previewText(seen.audition.phrase),
+      language: seen.language,
       count: DESIGN_COUNT,
     })
     const ids = candidates.map((_, index) => designId(characterId, stamp, index))
@@ -82,12 +101,21 @@ export async function designVoices(
         }),
       ),
     )
-    const kept = await changeDesigns(projectFile, characterId, (designs) =>
-      addDesigns(designs, text, stamp, ids),
+    const kept = await changeDesigns(
+      projectFile,
+      characterId,
+      (designs) => addDesigns(designs, text, stamp, ids),
+      asked,
     )
-    const ruled = await ruledOutIds(projectFile, characterId)
+    const ruled = await ruledOutIds(projectFile, characterId, asked)
     // An audition going on shows them at once; with none, the next one will.
-    await changeSession(projectFile, characterId, (s) => setDesigned(s, listDesigns(kept), ruled))
+    await changeSession(
+      projectFile,
+      characterId,
+      (s) => setDesigned(s, listDesigns(kept), ruled),
+      undefined,
+      asked,
+    )
     return { ok: true, added: ids.length }
   } catch (error) {
     if (error instanceof FishError) return { ok: false, reason: 'fish', message: error.detail }
@@ -110,12 +138,13 @@ export async function castDesign(
   characterId: string,
   voiceId: string,
   fishFor: FishFactory,
+  language?: string,
 ): Promise<CastResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
   const character = loaded.summary.characters.find((c) => c.id === characterId)
   if (!character) return null
-  const found = await sessionFor(projectFile, characterId)
+  const found = await sessionFor(projectFile, characterId, language)
   if (!found?.ok || !found.session) {
     return { ok: false, reason: 'no-session', message: 'There is no audition to cast from.' }
   }
@@ -153,9 +182,14 @@ export async function castDesign(
   } catch (error) {
     return failed(error instanceof FishError ? error.detail : errorText(error))
   }
-  const cast = await castOwnVoice(projectFile, characterId, saved)
+  const cast = await castOwnVoice(projectFile, characterId, saved, language)
   if (cast?.ok) {
-    await changeDesigns(projectFile, characterId, (designs) => removeDesign(designs, voiceId))
+    await changeDesigns(
+      projectFile,
+      characterId,
+      (designs) => removeDesign(designs, voiceId),
+      language,
+    )
   }
   return cast
 }

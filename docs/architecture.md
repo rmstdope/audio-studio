@@ -443,7 +443,7 @@ credit while Fish works), asks Fish, and charges nothing when it refuses. With n
 the page starts one afterwards (a paid audition model's own box follows).
 Fish makes no voice on the account from a design, only audio, so a design has no Fish id until it
 is cast. The studio gives each a local id `design-<12 hex>` and keeps them per character in
-`.audio-studio/designs/<character>-<hash>.json` (`core/designs.ts`: the voices with their number
+`.audio-studio/designs/<character>-<hash>.json` (one per language in a project with several, named as the audition's and ruled-out files are; `core/designs.ts`: the voices with their number
 "Design n", the description, when they were asked for, how many were ever made, and the last
 description sent); the preview is encoded to MP3 into `.audio-studio/takes/` under a key made from
 the id, so it plays as the voice's take (a design is never recorded on a paid model). The session

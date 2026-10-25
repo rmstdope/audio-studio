@@ -238,6 +238,7 @@ export function CharacterView({
       {designing && (
         <DesignVoice
           characterId={character.id}
+          language={queried}
           name={character.name}
           start={designStart(character.keywords, character.style)}
           auditioning={inProgress !== null}

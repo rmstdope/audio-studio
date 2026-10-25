@@ -478,6 +478,7 @@ export function ShortlistBoard({
       {designing && (
         <DesignVoice
           characterId={characterId}
+          language={language?.id}
           name={name}
           start={designStart}
           auditioning

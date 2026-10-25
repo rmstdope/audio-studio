@@ -849,12 +849,12 @@ export function useCloneVoice(characterId: string) {
 }
 
 /** The description the character's design box starts with: the last one sent, null before any. */
-export function useDesigns(characterId: string) {
+export function useDesigns(characterId: string, language?: string) {
   return useQuery({
-    queryKey: ['designs', characterId],
+    queryKey: ['designs', characterId, language ?? ''],
     queryFn: () =>
       getJson<{ ok: true; description: string | null } | ProjectFailure>(
-        `/api/characters/${encodeURIComponent(characterId)}/designs`,
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/designs`, language),
       ),
   })
 }
@@ -864,24 +864,27 @@ export function useDesigns(characterId: string) {
  * says what was made, or why not; the audition (the designs join it), the last description and the
  * credit are read again after one that was made.
  */
-export function useDesignVoices(characterId: string) {
+export function useDesignVoices(characterId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async (description: string) => {
-      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}/design`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ description, spendUpTo: DESIGN_PRICE }),
-      })
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/design`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ description, spendUpTo: DESIGN_PRICE }),
+        },
+      )
       if (!response.ok && response.status !== 409) {
         throw new Error(`designing answered ${response.status}`)
       }
       return (await response.json()) as NonNullable<DesignResult> | { ok: false; message: string }
     },
     onSettled: (result) => {
-      void client.invalidateQueries({ queryKey: ['designs', characterId] })
+      void client.invalidateQueries({ queryKey: ['designs', characterId, language ?? ''] })
       if (!result?.ok) return
-      void client.invalidateQueries({ queryKey: ['session', characterId] })
+      void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
       void client.invalidateQueries({ queryKey: ['credit'] })
     },
   })

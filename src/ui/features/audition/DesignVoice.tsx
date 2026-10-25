@@ -29,6 +29,7 @@ function failureLine(
  */
 export function DesignVoice({
   characterId,
+  language,
   name,
   start,
   auditioning,
@@ -36,6 +37,8 @@ export function DesignVoice({
   onClose,
 }: {
   characterId: string
+  /** The language of the audition, in a project with several: the designs are kept per language. */
+  language?: string
   name: string
   /** The starting text when nothing was sent before. */
   start: string
@@ -44,9 +47,9 @@ export function DesignVoice({
   onDone: () => void
   onClose: () => void
 }) {
-  const designs = useDesigns(characterId)
+  const designs = useDesigns(characterId, language)
   const credit = useCredit()
-  const design = useDesignVoices(characterId)
+  const design = useDesignVoices(characterId, language)
   const [typed, setTyped] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const field = useRef<HTMLTextAreaElement>(null)

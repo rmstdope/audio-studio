@@ -1157,7 +1157,7 @@ export function startServer({
       },
       '/api/characters/:id/designs': {
         GET: guard(async (request) => {
-          const result = await designsFor(projectFile, request.params.id)
+          const result = await designsFor(projectFile, request.params.id, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -1169,7 +1169,7 @@ export function startServer({
             return Response.json({ error: 'expected { description, spendUpTo? }' }, { status: 400 })
           }
           const { id } = request.params
-          if ((await designsFor(projectFile, id)) === null) return notFound()
+          if ((await designsFor(projectFile, id, languageOf(request))) === null) return notFound()
           // Held back from the credit while Fish designs; Fish bills a request that works.
           const got = await admit(DESIGN_MODEL, DESIGN_PRICE, body.data.spendUpTo)
           if ('problem' in got) return Response.json({ ok: false, ...got.problem }, { status: 409 })
@@ -1180,6 +1180,7 @@ export function startServer({
               body.data.description,
               fishFor,
               encode,
+              languageOf(request),
             )
             if (!result) return notFound()
             return Response.json(result, { status: 'added' in result ? 200 : 409 })
