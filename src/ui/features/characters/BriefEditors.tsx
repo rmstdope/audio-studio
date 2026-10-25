@@ -81,8 +81,8 @@ export function PhraseEditor({
 }) {
   const save = useSetPhrase(characterId)
   const [draft, setDraft] = useState<string | null>(null)
-  const text = draft ?? audition.phrase
-  const changed = draft !== null && draft.trim() !== audition.phrase
+  const text = draft ?? audition.phrase ?? ''
+  const changed = draft !== null && draft.trim() !== (audition.phrase ?? '')
 
   return (
     <form
@@ -93,7 +93,8 @@ export function PhraseEditor({
       }}
     >
       <label className="label" htmlFor="phrase">
-        Audition phrase · {audition.own ? 'this character’s own' : 'the project’s standard'}
+        Audition phrase ·{' '}
+        {audition.from === 'own' ? 'this character’s own' : 'the project’s standard'}
       </label>
       <textarea
         id="phrase"
@@ -106,7 +107,7 @@ export function PhraseEditor({
         <button className="btn" type="submit" disabled={!changed || save.isPending}>
           {save.isPending ? 'Saving…' : 'Save phrase'}
         </button>
-        {audition.own && (
+        {audition.from === 'own' && (
           <button
             className="btn"
             type="button"

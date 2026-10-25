@@ -10,7 +10,7 @@ describe('auditionText', () => {
   it('uses the project’s phrase, in the character’s style, said as the cast asks', () => {
     const text = auditionText({ style: '[warm]' }, { Elior: 'El-ee-or' }, narration)
     expect(text.phrase).toBe(narration.audition.phrase)
-    expect(text.own).toBe(false)
+    expect(text.from).toBe('standard')
     expect(text.spoken).toBe(`[warm] ${narration.audition.phrase}`)
     const named = auditionText(
       { style: '', audition: { phrase: 'Elior, come here.' } },
@@ -19,9 +19,53 @@ describe('auditionText', () => {
     )
     expect(named).toEqual({
       phrase: 'Elior, come here.',
-      own: true,
+      from: 'own',
       spoken: 'El-ee-or, come here.',
     })
+  })
+})
+
+describe('auditionText in another language', () => {
+  const several: typeof narration = {
+    ...narration,
+    languages: ['en', 'sv'],
+    audition: { ...narration.audition, phrases: { sv: 'Kom in, barn.' } },
+  }
+  const sv = (character: Parameters<typeof auditionText>[0], longest: string | null, n = several) =>
+    auditionText(character, {}, n, 'sv', longest)
+
+  it('prefers the character’s own phrase in the language', () => {
+    expect(sv({ audition: { phrase: 'Min fras.' } }, 'Längsta raden.')).toMatchObject({
+      phrase: 'Min fras.',
+      from: 'own',
+    })
+  })
+
+  it('then the project’s standard phrase in that language, not the English one', () => {
+    expect(sv({ style: '[warm]' }, 'Längsta raden.')).toMatchObject({
+      phrase: 'Kom in, barn.',
+      from: 'standard',
+      spoken: '[warm] Kom in, barn.',
+    })
+  })
+
+  it('then her longest line in that language', () => {
+    expect(sv({}, 'Längsta raden.', { ...several, audition: narration.audition })).toMatchObject({
+      phrase: 'Längsta raden.',
+      from: 'line',
+    })
+  })
+
+  it('has none when the project has no phrase for it and she has no lines', () => {
+    expect(sv({}, null, { ...several, audition: narration.audition })).toEqual({
+      phrase: null,
+      from: 'none',
+      spoken: '',
+    })
+  })
+
+  it('keeps the built-in phrase for the source language, whatever else is known', () => {
+    expect(auditionText({}, {}, several, 'en', 'The longest line.').from).toBe('standard')
   })
 })
 

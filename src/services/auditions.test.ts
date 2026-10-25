@@ -91,7 +91,7 @@ describe('findCandidates', () => {
     const recorded = await recordTake(projectFile, 'grandmother', 'w1', async () => fish, limiter)
     const result = await findCandidates(projectFile, 'grandmother', async () => fish)
     if (!result?.ok || !recorded?.ok) throw new Error('expected both to work')
-    expect(result.audition.own).toBe(false)
+    expect(result.audition.from).toBe('standard')
     expect(result.audition.spoken).toStartWith('[warm] ')
     expect(result.takes).toEqual({ w1: recorded.key })
   })

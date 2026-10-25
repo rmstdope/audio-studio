@@ -17,7 +17,7 @@ export const TAKES_DIR = '.audio-studio/takes'
 /** A recorded take (its key, and the text it is of), or why there is none. Null for an unknown character. */
 export type TakeResult =
   | { ok: true; key: string; spoken: string; cached: boolean }
-  | { ok: false; reason: 'no-key' | 'fish'; message: string }
+  | { ok: false; reason: 'no-key' | 'fish' | 'no-phrase'; message: string }
   | { ok: false; problems: Problem[] }
   | null
 
@@ -45,11 +45,14 @@ export async function recordTake(
 
   const root = dirname(projectFile)
   const text = auditionFor(cast, characterId, project)
+  if (text.phrase === null) {
+    return { ok: false, reason: 'no-phrase', message: 'There is no audition phrase to record.' }
+  }
   // A phrase edited into the cast by hand is checked too: never pay for a take that is too long.
   const tooLong = phraseProblem(text.phrase, project.narration.quality.chunkLimit)
   if (tooLong) {
-    const where = text.own ? phrasePath(characterId) : 'narration.audition.phrase'
-    const file = text.own ? project.narration.characters : basename(projectFile)
+    const where = text.from === 'own' ? phrasePath(characterId) : 'narration.audition.phrase'
+    const file = text.from === 'own' ? project.narration.characters : basename(projectFile)
     return { ok: false, problems: [{ file, path: where, message: tooLong }] }
   }
   const tts = ttsFor(project.narration.tts, cast.speakers[characterId])
