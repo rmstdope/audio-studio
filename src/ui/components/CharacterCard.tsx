@@ -1,10 +1,10 @@
 import type { LineStatus } from '../../core/planner'
 import type { CharacterSummary } from '../../core/summary'
-import { plural, tintFor, voiceLabel } from '../format'
+import { plural, tintFor } from '../format'
 import { linesSummary, STATUS } from '../status'
 import { routeHref } from '../route'
 import { StatusBar } from './StatusBar'
-import { missingVoiceChips, type Language } from '../castLanguages'
+import { cardVoice, missingVoiceChips, type Language } from '../castLanguages'
 
 /** The badge a card shows: cast state first, then what needs doing. */
 function badgeFor(
@@ -48,7 +48,8 @@ export function CharacterCard({
   /** The language the page the card is on shows, which Open keeps. */
   language?: string
 }) {
-  const cast = character.voice !== null
+  const voice = cardVoice(character, languages, language)
+  const cast = voice.cast
   const badge = badgeFor(cast, counts)
   return (
     <article className="card" aria-label={character.name}>
@@ -58,8 +59,11 @@ export function CharacterCard({
         </div>
         <div className="card-title">
           <strong>{character.name}</strong>
-          <span className="mono" title={character.voice ?? undefined}>
-            {voiceLabel(character)}
+          <span
+            className="mono"
+            title={(language ? character.languages[language]?.voice : character.voice) ?? undefined}
+          >
+            {voice.label}
           </span>
         </div>
         <span className="badge" style={{ color: badge.color, background: badge.bg }}>

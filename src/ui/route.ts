@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 export type Route =
   | { view: 'part'; part: string | null; language?: string }
   | { view: 'lines'; part: string; language?: string }
-  | { view: 'characters' }
+  | { view: 'characters'; language?: string }
   | { view: 'changes' }
   | { view: 'setup' }
   | { view: 'character'; character: string; language?: string }
@@ -25,7 +25,7 @@ export function parseRoute(hash: string): Route {
   if (first === 'changes') return { view: 'changes' }
   if (first === 'setup') return { view: 'setup' }
   if (first === 'characters') {
-    if (!second) return { view: 'characters' }
+    if (!second) return language ? { view: 'characters', language } : { view: 'characters' }
     const character = decodeURIComponent(second)
     const view = third === 'audition' ? 'audition' : 'character'
     return language ? { view, character, language } : { view, character }
@@ -40,10 +40,10 @@ export function parseRoute(hash: string): Route {
 
 /** The hash for a route. */
 export function routeHref(route: Route): string {
-  if (route.view === 'characters') return '#/characters'
   if (route.view === 'changes') return '#/changes'
   if (route.view === 'setup') return '#/setup'
   const query = route.language ? `?language=${encodeURIComponent(route.language)}` : ''
+  if (route.view === 'characters') return `#/characters${query}`
   if (route.view === 'character')
     return `#/characters/${encodeURIComponent(route.character)}${query}`
   if (route.view === 'audition')

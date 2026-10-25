@@ -1,5 +1,6 @@
 import type { AuditionText } from '../core/takes'
 import type { CharacterSummary } from '../core/summary'
+import { voiceLabel } from './format'
 
 /** A declared language, named in itself. */
 export interface Language {
@@ -45,6 +46,24 @@ export function castTab(
     return { count: 'Cast', title: casting.voiceName || casting.voice, dimmed: false }
   }
   return { count: 'No voice', title: `No ${language.name} voice yet`, dimmed: true }
+}
+
+/**
+ * The voice a card shows in the language shown: her own voice for the source language (as it
+ * always was), her casting in another; or that there is none yet.
+ */
+export function cardVoice(
+  character: CharacterSummary,
+  languages: Language[],
+  language: string | undefined,
+): { cast: boolean; label: string } {
+  if (!language || language === languages[0]?.id) {
+    return { cast: character.voice !== null, label: voiceLabel(character) }
+  }
+  const casting = character.languages[language]
+  return casting?.voice
+    ? { cast: true, label: voiceLabel(casting) }
+    : { cast: false, label: `No ${nameOf(languages, language)} voice yet` }
 }
 
 /** The chips a card adds: "No Deutsch voice" for each language but the first in which she has none. */

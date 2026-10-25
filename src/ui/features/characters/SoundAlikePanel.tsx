@@ -21,11 +21,17 @@ import {
 export function SoundAlikePanel({
   groups,
   projectFile,
+  language = null,
+  builtIn = true,
 }: {
   groups: string[][]
   projectFile: string
+  /** A language besides the source, whose own groups these are; null: the source language's. */
+  language?: { id: string; name: string } | null
+  /** Whether the studio's built-in English groups apply here, so the panel says so. */
+  builtIn?: boolean
 }) {
-  const save = useSetSoundAlike()
+  const save = useSetSoundAlike(language?.id)
   const [draft, setDraft] = useState<SoundAlikeDraft | null>(null)
   const rows = draft?.rows ?? startDraft(groups).rows
   const edited = draft ? groupsOf(draft) : groups
@@ -48,14 +54,18 @@ export function SoundAlikePanel({
     <section className="panel pronounce" aria-label="Words that sound the same">
       <div className="pronounce-head">
         <div>
-          <span className="label">Words that sound the same</span>
+          <span className="label">
+            Words that sound the same{language ? ` · ${language.name}` : ''}
+          </span>
           <strong>{groups.length ? plural(groups.length, 'group') : 'None of your own'}</strong>
         </div>
         <span className="muted">
           When Whisper writes one word of a group for another (“Liria” for “Lyria”), it still counts
-          as heard, as for the studio’s built-in English ones (“inn” and “in”). Words or phrases
-          (“all right”, “alright”) are separated by commas. Counts from the next take on. Saved in{' '}
-          <span className="mono">{projectFile}</span>.
+          as heard
+          {language ? ` in ${language.name} lines` : ''}
+          {builtIn ? ', as for the studio’s built-in English ones (“inn” and “in”)' : ''}. Words or
+          phrases (“all right”, “alright”) are separated by commas. Counts from the next take on.
+          Saved in <span className="mono">{projectFile}</span>.
         </span>
       </div>
       {/* Edits wait while a save is under way, so none is dropped when it lands. */}
@@ -124,7 +134,15 @@ export function SoundAlikePanel({
       {problem && (
         <Problems
           title="The groups need a change"
-          problems={[{ file: projectFile, path: 'narration.quality.soundAlike', message: problem }]}
+          problems={[
+            {
+              file: projectFile,
+              path: language
+                ? `narration.quality.soundAlikeByLanguage.${language.id}`
+                : 'narration.quality.soundAlike',
+              message: problem,
+            },
+          ]}
         />
       )}
       {problems.length > 0 && <Problems title="The words could not be saved" problems={problems} />}

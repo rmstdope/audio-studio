@@ -27,11 +27,14 @@ import {
 export function PronunciationsPanel({
   table,
   castPath,
+  language = null,
 }: {
   table: Pronunciation[]
   castPath: string
+  /** A language besides the source, whose own table this is; null: the source language's. */
+  language?: { id: string; name: string } | null
 }) {
-  const save = useSetPronunciations()
+  const save = useSetPronunciations(language?.id)
   const [draft, setDraft] = useState<PronounceDraft | null>(null)
   const rows = draft?.rows ?? startDraft(table).rows
   const edited = cleanPronunciations(draft ? tableOf(draft) : table)
@@ -55,12 +58,13 @@ export function PronunciationsPanel({
     <section className="panel pronounce" aria-label="Pronunciations">
       <div className="pronounce-head">
         <div>
-          <span className="label">Pronunciations</span>
+          <span className="label">Pronunciations{language ? ` · ${language.name}` : ''}</span>
           <strong>{table.length ? plural(table.length, 'entry') : 'None yet'}</strong>
         </div>
         <span className="muted">
-          Applied to every line, in the order the studio applies them, before it is sent; spaces
-          count, so “Al ” is not in “Alice”. Saved in <span className="mono">{castPath}</span>.
+          Applied to every {language ? `${language.name} ` : ''}line, in the order the studio
+          applies them, before it is sent; spaces count, so “Al ” is not in “Alice”. Saved in{' '}
+          <span className="mono">{castPath}</span>.
         </span>
       </div>
       {/* Edits wait while a save is under way, so none is dropped when it lands. */}
@@ -174,7 +178,13 @@ export function PronunciationsPanel({
       {tableProblem && (
         <Problems
           title="The table needs a change"
-          problems={[{ file: castPath, path: 'pronounce', message: tableProblem }]}
+          problems={[
+            {
+              file: castPath,
+              path: language ? `languages.${language.id}.pronounce` : 'pronounce',
+              message: tableProblem,
+            },
+          ]}
         />
       )}
       {problems.length > 0 && (
