@@ -361,6 +361,13 @@ describe('a part in several languages', () => {
     expect(loaded.summary.problems.map((p) => p.file)).not.toContain('tts/act1/de/script.json')
   })
 
+  it('reports a broken dialog of another language, as one of the source language', async () => {
+    const root = tempRepo({ ...files, 'tts/act1/sv/script.json': '[not json' })
+    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    if (!loaded.ok) throw new Error('expected a summary')
+    expect(loaded.summary.problems.map((p) => p.file)).toContain('tts/act1/sv/script.json')
+  })
+
   it('reads the source language when none is asked for, or one is not declared', async () => {
     for (const asked of [undefined, 'fr']) {
       const { part } = await open(asked)

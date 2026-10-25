@@ -225,6 +225,25 @@ describe('a character per language', () => {
     expect(mira.languages.en?.longest).toBe('line 0')
   })
 
+  it('leaves out lines too long for one take when choosing her longest', () => {
+    const long = 'x'.repeat(401)
+    const found = summarize(
+      input({
+        project: several,
+        dialogs: {
+          act1: {
+            status: 'ok',
+            lines: [
+              { key: 'a', speaker: 'mira', text: 'kort' },
+              { key: 'b', speaker: 'mira', text: long },
+            ],
+          },
+        },
+      }),
+    )
+    expect(found.characters[0]?.languages.en?.longest).toBe('kort')
+  })
+
   it('has no voice and no lines for a language she is not in', () => {
     const lone = summary.characters.find((c) => c.id === 'lone')!
     expect(lone.languages.sv).toMatchObject({ voice: null, appearances: [], longest: null })

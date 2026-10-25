@@ -7,6 +7,7 @@ import { adoptUntracked, planPart, type PartState, type PlanInput } from '../cor
 import {
   PROJECT_FILE,
   ProjectSchema,
+  declaredLanguage,
   partPathFor,
   problemsFrom,
   type Part,
@@ -98,7 +99,7 @@ export async function cacheNameFor(
   if (language === undefined) return characterId
   const opened = await openProject(projectFile)
   if (!opened.ok) return characterId
-  const resolved = languageOf(opened.project.narration, language)
+  const resolved = declaredLanguage(opened.project.narration, language)
   return resolved === opened.project.narration.languages[0]
     ? characterId
     : `${characterId}\0${resolved}`
@@ -307,7 +308,7 @@ export async function clipFile(
   if (!narration.parts.some((p) => p.id === partId) || file.startsWith('.')) return null
   const folder = resolveInRoot(
     dirname(projectFile),
-    partPathFor(narration.paths.clips, partId, languageOf(narration, language)),
+    partPathFor(narration.paths.clips, partId, declaredLanguage(narration, language)),
   )
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
@@ -346,7 +347,7 @@ export async function readPart(
 
   const problems: Problem[] = []
   const templates = project.narration.paths
-  const language = languageOf(project.narration, asked)
+  const language = declaredLanguage(project.narration, asked)
   const at = (template: string) => partPathFor(template, part.id, language)
 
   const dialog = await readDialog(root, project, part, problems, language)
@@ -400,13 +401,6 @@ export async function readPart(
     },
     problems,
   }
-}
-
-/** The language to read: the one asked for if the project declares it, else its first. */
-function languageOf(narration: Project['narration'], asked: string | undefined): string {
-  return asked !== undefined && narration.languages.includes(asked)
-    ? asked
-    : narration.languages[0]!
 }
 
 /** A resource read's value, or null when there is no file or it is broken (already a problem). */

@@ -1,7 +1,13 @@
 import { dirname } from 'node:path'
 import { formatCast } from '../core/castFormat'
 import { resolveInRoot } from '../core/paths'
-import { phraseProblem, problemsFrom, type Problem, type Project } from '../core/project'
+import {
+  declaredLanguage,
+  phraseProblem,
+  problemsFrom,
+  type Problem,
+  type Project,
+} from '../core/project'
 import {
   INTEGER_LIKE,
   cleanPronunciations,
@@ -307,7 +313,7 @@ export async function setPhrase(
   if (!loaded.ok) return loaded
   if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
   const { narration } = loaded.project
-  const which = languageIn(narration, language)
+  const which = declaredLanguage(narration, language)
   const tooLong = own ? phraseProblem(own, narration.quality.chunkLimit) : null
   if (tooLong) {
     const path = phrasePath(characterId, which === narration.languages[0] ? undefined : which)
@@ -353,13 +359,6 @@ function inLanguage(
   if (Object.keys(languages).length) return { ...entry, languages }
   const { languages: _removed, ...rest } = entry
   return rest
-}
-
-/** The language a request means: the one asked for if the project declares it, else the source's. */
-function languageIn(narration: Project['narration'], asked: string | undefined): string {
-  return asked !== undefined && narration.languages.includes(asked)
-    ? asked
-    : narration.languages[0]!
 }
 
 /**
@@ -471,7 +470,7 @@ async function writeCharacter(
     }
     const speakers = { ...cast.speakers }
     const { narration } = loaded.project
-    const which = { language: languageIn(narration, asked), source: narration.languages[0]! }
+    const which = { language: declaredLanguage(narration, asked), source: narration.languages[0]! }
     speakers[characterId] = change(speakers[characterId] ?? {}, which)
     return { ...cast, speakers }
   })

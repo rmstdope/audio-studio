@@ -15,7 +15,7 @@ import {
   type AuditionSession,
 } from '../core/audition'
 import { resolveInRoot } from '../core/paths'
-import type { Problem } from '../core/project'
+import { declaredLanguage, type Problem } from '../core/project'
 import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import type { Candidate, Voice } from '../core/voiceSearch'
@@ -345,8 +345,7 @@ export async function recordedLines(
 ): Promise<Appearance[]> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return []
-  const { languages } = loaded.project.narration
-  const language = asked !== undefined && languages.includes(asked) ? asked : languages[0]!
+  const language = declaredLanguage(loaded.project.narration, asked)
   const character = loaded.summary.characters.find((c) => c.id === characterId)
   const recorded: Appearance[] = []
   for (const { part } of character?.languages[language]?.appearances ?? []) {
@@ -388,8 +387,7 @@ export async function castVoice(
     if (!loaded.ok) return loaded
     const character = loaded.summary.characters.find((c) => c.id === characterId)
     if (!character) return null
-    const { languages } = loaded.project.narration
-    const language = asked !== undefined && languages.includes(asked) ? asked : languages[0]!
+    const language = declaredLanguage(loaded.project.narration, asked)
     const session = await readSession(projectFile, characterId, language)
     if (!session) {
       return { ok: false, reason: 'no-session', message: 'There is no audition to cast from.' }

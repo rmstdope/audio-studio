@@ -1,7 +1,13 @@
 import type { ProjectSummary } from '../../../core/summary'
-import { castSaved, isMultilingual, languageShown, nameOf } from '../../castLanguages'
+import {
+  castSaved,
+  isMultilingual,
+  languageShown,
+  nameOf,
+  queryLanguage,
+} from '../../castLanguages'
 import type { CastResult } from '../../../services/sessions'
-import { useCast, useSession, useSessionAction } from '../../api'
+import { useCast, useParts, useSession, useSessionAction } from '../../api'
 import { CheckIcon } from '../../components/icons'
 import { Failure } from '../../components/Failure'
 import { useClipPlayer } from '../../components/useClipPlayer'
@@ -29,9 +35,26 @@ export function AuditionView({
   const language = languageShown(summary.languages, asked)
   const languageName = nameOf(summary.languages, language)
   const inLanguage = several ? { id: language, name: languageName } : null
-  const sessionQuery = useSession(characterId, Boolean(character), language)
-  const start = useSessionAction(characterId, language)
-  const cast = useCast(characterId, language)
+  const asking = queryLanguage(summary.languages, asked)
+  const sessionQuery = useSession(characterId, Boolean(character), asking)
+  const start = useSessionAction(characterId, asking)
+  const cast = useCast(characterId, asking)
+  const parts = character?.languages[language]?.appearances ?? []
+  const loadedParts = useParts(
+    parts.map((a) => a.part),
+    asking,
+  )
+  const lineTexts = [
+    ...new Set(
+      loadedParts.flatMap((query) =>
+        query.data?.ok
+          ? query.data.part.lines
+              .filter((l) => l.speaker === characterId && l.text)
+              .map((l) => l.text)
+          : [],
+      ),
+    ),
+  ]
   const { playing, toggle, stop } = useClipPlayer()
 
   if (!character) {
@@ -99,6 +122,7 @@ export function AuditionView({
                 audition={board.audition}
                 language={inLanguage?.id}
                 languageName={inLanguage?.name}
+                lines={lineTexts}
               />
             )}
             <StyleEditor characterId={character.id} style={character.style} />

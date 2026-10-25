@@ -1,5 +1,5 @@
 import { languageName } from './languages'
-import { partPathFor, type Problem, type Project } from './project'
+import { partPathFor, phraseProblem, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
 import { voiceOf, type Cast, type Line } from './resources'
 
@@ -172,7 +172,13 @@ export function summarize({
       }
       for (const line of dialog.lines) {
         const entry = found.get(line.speaker)!
-        if (line.text.trim() && (entry.longest === null || line.text.length > entry.longest.length))
+        // Only a line that fits one take can be a phrase.
+        const fits = phraseProblem(line.text, narration.quality.chunkLimit) === null
+        if (
+          fits &&
+          line.text.trim() &&
+          (entry.longest === null || [...line.text].length > [...entry.longest].length)
+        )
           entry.longest = line.text
       }
     }

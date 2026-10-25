@@ -194,7 +194,7 @@ export function PhraseEditor({
                 disabled={save.isPending}
                 onClick={() => save.mutate(null, { onSuccess: done })}
               >
-                Use the standard phrase
+                {audition.standard ? 'Use the standard phrase' : 'Remove her phrase'}
               </button>
             )}
             {changing && (

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
-import { phraseProblem, type Problem, type Project } from '../core/project'
+import { declaredLanguage, phraseProblem, type Problem, type Project } from '../core/project'
 import { projectCast, ttsFor, type Cast } from '../core/resources'
 import type { ProjectSummary } from '../core/summary'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
@@ -201,7 +201,7 @@ export function auditionIn(
   asked?: string,
 ): { language: string; cast: Cast; audition: AuditionText } {
   const { languages } = project.narration
-  const language = asked !== undefined && languages.includes(asked) ? asked : languages[0]!
+  const language = declaredLanguage(project.narration, asked)
   const seen = projectCast(cast, language, languages[0]!)
   const longest = summary.characters.find((c) => c.id === characterId)?.languages[language]?.longest
   return {

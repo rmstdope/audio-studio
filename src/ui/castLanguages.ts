@@ -12,6 +12,17 @@ export function languageShown(languages: Language[], asked: string | undefined):
   return languages.find((l) => l.id === asked)?.id ?? languages[0]?.id ?? ''
 }
 
+/**
+ * The language a page asks the server for and keys its cached answers by: the one shown in a
+ * project with several, none in a project with one, so every part of a page agrees on the key.
+ */
+export function queryLanguage(
+  languages: Language[],
+  asked: string | undefined,
+): string | undefined {
+  return isMultilingual(languages) ? languageShown(languages, asked) : undefined
+}
+
 /** Whether the project narrates in more than one language, so pages show languages at all. */
 export function isMultilingual(languages: Language[]): boolean {
   return languages.length > 1
@@ -160,5 +171,6 @@ export function castInLanguage(
 /** What the page says once a voice is cast in a language. */
 export function castSaved(languages: Language[], language: string, stale: number): string {
   const name = nameOf(languages, language)
+  if (!stale) return `Saved to the ${name} cast for every act.`
   return `Saved to the ${name} cast for every act. ${stale} ${stale === 1 ? 'line is' : 'lines are'} now stale and ${stale === 1 ? 'needs' : 'need'} recording again.`
 }

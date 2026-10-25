@@ -20,6 +20,7 @@ describe('auditionText', () => {
     expect(named).toEqual({
       phrase: 'Elior, come here.',
       from: 'own',
+      standard: true,
       spoken: 'El-ee-or, come here.',
     })
   })
@@ -60,6 +61,7 @@ describe('auditionText in another language', () => {
     expect(sv({}, null, { ...several, audition: narration.audition })).toEqual({
       phrase: null,
       from: 'none',
+      standard: false,
       spoken: '',
     })
   })

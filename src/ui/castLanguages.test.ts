@@ -5,6 +5,7 @@ import {
   castSaved,
   castTab,
   languageShown,
+  queryLanguage,
   missingVoiceChips,
   noPhraseText,
   noVoiceText,
@@ -48,6 +49,14 @@ describe('languageShown', () => {
     expect(languageShown(languages, 'sv')).toBe('sv')
     expect(languageShown(languages, 'fr')).toBe('en')
     expect(languageShown(languages, undefined)).toBe('en')
+  })
+})
+
+describe('queryLanguage', () => {
+  it('is the language shown in a project with several, and none in a project with one', () => {
+    expect(queryLanguage(languages, 'sv')).toBe('sv')
+    expect(queryLanguage(languages, 'fr')).toBe('en')
+    expect(queryLanguage(languages.slice(0, 1), 'en')).toBeUndefined()
   })
 })
 
@@ -126,6 +135,7 @@ describe('the phrase', () => {
   const text = (from: 'own' | 'standard' | 'line' | 'none') => ({
     phrase: from === 'none' ? null : 'x',
     from,
+    standard: true,
     spoken: 'x',
   })
   it('notes where it comes from', () => {
@@ -161,6 +171,9 @@ describe('casting in a language', () => {
   })
   it('says nothing is stale when nothing is recorded', () => {
     expect(castInLanguage('G', 'Grandmother', languages, 'sv', []).stale).toBeNull()
+  })
+  it('says only what was saved when nothing was recorded', () => {
+    expect(castSaved(languages, 'sv', 0)).toBe('Saved to the Svenska cast for every act.')
   })
   it('says what was saved', () => {
     expect(castSaved(languages, 'sv', 18)).toBe(

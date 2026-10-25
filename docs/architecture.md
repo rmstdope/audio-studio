@@ -726,8 +726,6 @@ download.
 
 Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's status),
 `POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
-Every route of a character, its voice, takes, audition and ruled-out voices takes `?language=`
-(the source language when absent or not declared), and the cast is changed for that language only.
 `GET /api/characters/:id/voice` (its cast voice as Fish knows it, its take and the audition
 phrase; one lookup, no search), `PATCH /api/characters/:id`
 (keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`,
@@ -743,7 +741,9 @@ spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
 `undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
-`DELETE /api/characters/:id/ruled-out/:voice` (allow one again). The rest is the plan:
+`DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
+voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
+not declared), and casting changes that language only. The rest is the plan:
 
 ```
 GET    /api/project                              project, parts

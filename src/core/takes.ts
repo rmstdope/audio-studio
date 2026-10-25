@@ -15,6 +15,8 @@ export interface AuditionText {
    * nothing.
    */
   from: PhraseSource
+  /** Whether the project has a standard phrase in the language, which clearing her own would go back to. */
+  standard: boolean
   /** The phrase as sent to Fish: the character's style cue, then the words as the cast says them. */
   spoken: string
 }
@@ -46,6 +48,7 @@ export function auditionText(
   return {
     phrase,
     from,
+    standard: Boolean(standard),
     spoken: phrase === null ? '' : spokenText(phrase, character.style ?? '', pronounce),
   }
 }

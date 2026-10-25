@@ -220,6 +220,16 @@ export function partPathFor(template: string, partId: string, language?: string)
   return language === undefined ? path : path.replaceAll('{language}', language)
 }
 
+/** The language a request means: the one asked for if the project declares it, else the source language. */
+export function declaredLanguage(
+  narration: Pick<Project['narration'], 'languages'>,
+  asked: string | undefined,
+): string {
+  return asked !== undefined && narration.languages.includes(asked)
+    ? asked
+    : narration.languages[0]!
+}
+
 /** Something wrong with a file the studio reads: which file, where in it, and what. */
 export interface Problem {
   file: string

@@ -11,6 +11,7 @@ import {
   isMultilingual,
   languageShown,
   nameOf,
+  queryLanguage,
   noVoiceText,
   speedInLanguage,
   startBlocked,
@@ -67,9 +68,11 @@ export function CharacterView({
   const language = languageShown(summary.languages, asked)
   const languageName = nameOf(summary.languages, language)
   const casting = character?.languages[language]
-  const session = useSession(characterId, Boolean(character), language)
-  const voice = useCharacterVoice(characterId, casting?.voice ?? null, Boolean(character), language)
-  const start = useSessionAction(characterId, language)
+  // Every hook of the page and its panels asks with the same language, or none in a project with one.
+  const asking = queryLanguage(summary.languages, asked)
+  const session = useSession(characterId, Boolean(character), asking)
+  const voice = useCharacterVoice(characterId, casting?.voice ?? null, Boolean(character), asking)
+  const start = useSessionAction(characterId, asking)
   const going = useAuditionsGoingOn(
     characterId,
     summary.languages.map((l) => l.id),
@@ -81,13 +84,19 @@ export function CharacterView({
   // Her lines in this language, to pick an audition phrase from.
   const loadedParts = useParts(
     appearances.map((a) => a.part),
-    language,
+    asking,
   )
-  const lineTexts = loadedParts.flatMap((query) =>
-    query.data?.ok
-      ? query.data.part.lines.filter((l) => l.speaker === characterId && l.text).map((l) => l.text)
-      : [],
-  )
+  const lineTexts = [
+    ...new Set(
+      loadedParts.flatMap((query) =>
+        query.data?.ok
+          ? query.data.part.lines
+              .filter((l) => l.speaker === characterId && l.text)
+              .map((l) => l.text)
+          : [],
+      ),
+    ),
+  ]
 
   if (!character) {
     return (
