@@ -1,0 +1,1631 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Recording models</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --miss: #8fb5ff;
+        --miss-bg: #142033;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #050608;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .note {
+        max-width: 1180px;
+        margin: 18px auto 8px;
+        padding: 0 16px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .note b {
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1180px;
+        margin: 0 auto 28px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        min-height: 420px;
+        background: var(--bg);
+      }
+      .side {
+        width: 220px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: none;
+      }
+      .brand {
+        font-weight: 600;
+      }
+      .lbl {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .pbox {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 13px;
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .ni {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 8px;
+        border-radius: 8px;
+        color: var(--soft);
+        font-size: 13px;
+      }
+      .ni.on {
+        background: #2a1b12;
+        color: #ff9a6b;
+      }
+      .cnt {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-radius: 99px;
+        padding: 0 7px;
+        font-size: 12px;
+      }
+      .main {
+        flex: 1;
+        padding: 22px 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn.p {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.g {
+        background: transparent;
+        border-color: transparent;
+        color: var(--muted);
+      }
+      .warnbox {
+        background: var(--warn-bg);
+        border: 1px solid #5a4a1e;
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .warnbox .t {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .warnbox strong {
+        color: var(--warn);
+      }
+      .okbox {
+        background: var(--ok-bg);
+        border: 1px solid #1f5a40;
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .okbox strong {
+        color: var(--ok);
+      }
+      .errbox {
+        background: var(--danger-bg);
+        border: 1px solid #6a2a3a;
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .errbox strong {
+        color: var(--danger-ink);
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .grow {
+        flex: 1;
+      }
+      .chip {
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 12px;
+      }
+      .c-ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .c-st {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .c-mi {
+        background: var(--miss-bg);
+        color: var(--miss);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      td {
+        padding: 7px 6px;
+        border-top: 1px solid var(--line);
+      }
+      .stage {
+        display: flex;
+        gap: 8px;
+      }
+      .stage label {
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        padding: 5px 10px;
+      }
+      .stage .on {
+        border-color: var(--accent);
+        color: #ff9a6b;
+      }
+      .tag {
+        display: inline-block;
+        background: #ffc24b;
+        color: #1a1200;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        margin-right: 8px;
+      }
+      ul.eff {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .setup {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .st {
+        width: 150px;
+        flex: none;
+        font-size: 13px;
+      }
+      .st.ok {
+        color: var(--ok);
+      }
+      .st.pr {
+        color: var(--warn);
+      }
+      @media (max-width: 700px) {
+        .side {
+          display: none;
+        }
+        .warnbox,
+        .okbox {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+
+      .slist {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sc {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 16px;
+        align-items: start;
+      }
+      .ss {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .ss.ok {
+        color: var(--ok);
+      }
+      .ss.pr {
+        color: var(--warn);
+      }
+      .ss.off {
+        color: var(--faint);
+      }
+      .stx {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .fix {
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: #0d0f14;
+        border: 1px solid var(--line);
+        width: fit-content;
+      }
+      select {
+        background: var(--raised);
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 5px 8px;
+        font: inherit;
+      }
+      .tiers td {
+        padding: 5px 8px;
+      }
+      .tiers .over {
+        color: var(--warn);
+      }
+      .tiers .fine {
+        color: var(--ok);
+      }
+      .tiers .cur {
+        background: #191c24;
+      }
+      .focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      @media (max-width: 700px) {
+        .sc {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+      }
+
+      .models {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .models h2 {
+        margin: 0 0 2px;
+        font-size: 15px;
+      }
+      .mrow {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 16px;
+        padding: 12px 0;
+        border-top: 1px solid var(--line);
+        align-items: start;
+      }
+      .mrow:first-of-type {
+        border-top: 0;
+      }
+      .mname {
+        font-weight: 600;
+      }
+      .mtx {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .price {
+        color: var(--soft);
+      }
+      .free {
+        color: var(--ok);
+      }
+      .promo {
+        color: var(--warn);
+      }
+      .menu {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 4px;
+        width: 360px;
+        max-width: 100%;
+        box-shadow: 0 8px 24px #0008;
+      }
+      .opt {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 10px;
+        border-radius: 7px;
+      }
+      .opt.sel {
+        background: #2a1b12;
+        color: #ff9a6b;
+      }
+      .opt .p {
+        color: var(--muted);
+      }
+      .opt.dim {
+        color: var(--faint);
+      }
+      .sep {
+        border-top: 1px solid var(--line);
+        margin: 4px 0;
+      }
+      .qbox {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .qbox ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .notebar {
+        font-size: 13px;
+        color: var(--soft);
+        background: #0d0f14;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+      h3.cap {
+        margin: 22px auto 6px;
+        max-width: 1180px;
+        padding: 0 16px;
+        font-size: 13px;
+        color: var(--soft);
+      }
+      @media (max-width: 700px) {
+        .mrow {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+      }
+
+      .errline {
+        color: var(--danger-ink);
+        font-size: 13px;
+      }
+      .hint {
+        font-size: 12.5px;
+        color: var(--faint);
+      }
+      select[disabled] {
+        opacity: 0.55;
+      }
+      .narrow {
+        max-width: 380px;
+      }
+      .narrow .side {
+        display: none;
+      }
+      .narrow .mrow {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+      .narrow .row {
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="note">
+      <b>The agreed design</b> for choosing the audition, draft and final models on Setup, every
+      state.
+    </p>
+    <p class="note">
+      <b>1 — As it opens.</b> The Models panel above the checks. Each price is Fish's rate, then
+      what the whole dialog would cost recorded once with it.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>2 — A promotion.</b> drama-3 on Draft: the promotion price and when it ends; after 12
+      November only the list price shows.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>drama-3</option></select
+                ><span class="promo">$10 per million characters until 12 November, then $50</span
+                ><span class="muted"
+                  >· about $1.18 for all 2,340 lines ($5.90 from 12 November)</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>3 — Nothing at stake saves at once.</b> The audition model, or a draft or final model with
+      no lines recorded with it yet: the menu saves as soon as it is picked, disabled with “Saving…”
+      beside it while it saves.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="hint">Saving…</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>4 — Draft change that makes lines out of date.</b> The question opens under the menu; the
+      menu still shows the old model, focus is on Switch. Escape or Keep closes it, nothing written,
+      focus back on the menu.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select class="focus">
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+              <div class="qbox">
+                <strong>Switch drafts to <span class="mono">s2.1-pro</span>?</strong>
+                <ul>
+                  <li>
+                    Draft: <span class="mono">s2.1-pro-free</span> →
+                    <span class="mono">s2.1-pro</span>
+                  </li>
+                  <li>
+                    1,412 lines drafted with <span class="mono">s2.1-pro-free</span> become out of
+                    date: the next draft records them again, about $1.07.
+                  </li>
+                  <li>
+                    Saved in <span class="mono">audio-studio.json</span>; nothing else in it
+                    changes.
+                  </li>
+                </ul>
+                <div class="row">
+                  <button class="btn g">Keep <span class="mono">s2.1-pro-free</span></button
+                  ><button class="btn p">Switch to <span class="mono">s2.1-pro</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>5 — Switching.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select disabled>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select disabled>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+              <div class="qbox">
+                <strong>Switch drafts to <span class="mono">s2.1-pro</span>?</strong>
+                <ul>
+                  <li>
+                    Draft: <span class="mono">s2.1-pro-free</span> →
+                    <span class="mono">s2.1-pro</span>
+                  </li>
+                  <li>
+                    1,412 lines drafted with <span class="mono">s2.1-pro-free</span> become out of
+                    date: the next draft records them again, about $1.07.
+                  </li>
+                  <li>
+                    Saved in <span class="mono">audio-studio.json</span>; nothing else in it
+                    changes.
+                  </li>
+                </ul>
+                <div class="row">
+                  <button class="btn g" disabled>
+                    Keep <span class="mono">s2.1-pro-free</span></button
+                  ><button class="btn p" disabled>Switching…</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select disabled>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>6 — Final change.</b> Lines recorded for the final with the old model; a promotion gives
+      both prices.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select class="focus">
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+              <div class="qbox">
+                <strong>Switch the final recording to <span class="mono">drama-3</span>?</strong>
+                <ul>
+                  <li>
+                    Final: <span class="mono">s2.1-pro</span> → <span class="mono">drama-3</span>
+                  </li>
+                  <li>
+                    640 lines recorded for the final with <span class="mono">s2.1-pro</span> become
+                    out of date: the next final recording records them again, about $0.32 (about
+                    $1.60 from 12 November).
+                  </li>
+                  <li>
+                    Saved in <span class="mono">audio-studio.json</span>; nothing else in it
+                    changes.
+                  </li>
+                </ul>
+                <div class="row">
+                  <button class="btn g">Keep <span class="mono">s2.1-pro</span></button
+                  ><button class="btn p">Switch to <span class="mono">drama-3</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>7 — Change to a free model.</b> Lines still go out of date; recording them again is free.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select class="focus">
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+              <div class="qbox">
+                <strong>Switch drafts to <span class="mono">s2.1-pro-free</span>?</strong>
+                <ul>
+                  <li>
+                    Draft: <span class="mono">s2.1-pro</span> →
+                    <span class="mono">s2.1-pro-free</span>
+                  </li>
+                  <li>
+                    1,412 lines drafted with <span class="mono">s2.1-pro</span> become out of date:
+                    the next draft records them again, free.
+                  </li>
+                  <li>
+                    Saved in <span class="mono">audio-studio.json</span>; nothing else in it
+                    changes.
+                  </li>
+                </ul>
+                <div class="row">
+                  <button class="btn g">Keep <span class="mono">s2.1-pro</span></button
+                  ><button class="btn p">Switch to <span class="mono">s2.1-pro-free</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>8 — Save failed.</b> In place of the question. Try again saves again; Keep closes it.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+              <div class="errbox">
+                <div class="t" style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+                  <strong>Could not switch drafts to <span class="mono">s2.1-pro</span></strong
+                  ><span class="muted"
+                    ><span class="mono">audio-studio.json</span> could not be saved: permission
+                    denied. Nothing was changed.</span
+                  >
+                </div>
+                <button class="btn g">Keep <span class="mono">s2.1-pro-free</span></button
+                ><button class="btn p">Try again</button>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>9 — s1 to s2.1-pro.</b> As the retirement banner agreed: no question, lines recorded with
+      s1 stay in date. It saves at once and the banner turns green. s1 is offered at the bottom only
+      while a stage still uses it.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>s1</option></select
+                ><span class="price">$15 per million characters · retires 31 December</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>10 — Final the same as draft.</b> (Question 2 below.)</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+              <span class="hint"
+                >Same as draft: every line is recorded once, with no separate final recording.</span
+              >
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>11 — No lines yet</b> (dialog not refreshed): the rate only, no project total.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>12 — Project file can't be read</b>: no panel, as today.</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <p class="panel muted">The project file cannot be read; fix it first.</p>
+      </main>
+    </div>
+    <p class="note">
+      <b>13 — Narrow window</b>: each stage stacks, name above, menu, then the price wrapping under
+      it; the question's buttons wrap as one unit.
+    </p>
+    <div class="frame narrow">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+              <div class="qbox">
+                <strong>Switch drafts to <span class="mono">s2.1-pro</span>?</strong>
+                <ul>
+                  <li>
+                    Draft: <span class="mono">s2.1-pro-free</span> →
+                    <span class="mono">s2.1-pro</span>
+                  </li>
+                  <li>
+                    1,412 lines drafted with <span class="mono">s2.1-pro-free</span> become out of
+                    date: the next draft records them again, about $1.07.
+                  </li>
+                  <li>
+                    Saved in <span class="mono">audio-studio.json</span>; nothing else in it
+                    changes.
+                  </li>
+                </ul>
+                <div class="row">
+                  <button class="btn g">Keep <span class="mono">s2.1-pro-free</span></button
+                  ><button class="btn p">Switch to <span class="mono">s2.1-pro</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>14 — A recording or an audition is going on.</b> While a recording or an audition is going
+      on, the menus are disabled with a line saying why; they come back when it ends.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Spending <span class="muted">$30.07</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <section class="panel models">
+          <h2>Models</h2>
+          <span class="muted" style="margin-bottom: 6px"
+            >Which Fish model records each stage. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="notebar" style="margin-bottom: 6px">
+            Act II: The Mill is recording. The models can be changed when it ends.
+          </div>
+          <div class="mrow">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select disabled>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft</div>
+            <div class="mtx">
+              <span class="muted">Every line, recorded while the game is being written.</span>
+              <div class="row">
+                <select disabled>
+                  <option>s2.1-pro-free</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Final</div>
+            <div class="mtx">
+              <span class="muted">Every line again, for the game you ship.</span>
+              <div class="row">
+                <select disabled>
+                  <option>s2.1-pro</option></select
+                ><span class="price">$15 per million characters</span
+                ><span class="muted">· about $1.77 for all 2,340 lines</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
