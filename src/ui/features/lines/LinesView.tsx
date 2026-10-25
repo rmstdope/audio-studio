@@ -621,23 +621,43 @@ function CueCell({
 function NoteCell({ partId, lineKey, note }: { partId: string; lineKey: string; note: string }) {
   const save = useSetNote(partId)
   const [draft, setDraft] = useState<string | null>(null)
-  const close = () => setDraft(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const refocus = useRef(false)
+  // Back on the note after editing, so the keyboard keeps its place in the table.
+  useEffect(() => {
+    if (draft === null && refocus.current) {
+      refocus.current = false
+      button.current?.focus()
+    }
+  }, [draft])
+  const open = (text: string) => {
+    save.reset()
+    setDraft(text)
+  }
+  const close = () => {
+    refocus.current = true
+    setDraft(null)
+  }
+  const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
+  const refused = save.data && !save.data.ok && !('problems' in save.data)
   if (draft === null) {
     return note ? (
       <button
+        ref={button}
         type="button"
         className="note-button"
         title="Your note on this line: edit"
-        onClick={() => setDraft(note)}
+        onClick={() => open(note)}
       >
         {note}
       </button>
     ) : (
       <button
+        ref={button}
         type="button"
         className="note-add"
         title="A note to yourself about this line, kept on this machine only"
-        onClick={() => setDraft('')}
+        onClick={() => open('')}
       >
         Add note
       </button>
@@ -679,6 +699,8 @@ function NoteCell({ partId, lineKey, note }: { partId: string; lineKey: string; 
           Cancel
         </button>
       </div>
+      {problems.length > 0 && <Problems title="The note could not be saved" problems={problems} />}
+      {refused && <span className="adopt-error">The project file cannot be read.</span>}
       {save.isError && <span className="adopt-error">{save.error.message}</span>}
     </form>
   )

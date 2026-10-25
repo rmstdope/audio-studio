@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setNote } from './notes'
@@ -52,8 +52,38 @@ describe('setNote', () => {
     expect(existsSync(join(root, 'tts/act1/cues.json'))).toBe(false)
   })
 
-  it('shows no notes for a file that does not fit', async () => {
-    const root = tempRepo({ ...files, '.audio-studio/notes/act1-x.json': { nonsense: 1 } })
-    expect(await notesOf(join(root, 'audio-studio.json'))).toEqual({})
+  it('names a notes file that does not fit, shows none, and never writes over it', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await setNote(projectFile, 'act1', 'k1', 'kept by hand')
+    const dir = join(root, '.audio-studio/notes')
+    const file = join(dir, readdirSync(dir)[0]!)
+    writeFileSync(file, '{"version": 1, "part": "act1", "lines": {"k1": "kept by hand"},}')
+    const part = await loadPart(projectFile, 'act1')
+    if (!part?.ok) throw new Error('expected the part')
+    expect(part.part.notes).toEqual({})
+    expect(part.part.problems).toEqual([
+      { file: `.audio-studio/notes/${readdirSync(dir)[0]}`, path: '', message: expect.any(String) },
+    ])
+    const refused = await setNote(projectFile, 'act1', 'k2', 'new')
+    expect(refused).toMatchObject({
+      ok: false,
+      problems: [{ file: expect.stringContaining('notes') }],
+    })
+    expect(readFileSync(file, 'utf8')).toContain('kept by hand')
+  })
+
+  it('keeps a note on a line that left the dialog, but does not show it', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await setNote(projectFile, 'act1', 'k2', 'gone soon')
+    writeFileSync(
+      join(root, 'tts/act1/script.json'),
+      JSON.stringify([{ key: 'k1', speaker: 'mira', text: 'Welcome home.' }]),
+    )
+    expect(await notesOf(projectFile)).toEqual({})
+    await setNote(projectFile, 'act1', 'k1', 'still here')
+    const dir = join(root, '.audio-studio/notes')
+    expect(readFileSync(join(dir, readdirSync(dir)[0]!), 'utf8')).toContain('gone soon')
   })
 })

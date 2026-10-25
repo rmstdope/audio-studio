@@ -97,6 +97,28 @@ export function formatEntriesPerLine(record: Record<string, unknown>): string {
 }
 
 /**
+ * A per-part file of the tool's cache (what was heard, notes), read and checked against its
+ * schema: `empty` when there is no file; `broken` (with `empty`) when there is one that cannot be
+ * read or does not fit, so a caller writing the file can refuse to write over it.
+ */
+export async function readCached<T extends z.ZodType>(
+  root: string,
+  dir: string,
+  partId: string,
+  schema: T,
+  empty: z.infer<T>,
+  fits: (value: z.infer<T>) => boolean = () => true,
+): Promise<{ value: z.infer<T>; broken: boolean; path: string }> {
+  const path = characterFile(dir, partId)
+  const json = await readJson(resolveInRoot(root, path))
+  if (json.status === 'missing') return { value: empty, broken: false, path }
+  if (json.status !== 'ok') return { value: empty, broken: true, path }
+  const parsed = schema.safeParse(json.value)
+  if (!parsed.success || !fits(parsed.data)) return { value: empty, broken: true, path }
+  return { value: parsed.data, broken: false, path }
+}
+
+/**
  * A file of one character's in a folder of the tool's cache: a readable name plus a short hash of
  * the id, so any character id makes a safe file name.
  */

@@ -1,13 +1,14 @@
 import { rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { withNote } from '../core/notes'
+import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
 import { characterFile, writeAtomic } from './files'
 import { inPartTurn } from './partFiles'
 import { NOTES_DIR, readNotes, readPart, type ProjectFailure } from './workspace'
 
-/** What saving a note did; null for an unknown part or line. */
-export type NoteChange = { ok: true } | ProjectFailure | null
+/** What saving a note did, or why not (a notes file that cannot be read); null for an unknown part or line. */
+export type NoteChange = { ok: true } | { ok: false; problems: Problem[] } | ProjectFailure | null
 
 /**
  * Saves the user's note on a line in the part's notes file in the tool cache (an empty note
@@ -25,7 +26,9 @@ export async function setNote(
     if (!part || !part.ok) return part
     if (!part.input.lines.some((l) => l.key === key)) return null
     const root = dirname(projectFile)
-    const before = await readNotes(root, partId)
+    const { notes: before, problem } = await readNotes(root, partId)
+    // Never written over: a broken file may hold notes the user wrote.
+    if (problem) return { ok: false, problems: [problem] }
     const next = withNote(before, key, note)
     if (next !== before) {
       const file = characterFile(NOTES_DIR, partId)

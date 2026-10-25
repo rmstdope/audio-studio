@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { HeardSchema, emptyHeard, withHeard, type Heard, type HeardLine } from '../core/heard'
 import { resolveInRoot } from '../core/paths'
-import { characterFile, readJson, writeAtomic } from './files'
+import { characterFile, readCached, writeAtomic } from './files'
 import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
 
@@ -56,9 +56,13 @@ export async function heardFor(
 
 /** What was kept for a part; nothing if there is no file, or it does not fit (a hand edit). */
 async function read(projectFile: string, partId: string): Promise<Heard> {
-  const file = resolveInRoot(dirname(projectFile), characterFile(HEARD_DIR, partId))
-  const json = await readJson(file)
-  if (json.status !== 'ok') return emptyHeard(partId)
-  const parsed = HeardSchema.safeParse(json.value)
-  return parsed.success && parsed.data.part === partId ? parsed.data : emptyHeard(partId)
+  const { value } = await readCached(
+    dirname(projectFile),
+    HEARD_DIR,
+    partId,
+    HeardSchema,
+    emptyHeard(partId),
+    (heard) => heard.part === partId,
+  )
+  return value
 }

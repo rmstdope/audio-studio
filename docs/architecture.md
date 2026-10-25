@@ -531,6 +531,8 @@ An audition is for a character, not for a part: the result applies to every part
   playing is marked and kept in view; a clip that fails is skipped.
 - A note on a line (built): a note to oneself under the line's text on the lines page ("too
   fast"), edited in place, with a **With a note** filter; kept in the tool cache, not committed.
+  A note on a line that left the dialog is kept but not shown. A notes file that cannot be read
+  is named as a problem and never written over: the notes are the user's own words.
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.

@@ -24,6 +24,8 @@ export function emptyNotes(part: string): Notes {
  * the same object, when nothing changes.
  */
 export function withNote(notes: Notes, key: string, note: string): Notes {
+  // Own keys only: a line keyed `__proto__` is written, but dropped when the file is read back
+  // (as a pronunciation so keyed is, see `core/resources.ts`); a key that odd is not expected.
   const text = note.trim()
   const current = Object.hasOwn(notes.lines, key) ? notes.lines[key] : undefined
   if (text === (current ?? '')) return notes
