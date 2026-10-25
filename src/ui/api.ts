@@ -24,7 +24,7 @@ import type { AcceptResult, MeasureResult, RecordResult } from '../services/narr
 import type { RuledOutResult } from '../services/ruledOut'
 import type { SoundAlikeChange } from '../services/soundAlike'
 import type { CastResult, SessionView } from '../services/sessions'
-import type { TakeResult } from '../services/takes'
+import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import { centsUp } from './format'
 import { isAbout, withAuditionTakes, withTake, withVoiceTake } from './takes'
@@ -638,6 +638,29 @@ export function useAllowVoices(characterId: string) {
     },
     onSuccess: (result) => {
       client.setQueryData(['ruled-out', characterId], result)
+    },
+  })
+}
+
+/**
+ * Hears a line with a cue before saving it: the server records the line as a take with the cue
+ * (empty: the character's style) and answers with the take to play, or why there is none.
+ */
+export function useTryCue(partId: string) {
+  return useMutation({
+    mutationFn: async ({ key, cue }: { key: string; cue: string }) => {
+      const response = await fetch(
+        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/try`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ cue }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`trying the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<TryResult>
     },
   })
 }

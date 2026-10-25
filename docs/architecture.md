@@ -493,6 +493,13 @@ An audition is for a character, not for a part: the result applies to every part
 
 - Edit a character's style cue or keywords, a line's cue, or the pronunciation table (built):
   saved at once, and affected lines show as stale.
+- Hear a cue before saving it (built: **Hear it** while editing a line's cue): the speaker's cast
+  voice says the line after the cue as typed (empty: the character's style), as the cast says it.
+  It is a take, not a clip: recorded with the audition model (free), the whole line in one
+  request (Fish splits long text itself), kept in `.audio-studio/takes/` under the take key, so
+  the same cue on the same line is recorded once; nothing of the game's is written. The clip
+  recorded afterwards uses the draft model, chunked and checked, so it can sound a little
+  different.
 - Edit the project's own words that sound the same (built: the Words that sound the same panel on
   the characters page, under Pronunciations): one group a row, words separated by commas, saved
   as a whole in the project file's `narration.quality.soundAlike`, refused if the file's groups
@@ -649,8 +656,9 @@ Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's stat
 `POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
 `GET /api/characters/:id/voice` (its cast voice as Fish knows it, its take and the audition
 phrase; one lookup, no search), `PATCH /api/characters/:id`
-(keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`
-`POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
+(keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`,
+`POST /api/parts/:part/lines/:key/try` (`{ cue }`: a take of the line said with that cue, nothing saved)
+and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
 `{ confirmedCost }` on a paid model, else 409 with the ceiling to confirm),
 `GET /api/parts/:part/plan?speaker=&weak=1` (what generating would do, weak lines included if
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
@@ -669,6 +677,7 @@ GET    /api/credit                               the Fish account's API credit (
 GET    /api/parts/:part                          the part, every line with its status and reason
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
+POST   /api/parts/:part/lines/:key/try           hear the line with a cue ({ cue }): a take, nothing saved
 POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
 POST   /api/parts/:part/refresh                  run refreshDialog

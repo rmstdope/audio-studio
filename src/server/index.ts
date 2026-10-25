@@ -21,7 +21,7 @@ import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import { setSoundAlike } from '../services/soundAlike'
-import { recordTake, takeFile } from '../services/takes'
+import { recordTake, takeFile, tryLine } from '../services/takes'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -592,6 +592,16 @@ export function startServer({
             return Response.json({ error: 'expected { groups, was }' }, { status: 400 })
           }
           const result = await setSoundAlike(projectFile, body.data.groups, body.data.was)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/lines/:key/try': {
+        POST: fromOwnPage(async (request) => {
+          const body = CueBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { cue }' }, { status: 400 })
+          const { part, key } = request.params
+          const result = await tryLine(projectFile, part, key, body.data.cue, fishFor, fishWork)
+          if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

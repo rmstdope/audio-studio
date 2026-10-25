@@ -4,10 +4,11 @@ import { resolveInRoot } from '../core/paths'
 import { phraseProblem, type Problem, type Project } from '../core/project'
 import type { Cast } from '../core/resources'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
+import { spokenText } from '../core/spoken'
 import type { FishFactory } from './auditions'
 import { writeAtomic } from './files'
 import type { Limiter } from './limit'
-import { loadWorkspace } from './workspace'
+import { loadWorkspace, readPart, type ProjectFailure } from './workspace'
 import { NO_KEY } from './fish'
 
 /** Where audition takes are kept, in the project's tool cache (gitignored by the consumer). */
@@ -19,6 +20,10 @@ export type TakeResult =
   | { ok: false; reason: 'no-key' | 'fish'; message: string }
   | { ok: false; problems: Problem[] }
   | null
+
+/** A line tried with a cue: a take of it, or why there is none. Null for an unknown part or line. */
+export type TryResult =
+  TakeResult | { ok: false; reason: 'uncast'; message: string } | ProjectFailure
 
 /**
  * Has `voiceId` say the character's audition phrase, in its style, with the audition model, and
@@ -47,9 +52,62 @@ export async function recordTake(
     const file = text.own ? project.narration.characters : basename(projectFile)
     return { ok: false, problems: [{ file, path: where, message: tooLong }] }
   }
-  const key = takeOf(project, voiceId, text)
+  return speak(root, project, voiceId, text.spoken, fishFor, limiter)
+}
+
+/**
+ * Hears a line with a cue before the cue is saved: the speaker's cast voice says the line, as
+ * the cast says it, after the cue (empty: the character's style, as a line without its own cue
+ * is said). A try is a take: recorded with the audition model (free), the whole line in one
+ * request (Fish splits long text itself), and kept in the tool cache, so the same cue on the same
+ * line is recorded once. Nothing of the game's is written.
+ */
+export async function tryLine(
+  projectFile: string,
+  partId: string,
+  key: string,
+  cue: string,
+  fishFor: FishFactory,
+  limiter: Limiter,
+): Promise<TryResult> {
+  const read = await readPart(projectFile, partId)
+  if (!read || !read.ok) return read
+  // Only the cast is needed besides the dialog (a line of a broken dialog is not found): a broken
+  // manifest or lock, which the lines page lists lines under, does not stop a try.
+  const problems = castProblems(read.project, read.problems)
+  if (problems.length) return { ok: false, problems }
+  const line = read.input.lines.find((l) => l.key === key)
+  if (!line) return null
+  const { cast } = read.input
+  const character = cast.speakers[line.speaker]
+  if (!character?.voice) {
+    return {
+      ok: false,
+      reason: 'uncast',
+      message: `${line.speaker} has no voice yet; cast one first.`,
+    }
+  }
+  const tried = cue.trim() || (character.style ?? '')
+  const spoken = spokenText(line.text, tried, cast.pronounce)
+  return speak(dirname(projectFile), read.project, character.voice, spoken, fishFor, limiter)
+}
+
+/**
+ * `voice` saying `spoken` with the audition model, kept in the tool cache under its take key; a
+ * take already there is not recorded again, and requests for the same take share one recording.
+ */
+async function speak(
+  root: string,
+  project: Project,
+  voice: string,
+  spoken: string,
+  fishFor: FishFactory,
+  limiter: Limiter,
+): Promise<TakeResult> {
+  const { tts, models, quality } = project.narration
+  const key = takeKey({ model: models.audition, voice, spoken, tts })
   const file = resolveInRoot(root, takePath(key))
-  const recorded = { ok: true as const, key, spoken: text.spoken }
+  const recorded = { ok: true as const, key, spoken }
   if (existsSync(file)) return { ...recorded, cached: true }
 
   const fish = await fishFor(root, project)
@@ -60,14 +118,13 @@ export async function recordTake(
       message: NO_KEY,
     }
   }
-  const { tts, models, quality } = project.narration
   try {
     const cached = await limiter.run(key, quality.parallel, async () => {
       // Another request may have recorded it while this one waited: never pay for it twice.
       if (existsSync(file)) return true
       const audio = await fish.tts({
-        text: text.spoken,
-        voice: voiceId,
+        text: spoken,
+        voice,
         model: models.audition,
         temperature: tts.temperature,
         topP: tts.topP,

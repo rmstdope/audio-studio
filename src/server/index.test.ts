@@ -272,6 +272,33 @@ describe('server', () => {
     expect(after.part.lines.find((l: { key: string }) => l.key === 'a').ownCue).toBe(false)
   })
 
+  it('tries a cue on a line, from the studio’s own page only, and serves the take', async () => {
+    const tryCue = (key: string, body: unknown, origin = server.url.origin) =>
+      fetch(url(`/api/parts/act1/lines/${key}/try`), {
+        method: 'POST',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    expect((await tryCue('a', { cue: '[hushed]' }, 'https://evil.example')).status).toBe(403)
+    expect((await tryCue('a', { cue: 3 })).status).toBe(400)
+    expect((await tryCue('nope', { cue: '[hushed]' })).status).toBe(404)
+    expect(
+      (
+        await fetch(url('/api/parts/act9/lines/a/try'), {
+          method: 'POST',
+          headers: { origin: server.url.origin, 'content-type': 'application/json' },
+          body: '{"cue":""}',
+        })
+      ).status,
+    ).toBe(404)
+    const response = await tryCue('a', { cue: '[hushed]' })
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body).toMatchObject({ ok: true, spoken: '[hushed] Once.', cached: false })
+    const take = await fetch(url(`/api/takes/${body.key}.mp3`))
+    expect([...new Uint8Array(await take.arrayBuffer())]).toEqual([0x49, 0x44, 0x33])
+  })
+
   it('records a take, from the studio’s own page only, and serves it', async () => {
     const record = (origin: string) =>
       fetch(url('/api/characters/narrator/takes'), {

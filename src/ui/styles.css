@@ -1596,7 +1596,11 @@ a.btn {
 }
 .cue-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+}
+.cue-tried {
+  font-size: 11px;
 }
 
 .pronounce {

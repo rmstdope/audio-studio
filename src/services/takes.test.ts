@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
-import { auditionTakes, recordTake, takeFile } from './takes'
+import { auditionTakes, recordTake, takeFile, tryLine } from './takes'
 
 const files = {
   'audio-studio.json': projectJson(),
@@ -241,5 +241,123 @@ describe('recordedTakes', () => {
     )
     const result = await auditionTakes(projectFile, 'grandmother', ['cur', 'other'])
     expect(take?.ok && result?.ok && result.takes).toEqual({ cur: take?.ok ? take.key : '' })
+  })
+})
+
+describe('tryLine', () => {
+  const projectFileOf = (root: string) => join(root, 'audio-studio.json')
+
+  it('has the cast voice say the line with the cue tried, as the cast says it, and keeps it', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const result = await tryLine(
+      projectFileOf(root),
+      'act1',
+      'a',
+      '[hushed]',
+      async () => fish,
+      createLimiter(),
+    )
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result).toMatchObject({ spoken: '[hushed] Hello.', cached: false })
+    expect(requests).toEqual([
+      {
+        text: '[hushed] Hello.',
+        voice: 'cur',
+        model: 's2.1-pro-free',
+        temperature: 0.7,
+        topP: 0.7,
+        speed: 1,
+      },
+    ])
+    expect(await takeFile(projectFileOf(root), result.key)).toBe(
+      join(root, '.audio-studio/takes', `${result.key}.mp3`),
+    )
+    // Nothing of the game's: no cue saved, no manifest or lock made.
+    for (const file of [
+      'tts/act1/cues.json',
+      'audio/act1/manifest.json',
+      'tts/act1/narration.lock.json',
+    ]) {
+      expect(existsSync(join(root, file))).toBe(false)
+    }
+  })
+
+  it('needs only the dialog and the cast: a broken manifest or lock does not stop it', async () => {
+    const root = tempRepo({
+      ...files,
+      'audio/act1/manifest.json': { a: { file: 3 } },
+      'tts/act1/narration.lock.json': 'not json',
+    })
+    const { fish } = fakeFish()
+    const result = await tryLine(
+      projectFileOf(root),
+      'act1',
+      'a',
+      '',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(result).toMatchObject({ ok: true })
+    const broken = tempRepo({ ...files, 'tts/cast.json': { speakers: 'no' } })
+    const refused = await tryLine(
+      projectFileOf(broken),
+      'act1',
+      'a',
+      '',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(refused).toMatchObject({ ok: false, problems: [{ file: 'tts/cast.json' }] })
+  })
+
+  it('tries the character’s style for an empty cue, and records a cue once', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const limiter = createLimiter()
+    const first = await tryLine(projectFileOf(root), 'act1', 'a', '  ', async () => fish, limiter)
+    const again = await tryLine(projectFileOf(root), 'act1', 'a', '', async () => fish, limiter)
+    expect(first).toMatchObject({ ok: true, spoken: '[warm] Hello.', cached: false })
+    expect(again).toMatchObject({ ok: true, spoken: '[warm] Hello.', cached: true })
+    expect(requests).toHaveLength(1)
+  })
+
+  it('is null for an unknown part or line, and refuses a line whose speaker has no voice', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': [
+        { key: 'a', speaker: 'grandmother', text: 'Hello.' },
+        { key: 'b', speaker: 'stranger', text: 'Who?' },
+      ],
+    })
+    const { fish, requests } = fakeFish()
+    const limiter = createLimiter()
+    expect(
+      await tryLine(projectFileOf(root), 'act9', 'a', '', async () => fish, limiter),
+    ).toBeNull()
+    expect(
+      await tryLine(projectFileOf(root), 'act1', 'zz', '', async () => fish, limiter),
+    ).toBeNull()
+    expect(await tryLine(projectFileOf(root), 'act1', 'b', '', async () => fish, limiter)).toEqual({
+      ok: false,
+      reason: 'uncast',
+      message: 'stranger has no voice yet; cast one first.',
+    })
+    expect(requests).toHaveLength(0)
+  })
+
+  it('says there is no key, and what Fish answered', async () => {
+    const root = tempRepo(files)
+    const limiter = createLimiter()
+    expect(
+      await tryLine(projectFileOf(root), 'act1', 'a', '', async () => null, limiter),
+    ).toMatchObject({
+      ok: false,
+      reason: 'no-key',
+    })
+    const failing: FishClient = { ...fakeFish().fish, tts: () => Promise.reject(new Error('boom')) }
+    expect(
+      await tryLine(projectFileOf(root), 'act1', 'a', '', async () => failing, limiter),
+    ).toEqual({ ok: false, reason: 'fish', message: 'boom' })
   })
 })

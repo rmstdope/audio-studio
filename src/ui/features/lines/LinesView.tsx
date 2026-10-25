@@ -1,7 +1,16 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
-import { clipUrl, useAccept, useCheckAgain, usePart, useRecordLines, useSetCue } from '../../api'
+import {
+  clipUrl,
+  takeUrl,
+  useAccept,
+  useCheckAgain,
+  usePart,
+  useRecordLines,
+  useSetCue,
+  useTryCue,
+} from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
@@ -224,7 +233,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                       </div>
                     </td>
                     <td>
-                      <CueCell partId={loaded.id} line={line} />
+                      <CueCell partId={loaded.id} line={line} playing={playing} toggle={toggle} />
                     </td>
                     <td className="mono num">{seconds(line.duration)}</td>
                     <td className="mono num">
@@ -411,11 +420,34 @@ function OrphanTable({
 
 /**
  * A line's cue: its own, or its character's style (dimmed). Clicking it edits the line's own cue;
- * saving an empty one goes back to the style.
+ * saving an empty one goes back to the style. While editing, Hear it plays the line said with the
+ * cue as typed (a take, nothing saved), so a cue is heard before it is kept.
  */
-function CueCell({ partId, line }: { partId: string; line: LineState }) {
+function CueCell({
+  partId,
+  line,
+  playing,
+  toggle,
+}: {
+  partId: string
+  line: LineState
+  playing: string | null
+  toggle: (id: string, url: string) => void
+}) {
   const save = useSetCue(partId)
+  const hear = useTryCue(partId)
   const [draft, setDraft] = useState<string | null>(null)
+  // The take playing from this cell, so Hear it reads Stop while it plays.
+  const tryId = `try/${line.key}`
+  const heard = hear.data?.ok ? hear.data : null
+  const refused = hear.data && !hear.data.ok ? hear.data : null
+  const tryIt = () => {
+    if (playing === tryId) return toggle(tryId, '')
+    hear.mutate(
+      { key: line.key, cue: draft ?? '' },
+      { onSuccess: (result) => result.ok && toggle(tryId, takeUrl(result.key)) },
+    )
+  }
   const cell = useRef<HTMLButtonElement>(null)
   const refocus = useRef(false)
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
@@ -429,8 +461,20 @@ function CueCell({ partId, line }: { partId: string; line: LineState }) {
     }
   }, [draft])
 
+  // A try still playing stops when the row leaves the table (a filter or search changed).
+  const playingNow = useRef(playing)
+  playingNow.current = playing
+  useEffect(
+    () => () => {
+      if (playingNow.current === tryId) toggle(tryId, '')
+    },
+    [tryId, toggle],
+  )
+
   const close = () => {
     refocus.current = true
+    if (playing === tryId) toggle(tryId, '')
+    hear.reset()
     setDraft(null)
   }
   const done = (result: { ok: boolean }) => result.ok && close()
@@ -489,9 +533,24 @@ function CueCell({ partId, line }: { partId: string; line: LineState }) {
         <button className="btn" type="button" onClick={close}>
           Cancel
         </button>
+        <button
+          className="btn"
+          type="button"
+          title="Hear the line said with this cue, without saving anything (a free take)"
+          disabled={hear.isPending}
+          onClick={tryIt}
+        >
+          {hear.isPending ? 'Recording…' : playing === tryId ? 'Stop' : 'Hear it'}
+        </button>
       </div>
+      {heard && playing === tryId && <span className="muted cue-tried mono">{heard.spoken}</span>}
       {problems.length > 0 && <Problems title="The cue could not be saved" problems={problems} />}
       {save.isError && <span className="adopt-error">{save.error.message}</span>}
+      {refused && 'problems' in refused && (
+        <Problems title="The cue could not be tried" problems={refused.problems} />
+      )}
+      {refused && 'message' in refused && <span className="adopt-error">{refused.message}</span>}
+      {hear.isError && <span className="adopt-error">{hear.error.message}</span>}
     </form>
   )
 }
