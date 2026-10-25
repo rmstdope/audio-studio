@@ -28,6 +28,11 @@ describe('a character’s language in the address', () => {
 })
 
 describe('parseRoute', () => {
+  it('reads the spending page', () => {
+    expect(parseRoute('#/spending')).toEqual({ view: 'spending' })
+    expect(routeHref({ view: 'spending' })).toBe('#/spending')
+  })
+
   it('reads a part', () => {
     expect(parseRoute('#/parts/act2')).toEqual({ view: 'part', part: 'act2' })
   })

@@ -79,6 +79,16 @@ export function ChangesIcon() {
   )
 }
 
+/** Spending: a coin with a dollar sign. */
+export function SpendingIcon() {
+  return (
+    <Stroke>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M14.8 9.2c-.4-.9-1.4-1.4-2.8-1.4-1.6 0-2.7.8-2.7 2 0 3 5.6 1.5 5.6 4.3 0 1.2-1.1 2-2.9 2-1.5 0-2.6-.6-3-1.6M12 6.3v1.5M12 16.2v1.5" />
+    </Stroke>
+  )
+}
+
 /** Play a clip. */
 export function PlayIcon({ size = 14 }: { size?: number }) {
   return (

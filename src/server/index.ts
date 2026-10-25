@@ -20,6 +20,8 @@ import { planPart } from '../core/planner'
 import { SPEED } from '../core/resources'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
+import { createSpendLog, readSpending } from '../services/spending'
+import { outcomeOf, summariseSpending } from '../core/spending'
 import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
@@ -416,7 +418,7 @@ export function startServer({
     if (read.problems.length) return { ok: false as const, problems: read.problems }
     const { narration } = read.project
     // With one model for both, there is no final step: the final plan is the draft one.
-    const stage =
+    const stage: 'draft' | 'final' =
       asked === 'final' && narration.models.final !== narration.models.draft ? 'final' : 'draft'
     const { pronounce } = read.input.cast
     const state = planPart(read.input)
@@ -444,6 +446,39 @@ export function startServer({
       model: pricing.model,
       ceilingOf,
       parallel: narration.quality.parallel,
+      stage,
+      // Recording is in the source language.
+      language: narration.languages[0] ?? 'en',
+    }
+  }
+
+  /** The paid recordings of this studio: running ones live, finished ones saved. */
+  const spendLog = createSpendLog(projectFile)
+
+  /**
+   * Runs one request's recording of a single line, following it in the spend log: it counts as one
+   * line recorded when the result is a recording, and is saved if it spent anything.
+   */
+  async function loggedOne<T extends { ok: boolean } | null>(
+    planned: { model: string; stage: 'draft' | 'final'; language: string },
+    part: string,
+    budget: Budget,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const followed = spendLog.follow({
+      part,
+      ...planned,
+      planned: 1,
+      budget,
+      progress: () => ({ lines: 0 }),
+    })
+    let result: T | undefined
+    try {
+      result = await run()
+      return result
+    } finally {
+      const recorded = result?.ok === true && !(result && 'skipped' in result)
+      await followed.end({ lines: recorded ? 1 : 0, outcome: recorded ? 'done' : 'error' })
     }
   }
 
@@ -545,13 +580,15 @@ export function startServer({
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
           try {
-            const result = await recordLine(projectFile, part, key, fishFor, {
-              encode,
-              limiter: fishWork,
-              transcriber: await transcriberFor(),
-              stage: body.data.stage,
-              budget: admitted.budget,
-            })
+            const result = await loggedOne(planned, part, admitted.budget, async () =>
+              recordLine(projectFile, part, key, fishFor, {
+                encode,
+                limiter: fishWork,
+                transcriber: await transcriberFor(),
+                stage: body.data.stage,
+                budget: admitted.budget,
+              }),
+            )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
           } finally {
@@ -614,6 +651,21 @@ export function startServer({
               { status: 409 },
             )
           }
+          // Set once the job has started; `onEnd` only runs after the job's first await, so it is set.
+          let jobId = ''
+          const progress = () => {
+            const state = jobs.get(jobId)
+            return { lines: state ? state.done - state.skipped - state.failed.length : 0 }
+          }
+          const followed = measuring
+            ? null
+            : spendLog.follow({
+                part,
+                ...planned,
+                planned: keys.length,
+                budget,
+                progress,
+              })
           const job = jobs.start({
             kind: body.data.kind,
             part,
@@ -638,10 +690,24 @@ export function startServer({
                     transcriber: await transcriberFor(),
                   }),
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys),
-            onEnd: () => budgets.delete(budget),
+            onEnd: () => {
+              budgets.delete(budget)
+              const state = jobs.get(jobId)
+              if (!followed || !state || state.status === 'running') return
+              void followed.end({
+                lines: progress().lines,
+                outcome: outcomeOf({
+                  status: state.status === 'done' ? 'done' : 'cancelled',
+                  failed: state.failed.length,
+                }),
+              })
+            },
           })
           // Not started (another job runs for the part): nothing is held back for it.
-          if ('error' in job) budgets.delete(budget)
+          if ('error' in job) {
+            budgets.delete(budget)
+            void followed?.end({ lines: 0, outcome: 'error' })
+          } else jobId = job.id
           return Response.json(job, { status: 'error' in job ? 409 : 200 })
         }),
       },
@@ -708,6 +774,23 @@ export function startServer({
           const result = await moveCue(projectFile, part, key, body.data.to)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/spending': {
+        GET: guard(async () => {
+          const [project, saved] = await Promise.all([
+            loadProject(projectFile),
+            readSpending(projectFile),
+          ])
+          if (!saved.ok) return Response.json({ ok: false, problems: saved.problems })
+          const parts = project.ok
+            ? project.summary.parts.map((p) => ({ id: p.id, title: p.title }))
+            : []
+          return Response.json({
+            ok: true,
+            ...summariseSpending(saved.recordings, spendLog.running(), parts),
+            languages: project.ok ? project.summary.languages.length : 1,
+          })
         }),
       },
       '/api/credit': {
@@ -787,11 +870,13 @@ export function startServer({
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
           try {
-            const result = await takeLine(projectFile, part, key, fishFor, {
-              limiter: fishWork,
-              transcriber: await transcriberFor(),
-              budget: admitted.budget,
-            })
+            const result = await loggedOne(planned, part, admitted.budget, async () =>
+              takeLine(projectFile, part, key, fishFor, {
+                limiter: fishWork,
+                transcriber: await transcriberFor(),
+                budget: admitted.budget,
+              }),
+            )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
           } finally {

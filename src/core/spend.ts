@@ -63,6 +63,8 @@ export interface Budget {
   readonly dollars: number
   /** Dollars left to spend. */
   readonly left: number
+  /** Dollars charged so far, less refunds: what was given less what is left. */
+  readonly spent: number
   /**
    * Takes `bytes` of text on `model` at `at` out of the budget: null if it fits, else why not (and
    * nothing is taken).
@@ -85,6 +87,10 @@ export function createBudget({ model, dollars }: { model: string; dollars: numbe
     },
     get left() {
       return left
+    },
+    get spent() {
+      // Rounded to a billionth of a dollar: a spend and its refund leave float dust, not money.
+      return Math.max(0, Math.round((given - left) * 1e9) / 1e9)
     },
     spend(asked, bytes, at) {
       if (asked !== model) {

@@ -113,6 +113,7 @@ audio-studio/
 │   │   ├── soundAlikeEdit.ts    the project's sound-alike groups as edited (rows, problems)
 │   │   ├── prices.ts            Fish's prices per model, promotions with their end
 │   │   ├── spend.ts             whether a paid recording may start (confirmed, covered)
+│   │   ├── spending.ts          paid recordings as saved, and the page's totals and rows
 │   │   ├── changes.ts           git status output parsed and grouped by part
 │   │   ├── dialogDiff.ts        what a refreshed dialog added, removed and changed
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
@@ -136,6 +137,7 @@ audio-studio/
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
+│   │   ├── spending.ts          the record of paid recordings (.audio-studio/spending.json) and the running ones
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
 │   │   ├── models.ts            s1 → s2.1-pro in the project file's draft and final models
 │   │   ├── projectFile.ts       reading the project file for a change, and writing it back as it was laid out
@@ -627,6 +629,16 @@ An audition is for a character, not for a part: the result applies to every part
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
+- **Spending** page (built): what paid recordings cost, project-wide and read only. Every
+  recording made with a paid model (a whole part's, draft or final, or one line's record or extra
+  take) is added to `.audio-studio/spending.json` when it ends: when it started, part, language
+  (the source language, as recording is), model, lines recorded out of lines planned, how it ended
+  (done, stopped, or a failed line), and the dollars charged to its budget (`Budget.spent`: the
+  studio's own price estimate as each line was sent, not Fish's bill). A recording that cost
+  nothing is not saved, nor is a free model's. A recording running now is not in the file: the page
+  reads it live from the job and its budget, shows it at the top and counts it in the totals. A
+  studio killed mid-recording loses that recording's entry. A damaged file is reported with its
+  file and path and never written over. The sidebar entry shows the total.
 
 ### 8.4 Model stages and final generation
 
@@ -808,6 +820,7 @@ PATCH  /api/characters/:id                       style, speed, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
 PATCH  /api/sound-alike                          the project's sound-alike groups ({ groups, was })
 PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
+GET    /api/spending                             paid recordings: totals per part, running ones live, or the record's problems
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
 GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
 DELETE /api/characters/:id/ruled-out             forget them all
@@ -977,8 +990,8 @@ Small, independently useful increments:
       models differ; final clips marked in the line table and left alone by draft plans.
 
    What a paid account could still have (paid auditions, the `s1` retirement, your own voices,
-   voice design, a spend log; cloning is built, as-5gk.5, and so is the rate tier on Setup,
-   as-5gk.7) is in `docs/paid-account.md`, not planned yet.
+   voice design; cloning is built, as-5gk.5, the rate tier on Setup, as-5gk.7, and the spend log,
+   as-5gk.8) is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in

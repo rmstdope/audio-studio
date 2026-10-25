@@ -18,6 +18,7 @@ import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
 import type { Problem } from '../core/project'
+import type { SpendingAnswer } from '../core/spending'
 import type { JobState } from '../services/jobs'
 import type { HeardResult } from '../services/heard'
 import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
@@ -74,6 +75,21 @@ export function useChanges() {
     queryKey: ['changes'],
     queryFn: () => getJson<ChangesResult>('/api/changes'),
     refetchInterval: 5000,
+  })
+}
+
+/**
+ * What paid recordings cost: read again every couple of seconds while one runs (its cost and
+ * lines are live), else every so often, since recordings end from other pages.
+ */
+export function useSpending() {
+  return useQuery({
+    queryKey: ['spending'],
+    queryFn: () => getJson<SpendingAnswer>('/api/spending'),
+    refetchInterval: (query) =>
+      query.state.data?.ok && query.state.data.rows.some((r) => r.state === 'running')
+        ? 2000
+        : 15_000,
   })
 }
 
@@ -1052,6 +1068,7 @@ export function useLineTakeActions(partId: string, key: string) {
         setRefused({ what: 'The take could not be made', answer: result })
       }
       void client.invalidateQueries({ queryKey: ['credit'] })
+      void client.invalidateQueries({ queryKey: ['spending'] })
       return reloadTakes()
     },
   })
@@ -1191,6 +1208,8 @@ export function useRecordLines(partId: string) {
         // The line stays "recording" until its new status is shown, so it is never offered twice.
         void client.invalidateQueries({ queryKey: ['plan', partId] })
         void client.invalidateQueries({ queryKey: ['credit'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
         void client.invalidateQueries({ queryKey: ['heard', partId] })
         await client.invalidateQueries({ queryKey: ['part', partId] })
         setRecording((now) => {
@@ -1269,6 +1288,8 @@ export function useJob(partId: string) {
       // A finished job may have spent credit.
       if (job && !running && before?.status !== job.status) {
         void client.invalidateQueries({ queryKey: ['credit'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
       }
       return job
     },
@@ -1303,7 +1324,11 @@ export function useJobActions(partId: string) {
       if (!response.ok) throw new Error(`generating answered ${response.status}`)
       return body
     },
-    onSuccess: (job) => client.setQueryData(['job', partId], job),
+    onSuccess: (job) => {
+      client.setQueryData(['job', partId], job)
+      // A paid job is on the Spending page from its first moment.
+      void client.invalidateQueries({ queryKey: ['spending'] })
+    },
     // Refused (the cost changed, a promotion ended): the plan shows what to confirm now.
     onError: () => client.invalidateQueries({ queryKey: ['plan', partId] }),
   })
