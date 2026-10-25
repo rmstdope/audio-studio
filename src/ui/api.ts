@@ -23,8 +23,10 @@ import type { HeardResult } from '../services/heard'
 import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { Take } from '../core/retirement'
+import type { FishTier } from '../core/setup'
 import type { ModelsChange } from '../services/models'
 import type { SoundAlikeChange } from '../services/soundAlike'
+import type { FishTierChange } from '../services/fishTier'
 import type { SetupResult } from '../services/setup'
 import type { NoteChange } from '../services/notes'
 import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../services/lineTakes'
@@ -963,6 +965,32 @@ export function useSetup(fresh = false) {
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     refetchOnMount: fresh ? 'always' : true,
+  })
+}
+
+/** Saves what the user has paid Fish in total (or clears it), then checks the setup again. */
+export function useSetFishTier() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'fish-tier' },
+    mutationFn: async (tier: FishTier | null) => {
+      const response = await fetch('/api/fish-tier', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the tier answered ${response.status}`)
+      }
+      const change = (await response.json()) as FishTierChange
+      if (!change.ok) throw new Error('the tier was not saved')
+    },
+    // Saved or not, the row checks again, so it shows what the file holds.
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['setup'] }),
+        client.invalidateQueries({ queryKey: ['project'] }),
+      ]),
   })
 }
 

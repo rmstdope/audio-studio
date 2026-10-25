@@ -20,6 +20,7 @@ describe('checkSetup', () => {
       whisper: 'ok',
       key: 'ok',
       fish: 'ok',
+      requests: 'ok',
       refresh: 'off',
     })
   })
@@ -43,6 +44,7 @@ describe('checkSetup', () => {
       whisper: 'problem',
       key: 'problem',
       fish: 'off',
+      requests: 'off',
       refresh: 'off',
     })
     expect(asked).toBe(0)
@@ -69,5 +71,29 @@ describe('checkSetup', () => {
     const root = tempRepo({ 'audio-studio.json': { name: 3 } })
     const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {})
     expect(result.ok).toBe(false)
+  })
+})
+
+describe('checkSetup, requests at once', () => {
+  it('reads parallel and the tier from the project file', async () => {
+    const quality = (q: Record<string, unknown>) =>
+      projectJson({ narration: { ...(projectJson().narration as object), quality: q } })
+    const states = async (project: Record<string, unknown>) => {
+      const root = tempRepo({ 'audio-studio.json': project, '.env': 'FISH_AUDIO_API_KEY=k\n' })
+      const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {})
+      if (!result.ok) throw new Error('expected checks')
+      return result.checks.find((c) => c.id === 'requests')!
+    }
+    expect(await states(quality({ parallel: 8 }))).toMatchObject({
+      state: 'problem',
+      tier: { chosen: null },
+    })
+    expect(await states(quality({ parallel: 8, fishTier: '100' }))).toMatchObject({
+      state: 'ok',
+      tier: { chosen: '100' },
+    })
+    expect(await states(quality({ parallel: 8, fishTier: 'under-100' })).then((c) => c.fix)).toBe(
+      'Set quality.parallel to 5 or less in the project file.',
+    )
   })
 })

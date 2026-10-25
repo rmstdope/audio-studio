@@ -11,6 +11,8 @@ const ready: SetupFacts = {
   key: true,
   fish: { ok: true, credit: 12.5 },
   refreshDialog: true,
+  parallel: 4,
+  fishTier: null,
 }
 
 const byId = (facts: SetupFacts) => Object.fromEntries(setupChecks(facts).map((c) => [c.id, c]))
@@ -18,7 +20,14 @@ const byId = (facts: SetupFacts) => Object.fromEntries(setupChecks(facts).map((c
 describe('setupChecks', () => {
   it('finds everything in place on a ready machine', () => {
     const checks = setupChecks(ready)
-    expect(checks.map((c) => c.id)).toEqual(['ffmpeg', 'whisper', 'key', 'fish', 'refresh'])
+    expect(checks.map((c) => c.id)).toEqual([
+      'ffmpeg',
+      'whisper',
+      'key',
+      'fish',
+      'requests',
+      'refresh',
+    ])
     expect(checks.every((c) => c.state === 'ok')).toBe(true)
     expect(byId(ready).fish!.credit).toBe(12.5)
   })
@@ -65,5 +74,58 @@ describe('setupChecks', () => {
 
   it('treats refreshDialog as optional', () => {
     expect(byId({ ...ready, refreshDialog: false }).refresh!.state).toBe('off')
+  })
+})
+
+describe('the requests-at-once check', () => {
+  const requests = (facts: Partial<SetupFacts>) => byId({ ...ready, ...facts }).requests!
+
+  it('is ready with no tier when parallel is within what every account allows', () => {
+    expect(requests({ parallel: 4 })).toMatchObject({
+      title: 'Requests at once',
+      state: 'ok',
+      detail: 'Recording sends 4 at a time, which every Fish account allows.',
+      tier: { chosen: null },
+    })
+    expect(requests({ parallel: 5 }).state).toBe('ok')
+  })
+
+  it('asks for the tier when parallel is above 5 and none is chosen', () => {
+    expect(requests({ parallel: 8 })).toMatchObject({
+      state: 'problem',
+      detail:
+        'Recording sends 8 at a time. Fish allows 5 at once unless you have paid it $100 or more in total; say which to check it.',
+      tier: { chosen: null },
+    })
+    expect(requests({ parallel: 8 }).fix).toBeUndefined()
+  })
+
+  it('is ready when a chosen tier allows parallel', () => {
+    expect(requests({ parallel: 8, fishTier: '100' })).toMatchObject({
+      state: 'ok',
+      detail: 'Recording sends 8 at a time; your account allows 15.',
+      tier: { chosen: '100' },
+    })
+    expect(requests({ parallel: 15, fishTier: '100' }).state).toBe('ok')
+  })
+
+  it('warns, with the fix as text, when parallel is above the chosen tier', () => {
+    expect(requests({ parallel: 8, fishTier: 'under-100' })).toMatchObject({
+      state: 'problem',
+      detail:
+        'Recording sends 8 at a time, but your account allows 5. Fish will turn the extra requests away and recording will slow down while the studio waits and retries.',
+      fix: 'Set quality.parallel to 5 or less in the project file.',
+      tier: { chosen: 'under-100' },
+    })
+    expect(requests({ parallel: 60, fishTier: '1000' })).toMatchObject({
+      state: 'problem',
+      fix: 'Set quality.parallel to 50 or less in the project file.',
+    })
+  })
+
+  it('is not used without a key, and shows no menu', () => {
+    const check = requests({ key: false, parallel: 8, fishTier: '100' })
+    expect(check).toMatchObject({ state: 'off', detail: 'Not checked: there is no key.' })
+    expect(check.tier).toBeUndefined()
   })
 })

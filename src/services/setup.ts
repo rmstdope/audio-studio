@@ -48,6 +48,8 @@ export async function checkSetup(
     key,
     fish: key ? await credit() : { ok: false, reason: 'no-key', message: 'no key' },
     refreshDialog: Boolean(narration.refreshDialog),
+    parallel: narration.quality.parallel,
+    fishTier: narration.quality.fishTier ?? null,
   }
   return { ok: true, checks: setupChecks(facts) }
 }

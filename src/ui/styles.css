@@ -1986,6 +1986,25 @@ a.btn {
   border: 1px solid var(--line);
   width: fit-content;
 }
+.setup-tier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.setup-tier select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+.setup-hint {
+  font-size: 12px;
+}
 .setup-problems {
   color: var(--warn);
 }

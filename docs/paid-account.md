@@ -50,12 +50,13 @@ Making a voice from a text description (`voice-design-1`, `POST /v1/voice-design
 successful request, so it needs credit. Like a paid audition, it must ask to confirm and be charged
 to a budget before it spends.
 
-## Rate tier in the UI
+## Rate tier in the UI (built)
 
-The 429 backoff is built (§10). What is missing is showing the account's concurrency limit next to
-`quality.parallel`, so a 429 is explained before it happens. Fish sets the limit by total prepaid
-spend: 5 requests at a time under $100, 15 from $100, 50 from $1,000. Fish's docs name no way to
-ask for the tier, so it may have to be inferred, or entered by the user.
+The 429 backoff is built (§10), and so is showing the account's concurrency limit next to
+`quality.parallel`, so a 429 is explained before it happens (as-5gk.7). Fish sets the limit by total
+prepaid spend: 5 requests at a time under $100, 15 from $100, 50 from $1,000. Fish's docs name no
+way to ask for the tier, so the user enters it once in a menu on Setup's Requests at once row,
+saved in the project file as `quality.fishTier`.
 
 ## Spend log
 
