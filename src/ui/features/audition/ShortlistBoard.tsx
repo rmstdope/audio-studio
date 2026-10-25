@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AuditionSession } from '../../../core/audition'
+import type { CharacterSummary } from '../../../core/summary'
 import type { SessionView } from '../../../services/sessions'
+import { castInLanguage, shortlistNote, type Language } from '../../castLanguages'
 import {
   useCast,
   useOwnVoices,
@@ -40,6 +42,9 @@ type Asking = { kind: 'cast'; voice: string } | { kind: 'stop' } | null
  */
 export function ShortlistBoard({
   characterId,
+  character,
+  languages,
+  language,
   name,
   lines,
   view,
@@ -50,9 +55,14 @@ export function ShortlistBoard({
   titles,
 }: {
   characterId: string
+  character: CharacterSummary
+  /** Every declared language. */
+  languages: Language[]
+  /** The language of the audition, in a project with several; null in a project with one. */
+  language: Language | null
   /** The character's name. */
   name: string
-  /** The character's lines in every part. */
+  /** The character's lines in every part (in the language). */
   lines: number
   view: Extract<SessionView, { ok: true }> & { session: AuditionSession }
   playing: string | null
@@ -65,12 +75,17 @@ export function ShortlistBoard({
   titles: Map<string, string>
 }) {
   const { session, takes, audition } = view
-  const act = useSessionAction(characterId)
-  const sittingQuery = useSitting(characterId)
-  const recorder = useTakes(characterId, true)
-  const sittingActions = useSittingActions(characterId)
-  const ruledOut = useRuledOut(characterId)
-  const own = useOwnVoices(characterId)
+  const act = useSessionAction(characterId, language?.id)
+  const sittingQuery = useSitting(characterId, true, language?.id)
+  const recorder = useTakes(characterId, true, language?.id)
+  const sittingActions = useSittingActions(characterId, language?.id)
+  const ruledOut = useRuledOut(characterId, language?.id)
+  const own = useOwnVoices(characterId, language?.id)
+  const page = routeHref({
+    view: 'character',
+    character: characterId,
+    ...(language ? { language: language.id } : {}),
+  })
   const [asking, setAsking] = useState<Asking>(null)
   // The voice this page dropped last; its drop can be undone while it is the last one.
   const [droppedHere, setDroppedHere] = useState<string | null>(null)
@@ -87,7 +102,7 @@ export function ShortlistBoard({
   // Unknown money counts as free: the server refuses a paid take that has no sitting anyway.
   const ready = !sittingQuery.isPending && (!paid || sitting !== null)
   const missing =
-    audition && ready
+    audition?.phrase != null && ready
       ? takesToRecord(onBoard, takes, recorder.recording, recorder.errors).filter(
           (v) => !asked.current.has(`${audition.spoken}\n${v}`),
         )
@@ -150,7 +165,13 @@ export function ShortlistBoard({
         voice={voice}
         candidate={session.matched[id] ? { voice, matched: session.matched[id] } : undefined}
         keywordCount={session.keywords.length}
-        note={isCurrent ? 'Cast now' : undefined}
+        note={
+          language
+            ? shortlistNote(character, languages, language.id, id)
+            : isCurrent
+              ? 'Cast now'
+              : undefined
+        }
         playing={playing}
         toggle={toggle}
         take={takes[id] ?? null}
@@ -207,6 +228,19 @@ export function ShortlistBoard({
   const ownState = ownSectionState(session, own)
   const casting = asking?.kind === 'cast' ? asking.voice : null
   const keeping = casting !== null && casting === session.current
+  const inLanguage =
+    language && casting !== null
+      ? castInLanguage(
+          title(casting),
+          name,
+          languages,
+          language.id,
+          (view.recorded ?? []).map((a) => ({
+            title: titles.get(a.part) ?? a.part,
+            lines: a.lines,
+          })),
+        )
+      : null
 
   return (
     <div className="board">
@@ -224,7 +258,7 @@ export function ShortlistBoard({
         <span className="spacer" />
         <a
           className="btn btn-ghost"
-          href={routeHref({ view: 'character', character: characterId })}
+          href={page}
           // A paused audition keeps no money: Resume asks again.
           onClick={() => sitting && sittingActions.end.mutate()}
         >
@@ -255,7 +289,7 @@ export function ShortlistBoard({
           failure={sittingFailure(sittingActions.resume.data)}
           onPay={(amount) => sittingActions.resume.mutate(amount)}
           onCancel={() => {
-            window.location.hash = routeHref({ view: 'character', character: characterId })
+            window.location.hash = page
           }}
         />
       )}
@@ -265,9 +299,13 @@ export function ShortlistBoard({
         <Confirm
           key={casting}
           title={
-            keeping
-              ? `Keep ${title(casting)} as ${name}’s voice?`
-              : `Cast ${title(casting)} as ${name}?`
+            language
+              ? keeping
+                ? `Keep ${title(casting)} as ${name}’s ${language.name} voice?`
+                : inLanguage!.title
+              : keeping
+                ? `Keep ${title(casting)} as ${name}’s voice?`
+                : `Cast ${title(casting)} as ${name}?`
           }
           effects={castEffects({
             name,
@@ -277,7 +315,9 @@ export function ShortlistBoard({
             titles,
             dropped,
             unheard: session.toHear.length + session.queue.length,
+            ...(language ? { language: language.name, stale: inLanguage?.stale } : {}),
           })}
+          {...(language ? { back: 'Cancel' } : {})}
           onBack={() => setAsking(null)}
         >
           <button
@@ -297,7 +337,7 @@ export function ShortlistBoard({
           onBack={() => setAsking(null)}
           note="To come back to it later instead, pause: the audition stays as it is."
         >
-          <a className="btn" href={routeHref({ view: 'character', character: characterId })}>
+          <a className="btn" href={page}>
             Pause instead
           </a>
           <button

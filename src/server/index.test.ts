@@ -601,6 +601,97 @@ describe('server, words that sound the same', () => {
   })
 })
 
+describe('server, a character per language', () => {
+  const base = projectJson()
+  const languageRoot = tempRepo({
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+        audition: { phrases: { sv: 'Kom in.' } },
+      },
+    },
+    'tts/cast.json': { speakers: { narrator: { voice: 'w1', audition: { keywords: ['warm'] } } } },
+    'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+    'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'En gång.' }],
+  })
+  const warm = {
+    id: 'w1',
+    title: 'Warm',
+    description: '',
+    tags: [],
+    languages: ['en'],
+    uses: 1,
+    likes: 0,
+    author: '',
+    sample: null,
+  }
+  const asked: (string | undefined)[] = []
+  const languageServer = startServer({
+    projectFile: join(languageRoot, 'audio-studio.json'),
+    port: 0,
+    fish: {
+      ...fish,
+      async listVoices(query) {
+        asked.push(query.language)
+        return { total: 1, items: [{ ...warm, id: 'w2' }] }
+      },
+      async getVoice() {
+        return warm
+      },
+    },
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => languageServer.stop(true))
+  const call = (method: string, path: string, body?: unknown) =>
+    fetch(new URL(path, languageServer.url), {
+      method,
+      headers: { origin: languageServer.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }).then((r) => r.json())
+
+  it('keeps an audition for each language, the one asked for with ?language=', async () => {
+    const started = await call('POST', '/api/auditions/narrator/start?language=sv')
+    expect(started.session.shortlist).toEqual(['w1'])
+    expect(started.audition).toMatchObject({ phrase: 'Kom in.', from: 'standard' })
+    expect(asked).toEqual(['sv'])
+    expect((await call('GET', '/api/auditions/narrator')).session).toBeNull()
+    expect((await call('GET', '/api/auditions/narrator?language=sv')).session).not.toBeNull()
+  })
+
+  it('serves the voice cast in the language, and the ruled-out voices of it', async () => {
+    expect((await call('GET', '/api/characters/narrator/voice?language=sv')).id).toBeNull()
+    expect((await call('GET', '/api/characters/narrator/voice')).id).toBe('w1')
+    await call('POST', '/api/auditions/narrator/move?language=sv', { voice: 'w2', move: 'drop' })
+    expect(
+      (await call('GET', '/api/characters/narrator/ruled-out?language=sv')).voices,
+    ).toHaveLength(1)
+    expect((await call('GET', '/api/characters/narrator/ruled-out')).voices).toHaveLength(0)
+  })
+
+  it('changes a character’s speed and casts a voice for the language only', async () => {
+    await call('PATCH', '/api/characters/narrator?language=sv', { speed: 0.95 })
+    await call('POST', '/api/auditions/narrator/move?language=sv', {
+      voice: 'w1',
+      move: 'shortlist',
+    })
+    const cast = await call('POST', '/api/auditions/narrator/cast?language=sv', { voice: 'w1' })
+    expect(cast.ok).toBe(true)
+    const saved = JSON.parse(readFileSync(join(languageRoot, 'tts/cast.json'), 'utf8'))
+    expect(saved.speakers.narrator.languages.sv).toMatchObject({ voice: 'w1', speed: 0.95 })
+    expect(saved.speakers.narrator.speed).toBeUndefined()
+  })
+})
+
 describe('server, retiring models', () => {
   const project = projectJson()
   ;(project.narration as { models?: unknown }).models = { draft: 's1', final: 's1' }
@@ -634,6 +725,69 @@ describe('server, retiring models', () => {
     expect((await patch({ takes })).status).toBe(409)
     const shown = await (await fetch(new URL('/api/project', server.url))).json()
     expect(shown.summary.models).toEqual({ draft: 's2.1-pro', final: 's2.1-pro' })
+  })
+})
+
+describe('server, paid auditions in two languages', () => {
+  const base = projectJson()
+  const root = tempRepo({
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        models: { audition: 's2.1-pro' },
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+        audition: { phrases: { sv: 'Kom in.' } },
+      },
+    },
+    'tts/cast.json': { speakers: { gran: { voice: 'cur', audition: { keywords: ['warm'] } } } },
+    'tts/act1/en/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
+    'tts/act1/sv/script.json': [{ key: 'a', speaker: 'gran', text: 'Hej.' }],
+  })
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: {
+      ...fish,
+      async credit() {
+        return 5
+      },
+      async getVoice() {
+        throw new Error('gone')
+      },
+    },
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(new URL(path, server.url), {
+      method,
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const sitting = async (language: string) =>
+    (await (await send('GET', `/api/auditions/gran/sitting?language=${language}`)).json()).sitting
+
+  it('keeps a sitting for each language’s audition, so starting one leaves the other’s money', async () => {
+    expect(
+      (await send('POST', '/api/auditions/gran/start?language=en', { spendUpTo: 0.5 })).status,
+    ).toBe(200)
+    expect(
+      (await send('POST', '/api/auditions/gran/start?language=sv', { spendUpTo: 0.2 })).status,
+    ).toBe(200)
+    expect((await sitting('en')).dollars).toBe(0.5)
+    expect((await sitting('sv')).dollars).toBe(0.2)
+    await send('DELETE', '/api/auditions/gran?language=sv')
+    expect(await sitting('sv')).toBeNull()
+    expect((await sitting('en')).dollars).toBe(0.5)
   })
 })
 

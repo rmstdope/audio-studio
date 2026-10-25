@@ -10,12 +10,12 @@ export type Route =
   | { view: 'characters' }
   | { view: 'changes' }
   | { view: 'setup' }
-  | { view: 'character'; character: string }
-  | { view: 'audition'; character: string }
+  | { view: 'character'; character: string; language?: string }
+  | { view: 'audition'; character: string; language?: string }
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition`, `#/changes`, `#/setup`; anything else is the
+ * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/setup`; anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
@@ -27,7 +27,8 @@ export function parseRoute(hash: string): Route {
   if (first === 'characters') {
     if (!second) return { view: 'characters' }
     const character = decodeURIComponent(second)
-    return third === 'audition' ? { view: 'audition', character } : { view: 'character', character }
+    const view = third === 'audition' ? 'audition' : 'character'
+    return language ? { view, character, language } : { view, character }
   }
   if (first === 'parts' && second) {
     const part = decodeURIComponent(second)
@@ -42,11 +43,12 @@ export function routeHref(route: Route): string {
   if (route.view === 'characters') return '#/characters'
   if (route.view === 'changes') return '#/changes'
   if (route.view === 'setup') return '#/setup'
-  if (route.view === 'character') return `#/characters/${encodeURIComponent(route.character)}`
-  if (route.view === 'audition')
-    return `#/characters/${encodeURIComponent(route.character)}/audition`
-  const part = encodeURIComponent(route.part ?? '')
   const query = route.language ? `?language=${encodeURIComponent(route.language)}` : ''
+  if (route.view === 'character')
+    return `#/characters/${encodeURIComponent(route.character)}${query}`
+  if (route.view === 'audition')
+    return `#/characters/${encodeURIComponent(route.character)}/audition${query}`
+  const part = encodeURIComponent(route.part ?? '')
   return `${route.view === 'lines' ? `#/parts/${part}/lines` : `#/parts/${part}`}${query}`
 }
 

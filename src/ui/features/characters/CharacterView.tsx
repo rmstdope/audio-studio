@@ -3,10 +3,28 @@ import type { AuditionSession } from '../../../core/audition'
 import { FREE_MODELS } from '../../../core/project'
 import type { SittingView } from '../../../core/sitting'
 import { usd } from '../../../core/spend'
-import { sharesVoiceWith, type CharacterSummary, type ProjectSummary } from '../../../core/summary'
+import {
+  sharesVoiceWith,
+  type CharacterLanguage,
+  type CharacterSummary,
+  type ProjectSummary,
+} from '../../../core/summary'
+import {
+  castTab,
+  isMultilingual,
+  languageShown,
+  nameOf,
+  queryLanguage,
+  noVoiceText,
+  speedInLanguage,
+  startBlocked,
+  type Language,
+} from '../../castLanguages'
+import { LanguageSwitch } from '../lines/LanguageSwitch'
 import {
   clipUrl,
   takeUrl,
+  useAuditionsGoingOn,
   useCharacterVoice,
   usePart,
   useParts,
@@ -46,20 +64,51 @@ import { KeywordsEditor, PhraseEditor, SpeedEditor, StyleEditor } from './BriefE
 export function CharacterView({
   summary,
   characterId,
+  asked,
 }: {
   summary: ProjectSummary
   characterId: string
+  /** The language the address names, if any. */
+  asked?: string
 }) {
   const character = summary.characters.find((c) => c.id === characterId)
-  const session = useSession(characterId, Boolean(character))
-  const voice = useCharacterVoice(characterId, character?.voice ?? null, Boolean(character))
-  const start = useSessionAction(characterId)
-  const sittingQuery = useSitting(characterId, Boolean(character))
-  const sittingActions = useSittingActions(characterId)
+  const several = isMultilingual(summary.languages)
+  const language = languageShown(summary.languages, asked)
+  const languageName = nameOf(summary.languages, language)
+  const casting = character?.languages[language]
+  // Every hook of the page and its panels asks with the same language, or none in a project with one.
+  const queried = queryLanguage(summary.languages, asked)
+  const session = useSession(characterId, Boolean(character), queried)
+  const voice = useCharacterVoice(characterId, casting?.voice ?? null, Boolean(character), queried)
+  const start = useSessionAction(characterId, queried)
+  const going = useAuditionsGoingOn(
+    characterId,
+    summary.languages.map((l) => l.id),
+    Boolean(character) && several,
+  )
+  const sittingQuery = useSitting(characterId, Boolean(character), queried)
+  const sittingActions = useSittingActions(characterId, queried)
   // Which question is open: starting an audition on a paid model, or carrying one on.
   const [asking, setAsking] = useState<'start' | 'resume' | null>(null)
   const player = useClipPlayer()
   const { playing, toggle } = player
+  const appearances = casting?.appearances ?? []
+  // Her lines in this language, to pick an audition phrase from.
+  const loadedParts = useParts(
+    appearances.map((a) => a.part),
+    queried,
+  )
+  const lineTexts = [
+    ...new Set(
+      loadedParts.flatMap((query) =>
+        query.data?.ok
+          ? query.data.part.lines
+              .filter((l) => l.speaker === characterId && l.text)
+              .map((l) => l.text)
+          : [],
+      ),
+    ),
+  ]
 
   if (!character) {
     return (
@@ -76,8 +125,14 @@ export function CharacterView({
   const view = session.data?.ok ? session.data : null
   const inProgress = view?.session ?? null
   // An answer about the voice cast now: one about an earlier voice is not shown.
-  const answer = voice.data?.ok && isAbout(voice.data, character.voice) ? voice.data : null
-  const audition = routeHref({ view: 'audition', character: character.id })
+  const answer = voice.data?.ok && isAbout(voice.data, casting?.voice ?? null) ? voice.data : null
+  const audition = routeHref({
+    view: 'audition',
+    character: character.id,
+    ...(several ? { language } : {}),
+  })
+  const blocked = answer ? startBlocked(answer.audition, languageName) : null
+  const inLanguage: Language | null = several ? { id: language, name: languageName } : null
   const money = sittingQuery.data?.ok ? sittingQuery.data : null
 
   return (
@@ -93,13 +148,36 @@ export function CharacterView({
             </span>
             <h1>{character.name}</h1>
             <span className="muted">
-              {character.appearances.length
-                ? `${plural(character.totalLines, 'line')} in ${plural(character.appearances.length, summary.partLabel.toLowerCase())}`
+              {appearances.length
+                ? `${plural(casting?.totalLines ?? 0, 'line')} in ${plural(appearances.length, summary.partLabel.toLowerCase())}`
                 : 'No lines yet'}{' '}
-              · one voice in every {summary.partLabel.toLowerCase()}
+              · {several ? 'one voice per language in every' : 'one voice in every'}{' '}
+              {summary.partLabel.toLowerCase()}
             </span>
           </div>
         </div>
+        {several && (
+          <LanguageSwitch
+            tabs={summary.languages.map((l) => {
+              const tab = castTab(character, l, going[l.id] ?? false)
+              return {
+                id: l.id,
+                name: l.name,
+                count: going[l.id] === null ? null : tab.count,
+                title: tab.title,
+                dimmed: tab.dimmed,
+              }
+            })}
+            active={language}
+            onChoose={(id) => {
+              window.location.hash = routeHref({
+                view: 'character',
+                character: character.id,
+                language: id,
+              })
+            }}
+          />
+        )}
         {inProgress ? (
           // On a paid model, with no money left in this sitting, Resume asks for more first.
           needsResumeBox(money) ? (
@@ -118,7 +196,10 @@ export function CharacterView({
               className="btn btn-primary"
               type="button"
               // While the audition is read again, one may have been started elsewhere.
-              disabled={start.isPending || session.isFetching || sittingQuery.isPending}
+              disabled={
+                start.isPending || session.isFetching || sittingQuery.isPending || blocked !== null
+              }
+              title={blocked ?? undefined}
               onClick={() =>
                 money?.paid
                   ? setAsking('start')
@@ -177,12 +258,19 @@ export function CharacterView({
         <div className="audition-main">
           <VoicePanel
             character={character}
+            casting={casting}
+            languages={summary.languages}
+            language={inLanguage}
             answer={answer}
             playing={playing}
             toggle={toggle}
-            sharedWith={sharesVoiceWith(summary.characters, character.id)}
+            sharedWith={sharesVoiceWith(
+              summary.characters,
+              character.id,
+              several ? language : undefined,
+            )}
             paidModel={money?.paid ? money.model : null}
-            parts={character.appearances.map((a) => ({
+            parts={appearances.map((a) => ({
               id: a.part,
               title: titles.get(a.part) ?? a.part,
             }))}
@@ -192,31 +280,42 @@ export function CharacterView({
           <section className="panel character-lines" aria-label="Lines">
             <div className="section-head">
               <h2 className="section-title">Lines</h2>
+              {inLanguage && <span className="muted">in {languageName}</span>}
             </div>
-            {character.appearances.length ? (
-              character.appearances.map((a) => (
-                <PartLines
-                  key={a.part}
-                  partId={a.part}
-                  title={titles.get(a.part) ?? a.part}
-                  speaker={character.id}
-                  lines={a.lines}
-                />
-              ))
+            {listedParts(character, summary.languages, summary.parts).length ? (
+              listedParts(character, summary.languages, summary.parts).map((part) => {
+                const lines = appearances.find((a) => a.part === part)?.lines ?? 0
+                return lines ? (
+                  <PartLines
+                    key={part}
+                    partId={part}
+                    title={titles.get(part) ?? part}
+                    speaker={character.id}
+                    lines={lines}
+                    language={inLanguage ? language : undefined}
+                  />
+                ) : (
+                  <div key={part} className="part-lines">
+                    <strong>{titles.get(part) ?? part}</strong>
+                    <span className="muted">no {languageName} dialog yet</span>
+                  </div>
+                )
+              })
             ) : (
               <span className="muted">
                 {character.name} has no lines in any {summary.partLabel.toLowerCase()} yet.
               </span>
             )}
           </section>
-          {character.appearances.length > 0 && (
+          {appearances.length > 0 && (
             <InTheGame
               speaker={character.id}
               name={character.name}
-              parts={character.appearances.map((a) => ({
+              parts={appearances.map((a) => ({
                 id: a.part,
                 title: titles.get(a.part) ?? a.part,
               }))}
+              language={inLanguage?.id}
               player={player}
             />
           )}
@@ -227,24 +326,54 @@ export function CharacterView({
             <InProgress
               characterId={character.id}
               name={character.name}
-              lines={character.totalLines}
+              lines={casting?.totalLines ?? 0}
               session={inProgress}
               href={audition}
+              language={inLanguage}
               money={money}
               onResume={() => setAsking('resume')}
             />
           )}
           <section className="panel brief-panel" aria-label="Delivery">
+            {inLanguage && <span className="label">Delivery</span>}
             <StyleEditor characterId={character.id} style={character.style} />
-            <SpeedEditor
-              characterId={character.id}
-              speed={character.speed}
-              projectSpeed={summary.speed}
-            />
+            {inLanguage && <span className="muted brief-hint">The same in every language.</span>}
+            {(() => {
+              const speed = speedInLanguage(character, summary.languages, language, summary.speed)
+              return (
+                <SpeedEditor
+                  characterId={character.id}
+                  speed={inLanguage ? (casting?.speed ?? null) : character.speed}
+                  projectSpeed={summary.speed}
+                  language={inLanguage ? language : undefined}
+                  label={inLanguage ? speed.label : undefined}
+                  beneath={inLanguage ? speed.others : undefined}
+                />
+              )
+            })()}
           </section>
           <section className="panel brief-panel" aria-label="Casting brief">
-            <KeywordsEditor characterId={character.id} keywords={character.keywords} />
-            {answer && <PhraseEditor characterId={character.id} audition={answer.audition} />}
+            {inLanguage && <span className="label">Casting brief · {languageName}</span>}
+            <KeywordsEditor
+              characterId={character.id}
+              keywords={character.keywords}
+              note={
+                inLanguage
+                  ? `The same in every language; the search looks only at ${languageName} voices.`
+                  : undefined
+              }
+            />
+            {answer && (
+              <PhraseEditor
+                key={language}
+                characterId={character.id}
+                characterName={character.name}
+                audition={answer.audition}
+                language={inLanguage?.id}
+                languageName={inLanguage?.name}
+                lines={lineTexts}
+              />
+            )}
             {answer && (
               <div className="brief-item">
                 <span className="label">Language</span>
@@ -253,7 +382,12 @@ export function CharacterView({
             )}
           </section>
           <section className="panel brief-panel" aria-label="Ruled out">
-            <RuledOutPanel characterId={character.id} name={character.name} />
+            <RuledOutPanel
+              characterId={character.id}
+              name={character.name}
+              language={inLanguage?.id}
+              languageName={inLanguage?.name}
+            />
           </section>
         </aside>
       </div>
@@ -267,6 +401,9 @@ export function CharacterView({
  */
 function VoicePanel({
   character,
+  casting,
+  languages,
+  language,
   answer,
   playing,
   toggle,
@@ -277,6 +414,11 @@ function VoicePanel({
   sessionKnown,
 }: {
   character: CharacterSummary
+  /** Her casting in the language shown. */
+  casting: CharacterLanguage | undefined
+  languages: Language[]
+  /** The language shown, in a project with several; null in a project with one. */
+  language: Language | null
   /** What the server says about the voice cast now; null until it has. */
   answer: Voiced | null
   playing: string | null
@@ -292,8 +434,8 @@ function VoicePanel({
   /** Whether the audition has been read: only then is it known whether one is going on. */
   sessionKnown: boolean
 }) {
-  const recorder = useTakes(character.id)
-  const id = character.voice
+  const recorder = useTakes(character.id, false, language?.id)
+  const id = casting?.voice ?? null
   // The take is asked for once per phrase, so one the page cannot show is not asked again.
   const asked = useRef(new Set<string>())
   const wanted = answer ? takeToRecord(answer, id) : null
@@ -308,7 +450,14 @@ function VoicePanel({
     <CloneVoice
       characterId={character.id}
       name={character.name}
-      currentTitle={id ? answer?.voice?.title || voiceLabel(character) : null}
+      language={language?.id}
+      languageName={language?.name}
+      languages={languages}
+      currentTitle={
+        id
+          ? answer?.voice?.title || voiceLabel({ voice: id, voiceName: casting?.voiceName ?? null })
+          : null
+      }
       parts={parts}
       inProgress={inProgress}
       sessionKnown={sessionKnown}
@@ -319,11 +468,12 @@ function VoicePanel({
   if (!id) {
     return (
       <section className="panel voice-panel" aria-label="Voice">
-        <span className="label">Voice</span>
-        <strong>No voice yet</strong>
+        <span className="label">Voice{language ? ` · ${language.name}` : ''}</span>
+        <strong>{language ? `No ${language.name} voice yet` : 'No voice yet'}</strong>
         <span className="muted">
-          Start an audition to find one, or clone one from recordings you have. Until then{' '}
-          {character.name}’s lines cannot be recorded.
+          {language
+            ? noVoiceText(character, languages, language.id)
+            : `Start an audition to find one, or clone one from recordings you have. Until then ${character.name}’s lines cannot be recorded.`}
         </span>
         {clone}
       </section>
@@ -335,11 +485,13 @@ function VoicePanel({
   return (
     <section className="panel voice-panel" aria-label="Voice">
       <div className="section-head">
-        <span className="label">Voice</span>
+        <span className="label">Voice{language ? ` · ${language.name}` : ''}</span>
         <span className="chip chip-ok">Cast</span>
       </div>
       <div className="voice-name">
-        <strong>{voice?.title || voiceLabel(character)}</strong>
+        <strong>
+          {voice?.title || voiceLabel({ voice: id, voiceName: casting?.voiceName ?? null })}
+        </strong>
         {voice && (
           <span className="muted">
             {voice.author ? `by ${voice.author} · ` : ''}
@@ -366,11 +518,19 @@ function VoicePanel({
         <p className="status-note shared-voice">
           <AlertIcon />
           <span>
-            Also the voice of{' '}
+            Also the {language ? `${language.name} ` : ''}voice of{' '}
             {sharedWith.map((other, i) => (
               <span key={other.id}>
                 {separatorBefore(i, sharedWith.length)}
-                <a href={routeHref({ view: 'character', character: other.id })}>{other.name}</a>
+                <a
+                  href={routeHref({
+                    view: 'character',
+                    character: other.id,
+                    ...(language ? { language: language.id } : {}),
+                  })}
+                >
+                  {other.name}
+                </a>
               </span>
             ))}
             . Characters in one voice are hard to tell apart in a scene.
@@ -453,14 +613,20 @@ function InTheGame({
   speaker,
   name,
   parts,
+  language,
   player,
 }: {
   speaker: string
   name: string
   parts: { id: string; title: string }[]
+  /** The language whose recorded lines are heard; left out in a project with one. */
+  language?: string
   player: ReturnType<typeof useClipPlayer>
 }) {
-  const loaded = useParts(parts.map((p) => p.id))
+  const loaded = useParts(
+    parts.map((p) => p.id),
+    language,
+  )
   const [all, setAll] = useState(false)
   const listed = parts.map((p, i) => {
     const query = loaded[i]
@@ -470,7 +636,7 @@ function InTheGame({
   })
   const lines = recordedLinesOf(listed, speaker)
   const view = inGameState(listed, lines, all)
-  const clips: Clip[] = lines.map((l) => ({ id: l.id, url: clipUrl(l.part, l.file) }))
+  const clips: Clip[] = lines.map((l) => ({ id: l.id, url: clipUrl(l.part, l.file, language) }))
   return (
     <section className="panel in-game" aria-label="Hear it in the game">
       <div className="section-head">
@@ -488,7 +654,9 @@ function InTheGame({
           {view.failed.map((p, i) => (
             <span key={p.id}>
               {i > 0 && (i === view.failed.length - 1 ? ' and ' : ', ')}
-              <a href={routeHref({ view: 'lines', part: p.id })}>{p.title}</a>
+              <a href={routeHref({ view: 'lines', part: p.id, ...(language ? { language } : {}) })}>
+                {p.title}
+              </a>
             </span>
           ))}
           ; they are left out here. Open {view.failed.length === 1 ? 'it' : 'them'} to see why.
@@ -502,7 +670,7 @@ function InTheGame({
                 type="button"
                 className="icon-btn"
                 aria-label={player.playing === l.id ? 'Stop' : `Play “${l.text}”`}
-                onClick={() => player.toggle(l.id, clipUrl(l.part, l.file))}
+                onClick={() => player.toggle(l.id, clipUrl(l.part, l.file, language))}
               >
                 {player.playing === l.id ? <PauseIcon /> : <PlayIcon />}
               </button>
@@ -555,17 +723,22 @@ function PartLines({
   title,
   speaker,
   lines,
+  language,
 }: {
   partId: string
   title: string
   speaker: string
   lines: number
+  language?: string
 }) {
-  const part = usePart(partId)
+  const part = usePart(partId, true, language)
   const loaded = part.data?.ok ? part.data.part : null
   const counts = loaded ? speakerCounts(loaded.lines, speaker) : null
   return (
-    <a className="part-lines" href={routeHref({ view: 'lines', part: partId })}>
+    <a
+      className="part-lines"
+      href={routeHref({ view: 'lines', part: partId, ...(language ? { language } : {}) })}
+    >
       <strong>{title}</strong>
       {counts ? <StatusBar counts={counts} height={6} /> : <span className="muted">…</span>}
       <span className="muted">
@@ -583,6 +756,7 @@ function InProgress({
   lines,
   session,
   href,
+  language,
   money,
   onResume,
 }: {
@@ -591,13 +765,14 @@ function InProgress({
   lines: number
   session: AuditionSession
   href: string
+  language: Language | null
   /** The audition's money, once known. */
   money: SittingView | null
   /** Opens the box that asks what the audition may spend as it goes on. */
   onResume: () => void
 }) {
-  const act = useSessionAction(characterId)
-  const ruledOut = useRuledOut(characterId)
+  const act = useSessionAction(characterId, language?.id)
+  const ruledOut = useRuledOut(characterId, language?.id)
   const [asking, setAsking] = useState(false)
   const ruledIds = ruledOut.data?.ok ? ruledOut.data.voices.map((v) => v.id) : null
   return (
@@ -647,4 +822,19 @@ function InProgress({
       {act.isError && <span className="adopt-error">{act.error.message}</span>}
     </section>
   )
+}
+
+/**
+ * The parts to list under Lines: those she speaks in, in any language, in the project's order, so
+ * a language without lines in one says so.
+ */
+function listedParts(
+  character: CharacterSummary,
+  languages: Language[],
+  parts: { id: string }[],
+): string[] {
+  const spoken = new Set(
+    languages.flatMap((l) => character.languages[l.id]?.appearances.map((a) => a.part) ?? []),
+  )
+  return parts.map((p) => p.id).filter((part) => spoken.has(part))
 }

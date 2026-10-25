@@ -26,7 +26,7 @@ import { canCompare } from '../../heard'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
-import { noDialogPanel, recordingNote } from '../../languages'
+import { languageTab, noDialogPanel, recordingNote } from '../../languages'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
@@ -213,10 +213,18 @@ export function LinesView({
       </div>
       {several && (
         <LanguageSwitch
-          languages={declared}
-          progress={seen.current}
+          tabs={declared.map((language) => {
+            const known = seen.current?.find((p) => p.id === language.id)
+            const tab = known ? languageTab(known, shortTitle(part.title)) : null
+            return {
+              id: language.id,
+              name: language.name,
+              count: tab?.count ?? null,
+              title: tab?.title,
+              dimmed: tab?.dimmed ?? false,
+            }
+          })}
           active={active.id}
-          partTitle={shortTitle(part.title)}
           onChoose={(id) => {
             window.location.hash = routeHref({ view: 'lines', part: part.id, language: id })
           }}

@@ -43,6 +43,7 @@ export function CharactersView({ summary }: { summary: ProjectSummary }) {
                 (a) => `${titles.get(a.part) ?? a.part} · ${a.lines}`,
               )}
               sharedVoice={sharing.has(character.id)}
+              languages={summary.languages}
             />
           ))}
         </div>

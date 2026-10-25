@@ -2,6 +2,7 @@ import { dirname } from 'node:path'
 import { formatCast } from '../core/castFormat'
 import { resolveInRoot } from '../core/paths'
 import {
+  declaredLanguage,
   FREE_MODELS,
   phraseProblem,
   problemsFrom,
@@ -22,7 +23,7 @@ import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import { NO_KEY, type FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
 import { ruledOutIds } from './ruledOut'
-import { auditionFor, castProblems, phrasePath, recordedTakes } from './takes'
+import { auditionIn, castProblems, phrasePath, recordedTakes } from './takes'
 import { createSerial } from './serial'
 import { searchVoices } from './voiceSearch'
 import { loadWorkspace, openProject, type ProjectFailure } from './workspace'
@@ -42,6 +43,10 @@ export type CandidatesResult =
       language: string
       /** The character's current voice, if it has one and Fish still has it. */
       current: Voice | null
+      /** Her casting in this language: the cast voice's id and name, whether or not Fish has it. */
+      casting: { voice: string | null; voiceName: string | null }
+      /** Her voices in the other languages that Fish knows, to hear in this one. */
+      others: Voice[]
       candidates: Candidate[]
       /** What the character says in a take. */
       audition: AuditionText
@@ -72,6 +77,7 @@ export async function findCandidates(
   characterId: string,
   fishFor: FishFactory,
   options: SearchOptions = {},
+  asked?: string,
 ): Promise<CandidatesResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -88,14 +94,18 @@ export async function findCandidates(
       message: NO_KEY,
     }
   }
-  const { language } = project.narration.audition
+  const seen = auditionIn(project, cast, summary, characterId, asked)
+  const language = searchLanguage(project, seen.language)
+  const own = character.languages[seen.language]
   const keywords = options.keywords ?? character.keywords
   try {
-    const current = character.voice ? await fish.getVoice(character.voice).catch(() => null) : null
+    const current = own?.voice ? await fish.getVoice(own.voice).catch(() => null) : null
+    const others = await otherVoices(fish, character, seen.language)
     // Left out before the list is cut, so a later search reaches voices past the first ones.
     const exclude = new Set([
-      ...(character.voice ? [character.voice] : []),
-      ...(await ruledOutIds(projectFile, characterId)),
+      ...(own?.voice ? [own.voice] : []),
+      ...others.map((v) => v.id),
+      ...(await ruledOutIds(projectFile, characterId, seen.language)),
       ...(options.exclude ?? []),
     ])
     const found = keywords.length
@@ -107,17 +117,23 @@ export async function findCandidates(
       : []
     const candidates = found.slice(0, CANDIDATE_LIMIT)
     const root = dirname(projectFile)
-    const audition = auditionFor(cast, characterId, project)
-    const voices = [...(current ? [current.id] : []), ...candidates.map((c) => c.voice.id)]
+    const { audition } = seen
+    const voices = [
+      ...(current ? [current.id] : []),
+      ...others.map((v) => v.id),
+      ...candidates.map((c) => c.voice.id),
+    ]
     return {
       ok: true,
       character,
       keywords,
-      language,
+      language: seen.language,
       current,
+      casting: { voice: own?.voice ?? null, voiceName: own?.voiceName ?? null },
+      others,
       candidates,
       audition,
-      takes: recordedTakes(root, project, cast, characterId, audition, voices),
+      takes: recordedTakes(root, project, seen.cast, characterId, audition, voices),
       perRound: project.narration.audition.candidatesPerRound,
     }
   } catch (error) {
@@ -127,6 +143,32 @@ export async function findCandidates(
       message: error instanceof Error ? error.message : String(error),
     }
   }
+}
+
+/** The language Fish is searched in for voices of `language`: the source language as the project says, another by its code. */
+function searchLanguage(project: Project, language: string): string {
+  return language === project.narration.languages[0]
+    ? project.narration.audition.language
+    : language
+}
+
+/**
+ * The character's voices in the languages other than `language`, as Fish knows them (a voice Fish
+ * no longer has is left out), each once, in the project's order and without the voice cast in
+ * `language` itself.
+ */
+async function otherVoices(
+  fish: FishClient,
+  character: CharacterSummary,
+  language: string,
+): Promise<Voice[]> {
+  const ids = Object.entries(character.languages)
+    .filter(([id]) => id !== language)
+    .map(([, casting]) => casting.voice)
+    .filter((id): id is string => id !== null && id !== character.languages[language]?.voice)
+  const unique = [...new Set(ids)]
+  const found = await Promise.all(unique.map((id) => fish.getVoice(id).catch(() => null)))
+  return found.filter((voice): voice is Voice => voice !== null)
 }
 
 /** A character's cast voice for its page, or why it cannot be shown. Null for an unknown character. */
@@ -159,6 +201,7 @@ export async function characterVoice(
   projectFile: string,
   characterId: string,
   fishFor: FishFactory,
+  asked?: string,
 ): Promise<CharacterVoiceResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -166,9 +209,10 @@ export async function characterVoice(
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
   if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
-  const audition = auditionFor(cast, characterId, project)
-  const { language } = project.narration.audition
-  const id = character.voice
+  const seen = auditionIn(project, cast, summary, characterId, asked)
+  const { audition } = seen
+  const language = searchLanguage(project, seen.language)
+  const id = character.languages[seen.language]?.voice ?? null
   const answer = {
     ok: true as const,
     id,
@@ -180,9 +224,15 @@ export async function characterVoice(
   }
   if (!id) return answer
   const take =
-    recordedTakes(dirname(projectFile), project, cast, characterId, audition, [id], FREE_MODELS[0])[
-      id
-    ] ?? null
+    recordedTakes(
+      dirname(projectFile),
+      project,
+      seen.cast,
+      characterId,
+      audition,
+      [id],
+      FREE_MODELS[0],
+    )[id] ?? null
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_KEY } }
   try {
@@ -234,18 +284,30 @@ export function setStyle(
 
 /**
  * Saves a character's own speaking speed in the cast (its lines and takes are spoken at it instead
- * of the project's `tts.speed`); null removes it. Its recorded lines go stale.
+ * of the project's `tts.speed`); null removes it. Its recorded lines go stale. For a language other
+ * than the source language it is that language's own speed.
  */
 export function setSpeed(
   projectFile: string,
   characterId: string,
   speed: number | null,
+  language?: string,
 ): Promise<CharacterChange> {
-  return updateCharacter(projectFile, characterId, (entry) => {
-    if (speed !== null) return { ...entry, speed }
-    const { speed: _removed, ...rest } = entry
-    return rest
-  })
+  return updateCharacter(
+    projectFile,
+    characterId,
+    (entry, which) => {
+      if (which.language !== which.source) {
+        return inLanguage(entry, which.language, (own) =>
+          withField(own, 'speed', speed ?? undefined),
+        )
+      }
+      if (speed !== null) return { ...entry, speed }
+      const { speed: _removed, ...rest } = entry
+      return rest
+    },
+    language,
+  )
 }
 
 /** Saves a character's own audition phrase in the cast; an empty phrase goes back to the standard one. */
@@ -253,18 +315,59 @@ export async function setPhrase(
   projectFile: string,
   characterId: string,
   phrase: string | null,
+  language?: string,
 ): Promise<CharacterChange> {
   const own = phrase?.trim() || undefined
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
   if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
   const { narration } = loaded.project
+  const which = declaredLanguage(narration, language)
   const tooLong = own ? phraseProblem(own, narration.quality.chunkLimit) : null
   if (tooLong) {
-    const problem = { file: narration.characters, path: phrasePath(characterId), message: tooLong }
-    return { ok: false, problems: [problem] }
+    const path = phrasePath(characterId, which === narration.languages[0] ? undefined : which)
+    return { ok: false, problems: [{ file: narration.characters, path, message: tooLong }] }
   }
-  return updateCharacter(projectFile, characterId, (entry) => withAudition(entry, { phrase: own }))
+  return updateCharacter(
+    projectFile,
+    characterId,
+    (entry, at) =>
+      at.language === at.source
+        ? withAudition(entry, { phrase: own })
+        : inLanguage(entry, at.language, (voice) => withField(voice, 'phrase', own)),
+    language,
+  )
+}
+
+/** A language's casting with one field set, or removed when `value` is undefined. */
+function withField(
+  voice: NonNullable<Character['languages']>[string],
+  field: 'speed' | 'phrase' | 'voice' | 'voiceName',
+  value: string | number | undefined,
+): NonNullable<Character['languages']>[string] {
+  const next: Record<string, unknown> = { ...voice, [field]: value }
+  if (value === undefined) delete next[field]
+  return next
+}
+
+/**
+ * An entry with its casting in `language` (other than the source language) changed; a language
+ * left with nothing is removed, and so is `languages` when empty, so clearing leaves no trace.
+ */
+function inLanguage(
+  entry: Character,
+  language: string,
+  change: (
+    voice: NonNullable<Character['languages']>[string],
+  ) => NonNullable<Character['languages']>[string],
+): Character {
+  const next = change(entry.languages?.[language] ?? {})
+  const languages = { ...entry.languages }
+  if (Object.keys(next).length) languages[language] = next
+  else delete languages[language]
+  if (Object.keys(languages).length) return { ...entry, languages }
+  const { languages: _removed, ...rest } = entry
+  return rest
 }
 
 /**
@@ -287,31 +390,45 @@ function withAudition(
   )
 }
 
-/** Casts a voice for a character: its id and name in the cast; style and the rest stay as they are. */
+/**
+ * Casts a voice for a character in a language (the source language's when none is named): its id
+ * and name in the cast; style and the rest stay as they are.
+ */
 export function setVoice(
   projectFile: string,
   characterId: string,
   voice: { id: string; name: string },
+  language?: string,
 ): Promise<CharacterChange> {
-  return updateCharacter(projectFile, characterId, (entry) => {
-    if (!('voice' in entry)) {
-      const { voiceName: _old, ...rest } = entry
-      return { ...rest, voice: voice.id, voiceName: voice.name }
-    }
-    // The voice stays where it was, its name right after it.
-    return Object.fromEntries(
-      Object.entries(entry).flatMap(([key, value]): [string, unknown][] =>
-        key === 'voice'
-          ? [
-              ['voice', voice.id],
-              ['voiceName', voice.name],
-            ]
-          : key === 'voiceName'
-            ? []
-            : [[key, value]],
-      ),
-    )
-  })
+  return updateCharacter(
+    projectFile,
+    characterId,
+    (entry, which) => {
+      if (which.language !== which.source) {
+        return inLanguage(entry, which.language, (own) =>
+          withField(withField(own, 'voice', voice.id), 'voiceName', voice.name),
+        )
+      }
+      if (!('voice' in entry)) {
+        const { voiceName: _old, ...rest } = entry
+        return { ...rest, voice: voice.id, voiceName: voice.name }
+      }
+      // The voice stays where it was, its name right after it.
+      return Object.fromEntries(
+        Object.entries(entry).flatMap(([key, value]): [string, unknown][] =>
+          key === 'voice'
+            ? [
+                ['voice', voice.id],
+                ['voiceName', voice.name],
+              ]
+            : key === 'voiceName'
+              ? []
+              : [[key, value]],
+        ),
+      )
+    },
+    language,
+  )
 }
 
 /**
@@ -330,15 +447,19 @@ const castWrites = createSerial()
 function updateCharacter(
   projectFile: string,
   characterId: string,
-  change: (entry: Character) => Character,
+  change: (entry: Character, which: { language: string; source: string }) => Character,
+  language?: string,
 ): Promise<CharacterChange> {
-  return castWrites.run(projectFile, () => writeCharacter(projectFile, characterId, change))
+  return castWrites.run(projectFile, () =>
+    writeCharacter(projectFile, characterId, change, language),
+  )
 }
 
 async function writeCharacter(
   projectFile: string,
   characterId: string,
-  change: (entry: Character) => Character,
+  change: (entry: Character, which: { language: string; source: string }) => Character,
+  asked?: string,
 ): Promise<CharacterChange> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -357,7 +478,9 @@ async function writeCharacter(
       return [{ file: path, path: 'pronounce', message }]
     }
     const speakers = { ...cast.speakers }
-    speakers[characterId] = change(speakers[characterId] ?? {})
+    const { narration } = loaded.project
+    const which = { language: declaredLanguage(narration, asked), source: narration.languages[0]! }
+    speakers[characterId] = change(speakers[characterId] ?? {}, which)
     return { ...cast, speakers }
   })
 }

@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import type { AuditionText } from '../../../core/takes'
 import { useSetKeywords, useSetPhrase, useSetSpeed, useSetStyle } from '../../api'
 import { SPEED } from '../../../core/resources'
 import { speedDraft } from '../../speedDraft'
 import { Problems } from '../../components/Problems'
 import { addKeyword } from '../../keywords'
+import { noPhraseText, phraseNote } from '../../castLanguages'
 
 /**
  * A character's search keywords, saved in the cast: what the next audition searches Fish's
@@ -13,9 +14,12 @@ import { addKeyword } from '../../keywords'
 export function KeywordsEditor({
   characterId,
   keywords,
+  note,
 }: {
   characterId: string
   keywords: string[]
+  /** Said under the keywords in a project with several languages: they are one set for all. */
+  note?: string
 }) {
   const save = useSetKeywords(characterId)
   const [draft, setDraft] = useState('')
@@ -63,6 +67,7 @@ export function KeywordsEditor({
       <span className="muted brief-hint">
         Saved in the cast. Each keyword is searched, and voices are ranked by how many they match.
       </span>
+      {note && <span className="muted brief-hint">{note}</span>}
       {save.data && !save.data.ok && 'problems' in save.data && (
         <Problems title="The keywords could not be saved" problems={save.data.problems} />
       )}
@@ -71,57 +76,151 @@ export function KeywordsEditor({
   )
 }
 
-/** What a character says in its audition takes: its own phrase, or the project's standard one. */
+/**
+ * What a character says in its audition takes: its own phrase, or the project's standard one; in a
+ * project with several languages, the phrase in `language`, which may be her longest line there
+ * until she is given one, or missing.
+ */
 export function PhraseEditor({
   characterId,
+  characterName,
   audition,
+  language,
+  languageName,
+  lines = [],
 }: {
   characterId: string
+  characterName: string
   audition: AuditionText
+  /** The language the phrase is in; left out in a project with one language. */
+  language?: string
+  languageName?: string
+  /** Her lines in the language, to pick a phrase from. */
+  lines?: string[]
 }) {
-  const save = useSetPhrase(characterId)
+  const save = useSetPhrase(characterId, language)
   const [draft, setDraft] = useState<string | null>(null)
-  const text = draft ?? audition.phrase
-  const changed = draft !== null && draft.trim() !== audition.phrase
+  const [changing, setChanging] = useState(false)
+  const area = useRef<HTMLTextAreaElement>(null)
+  const several = language !== undefined && languageName !== undefined
+  const text = draft ?? audition.phrase ?? ''
+  const changed = draft !== null && draft.trim() !== (audition.phrase ?? '')
+  const note = several ? phraseNote(audition, characterName, languageName) : null
+  // A phrase borrowed from a line, or missing, is edited only on asking (Change, Write a phrase).
+  const editing = !several || audition.from === 'own' || audition.from === 'standard' || changing
+  const done = (result: { ok: boolean }) => {
+    if (result.ok) {
+      setDraft(null)
+      setChanging(false)
+    }
+  }
 
   return (
     <form
       className="brief-item"
       onSubmit={(event) => {
         event.preventDefault()
-        save.mutate(text.trim() || null, { onSuccess: (result) => result.ok && setDraft(null) })
+        save.mutate(text.trim() || null, { onSuccess: done })
       }}
     >
       <label className="label" htmlFor="phrase">
-        Audition phrase · {audition.own ? 'this character’s own' : 'the project’s standard'}
+        Audition phrase
+        {several
+          ? ''
+          : ` · ${audition.from === 'own' ? 'this character’s own' : 'the project’s standard'}`}
       </label>
-      <textarea
-        id="phrase"
-        className="phrase"
-        rows={3}
-        value={text}
-        onChange={(e) => setDraft(e.target.value)}
-      />
-      <div className="keyword-add">
-        <button className="btn" type="submit" disabled={!changed || save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save phrase'}
-        </button>
-        {audition.own && (
+      {several && audition.phrase === null && !changing ? (
+        <>
+          <strong>None in {languageName} yet</strong>
+          <span className="muted brief-hint">{noPhraseText(characterName, languageName)}</span>
           <button
-            className="btn"
+            className="btn btn-small"
             type="button"
-            disabled={save.isPending}
-            onClick={() =>
-              save.mutate(null, { onSuccess: (result) => result.ok && setDraft(null) })
-            }
+            onClick={() => {
+              setChanging(true)
+              setTimeout(() => area.current?.focus())
+            }}
           >
-            Use the standard phrase
+            Write a phrase
           </button>
-        )}
-      </div>
+        </>
+      ) : several && !editing ? (
+        <>
+          <span lang={language}>“{audition.phrase}”</span>
+          <span className="muted brief-hint">
+            {note}{' '}
+            <button
+              className="btn btn-ghost btn-small"
+              type="button"
+              onClick={() => setChanging(true)}
+            >
+              Change
+            </button>
+          </span>
+        </>
+      ) : (
+        <>
+          {lines.length > 0 && changing && (
+            <select
+              aria-label={`Pick one of ${characterName}’s ${languageName} lines`}
+              value=""
+              onChange={(e) => e.target.value && setDraft(e.target.value)}
+            >
+              <option value="">Pick one of her lines…</option>
+              {lines.map((line) => (
+                <option key={line} value={line}>
+                  {line.length > 80 ? `${line.slice(0, 80)}…` : line}
+                </option>
+              ))}
+            </select>
+          )}
+          <textarea
+            id="phrase"
+            ref={area}
+            className="phrase"
+            lang={language}
+            rows={3}
+            value={text}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="keyword-add">
+            <button className="btn" type="submit" disabled={!changed || save.isPending}>
+              {save.isPending ? 'Saving…' : 'Save phrase'}
+            </button>
+            {audition.from === 'own' && (
+              <button
+                className="btn"
+                type="button"
+                disabled={save.isPending}
+                onClick={() => save.mutate(null, { onSuccess: done })}
+              >
+                {audition.standard ? 'Use the standard phrase' : 'Remove her phrase'}
+              </button>
+            )}
+            {changing && (
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => {
+                  setDraft(null)
+                  setChanging(false)
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+          {note && <span className="muted brief-hint">{note}</span>}
+        </>
+      )}
       <span className="muted brief-hint">
-        A changed phrase needs new takes. Sent to Fish as:{' '}
-        <span className="mono">{audition.spoken}</span>
+        A changed phrase needs new takes.
+        {audition.phrase !== null && (
+          <>
+            {' '}
+            Sent to Fish as: <span className="mono">{audition.spoken}</span>
+          </>
+        )}
       </span>
       {save.data && !save.data.ok && 'problems' in save.data && (
         <Problems title="The phrase could not be saved" problems={save.data.problems} />
@@ -188,12 +287,21 @@ export function SpeedEditor({
   characterId,
   speed,
   projectSpeed,
+  language,
+  label,
+  beneath,
 }: {
   characterId: string
   speed: number | null
   projectSpeed: number
+  /** The language the speed is of, in a project with several; left out otherwise. */
+  language?: string
+  /** What the field is called in a project with several languages ("Speed · Deutsch"). */
+  label?: string
+  /** The other languages' speeds, listed beneath. */
+  beneath?: string
 }) {
-  const save = useSetSpeed(characterId)
+  const save = useSetSpeed(characterId, language)
   const [draft, setDraft] = useState<string | null>(null)
   const shown = draft ?? (speed === null ? '' : String(speed))
   const parsed = speedDraft(shown, speed)
@@ -208,7 +316,8 @@ export function SpeedEditor({
       }}
     >
       <label className="label" htmlFor="speed">
-        Speed · {speed === null ? `the project’s, ${projectSpeed}` : 'this character’s own'}
+        {label ??
+          `Speed · ${speed === null ? `the project’s, ${projectSpeed}` : 'this character’s own'}`}
       </label>
       <div className="keyword-add">
         <input
@@ -247,6 +356,7 @@ export function SpeedEditor({
           </button>
         )}
       </div>
+      {beneath && <span className="muted brief-hint">{beneath}</span>}
       <span className="muted brief-hint">
         {parsed.ok
           ? `From ${SPEED.min} (half) to ${SPEED.max} (double). Saved in the cast; recorded lines show as stale until generated again.`

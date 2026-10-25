@@ -7,6 +7,7 @@ import { adoptUntracked, planPart, type PartState, type PlanInput } from '../cor
 import {
   PROJECT_FILE,
   ProjectSchema,
+  declaredLanguage,
   partPathFor,
   problemsFrom,
   type Part,
@@ -19,6 +20,7 @@ import {
   DialogSchema,
   LockSchema,
   ManifestSchema,
+  projectCast,
   type Cast,
 } from '../core/resources'
 import { summarize, type DialogState, type ProjectSummary } from '../core/summary'
@@ -83,6 +85,26 @@ export async function knownCharacter(
   return loaded.summary.characters.some((c) => c.id === characterId) ? true : null
 }
 
+/**
+ * What names a character's own files in the tool cache (its audition, its ruled-out voices) in a
+ * language: the character's id for the source language, which keeps the names it always had, and
+ * for a language the project does not declare; else the id with the language. The project file
+ * is read to know the languages; if it cannot be, the id.
+ */
+export async function cacheNameFor(
+  projectFile: string,
+  characterId: string,
+  language?: string,
+): Promise<string> {
+  if (language === undefined) return characterId
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return characterId
+  const resolved = declaredLanguage(opened.project.narration, language)
+  return resolved === opened.project.narration.languages[0]
+    ? characterId
+    : `${characterId}\0${resolved}`
+}
+
 /** The parsed project file, the cast and the summary of the project, for the server's own use. */
 export async function loadWorkspace(projectFile: string): Promise<
   | {
@@ -105,6 +127,14 @@ export async function loadWorkspace(projectFile: string): Promise<
   for (const part of project.narration.parts) {
     dialogs[part.id] = await readDialog(root, project, part, problems)
   }
+  // The other languages' dialogs say where a character speaks in each; a missing one is no problem.
+  const languageDialogs: Record<string, Record<string, DialogState>> = {}
+  for (const language of project.narration.languages.slice(1)) {
+    languageDialogs[language] = {}
+    for (const part of project.narration.parts) {
+      languageDialogs[language][part.id] = await readDialog(root, project, part, problems, language)
+    }
+  }
   return {
     ok: true,
     project,
@@ -114,6 +144,7 @@ export async function loadWorkspace(projectFile: string): Promise<
       projectFile: basename(projectFile),
       root,
       dialogs,
+      languageDialogs,
       cast,
       problems,
     }),
@@ -277,7 +308,7 @@ export async function clipFile(
   if (!narration.parts.some((p) => p.id === partId) || file.startsWith('.')) return null
   const folder = resolveInRoot(
     dirname(projectFile),
-    partPathFor(narration.paths.clips, partId, languageOf(narration, language)),
+    partPathFor(narration.paths.clips, partId, declaredLanguage(narration, language)),
   )
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
@@ -316,7 +347,7 @@ export async function readPart(
 
   const problems: Problem[] = []
   const templates = project.narration.paths
-  const language = languageOf(project.narration, asked)
+  const language = declaredLanguage(project.narration, asked)
   const at = (template: string) => partPathFor(template, part.id, language)
 
   const dialog = await readDialog(root, project, part, problems, language)
@@ -350,7 +381,11 @@ export async function readPart(
     input: {
       lines: dialog.status === 'ok' ? dialog.lines : [],
       ...(source?.status === 'ok' ? { source: source.lines } : {}),
-      cast: cast ?? { speakers: {}, pronounce: {} },
+      cast: projectCast(
+        cast ?? { speakers: {}, pronounce: {} },
+        language,
+        project.narration.languages[0]!,
+      ),
       cues: cues ?? {},
       lock: lock ?? {},
       manifest: manifest ?? {},
@@ -366,13 +401,6 @@ export async function readPart(
     },
     problems,
   }
-}
-
-/** The language to read: the one asked for if the project declares it, else its first. */
-function languageOf(narration: Project['narration'], asked: string | undefined): string {
-  return asked !== undefined && narration.languages.includes(asked)
-    ? asked
-    : narration.languages[0]!
 }
 
 /** A resource read's value, or null when there is no file or it is broken (already a problem). */

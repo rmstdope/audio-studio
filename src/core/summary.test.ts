@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { projectJson } from '../../test/helpers'
 import { ProjectSchema } from './project'
-import type { Line } from './resources'
+import { CastSchema, type Line } from './resources'
 import { displayName, sharesVoiceWith, summarize, type SummaryInput } from './summary'
 
 const project = ProjectSchema.parse(projectJson())
@@ -59,7 +59,7 @@ describe('summarize', () => {
         cast: { speakers: { narrator: { voice: 'v1', style: '[warm]' } }, pronounce: {} },
       }),
     )
-    expect(summary.characters).toEqual([
+    expect(summary.characters).toMatchObject([
       {
         id: 'narrator',
         name: 'Narrator',
@@ -165,5 +165,101 @@ describe('sharesVoiceWith', () => {
   it('is nobody for an uncast or unknown character', () => {
     expect(sharesVoiceWith(characters, 'aren')).toEqual([])
     expect(sharesVoiceWith(characters, 'nobody')).toEqual([])
+  })
+})
+
+describe('a character per language', () => {
+  const languages = ['en', 'sv']
+  const several: typeof project = {
+    ...project,
+    narration: {
+      ...project.narration,
+      languages,
+      paths: {
+        dialog: 'tts/{part}/{language}/script.json',
+        cues: 'c/{language}/{part}',
+        lock: 'l/{language}/{part}',
+        clips: 'a/{language}/{part}',
+        manifest: 'm/{language}/{part}',
+      },
+    },
+  }
+  const cast = CastSchema.parse({
+    speakers: {
+      mira: {
+        voice: 'v-en',
+        voiceName: 'Mira EN',
+        languages: { sv: { voice: 'v-sv', voiceName: 'Mira SV', speed: 0.95 } },
+      },
+      gran: { voice: 'v-en', languages: { sv: { voice: 'v-en' } } },
+      lone: { voice: 'v-lone' },
+    },
+  })
+  const summary = summarize(
+    input({
+      project: several,
+      cast,
+      dialogs: { act1: { status: 'ok', lines: lines('mira', 'mira', 'lone') } },
+      languageDialogs: {
+        sv: {
+          act1: {
+            status: 'ok',
+            lines: [
+              { key: 'a', speaker: 'mira', text: 'kort' },
+              { key: 'b', speaker: 'mira', text: 'en längre rad' },
+            ],
+          },
+        },
+      },
+    }),
+  )
+  const mira = summary.characters.find((c) => c.id === 'mira')!
+
+  it('keeps the source language’s fields as they were', () => {
+    expect(mira).toMatchObject({ voice: 'v-en', voiceName: 'Mira EN', totalLines: 2 })
+  })
+
+  it('knows each language’s voice, speed, lines and longest line', () => {
+    expect(mira.languages.sv).toEqual({
+      voice: 'v-sv',
+      voiceName: 'Mira SV',
+      speed: 0.95,
+      phrase: null,
+      appearances: [{ part: 'act1', lines: 2 }],
+      totalLines: 2,
+      longest: 'en längre rad',
+    })
+    expect(mira.languages.en?.longest).toBe('line 0')
+  })
+
+  it('leaves out lines too long for one take when choosing her longest', () => {
+    const long = 'x'.repeat(401)
+    const found = summarize(
+      input({
+        project: several,
+        dialogs: {
+          act1: {
+            status: 'ok',
+            lines: [
+              { key: 'a', speaker: 'mira', text: 'kort' },
+              { key: 'b', speaker: 'mira', text: long },
+            ],
+          },
+        },
+      }),
+    )
+    expect(found.characters[0]?.languages.en?.longest).toBe('kort')
+  })
+
+  it('has no voice and no lines for a language she is not in', () => {
+    const lone = summary.characters.find((c) => c.id === 'lone')!
+    expect(lone.languages.sv).toMatchObject({ voice: null, appearances: [], longest: null })
+  })
+
+  it('notes a shared voice only within one language', () => {
+    const { characters } = summary
+    expect(sharesVoiceWith(characters, 'mira', 'en').map((c) => c.id)).toEqual(['gran'])
+    expect(sharesVoiceWith(characters, 'mira', 'sv')).toEqual([])
+    expect(sharesVoiceWith(characters, 'gran', 'sv')).toEqual([])
   })
 })

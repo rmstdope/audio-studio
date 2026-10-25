@@ -142,6 +142,11 @@ const NarrationSchema = z
           .default(
             'Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.',
           ),
+        /**
+         * The standard phrase of the other languages, by language code: the source language's is
+         * `phrase`. A language without one has no standard phrase.
+         */
+        phrases: z.record(z.string(), z.string().min(1)).optional(),
         candidatesPerRound: z.number().int().min(1).default(5),
         language: z.string().default('en'),
       })
@@ -159,12 +164,30 @@ const NarrationSchema = z
         })
       }
     }
+    for (const language of Object.keys(narration.audition.phrases ?? {})) {
+      if (narration.languages.includes(language)) continue
+      context.addIssue({
+        code: 'custom',
+        path: ['audition', 'phrases', language],
+        message: `"${language}" is not one of the project’s languages`,
+      })
+    }
     const limit = narration.quality.chunkLimit
     // A wrong limit is reported on its own; measuring against it would only add noise.
     if (!Number.isInteger(limit) || limit < MIN_CHUNK) return
     const problem = phraseProblem(narration.audition.phrase, limit)
     if (problem)
       context.addIssue({ code: 'custom', path: ['audition', 'phrase'], message: problem })
+    for (const [language, phrase] of Object.entries(narration.audition.phrases ?? {})) {
+      const tooLong = phraseProblem(phrase, limit)
+      if (tooLong) {
+        context.addIssue({
+          code: 'custom',
+          path: ['audition', 'phrases', language],
+          message: tooLong,
+        })
+      }
+    }
   })
 
 /** The project file, `audio-studio.json`, in the consumer repository's root. */
@@ -189,6 +212,16 @@ export type PartPaths = Project['narration']['paths']
 export function partPathFor(template: string, partId: string, language?: string): string {
   const path = template.replaceAll('{part}', partId)
   return language === undefined ? path : path.replaceAll('{language}', language)
+}
+
+/** The language a request means: the one asked for if the project declares it, else the source language. */
+export function declaredLanguage(
+  narration: Pick<Project['narration'], 'languages'>,
+  asked: string | undefined,
+): string {
+  return asked !== undefined && narration.languages.includes(asked)
+    ? asked
+    : narration.languages[0]!
 }
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */

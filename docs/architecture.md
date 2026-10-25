@@ -225,6 +225,9 @@ an id and a title.
   Path templates may contain `{language}`; with more than one language every path (`dialog`,
   `cues`, `lock`, `clips`, `manifest`) must, or languages would share a file. Each language is
   named in itself in the UI (`core/languages.ts`: `sv` is Svenska).
+- `audition.phrases` (optional, language code → phrase) is the standard audition phrase of each
+  language but the first, whose own is `audition.phrase`; each must fit one take. A language
+  without one borrows her longest line (§6).
 - `refreshDialog` is optional. When set, the UI offers **Refresh dialog**, which runs it in the
   project root and reloads the script. This is how the studio stays generic: the game owns how its
   dialog is extracted.
@@ -272,6 +275,16 @@ say); the studio points it out on their pages and cards, as a note, not a proble
   "pronounce": { "Act I:": "Act One:" }
 }
 ```
+
+**Per language** (as-170.2): the fields above are the source language's (the first declared). Her
+casting in any other language is `languages: { "sv": { voice, voiceName, speed, phrase } }` on the
+same entry, so a single-language cast, and RetroQuest's file, are unchanged. Keywords and style
+are one set for every language. `core/resources.ts` reads it through `voiceOf` and `projectCast`,
+which gives the planner and the takes the cast as one language sees it. The audition phrase of a
+language is her own in it, else the project's standard one in it, else her longest line in it, else
+none (and no audition can start). Her audition and ruled-out voices are kept per language in the
+cache, the source language's under the names they always had; an audition's shortlist starts
+with her voices in the other languages, so they can be heard saying this language's phrase.
 
 New fields: `voiceName` (shown in the UI; the id alone is unreadable), `audition` (the keywords,
 plus an optional phrase that replaces the project's standard one) and `speed` (the character's own
@@ -759,7 +772,9 @@ spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
 `undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model; `GET`, `POST` (`{ amount }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }`) are the audition's money; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
-`DELETE /api/characters/:id/ruled-out/:voice` (allow one again). The rest is the plan:
+`DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
+voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
+not declared), and casting changes that language only. The rest is the plan:
 
 ```
 GET    /api/project                              project, parts
@@ -1017,6 +1032,9 @@ Small, independently useful increments:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's
        progress, untranslated lines, read only (no recording yet).
+    2. **Cast each character per language** (built): a voice, speed and phrase per language in the
+       cast, an audition and ruled-out voices per language, a language switch on a character's
+       page and its audition, and a chip on a card for each language without a voice.
 
 ---
 

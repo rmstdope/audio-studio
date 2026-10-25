@@ -1,6 +1,32 @@
 import { describe, expect, it } from 'bun:test'
 import { parseRoute, routeHref } from './route'
 
+describe('a character’s language in the address', () => {
+  it('is kept on the character’s page and on its audition', () => {
+    expect(parseRoute('#/characters/mira?language=sv')).toEqual({
+      view: 'character',
+      character: 'mira',
+      language: 'sv',
+    })
+    expect(parseRoute('#/characters/mira/audition?language=sv')).toEqual({
+      view: 'audition',
+      character: 'mira',
+      language: 'sv',
+    })
+    expect(routeHref({ view: 'character', character: 'mira', language: 'sv' })).toBe(
+      '#/characters/mira?language=sv',
+    )
+    expect(routeHref({ view: 'audition', character: 'old mira', language: 'sv' })).toBe(
+      '#/characters/old%20mira/audition?language=sv',
+    )
+  })
+
+  it('is left out when there is none, as before', () => {
+    expect(parseRoute('#/characters/mira')).toEqual({ view: 'character', character: 'mira' })
+    expect(routeHref({ view: 'character', character: 'mira' })).toBe('#/characters/mira')
+  })
+})
+
 describe('parseRoute', () => {
   it('reads a part', () => {
     expect(parseRoute('#/parts/act2')).toEqual({ view: 'part', part: 'act2' })

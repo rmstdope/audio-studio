@@ -3,24 +3,54 @@ import type { Project } from './project'
 import type { Character } from './resources'
 import { spokenText } from './spoken'
 
-/** What a character says in an audition: the phrase, whether it is its own, and the text sent. */
+/** Where an audition phrase comes from. */
+export type PhraseSource = 'own' | 'standard' | 'line' | 'none'
+
+/** What a character says in an audition: the phrase, where it came from, and the text sent. */
 export interface AuditionText {
-  phrase: string
-  /** True when the character has its own phrase, false for the project's standard one. */
-  own: boolean
+  /** The phrase; null when there is none (`from` is `none`). */
+  phrase: string | null
+  /**
+   * The character's own phrase, the project's standard one, her longest line in the language, or
+   * nothing.
+   */
+  from: PhraseSource
+  /** Whether the project has a standard phrase in the language, which clearing her own would go back to. */
+  standard: boolean
   /** The phrase as sent to Fish: the character's style cue, then the words as the cast says them. */
   spoken: string
 }
 
-/** The audition phrase for a character: its own if it has one, else the project's standard one. */
+/**
+ * The audition phrase for a character in a language (`character` as that language sees it, see
+ * `projectCast`): its own if it has one, else the project's standard one for the language, else
+ * `longest`, her longest line in it. The source language always has the standard one.
+ */
 export function auditionText(
   character: Pick<Character, 'style' | 'audition'>,
   pronounce: Record<string, string>,
   narration: Project['narration'],
+  language: string = narration.languages[0]!,
+  longest: string | null = null,
 ): AuditionText {
   const own = character.audition?.phrase?.trim()
-  const phrase = own || narration.audition.phrase
-  return { phrase, own: Boolean(own), spoken: spokenText(phrase, character.style ?? '', pronounce) }
+  const standard =
+    language === narration.languages[0]
+      ? narration.audition.phrase
+      : narration.audition.phrases?.[language]
+  const [phrase, from]: [string | null, PhraseSource] = own
+    ? [own, 'own']
+    : standard
+      ? [standard, 'standard']
+      : longest
+        ? [longest, 'line']
+        : [null, 'none']
+  return {
+    phrase,
+    from,
+    standard: Boolean(standard),
+    spoken: phrase === null ? '' : spokenText(phrase, character.style ?? '', pronounce),
+  }
 }
 
 /** Everything that changes an audition take's audio. */

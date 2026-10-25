@@ -13,6 +13,7 @@ import {
 } from '../../api'
 import { audioSeconds } from '../../audioLength'
 import { castEffects } from '../../board'
+import { castInLanguage, type Language } from '../../castLanguages'
 import { Confirm } from '../../components/Confirm'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { recordedLinesOf } from '../../inGame'
@@ -86,9 +87,17 @@ export function CloneVoice({
   sessionKnown,
   playing,
   toggle,
+  language,
+  languageName,
+  languages = [],
 }: {
   characterId: string
   name: string
+  /** Every declared language, for saying what casting leaves alone. */
+  languages?: Language[]
+  /** The language it is cast for, in a project with several; left out otherwise. */
+  language?: string
+  languageName?: string
   /** The title of the voice cast now, if there is one. */
   currentTitle: string | null
   /** The character's parts, for the lines casting makes stale. */
@@ -176,7 +185,7 @@ export function CloneVoice({
       setMade(result.voice)
       setSample('recording')
       setMode('made')
-      void recordVoiceTake(characterId, result.voice.id).then(
+      void recordVoiceTake(characterId, result.voice.id, language).then(
         (take) =>
           setSample(
             take.ok
@@ -258,6 +267,9 @@ export function CloneVoice({
         ) : confirming ? (
           <CastOwnConfirm
             characterId={characterId}
+            language={language}
+            languageName={languageName}
+            languages={languages}
             name={name}
             current={currentTitle}
             voice={made}
@@ -269,6 +281,7 @@ export function CloneVoice({
         ) : (
           <CardButtons
             characterId={characterId}
+            language={language}
             name={name}
             currentTitle={currentTitle}
             voice={made}
@@ -409,6 +422,7 @@ export function CloneVoice({
 /** The card's buttons: cast, bring into the audition, close. */
 function CardButtons({
   characterId,
+  language,
   name,
   currentTitle,
   voice,
@@ -419,6 +433,7 @@ function CardButtons({
   onClose,
 }: {
   characterId: string
+  language?: string
   name: string
   currentTitle: string | null
   voice: { id: string; name: string }
@@ -429,7 +444,7 @@ function CardButtons({
   onCast: () => void
   onClose: () => void
 }) {
-  const session = useSessionAction(characterId)
+  const session = useSessionAction(characterId, language)
   const [error, setError] = useState<string | null>(null)
 
   async function bring() {
@@ -441,7 +456,11 @@ function CardButtons({
       }
       const added = await session.mutateAsync({ action: 'add', body: { voice: voice.id } })
       if (!added.ok) return setError('message' in added ? added.message : PROJECT)
-      window.location.hash = routeHref({ view: 'audition', character: characterId })
+      window.location.hash = routeHref({
+        view: 'audition',
+        character: characterId,
+        ...(language ? { language } : {}),
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -473,6 +492,9 @@ function CardButtons({
 /** The question before casting the new voice: what changes, as when casting from the audition. */
 function CastOwnConfirm({
   characterId,
+  language,
+  languageName,
+  languages,
   name,
   current,
   voice,
@@ -482,6 +504,9 @@ function CastOwnConfirm({
   onCast,
 }: {
   characterId: string
+  language?: string
+  languageName?: string
+  languages: Language[]
   name: string
   current: string | null
   voice: { id: string; name: string }
@@ -490,8 +515,11 @@ function CastOwnConfirm({
   onBack: () => void
   onCast: () => void
 }) {
-  const cast = useCastOwnVoice(characterId)
-  const loaded = useParts(parts.map((p) => p.id))
+  const cast = useCastOwnVoice(characterId, language)
+  const loaded = useParts(
+    parts.map((p) => p.id),
+    language,
+  )
   const listed = parts.map((p, i) => {
     const data = loaded[i]?.data
     return { ...p, lines: data?.ok ? data.part.lines : null }
@@ -505,7 +533,11 @@ function CastOwnConfirm({
   })
   return (
     <Confirm
-      title={`Cast ${voice.name} as ${name}?`}
+      title={
+        languageName
+          ? `Cast ${voice.name} as ${name}’s ${languageName} voice?`
+          : `Cast ${voice.name} as ${name}?`
+      }
       back="Back"
       effects={castEffects({
         name,
@@ -516,6 +548,21 @@ function CastOwnConfirm({
         dropped: inProgress?.dropped.length ?? 0,
         unheard: inProgress ? inProgress.toHear.length + inProgress.queue.length : 0,
         auditioning: inProgress !== null,
+        ...(language && languageName
+          ? {
+              language: languageName,
+              stale: castInLanguage(
+                voice.name,
+                name,
+                languages,
+                language,
+                recorded.map((a) => ({
+                  title: parts.find((p) => p.id === a.part)?.title ?? a.part,
+                  lines: a.lines,
+                })),
+              ).stale,
+            }
+          : {}),
       })}
       onBack={onBack}
     >

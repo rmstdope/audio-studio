@@ -88,9 +88,19 @@ export function App() {
         ) : route.view === 'characters' ? (
           <CharactersView summary={summary} />
         ) : route.view === 'character' ? (
-          <CharacterView key={route.character} summary={summary} characterId={route.character} />
+          <CharacterView
+            key={route.character}
+            summary={summary}
+            characterId={route.character}
+            asked={route.language}
+          />
         ) : route.view === 'audition' ? (
-          <AuditionView key={route.character} summary={summary} characterId={route.character} />
+          <AuditionView
+            key={route.character}
+            summary={summary}
+            characterId={route.character}
+            asked={route.language}
+          />
         ) : route.view === 'lines' ? (
           <LinesView key={part.id} summary={summary} part={part} language={route.language} />
         ) : (

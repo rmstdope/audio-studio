@@ -43,30 +43,35 @@ export const AuditionSessionSchema = z.object({
 /** An audition in progress for one character. */
 export type AuditionSession = z.infer<typeof AuditionSessionSchema>
 
-/** The start: the current voice (if any) on the shortlist, the top `perRound` candidates to hear. */
+/** The start: the current voice (if any) and her other languages' voices on the shortlist, the top `perRound` candidates to hear. */
 export function startSession(options: {
   character: string
   keywords: string[]
   current: Voice | null
+  /** Her voices in other languages: shortlisted after the current one, to hear in this language. */
+  others?: Voice[]
   candidates: Candidate[]
   perRound: number
 }): AuditionSession {
-  const { character, keywords, current, candidates, perRound } = options
-  const ranked = candidates.filter((c) => c.voice.id !== current?.id)
+  const { character, keywords, current, others = [], candidates, perRound } = options
+  const listed = [...(current ? [current] : []), ...others].filter(
+    (voice, i, all) => all.findIndex((v) => v.id === voice.id) === i,
+  )
+  const ranked = candidates.filter((c) => !listed.some((v) => v.id === c.voice.id))
   const voices: Record<string, Voice> = {}
   const matched: Record<string, string[]> = {}
   for (const { voice, matched: words } of ranked) {
     voices[voice.id] = voice
     matched[voice.id] = words
   }
-  if (current) voices[current.id] = current
+  for (const voice of listed) voices[voice.id] = voice
   const ids = ranked.map((c) => c.voice.id)
   return {
     version: 2,
     character,
     keywords,
     current: current?.id ?? null,
-    shortlist: current ? [current.id] : [],
+    shortlist: listed.map((v) => v.id),
     yours: [],
     mine: [],
     toHear: ids.slice(0, perRound),

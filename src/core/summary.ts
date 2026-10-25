@@ -1,7 +1,7 @@
 import { languageName } from './languages'
-import { partPathFor, type Problem, type Project } from './project'
+import { partPathFor, phraseProblem, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
-import type { Cast, Line } from './resources'
+import { voiceOf, type Cast, type Line } from './resources'
 
 /** What reading a part's dialog gave: its lines, no file yet, or a file that failed validation. */
 export type DialogState =
@@ -24,7 +24,24 @@ export interface PartSummary {
   characters: { id: string; lines: number }[]
 }
 
-/** A character as the UI shows it: its cast entry and where it speaks across the project. */
+/** A character in one language: its casting there, and where it speaks in that language's dialog. */
+export interface CharacterLanguage {
+  voice: string | null
+  voiceName: string | null
+  /** The character's own speed in the language, or null for the project's. */
+  speed: number | null
+  /** The character's own audition phrase in the language, or null. */
+  phrase: string | null
+  appearances: Appearance[]
+  totalLines: number
+  /** The character's longest line in the language (first on a tie); null without lines. */
+  longest: string | null
+}
+
+/**
+ * A character as the UI shows it: its cast entry and where it speaks across the project. The
+ * fields on its own are the source language's; `languages` has every declared language.
+ */
 export interface CharacterSummary {
   id: string
   name: string
@@ -36,20 +53,27 @@ export interface CharacterSummary {
   keywords: string[]
   appearances: Appearance[]
   totalLines: number
+  /** The character in each declared language, by code. */
+  languages: Record<string, CharacterLanguage>
 }
 
 /**
- * The other characters cast with the same voice as `characterId`: two characters in one voice are
- * hard to tell apart in a scene, so the UI points it out (it may be meant: a narrator and a
- * character in a prologue). Empty for an uncast or unknown character.
+ * The other characters cast with the same voice as `characterId` in `language` (the source
+ * language's when none is named): two characters in one voice are hard to tell apart in a scene,
+ * so the UI points it out (it may be meant: a narrator and a character in a prologue). One
+ * character with the same voice in two languages is not a note. Empty for an uncast or unknown
+ * character.
  */
 export function sharesVoiceWith(
   characters: CharacterSummary[],
   characterId: string,
+  language?: string,
 ): CharacterSummary[] {
-  const voice = characters.find((c) => c.id === characterId)?.voice
+  const voiceIn = (c: CharacterSummary) => (language ? c.languages[language]?.voice : c.voice)
+  const self = characters.find((c) => c.id === characterId)
+  const voice = self && voiceIn(self)
   if (!voice) return []
-  return characters.filter((c) => c.id !== characterId && c.voice === voice)
+  return characters.filter((c) => c.id !== characterId && voiceIn(c) === voice)
 }
 
 /** Everything the overview needs about the project, from the project file and its resources. */
@@ -85,6 +109,8 @@ export interface SummaryInput {
   projectFile: string
   root: string
   dialogs: Record<string, DialogState>
+  /** The other languages' dialogs by language code, then part; a language left out has none. */
+  languageDialogs?: Record<string, Record<string, DialogState>>
   cast: Cast | null
   problems: Problem[]
 }
@@ -103,6 +129,7 @@ export function summarize({
   projectFile,
   root,
   dialogs,
+  languageDialogs = {},
   cast,
   problems,
 }: SummaryInput): ProjectSummary {
@@ -128,11 +155,58 @@ export function summarize({
     }
   })
 
+  const source = narration.languages[0]!
+  // Where each character speaks in each language, and its longest line there.
+  const spoken = new Map<
+    string,
+    Map<string, { appearances: Appearance[]; longest: string | null }>
+  >()
+  for (const language of narration.languages) {
+    const byPart = language === source ? dialogs : (languageDialogs[language] ?? {})
+    const found = new Map<string, { appearances: Appearance[]; longest: string | null }>()
+    for (const part of narration.parts) {
+      const dialog = byPart[part.id]
+      if (dialog?.status !== 'ok') continue
+      for (const [id, count] of countBySpeaker(dialog.lines)) {
+        const entry = found.get(id) ?? { appearances: [], longest: null }
+        entry.appearances.push({ part: part.id, lines: count })
+        found.set(id, entry)
+      }
+      for (const line of dialog.lines) {
+        const entry = found.get(line.speaker)!
+        // Only a line that fits one take can be a phrase.
+        const fits = phraseProblem(line.text, narration.quality.chunkLimit) === null
+        if (
+          fits &&
+          line.text.trim() &&
+          (entry.longest === null || [...line.text].length > [...entry.longest].length)
+        )
+          entry.longest = line.text
+      }
+    }
+    spoken.set(language, found)
+  }
+
   const speakers = cast?.speakers ?? {}
   const ids = new Set([...Object.keys(speakers), ...appearances.keys()])
   const characters = [...ids].map((id): CharacterSummary => {
     const entry = speakers[id]
     const seen = appearances.get(id) ?? []
+    const languages = Object.fromEntries(
+      narration.languages.map((language): [string, CharacterLanguage] => {
+        const where = spoken.get(language)?.get(id)
+        const lines = where?.appearances ?? []
+        return [
+          language,
+          {
+            ...voiceOf(entry, language, source),
+            appearances: lines,
+            totalLines: lines.reduce((sum, a) => sum + a.lines, 0),
+            longest: where?.longest ?? null,
+          },
+        ]
+      }),
+    )
     return {
       id,
       name: displayName(id),
@@ -143,6 +217,7 @@ export function summarize({
       keywords: entry?.audition?.keywords ?? [],
       appearances: seen,
       totalLines: seen.reduce((sum, a) => sum + a.lines, 0),
+      languages,
     }
   })
 

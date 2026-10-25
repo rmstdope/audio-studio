@@ -127,3 +127,69 @@ describe('ruled-out voices, saved', () => {
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
   })
 })
+
+describe('ruled-out voices per language', () => {
+  const base = projectJson()
+  const several = {
+    ...files,
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+      },
+    },
+  }
+  const open = () => join(tempRepo(several), 'audio-studio.json')
+
+  it('keeps a list for each language: ruling out in Svenska leaves English alone', async () => {
+    const projectFile = open()
+    await updateRuledOut(projectFile, 'mira', { out: [{ id: 'a', title: 'A' }], language: 'sv' })
+    expect(await ruledOutIds(projectFile, 'mira', 'sv')).toEqual(['a'])
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+    expect(await ruledOutIds(projectFile, 'mira', 'en')).toEqual([])
+  })
+
+  it('allows a voice again, or forgets them all, in one language only', async () => {
+    const projectFile = open()
+    for (const language of ['en', 'sv']) {
+      await updateRuledOut(projectFile, 'mira', {
+        out: [
+          { id: 'a', title: 'A' },
+          { id: 'b', title: 'B' },
+        ],
+        language,
+      })
+    }
+    await allowVoices(projectFile, 'mira', ['a'], 'sv')
+    expect(await ruledOutIds(projectFile, 'mira', 'sv')).toEqual(['b'])
+    await allowVoices(projectFile, 'mira', 'all', 'sv')
+    expect(await ruledOutIds(projectFile, 'mira', 'sv')).toEqual([])
+    expect((await ruledOutIds(projectFile, 'mira')).sort()).toEqual(['a', 'b'])
+  })
+
+  it('lists a language’s voices, and takes a language the project lacks for the source language', async () => {
+    const projectFile = open()
+    await updateRuledOut(projectFile, 'mira', { out: [{ id: 'a', title: 'A' }], language: 'fr' })
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
+    const listed = await ruledOutVoices(projectFile, 'mira', 'sv')
+    expect(listed).toEqual({ ok: true, voices: [] })
+  })
+
+  it('keeps the source language’s file where it was', async () => {
+    const projectFile = open()
+    await updateRuledOut(projectFile, 'mira', { out: [{ id: 'a', title: 'A' }] })
+    await updateRuledOut(projectFile, 'mira', { out: [{ id: 'b', title: 'B' }], language: 'sv' })
+    const dir = join(projectFile, '..', RULED_OUT_DIR)
+    expect(readdirSync(dir)).toHaveLength(2)
+    expect(readdirSync(dir).filter((f) => f.startsWith('mira-'))).toHaveLength(1)
+    expect(readdirSync(dir).filter((f) => f.startsWith('mira_sv-'))).toHaveLength(1)
+  })
+})

@@ -24,10 +24,16 @@ export function castEffects({
   titles,
   dropped,
   unheard,
+  language,
+  stale,
   auditioning = true,
 }: {
   /** The character's name. */
   name: string
+  /** The language being cast, named, in a project with several. */
+  language?: string
+  /** What to say of the lines gone stale in place of the usual sentence (null: nothing). */
+  stale?: string | null
   /** The title of the character's voice now, if it has one. */
   current: string | null
   /** Whether the voice cast is another than the character's voice now. */
@@ -45,7 +51,9 @@ export function castEffects({
 }): string[] {
   const lines = replacing ? recorded.reduce((sum, a) => sum + a.lines, 0) : 0
   const effects: string[] = []
-  if (lines) {
+  if (stale !== undefined) {
+    if (stale && lines) effects.push(stale)
+  } else if (lines) {
     const where = recorded.map((a) => `${titles.get(a.part) ?? a.part}: ${a.lines}`).join(', ')
     effects.push(
       `${plural(lines, 'recorded line')} ${lines === 1 ? 'goes' : 'go'} stale (${where}). ` +
@@ -54,7 +62,7 @@ export function castEffects({
   }
   if (current && replacing) {
     effects.push(
-      `${current} is no longer ${name}’s voice. It is not ruled out: it can come back in a later audition.`,
+      `${current} is no longer ${name}’s ${language ? `${language} ` : ''}voice. It is not ruled out: it can come back in a later audition.`,
     )
   }
   const after = [

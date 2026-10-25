@@ -43,6 +43,34 @@ function start(current: Voice | null = null): AuditionSession {
   })
 }
 
+describe('startSession with her voices in other languages', () => {
+  const begin = (current: Voice | null, others: Voice[]) =>
+    startSession({
+      character: 'mira',
+      keywords: ['warm'],
+      current,
+      others,
+      candidates: candidates('a', 'b', 'c', 'x'),
+      perRound: 3,
+    })
+
+  it('shortlists them after the current voice, so they can be heard saying the new phrase', () => {
+    const session = begin(voice('cur'), [voice('en'), voice('de')])
+    expect(session.shortlist).toEqual(['cur', 'en', 'de'])
+    expect(Object.keys(session.voices)).toContain('en')
+  })
+
+  it('lists a voice once, and does not offer it again among the candidates', () => {
+    const session = begin(voice('cur'), [voice('cur'), voice('x'), voice('x')])
+    expect(session.shortlist).toEqual(['cur', 'x'])
+    expect([...session.toHear, ...session.queue]).toEqual(['a', 'b', 'c'])
+  })
+
+  it('shortlists them when she has no voice in the language yet', () => {
+    expect(begin(null, [voice('en')]).shortlist).toEqual(['en'])
+  })
+})
+
 describe('startSession', () => {
   it('puts the current voice on the shortlist and the top candidates up to hear', () => {
     const session = start(voice('cur'))

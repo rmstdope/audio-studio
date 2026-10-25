@@ -72,6 +72,34 @@ describe('ProjectSchema', () => {
     ])
   })
 
+  it('takes a standard audition phrase per declared language, each short enough for one take', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    const withPhrases = (phrases: Record<string, string>) => ({
+      ...base,
+      narration: {
+        ...narration,
+        languages: ['en', 'sv'],
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+        audition: { phrases },
+      },
+    })
+    const ok = parse(withPhrases({ sv: 'Kom in.' }))
+    expect(ok.data?.narration.audition.phrases).toEqual({ sv: 'Kom in.' })
+    expect(problems(withPhrases({ de: 'Komm herein.' })).map((p) => [p.path, p.message])).toEqual([
+      ['narration.audition.phrases.de', '"de" is not one of the project’s languages'],
+    ])
+    expect(problems(withPhrases({ sv: 'x'.repeat(401) }))[0]?.path).toBe(
+      'narration.audition.phrases.sv',
+    )
+  })
+
   it('never refuses a project for the built-in phrase, whatever chunk limit it allows', () => {
     const base = projectJson()
     const narration = base.narration as Record<string, unknown>

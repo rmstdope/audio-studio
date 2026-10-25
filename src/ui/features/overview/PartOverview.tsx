@@ -97,7 +97,7 @@ export function PartOverview({
                 : 'Checking clips…'}
             </section>
           )}
-          <CastSection summary={summary} part={part} detail={loaded} />
+          <CastSection summary={summary} part={part} detail={loaded} language={language} />
         </>
       )}
     </>
@@ -191,10 +191,13 @@ function CastSection({
   summary,
   part,
   detail,
+  language,
 }: {
   summary: ProjectSummary
   part: PartSummary
   detail: PartDetail | null
+  /** The language in the address, which a card's Open keeps. */
+  language?: string
 }) {
   const byId = new Map(summary.characters.map((c) => [c.id, c]))
   const titles = new Map(summary.parts.map((p) => [p.id, shortTitle(p.title)]))
@@ -230,6 +233,8 @@ function CastSection({
               .filter((a) => a.part !== part.id)
               .map((a) => `Also in ${titles.get(a.part) ?? a.part}`)}
             sharedVoice={sharesVoiceWith(summary.characters, character.id).length > 0}
+            languages={summary.languages}
+            language={language}
           />
         ))}
       </div>

@@ -600,3 +600,133 @@ describe('refreshOwnVoices', () => {
     expect(result).toMatchObject({ ok: false, reason: 'no-session' })
   })
 })
+
+describe('an audition per language', () => {
+  const base = projectJson()
+  const several = {
+    ...files,
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        audition: { candidatesPerRound: 3 },
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+      },
+    },
+    'tts/act1/script.json': undefined,
+    'tts/act2/script.json': undefined,
+    'audio/act1/manifest.json': undefined,
+    'audio/act1/a1.mp3': undefined,
+    'tts/act1/en/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
+    'tts/act1/sv/script.json': [
+      { key: 'a1', speaker: 'mira', text: 'Välkommen.' },
+      { key: 'a2', speaker: 'mira', text: 'Igen och igen.' },
+    ],
+    'audio/act1/sv/manifest.json': { a1: { file: 'a1.mp3' }, a2: { file: 'a2.mp3' } },
+    'audio/act1/sv/a1.mp3': 'clip',
+    'audio/act1/sv/a2.mp3': 'clip',
+  }
+  const begin = async (language = 'sv') => {
+    const root = tempRepo(several)
+    const projectFile = join(root, 'audio-studio.json')
+    const result = await startAudition(projectFile, 'mira', fishFor, language)
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    return { root, projectFile, session: result.session }
+  }
+  const castFile = (root: string) => JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+
+  it('starts with her voice in another language on the shortlist, when she has none in this one', async () => {
+    const { projectFile, session } = await begin()
+    expect(session.current).toBeNull()
+    expect(session.shortlist).toEqual(['cur'])
+    expect(session.toHear).toEqual(['a', 'b', 'c'])
+    expect(await sessionFor(projectFile, 'mira', 'sv')).toEqual({ ok: true, session })
+    expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
+  })
+
+  it('keeps one audition for each language, so one can wait while another is started', async () => {
+    const { projectFile } = await begin()
+    const en = await startAudition(projectFile, 'mira', fishFor)
+    expect(en?.ok && en.session.current).toBe('cur')
+    await moveVoice(projectFile, 'mira', 'a', 'shortlist', 'sv')
+    const sv = await sessionFor(projectFile, 'mira', 'sv')
+    const english = await sessionFor(projectFile, 'mira')
+    expect(sv?.ok && sv.session?.shortlist).toEqual(['cur', 'a'])
+    expect(english?.ok && english.session?.shortlist).toEqual(['cur'])
+  })
+
+  it('rules a dropped voice out in this language only', async () => {
+    const { projectFile } = await begin()
+    await moveVoice(projectFile, 'mira', 'a', 'drop', 'sv')
+    expect(await ruledOutIds(projectFile, 'mira', 'sv')).toEqual(['a'])
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+    await undoLastDrop(projectFile, 'mira', 'sv')
+    expect(await ruledOutIds(projectFile, 'mira', 'sv')).toEqual([])
+  })
+
+  it('shows the language’s phrase and the lines casting would make stale in it', async () => {
+    const { projectFile } = await begin()
+    const result = await sessionFor(projectFile, 'mira', 'sv')
+    const view = await viewOf(projectFile, 'mira', result!, { language: 'sv' })
+    expect(view).toMatchObject({
+      ok: true,
+      audition: { phrase: 'Igen och igen.', from: 'line' },
+      recorded: [{ part: 'act1', lines: 2 }],
+    })
+    expect(await recordedLines(projectFile, 'mira')).toEqual([])
+    expect(await recordedLines(projectFile, 'mira', 'sv')).toEqual([{ part: 'act1', lines: 2 }])
+  })
+
+  it('casts for this language only: its voice is added, English is left, and only its lines go stale', async () => {
+    const { root, projectFile } = await begin()
+    await moveVoice(projectFile, 'mira', 'b', 'shortlist', 'sv')
+    const result = await castVoice(projectFile, 'mira', 'b', 'sv')
+    expect(result).toEqual({
+      ok: true,
+      voice: { id: 'b', name: 'Warm b' },
+      changed: true,
+      stale: [{ part: 'act1', lines: 2 }],
+    })
+    expect(castFile(root).speakers.mira).toMatchObject({
+      voice: 'cur',
+      languages: { sv: { voice: 'b', voiceName: 'Warm b' } },
+    })
+    expect(await sessionFor(projectFile, 'mira', 'sv')).toEqual({ ok: true, session: null })
+  })
+
+  it('casts one of her voices from another language, once it has been heard saying this language’s phrase', async () => {
+    const { projectFile } = await begin()
+    const result = await castVoice(projectFile, 'mira', 'cur', 'sv')
+    expect(result).toMatchObject({ ok: true, changed: true })
+  })
+
+  it('does not start without a phrase to say, and says why', async () => {
+    const root = tempRepo({
+      ...several,
+      'tts/act1/sv/script.json': [],
+      'audio/act1/sv/manifest.json': {},
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await startAudition(projectFile, 'mira', fishFor, 'sv')).toMatchObject({
+      ok: false,
+      reason: 'no-phrase',
+    })
+    expect(await sessionFor(projectFile, 'mira', 'sv')).toEqual({ ok: true, session: null })
+  })
+
+  it('discards one language’s audition and leaves the others', async () => {
+    const { projectFile } = await begin()
+    await startAudition(projectFile, 'mira', fishFor)
+    await discardSession(projectFile, 'mira', 'sv')
+    expect(await sessionFor(projectFile, 'mira', 'sv')).toEqual({ ok: true, session: null })
+    const en = await sessionFor(projectFile, 'mira')
+    expect(en?.ok && en.session).not.toBeNull()
+  })
+})

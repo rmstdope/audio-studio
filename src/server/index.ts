@@ -58,6 +58,7 @@ import { heardFor } from '../services/heard'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
 import {
   adoptPart,
+  cacheNameFor,
   clipFile,
   loadPart,
   loadProject,
@@ -242,7 +243,7 @@ export function startServer({
   async function answer(
     characterId: string,
     pending: Promise<SessionResult>,
-    options: { recorded?: boolean } = {},
+    options: { recorded?: boolean; language?: string } = {},
   ): Promise<Response> {
     const result = await pending
     if (!result) return notFound()
@@ -337,6 +338,10 @@ export function startServer({
    */
   const sittings = new Map<string, Budget>()
 
+  /** What a character's sitting is kept under: its id and the language of the audition it is for. */
+  const sittingKey = (characterId: string, request: Request) =>
+    cacheNameFor(projectFile, characterId, languageOf(request))
+
   /** Ends a character's sitting: what was left is not kept, and the credit is free again. */
   function endSitting(characterId: string) {
     const budget = sittings.get(characterId)
@@ -348,11 +353,11 @@ export function startServer({
   }
 
   /** The money of a character's audition for the page; null for an unknown character. */
-  async function sittingView(characterId: string) {
-    const money = await auditionMoney(projectFile, characterId)
+  async function sittingView(characterId: string, key: string, language?: string) {
+    const money = await auditionMoney(projectFile, characterId, language)
     if (!money || !money.ok) return money
     const paid = isPaid(money.model, new Date())
-    const budget = paid ? sittings.get(characterId) : undefined
+    const budget = paid ? sittings.get(key) : undefined
     const view: SittingView = {
       model: money.model,
       paid,
@@ -365,9 +370,17 @@ export function startServer({
   }
 
   /** A sitting's answer: its money, or why it was refused (409), or 404 for an unknown character. */
-  async function sittingAnswer(characterId: string, refused?: SpendProblem | null) {
+  async function sittingAnswer(
+    request: Request,
+    characterId: string,
+    refused?: SpendProblem | null,
+  ) {
     if (refused) return Response.json({ ok: false, ...refused }, { status: 409 })
-    const view = await sittingView(characterId)
+    const view = await sittingView(
+      characterId,
+      await sittingKey(characterId, request),
+      languageOf(request),
+    )
     if (!view) return notFound()
     return Response.json(view, { status: view.ok ? 200 : 409 })
   }
@@ -379,11 +392,11 @@ export function startServer({
 
   /** What generating a part (or one speaker in it) would do, or why it can't be planned. */
   /** Saves the one field of a character a PATCH changes. */
-  function changeCharacter(id: string, change: z.infer<typeof CharacterBody>) {
+  function changeCharacter(id: string, change: z.infer<typeof CharacterBody>, language?: string) {
     if ('keywords' in change) return setKeywords(projectFile, id, change.keywords)
     if ('style' in change) return setStyle(projectFile, id, change.style)
-    if ('speed' in change) return setSpeed(projectFile, id, change.speed)
-    return setPhrase(projectFile, id, change.phrase)
+    if ('speed' in change) return setSpeed(projectFile, id, change.speed, language)
+    return setPhrase(projectFile, id, change.phrase, language)
   }
 
   async function planFor(
@@ -664,7 +677,7 @@ export function startServer({
             )
           }
           const { id } = request.params
-          const result = await changeCharacter(id, body.data)
+          const result = await changeCharacter(id, body.data, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
@@ -823,21 +836,31 @@ export function startServer({
           }
           const { id } = request.params
           const { voice, board } = body.data
-          const budget = board ? sittings.get(id) : undefined
-          const result = await recordTake(projectFile, id, voice, fishFor, fishWork, {
-            board,
-            budget,
-            open: () => budget !== undefined && sittings.get(id) === budget,
-            flight: (dollars) => {
-              if (!budget) return () => undefined
-              inFlight.set(budget, (inFlight.get(budget) ?? 0) + dollars)
-              return () => {
-                const now = inFlight.get(budget)
-                if (now !== undefined) inFlight.set(budget, Math.max(now - dollars, 0))
-              }
+          const sitting = await sittingKey(id, request)
+          const budget = board ? sittings.get(sitting) : undefined
+          const result = await recordTake(
+            projectFile,
+            id,
+            voice,
+            fishFor,
+            fishWork,
+            {
+              board,
+              budget,
+              open: () => budget !== undefined && sittings.get(sitting) === budget,
+              flight: (dollars) => {
+                if (!budget) return () => undefined
+                inFlight.set(budget, (inFlight.get(budget) ?? 0) + dollars)
+                return () => {
+                  const now = inFlight.get(budget)
+                  if (now !== undefined) inFlight.set(budget, Math.max(now - dollars, 0))
+                }
+              },
+              charged: async (dollars) =>
+                void (await recordSpent(projectFile, id, dollars, languageOf(request))),
             },
-            charged: async (dollars) => void (await recordSpent(projectFile, id, dollars)),
-          })
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: 'problems' in result ? 409 : 200 })
         }),
@@ -845,16 +868,22 @@ export function startServer({
       '/api/auditions/:id': {
         GET: guard(async (request) => {
           const { id } = request.params
-          const result = await sessionFor(projectFile, id)
-          return result ? Response.json(await viewOf(projectFile, id, result)) : notFound()
+          const language = languageOf(request)
+          const result = await sessionFor(projectFile, id, language)
+          return result
+            ? Response.json(await viewOf(projectFile, id, result, { language }))
+            : notFound()
         }),
         DELETE: fromOwnPage(async (request) => {
           const { id } = request.params
-          const discarded = await discardSession(projectFile, id)
+          const language = languageOf(request)
+          const discarded = await discardSession(projectFile, id, language)
           if (!discarded) return notFound()
           if (discarded !== true) return Response.json(discarded, { status: 409 })
-          endSitting(id)
-          return Response.json(await viewOf(projectFile, id, { ok: true, session: null }))
+          endSitting(await sittingKey(id, request))
+          return Response.json(
+            await viewOf(projectFile, id, { ok: true, session: null }, { language }),
+          )
         }),
       },
       '/api/auditions/:id/start': {
@@ -863,7 +892,7 @@ export function startServer({
           if (!body.success)
             return Response.json({ error: 'expected { spendUpTo? }' }, { status: 400 })
           const { id } = request.params
-          const money = await auditionMoney(projectFile, id)
+          const money = await auditionMoney(projectFile, id, languageOf(request))
           if (!money) return notFound()
           if (!money.ok) return Response.json(money, { status: 409 })
           // A paid audition model starts with a sitting: no amount, no audition.
@@ -872,47 +901,47 @@ export function startServer({
           if (paid) {
             const { spendUpTo } = body.data
             if (spendUpTo === undefined) {
-              return sittingAnswer(id, {
+              return sittingAnswer(request, id, {
                 reason: 'confirm',
                 ceiling: 0,
                 message: `Takes with ${money.model} are paid; say how much the audition may spend.`,
               })
             }
             const got = await admit(money.model, spendUpTo, spendUpTo)
-            if ('problem' in got) return sittingAnswer(id, got.problem)
+            if ('problem' in got) return sittingAnswer(request, id, got.problem)
             admitted = got.budget
             // After the credit was read, so two starts at once cannot leave a budget behind.
-            endSitting(id)
-            sittings.set(id, admitted)
+            endSitting(await sittingKey(id, request))
+            sittings.set(await sittingKey(id, request), admitted)
           }
-          const started = await startAudition(projectFile, id, fishFor)
+          const started = await startAudition(projectFile, id, fishFor, languageOf(request))
           // An audition that did not start has no sitting.
-          if (admitted && !started?.ok) endSitting(id)
-          return answer(id, Promise.resolve(started))
+          if (admitted && !started?.ok) endSitting(await sittingKey(id, request))
+          return answer(id, Promise.resolve(started), { language: languageOf(request) })
         }),
       },
       '/api/auditions/:id/sitting': {
-        GET: guard((request) => sittingAnswer(request.params.id)),
+        GET: guard((request) => sittingAnswer(request, request.params.id)),
         POST: fromOwnPage(async (request) => {
           const body = AmountBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { amount }' }, { status: 400 })
           const { id } = request.params
-          const money = await auditionMoney(projectFile, id)
+          const money = await auditionMoney(projectFile, id, languageOf(request))
           if (!money) return notFound()
           if (!money.ok) return Response.json(money, { status: 409 })
           if (isPaid(money.model, new Date())) {
             const got = await admit(money.model, body.data.amount, body.data.amount)
-            if ('problem' in got) return sittingAnswer(id, got.problem)
+            if ('problem' in got) return sittingAnswer(request, id, got.problem)
             // Resuming is a fresh sitting; what the last one had left is not kept. It was held
             // while the new amount was checked, which is less than one take (a used-up sitting).
-            endSitting(id)
-            sittings.set(id, got.budget)
+            endSitting(await sittingKey(id, request))
+            sittings.set(await sittingKey(id, request), got.budget)
           }
-          return sittingAnswer(id)
+          return sittingAnswer(request, id)
         }),
-        DELETE: fromOwnPage((request) => {
-          endSitting(request.params.id)
-          return sittingAnswer(request.params.id)
+        DELETE: fromOwnPage(async (request) => {
+          endSitting(await sittingKey(request.params.id, request))
+          return sittingAnswer(request, request.params.id)
         }),
       },
       '/api/auditions/:id/sitting/add': {
@@ -920,9 +949,9 @@ export function startServer({
           const body = AmountBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { amount }' }, { status: 400 })
           const { id } = request.params
-          const budget = sittings.get(id)
+          const budget = sittings.get(await sittingKey(id, request))
           if (!budget) {
-            return sittingAnswer(id, {
+            return sittingAnswer(request, id, {
               reason: 'confirm',
               ceiling: 0,
               message: 'There is no sitting to add to; resume the audition.',
@@ -936,14 +965,18 @@ export function startServer({
             confirmed: body.data.amount,
             credit: free,
           })
-          if (problem) return sittingAnswer(id, problem)
+          if (problem) return sittingAnswer(request, id, problem)
           budget.add(body.data.amount)
-          return sittingAnswer(id)
+          return sittingAnswer(request, id)
         }),
       },
       '/api/auditions/:id/own': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, refreshOwnVoices(projectFile, request.params.id, fishFor)),
+          answer(
+            request.params.id,
+            refreshOwnVoices(projectFile, request.params.id, fishFor, languageOf(request)),
+            { language: languageOf(request) },
+          ),
         ),
       },
       '/api/auditions/:id/move': {
@@ -957,19 +990,29 @@ export function startServer({
           }
           const { voice, move } = body.data
           const { id } = request.params
-          return answer(id, moveVoice(projectFile, id, voice, move), { recorded: false })
+          const language = languageOf(request)
+          return answer(id, moveVoice(projectFile, id, voice, move, language), {
+            recorded: false,
+            language,
+          })
         }),
       },
       '/api/auditions/:id/undo': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, undoLastDrop(projectFile, request.params.id), {
-            recorded: false,
-          }),
+          answer(
+            request.params.id,
+            undoLastDrop(projectFile, request.params.id, languageOf(request)),
+            { recorded: false, language: languageOf(request) },
+          ),
         ),
       },
       '/api/auditions/:id/more': {
         POST: fromOwnPage((request) =>
-          answer(request.params.id, moreVoices(projectFile, request.params.id, fishFor)),
+          answer(
+            request.params.id,
+            moreVoices(projectFile, request.params.id, fishFor, languageOf(request)),
+            { language: languageOf(request) },
+          ),
         ),
       },
       '/api/auditions/:id/add': {
@@ -977,7 +1020,10 @@ export function startServer({
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { id } = request.params
-          return answer(id, addVoiceById(projectFile, id, body.data.voice, fishFor))
+          const language = languageOf(request)
+          return answer(id, addVoiceById(projectFile, id, body.data.voice, fishFor, language), {
+            language,
+          })
         }),
       },
       '/api/characters/:id/clone-voice': {
@@ -1010,8 +1056,14 @@ export function startServer({
             return Response.json({ error: 'expected { voice, name }' }, { status: 400 })
           }
           const { voice, name } = body.data
-          const result = await castOwnVoice(projectFile, request.params.id, { id: voice, name })
+          const result = await castOwnVoice(
+            projectFile,
+            request.params.id,
+            { id: voice, name },
+            languageOf(request),
+          )
           if (!result) return notFound()
+          if (result.ok) endSitting(await sittingKey(request.params.id, request))
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
@@ -1019,16 +1071,23 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
-          const result = await castVoice(projectFile, request.params.id, body.data.voice)
+          const result = await castVoice(
+            projectFile,
+            request.params.id,
+            body.data.voice,
+            languageOf(request),
+          )
           if (!result) return notFound()
-          if (result.ok) endSitting(request.params.id)
+          if (result.ok) endSitting(await sittingKey(request.params.id, request))
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
       '/api/characters/:id/ruled-out': {
-        GET: guard(async (request) => ruledOut(ruledOutVoices(projectFile, request.params.id))),
+        GET: guard(async (request) =>
+          ruledOut(ruledOutVoices(projectFile, request.params.id, languageOf(request))),
+        ),
         DELETE: fromOwnPage((request) =>
-          ruledOut(allowVoices(projectFile, request.params.id, 'all')),
+          ruledOut(allowVoices(projectFile, request.params.id, 'all', languageOf(request))),
         ),
       },
       '/api/characters/:id/ruled-out/:voice': {
@@ -1036,7 +1095,7 @@ export function startServer({
           const { id, voice } = request.params
           if (!VOICE_ID.test(voice))
             return Response.json({ error: 'not a voice id' }, { status: 400 })
-          return ruledOut(allowVoices(projectFile, id, [voice]))
+          return ruledOut(allowVoices(projectFile, id, [voice], languageOf(request)))
         }),
       },
       '/api/takes/:file': {
@@ -1048,7 +1107,12 @@ export function startServer({
       },
       '/api/characters/:id/voice': {
         GET: guard(async (request) => {
-          const result = await characterVoice(projectFile, request.params.id, fishFor)
+          const result = await characterVoice(
+            projectFile,
+            request.params.id,
+            fishFor,
+            languageOf(request),
+          )
           return result ? Response.json(result) : notFound()
         }),
       },

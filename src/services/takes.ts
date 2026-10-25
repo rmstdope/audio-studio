@@ -1,10 +1,17 @@
 import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
-import { FREE_MODELS, phraseProblem, type Problem, type Project } from '../core/project'
+import {
+  declaredLanguage,
+  FREE_MODELS,
+  phraseProblem,
+  type Problem,
+  type Project,
+} from '../core/project'
 import type { Budget } from '../core/spend'
 import { isPaid } from '../core/sitting'
-import { ttsFor, type Cast } from '../core/resources'
+import { projectCast, ttsFor, type Cast } from '../core/resources'
+import type { ProjectSummary } from '../core/summary'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
 import { spokenText } from '../core/spoken'
 import type { FishFactory } from './auditions'
@@ -19,7 +26,7 @@ export const TAKES_DIR = '.audio-studio/takes'
 /** A recorded take (its key, and the text it is of), or why there is none. Null for an unknown character. */
 export type TakeResult =
   | { ok: true; key: string; spoken: string; cached: boolean }
-  | { ok: false; reason: 'no-key' | 'fish' | 'no-sitting' | 'waits'; message: string }
+  | { ok: false; reason: 'no-key' | 'fish' | 'no-sitting' | 'waits' | 'no-phrase'; message: string }
   | { ok: false; problems: Problem[] }
   | null
 
@@ -59,6 +66,7 @@ export async function recordTake(
   fishFor: FishFactory,
   limiter: Limiter,
   options: TakeOptions = {},
+  asked?: string,
 ): Promise<TakeResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return { ok: false, problems: loaded.problems }
@@ -67,15 +75,28 @@ export async function recordTake(
   if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
 
   const root = dirname(projectFile)
-  const text = auditionFor(cast, characterId, project)
+  const {
+    language,
+    cast: seen,
+    audition: text,
+  } = auditionIn(project, cast, summary, characterId, asked)
+  if (text.phrase === null) {
+    return { ok: false, reason: 'no-phrase', message: 'There is no audition phrase to record.' }
+  }
   // A phrase edited into the cast by hand is checked too: never pay for a take that is too long.
   const tooLong = phraseProblem(text.phrase, project.narration.quality.chunkLimit)
   if (tooLong) {
-    const where = text.own ? phrasePath(characterId) : 'narration.audition.phrase'
-    const file = text.own ? project.narration.characters : basename(projectFile)
+    const source = language === project.narration.languages[0]
+    const where =
+      text.from === 'own'
+        ? phrasePath(characterId, source ? undefined : language)
+        : source
+          ? 'narration.audition.phrase'
+          : `narration.audition.phrases.${language}`
+    const file = text.from === 'own' ? project.narration.characters : basename(projectFile)
     return { ok: false, problems: [{ file, path: where, message: tooLong }] }
   }
-  const tts = ttsFor(project.narration.tts, cast.speakers[characterId])
+  const tts = ttsFor(project.narration.tts, seen.speakers[characterId])
   const model = options.board ? project.narration.models.audition : FREE_MODELS[0]
   return speak(root, project, voiceId, text.spoken, tts, model, fishFor, limiter, options)
 }
@@ -236,23 +257,54 @@ export async function auditionTakes(
   projectFile: string,
   characterId: string,
   voiceIds: string[],
+  asked?: string,
 ): Promise<AuditionTakesResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return { ok: false, problems: loaded.problems }
   const { project, cast, summary } = loaded
   if (!summary.characters.some((c) => c.id === characterId)) return null
   if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
-  const audition = auditionFor(cast, characterId, project)
+  const seen = auditionIn(project, cast, summary, characterId, asked)
   return {
     ok: true,
-    audition,
-    takes: recordedTakes(dirname(projectFile), project, cast, characterId, audition, voiceIds),
+    audition: seen.audition,
+    takes: recordedTakes(
+      dirname(projectFile),
+      project,
+      seen.cast,
+      characterId,
+      seen.audition,
+      voiceIds,
+    ),
   }
 }
 
-/** The audition phrase of a character in the cast (or of a speaker not in it yet). */
-export function auditionFor(cast: Cast, characterId: string, project: Project): AuditionText {
-  return auditionText(cast.speakers[characterId] ?? {}, cast.pronounce, project.narration)
+/**
+ * A character's audition in a language (the source language's when none is asked for, or the
+ * project lacks it): the language, the cast as that language sees it, and what the character says.
+ */
+export function auditionIn(
+  project: Project,
+  cast: Cast,
+  summary: ProjectSummary,
+  characterId: string,
+  asked?: string,
+): { language: string; cast: Cast; audition: AuditionText } {
+  const { languages } = project.narration
+  const language = declaredLanguage(project.narration, asked)
+  const seen = projectCast(cast, language, languages[0]!)
+  const longest = summary.characters.find((c) => c.id === characterId)?.languages[language]?.longest
+  return {
+    language,
+    cast: seen,
+    audition: auditionText(
+      seen.speakers[characterId] ?? {},
+      cast.pronounce,
+      project.narration,
+      language,
+      longest ?? null,
+    ),
+  }
 }
 
 /**
@@ -289,11 +341,13 @@ export function castProblems(project: Project, problems: Problem[]): Problem[] {
 }
 
 /** Where a character's own phrase is in the cast, as a problem path. */
-export function phrasePath(characterId: string): string {
+export function phrasePath(characterId: string, language?: string): string {
   const id = /^[A-Za-z_][\w-]*$/.test(characterId)
     ? `.${characterId}`
     : `[${JSON.stringify(characterId)}]`
-  return `speakers${id}.audition.phrase`
+  return language === undefined
+    ? `speakers${id}.audition.phrase`
+    : `speakers${id}.languages.${language}.phrase`
 }
 
 function takePath(key: string): string {

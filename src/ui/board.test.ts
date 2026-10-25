@@ -25,6 +25,44 @@ const titles = new Map([
   ['act3', 'Act III'],
 ])
 
+describe('castEffects in a language', () => {
+  it('names the language, and uses the sentence about its stale lines', () => {
+    expect(
+      castEffects({
+        name: 'Grandmother',
+        current: 'Varm Mormor',
+        replacing: true,
+        recorded: [{ part: 'act1', lines: 18 }],
+        titles,
+        dropped: 0,
+        unheard: 0,
+        language: 'Svenska',
+        stale: '18 Svenska lines go stale and need recording again: Act I 18.',
+      }),
+    ).toEqual([
+      '18 Svenska lines go stale and need recording again: Act I 18.',
+      'Varm Mormor is no longer Grandmother’s Svenska voice. It is not ruled out: it can come back in a later audition.',
+      'The audition ends.',
+    ])
+  })
+
+  it('leaves the stale sentence out when nothing is recorded', () => {
+    expect(
+      castEffects({
+        name: 'Grandmother',
+        current: null,
+        replacing: true,
+        recorded: [],
+        titles,
+        dropped: 0,
+        unheard: 0,
+        language: 'Svenska',
+        stale: null,
+      }),
+    ).toEqual(['The audition ends.'])
+  })
+})
+
 describe('castEffects', () => {
   it('says which recorded lines go stale, that the old voice is not ruled out, and how the audition ends', () => {
     expect(
