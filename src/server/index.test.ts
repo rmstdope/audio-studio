@@ -890,6 +890,12 @@ describe.skipIf(!Bun.which('ffmpeg'))('server, measuring clips', () => {
       200,
       { ok: true, key: 'a', heard: 0.5, duration: expect.any(Number) },
     ])
+    // Accepted, the line is no longer weak, and is not checked again.
+    await fetch(at('/api/parts/act1/lines/a/accept'), {
+      method: 'POST',
+      headers: { origin: server.url.origin },
+    })
+    expect((await check('a')).status).toBe(409)
   })
 })
 

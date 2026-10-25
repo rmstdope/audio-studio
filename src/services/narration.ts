@@ -529,8 +529,7 @@ export interface MeasureOptions {
  * Measures a recorded clip without new audio (narrate.py `--retime`): its length from the decoded
  * audio, what Whisper hears in it, the words aligned. The manifest gets the word timings and
  * length, the lock how well the clip is heard, so a clip heard poorly shows as weak. Only
- * up-to-date clips never measured are, or, `again`, up-to-date clips already checked (weak ones
- * too), scored with the rules of today; nothing is written if the clip was recorded again
+ * up-to-date clips never measured are, or, `again`, weak lines, scored with the rules of today; nothing is written if the clip was recorded again
  * meanwhile (its lock entry's time changed).
  */
 export async function measureLine(
@@ -556,14 +555,15 @@ export async function measureLine(
   const entry = read.input.manifest[key]
   const before = read.input.lock[key]
   // What plans offer: up-to-date clips never measured (adopted, or recorded unchecked); asked
-  // again, up-to-date clips already checked, weak ones too.
-  const upToDate = state?.status === 'ok' || (again && state?.status === 'weak')
-  if (!upToDate || !entry || !before || (before.heard !== undefined) !== Boolean(again)) {
+  // again, weak lines (an accepted one is ok as it is).
+  const checked = before?.heard !== undefined
+  const fits = again ? state?.status === 'weak' : state?.status === 'ok' && !checked
+  if (!fits || !entry || !before) {
     return {
       ok: false,
       reason: 'not-recorded',
       message: again
-        ? 'Only up-to-date clips Whisper checked can be checked again.'
+        ? 'Only a weak line can be checked again.'
         : 'Only up-to-date clips never checked by Whisper can be measured.',
     }
   }

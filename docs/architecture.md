@@ -494,12 +494,14 @@ An audition is for a character, not for a part: the result applies to every part
   it, in its own indentation (a hand-compacted object is written out). Takes already recorded keep
   their heard share; the groups count from the next take on.
 - Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
-  (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again).
-  Or check a weak one again (built: Check again): Whisper hears the line's clip again, without new
-  audio, and the line is scored and timed with today's rules (heard share and word timings in the
-  lock and manifest, what was heard in the cache), as measuring does for clips never checked
-  (§8.2); a take scored before the rules improved is not weak once checked again. Checking a
-  part's weak lines at once waits for the next step.
+  (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again). Or check
+  a weak one again (built: Check again): Whisper hears the line's clip again, without new audio, and
+  the line is scored and timed with today's rules (heard share and word timings in the lock and
+  manifest, what was heard in the cache), as measuring does for clips never checked (§8.2); a take
+  scored before the rules improved is not weak once checked again. Whisper hears the clip as kept
+  (the levelled MP3, decoded), not the take as Fish sent it, so its score and timings can move a
+  little either way besides. Only weak lines are checked again (an accepted one is ok as it is).
+  Checking a part's weak lines at once waits for the next step.
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
