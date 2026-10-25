@@ -42,17 +42,29 @@ export function VoiceCard({
 }) {
   const sample = voice.sample
   return (
-    <article className={`card voice-card${listed ? ' kept' : ''}`} aria-label={voice.title}>
+    <article
+      className={`card voice-card${listed ? ' kept' : ''}${voice.own ? ' yours' : ''}`}
+      aria-label={voice.title}
+    >
       <div className="card-head">
         <div className="card-title">
           <strong>{voice.title || 'Untitled voice'}</strong>
           <span className="muted voice-meta">
-            {voice.author ? `by ${voice.author} · ` : ''}
-            {compact(voice.uses)} uses · {compact(voice.likes)} likes
+            {voice.own ? (
+              'Your voice · private'
+            ) : (
+              <>
+                {voice.author ? `by ${voice.author} · ` : ''}
+                {compact(voice.uses)} uses · {compact(voice.likes)} likes
+              </>
+            )}
           </span>
         </div>
-        {note ? (
-          <span className="badge ok">{note}</span>
+        {note || voice.own ? (
+          <span className="badges">
+            {note && <span className="badge ok">{note}</span>}
+            {voice.own && <span className="badge yours">Yours</span>}
+          </span>
         ) : candidate && keywordCount ? (
           <span className="chip" title={candidate.matched.join(', ')}>
             {candidate.matched.length}/{keywordCount} keywords

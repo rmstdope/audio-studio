@@ -57,6 +57,9 @@
   --drop-on-bg: #3a1a20;
   --drop-on-line: #8a3443;
   --accent-soft-line: #5a3218;
+  --own-bg: #16223a;
+  --own-ink: #8fb4ff;
+  --own-line: #2a3f66;
   --success-bg: #0f2219;
   --chip-hover: #262a35;
   --shadow: 0 12px 32px rgb(0 0 0 / 45%);
@@ -1407,6 +1410,40 @@ a.btn {
 .voice-card.kept {
   background: var(--panel);
   border-color: var(--kept-line);
+}
+
+.voice-card.yours {
+  border-color: var(--own-line);
+}
+
+.voice-card.yours.kept {
+  border-color: var(--kept-line);
+  box-shadow: inset 0 0 0 1px var(--own-line);
+}
+
+.badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.badge.yours {
+  background: var(--own-bg);
+  color: var(--own-ink);
+  border: 1px solid var(--own-line);
+}
+
+.bar-error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--drop-on-line);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger-ink);
 }
 
 .card-actions {

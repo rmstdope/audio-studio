@@ -38,6 +38,9 @@ const library = [
 ]
 
 const fish: FishClient = {
+  async listOwnVoices() {
+    return []
+  },
   async credit() {
     return 25
   },

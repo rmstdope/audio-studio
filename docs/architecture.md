@@ -392,6 +392,16 @@ resumed and stopped from there; the page shows no candidates. The **audition pag
 with beside it and the keywords the audition started with; with no audition in progress, it
 offers to start one.
 
+**Your voices** sit on the board between the Shortlist and To hear: every voice on the user's own
+Fish account (`GET /model?self=true`, `listOwnVoices`), whatever the keywords, never ranked and
+never in To hear. They are fetched by their own request (`POST /api/auditions/:id/own`) when a
+board opens, on a start or a resume, and again on Try again, so the board does not wait for Fish;
+a failure leaves the session as it was. The session keeps them in `yours` (the section) and
+`mine` (the whole account, for the "none" and "all used up" lines); a voice marked `own` keeps its
+"Yours" badge and blue border on the shortlist and as the cast voice. Shortlist, Unlist (back to
+Your voices) and Drop (ruled out like any voice) work as elsewhere; an own voice ruled out is not
+put back by a later fetch.
+
 ```
  keywords ──► search Fish's library, leaving out ruled-out voices ──► ranked candidates
                                        │
@@ -909,7 +919,7 @@ Small, independently useful increments:
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
-   What a paid account could still have (paid auditions, the `s1` retirement, your own voices,
+   What a paid account could still have (paid auditions, the `s1` retirement,
    cloning and design, the rate tier, a spend log) is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:

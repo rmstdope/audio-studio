@@ -13,6 +13,8 @@ export const VoiceSchema = z.object({
   author: z.string(),
   /** The uploader's demo clip, if any. Free to play. */
   sample: z.object({ text: z.string(), audio: z.string() }).nullable(),
+  /** Whether it is a voice on the user's own Fish account (cloned or private), not the library's. */
+  own: z.boolean().optional(),
 })
 
 /** A voice in Fish Audio's library, as the studio uses it. */

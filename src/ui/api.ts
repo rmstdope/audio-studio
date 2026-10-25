@@ -617,6 +617,48 @@ export function useSessionAction(characterId: string) {
   })
 }
 
+/**
+ * Fetches the voices on the user's own Fish account into the character's audition (`fetch`, once
+ * per board and again for Try again). It has no scope of its own, so the board's buttons work
+ * while Fish answers. `fetched` is true once an answer came, `error` Fish's reason when it failed.
+ */
+export function useOwnVoices(characterId: string) {
+  const client = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/auditions/${encodeURIComponent(characterId)}/own`, {
+        method: 'POST',
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`the audition answered ${response.status}`)
+      }
+      return (await response.json()) as SessionView
+    },
+    onSuccess: (view) => {
+      if (!view.ok) return
+      client.setQueryData<SessionView>(['session', characterId], (old) => {
+        if (!old?.ok) return view
+        // Moves made meanwhile are in the answer; keep the recorded lines and takes shown.
+        return {
+          ...view,
+          recorded: view.recorded ?? old.recorded,
+          takes: { ...old.takes, ...view.takes },
+        }
+      })
+    },
+  })
+  const failure = mutation.data && !mutation.data.ok ? mutation.data : null
+  const error =
+    mutation.error?.message ??
+    (failure ? ('message' in failure ? failure.message : 'the project’s files need fixing') : null)
+  return {
+    fetch: () => mutation.mutate(),
+    pending: mutation.isPending,
+    fetched: mutation.isSuccess && !failure,
+    error,
+  }
+}
+
 /** The voice a move drops, if it is a drop. */
 function droppedBy(body: unknown): string | null {
   const move = body as { voice?: unknown; move?: unknown } | undefined

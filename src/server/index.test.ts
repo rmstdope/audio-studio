@@ -16,6 +16,9 @@ const root = tempRepo({
   'audio/act1/a.mp3': 'ID3-not-really-audio',
 })
 const fish: FishClient = {
+  async listOwnVoices() {
+    return []
+  },
   async credit() {
     return 25
   },
@@ -415,6 +418,8 @@ describe('server', () => {
       recorded: [],
     })
     const started = await (await post('/api/auditions/narrator/start')).json()
+    const own = await (await post('/api/auditions/narrator/own')).json()
+    expect(own).toMatchObject({ ok: true, session: { yours: [], mine: [] } })
     expect(started.session.toHear).toEqual(['w1'])
     expect(started.audition.spoken).toContain('Once upon a time.')
     for (const body of [
@@ -448,7 +453,7 @@ describe('server', () => {
   it('refuses every audition change from another page', async () => {
     const changes: [string, string][] = [
       ['DELETE', '/api/auditions/narrator'],
-      ...['start', 'move', 'undo', 'more', 'add', 'cast'].map((action): [string, string] => [
+      ...['start', 'move', 'undo', 'more', 'add', 'cast', 'own'].map((action): [string, string] => [
         'POST',
         `/api/auditions/narrator/${action}`,
       ]),

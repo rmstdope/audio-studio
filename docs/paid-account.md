@@ -38,11 +38,9 @@ is changed in one place only today (`narration.quality.soundAlike`, see `CLAUDE.
 
 ## Your own voices in casting
 
-Search covers Fish's public library only (`listVoices` in `services/fish.ts` never asks for your
-own). Fish lists the account's own voices with `GET /model?self=true`; on 2026-10-25 the account
-behind RetroQuest's key had none. They should appear on the audition board, marked as your own,
-and be castable like any other. Bringing a voice in by its id (`getVoice`, an authenticated
-`GET /model/{id}`) probably already works for a private voice you own, but that is not verified.
+Built: the audition board lists the account's own voices (`GET /model?self=true`) in a **Your
+voices** section (§8.1). Bringing a private voice in by its id (`getVoice`, an authenticated
+`GET /model/{id}`) is still not verified against a real private voice.
 
 ## Voice cloning
 

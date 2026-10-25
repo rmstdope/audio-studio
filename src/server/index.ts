@@ -40,6 +40,7 @@ import {
   discardSession,
   moreVoices,
   moveVoice,
+  refreshOwnVoices,
   sessionFor,
   startAudition,
   undoLastDrop,
@@ -750,6 +751,11 @@ export function startServer({
       '/api/auditions/:id/start': {
         POST: fromOwnPage((request) =>
           answer(request.params.id, startAudition(projectFile, request.params.id, fishFor)),
+        ),
+      },
+      '/api/auditions/:id/own': {
+        POST: fromOwnPage((request) =>
+          answer(request.params.id, refreshOwnVoices(projectFile, request.params.id, fishFor)),
         ),
       },
       '/api/auditions/:id/move': {

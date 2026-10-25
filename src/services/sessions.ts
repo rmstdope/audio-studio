@@ -7,6 +7,7 @@ import {
   drop,
   placeOf,
   queueMore,
+  setOwnVoices,
   shortlist,
   startSession,
   undoDrop,
@@ -20,7 +21,8 @@ import type { AuditionText } from '../core/takes'
 import type { Candidate, Voice } from '../core/voiceSearch'
 import { findCandidates, setVoice, type FishFactory } from './auditions'
 import { characterFile, readJson, writeAtomic } from './files'
-import { updateRuledOut } from './ruledOut'
+import { NO_KEY } from './fish'
+import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
 import { auditionTakes } from './takes'
 import {
@@ -170,6 +172,35 @@ export function undoLastDrop(projectFile: string, characterId: string): Promise<
     const undone = before.dropped.at(-1)?.id
     if (undone) await updateRuledOut(projectFile, characterId, { allowed: [undone] })
   })
+}
+
+/**
+ * Fetches the voices on the user's own Fish account and puts them in Your voices (see
+ * `setOwnVoices`), leaving out those ruled out for the character. Fish is asked outside the
+ * session's turn, so the board keeps working meanwhile; if Fish cannot list them, says why and
+ * leaves the session as it was.
+ */
+export async function refreshOwnVoices(
+  projectFile: string,
+  characterId: string,
+  fishFor: FishFactory,
+): Promise<SessionResult> {
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return opened
+  if ((await readSession(projectFile, characterId)) === null) {
+    return changeSession(projectFile, characterId, (s) => s)
+  }
+  const fish = await fishFor(dirname(projectFile), opened.project)
+  if (!fish) return { ok: false, reason: 'no-key', message: NO_KEY }
+  let own: Voice[]
+  try {
+    own = await fish.listOwnVoices()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { ok: false, reason: 'fish', message }
+  }
+  const ruledOut = await ruledOutIds(projectFile, characterId)
+  return changeSession(projectFile, characterId, (s) => setOwnVoices(s, own, ruledOut))
 }
 
 /**
@@ -367,8 +398,8 @@ export async function viewOf(
   if (!result.session) return { ...empty, session: null }
   // Counting recorded lines plans every part the character is in: only when it may have changed.
   const recorded = withRecorded ? await recordedLines(projectFile, characterId) : undefined
-  const { shortlist: listed, toHear } = result.session
-  const lookup = await auditionTakes(projectFile, characterId, [...listed, ...toHear])
+  const { shortlist: listed, yours, toHear } = result.session
+  const lookup = await auditionTakes(projectFile, characterId, [...listed, ...yours, ...toHear])
   if (!lookup?.ok) return { ...empty, session: result.session, recorded }
   return {
     ok: true,

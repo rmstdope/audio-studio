@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AuditionSession } from '../../../core/audition'
 import type { SessionView } from '../../../services/sessions'
-import { useCast, useRuledOut, useSessionAction, useTakes, type SessionAction } from '../../api'
+import {
+  useCast,
+  useOwnVoices,
+  useRuledOut,
+  useSessionAction,
+  useTakes,
+  type SessionAction,
+} from '../../api'
 import {
   castEffects,
   droppedRuledOut,
   isRuledOut,
+  ownSectionState,
   playsVoice,
   stopEffectsFor,
   takesToRecord,
@@ -56,6 +64,7 @@ export function ShortlistBoard({
   const act = useSessionAction(characterId)
   const recorder = useTakes(characterId)
   const ruledOut = useRuledOut(characterId)
+  const own = useOwnVoices(characterId)
   const [asking, setAsking] = useState<Asking>(null)
   // The voice this page dropped last; its drop can be undone while it is the last one.
   const [droppedHere, setDroppedHere] = useState<string | null>(null)
@@ -64,7 +73,7 @@ export function ShortlistBoard({
 
   // Every take is asked for once per phrase, so a take the cache cannot show is not asked again.
   const asked = useRef(new Set<string>())
-  const onBoard = [...session.shortlist, ...session.toHear]
+  const onBoard = [...session.shortlist, ...session.yours, ...session.toHear]
   const missing = audition
     ? takesToRecord(onBoard, takes, recorder.recording, recorder.errors).filter(
         (v) => !asked.current.has(`${audition.spoken}\n${v}`),
@@ -77,6 +86,9 @@ export function ShortlistBoard({
     }
     // `missing` is new on every render; what it holds is what matters.
   }, [missing.join(',')])
+
+  // The account's own voices are fetched when the board opens (a start, or a resume).
+  useEffect(() => own.fetch(), [])
 
   // Nothing of the board plays on once it is gone (the audition stopped or a voice cast).
   useEffect(() => stop, [])
@@ -173,6 +185,7 @@ export function ShortlistBoard({
     )
   }
 
+  const ownState = ownSectionState(session, own)
   const casting = asking?.kind === 'cast' ? asking.voice : null
   const keeping = casting !== null && casting === session.current
 
@@ -263,6 +276,42 @@ export function ShortlistBoard({
         </div>
         {session.shortlist.length > 0 && (
           <div className="cards">{session.shortlist.map((id) => card(id, true))}</div>
+        )}
+      </section>
+
+      <section className="section" aria-label="Your voices">
+        <div className="section-head">
+          <h2 className="section-title">Your voices</h2>
+          {ownState !== 'none' && (
+            <span className="muted">
+              The voices on your own Fish account. They’re here whatever the keywords.
+            </span>
+          )}
+        </div>
+        {own.error && (
+          <div className="bar-error" role="alert">
+            <span>Fish didn’t send your own voices: {own.error.replace(/\.$/, '')}.</span>
+            <button
+              className="btn btn-small"
+              type="button"
+              disabled={own.pending}
+              onClick={own.fetch}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+        {ownState === 'loading' && <p className="muted">Getting your voices from Fish…</p>}
+        {ownState === 'none' && (
+          <p className="muted">
+            No voices on your Fish account yet. Voices you clone or make on Fish show up here.
+          </p>
+        )}
+        {ownState === 'allUsed' && (
+          <p className="muted">All your voices are on the shortlist or ruled out for {name}.</p>
+        )}
+        {ownState === 'cards' && (
+          <div className="cards">{session.yours.map((id) => card(id, false))}</div>
         )}
       </section>
 

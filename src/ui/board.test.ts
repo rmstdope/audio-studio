@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   castEffects,
   droppedRuledOut,
+  ownSectionState,
   playsVoice,
   sampleClip,
   stopEffects,
@@ -171,5 +172,32 @@ describe('playsVoice', () => {
     expect(playsVoice(sampleClip('v2'), 'v1')).toBe(false)
     expect(takeClip('v1')).not.toBe(sampleClip('v1'))
     expect(playsVoice(null, 'v1')).toBe(false)
+  })
+})
+
+describe('ownSectionState', () => {
+  const some = { yours: ['m1'], mine: ['m1'] }
+  it('waits for Fish before the first answer, and shows the voices meanwhile if it has them', () => {
+    expect(ownSectionState({ yours: [], mine: [] }, { fetched: false, error: null })).toBe(
+      'loading',
+    )
+    expect(ownSectionState(some, { fetched: false, error: null })).toBe('cards')
+  })
+  it('says the account has none once Fish answered with none', () => {
+    expect(ownSectionState({ yours: [], mine: [] }, { fetched: true, error: null })).toBe('none')
+  })
+  it('says all are used up when the account has voices and none is left to hear', () => {
+    expect(ownSectionState({ yours: [], mine: ['m1'] }, { fetched: true, error: null })).toBe(
+      'allUsed',
+    )
+    expect(ownSectionState({ yours: [], mine: ['m1'] }, { fetched: false, error: null })).toBe(
+      'allUsed',
+    )
+  })
+  it('shows the voices, and the error, when Fish could not be asked again', () => {
+    expect(ownSectionState(some, { fetched: true, error: 'down' })).toBe('cards')
+    expect(ownSectionState({ yours: [], mine: [] }, { fetched: false, error: 'down' })).toBe(
+      'error',
+    )
   })
 })

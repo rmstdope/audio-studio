@@ -34,6 +34,8 @@ export interface TtsRequest {
 export interface FishClient {
   listVoices(query: VoiceQuery): Promise<VoicePage>
   getVoice(id: string): Promise<Voice>
+  /** Every voice on the account itself (cloned or private), marked `own`. */
+  listOwnVoices(): Promise<Voice[]>
   /** The text spoken in the voice, as MP3 (or WAV when asked). */
   tts(request: TtsRequest): Promise<Uint8Array>
   /**
@@ -180,6 +182,15 @@ export function createFishClient(
       })
       const page = ApiPageSchema.parse(body)
       return { total: page.total, items: page.items.map(toVoice) }
+    },
+    async listOwnVoices() {
+      const voices: Voice[] = []
+      for (let pageNumber = 1; ; pageNumber++) {
+        const body = await get('/model', { self: 'true', page_size: 100, page_number: pageNumber })
+        const page = ApiPageSchema.parse(body)
+        voices.push(...page.items.map((item) => ({ ...toVoice(item), own: true })))
+        if (!page.items.length || voices.length >= page.total) return voices
+      }
     },
     async credit() {
       const { credit } = z

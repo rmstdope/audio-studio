@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { VoiceSchema, type Candidate, type Voice } from './voiceSearch'
 
-/** Where a voice on the board is: up to hear, or on the shortlist. */
-const PlaceSchema = z.enum(['toHear', 'shortlist'])
+/** Where a voice on the board is: the user's own, up to hear, or on the shortlist. */
+const PlaceSchema = z.enum(['yours', 'toHear', 'shortlist'])
 
-/** Where a voice on the board is: up to hear, or on the shortlist. */
+/** Where a voice on the board is: the user's own, up to hear, or on the shortlist. */
 export type Place = z.infer<typeof PlaceSchema>
 
 /**
@@ -23,6 +23,10 @@ export const AuditionSessionSchema = z.object({
   current: z.string().nullable(),
   /** The voices that can be cast, in the order shortlisted. */
   shortlist: z.array(z.string()),
+  /** The user's own Fish voices not shortlisted or dropped, in the order shown (Your voices). */
+  yours: z.array(z.string()).default([]),
+  /** Every voice on the user's account when last fetched; empty until then. */
+  mine: z.array(z.string()).default([]),
   /** The voices being listened to, in the order shown. */
   toHear: z.array(z.string()),
   /** Voices dropped in this audition, the latest last, and where each was. */
@@ -61,6 +65,8 @@ export function startSession(options: {
     keywords,
     current: current?.id ?? null,
     shortlist: current ? [current.id] : [],
+    yours: [],
+    mine: [],
     toHear: ids.slice(0, perRound),
     dropped: [],
     queue: ids.slice(perRound),
@@ -69,23 +75,55 @@ export function startSession(options: {
   }
 }
 
-/** The session with a voice moved from those to hear to the end of the shortlist. */
-export function shortlist(session: AuditionSession, voice: string): AuditionSession {
-  if (!session.toHear.includes(voice)) return session
+/**
+ * The session with the user's own voices: all of them in Your voices (an own voice the search
+ * found leaves To hear and the queue), except those already shortlisted, dropped or ruled out for the character. Each is marked
+ * as own wherever it is, the current voice included. Voices gone from the account leave the section.
+ */
+export function setOwnVoices(
+  session: AuditionSession,
+  own: Voice[],
+  ruledOut: string[] = [],
+): AuditionSession {
+  const ids = own.map((v) => v.id)
+  const known = new Set(ids)
+  const placed = new Set([...session.shortlist, ...session.dropped.map((d) => d.id), ...ruledOut])
+  const keep = session.yours.filter((id) => known.has(id))
+  const added = ids.filter((id) => !placed.has(id) && !keep.includes(id))
+  const marked = Object.fromEntries(own.map((v) => [v.id, { ...v, own: true }]))
   return {
     ...session,
+    yours: [...keep, ...added],
+    mine: ids,
+    toHear: session.toHear.filter((id) => !known.has(id)),
+    queue: session.queue.filter((id) => !known.has(id)),
+    voices: { ...session.voices, ...marked },
+  }
+}
+
+/** The session with a voice moved from Your voices or those to hear to the end of the shortlist. */
+export function shortlist(session: AuditionSession, voice: string): AuditionSession {
+  if (!session.toHear.includes(voice) && !session.yours.includes(voice)) return session
+  return {
+    ...session,
+    yours: session.yours.filter((v) => v !== voice),
     toHear: session.toHear.filter((v) => v !== voice),
     shortlist: [...session.shortlist, voice],
   }
 }
 
-/** The session with a voice moved off the shortlist, to the front of those to hear. */
+/**
+ * The session with a voice moved off the shortlist: back to the front of Your voices if it is the
+ * user's own, else to the front of those to hear.
+ */
 export function unlist(session: AuditionSession, voice: string): AuditionSession {
   if (!session.shortlist.includes(voice)) return session
+  const own = session.voices[voice]?.own === true
   return {
     ...session,
     shortlist: session.shortlist.filter((v) => v !== voice),
-    toHear: [voice, ...session.toHear],
+    yours: own ? [voice, ...session.yours] : session.yours,
+    toHear: own ? session.toHear : [voice, ...session.toHear],
   }
 }
 
@@ -139,22 +177,26 @@ export function queueMore(session: AuditionSession, candidates: Candidate[]): Au
 }
 
 /**
- * The session with a voice brought in by id, at the front of those to hear: from the queue, one
- * dropped earlier, or a new one. Unchanged if the voice is on the board already.
+ * The session with a voice brought in by id, at the front of those to hear (of Your voices, if it
+ * is on the user's account): from the queue, one dropped earlier, or a new one. Unchanged if the
+ * voice is on the board already.
  */
 export function addVoice(session: AuditionSession, voice: Voice): AuditionSession {
   if (placeOf(session, voice.id)) return session
+  const own = session.mine.includes(voice.id)
   return {
     ...session,
-    toHear: [voice.id, ...session.toHear],
+    yours: own ? [voice.id, ...session.yours] : session.yours,
+    toHear: own ? session.toHear : [voice.id, ...session.toHear],
     queue: session.queue.filter((id) => id !== voice.id),
     dropped: session.dropped.filter((d) => d.id !== voice.id),
-    voices: { ...session.voices, [voice.id]: voice },
+    voices: { ...session.voices, [voice.id]: own ? { ...voice, own: true } : voice },
   }
 }
 
 /** Where a voice is on the board, or null if it is not on it. */
 export function placeOf(session: AuditionSession, voice: string): Place | null {
+  if (session.yours.includes(voice)) return 'yours'
   if (session.toHear.includes(voice)) return 'toHear'
   if (session.shortlist.includes(voice)) return 'shortlist'
   return null
