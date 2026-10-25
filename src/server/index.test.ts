@@ -1083,6 +1083,78 @@ describe('server, a paid draft model', () => {
     expect(spoken).toBeGreaterThan(0)
   })
 
+  describe('an extra take', () => {
+    const takes = () => at('/api/parts/act1/lines/a/takes')
+    const takeAgain = (confirmedCost?: number) =>
+      fetch(takes(), {
+        method: 'POST',
+        headers: own,
+        body: confirmedCost === undefined ? undefined : JSON.stringify({ confirmedCost }),
+      })
+
+    it('is recorded only once its cost is confirmed, and priced for one take', async () => {
+      credit = 10
+      const before = spoken
+      const asked = await takeAgain()
+      expect(asked.status).toBe(409)
+      const body = await asked.json()
+      expect(body).toMatchObject({ ok: false, reason: 'confirm' })
+      // 17 bytes of text at $15 per million: one take, not the three a recording is held to.
+      expect(body.ceiling).toBeCloseTo((17 / 1_000_000) * 15, 12)
+      const small = await takeAgain(body.ceiling / 2)
+      expect(small.status).toBe(409)
+      expect(await small.json()).toMatchObject({ ok: false, reason: 'confirm' })
+      expect(spoken).toBe(before)
+      credit = body.ceiling / 2
+      expect(await (await takeAgain(body.ceiling)).json()).toMatchObject({
+        ok: false,
+        reason: 'credit',
+      })
+      expect(spoken).toBe(before)
+      credit = 10
+      expect(await (await takeAgain(body.ceiling)).json()).toMatchObject({
+        ok: true,
+        take: { current: true },
+      })
+      expect(spoken).toBe(before + 1)
+      const listed = await (await fetch(takes())).json()
+      expect(listed.takes).toHaveLength(1)
+    })
+
+    it('records nothing when the account’s credit is unknown', async () => {
+      const before = spoken
+      const was = account.credit
+      account.credit = async () => {
+        throw new Error('Fish is down')
+      }
+      try {
+        const answer = await takeAgain(1)
+        expect(answer.status).toBe(409)
+        expect(await answer.json()).toMatchObject({
+          ok: false,
+          reason: 'credit',
+          message: 'The account’s credit is unknown, so nothing is recorded.',
+        })
+        expect(spoken).toBe(before)
+      } finally {
+        account.credit = was
+      }
+    })
+
+    it('answers a body it cannot read with 400', async () => {
+      const bad = await fetch(takes(), { method: 'POST', headers: own, body: '{ not json' })
+      expect(bad.status).toBe(400)
+    })
+
+    it('refuses a request from another page', async () => {
+      const response = await fetch(takes(), {
+        method: 'POST',
+        headers: { origin: 'https://evil.example' },
+      })
+      expect(response.status).toBe(403)
+    })
+  })
+
   it('answers a body it cannot read with 400', async () => {
     const bad = await fetch(at('/api/parts/act1/lines/a/record'), {
       method: 'POST',

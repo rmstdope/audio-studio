@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { clipInputs, fingerprint } from '../core/fingerprint'
 import { ProjectSchema } from '../core/project'
+import { createBudget, type Budget } from '../core/spend'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import type { FishClient, TtsRequest } from './fish'
@@ -72,10 +73,17 @@ const keepWav: Encoder = async (wav, file) => {
 }
 
 const projectFileOf = (root: string) => join(root, 'audio-studio.json')
-const take = (root: string, fish: FishClient, transcriber: Transcriber | null = null) =>
+const free = createBudget({ model: 's2.1-pro-free', dollars: 0 })
+const take = (
+  root: string,
+  fish: FishClient,
+  transcriber: Transcriber | null = null,
+  budget: Budget = free,
+) =>
   takeLine(projectFileOf(root), 'act1', 'k1', async () => fish, {
     limiter: createLimiter(),
     transcriber,
+    budget,
   })
 
 describe('takeLine', () => {
@@ -110,14 +118,44 @@ describe('takeLine', () => {
     expect(listed?.ok && listed.takes.map((t) => t.id)).toEqual([second.take.id, first.take.id])
   })
 
-  it('refuses a line without a voice, a paid draft model, and says when there is no key', async () => {
+  it('refuses a line without a voice, and says when there is no key', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
     const uncast = await takeLine(projectFileOf(root), 'act1', 'k3', async () => fish, {
       limiter: createLimiter(),
+      budget: free,
     })
     expect(uncast).toMatchObject({ ok: false, reason: 'uncast' })
-    const paid = tempRepo({
+    expect(requests).toHaveLength(0)
+    const noKey = await takeLine(projectFileOf(root), 'act1', 'k1', async () => null, {
+      limiter: createLimiter(),
+      budget: free,
+    })
+    expect(noKey).toMatchObject({ ok: false, reason: 'no-key' })
+    expect(
+      await takeLine(projectFileOf(root), 'act9', 'k1', async () => fish, {
+        limiter: createLimiter(),
+        budget: free,
+      }),
+    ).toBeNull()
+    expect(
+      await takeLine(projectFileOf(root), 'act1', 'zz', async () => fish, {
+        limiter: createLimiter(),
+        budget: free,
+      }),
+    ).toBeNull()
+  })
+
+  it('reports Fish failing', async () => {
+    const root = tempRepo(files)
+    const failing: FishClient = { ...fakeFish().fish, tts: () => Promise.reject(new Error('boom')) }
+    expect(await take(root, failing)).toEqual({ ok: false, reason: 'fish', message: 'boom' })
+  })
+})
+
+describe('takeLine, a paid draft model', () => {
+  const paid = () =>
+    tempRepo({
       ...files,
       'audio-studio.json': {
         ...projectJson(),
@@ -127,28 +165,25 @@ describe('takeLine', () => {
         },
       },
     })
-    expect(await take(paid, fish)).toMatchObject({ ok: false, reason: 'paid' })
-    expect(requests).toHaveLength(0)
-    const noKey = await takeLine(projectFileOf(root), 'act1', 'k1', async () => null, {
-      limiter: createLimiter(),
-    })
-    expect(noKey).toMatchObject({ ok: false, reason: 'no-key' })
-    expect(
-      await takeLine(projectFileOf(root), 'act9', 'k1', async () => fish, {
-        limiter: createLimiter(),
-      }),
-    ).toBeNull()
-    expect(
-      await takeLine(projectFileOf(root), 'act1', 'zz', async () => fish, {
-        limiter: createLimiter(),
-      }),
-    ).toBeNull()
+
+  it('records a take against the budget it is given', async () => {
+    const root = paid()
+    const { fish, requests } = fakeFish()
+    const budget = createBudget({ model: 's1', dollars: 1 })
+    const result = await take(root, fish, null, budget)
+    expect(result).toMatchObject({ ok: true, take: { current: true } })
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.model).toBe('s1')
+    expect(budget.left).toBeLessThan(1)
   })
 
-  it('reports Fish failing', async () => {
-    const root = tempRepo(files)
-    const failing: FishClient = { ...fakeFish().fish, tts: () => Promise.reject(new Error('boom')) }
-    expect(await take(root, failing)).toEqual({ ok: false, reason: 'fish', message: 'boom' })
+  it('sends nothing to Fish when the budget does not cover the take', async () => {
+    const root = paid()
+    const { fish, requests } = fakeFish()
+    const result = await take(root, fish, null, createBudget({ model: 's1', dollars: 0 }))
+    expect(result).toMatchObject({ ok: false, reason: 'spend' })
+    expect(requests).toHaveLength(0)
+    expect(await listLineTakes(projectFileOf(root), 'act1', 'k1')).toEqual({ ok: true, takes: [] })
   })
 })
 

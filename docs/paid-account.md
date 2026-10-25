@@ -3,7 +3,8 @@
 What the studio already does for a paid account: it prices every current model (`core/prices.ts`),
 shows the account's API credit, asks for a spending ceiling before a paid recording and holds it
 to that budget (`core/spend.ts`), offers a final recording with the final model (§8.4 of
-`architecture.md`), and asks Fish again after a 429 (§10).
+`architecture.md`), asks Fish again after a 429 (§10), and takes a line again on a paid draft
+model after asking what the take can cost and getting a yes (**Another take**, §8.3).
 
 The items below are not built. Each is small enough for one pull request, unless it says
 otherwise. Facts about Fish come from its docs as checked on 2026-10-25; check them again before
@@ -26,13 +27,6 @@ ship with needs a priced audition stage, in more than one pull request:
 
 The take cache key already includes the model (`takeKey` in `core/takes.ts`), so takes on two
 models do not mix.
-
-## Paid extra takes of a line
-
-Extra takes (**Takes** on a line's row) use the draft model, free only: `takeLine` in
-`services/lineTakes.ts` refuses them when the draft model is paid, and §8.3 says so. With a paid
-draft model, an extra take would need the same confirm-and-budget flow as recording a line from
-its row.
 
 ## The `s1` retirement
 

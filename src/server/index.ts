@@ -145,6 +145,9 @@ function parseOrNull(text: string): unknown {
   }
 }
 
+/** Taking a line again: the most the user agreed to spend on the take, for a paid draft model. */
+const TakeLineBody = z.object({ confirmedCost: z.number().nonnegative().optional() }).strict()
+
 /** Recording one line: the most the user agreed to spend on it, for a paid model. */
 const RecordBody = z
   .object({
@@ -331,7 +334,8 @@ export function startServer({
       final: stage === 'final',
     })
     // The most recording these lines can cost, priced as the plan was.
-    const ceilingOf = (keys: string[]) => costCeiling(state, keys, pricing)
+    const ceilingOf = (keys: string[], takes = pricing.takes) =>
+      costCeiling(state, keys, { ...pricing, takes })
     return {
       ok: true as const,
       plan,
@@ -636,12 +640,34 @@ export function startServer({
         }),
         POST: fromOwnPage(async (request) => {
           const { part, key } = request.params
-          const result = await takeLine(projectFile, part, key, fishFor, {
-            limiter: fishWork,
-            transcriber: await transcriberFor(),
-          })
-          if (!result) return notFound()
-          return Response.json(result, { status: result.ok ? 200 : 409 })
+          const text = await request.text()
+          const body = TakeLineBody.safeParse(parseOrNull(text || '{}'))
+          if (!body.success) {
+            return Response.json({ error: 'expected { confirmedCost? }' }, { status: 400 })
+          }
+          // Fails closed, as recording does: a take is priced for one request per piece.
+          const planned = await planFor(part, undefined, false, 'draft')
+          if (!planned) return notFound()
+          if (!planned.ok) return Response.json(planned, { status: 409 })
+          const admitted = await admit(
+            planned.model,
+            planned.ceilingOf([key], 1),
+            body.data.confirmedCost,
+          )
+          if ('problem' in admitted) {
+            return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
+          }
+          try {
+            const result = await takeLine(projectFile, part, key, fishFor, {
+              limiter: fishWork,
+              transcriber: await transcriberFor(),
+              budget: admitted.budget,
+            })
+            if (!result) return notFound()
+            return Response.json(result, { status: result.ok ? 200 : 409 })
+          } finally {
+            budgets.delete(admitted.budget)
+          }
         }),
       },
       '/api/parts/:part/lines/:key/takes/:file': {

@@ -30,7 +30,7 @@ import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import { centsUp } from './format'
-import { isAbout, withAuditionTakes, withTake, withVoiceTake } from './takes'
+import { isAbout, takeAnswerState, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
 /** A successful answer about a character's cast voice. */
@@ -754,8 +754,10 @@ export function lineTakeUrl(partId: string, key: string, id: string): string {
 }
 
 /**
- * A line's extra takes: `take` records one more (free), `use` makes one the line's clip, `drop`
- * removes one from the cache. Each reloads the list; using one reloads the part too.
+ * A line's extra takes: `take` records one more, `use` makes one the line's clip, `drop` removes
+ * one from the cache. Each reloads the list; using one reloads the part too. On a paid draft model
+ * `take` first answers with the most it can cost: `toConfirm` holds it until the user pays (`take`
+ * again with that amount) or `cancel`s; nothing about the ask outlives the list.
  */
 export function useLineTakeActions(partId: string, key: string) {
   const client = useQueryClient()
@@ -766,11 +768,33 @@ export function useLineTakeActions(partId: string, key: string) {
     what: string
     answer: NonNullable<TakeLineResult> | NonNullable<UseTakeResult>
   } | null>(null)
+  const [toConfirm, setToConfirm] = useState<number | null>(null)
+  const [refusal, setRefusal] = useState<string | null>(null)
   const take = useMutation({
-    mutationFn: () => postJson<NonNullable<TakeLineResult>>(base),
-    onMutate: () => setRefused(null),
+    mutationFn: async (confirmedCost?: number) => {
+      const response = await fetch(base, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(confirmedCost === undefined ? {} : { confirmedCost }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`${base} answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<TakeLineResult>
+    },
+    onMutate: () => {
+      setRefused(null)
+      setRefusal(null)
+      setToConfirm(null)
+    },
     onSuccess: (result) => {
-      if (!result.ok) setRefused({ what: 'The take could not be made', answer: result })
+      const state = takeAnswerState(result)
+      setToConfirm(state.toConfirm)
+      setRefusal(state.refusal)
+      if (!result.ok && !state.toConfirm && !state.refusal) {
+        setRefused({ what: 'The take could not be made', answer: result })
+      }
+      void client.invalidateQueries({ queryKey: ['credit'] })
       return reloadTakes()
     },
   })
@@ -797,7 +821,7 @@ export function useLineTakeActions(partId: string, key: string) {
     },
     onSuccess: reloadTakes,
   })
-  return { take, use, drop, refused }
+  return { take, use, drop, refused, toConfirm, refusal, cancel: () => setToConfirm(null) }
 }
 
 /** The URL of a recorded audition take. */
