@@ -22,7 +22,7 @@ import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
-import { clipsInTurn, playthroughLabel } from '../../playthrough'
+import { clipsInTurn, playthroughButton } from '../../playthrough'
 
 type Filter = 'all' | 'attention' | LineStatus | 'orphans'
 
@@ -92,7 +92,13 @@ export function LinesView({ part }: { part: PartSummary }) {
   // A playthrough: the lines shown with a clip, in turn, from the first or from one line.
   const turn = clipsInTurn(lines)
   const playFrom = (key?: string) =>
-    playInTurn(clipsInTurn(lines, key).map((c) => ({ id: c.key, url: clipUrl(part.id, c.file) })))
+    playInTurn(
+      (key === undefined ? turn : clipsInTurn(lines, key)).map((c) => ({
+        id: c.key,
+        url: clipUrl(part.id, c.file),
+      })),
+    )
+  const playButton = playthroughButton(inTurn, turn.length, lines.length)
   const playingRow = useRef<HTMLTableRowElement>(null)
   useEffect(() => {
     if (inTurn) playingRow.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -169,22 +175,18 @@ export function LinesView({ part }: { part: PartSummary }) {
           ))}
         </div>
         <div className="filters">
-          {filter !== 'orphans' && turn.length > 0 && (
+          {playButton && (
             <button
               className="btn"
               type="button"
-              title="Hear the lines shown one after another, as the game plays them"
-              onClick={() => (inTurn ? stop() : playFrom())}
+              title={
+                playButton.stop
+                  ? undefined
+                  : 'Hear the lines shown one after another, as the game plays them'
+              }
+              onClick={() => (playButton.stop ? stop() : playFrom())}
             >
-              {inTurn ? (
-                <>
-                  <PauseIcon /> Stop
-                </>
-              ) : (
-                <>
-                  <PlayIcon /> {playthroughLabel(turn.length, lines.length)}
-                </>
-              )}
+              {playButton.stop ? <PauseIcon /> : <PlayIcon />} {playButton.label}
             </button>
           )}
           <label className="field">
@@ -294,7 +296,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                             {playing === line.key ? <PauseIcon /> : <PlayIcon />}
                           </button>
                         )}
-                        {line.file && !inTurn && (
+                        {line.file && (
                           <button
                             type="button"
                             className="icon-btn from-here"

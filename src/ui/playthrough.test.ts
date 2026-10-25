@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { LineState } from '../core/planner'
-import { clipsInTurn, playthroughLabel } from './playthrough'
+import { clipsInTurn, playthroughButton, playthroughLabel } from './playthrough'
 
 function line(key: string, overrides: Partial<LineState> = {}): LineState {
   return {
@@ -41,5 +41,22 @@ describe('playthroughLabel', () => {
     expect(playthroughLabel(3, 3)).toBe('Play 3 lines in turn')
     expect(playthroughLabel(1, 1)).toBe('Play 1 line in turn')
     expect(playthroughLabel(2, 5)).toBe('Play 2 of 5 lines in turn')
+  })
+})
+
+describe('playthroughButton', () => {
+  it('offers to play the lines shown with a clip', () => {
+    expect(playthroughButton(false, 3, 5)).toEqual({
+      stop: false,
+      label: 'Play 3 of 5 lines in turn',
+    })
+  })
+
+  it('is Stop while a list plays, even when the lines shown changed to ones without a clip', () => {
+    expect(playthroughButton(true, 0, 2)).toEqual({ stop: true, label: 'Stop' })
+  })
+
+  it('is absent when nothing shown has a clip and nothing plays', () => {
+    expect(playthroughButton(false, 0, 2)).toBeNull()
   })
 })

@@ -518,8 +518,9 @@ An audition is for a character, not for a part: the result applies to every part
   job of kind `check`).
 - Hear a part as the game plays it (built): on the lines page, **Play N lines in turn** plays the
   lines shown (filtered as the table is: one character, one status, a search) one after another
-  in dialog order, every speaker; a row's **from here** button starts there. The row playing is
-  marked and kept in view; a clip that fails is skipped.
+  in dialog order, every speaker; a row's **from here** button starts there. The list is fixed
+  when it starts: filtering afterwards does not change it, and Stop stays offered. The row
+  playing is marked and kept in view; a clip that fails is skipped.
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.

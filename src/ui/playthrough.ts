@@ -23,6 +23,20 @@ export function clipsInTurn(lines: LineState[], from?: string): TurnClip[] {
   return lines.slice(start).flatMap((l) => (l.file ? [{ key: l.key, file: l.file }] : []))
 }
 
+/**
+ * The playthrough button: Stop while a list plays (whatever the table shows by now: the list is
+ * fixed when it starts), else Play for the lines shown with a clip, or none when there is nothing
+ * to play.
+ */
+export function playthroughButton(
+  inTurn: boolean,
+  withClip: number,
+  shown: number,
+): { stop: boolean; label: string } | null {
+  if (inTurn) return { stop: true, label: 'Stop' }
+  return withClip > 0 ? { stop: false, label: playthroughLabel(withClip, shown) } : null
+}
+
 /** The Play button's label: how many of the lines shown have a clip to play. */
 export function playthroughLabel(withClip: number, shown: number): string {
   return withClip === shown
