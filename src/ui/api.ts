@@ -25,6 +25,7 @@ import type { RuledOutResult } from '../services/ruledOut'
 import type { SoundAlikeChange } from '../services/soundAlike'
 import type { SetupResult } from '../services/setup'
 import type { NoteChange } from '../services/notes'
+import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../services/lineTakes'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
@@ -734,6 +735,69 @@ export function useSetup(fresh = false) {
     refetchOnWindowFocus: false,
     refetchOnMount: fresh ? 'always' : true,
   })
+}
+
+/** A line's extra takes, newest first, each marked current or stale. */
+export function useLineTakes(partId: string, key: string) {
+  return useQuery({
+    queryKey: ['line-takes', partId, key],
+    queryFn: () =>
+      getJson<NonNullable<LineTakesResult>>(
+        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`,
+      ),
+  })
+}
+
+/** The URL of one of a line's extra takes (a WAV). */
+export function lineTakeUrl(partId: string, key: string, id: string): string {
+  return `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes/${id}.wav`
+}
+
+/**
+ * A line's extra takes: `take` records one more (free), `use` makes one the line's clip, `drop`
+ * removes one from the cache. Each reloads the list; using one reloads the part too.
+ */
+export function useLineTakeActions(partId: string, key: string) {
+  const client = useQueryClient()
+  const base = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`
+  const reloadTakes = () => client.invalidateQueries({ queryKey: ['line-takes', partId, key] })
+  // The last refusal, of either action, shown until the next action.
+  const [refused, setRefused] = useState<{
+    what: string
+    answer: NonNullable<TakeLineResult> | NonNullable<UseTakeResult>
+  } | null>(null)
+  const take = useMutation({
+    mutationFn: () => postJson<NonNullable<TakeLineResult>>(base),
+    onMutate: () => setRefused(null),
+    onSuccess: (result) => {
+      if (!result.ok) setRefused({ what: 'The take could not be made', answer: result })
+      return reloadTakes()
+    },
+  })
+  const use = useMutation({
+    mutationFn: (id: string) => postJson<NonNullable<UseTakeResult>>(`${base}/${id}/use`),
+    onMutate: () => setRefused(null),
+    onSuccess: async (result) => {
+      if (!result.ok) setRefused({ what: 'The take could not be used', answer: result })
+      await reloadTakes()
+      if (result.ok) {
+        void client.invalidateQueries({ queryKey: ['plan', partId] })
+        void client.invalidateQueries({ queryKey: ['changes'] })
+        await client.invalidateQueries({ queryKey: ['part', partId] })
+      }
+    },
+  })
+  const drop = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`${base}/${id}`, { method: 'DELETE' })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`dropping the take answered ${response.status}`)
+      }
+      return (await response.json()) as { ok: boolean }
+    },
+    onSuccess: reloadTakes,
+  })
+  return { take, use, drop, refused }
 }
 
 /** The URL of a recorded audition take. */

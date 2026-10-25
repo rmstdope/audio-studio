@@ -126,6 +126,8 @@ audio-studio/
 │   │   ├── heard.ts             what Whisper heard of a part's lines below full, as saved
 │   │   ├── soundAlike.ts        English words that sound the same, matched as one
 │   │   ├── setup.ts             what the machine and project lack, from facts, with a fix each
+│   │   ├── notes.ts             the user's notes on a part's lines, as saved
+│   │   ├── lineTakes.ts         a line's extra takes, as saved, and as listed
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
@@ -138,6 +140,8 @@ audio-studio/
 │   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
 │   │   ├── takes.ts             audition takes and tries: recorded once, cached by what they are made of
 │   │   ├── setup.ts             the facts for the setup checks: tools on the PATH, the key, Fish
+│   │   ├── notes.ts             the user's notes on lines, saved in the cache
+│   │   ├── lineTakes.ts         a line's extra takes: taken, listed, used as the clip, dropped
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
 │   │   ├── audio.ts             encode MP3 with ffmpeg, level its loudness (as level.py)
 │   │   ├── files.ts             read resources, write atomically, lock formatting
@@ -305,7 +309,9 @@ the line again writes a new entry without it.
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
 **Cache** (`.audio-studio/`, gitignored): the tool's own state, none of it the game's: audition
-takes, audition sessions in progress, the voices ruled out per character, the user's notes on
+takes, audition sessions in progress, the voices ruled out per character, a line's extra takes
+(`.audio-studio/line-takes/<part>-<hash>/<key>/<id>.wav` and `.json`: the audio as Fish sent it,
+joined, and what Whisper made of it), the user's notes on
 lines (`.audio-studio/notes/<part>-<hash>.json`: "too fast", "retake after the rewrite"; on this
 machine only, so a teammate does not see them), and what Whisper heard
 of each kept take heard below full (`.audio-studio/heard/<part>-<hash>.json`: per line, the lock
@@ -529,9 +535,19 @@ An audition is for a character, not for a part: the result applies to every part
   in dialog order, every speaker; a row's **from here** button starts there. The list is fixed
   when it starts: filtering afterwards does not change it, and Stop stays offered. The row
   playing is marked and kept in view; a clip that fails is skipped.
+- Extra takes of a line (built: **Takes** on its row, opening a list under it): **Another take**
+  has Fish speak the line once more (the draft model, free only: a take is for comparing and asks
+  no one to pay), checked by Whisper when the project checks takes, and kept in the tool cache as a
+  WAV with its score and timings; nothing of the game's is written. Each take is played, compared
+  by score and length, and **Use this take** makes it the line's clip, encoded and written with the
+  manifest and lock exactly as a recording is (the same `commitClip`), or dropped. A take made from
+  other inputs than today's (the cue, text, voice or settings changed) is marked stale: heard, not
+  used. A take is a draft one: a line whose clip is final is never taken back to the draft model
+  (§8.4), so Use is refused for it, and a final clip landing meanwhile is kept as a recording
+  keeps it. A broken file of the part is reported with its path, as a recording reports it. Whisper's best is not always the best read; this lets the ear decide.
 - Keys on the lines table (built): a row takes focus (Tab, or a click); j/k and the arrows
   move, space or Enter plays, f plays from there, r records or retakes, a accepts, h shows what
-  was heard, c edits the cue, n the note. A hint under the table lists them. Nothing while typing
+  was heard, c edits the cue, n the note, t opens the takes. A hint under the table lists them. Nothing while typing
   in a field, nothing with Cmd, Ctrl or Alt held (the browser's shortcuts stay its own), and on a
   button in the row space and Enter are the button's.
 - A note on a line (built): a note to oneself under the line's text on the lines page ("too
@@ -702,6 +718,11 @@ GET    /api/parts/:part/clips/:file              a clip from the part's clips fo
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
 POST   /api/parts/:part/lines/:key/try           hear the line with a cue ({ cue }): a take, nothing saved
 PATCH  /api/parts/:part/lines/:key/note          the user's note on the line ({ note }; empty removes)
+GET    /api/parts/:part/lines/:key/takes         the line's extra takes, newest first, current or stale
+POST   /api/parts/:part/lines/:key/takes         one more take into the cache (free model only)
+GET    /api/parts/:part/lines/:key/takes/:id.wav a take's audio
+POST   /api/parts/:part/lines/:key/takes/:id/use make the take the line's clip (as a recording)
+DELETE /api/parts/:part/lines/:key/takes/:id     drop the take
 POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
 POST   /api/parts/:part/refresh                  run refreshDialog
@@ -902,6 +923,8 @@ Small, independently useful increments:
        and the characters page; it may be meant, so it is a note, not a problem.
     6. **Notes on lines** (built): a note to oneself per line, in the tool cache (§6, §8.3).
     7. **Keys** (built): the lines table worked from the keyboard (§8.3).
+    8. **Extra takes** (built): more takes of a line in the cache, compared by ear, one made the
+       clip (§8.3); the recording split into speaking, checking and committing a take for it.
 11. **What was heard**, in two pull requests:
     1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
        when it is checked; the lines page shows it beside the text, missed words marked.

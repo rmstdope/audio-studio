@@ -1,6 +1,15 @@
 /** What a key does on a row of the lines table. */
 export type LineKeyAction =
-  'next' | 'previous' | 'play' | 'fromHere' | 'record' | 'accept' | 'heard' | 'cue' | 'note'
+  | 'next'
+  | 'previous'
+  | 'play'
+  | 'fromHere'
+  | 'record'
+  | 'accept'
+  | 'heard'
+  | 'cue'
+  | 'note'
+  | 'takes'
 
 /** One action of the lines table: its keys, how the hint shows them, and what it does. */
 export interface LineKey {
@@ -21,6 +30,7 @@ export const LINE_KEYS: LineKey[] = [
   { keys: ['h'], shown: 'h', does: 'what was heard', action: 'heard' },
   { keys: ['c'], shown: 'c', does: 'cue', action: 'cue' },
   { keys: ['n'], shown: 'n', does: 'note', action: 'note' },
+  { keys: ['t'], shown: 't', does: 'takes', action: 'takes' },
 ]
 
 /** Where a key was pressed, as far as the table cares. */

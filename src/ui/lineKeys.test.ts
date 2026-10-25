@@ -21,6 +21,7 @@ describe('lineKeyAction', () => {
     expect(press('n')).toBe('note')
     expect(press('f')).toBe('fromHere')
     expect(press('h')).toBe('heard')
+    expect(press('t')).toBe('takes')
     expect(press('x')).toBeNull()
     expect(press('Tab')).toBeNull()
   })
@@ -50,6 +51,7 @@ describe('lineKeyAction', () => {
       'heard',
       'cue',
       'note',
+      'takes',
     ]
     expect(LINE_KEYS.map((k) => k.action).sort()).toEqual([...actions].sort())
   })
