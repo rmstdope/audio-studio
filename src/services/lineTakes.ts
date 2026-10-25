@@ -4,9 +4,9 @@ import { dirname, join } from 'node:path'
 import { clipInputs, fingerprint, type ClipInputs } from '../core/fingerprint'
 import { LineTakeSchema, takesView, type LineTake, type LineTakeView } from '../core/lineTakes'
 import { resolveInRoot } from '../core/paths'
-import { FREE_MODELS, type Problem } from '../core/project'
+import { type Problem } from '../core/project'
 import type { Line } from '../core/resources'
-import { createBudget } from '../core/spend'
+import type { Budget } from '../core/spend'
 import type { FishFactory } from './auditions'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { characterFile, listFiles, readJson, writeAtomic } from './files'
@@ -28,7 +28,7 @@ export type TakeLineResult =
   | { ok: true; take: LineTakeView }
   | {
       ok: false
-      reason: 'uncast' | 'no-key' | 'paid' | 'fish' | 'audio' | 'transcribe'
+      reason: 'uncast' | 'no-key' | 'spend' | 'fish' | 'audio' | 'transcribe'
       message: string
     }
   | { ok: false; problems: Problem[] }
@@ -37,9 +37,6 @@ export type TakeLineResult =
 
 /** Making a take the line's clip: as a recording, or refused because the take is stale. */
 export type UseTakeResult = RecordResult | { ok: false; reason: 'stale' | 'final'; message: string }
-
-/** The free model only: an extra take never costs anything. */
-const FREE_ONLY = createBudget({ model: FREE_MODELS[0], dollars: 0 })
 
 /**
  * A line's extra takes: the ones the user asked for from the lines page, to compare and choose
@@ -58,9 +55,9 @@ export async function listLineTakes(
 }
 
 /**
- * Records one more take of a line into the tool cache, with the draft model (the free one only: a
- * take is for comparing, and asks no one to pay), checked by Whisper when the project checks
- * takes. The take is kept as a WAV beside what was made of it; nothing of the game's is written
+ * Records one more take of a line into the tool cache, with the draft model, charged to `budget`
+ * (a zero one for the free model; a paid model's is what the user confirmed), checked by Whisper
+ * when the project checks takes. The take is kept as a WAV beside what was made of it; nothing of the game's is written
  * until the user chooses it (`useLineTake`).
  */
 export async function takeLine(
@@ -68,7 +65,11 @@ export async function takeLine(
   partId: string,
   key: string,
   fishFor: FishFactory,
-  { limiter, transcriber = null }: { limiter: Limiter; transcriber?: Transcriber | null },
+  {
+    limiter,
+    transcriber = null,
+    budget,
+  }: { limiter: Limiter; transcriber?: Transcriber | null; budget: Budget },
 ): Promise<TakeLineResult> {
   const found = await lineAndInputs(projectFile, partId, key)
   if (found.kind === 'problems') return { ok: false, problems: found.problems }
@@ -82,13 +83,6 @@ export async function takeLine(
     }
   }
   const { narration } = read.project
-  if (!(FREE_MODELS as readonly string[]).includes(inputs.model)) {
-    return {
-      ok: false,
-      reason: 'paid',
-      message: `Extra takes use the free model only; the draft model is ${inputs.model}. Record the line from its row instead.`,
-    }
-  }
   const root = dirname(projectFile)
   const fish = await fishFor(root, read.project)
   if (!fish) return { ok: false, reason: 'no-key', message: NO_KEY }
@@ -99,12 +93,11 @@ export async function takeLine(
     inputs,
     cast: read.input.cast,
     narration,
-    budget: FREE_ONLY,
+    budget,
     limiter,
     limiterKey: `line-take\n${projectFile}\n${partId}\n${key}\n${id}`,
   })
-  // The budget is the free model's, so a refusal to spend cannot happen here.
-  if (!spoken.ok) return { ...spoken, reason: spoken.reason === 'audio' ? 'audio' : 'fish' }
+  if (!spoken.ok) return spoken
   const checker = narration.quality.transcriber === 'none' ? null : transcriber
   let checked
   try {

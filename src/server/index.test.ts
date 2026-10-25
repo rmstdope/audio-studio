@@ -1083,6 +1083,51 @@ describe('server, a paid draft model', () => {
     expect(spoken).toBeGreaterThan(0)
   })
 
+  describe('an extra take', () => {
+    const takes = () => at('/api/parts/act1/lines/a/takes')
+    const takeAgain = (confirmedCost?: number) =>
+      fetch(takes(), {
+        method: 'POST',
+        headers: own,
+        body: confirmedCost === undefined ? undefined : JSON.stringify({ confirmedCost }),
+      })
+
+    it('is recorded only once its cost is confirmed, and priced for one take', async () => {
+      credit = 10
+      const before = spoken
+      const asked = await takeAgain()
+      expect(asked.status).toBe(409)
+      const body = await asked.json()
+      expect(body).toMatchObject({ ok: false, reason: 'confirm' })
+      // 17 bytes of text at $15 per million: one take, not the three a recording is held to.
+      expect(body.ceiling).toBeCloseTo((17 / 1_000_000) * 15, 12)
+      expect((await takeAgain(body.ceiling / 2)).status).toBe(409)
+      expect(spoken).toBe(before)
+      credit = body.ceiling / 2
+      expect(await (await takeAgain(body.ceiling)).json()).toMatchObject({
+        ok: false,
+        reason: 'credit',
+      })
+      expect(spoken).toBe(before)
+      credit = 10
+      expect(await (await takeAgain(body.ceiling)).json()).toMatchObject({
+        ok: true,
+        take: { current: true },
+      })
+      expect(spoken).toBe(before + 1)
+      const listed = await (await fetch(takes())).json()
+      expect(listed.takes).toHaveLength(1)
+    })
+
+    it('refuses a request from another page', async () => {
+      const response = await fetch(takes(), {
+        method: 'POST',
+        headers: { origin: 'https://evil.example' },
+      })
+      expect(response.status).toBe(403)
+    })
+  })
+
   it('answers a body it cannot read with 400', async () => {
     const bad = await fetch(at('/api/parts/act1/lines/a/record'), {
       method: 'POST',
