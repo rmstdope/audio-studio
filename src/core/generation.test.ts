@@ -221,6 +221,13 @@ describe('planGeneration, the final recording', () => {
     expect(plan.final).toBe(true)
     expect(planGeneration({ lines, orphans: [] }, { at: AT, model: 's2-pro' }).keys).toEqual(['d'])
   })
+
+  it('never records an untranslated line', () => {
+    const lines: LineState[] = [line('a', 'mira', 'untranslated'), line('b', 'mira', 'missing')]
+    const plan = planGeneration({ lines, orphans: [] }, { at: AT, model: 's2-pro', final: true })
+    expect(plan.keys).toEqual(['b'])
+    expect(plan.untranslated).toBe(1)
+  })
 })
 
 describe('planGeneration, final clips kept final', () => {

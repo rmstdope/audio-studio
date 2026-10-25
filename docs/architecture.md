@@ -717,7 +717,7 @@ generation while the script and cast still change) and `final` (the recording th
   and a job when it ends, give theirs back. An audition on a paid model works the same with a
   budget per sitting, asked for by amount rather than by a ceiling (§8.1).
 - **Final recording** (built): when `final` names another model than `draft`, the Generate panel
-  offers **Draft** and **Final**. The final plan records every cast line whose clip was not made
+  offers **Draft** and **Final**. The final plan records every cast, translated line whose clip was not made
   with the final model yet (missing, stale, drafted, untracked), with the final model, priced and
   confirmed like any paid job. A clip is up to date if its lock matches the inputs with either
   model; one made with the final model is marked `final` in the line table, and draft plans
