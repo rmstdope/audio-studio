@@ -602,8 +602,9 @@ An audition is for a character, not for a part: the result applies to every part
       takes the heard word's times. Only a capitalised shown word of four letters or more as said (a
       possessive 's not counted), nothing but letters and not all capitals, qualifies; where a
       sentence starts (after . ! ? … or a colon, opening a quote, single or double, or after a dash
-      inside a word) only a known name: a one-word character id of the cast ("aren", not "ancient
-      tree spirit") or pronunciation. Lowercase words, short ones, numbers (in digits or in words:
+      inside a word), and anywhere in German (`de`), which capitalises every noun ("Hund" heard as
+      "Hand" is missed), only a known name: a one-word character id of the cast ("aren", not
+      "ancient tree spirit") or pronunciation. Lowercase words, short ones, numbers (in digits or in words:
       "Act Three" heard as "Act Tree" is missed) and other sentence-initial words must match
       exactly. Words are compared in any alphabet, letters and their marks kept ("får" is not "för",
       Russian ё read as е), and a name in any alphabet is guessed the same way ("Лирия" as

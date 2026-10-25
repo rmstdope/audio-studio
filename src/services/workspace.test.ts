@@ -482,6 +482,19 @@ describe('a part in several languages', () => {
     expect(same(en, 'twenty', '20')).toBe(true)
   })
 
+  it('hears German as a language that capitalises its nouns, and no other', async () => {
+    const root = tempRepo({ ...files, 'audio-studio.json': project(['en', 'sv', 'de']) })
+    const projectFile = join(root, 'audio-studio.json')
+    const nouns = async (language: string) => {
+      const read = await readPart(projectFile, 'act1', language)
+      if (!read?.ok) throw new Error('no part')
+      return read.ears.capitalNouns
+    }
+    expect(await nouns('de')).toBe(true)
+    expect(await nouns('en')).toBe(false)
+    expect(await nouns('sv')).toBe(false)
+  })
+
   it('says so when the source dialog is missing, since lines cannot be matched', async () => {
     const { part } = await open('sv', 'act1', { 'tts/act1/en/script.json': undefined })
     expect(part.problems.map((p) => p.file)).toContain('tts/act1/en/script.json')

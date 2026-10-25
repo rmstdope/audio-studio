@@ -18,3 +18,11 @@ export function languageName(code: string): string {
   const name = new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code
   return name.charAt(0).toLocaleUpperCase(code) + name.slice(1)
 }
+
+/**
+ * Whether a language writes every noun with a capital (German, `de` and its regions), so a
+ * capitalised word in it says nothing about being a name.
+ */
+export function capitalisesNouns(code: string): boolean {
+  return code.split('-')[0] === 'de'
+}
