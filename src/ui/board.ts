@@ -170,3 +170,18 @@ export function stopEffectsFor(
     shortlisted: session.shortlist.filter((v) => v !== current).length,
   })
 }
+
+/**
+ * What Your voices shows: `loading` until Fish has answered (also on a resume), `error` when
+ * it could not list them and there are none to show, `none` when the account has none, `allUsed`
+ * when all of them are shortlisted or ruled out, else the `cards`.
+ */
+export function ownSectionState(
+  session: Pick<AuditionSession, 'yours' | 'mine'>,
+  fetch: { fetched: boolean; error: string | null },
+): 'loading' | 'error' | 'none' | 'allUsed' | 'cards' {
+  if (fetch.error) return session.yours.length > 0 ? 'cards' : 'error'
+  if (!fetch.fetched) return 'loading'
+  if (session.yours.length > 0) return 'cards'
+  return session.mine.length > 0 ? 'allUsed' : 'none'
+}

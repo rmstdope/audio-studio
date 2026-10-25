@@ -11,13 +11,17 @@ import {
   discardSession,
   moreVoices,
   moveVoice,
+  refreshOwnVoices,
   recordedLines,
   sessionFor,
   startAudition,
   undoLastDrop,
+  viewOf,
 } from './sessions'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { setKeywords } from './auditions'
+import { createLimiter } from './limit'
+import { recordTake } from './takes'
 
 /** Rules voices out, as a drop does. */
 const ruleOutVoices = (
@@ -47,7 +51,11 @@ const library = [
 ]
 const extra = voice('x', 'Someone else')
 
+let ownVoices: Voice[] = []
 const fish: FishClient = {
+  async listOwnVoices() {
+    return ownVoices
+  },
   async credit() {
     return 25
   },
@@ -433,5 +441,73 @@ describe('ruled-out voices in an audition', () => {
     const again = await addVoiceById(projectFile, 'mira', 'b', fishFor)
     expect(again?.ok && [again.session.toHear[0], again.session.dropped]).toEqual(['b', []])
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+})
+
+describe('refreshOwnVoices', () => {
+  const mine = (id: string): Voice => ({ ...voice(id, `Clone ${id}`), own: true })
+
+  it('fills Your voices from the account, and picks up a voice made since on resume', async () => {
+    ownVoices = [mine('m1')]
+    const { projectFile } = await started()
+    const first = await refreshOwnVoices(projectFile, 'mira', fishFor)
+    expect(first?.ok && first.session.yours).toEqual(['m1'])
+    const kept = await sessionFor(projectFile, 'mira')
+    expect(kept?.ok && kept.session?.voices.m1?.own).toBe(true)
+    ownVoices = [mine('m1'), mine('m2')]
+    const again = await refreshOwnVoices(projectFile, 'mira', fishFor)
+    expect(again?.ok && again.session.yours).toEqual(['m1', 'm2'])
+    const saved = await sessionFor(projectFile, 'mira')
+    expect(saved?.ok && saved.session?.yours).toEqual(['m1', 'm2'])
+    ownVoices = []
+  })
+
+  it('shows the take of an own voice with the board', async () => {
+    ownVoices = [mine('m1')]
+    const { projectFile } = await started()
+    const result = await refreshOwnVoices(projectFile, 'mira', fishFor)
+    await recordTake(projectFile, 'mira', 'm1', fishFor, createLimiter())
+    const view = await viewOf(projectFile, 'mira', result!)
+    expect(view.ok && Object.keys(view.takes)).toEqual(['m1'])
+    ownVoices = []
+  })
+
+  it('does not bring back an own voice ruled out for the character', async () => {
+    ownVoices = [mine('m1'), mine('m2')]
+    const { projectFile } = await started()
+    await ruleOutVoices(projectFile, 'mira', [{ id: 'm1', title: 'Clone m1' }])
+    const result = await refreshOwnVoices(projectFile, 'mira', fishFor)
+    expect(result?.ok && result.session.yours).toEqual(['m2'])
+    ownVoices = []
+  })
+
+  it('drops an own voice like any other: ruled out, and undone', async () => {
+    ownVoices = [mine('m1')]
+    const { projectFile } = await started()
+    await refreshOwnVoices(projectFile, 'mira', fishFor)
+    const dropped = await moveVoice(projectFile, 'mira', 'm1', 'drop')
+    expect(dropped?.ok && dropped.session.yours).toEqual([])
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual(['m1'])
+    const undone = await undoLastDrop(projectFile, 'mira')
+    expect(undone?.ok && undone.session.yours).toEqual(['m1'])
+    expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+    ownVoices = []
+  })
+
+  it('says why Fish would not list them, and leaves the session as it was', async () => {
+    const { projectFile, session } = await started()
+    const failing = async () => ({
+      ...fish,
+      listOwnVoices: () => Promise.reject(new Error('down')),
+    })
+    const result = await refreshOwnVoices(projectFile, 'mira', failing)
+    expect(result).toMatchObject({ ok: false, reason: 'fish', message: 'down' })
+    expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session })
+  })
+
+  it('has no session to fill before an audition is started', async () => {
+    const root = tempRepo(files)
+    const result = await refreshOwnVoices(join(root, 'audio-studio.json'), 'mira', fishFor)
+    expect(result).toMatchObject({ ok: false, reason: 'no-session' })
   })
 })
