@@ -252,7 +252,7 @@ describe('alignWords, words joined by hyphens and dashes', () => {
     expect(alignWords(shown, heard, 4, undefined, new Set(['malakar'])).ratio).toBe(1)
     expect(alignWords(['…', '-', '—'], [], 1).ratio).toBe(1)
     expect(alignWords(['wait', '…', 'now'], heardAs('wait'), 2).ratio).toBe(1 / 2)
-    // Letters outside a to z are still a word, though they compare as nothing.
+    // Letters outside a to z are a word too.
     expect(alignWords(['wait', 'Да'], heardAs('wait'), 2).missed).toEqual([1])
   })
 })
@@ -552,7 +552,7 @@ describe('alignWords, words that sound the same', () => {
     alignWords(shown.split(' '), heardAs(heard), 9, undefined, new Set(), alike)
 
   it('leaves the built-in English groups out of another language', () => {
-    const swedish = soundAlikes([['Lyria', 'Liria']], false)
+    const swedish = soundAlikes([['Lyria', 'Liria']], 'sv')
     expect(align('Rest at the inn.', 'Rest at the in.', swedish).ratio).toBeLessThan(1)
     expect(align('Lyria waits.', 'Liria waits.', swedish).ratio).toBe(1)
   })
@@ -709,5 +709,50 @@ describe('pyRound (Python’s round(x, 3))', () => {
     expect(alignWords(['constructor'], [{ word: 'constructor', start: 0, end: 1 }], 1).ratio).toBe(
       1,
     )
+  })
+})
+
+describe('alignWords, in any alphabet', () => {
+  const heardAs = (line: string) =>
+    words(...line.split(' ').map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const align = (shown: string, heard: string, language = 'en') =>
+    alignWords(shown.split(' '), heardAs(heard), 9, undefined, new Set(), soundAlikes([], language))
+
+  it('compares letters of every alphabet, so a wrong take in Russian or Greek is caught', () => {
+    expect(align('Я пойду в лес сегодня.', 'Он видел большую собаку вчера.', 'ru').ratio).toBe(0)
+    expect(align('Я пойду в лес сегодня.', 'Я пойду в лес сегодня.', 'ru').ratio).toBe(1)
+    expect(align('Πάμε στο δάσος.', 'Είδα ένα σκύλο.', 'el').ratio).toBe(0)
+    expect(align('Πάμε στο δάσος.', 'Πάμε στο δάσος.', 'el').ratio).toBe(1)
+    // As the studio aligned before it was told a language.
+    expect(align('Я пойду в лес.', 'Он видел собаку вчера.').ratio).toBeLessThan(0.9)
+  })
+
+  it('tells words apart by their letters beyond a to z (får and för)', () => {
+    expect(align('Vi får gå.', 'Vi för gå.', 'sv').missed).toEqual([1])
+    expect(align('Vi får gå.', 'Vi får gå.', 'sv').ratio).toBe(1)
+    expect(align('Über alles.', 'über alles', 'de').ratio).toBe(1)
+  })
+
+  it('matches number words of the line’s language to the digits Whisper writes', () => {
+    expect(align('I have twenty coins.', 'I have 20 coins.').ratio).toBe(1)
+    expect(align('I have twenty-one coins.', 'I have 21 coins.').ratio).toBe(1)
+    expect(align('I have twenty one coins.', 'I have 21 coins.').ratio).toBe(1)
+    expect(align('I have 21 coins.', 'I have twenty-one coins.').ratio).toBe(1)
+    expect(align('Jag har tjugo mynt.', 'Jag har 20 mynt.', 'sv').ratio).toBe(1)
+    expect(align('Jag har två mynt.', 'Jag har 2 mynt.', 'sv').ratio).toBe(1)
+    expect(align('Jag har tjugotvå mynt.', 'Jag har 22 mynt.', 'sv').ratio).toBe(1)
+    expect(align('Ich habe einundzwanzig Münzen.', 'Ich habe 21 Münzen.', 'de').ratio).toBe(1)
+    expect(align('Ich habe zwölf Münzen.', 'Ich habe 12 Münzen.', 'de').ratio).toBe(1)
+    expect(align('У меня двадцать одна монета.', 'У меня 21 монета.', 'ru').ratio).toBe(1)
+    expect(align('У меня две монеты.', 'У меня 2 монеты.', 'ru').ratio).toBe(1)
+    expect(align('Έχω είκοσι ένα νομίσματα.', 'Έχω 21 νομίσματα.', 'el').ratio).toBe(1)
+    expect(align('Έχω δύο νομίσματα.', 'Έχω 2 νομίσματα.', 'el').ratio).toBe(1)
+  })
+
+  it('does not take a number word for another number, or another language’s number word', () => {
+    expect(align('Jag har tjugo mynt.', 'Jag har 30 mynt.', 'sv').missed).toEqual([2])
+    expect(align('I have twenty coins.', 'I have 21 coins.').missed).toEqual([2])
+    expect(align('Jag har två mynt.', 'Jag har 2 mynt.').missed).toEqual([2])
+    expect(align('Jag har två mynt.', 'Jag har two mynt.', 'sv').missed).toEqual([2])
   })
 })

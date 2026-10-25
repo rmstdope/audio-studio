@@ -1,3 +1,4 @@
+import { numberWords } from './numbers'
 import { SOUND_ALIKE } from './soundAlike'
 import { spokenText } from './spoken'
 
@@ -22,14 +23,9 @@ export interface HeardSegment {
   words?: HeardWord[]
 }
 
-const NUMBERS = new Map(
-  'zero one two three four five six seven eight nine ten eleven twelve'
-    .split(' ')
-    .map((word, n): [string, string] => [word, String(n)]),
-)
-
 /**
- * A word without case or punctuation (narrate.py `_plain`). Apostrophes stay inside a word
+ * A word without case or punctuation (narrate.py `_plain`), in any alphabet: letters and their
+ * marks ("får" is not "för", "Да" is a word) and digits are kept, composed as one (NFC). Apostrophes stay inside a word
  * ("don't") but not at its ends, where they are single quotes around speech ("'You",
  * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. A possessive
  * is one word however it is written, since Whisper cannot hear which: "Sorceress's" and
@@ -38,38 +34,44 @@ const NUMBERS = new Map(
  */
 function plain(word: string): string {
   return word
+    .normalize('NFC')
     .toLowerCase()
     .replace(/&/g, 'and')
-    .replace(/[^a-z0-9']/g, '')
+    .replace(/[^\p{L}\p{M}\p{N}']/gu, '')
     .replace(/^'+|'+$/g, '')
     .replace(/s?'s$/, 's')
 }
 
-/** A word for comparison: plain, small numbers as digits, since Whisper writes "1" (`_norm`). */
+/**
+ * A word for comparison: plain (narrate.py `_norm`, which also wrote English "one" to "twelve" as
+ * digits; numbers are now matched as words that sound the same, in the line's language: see
+ * `soundAlikes`).
+ */
 function norm(word: string): string {
-  const p = plain(word)
-  return NUMBERS.get(p) ?? p
+  return plain(word)
 }
 
 /** Words matched as one, as they sound the same: each word (as `norm` gives it) → its group's. */
 export type SoundAlike = ReadonlyMap<string, string>
 
 /**
- * The words that sound the same: the built-in groups (`SOUND_ALIKE`) and `extra` ones (a
- * project's `quality.soundAlike`), groups that share a word joined into one. Each word maps to
- * one word of its group, the same for all, as `norm` writes them ("two" is "2").
+ * The words that sound the same in `language`: the numbers 0 to 99 as its words and as digits,
+ * since Whisper writes "20" for "twenty" (`numberWords`), the built-in English groups
+ * (`SOUND_ALIKE`) in English only, and `extra` ones (a project's `quality.soundAlike`), groups
+ * that share a word joined into one ("two", "2", "to" and "too"). Each word maps to one word of
+ * its group, the same for all, as `norm` writes them.
  */
 export function soundAlikes(
   extra: readonly (readonly string[])[] = [],
-  /** Whether the built-in groups apply: they are English words, so only to English. */
-  builtIn = true,
+  language = 'en',
 ): SoundAlike {
+  const english = language.split('-')[0]!.toLowerCase() === 'en'
   const parent = new Map<string, string>()
   const root = (word: string): string => {
     const up = parent.get(word) ?? word
     return up === word ? word : root(up)
   }
-  for (const group of [...(builtIn ? SOUND_ALIKE : []), ...extra]) {
+  for (const group of [...numberWords(language), ...(english ? SOUND_ALIKE : []), ...extra]) {
     const [first, ...rest] = group.map(norm).filter(Boolean).map(american)
     if (!first) continue
     for (const word of rest) {
@@ -391,9 +393,9 @@ function spelledBy(word: string, words: string[], alike: SoundAlike): number {
   return 0
 }
 
-/** Words run together, as `plain` gives them, as they are matched: numbers as digits, grouped. */
+/** Words run together, as `plain` gives them, as they are matched: grouped ("twentyone" is 21). */
 function sounded(spelled: string, alike: SoundAlike): string {
-  return grouped(NUMBERS.get(spelled) ?? spelled, alike)
+  return grouped(spelled, alike)
 }
 
 /**
@@ -575,9 +577,8 @@ export function alignWords(
     wantFrom = a + size
     gotFrom = b + size
   }
-  // Only words count: punctuation on its own ("—", "…") has nothing to hear. Letters outside a
-  // to z, which compare as nothing, still make a word.
-  const words = want.flatMap((w, k) => (w || /[\p{L}\p{N}]/u.test(spoken[k]!) ? [k] : []))
+  // Only words count: punctuation on its own ("—", "…") has nothing to hear.
+  const words = want.flatMap((w, k) => (w ? [k] : []))
   const missed = words.filter((k) => !times[k])
   const matched = words.length - missed.length
 

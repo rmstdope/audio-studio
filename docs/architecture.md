@@ -122,6 +122,7 @@ audio-studio/
 │   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
 │   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
 │   │   ├── align.ts             Whisper words → word timings, heard ratio (narrate.py's, + names)
+│   │   ├── numbers.ts           the numbers 0–99 in words, per language, matched to digits
 │   │   ├── audition.ts          the audition board: to hear, shortlist, drop and undo
 │   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
 │   │   ├── heard.ts             what Whisper heard of a part's lines below full, as saved
@@ -244,7 +245,10 @@ an id and a title.
   English ones (`core/soundAlike.ts`: "in" and "inn", "weekly" and "weakly", "there", "their" and
   "they're", …); see §8.2. Optional, empty by default; edited on the characters page (§8.3).
   The same for a language besides the source in `quality.soundAlikeByLanguage` (`{ "sv": [[…]] }`,
-  declared languages only); the built-in groups are English words and apply to `en` only.
+  declared languages only); the built-in groups are English words and apply to `en` only. Words
+  are compared in any alphabet (letters and their marks kept: "får" is not "för"), and the numbers
+  0 to 99 of `en`, `sv`, `de`, `el` and `ru` are built-in groups of their language with the digits
+  Whisper writes ("tjugo" and "20", "twenty one" and "21"; `core/numbers.ts`).
 - `quality.fishTier` (`under-100`, `100` or `1000`) is what the user has paid Fish in total, which
   sets how many requests Fish takes at once (5, 15, 50). Fish offers no way to ask, so the user
   says it once in the menu on Setup's Requests at once row, saved at once
