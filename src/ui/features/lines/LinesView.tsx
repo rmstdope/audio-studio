@@ -24,6 +24,7 @@ import { dollars, longTitle, plural, shortTitle } from '../../format'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
+import { LINE_KEYS, isTyping, lineKeyAction } from '../../lineKeys'
 
 type Filter = 'all' | 'attention' | LineStatus | 'orphans' | 'notes'
 
@@ -105,6 +106,52 @@ export function LinesView({ part }: { part: PartSummary }) {
     )
   const playButton = playthroughButton(inTurn, turn.length, lines.length)
   const playingRow = useRef<HTMLTableRowElement>(null)
+
+  /**
+   * Keys on a focused row: move, play, and the row's own buttons (found in the row, so each
+   * component keeps its own behaviour). A key pressed while typing in a field is left to it.
+   */
+  const onRowKey = (event: React.KeyboardEvent<HTMLTableSectionElement>) => {
+    const target = event.target as HTMLElement
+    const row = target.closest<HTMLTableRowElement>('tr[data-key]')
+    if (!row) return
+    const action = lineKeyAction(event.key, isTyping(target.tagName))
+    if (!action) return
+    const key = row.dataset.key!
+    const line = lines.find((l) => l.key === key)
+    const click = (selector: string) => row.querySelector<HTMLButtonElement>(selector)?.click()
+    switch (action) {
+      case 'next':
+      case 'previous': {
+        const rows = [...row.parentElement!.querySelectorAll<HTMLTableRowElement>('tr[data-key]')]
+        const at = rows.indexOf(row) + (action === 'next' ? 1 : -1)
+        rows[at]?.focus()
+        break
+      }
+      case 'play':
+        if (line?.file) toggle(line.key, clipUrl(part.id, line.file))
+        break
+      case 'fromHere':
+        if (line?.file) playFrom(line.key)
+        break
+      case 'record':
+        click('.row-record')
+        break
+      case 'accept':
+        click('.row-accept')
+        break
+      case 'heard':
+        click('.heard-btn')
+        break
+      case 'cue':
+        click('.cue-button')
+        break
+      case 'note':
+        click('.note-button, .note-add')
+        break
+    }
+    event.preventDefault()
+  }
   useEffect(() => {
     if (inTurn) playingRow.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [playing, inTurn])
@@ -242,12 +289,15 @@ export function LinesView({ part }: { part: PartSummary }) {
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody onKeyDown={onRowKey}>
               {lines.map((line) => (
                 <Fragment key={line.key}>
                   <tr
                     ref={playing === line.key ? playingRow : undefined}
                     className={playing === line.key ? 'playing' : undefined}
+                    data-key={line.key}
+                    tabIndex={0}
+                    aria-label={`${displayName(line.speaker)}: ${line.text}`}
                   >
                     <td>
                       <StatusPill status={line.status} />
@@ -374,7 +424,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                             <>
                               <button
                                 type="button"
-                                className="btn"
+                                className="btn row-accept"
                                 title="Keep this take as it is: the line no longer shows as weak, until it is recorded again"
                                 disabled={checking.has(line.key)}
                                 onClick={() => void onRow(line.key, accept.mutateAsync, 'accepted')}
@@ -415,6 +465,17 @@ export function LinesView({ part }: { part: PartSummary }) {
           </table>
           {lines.length === 0 && <p className="table-empty muted">No lines match.</p>}
         </div>
+      )}
+      {filter !== 'orphans' && lines.length > 0 && (
+        <p className="keys-hint muted">
+          On a row:{' '}
+          {LINE_KEYS.map((k, i) => (
+            <span key={k.keys}>
+              {i > 0 && ' · '}
+              <kbd>{k.keys}</kbd> {k.does}
+            </span>
+          ))}
+        </p>
       )}
       <span className="muted" style={{ fontSize: 12 }}>
         Showing {plural(filter === 'orphans' ? loaded.orphans.length : lines.length, 'line')}

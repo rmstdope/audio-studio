@@ -529,6 +529,10 @@ An audition is for a character, not for a part: the result applies to every part
   in dialog order, every speaker; a row's **from here** button starts there. The list is fixed
   when it starts: filtering afterwards does not change it, and Stop stays offered. The row
   playing is marked and kept in view; a clip that fails is skipped.
+- Keys on the lines table (built): a row takes focus (Tab, or a click); j/k and the arrows
+  move, space plays, f plays from there, r records or retakes, a accepts, h shows what was
+  heard, c edits the cue, n the note. A hint under the table lists them. Nothing while typing in
+  a field.
 - A note on a line (built): a note to oneself under the line's text on the lines page ("too
   fast"), edited in place, with a **With a note** filter; kept in the tool cache, not committed.
   A note on a line that left the dialog is kept but not shown. A notes file that cannot be read
@@ -896,6 +900,7 @@ Small, independently useful increments:
     5. **Shared voices** (built): a character cast with another's voice says so on its page, card
        and the characters page; it may be meant, so it is a note, not a problem.
     6. **Notes on lines** (built): a note to oneself per line, in the tool cache (§6, §8.3).
+    7. **Keys** (built): the lines table worked from the keyboard (§8.3).
 11. **What was heard**, in two pull requests:
     1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
        when it is checked; the lines page shows it beside the text, missed words marked.
