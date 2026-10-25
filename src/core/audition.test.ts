@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  addSpent,
   addVoice,
   bringMore,
   drop,
@@ -136,5 +137,26 @@ describe('more voices', () => {
       ['d', 'f'],
     ])
     expect(addVoice(queued, voice('a'))).toBe(queued)
+  })
+})
+
+describe('what an audition has cost', () => {
+  const fresh = startSession({
+    character: 'mara',
+    keywords: [],
+    current: null,
+    candidates: [],
+    perRound: 5,
+  })
+
+  it('starts at nothing, and a saved session without the figure reads as nothing', () => {
+    expect(fresh.spent).toBe(0)
+    const { spent: _spent, ...older } = fresh
+    expect(AuditionSessionSchema.parse(older).spent).toBe(0)
+  })
+
+  it('adds up what takes were charged', () => {
+    expect(addSpent(addSpent(fresh, 0.01), 0.02).spent).toBeCloseTo(0.03, 12)
+    expect(addSpent(fresh, 0)).toBe(fresh)
   })
 })

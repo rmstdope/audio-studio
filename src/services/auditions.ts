@@ -1,7 +1,13 @@
 import { dirname } from 'node:path'
 import { formatCast } from '../core/castFormat'
 import { resolveInRoot } from '../core/paths'
-import { phraseProblem, problemsFrom, type Problem, type Project } from '../core/project'
+import {
+  FREE_MODELS,
+  phraseProblem,
+  problemsFrom,
+  type Problem,
+  type Project,
+} from '../core/project'
 import {
   INTEGER_LIKE,
   cleanPronunciations,
@@ -174,7 +180,9 @@ export async function characterVoice(
   }
   if (!id) return answer
   const take =
-    recordedTakes(dirname(projectFile), project, cast, characterId, audition, [id])[id] ?? null
+    recordedTakes(dirname(projectFile), project, cast, characterId, audition, [id], FREE_MODELS[0])[
+      id
+    ] ?? null
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_KEY } }
   try {
