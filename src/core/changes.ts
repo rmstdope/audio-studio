@@ -31,12 +31,12 @@ export interface ChangeGroups {
   parts: PartChanges[]
 }
 
-/** A part's files by path (with their role) and its clips folder (ending in `/`). */
+/** A part's files by path (with their role) and its clips folders, one per language (ending in `/`). */
 export interface PartPaths {
   id: string
   title: string
   files: Record<string, FileRole>
-  clips: string
+  clips: string[]
 }
 
 /** Every path the studio writes, from the project root, normalised as git writes them. */
@@ -57,17 +57,20 @@ export function projectPaths(project: Project, projectPath: string): ProjectPath
   return {
     own: [normal(projectPath), normal(narration.characters)],
     parts: narration.parts.map((part) => {
-      const at = (template: string) => normal(partPathFor(template, part.id))
+      const at = (template: string, language: string) =>
+        normal(partPathFor(template, part.id, language))
       return {
         id: part.id,
         title: part.title,
-        files: {
-          [at(narration.paths.dialog)]: 'dialog',
-          [at(narration.paths.cues)]: 'cues',
-          [at(narration.paths.lock)]: 'lock',
-          [at(narration.paths.manifest)]: 'manifest',
-        },
-        clips: `${at(narration.paths.clips)}/`,
+        files: Object.fromEntries(
+          narration.languages.flatMap((language) => [
+            [at(narration.paths.dialog, language), 'dialog'],
+            [at(narration.paths.cues, language), 'cues'],
+            [at(narration.paths.lock, language), 'lock'],
+            [at(narration.paths.manifest, language), 'manifest'],
+          ]),
+        ),
+        clips: narration.languages.map((language) => `${at(narration.paths.clips, language)}/`),
       }
     }),
   }
@@ -132,7 +135,10 @@ export function groupChanges(
     for (const change of changes) {
       const role = Object.hasOwn(part.files, change.path) ? part.files[change.path] : undefined
       if (role) files.push({ ...change, role })
-      else if (change.path.startsWith(part.clips) && change.path.endsWith('.mp3')) {
+      else if (
+        part.clips.some((folder) => change.path.startsWith(folder)) &&
+        change.path.endsWith('.mp3')
+      ) {
         clips[change.change]++
       }
     }

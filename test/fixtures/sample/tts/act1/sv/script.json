@@ -1,0 +1,27 @@
+[
+  {
+    "key": "a1",
+    "speaker": "narrator",
+    "text": "(sv) The lantern on the hill has not been lit in twenty years."
+  },
+  {
+    "key": "a3",
+    "speaker": "narrator",
+    "text": "(sv) Wind moves through the grass like a slow tide."
+  },
+  {
+    "key": "a4",
+    "speaker": "wren",
+    "text": "(sv) Is it true the light keeps the dark away?"
+  },
+  {
+    "key": "a5",
+    "speaker": "keeper",
+    "text": "(sv) It keeps the dark honest. That is all a light can do."
+  },
+  {
+    "key": "only-sv",
+    "speaker": "narrator",
+    "text": "Bara på svenska."
+  }
+]

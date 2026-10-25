@@ -16,6 +16,7 @@ function line(
     key,
     speaker,
     text,
+    english: null,
     cue: '',
     ownCue: false,
     final: false,

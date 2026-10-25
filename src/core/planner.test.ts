@@ -230,3 +230,63 @@ describe('planPart, a weak final clip', () => {
     })
   })
 })
+
+describe('planPart in a language besides the source', () => {
+  const source: Line[] = lines
+  const swedish: Line[] = [
+    { key: 'm1', speaker: 'mira', text: 'Välkommen, barn.' },
+    { key: 'x1', speaker: 'narrator', text: 'Bara på svenska.' },
+    { key: 'n1', speaker: 'narrator', text: 'Elior vaknar.' },
+  ]
+
+  it('lists the source order, with untranslated lines and lines only here', () => {
+    const state = planPart(input({ lines: swedish, source }))
+    expect(state.lines.map((l) => l.key)).toEqual(['n1', 'm1', 't1', 'x1'])
+    expect(statuses(state)).toEqual({
+      n1: 'untracked',
+      m1: 'untracked',
+      t1: 'untranslated',
+      x1: 'missing',
+    })
+  })
+
+  it('carries the source text beside the language’s own, and null where there is none', () => {
+    const state = planPart(input({ lines: swedish, source }))
+    const by = Object.fromEntries(state.lines.map((l) => [l.key, l]))
+    expect(by.m1).toMatchObject({ text: 'Välkommen, barn.', english: 'Welcome, child.' })
+    expect(by.t1).toMatchObject({ text: '', english: 'Have you heard?', speaker: 'tilda' })
+    expect(by.x1).toMatchObject({ text: 'Bara på svenska.', english: null })
+  })
+
+  it('counts untranslated lines, and a line with blank text is one', () => {
+    const blank = swedish.map((l) => (l.key === 'n1' ? { ...l, text: '  ' } : l))
+    const state = planPart(input({ lines: blank, source }))
+    expect(state.counts.untranslated).toBe(2)
+    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({
+      status: 'untranslated',
+      file: null,
+      duration: null,
+      heard: null,
+    })
+  })
+
+  it('leaves the source language as it was: no english, no untranslated', () => {
+    const state = planPart(input({ lock: trackedLock }))
+    expect(state.lines.every((l) => l.english === null)).toBe(true)
+    expect(state.counts.untranslated).toBe(0)
+  })
+})
+
+describe('planPart, a blank source line', () => {
+  it('is no gap in a translation, unless the language has the line', () => {
+    const source: Line[] = [
+      { key: 'b1', speaker: 'narrator', text: '' },
+      { key: 'b2', speaker: 'narrator', text: '' },
+    ]
+    const state = planPart(
+      input({ lines: [{ key: 'b2', speaker: 'narrator', text: 'Ja.' }], source }),
+    )
+    expect(state.lines.map((l) => [l.key, l.english])).toEqual([['b2', '']])
+    expect(state.counts.untranslated).toBe(0)
+  })
+})

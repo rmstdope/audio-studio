@@ -1,3 +1,4 @@
+import { languageName } from './languages'
 import { partPathFor, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
 import type { Cast, Line } from './resources'
@@ -57,6 +58,8 @@ export interface ProjectSummary {
   description: string
   root: string
   partLabel: string
+  /** The declared languages, source language first. */
+  languages: { id: string; name: string }[]
   charactersPath: string
   parts: PartSummary[]
   characters: CharacterSummary[]
@@ -116,7 +119,7 @@ export function summarize({
     return {
       id: part.id,
       title: part.title,
-      dialogPath: partPathFor(narration.paths.dialog, part.id),
+      dialogPath: partPathFor(narration.paths.dialog, part.id, narration.languages[0]),
       dialog: dialog.status,
       lineCount: lines.length,
       characters: byLinesThenId([...counts].map(([id, count]) => ({ id, lines: count }))),
@@ -146,6 +149,7 @@ export function summarize({
     description: project.description,
     root,
     partLabel: narration.partLabel,
+    languages: narration.languages.map((id) => ({ id, name: languageName(id) })),
     charactersPath: narration.characters,
     parts,
     characters: characters.sort((a, b) => b.totalLines - a.totalLines || a.id.localeCompare(b.id)),

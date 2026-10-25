@@ -1994,3 +1994,39 @@ a.btn {
   opacity: 0;
   pointer-events: none;
 }
+
+/* Languages on the lines page */
+
+.language-switch {
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
+.tab-dim {
+  opacity: 0.6;
+}
+
+.line-english {
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.4;
+}
+
+.line-english b {
+  margin-right: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.line-gap {
+  color: var(--faint);
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.language-note {
+  margin: 0;
+  font-size: 13px;
+}

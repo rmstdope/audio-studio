@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { knownLanguage } from './languages'
 import { isPriced } from './prices'
 import { SOUND_ALIKE_WORD } from './soundAlikeEdit'
 
@@ -63,6 +64,21 @@ const NarrationSchema = z
       .refine((parts) => new Set(parts.map((part) => part.id)).size === parts.length, {
         error: 'part ids must be unique',
       }),
+    /**
+     * The languages the game is narrated in, by code. The first is the source language: the one a
+     * translation is shown beside.
+     */
+    languages: z
+      .array(
+        z.string().refine(knownLanguage, {
+          error: (issue) => `"${String(issue.input)}" is not a language code (such as en or sv)`,
+        }),
+      )
+      .min(1)
+      .refine((languages) => new Set(languages).size === languages.length, {
+        error: 'languages must be unique',
+      })
+      .default(['en']),
     characters: z.string().min(1),
     paths: z.object({
       dialog: partPath,
@@ -138,6 +154,17 @@ const NarrationSchema = z
       .prefault({}),
   })
   .superRefine((narration, context) => {
+    if (narration.languages.length > 1) {
+      for (const [name, template] of Object.entries(narration.paths)) {
+        if (template.includes('{language}')) continue
+        context.addIssue({
+          code: 'custom',
+          path: ['paths', name],
+          message:
+            'must contain {language} when the project has several languages, or they would share one file',
+        })
+      }
+    }
     const limit = narration.quality.chunkLimit
     // A wrong limit is reported on its own; measuring against it would only add noise.
     if (!Number.isInteger(limit) || limit < MIN_CHUNK) return
@@ -164,9 +191,10 @@ export type Part = z.infer<typeof PartSchema>
 /** The part-dependent paths of the narration workspace. */
 export type PartPaths = Project['narration']['paths']
 
-/** A path template with `{part}` replaced by the part's id. */
-export function partPathFor(template: string, partId: string): string {
-  return template.replaceAll('{part}', partId)
+/** A path template with `{part}` replaced by the part's id and, if given, `{language}` by the language. */
+export function partPathFor(template: string, partId: string, language?: string): string {
+  const path = template.replaceAll('{part}', partId)
+  return language === undefined ? path : path.replaceAll('{language}', language)
 }
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */

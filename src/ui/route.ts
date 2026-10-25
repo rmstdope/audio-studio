@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react'
  * audition, or the project's uncommitted changes.
  */
 export type Route =
-  | { view: 'part'; part: string | null }
-  | { view: 'lines'; part: string }
+  | { view: 'part'; part: string | null; language?: string }
+  | { view: 'lines'; part: string; language?: string }
   | { view: 'characters' }
   | { view: 'changes' }
   | { view: 'setup' }
@@ -14,12 +14,14 @@ export type Route =
   | { view: 'audition'; character: string }
 
 /**
- * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines`, `#/characters`,
+ * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
  * `#/characters/mira`, `#/characters/mira/audition`, `#/changes`, `#/setup`; anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
-  const [, first, second, third] = hash.replace(/^#/, '').split('/')
+  const [path = '', query] = hash.replace(/^#/, '').split('?')
+  const language = new URLSearchParams(query).get('language') ?? undefined
+  const [, first, second, third] = path.split('/')
   if (first === 'changes') return { view: 'changes' }
   if (first === 'setup') return { view: 'setup' }
   if (first === 'characters') {
@@ -29,7 +31,8 @@ export function parseRoute(hash: string): Route {
   }
   if (first === 'parts' && second) {
     const part = decodeURIComponent(second)
-    return third === 'lines' ? { view: 'lines', part } : { view: 'part', part }
+    const view = third === 'lines' ? 'lines' : 'part'
+    return language ? { view, part, language } : { view, part }
   }
   return { view: 'part', part: null }
 }
@@ -43,7 +46,8 @@ export function routeHref(route: Route): string {
   if (route.view === 'audition')
     return `#/characters/${encodeURIComponent(route.character)}/audition`
   const part = encodeURIComponent(route.part ?? '')
-  return route.view === 'lines' ? `#/parts/${part}/lines` : `#/parts/${part}`
+  const query = route.language ? `?language=${encodeURIComponent(route.language)}` : ''
+  return `${route.view === 'lines' ? `#/parts/${part}/lines` : `#/parts/${part}`}${query}`
 }
 
 /** The current route, following the location hash. */
