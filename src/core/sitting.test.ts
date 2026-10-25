@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   amountProblem,
   cantStart,
+  isPaid,
   parseAmount,
   perTakeCost,
   suggestedAmount,
@@ -81,5 +82,13 @@ describe('sittingMoney', () => {
       usedUp: false,
     })
     expect(sittingMoney(0.1, 0.001, 0.002)).toMatchObject({ takesLeft: 0, usedUp: true })
+  })
+})
+
+describe('isPaid', () => {
+  it('is true for a priced model and one with no known price, false for the free model', () => {
+    expect(isPaid('s2.1-pro', at)).toBe(true)
+    expect(isPaid('mystery', at)).toBe(true)
+    expect(isPaid('s2.1-pro-free', at)).toBe(false)
   })
 })

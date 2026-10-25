@@ -30,7 +30,7 @@ import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import type { SittingView } from '../core/sitting'
-import { waitingAfter } from './sitting'
+import { takeCaches, waitingAfter } from './sitting'
 import { centsUp } from './format'
 import { isAbout, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
@@ -499,11 +499,12 @@ export function useSetCue(partId: string) {
  * Records audition takes: `record(voice)` asks the server for the take and adds it to the board
  * and the cast voice in the cache, without asking Fish for anything else. `board` says the takes
  * are the audition board's (on the audition model, paid from the sitting); the cast voice's on
- * its page are on the free model. `recording` holds the voices in progress, `errors` what went
+ * its page are on the free model; with a `paid` audition model the two are different takes and
+ * each goes only to its own cached answer (`takeCaches`). `recording` holds the voices in progress, `errors` what went
  * wrong per voice, `waiting` the voices whose take waits for more money (`retryWaiting` asks for
  * them again).
  */
-export function useTakes(characterId: string, board = false) {
+export function useTakes(characterId: string, board = false, paid = false) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -525,13 +526,18 @@ export function useTakes(characterId: string, board = false) {
         const result = (await response.json()) as NonNullable<TakeResult>
         if (result.ok) {
           setWaiting((now) => waitingAfter(now, voice, 'recorded'))
-          client.setQueriesData<NonNullable<CharacterVoiceResult>>(
-            { queryKey: ['voice', characterId] },
-            (old) => (old?.ok ? withVoiceTake<Voiced>(old, voice, result) : old),
-          )
-          client.setQueryData<SessionView>(['session', characterId], (old) =>
-            old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,
-          )
+          const caches = takeCaches(board, paid)
+          if (caches.voice) {
+            client.setQueriesData<NonNullable<CharacterVoiceResult>>(
+              { queryKey: ['voice', characterId] },
+              (old) => (old?.ok ? withVoiceTake<Voiced>(old, voice, result) : old),
+            )
+          }
+          if (caches.session) {
+            client.setQueryData<SessionView>(['session', characterId], (old) =>
+              old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,
+            )
+          }
         } else if ('reason' in result && result.reason === 'waits') {
           setWaiting((now) => waitingAfter(now, voice, 'waits'))
         } else {
@@ -554,7 +560,7 @@ export function useTakes(characterId: string, board = false) {
         })
       }
     },
-    [board, characterId, client],
+    [board, characterId, client, paid],
   )
 
   const retryWaiting = useCallback(() => {

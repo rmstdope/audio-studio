@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import {
   boxState,
   meterLine,
+  needsResumeBox,
+  takeCaches,
   payLabel,
   resumePoints,
   startPoints,
@@ -92,5 +94,27 @@ describe('waitingAfter', () => {
     expect(waitingAfter(waiting, 'b', 'waits')).toEqual(new Set(['a', 'b']))
     expect(waitingAfter(waiting, 'a', 'recorded')).toEqual(new Set())
     expect(waitingAfter(waiting, 'a', 'failed')).toEqual(new Set())
+  })
+})
+
+describe('needsResumeBox', () => {
+  const money = { dollars: 0.1, spent: 0, left: 0.1, takesLeft: 50, usedUp: false }
+  it('asks on a paid model with no sitting, or one that is used up; never with money', () => {
+    expect(needsResumeBox({ paid: true, sitting: null })).toBe(true)
+    expect(needsResumeBox({ paid: true, sitting: { ...money, usedUp: true } })).toBe(true)
+    expect(needsResumeBox({ paid: true, sitting: money })).toBe(false)
+    expect(needsResumeBox({ paid: false, sitting: null })).toBe(false)
+    expect(needsResumeBox(null)).toBe(false)
+  })
+})
+
+describe('takeCaches', () => {
+  it('keeps board takes and page takes apart on a paid model', () => {
+    expect(takeCaches(true, true)).toEqual({ voice: false, session: true })
+    expect(takeCaches(false, true)).toEqual({ voice: true, session: false })
+  })
+  it('feeds both when the model is free, as the takes are the same', () => {
+    expect(takeCaches(true, false)).toEqual({ voice: true, session: true })
+    expect(takeCaches(false, false)).toEqual({ voice: true, session: true })
   })
 })

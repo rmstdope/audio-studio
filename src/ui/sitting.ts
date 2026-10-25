@@ -78,6 +78,25 @@ export function resumePoints(perTake: number): string[] {
   ]
 }
 
+/**
+ * Whether Resume… (the box) stands in for plain Resume: on a paid model, when there is no sitting
+ * or its money is used up. With money in the sitting, Resume goes straight to the board.
+ */
+export function needsResumeBox(
+  money: { paid: boolean; sitting: { usedUp: boolean } | null } | null,
+): boolean {
+  return money !== null && money.paid && (money.sitting === null || money.sitting.usedUp)
+}
+
+/**
+ * Which cached answers a recorded take is added to: the cast voice's page answer, and the
+ * audition board's. On a paid model the board's takes (audition model) and the page's (free
+ * model) are different takes and stay apart; on a free model they are the same take.
+ */
+export function takeCaches(board: boolean, paid: boolean): { voice: boolean; session: boolean } {
+  return { voice: !board || !paid, session: board || !paid }
+}
+
 /** How a take went, for the voices waiting for money. */
 export type TakeOutcome = 'recorded' | 'waits' | 'failed'
 

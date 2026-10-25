@@ -3,7 +3,7 @@ import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import { FREE_MODELS, phraseProblem, type Problem, type Project } from '../core/project'
 import type { Budget } from '../core/spend'
-import { perTakeCost } from '../core/sitting'
+import { isPaid } from '../core/sitting'
 import { ttsFor, type Cast } from '../core/resources'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
 import { spokenText } from '../core/spoken'
@@ -37,6 +37,8 @@ export interface TakeOptions {
   board?: boolean
   budget?: Budget
   charged?: (dollars: number) => void | Promise<void>
+  /** Whether the sitting `budget` belongs to is still going on; checked when the take is charged. */
+  open?: () => boolean
 }
 
 /**
@@ -143,7 +145,7 @@ async function speak(
   if (existsSync(file)) return { ...recorded, cached: true }
 
   const bytes = new TextEncoder().encode(spoken).length
-  const paid = perTakeCost(model, bytes, new Date()) !== 0
+  const paid = isPaid(model, new Date())
   if (paid && !options.budget) {
     return {
       ok: false,
@@ -160,6 +162,7 @@ async function speak(
     }
   }
   let waits: string | null = null
+  let ended = false
   try {
     const cached = await limiter.run(key, quality.parallel, async () => {
       // Another request may have recorded it while this one waited: never pay for it twice.
@@ -167,6 +170,11 @@ async function speak(
       // Charged now, as late as it can be: the budget may have been spent while this one waited.
       const { budget } = options
       const before = budget?.left ?? 0
+      // A sitting that ended while this take waited its turn pays for nothing.
+      if (paid && options.open && !options.open()) {
+        ended = true
+        return true
+      }
       if (paid && budget) {
         waits = budget.spend(model, bytes, new Date())
         if (waits) return true
@@ -181,12 +189,23 @@ async function speak(
         budget?.refund(cost)
         throw error
       }
-      if (cost > 0) await options.charged?.(cost)
+      // What it cost is noted for the page; failing to note it does not unmake the take.
+      if (cost > 0) {
+        try {
+          await options.charged?.(cost)
+        } catch {
+          // Only the page's figure of what was spent is lost.
+        }
+      }
       return false
     })
+    if (ended) {
+      return { ok: false, reason: 'no-sitting', message: 'The audition’s sitting has ended.' }
+    }
     // Also for a request that shared another's recording, which the money did not cover.
     if (waits || !existsSync(file)) {
-      return { ok: false, reason: 'waits', message: `Take waits for more money: ${waits ?? ''}` }
+      const why = waits ? `: ${waits}` : ''
+      return { ok: false, reason: 'waits', message: `Take waits for more money${why}` }
     }
     return { ...recorded, cached }
   } catch (error) {

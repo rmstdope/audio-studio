@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditionSession } from '../../../core/audition'
+import { FREE_MODELS } from '../../../core/project'
 import type { SittingView } from '../../../core/sitting'
 import { usd } from '../../../core/spend'
 import { sharesVoiceWith, type CharacterSummary, type ProjectSummary } from '../../../core/summary'
@@ -30,6 +31,7 @@ import { inGameState, recordedLinesOf } from '../../inGame'
 import type { Clip } from '../../player'
 import { linesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
+import { needsResumeBox } from '../../sitting'
 import { voiceUrl } from '../../voiceId'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
@@ -99,7 +101,7 @@ export function CharacterView({
         </div>
         {inProgress ? (
           // On a paid model, with no money left in this sitting, Resume asks for more first.
-          money?.paid && !money.sitting ? (
+          needsResumeBox(money) ? (
             <button className="btn btn-primary" type="button" onClick={() => setAsking('resume')}>
               <HeadphonesIcon /> Resume…
             </button>
@@ -115,7 +117,7 @@ export function CharacterView({
               className="btn btn-primary"
               type="button"
               // While the audition is read again, one may have been started elsewhere.
-              disabled={start.isPending || session.isFetching || !money}
+              disabled={start.isPending || session.isFetching || sittingQuery.isPending}
               onClick={() =>
                 money?.paid
                   ? setAsking('start')
@@ -274,7 +276,7 @@ function VoicePanel({
   /** The audition model when it is a paid one: the cast voice's take is on the free model all the same. */
   paidModel: string | null
 }) {
-  const recorder = useTakes(character.id)
+  const recorder = useTakes(character.id, false, paidModel !== null)
   const id = character.voice
   // The take is asked for once per phrase, so one the page cannot show is not asked again.
   const asked = useRef(new Set<string>())
@@ -370,7 +372,9 @@ function VoicePanel({
             <strong>Take {paidModel && <span className="chip">free model</span>}</strong>
             <span className="muted">The audition phrase, in {character.name}’s style</span>
             {paidModel && (
-              <span className="muted">Recorded with s2.1-pro-free. Auditions use {paidModel}.</span>
+              <span className="muted">
+                Recorded with {FREE_MODELS[0]}. Auditions use {paidModel}.
+              </span>
             )}
           </span>
         </div>
@@ -571,9 +575,9 @@ function InProgress({
       <span>
         {plural(session.shortlist.length, 'voice')} shortlisted, {session.toHear.length} to hear.
       </span>
-      {money?.paid && session.spent > 0 && (
+      {money?.paid && (
         <span className="muted">
-          {usd(session.spent)} spent so far · {money.model}
+          {usd(money.spentBefore)} spent so far · {money.model}
         </span>
       )}
       {asking ? (
@@ -597,7 +601,7 @@ function InProgress({
           <button className="btn btn-ghost" type="button" onClick={() => setAsking(true)}>
             Stop…
           </button>
-          {money?.paid && !money.sitting ? (
+          {needsResumeBox(money) ? (
             <button className="btn btn-primary" type="button" onClick={onResume}>
               Resume…
             </button>

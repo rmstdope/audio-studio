@@ -7,6 +7,11 @@ const ROUNDING = 1e-9
 /** How many takes the suggested amount is meant to cover (about 50 voices). */
 const SUGGESTED_TAKES = 50
 
+/** Whether takes on `model` are charged: any model but a free one (one with no known price counts as paid). */
+export function isPaid(model: string, at: Date): boolean {
+  return (priceOf(model, at) ?? 1) > 0
+}
+
 /** What one take of `bytes` of text costs on `model` at `at`; null when the model's price is unknown. */
 export function perTakeCost(model: string, bytes: number, at: Date): number | null {
   const price = priceOf(model, at)

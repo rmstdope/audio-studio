@@ -13,8 +13,7 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
-import { priceOf } from '../core/prices'
-import { sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
+import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
 import { SPEED } from '../core/resources'
@@ -296,7 +295,14 @@ export function startServer({
    */
   const budgets = new Set<Budget>()
   const reserved = (also: Set<Budget> = new Set()) =>
-    [...new Set([...budgets, ...also])].reduce((sum, budget) => sum + budget.dollars, 0)
+    [...new Set([...budgets, ...also])].reduce((sum, budget) => sum + held(budget), 0)
+  /**
+   * What a budget holds back from the credit: all a recording was given (Fish may bill it after
+   * it was charged), but only what is left of a sitting, which lasts a whole audition: what it
+   * spent is already out of the credit Fish reports.
+   */
+  const held = (budget: Budget) => (isSitting(budget) ? budget.left : budget.dollars)
+  const isSitting = (budget: Budget) => [...sittings.values()].includes(budget)
 
   /**
    * The sittings of the auditions going on, by character: what each may still spend on the
@@ -316,7 +322,7 @@ export function startServer({
   async function sittingView(characterId: string) {
     const money = await auditionMoney(projectFile, characterId)
     if (!money || !money.ok) return money
-    const paid = (priceOf(money.model, new Date()) ?? 1) > 0
+    const paid = isPaid(money.model, new Date())
     const budget = paid ? sittings.get(characterId) : undefined
     const view: SittingView = {
       model: money.model,
@@ -748,9 +754,11 @@ export function startServer({
           }
           const { id } = request.params
           const { voice, board } = body.data
+          const budget = board ? sittings.get(id) : undefined
           const result = await recordTake(projectFile, id, voice, fishFor, fishWork, {
             board,
-            budget: board ? sittings.get(id) : undefined,
+            budget,
+            open: () => budget !== undefined && sittings.get(id) === budget,
             charged: async (dollars) => void (await recordSpent(projectFile, id, dollars)),
           })
           if (!result) return notFound()
@@ -782,7 +790,7 @@ export function startServer({
           if (!money) return notFound()
           if (!money.ok) return Response.json(money, { status: 409 })
           // A paid audition model starts with a sitting: no amount, no audition.
-          const paid = (priceOf(money.model, new Date()) ?? 1) > 0
+          const paid = isPaid(money.model, new Date())
           let admitted: Budget | null = null
           if (paid) {
             const { spendUpTo } = body.data
@@ -793,10 +801,11 @@ export function startServer({
                 message: `Takes with ${money.model} are paid; say how much the audition may spend.`,
               })
             }
-            endSitting(id)
             const got = await admit(money.model, spendUpTo, spendUpTo)
             if ('problem' in got) return sittingAnswer(id, got.problem)
             admitted = got.budget
+            // After the credit was read, so two starts at once cannot leave a budget behind.
+            endSitting(id)
             sittings.set(id, admitted)
           }
           const started = await startAudition(projectFile, id, fishFor)
@@ -814,11 +823,11 @@ export function startServer({
           const money = await auditionMoney(projectFile, id)
           if (!money) return notFound()
           if (!money.ok) return Response.json(money, { status: 409 })
-          if ((priceOf(money.model, new Date()) ?? 1) > 0) {
-            // Resuming is a fresh sitting; what the last one had left is not kept.
-            endSitting(id)
+          if (isPaid(money.model, new Date())) {
             const got = await admit(money.model, body.data.amount, body.data.amount)
             if ('problem' in got) return sittingAnswer(id, got.problem)
+            // Resuming is a fresh sitting; what the last one had left is not kept.
+            endSitting(id)
             sittings.set(id, got.budget)
           }
           return sittingAnswer(id)

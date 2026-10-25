@@ -1642,7 +1642,8 @@ describe('server, a paid audition', () => {
 
   it('holds a sitting’s money back from another one, and gives it back when it ends', async () => {
     credit = 0.015
-    // gran's sitting holds 0.01+; only about 0.005 is free for kid.
+    // gran's sitting holds what is left of it: add 0.01, and only about 0.005 is free for kid.
+    await send('POST', '/api/auditions/gran/sitting/add', { amount: 0.01 })
     const refused = await startWith('kid', 0.01)
     expect(await refused.json()).toMatchObject({ ok: false, reason: 'credit' })
     const ended = await send('DELETE', '/api/auditions/gran/sitting')
@@ -1665,8 +1666,90 @@ describe('server, a paid audition', () => {
     expect((await sitting('gran')).sitting).toBeNull()
   })
 
+  it('counts money a sitting has spent once against the credit, not twice', async () => {
+    credit = 0.02
+    await send('DELETE', '/api/auditions/gran/sitting')
+    await startWith('gran', 0.01)
+    expect(await takeOf('gran', 'one')).toMatchObject({ ok: true })
+    const spent = (await sitting('gran')).sitting.spent
+    // Fish has billed what the take cost: its credit fell by that much.
+    credit = 0.02 - spent
+    const added = await send('POST', '/api/auditions/gran/sitting/add', { amount: 0.01 })
+    expect(added.status).toBe(200)
+    credit = 4.82
+  })
+
+  it('leaves no money held when two resumes arrive at once', async () => {
+    credit = 4.82
+    await send('DELETE', '/api/auditions/gran/sitting')
+    await Promise.all([
+      send('POST', '/api/auditions/gran/sitting', { amount: 0.01 }),
+      send('POST', '/api/auditions/gran/sitting', { amount: 0.01 }),
+    ])
+    await send('DELETE', '/api/auditions/gran/sitting')
+    credit = 0.015
+    expect((await startWith('kid', 0.01)).status).toBe(200)
+    await send('DELETE', '/api/auditions/kid/sitting')
+    credit = 4.82
+  })
+
   it('only takes sitting changes from its own page', async () => {
     const denied = await fetch(at('/api/auditions/gran/sitting'), { method: 'DELETE' })
     expect(denied.status).toBe(403)
+  })
+})
+
+describe('server, a paid audition ended with takes queued', () => {
+  const paid = projectJson({
+    narration: {
+      ...(projectJson().narration as object),
+      models: { audition: 's2.1-pro' },
+      quality: { parallel: 1 },
+    },
+  })
+  const root = tempRepo({
+    'audio-studio.json': paid,
+    'tts/cast.json': { speakers: { gran: { voice: 'cur' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
+  })
+  let calls = 0
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  const account: FishClient = {
+    ...fish,
+    async tts() {
+      calls++
+      await gate
+      return new Uint8Array([1])
+    },
+  }
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: own,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('does not send takes that were still waiting their turn when the sitting ended', async () => {
+    await send('POST', '/api/auditions/gran/start', { spendUpTo: 0.05 })
+    const takes = ['v1', 'v2', 'v3'].map((voice) =>
+      send('POST', '/api/characters/gran/takes', { voice, board: true }).then((r) => r.json()),
+    )
+    while (calls === 0) await new Promise((resolve) => setTimeout(resolve, 5))
+    await send('DELETE', '/api/auditions/gran/sitting')
+    release()
+    const answers = await Promise.all(takes)
+    expect(calls).toBe(1)
+    expect(answers.filter((a) => a.reason === 'no-sitting')).toHaveLength(2)
   })
 })

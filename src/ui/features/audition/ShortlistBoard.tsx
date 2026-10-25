@@ -64,8 +64,12 @@ export function ShortlistBoard({
 }) {
   const { session, takes, audition } = view
   const act = useSessionAction(characterId)
-  const recorder = useTakes(characterId, true)
   const sittingQuery = useSitting(characterId)
+  const recorder = useTakes(
+    characterId,
+    true,
+    sittingQuery.data?.ok ? sittingQuery.data.paid : false,
+  )
   const sittingActions = useSittingActions(characterId)
   const ruledOut = useRuledOut(characterId)
   const [asking, setAsking] = useState<Asking>(null)
@@ -81,7 +85,8 @@ export function ShortlistBoard({
   const money = sittingQuery.data?.ok ? sittingQuery.data : null
   const paid = money?.paid ?? false
   const sitting = money?.sitting ?? null
-  const ready = money !== null && (!paid || sitting !== null)
+  // Unknown money counts as free: the server refuses a paid take that has no sitting anyway.
+  const ready = !sittingQuery.isPending && (!paid || sitting !== null)
   const missing =
     audition && ready
       ? takesToRecord(onBoard, takes, recorder.recording, recorder.errors).filter(

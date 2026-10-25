@@ -128,7 +128,7 @@ export function AuditionView({
                   <button
                     className="btn btn-primary"
                     type="button"
-                    disabled={start.isPending || !money}
+                    disabled={start.isPending || sittingQuery.isPending}
                     onClick={() =>
                       money?.paid ? setAsking(true) : start.mutate({ action: 'start' })
                     }

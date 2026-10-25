@@ -717,7 +717,7 @@ and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, m
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
 retakeWeak }`: start a generation, a measuring or a checking again, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
 `GET`/`DELETE /api/jobs/:id` (progress, cancel).
-Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the audition model, voice,
+Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries), voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
 `undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model; `GET`, `POST` (`{ amount }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }`) are the audition's money; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:

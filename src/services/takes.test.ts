@@ -478,6 +478,46 @@ describe('takes on a paid audition model', () => {
     expect(charged).toEqual([])
   })
 
+  it('sends nothing once the sitting has ended while the take was queued', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const budget = createBudget({ model: 's2.1-pro', dollars: 0.01 })
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+      {
+        board: true,
+        budget,
+        open: () => false,
+      },
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'no-sitting' })
+    expect(requests).toEqual([])
+    expect(budget.left).toBe(0.01)
+  })
+
+  it('keeps a take that was made when saving what it cost fails', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish } = fakeFish()
+    const budget = createBudget({ model: 's2.1-pro', dollars: 0.01 })
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+      {
+        board: true,
+        budget,
+        charged: () => Promise.reject(new Error('disk full')),
+      },
+    )
+    expect(result).toMatchObject({ ok: true, cached: false })
+  })
+
   it('keeps the cast voice’s page take on the free model, and a try too', async () => {
     const projectFile = join(
       tempRepo({
