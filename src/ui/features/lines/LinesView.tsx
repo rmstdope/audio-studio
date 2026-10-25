@@ -488,6 +488,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                         <LineTakes
                           partId={loaded.id}
                           lineKey={line.key}
+                          draftModel={loaded.draftModel}
                           playing={playing}
                           toggle={toggle}
                         />

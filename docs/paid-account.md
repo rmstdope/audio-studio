@@ -29,10 +29,9 @@ models do not mix.
 
 ## Paid extra takes of a line
 
-Extra takes (**Takes** on a line's row) use the draft model, free only: `takeLine` in
-`services/lineTakes.ts` refuses them when the draft model is paid, and §8.3 says so. With a paid
-draft model, an extra take would need the same confirm-and-budget flow as recording a line from
-its row.
+Built (as-5gk.2). With a paid draft model, **Another take** asks what the take can cost and
+records it only after **Pay up to $X**, through the same `admit` as recording a line from its row
+(one take priced, not `quality.takes`). Extra takes on the final model are not offered.
 
 ## The `s1` retirement
 

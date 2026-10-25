@@ -536,15 +536,18 @@ An audition is for a character, not for a part: the result applies to every part
   when it starts: filtering afterwards does not change it, and Stop stays offered. The row
   playing is marked and kept in view; a clip that fails is skipped.
 - Extra takes of a line (built: **Takes** on its row, opening a list under it): **Another take**
-  has Fish speak the line once more (the draft model, free only: a take is for comparing and asks
-  no one to pay), checked by Whisper when the project checks takes, and kept in the tool cache as a
+  has Fish speak the line once more with the draft model, checked by Whisper when the project checks takes, and kept in the tool cache as a
   WAV with its score and timings; nothing of the game's is written. Each take is played, compared
   by score and length, and **Use this take** makes it the line's clip, encoded and written with the
   manifest and lock exactly as a recording is (the same `commitClip`), or dropped. A take made from
   other inputs than today's (the cue, text, voice or settings changed) is marked stale: heard, not
   used. A take is a draft one: a line whose clip is final is never taken back to the draft model
   (§8.4), so Use is refused for it, and a final clip landing meanwhile is kept as a recording
-  keeps it. A broken file of the part is reported with its path, as a recording reports it. Whisper's best is not always the best read; this lets the ear decide.
+  keeps it. A broken file of the part is reported with its path, as a recording reports it. With a paid
+  draft model Another take first asks what it can cost (the same `admit` as Record, priced for one
+  take, not the `quality.takes` a recording is held to): **Pay up to $X** and **Cancel** replace the
+  button, every take asks again, and nothing of the ask is kept; the take is charged to the budget
+  confirmed, so no more than that reaches Fish. Whisper's best is not always the best read; this lets the ear decide.
 - Keys on the lines table (built): a row takes focus (Tab, or a click); j/k and the arrows
   move, space or Enter plays, f plays from there, r records or retakes, a accepts, h shows what
   was heard, c edits the cue, n the note, t opens the takes. A hint under the table lists them. Nothing while typing
@@ -719,7 +722,7 @@ GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line'
 POST   /api/parts/:part/lines/:key/try           hear the line with a cue ({ cue }): a take, nothing saved
 PATCH  /api/parts/:part/lines/:key/note          the user's note on the line ({ note }; empty removes)
 GET    /api/parts/:part/lines/:key/takes         the line's extra takes, newest first, current or stale
-POST   /api/parts/:part/lines/:key/takes         one more take into the cache (free model only)
+POST   /api/parts/:part/lines/:key/takes         one more take into the cache; a paid draft model asks for `{ confirmedCost }`
 GET    /api/parts/:part/lines/:key/takes/:id.wav a take's audio
 POST   /api/parts/:part/lines/:key/takes/:id/use make the take the line's clip (as a recording)
 DELETE /api/parts/:part/lines/:key/takes/:id     drop the take

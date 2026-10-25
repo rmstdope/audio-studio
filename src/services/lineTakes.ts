@@ -6,7 +6,7 @@ import { LineTakeSchema, takesView, type LineTake, type LineTakeView } from '../
 import { resolveInRoot } from '../core/paths'
 import { type Problem } from '../core/project'
 import type { Line } from '../core/resources'
-import type { Budget } from '../core/spend'
+import type { Budget, SpendProblem } from '../core/spend'
 import type { FishFactory } from './auditions'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { characterFile, listFiles, readJson, writeAtomic } from './files'
@@ -32,6 +32,7 @@ export type TakeLineResult =
       message: string
     }
   | { ok: false; problems: Problem[] }
+  | (SpendProblem & { ok: false })
   | ProjectFailure
   | null
 
