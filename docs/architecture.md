@@ -403,7 +403,9 @@ The **planner** gives every line one status:
 | `uncast`    | speaker has no voice                                                   | blocked until cast                  |
 
 Clips in the manifest whose key is no longer in the dialog are listed as **orphans** (removed after
-confirmation when generating), and cues whose key is gone as **orphaned cues**.
+confirmation when generating), and cues whose key is gone as **orphaned cues**. While the dialog
+file is there but cannot be read, neither is listed: its problem is shown instead, and generation
+is refused until it is fixed.
 
 A stale line's reasons come from comparing the lock entry with today's inputs: `voice`, `model`,
 `cue`, `text`, `pronunciation` (the words as said changed but the words did not) and `settings`.
