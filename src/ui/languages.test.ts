@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { languageTab, noDialogPanel, recordingNote } from './languages'
+import { languageTab, movedTo, noDialogPanel, recordingNote } from './languages'
 
 const sv = { id: 'sv', name: 'Svenska', dialog: 'ok' as const, upToDate: 40, total: 481 }
 const de = { id: 'de', name: 'Deutsch', dialog: 'missing' as const, upToDate: 0, total: 0 }
@@ -50,5 +50,23 @@ describe('the words around a language', () => {
       text: 'The game has not written Deutsch lines for this act. Once it does, the studio reads them in.',
       refresh: false,
     })
+  })
+})
+
+describe('movedTo', () => {
+  const ids = ['en', 'sv', 'de']
+
+  it('moves between languages with the arrow keys, wrapping round', () => {
+    expect(movedTo(ids, 'en', 'ArrowRight')).toBe('sv')
+    expect(movedTo(ids, 'de', 'ArrowRight')).toBe('en')
+    expect(movedTo(ids, 'en', 'ArrowLeft')).toBe('de')
+    expect(movedTo(ids, 'sv', 'ArrowDown')).toBe('de')
+    expect(movedTo(ids, 'sv', 'ArrowUp')).toBe('en')
+  })
+
+  it('goes to the first and last with Home and End, and ignores other keys', () => {
+    expect(movedTo(ids, 'sv', 'Home')).toBe('en')
+    expect(movedTo(ids, 'sv', 'End')).toBe('de')
+    expect(movedTo(ids, 'sv', 'a')).toBeNull()
   })
 })

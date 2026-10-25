@@ -276,3 +276,17 @@ describe('planPart in a language besides the source', () => {
     expect(state.counts.untranslated).toBe(0)
   })
 })
+
+describe('planPart, a blank source line', () => {
+  it('is no gap in a translation, unless the language has the line', () => {
+    const source: Line[] = [
+      { key: 'b1', speaker: 'narrator', text: '' },
+      { key: 'b2', speaker: 'narrator', text: '' },
+    ]
+    const state = planPart(
+      input({ lines: [{ key: 'b2', speaker: 'narrator', text: 'Ja.' }], source }),
+    )
+    expect(state.lines.map((l) => [l.key, l.english])).toEqual([['b2', '']])
+    expect(state.counts.untranslated).toBe(0)
+  })
+})

@@ -119,13 +119,13 @@ describe('projectPaths', () => {
         'tts/act1/narration.lock.json': 'lock',
         'audio/act1/manifest.json': 'manifest',
       },
-      clips: 'audio/act1/',
+      clips: ['audio/act1/'],
     })
   })
 })
 
 describe('projectPaths with several languages', () => {
-  it('lists every language’s files, and the source language’s clips folder', () => {
+  it('lists every language’s files and clips folder', () => {
     const many = ProjectSchema.parse(
       projectJson({
         narration: {
@@ -142,7 +142,7 @@ describe('projectPaths with several languages', () => {
       }),
     )
     const part = projectPaths(many, 'audio-studio.json').parts[0]!
-    expect(part.clips).toBe('audio/act1/en/')
+    expect(part.clips).toEqual(['audio/act1/en/', 'audio/act1/sv/'])
     expect(Object.keys(part.files)).toContain('tts/act1/sv/script.json')
     expect(Object.keys(part.files)).toHaveLength(8)
   })

@@ -326,6 +326,13 @@ export async function readPart(
     language !== sourceLanguage && dialog.status === 'ok'
       ? await readDialog(root, project, part, problems, sourceLanguage)
       : null
+  if (source?.status === 'missing') {
+    problems.push({
+      file: partPathFor(templates.dialog, part.id, sourceLanguage),
+      path: '',
+      message: `the ${languageName(sourceLanguage)} dialog is missing, so lines cannot be matched with it`,
+    })
+  }
   const cast = await readCast(root, project, problems)
   const cues = usable(await readResource(root, at(templates.cues), CuesSchema, problems))
   const lock = usable(await readResource(root, at(templates.lock), LockSchema, problems))

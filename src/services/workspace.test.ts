@@ -353,6 +353,11 @@ describe('a part in several languages', () => {
     expect(act2.part.dialog).toBe('invalid')
   })
 
+  it('says so when the source dialog is missing, since lines cannot be matched', async () => {
+    const { part } = await open('sv', 'act1', { 'tts/act1/en/script.json': undefined })
+    expect(part.problems.map((p) => p.file)).toContain('tts/act1/en/script.json')
+  })
+
   it('serves a clip from the language’s folder', async () => {
     const { root } = await open()
     const projectFile = join(root, 'audio-studio.json')

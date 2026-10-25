@@ -39,3 +39,13 @@ export function noDialogPanel(
     refresh: canRefresh,
   }
 }
+
+/** The language an arrow, Home or End key moves to from `current` (wrapping round), or null for any other key. */
+export function movedTo(ids: string[], current: string, key: string): string | null {
+  const at = ids.indexOf(current)
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[key]
+  if (key === 'Home') return ids[0] ?? null
+  if (key === 'End') return ids.at(-1) ?? null
+  if (step === undefined || at < 0) return null
+  return ids[(at + step + ids.length) % ids.length] ?? null
+}

@@ -33,7 +33,7 @@ export async function gitChanges(
   const paths = projectPaths(opened.project, projectPath)
   const pathspecs = [
     ...paths.own,
-    ...paths.parts.flatMap((part) => [...Object.keys(part.files), part.clips]),
+    ...paths.parts.flatMap((part) => [...Object.keys(part.files), ...part.clips]),
   ]
   const status = await run(git, root, [
     'status',

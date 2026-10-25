@@ -100,6 +100,12 @@ export function LinesView({
   }
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
+  // Another language has other statuses and speakers: start from what needs attention again,
+  // however the language changed (the switch, Back, an address).
+  useEffect(() => {
+    setFilter('attention')
+    setSpeaker('')
+  }, [active.id])
   const [search, setSearch] = useState('')
   // The line whose take is compared with what Whisper heard, if any.
   const [comparing, setComparing] = useState<string | null>(null)
@@ -212,9 +218,6 @@ export function LinesView({
           active={active.id}
           partTitle={shortTitle(part.title)}
           onChoose={(id) => {
-            // The other language has other statuses: start from what needs attention again.
-            setFilter('attention')
-            setSpeaker('')
             window.location.hash = routeHref({ view: 'lines', part: part.id, language: id })
           }}
         />

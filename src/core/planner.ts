@@ -183,13 +183,15 @@ function withSource(
   const own = new Map(lines.map((line) => [line.key, line]))
   const inSource = new Set(source.map((line) => line.key))
   return [
-    ...source.map((line) => {
-      const translated = own.get(line.key)
-      return {
-        line: translated && translated.text.trim() !== '' ? translated : { ...line, text: '' },
-        english: line.text,
-      }
-    }),
+    ...source
+      .filter((line) => line.text.trim() !== '' || own.has(line.key))
+      .map((line) => {
+        const translated = own.get(line.key)
+        return {
+          line: translated && translated.text.trim() !== '' ? translated : { ...line, text: '' },
+          english: line.text,
+        }
+      }),
     ...lines.filter((line) => !inSource.has(line.key)).map((line) => ({ line, english: null })),
   ]
 }
