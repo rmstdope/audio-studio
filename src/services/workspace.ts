@@ -84,6 +84,26 @@ export async function knownCharacter(
   return loaded.summary.characters.some((c) => c.id === characterId) ? true : null
 }
 
+/**
+ * What names a character's own files in the tool cache (its audition, its ruled-out voices) in a
+ * language: the character's id for the source language, which keeps the names it always had, and
+ * for a language the project does not declare; else the id with the language. The project file
+ * is read to know the languages; if it cannot be, the id.
+ */
+export async function cacheNameFor(
+  projectFile: string,
+  characterId: string,
+  language?: string,
+): Promise<string> {
+  if (language === undefined) return characterId
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return characterId
+  const resolved = languageOf(opened.project.narration, language)
+  return resolved === opened.project.narration.languages[0]
+    ? characterId
+    : `${characterId}\0${resolved}`
+}
+
 /** The parsed project file, the cast and the summary of the project, for the server's own use. */
 export async function loadWorkspace(projectFile: string): Promise<
   | {

@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import { phraseProblem, type Problem, type Project } from '../core/project'
-import { ttsFor, type Cast } from '../core/resources'
+import { projectCast, ttsFor, type Cast } from '../core/resources'
+import type { ProjectSummary } from '../core/summary'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
 import { spokenText } from '../core/spoken'
 import type { FishFactory } from './auditions'
@@ -36,6 +37,7 @@ export async function recordTake(
   voiceId: string,
   fishFor: FishFactory,
   limiter: Limiter,
+  asked?: string,
 ): Promise<TakeResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return { ok: false, problems: loaded.problems }
@@ -44,18 +46,28 @@ export async function recordTake(
   if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
 
   const root = dirname(projectFile)
-  const text = auditionFor(cast, characterId, project)
+  const {
+    language,
+    cast: seen,
+    audition: text,
+  } = auditionIn(project, cast, summary, characterId, asked)
   if (text.phrase === null) {
     return { ok: false, reason: 'no-phrase', message: 'There is no audition phrase to record.' }
   }
   // A phrase edited into the cast by hand is checked too: never pay for a take that is too long.
   const tooLong = phraseProblem(text.phrase, project.narration.quality.chunkLimit)
   if (tooLong) {
-    const where = text.from === 'own' ? phrasePath(characterId) : 'narration.audition.phrase'
+    const source = language === project.narration.languages[0]
+    const where =
+      text.from === 'own'
+        ? phrasePath(characterId, source ? undefined : language)
+        : source
+          ? 'narration.audition.phrase'
+          : `narration.audition.phrases.${language}`
     const file = text.from === 'own' ? project.narration.characters : basename(projectFile)
     return { ok: false, problems: [{ file, path: where, message: tooLong }] }
   }
-  const tts = ttsFor(project.narration.tts, cast.speakers[characterId])
+  const tts = ttsFor(project.narration.tts, seen.speakers[characterId])
   return speak(root, project, voiceId, text.spoken, tts, fishFor, limiter)
 }
 
@@ -155,26 +167,57 @@ export async function auditionTakes(
   projectFile: string,
   characterId: string,
   voiceIds: string[],
+  asked?: string,
 ): Promise<AuditionTakesResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return { ok: false, problems: loaded.problems }
   const { project, cast, summary } = loaded
   if (!summary.characters.some((c) => c.id === characterId)) return null
   if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
-  const audition = auditionFor(cast, characterId, project)
+  const seen = auditionIn(project, cast, summary, characterId, asked)
   return {
     ok: true,
-    audition,
-    takes: recordedTakes(dirname(projectFile), project, cast, characterId, audition, voiceIds),
+    audition: seen.audition,
+    takes: recordedTakes(
+      dirname(projectFile),
+      project,
+      seen.cast,
+      characterId,
+      seen.audition,
+      voiceIds,
+    ),
   }
 }
 
-/** The audition phrase of a character in the cast (or of a speaker not in it yet). */
-export function auditionFor(cast: Cast, characterId: string, project: Project): AuditionText {
-  return auditionText(cast.speakers[characterId] ?? {}, cast.pronounce, project.narration)
+/**
+ * A character's audition in a language (the source language's when none is asked for, or the
+ * project lacks it): the language, the cast as that language sees it, and what the character says.
+ */
+export function auditionIn(
+  project: Project,
+  cast: Cast,
+  summary: ProjectSummary,
+  characterId: string,
+  asked?: string,
+): { language: string; cast: Cast; audition: AuditionText } {
+  const { languages } = project.narration
+  const language = asked !== undefined && languages.includes(asked) ? asked : languages[0]!
+  const seen = projectCast(cast, language, languages[0]!)
+  const longest = summary.characters.find((c) => c.id === characterId)?.languages[language]?.longest
+  return {
+    language,
+    cast: seen,
+    audition: auditionText(
+      seen.speakers[characterId] ?? {},
+      cast.pronounce,
+      project.narration,
+      language,
+      longest ?? null,
+    ),
+  }
 }
 
-/** The keys of the takes already recorded, by voice, for the character's current phrase. */
+/** The keys of the takes already recorded, by voice, for the character's current phrase (`cast` as the language sees it). */
 export function recordedTakes(
   root: string,
   project: Project,

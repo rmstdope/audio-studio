@@ -646,4 +646,104 @@ describe('casting per language', () => {
       problems: [{ path: 'speakers.grandmother.languages.sv.phrase' }],
     })
   })
+
+  describe('searching, listening', () => {
+    const withCast = (cast: unknown, phrases: Record<string, string> = {}) => {
+      const f = several()
+      const narration = f['audio-studio.json'].narration as { audition?: unknown }
+      narration.audition = { phrases }
+      return { ...f, 'tts/cast.json': cast }
+    }
+    const grandmother = {
+      voice: 'cur',
+      voiceName: 'Gentle Granny',
+      style: '[warm]',
+      audition: { keywords: ['warm'] },
+    }
+    const spy = () => {
+      const languages: (string | undefined)[] = []
+      const client: FishClient = {
+        ...fish,
+        async listVoices(query) {
+          languages.push(query.language)
+          return fish.listVoices(query)
+        },
+      }
+      return { languages, client }
+    }
+
+    it('searches for voices that speak the language, from her voice in it, with her other voices to hear', async () => {
+      const root = tempRepo(withCast({ speakers: { grandmother } }, { sv: 'Kom in, barn.' }))
+      const { languages, client } = spy()
+      const result = await findCandidates(
+        join(root, 'audio-studio.json'),
+        'grandmother',
+        async () => client,
+        {},
+        'sv',
+      )
+      if (!result?.ok) throw new Error(JSON.stringify(result))
+      expect(languages).toEqual(['sv'])
+      expect(result.language).toBe('sv')
+      expect(result.current).toBeNull()
+      expect(result.others.map((v) => v.id)).toEqual(['cur'])
+      expect(result.audition).toMatchObject({ phrase: 'Kom in, barn.', from: 'standard' })
+    })
+
+    it('uses her longest line in the language when nothing else gives a phrase', async () => {
+      const f = withCast({ speakers: { grandmother } })
+      const root = tempRepo({
+        ...f,
+        'tts/act1/sv/script.json': [
+          { key: 'a', speaker: 'grandmother', text: 'Kort.' },
+          { key: 'b', speaker: 'grandmother', text: 'En längre rad.' },
+        ],
+      })
+      const result = await findCandidates(
+        join(root, 'audio-studio.json'),
+        'grandmother',
+        async () => fish,
+        {},
+        'sv',
+      )
+      expect(result?.ok && result.audition).toMatchObject({
+        phrase: 'En längre rad.',
+        from: 'line',
+      })
+    })
+
+    it('shows her voice in the language on her page, and none for a language she is not cast in', async () => {
+      const root = tempRepo(
+        withCast({
+          speakers: { grandmother: { ...grandmother, languages: { sv: { voice: 'w1' } } } },
+        }),
+      )
+      const projectFile = join(root, 'audio-studio.json')
+      const sv = await characterVoice(projectFile, 'grandmother', async () => fish, 'sv')
+      expect(sv).toMatchObject({ ok: true, id: 'w1', language: 'sv' })
+      const de = await characterVoice(projectFile, 'grandmother', async () => fish, 'de')
+      expect(de).toMatchObject({ ok: true, id: 'cur', language: 'en' })
+    })
+
+    it('records a take of the language’s phrase, and none without a phrase', async () => {
+      const f = withCast({ speakers: { grandmother } }, { sv: 'Kom in.' })
+      const root = tempRepo(f)
+      const projectFile = join(root, 'audio-studio.json')
+      const limiter = createLimiter()
+      const en = await recordTake(projectFile, 'grandmother', 'w1', async () => fish, limiter)
+      const sv = await recordTake(projectFile, 'grandmother', 'w1', async () => fish, limiter, 'sv')
+      expect(en?.ok && sv?.ok && en.key !== sv.key).toBe(true)
+      expect(sv?.ok && sv.spoken).toBe('[warm] Kom in.')
+      const none = tempRepo(withCast({ speakers: { grandmother } }))
+      const refused = await recordTake(
+        join(none, 'audio-studio.json'),
+        'grandmother',
+        'w1',
+        async () => fish,
+        limiter,
+        'sv',
+      )
+      expect(refused).toMatchObject({ ok: false, reason: 'no-phrase' })
+    })
+  })
 })

@@ -16,7 +16,7 @@ import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
 import { NO_KEY, type FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
 import { ruledOutIds } from './ruledOut'
-import { auditionFor, castProblems, phrasePath, recordedTakes } from './takes'
+import { auditionIn, castProblems, phrasePath, recordedTakes } from './takes'
 import { createSerial } from './serial'
 import { searchVoices } from './voiceSearch'
 import { loadWorkspace, openProject, type ProjectFailure } from './workspace'
@@ -36,6 +36,8 @@ export type CandidatesResult =
       language: string
       /** The character's current voice, if it has one and Fish still has it. */
       current: Voice | null
+      /** Her voices in the other languages that Fish knows, to hear in this one. */
+      others: Voice[]
       candidates: Candidate[]
       /** What the character says in a take. */
       audition: AuditionText
@@ -66,6 +68,7 @@ export async function findCandidates(
   characterId: string,
   fishFor: FishFactory,
   options: SearchOptions = {},
+  asked?: string,
 ): Promise<CandidatesResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -82,14 +85,18 @@ export async function findCandidates(
       message: NO_KEY,
     }
   }
-  const { language } = project.narration.audition
+  const seen = auditionIn(project, cast, summary, characterId, asked)
+  const language = searchLanguage(project, seen.language)
+  const own = character.languages[seen.language]
   const keywords = options.keywords ?? character.keywords
   try {
-    const current = character.voice ? await fish.getVoice(character.voice).catch(() => null) : null
+    const current = own?.voice ? await fish.getVoice(own.voice).catch(() => null) : null
+    const others = await otherVoices(fish, character, seen.language)
     // Left out before the list is cut, so a later search reaches voices past the first ones.
     const exclude = new Set([
-      ...(character.voice ? [character.voice] : []),
-      ...(await ruledOutIds(projectFile, characterId)),
+      ...(own?.voice ? [own.voice] : []),
+      ...others.map((v) => v.id),
+      ...(await ruledOutIds(projectFile, characterId, seen.language)),
       ...(options.exclude ?? []),
     ])
     const found = keywords.length
@@ -101,17 +108,22 @@ export async function findCandidates(
       : []
     const candidates = found.slice(0, CANDIDATE_LIMIT)
     const root = dirname(projectFile)
-    const audition = auditionFor(cast, characterId, project)
-    const voices = [...(current ? [current.id] : []), ...candidates.map((c) => c.voice.id)]
+    const { audition } = seen
+    const voices = [
+      ...(current ? [current.id] : []),
+      ...others.map((v) => v.id),
+      ...candidates.map((c) => c.voice.id),
+    ]
     return {
       ok: true,
       character,
       keywords,
-      language,
+      language: seen.language,
       current,
+      others,
       candidates,
       audition,
-      takes: recordedTakes(root, project, cast, characterId, audition, voices),
+      takes: recordedTakes(root, project, seen.cast, characterId, audition, voices),
       perRound: project.narration.audition.candidatesPerRound,
     }
   } catch (error) {
@@ -121,6 +133,32 @@ export async function findCandidates(
       message: error instanceof Error ? error.message : String(error),
     }
   }
+}
+
+/** The language Fish is searched in for voices of `language`: the source language as the project says, another by its code. */
+function searchLanguage(project: Project, language: string): string {
+  return language === project.narration.languages[0]
+    ? project.narration.audition.language
+    : language
+}
+
+/**
+ * The character's voices in the languages other than `language`, as Fish knows them (a voice Fish
+ * no longer has is left out), each once, in the project's order and without the voice cast in
+ * `language` itself.
+ */
+async function otherVoices(
+  fish: FishClient,
+  character: CharacterSummary,
+  language: string,
+): Promise<Voice[]> {
+  const ids = Object.entries(character.languages)
+    .filter(([id]) => id !== language)
+    .map(([, casting]) => casting.voice)
+    .filter((id): id is string => id !== null && id !== character.languages[language]?.voice)
+  const unique = [...new Set(ids)]
+  const found = await Promise.all(unique.map((id) => fish.getVoice(id).catch(() => null)))
+  return found.filter((voice): voice is Voice => voice !== null)
 }
 
 /** A character's cast voice for its page, or why it cannot be shown. Null for an unknown character. */
@@ -153,6 +191,7 @@ export async function characterVoice(
   projectFile: string,
   characterId: string,
   fishFor: FishFactory,
+  asked?: string,
 ): Promise<CharacterVoiceResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -160,9 +199,10 @@ export async function characterVoice(
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
   if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
-  const audition = auditionFor(cast, characterId, project)
-  const { language } = project.narration.audition
-  const id = character.voice
+  const seen = auditionIn(project, cast, summary, characterId, asked)
+  const { audition } = seen
+  const language = searchLanguage(project, seen.language)
+  const id = character.languages[seen.language]?.voice ?? null
   const answer = {
     ok: true as const,
     id,
@@ -174,7 +214,7 @@ export async function characterVoice(
   }
   if (!id) return answer
   const take =
-    recordedTakes(dirname(projectFile), project, cast, characterId, audition, [id])[id] ?? null
+    recordedTakes(dirname(projectFile), project, seen.cast, characterId, audition, [id])[id] ?? null
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_KEY } }
   try {
