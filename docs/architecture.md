@@ -132,7 +132,7 @@ audio-studio/
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
-│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice)
+│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice, designVoice)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
@@ -430,6 +430,31 @@ recordings go to `POST /api/characters/:id/clone-voice`, which makes a private v
 account (`FishClient.createVoice`) and writes nothing to the project. The card then offers to cast
 the voice (`POST /api/characters/:id/cast-voice`, with the usual confirmation), to bring it into
 the audition (the existing `start` and `add`), or to leave it on the Fish account.
+
+**Design a voice from a description** (`voice-design-1`, `POST /v1/voice-design`: $0.01 per
+successful request, four voices, each saying the audition phrase cut to the 150 characters Fish's
+API reference allows). A **Design a voice…** button on the character page (beside Start/Resume
+audition) and in the board's bottom bar opens a box with a text of at most 2,000 characters; it
+opens with the last description sent, else a start made from the casting brief (`designStart`).
+**Design voices…** opens a confirm (credit, **Pay up to $0.01**; without a readable or sufficient
+credit, "Fish can't design voices now"). Paying calls `POST /api/characters/:id/design` with
+`{ description, spendUpTo }`: the server admits $0.01 as a budget (`admit`, held back from the
+credit while Fish works), asks Fish, and charges nothing when it refuses. With no audition going on
+the page starts one afterwards (a paid audition model's own box follows).
+Fish makes no voice on the account from a design, only audio, so a design has no Fish id until it
+is cast. The studio gives each a local id `design-<12 hex>` and keeps them per character in
+`.audio-studio/designs/<character>-<hash>.json` (one per language in a project with several, named as the audition's and ruled-out files are; `core/designs.ts`: the voices with their number
+"Design n", the description, when they were asked for, how many were ever made, and the last
+description sent); the preview is encoded to MP3 into `.audio-studio/takes/` under a key made from
+the id, so it plays as the voice's take (a design is never recorded on a paid model). The session
+only references them (`designed`, a place like `yours`; `setDesigned` refreshes it from the store
+when an audition starts or a design is made), so a design never cast is back on the next audition
+for the character; a dropped one is ruled out like any voice and `setDesigned` leaves ruled-out
+ids out. The board's **Designed for <name>** section groups them by request, newest first.
+Casting a design (`castDesign`, through `POST …/cast`) first saves its preview to the account as a
+private voice named `<name> (designed)` (then `(designed 2)`, …: the first name the account does
+not have) with `FishClient.createVoice`, then casts that voice like one made from recordings and
+removes the design from the store. If Fish cannot save it nothing is cast and the card says so.
 
 ```
  keywords ──► search Fish's library, leaving out ruled-out voices ──► ranked candidates
@@ -835,6 +860,8 @@ POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json
 POST   /api/characters/:id/clone-voice           a private voice on the Fish account from recordings (multipart: title, voices)
 POST   /api/characters/:id/cast-voice            cast a voice no audition holds ({ voice, name }); ends an audition going on
+GET    /api/characters/:id/designs               the description the design box starts with
+POST   /api/characters/:id/design                have Fish design voices ({ description, spendUpTo: 0.01 }); 409 until the cost is confirmed and covered
 POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
                                                  part at a time); a paid
                                                  one with { confirmedCost }, else 409 with
@@ -989,9 +1016,9 @@ Small, independently useful increments:
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
-   What a paid account could still have (paid auditions, the `s1` retirement, your own voices,
-   voice design; cloning is built, as-5gk.5, the rate tier on Setup, as-5gk.7, and the spend log,
-   as-5gk.8) is in `docs/paid-account.md`, not planned yet.
+   What a paid account could still have (paid auditions, the `s1` retirement, your own voices) —
+   everything is built or filed: cloning (as-5gk.5), voice design (as-5gk.6), the rate tier on
+   Setup (as-5gk.7) and the spend log (as-5gk.8); the rest is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in

@@ -20,6 +20,7 @@ const fish: FishClient = {
     return []
   },
   createVoice: () => Promise.reject(new Error('not used')),
+  designVoice: () => Promise.reject(new Error('not used')),
   async credit() {
     return 25
   },
@@ -1269,6 +1270,7 @@ describe('server, a paid draft model', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1459,6 +1461,7 @@ describe('server, paid recording and what changes meanwhile', () => {
   const held: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       creditCalls++
       if (creditGate) await creditGate
@@ -1666,6 +1669,7 @@ describe('server, a paid job refused for a refresh', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1724,6 +1728,7 @@ describe('server, the final recording', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 10
     },
@@ -2480,5 +2485,121 @@ describe('server, the spending record', () => {
     const now = await spending()
     expect(now.count).toBe(before + 1)
     expect(now.rows[0]).toMatchObject({ lines: 1, planned: 1, state: 'done' })
+  })
+})
+
+describe('designing a voice', () => {
+  const repo = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const asked: string[] = []
+  const saved: string[] = []
+  let credit: number | Error = 25
+  const designing = startServer({
+    projectFile: join(repo, 'audio-studio.json'),
+    port: 0,
+    fish: {
+      ...fish,
+      async credit() {
+        if (credit instanceof Error) throw credit
+        return credit
+      },
+      async designVoice({ instruction, count }) {
+        asked.push(instruction)
+        if (instruction === 'refused') throw new FishError(503, 'Too busy')
+        return Array.from({ length: count }, (_, i) => ({ id: `c${i}`, wav: new Uint8Array([i]) }))
+      },
+      async createVoice({ title }) {
+        saved.push(title)
+        return {
+          id: 'f'.repeat(32),
+          title,
+          description: '',
+          tags: [],
+          languages: [],
+          uses: 0,
+          likes: 0,
+          author: '',
+          sample: null,
+        }
+      },
+    },
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => designing.stop(true))
+  const send = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+    fetch(new URL(path, designing.url), {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { origin: designing.url.origin, 'content-type': 'application/json', ...headers },
+    })
+  const design = (description: string, spendUpTo?: number) =>
+    send('/api/characters/narrator/design', { description, spendUpTo })
+
+  it('does not design until the cost is confirmed, or when the credit does not cover it', async () => {
+    const unconfirmed = await design('an old woman')
+    expect(unconfirmed.status).toBe(409)
+    expect(await unconfirmed.json()).toMatchObject({ ok: false, reason: 'confirm' })
+    credit = 0.005
+    const short = await design('an old woman', 0.01)
+    expect(short.status).toBe(409)
+    expect(await short.json()).toMatchObject({ ok: false, reason: 'credit' })
+    credit = new Error('wallet down')
+    const unknown = await design('an old woman', 0.01)
+    expect(await unknown.json()).toMatchObject({ ok: false, reason: 'credit' })
+    credit = 25
+    expect(asked).toEqual([])
+  })
+
+  it('designs once the cost is confirmed, and remembers the description', async () => {
+    const response = await design('an old woman', 0.01)
+    expect(await response.json()).toEqual({ ok: true, added: 4 })
+    expect(asked).toEqual(['an old woman'])
+    const last = await fetch(new URL('/api/characters/narrator/designs', designing.url))
+    expect(await last.json()).toEqual({ ok: true, description: 'an old woman' })
+  })
+
+  it('gives Fish’s refusal with a 409', async () => {
+    const refused = await design('refused', 0.01)
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toEqual({ ok: false, reason: 'fish', message: 'Too busy' })
+  })
+
+  it('refuses another page, a body that is not a description, and an unknown character', async () => {
+    const other = await send(
+      '/api/characters/narrator/design',
+      { description: 'x', spendUpTo: 0.01 },
+      { origin: 'https://evil.example' },
+    )
+    expect(other.status).toBe(403)
+    expect((await send('/api/characters/narrator/design', {})).status).toBe(400)
+    const unknown = await send('/api/characters/nobody/design', {
+      description: 'x',
+      spendUpTo: 0.01,
+    })
+    expect(unknown.status).toBe(404)
+  })
+
+  it('shows the designs on the board, saves one to the account on cast, and casts it', async () => {
+    const started = await send('/api/auditions/narrator/start', {})
+    const board = await started.json()
+    expect(board.session.designed.length).toBe(4)
+    const [id] = board.session.designed as string[]
+    expect(board.takes[id!]).toMatch(/^[0-9a-f]{16}$/)
+    expect((await fetch(new URL(`/api/takes/${board.takes[id!]}.mp3`, designing.url))).status).toBe(
+      200,
+    )
+    await send('/api/auditions/narrator/move', { voice: id, move: 'shortlist' })
+    const cast = await send('/api/auditions/narrator/cast', { voice: id })
+    expect(await cast.json()).toMatchObject({
+      ok: true,
+      voice: { id: 'f'.repeat(32), name: 'Narrator (designed)' },
+    })
+    expect(saved).toEqual(['Narrator (designed)'])
+    const file = JSON.parse(readFileSync(join(repo, 'tts/cast.json'), 'utf8'))
+    expect(file.speakers.narrator.voice).toBe('f'.repeat(32))
   })
 })

@@ -15,6 +15,12 @@ export const VoiceSchema = z.object({
   sample: z.object({ text: z.string(), audio: z.string() }).nullable(),
   /** Whether it is a voice on the user's own Fish account (cloned or private), not the library's. */
   own: z.boolean().optional(),
+  /**
+   * Set on a voice Fish designed from a description and that is not on the user's account yet:
+   * its number for the character ("Design n"), the description it was made from, and when it was
+   * asked for (ISO 8601; the designs of one request share it).
+   */
+  design: z.object({ n: z.number(), description: z.string(), at: z.string() }).optional(),
 })
 
 /** A voice in Fish Audio's library, as the studio uses it. */

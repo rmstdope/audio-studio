@@ -44,16 +44,20 @@ export function VoiceCard({
   actions?: ReactNode
 }) {
   const sample = voice.sample
+  // Fish's design, not yet on the account: its preview is its take, and it has no sample or id.
+  const designed = voice.design !== undefined
   return (
     <article
-      className={`card voice-card${listed ? ' kept' : ''}${voice.own ? ' yours' : ''}`}
+      className={`card voice-card${listed ? ' kept' : ''}${voice.own ? ' yours' : ''}${designed ? ' designed' : ''}`}
       aria-label={voice.title}
     >
       <div className="card-head">
         <div className="card-title">
           <strong>{voice.title || 'Untitled voice'}</strong>
           <span className="muted voice-meta">
-            {voice.own ? (
+            {designed ? (
+              'Designed · not saved'
+            ) : voice.own ? (
               'Your voice · private'
             ) : (
               <>
@@ -63,10 +67,11 @@ export function VoiceCard({
             )}
           </span>
         </div>
-        {note || voice.own ? (
+        {note || voice.own || designed ? (
           <span className="badges">
             {note && <span className="badge ok">{note}</span>}
             {voice.own && <span className="badge yours">Yours</span>}
+            {designed && <span className="badge designed">Designed</span>}
           </span>
         ) : candidate && keywordCount ? (
           <span className="chip" title={candidate.matched.join(', ')}>
@@ -97,8 +102,14 @@ export function VoiceCard({
             >
               {playing === takeClip(voice.id) ? <PauseIcon /> : <PlayIcon />}
             </button>
-            <span className="take-label">Take: the audition phrase in character</span>
+            <span className="take-label">
+              {designed
+                ? 'Take: the audition phrase, as designed'
+                : 'Take: the audition phrase in character'}
+            </span>
           </>
+        ) : designed ? (
+          <span className="muted">The preview of this design is no longer kept.</span>
         ) : waiting ? (
           <span className="muted take-waits">Take waits for more money</span>
         ) : (
@@ -108,29 +119,31 @@ export function VoiceCard({
         )}
       </div>
       {error && <span className="adopt-error take-error">{error}</span>}
-      <div className="voice-sample">
-        {sample ? (
-          <>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label={
-                playing === sampleClip(voice.id) ? 'Stop' : `Play Fish’s sample of ${voice.title}`
-              }
-              onClick={() => toggle(sampleClip(voice.id), sample.audio)}
-            >
-              {playing === sampleClip(voice.id) ? <PauseIcon /> : <PlayIcon />}
-            </button>
-            <span className="muted sample-text" title={sample.text}>
-              Fish sample{sample.text ? `: “${sample.text}”` : ''}
-            </span>
-          </>
-        ) : (
-          <span className="muted">No sample from Fish</span>
-        )}
-      </div>
+      {!designed && (
+        <div className="voice-sample">
+          {sample ? (
+            <>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={
+                  playing === sampleClip(voice.id) ? 'Stop' : `Play Fish’s sample of ${voice.title}`
+                }
+                onClick={() => toggle(sampleClip(voice.id), sample.audio)}
+              >
+                {playing === sampleClip(voice.id) ? <PauseIcon /> : <PlayIcon />}
+              </button>
+              <span className="muted sample-text" title={sample.text}>
+                Fish sample{sample.text ? `: “${sample.text}”` : ''}
+              </span>
+            </>
+          ) : (
+            <span className="muted">No sample from Fish</span>
+          )}
+        </div>
+      )}
       {actions && <div className="card-actions">{actions}</div>}
-      <span className="mono muted voice-id">{voice.id}</span>
+      {!designed && <span className="mono muted voice-id">{voice.id}</span>}
     </article>
   )
 }

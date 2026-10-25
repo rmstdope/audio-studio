@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { VoiceSchema, type Candidate, type Voice } from './voiceSearch'
 
-/** Where a voice on the board is: the user's own, up to hear, or on the shortlist. */
-const PlaceSchema = z.enum(['yours', 'toHear', 'shortlist'])
+/** Where a voice on the board is: the user's own, designed, up to hear, or on the shortlist. */
+const PlaceSchema = z.enum(['yours', 'designed', 'toHear', 'shortlist'])
 
-/** Where a voice on the board is: the user's own, up to hear, or on the shortlist. */
+/** Where a voice on the board is: the user's own, designed, up to hear, or on the shortlist. */
 export type Place = z.infer<typeof PlaceSchema>
 
 /**
@@ -27,6 +27,8 @@ export const AuditionSessionSchema = z.object({
   yours: z.array(z.string()).default([]),
   /** Every voice on the user's account when last fetched; empty until then. */
   mine: z.array(z.string()).default([]),
+  /** The voices Fish designed for the character, not shortlisted or dropped, in the order shown. */
+  designed: z.array(z.string()).default([]),
   /** The voices being listened to, in the order shown. */
   toHear: z.array(z.string()),
   /** Voices dropped in this audition, the latest last, and where each was. */
@@ -74,6 +76,7 @@ export function startSession(options: {
     shortlist: listed.map((v) => v.id),
     yours: [],
     mine: [],
+    designed: [],
     toHear: ids.slice(0, perRound),
     dropped: [],
     queue: ids.slice(perRound),
@@ -111,12 +114,41 @@ export function setOwnVoices(
   return JSON.stringify(next) === JSON.stringify(session) ? session : next
 }
 
-/** The session with a voice moved from Your voices or those to hear to the end of the shortlist. */
+/**
+ * The session with the voices Fish designed for the character (all those kept for it) in the
+ * designed section, except those already shortlisted, dropped, ruled out or placed elsewhere.
+ * Designs no longer kept leave the section.
+ */
+export function setDesigned(
+  session: AuditionSession,
+  designs: Voice[],
+  ruledOut: string[] = [],
+): AuditionSession {
+  const known = new Set(designs.map((v) => v.id))
+  const placed = new Set([...session.shortlist, ...session.dropped.map((d) => d.id), ...ruledOut])
+  const keep = session.designed.filter((id) => known.has(id) && !placed.has(id))
+  const added = designs.filter((v) => !placed.has(v.id) && !keep.includes(v.id))
+  const next = {
+    ...session,
+    designed: [...keep, ...added.map((v) => v.id)],
+    voices: { ...session.voices, ...Object.fromEntries(added.map((v) => [v.id, v])) },
+  }
+  return JSON.stringify(next) === JSON.stringify(session) ? session : next
+}
+
+/** The session with a voice moved from Your voices, the designed or those to hear to the end of the shortlist. */
 export function shortlist(session: AuditionSession, voice: string): AuditionSession {
-  if (!session.toHear.includes(voice) && !session.yours.includes(voice)) return session
+  if (
+    !session.toHear.includes(voice) &&
+    !session.yours.includes(voice) &&
+    !session.designed.includes(voice)
+  ) {
+    return session
+  }
   return {
     ...session,
     yours: session.yours.filter((v) => v !== voice),
+    designed: session.designed.filter((v) => v !== voice),
     toHear: session.toHear.filter((v) => v !== voice),
     shortlist: [...session.shortlist, voice],
   }
@@ -124,16 +156,18 @@ export function shortlist(session: AuditionSession, voice: string): AuditionSess
 
 /**
  * The session with a voice moved off the shortlist: back to the front of Your voices if it is the
- * user's own, else to the front of those to hear.
+ * user's own, of the designed if Fish designed it, else to the front of those to hear.
  */
 export function unlist(session: AuditionSession, voice: string): AuditionSession {
   if (!session.shortlist.includes(voice)) return session
   const own = session.voices[voice]?.own === true
+  const designed = !own && session.voices[voice]?.design !== undefined
   return {
     ...session,
     shortlist: session.shortlist.filter((v) => v !== voice),
     yours: own ? [voice, ...session.yours] : session.yours,
-    toHear: own ? session.toHear : [voice, ...session.toHear],
+    designed: designed ? [voice, ...session.designed] : session.designed,
+    toHear: own || designed ? session.toHear : [voice, ...session.toHear],
   }
 }
 
@@ -207,6 +241,7 @@ export function addVoice(session: AuditionSession, voice: Voice): AuditionSessio
 /** Where a voice is on the board, or null if it is not on it. */
 export function placeOf(session: AuditionSession, voice: string): Place | null {
   if (session.yours.includes(voice)) return 'yours'
+  if (session.designed.includes(voice)) return 'designed'
   if (session.toHear.includes(voice)) return 'toHear'
   if (session.shortlist.includes(voice)) return 'shortlist'
   return null

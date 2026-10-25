@@ -9,6 +9,7 @@ import {
   type MutationState,
   type QueryClient,
 } from '@tanstack/react-query'
+import { DESIGN_PRICE } from '../core/design'
 import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
@@ -33,6 +34,7 @@ import type { NoteChange } from '../services/notes'
 import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../services/lineTakes'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { CloneResult } from '../services/cloneVoice'
+import type { DesignResult } from '../services/designs'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import type { SittingView } from '../core/sitting'
@@ -842,6 +844,48 @@ export function useCloneVoice(characterId: string) {
         throw new Error(`cloning answered ${response.status}`)
       }
       return (await response.json()) as NonNullable<CloneResult>
+    },
+  })
+}
+
+/** The description the character's design box starts with: the last one sent, null before any. */
+export function useDesigns(characterId: string, language?: string) {
+  return useQuery({
+    queryKey: ['designs', characterId, language ?? ''],
+    queryFn: () =>
+      getJson<{ ok: true; description: string | null } | ProjectFailure>(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/designs`, language),
+      ),
+  })
+}
+
+/**
+ * Has Fish design voices from the description, once the user has confirmed the cost. The answer
+ * says what was made, or why not; the audition (the designs join it), the last description and the
+ * credit are read again after one that was made.
+ */
+export function useDesignVoices(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (description: string) => {
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/design`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ description, spendUpTo: DESIGN_PRICE }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`designing answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<DesignResult> | { ok: false; message: string }
+    },
+    onSettled: (result) => {
+      void client.invalidateQueries({ queryKey: ['designs', characterId, language ?? ''] })
+      if (!result?.ok) return
+      void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
+      void client.invalidateQueries({ queryKey: ['credit'] })
     },
   })
 }

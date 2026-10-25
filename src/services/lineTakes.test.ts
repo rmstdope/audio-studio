@@ -41,6 +41,7 @@ function fakeFish() {
       return []
     },
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 25
     },

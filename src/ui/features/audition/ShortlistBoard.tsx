@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { designGroups, quoted } from '../../../core/design'
 import type { AuditionSession } from '../../../core/audition'
 import type { CharacterSummary } from '../../../core/summary'
 import type { SessionView } from '../../../services/sessions'
@@ -19,11 +20,14 @@ import {
   isRuledOut,
   ownSectionState,
   playsVoice,
+  recordable,
+  saveFailedLine,
   stopEffectsFor,
   takesToRecord,
   undoFor,
 } from '../../board'
-import { CheckIcon, CrossIcon } from '../../components/icons'
+import { DesignVoice } from './DesignVoice'
+import { CheckIcon, CrossIcon, SparkIcon } from '../../components/icons'
 import { Confirm } from '../../components/Confirm'
 import { Failure } from '../../components/Failure'
 import { routeHref } from '../../route'
@@ -47,6 +51,7 @@ export function ShortlistBoard({
   language,
   name,
   lines,
+  designStart,
   view,
   playing,
   toggle,
@@ -64,6 +69,8 @@ export function ShortlistBoard({
   name: string
   /** The character's lines in every part (in the language). */
   lines: number
+  /** The text the design box starts with when nothing was sent before. */
+  designStart: string
   view: Extract<SessionView, { ok: true }> & { session: AuditionSession }
   playing: string | null
   toggle: (id: string, url: string) => void
@@ -91,10 +98,12 @@ export function ShortlistBoard({
   const [droppedHere, setDroppedHere] = useState<string | null>(null)
   const [voiceId, setVoiceId] = useState('')
   const [idError, setIdError] = useState<string | null>(null)
+  const [designing, setDesigning] = useState(false)
+  const designButton = useRef<HTMLButtonElement>(null)
 
   // Every take is asked for once per phrase, so a take the cache cannot show is not asked again.
   const asked = useRef(new Set<string>())
-  const onBoard = [...session.shortlist, ...session.yours, ...session.toHear]
+  const onBoard = recordable(session)
   // The money of a paid audition: takes wait for its sitting (a read of it, once known).
   const money = sittingQuery.data?.ok ? sittingQuery.data : null
   const paid = money?.paid ?? false
@@ -159,6 +168,18 @@ export function ShortlistBoard({
     const voice = session.voices[id]
     if (!voice) return null
     const isCurrent = id === session.current
+    const designed = voice.design !== undefined
+    // Saving a design to the Fish account takes a while: its card says so, and a failure stays on it.
+    const saving = designed && cast.isPending && cast.variables === id
+    const saveFailed =
+      designed &&
+      cast.data &&
+      !cast.data.ok &&
+      'reason' in cast.data &&
+      cast.data.reason === 'save' &&
+      cast.data.voice === id
+        ? cast.data.message
+        : null
     return (
       <VoiceCard
         key={id}
@@ -176,10 +197,10 @@ export function ShortlistBoard({
         toggle={toggle}
         take={takes[id] ?? null}
         recording={recorder.recording.has(id)}
-        error={recorder.errors[id] ?? null}
         onRecord={() => void recorder.record(id)}
         waiting={recorder.waiting.has(id)}
         listed={listed}
+        error={saveFailed ? saveFailedLine(saveFailed) : (recorder.errors[id] ?? null)}
         actions={
           <>
             <button
@@ -206,7 +227,13 @@ export function ShortlistBoard({
                   disabled={cast.isPending}
                   onClick={() => setAsking({ kind: 'cast', voice: id })}
                 >
-                  {isCurrent ? 'Keep this voice' : `Cast as ${name}`}
+                  {saving
+                    ? 'Saving to your Fish account…'
+                    : designed
+                      ? `Save and cast as ${name}`
+                      : isCurrent
+                        ? 'Keep this voice'
+                        : `Cast as ${name}`}
                 </button>
               </>
             ) : (
@@ -226,6 +253,7 @@ export function ShortlistBoard({
   }
 
   const ownState = ownSectionState(session, own)
+  const designs = designGroups(session)
   const casting = asking?.kind === 'cast' ? asking.voice : null
   const keeping = casting !== null && casting === session.current
   const inLanguage =
@@ -241,6 +269,7 @@ export function ShortlistBoard({
           })),
         )
       : null
+  const castingDesign = casting !== null && session.voices[casting]?.design !== undefined
 
   return (
     <div className="board">
@@ -316,6 +345,7 @@ export function ShortlistBoard({
             dropped,
             unheard: session.toHear.length + session.queue.length,
             ...(language ? { language: language.name, stale: inLanguage?.stale } : {}),
+            saves: castingDesign,
           })}
           {...(language ? { back: 'Cancel' } : {})}
           onBack={() => setAsking(null)}
@@ -326,7 +356,15 @@ export function ShortlistBoard({
             disabled={cast.isPending}
             onClick={() => cast.mutate(casting, { onSettled: () => setAsking(null) })}
           >
-            {cast.isPending ? 'Casting…' : keeping ? 'Keep it' : `Cast ${title(casting)}`}
+            {cast.isPending
+              ? castingDesign
+                ? 'Saving to your Fish account…'
+                : 'Casting…'
+              : keeping
+                ? 'Keep it'
+                : castingDesign
+                  ? `Save and cast as ${name}`
+                  : `Cast ${title(casting)}`}
           </button>
         </Confirm>
       )}
@@ -364,6 +402,23 @@ export function ShortlistBoard({
           <div className="cards">{session.shortlist.map((id) => card(id, true))}</div>
         )}
       </section>
+
+      {designs.length > 0 && (
+        <section className="section" id="designed" aria-label={`Designed for ${name}`}>
+          <div className="section-head">
+            <h2 className="section-title">Designed for {name}</h2>
+            <span className="muted">Not on your Fish account until you cast one.</span>
+          </div>
+          {designs.map((group) => (
+            <div className="design-group" key={group.at}>
+              <p className="design-group-heading" title={group.description}>
+                {quoted(group.description)}
+              </p>
+              <div className="cards">{group.voices.map((id) => card(id, false))}</div>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="section" aria-label="Your voices">
         <div className="section-head">
@@ -420,6 +475,26 @@ export function ShortlistBoard({
         )}
       </section>
 
+      {designing && (
+        <DesignVoice
+          characterId={characterId}
+          language={language?.id}
+          name={name}
+          start={designStart}
+          auditioning
+          onClose={() => {
+            setDesigning(false)
+            designButton.current?.focus()
+          }}
+          onDone={() => {
+            setDesigning(false)
+            designButton.current?.focus()
+            // The designs join the board when it is read again; bring the section into view then.
+            setTimeout(() => document.getElementById('designed')?.scrollIntoView(), 300)
+          }}
+        />
+      )}
+
       <div className="panel board-more">
         <button
           className="btn"
@@ -428,6 +503,15 @@ export function ShortlistBoard({
           onClick={() => run({ action: 'more' }, () => setDroppedHere(null))}
         >
           Bring in more
+        </button>
+        <button
+          ref={designButton}
+          className="btn"
+          type="button"
+          disabled={designing}
+          onClick={() => setDesigning(true)}
+        >
+          <SparkIcon /> Design a voice…
         </button>
         <span className="spacer" />
         <form className="add-voice" onSubmit={addById}>
@@ -450,7 +534,14 @@ export function ShortlistBoard({
         </form>
         {idError && <span className="adopt-error">{idError}</span>}
         <Failure title="The audition could not go on" result={act.data} />
-        <Failure title="The voice could not be cast" result={cast.data} />
+        <Failure
+          title="The voice could not be cast"
+          result={
+            cast.data && 'reason' in cast.data && cast.data.reason === 'save'
+              ? undefined
+              : cast.data
+          }
+        />
         {(act.isError || cast.isError) && (
           <span className="adopt-error">{(act.error ?? cast.error)?.message}</span>
         )}
