@@ -85,8 +85,8 @@ export function useCredit() {
 }
 
 /** A part with the state of every line's clip. */
-export function usePart(partId: string, enabled = true) {
-  return useQuery({ ...partQuery(partId), enabled })
+export function usePart(partId: string, enabled = true, language?: string) {
+  return useQuery({ ...partQuery(partId, language), enabled })
 }
 
 /**
@@ -104,17 +104,20 @@ export function useHeard(partId: string, key: string) {
 }
 
 /** How a part is asked for and cached, the same for one part as for several. */
-function partQuery(partId: string) {
+function partQuery(partId: string, language?: string) {
   return {
-    queryKey: ['part', partId],
-    queryFn: () => getJson<NonNullable<PartResult>>(`/api/parts/${encodeURIComponent(partId)}`),
+    queryKey: language ? ['part', partId, language] : ['part', partId],
+    queryFn: () =>
+      getJson<NonNullable<PartResult>>(
+        `/api/parts/${encodeURIComponent(partId)}${language ? `?language=${encodeURIComponent(language)}` : ''}`,
+      ),
   }
 }
 
 /** Several parts, as `usePart` loads each (sharing its cache), in the order given. */
 export function useParts(partIds: string[]) {
   return useQueries({
-    queries: partIds.map(partQuery),
+    queries: partIds.map((id) => partQuery(id)),
   })
 }
 
@@ -979,6 +982,7 @@ export function useJobActions(partId: string) {
 }
 
 /** The URL of a clip in a part. */
-export function clipUrl(partId: string, file: string): string {
-  return `/api/parts/${encodeURIComponent(partId)}/clips/${encodeURIComponent(file)}`
+export function clipUrl(partId: string, file: string, language?: string): string {
+  const query = language ? `?language=${encodeURIComponent(language)}` : ''
+  return `/api/parts/${encodeURIComponent(partId)}/clips/${encodeURIComponent(file)}${query}`
 }

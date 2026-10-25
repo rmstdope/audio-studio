@@ -78,9 +78,14 @@ export function App() {
         ) : route.view === 'audition' ? (
           <AuditionView key={route.character} summary={summary} characterId={route.character} />
         ) : route.view === 'lines' ? (
-          <LinesView key={part.id} part={part} />
+          <LinesView key={part.id} summary={summary} part={part} language={route.language} />
         ) : (
-          <PartOverview key={part.id} summary={summary} part={part} />
+          <PartOverview
+            key={part.id}
+            summary={summary}
+            part={part}
+            language={route.view === 'part' ? route.language : undefined}
+          />
         )}
       </main>
     </div>

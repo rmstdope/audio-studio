@@ -1,12 +1,14 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
-import type { PartSummary } from '../../../core/summary'
+import type { LanguageProgress } from '../../../services/workspace'
+import type { PartSummary, ProjectSummary } from '../../../core/summary'
 import {
   clipUrl,
   takeUrl,
   useAccept,
   useCheckAgain,
   usePart,
+  useRefreshDialog,
   useRecordLines,
   useSetCue,
   useSetNote,
@@ -15,13 +17,16 @@ import {
 import { ListIcon, PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
+import { RefreshOutcome } from '../overview/PartOverview'
 import { GeneratePanel } from './GeneratePanel'
+import { LanguageSwitch } from './LanguageSwitch'
 import { HeardComparison } from './HeardComparison'
 import { LineTakes } from './LineTakes'
 import { canCompare } from '../../heard'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
+import { noDialogPanel, recordingNote } from '../../languages'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
@@ -39,8 +44,27 @@ const RECORDABLE = new Set<LineStatus>(['missing', 'stale', 'weak'])
 const needsAttention = (line: LineState) => line.status !== 'ok'
 
 /** Every line of a part with the state of its clip, filtered by status, speaker and words. */
-export function LinesView({ part }: { part: PartSummary }) {
-  const detail = usePart(part.id, part.dialog === 'ok')
+export function LinesView({
+  summary,
+  part,
+  language,
+}: {
+  summary: ProjectSummary
+  part: PartSummary
+  /** The language asked for in the address; the source language if it is not declared. */
+  language?: string
+}) {
+  const declared = summary.languages
+  const several = declared.length > 1
+  const active = declared.find((l) => l.id === language) ?? declared[0]!
+  // Another language than the first: its lines are listed with the first's text beneath, and none is recorded yet.
+  const foreign = active.id !== declared[0]!.id
+  const source = declared[0]!
+  const detail = usePart(part.id, several || part.dialog === 'ok', several ? active.id : undefined)
+  const refresh = useRefreshDialog(part.id)
+  const clip = (file: string) => clipUrl(part.id, file, several ? active.id : undefined)
+  // The last counts seen, so the switch keeps them while another language loads.
+  const seen = useRef<LanguageProgress[] | null>(null)
   const { playing, inTurn, toggle, playInTurn, stop } = useClipPlayer()
   const recorder = useRecordLines(part.id)
   const accept = useAccept(part.id)
@@ -83,6 +107,7 @@ export function LinesView({ part }: { part: PartSummary }) {
   const [takesOf, setTakesOf] = useState<string | null>(null)
 
   const loaded = detail.data?.ok ? detail.data.part : null
+  if (loaded) seen.current = loaded.languages
   const lines = useMemo(() => {
     const words = search.trim().toLowerCase()
     return (loaded?.lines ?? []).filter(
@@ -104,7 +129,7 @@ export function LinesView({ part }: { part: PartSummary }) {
     playInTurn(
       (key === undefined ? turn : clipsInTurn(lines, key)).map((c) => ({
         id: c.key,
-        url: clipUrl(part.id, c.file),
+        url: clip(c.file),
       })),
     )
   const playButton = playthroughButton(inTurn, turn.length, lines.length)
@@ -137,7 +162,7 @@ export function LinesView({ part }: { part: PartSummary }) {
         break
       }
       case 'play':
-        if (line?.file) toggle(line.key, clipUrl(part.id, line.file))
+        if (line?.file) toggle(line.key, clip(line.file))
         break
       case 'fromHere':
         if (line?.file) playFrom(line.key)
@@ -180,17 +205,66 @@ export function LinesView({ part }: { part: PartSummary }) {
           {longTitle(part.title)} · {plural(part.lineCount, 'line')}
         </span>
       </div>
+      {several && (
+        <LanguageSwitch
+          languages={declared}
+          progress={seen.current}
+          active={active.id}
+          partTitle={shortTitle(part.title)}
+          onChoose={(id) => {
+            // The other language has other statuses: start from what needs attention again.
+            setFilter('attention')
+            setSpeaker('')
+            window.location.hash = routeHref({ view: 'lines', part: part.id, language: id })
+          }}
+        />
+      )}
     </header>
   )
 
-  if (!loaded) {
+  const dialog = loaded ? loaded.dialog : several ? 'ok' : part.dialog
+  if (loaded && dialog === 'missing' && several) {
+    const panel = noDialogPanel(
+      shortTitle(part.title),
+      active.name,
+      summary.canRefresh,
+      summary.partLabel,
+    )
+    return (
+      <>
+        {header}
+        <section className="panel language-empty">
+          <h2>{panel.heading}</h2>
+          <p className="muted">{panel.text}</p>
+          {panel.refresh && (
+            <button
+              className="btn"
+              type="button"
+              disabled={refresh.pending}
+              onClick={refresh.start}
+            >
+              {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
+            </button>
+          )}
+        </section>
+        {refresh.outcome && (
+          <RefreshOutcome
+            result={refresh.outcome.result}
+            error={refresh.outcome.error}
+            onClose={refresh.dismiss}
+          />
+        )}
+      </>
+    )
+  }
+  if (!loaded || dialog !== 'ok') {
     return (
       <>
         {header}
         <section className="panel muted">
-          {part.dialog === 'invalid'
+          {dialog === 'invalid'
             ? 'The dialog file could not be read: see the part’s overview for what is wrong.'
-            : part.dialog !== 'ok'
+            : dialog !== 'ok'
               ? 'This part has no dialog yet.'
               : detail.isError
                 ? `Could not load the part: ${detail.error.message}`
@@ -277,14 +351,24 @@ export function LinesView({ part }: { part: PartSummary }) {
         </div>
       </div>
 
-      <GeneratePanel
-        partId={loaded.id}
-        speaker={speaker || null}
-        models={{ draft: loaded.draftModel, final: loaded.finalModel }}
-      />
+      {foreign ? (
+        <p className="muted language-note">{recordingNote(active.name)}</p>
+      ) : (
+        <GeneratePanel
+          partId={loaded.id}
+          speaker={speaker || null}
+          models={{ draft: loaded.draftModel, final: loaded.finalModel }}
+        />
+      )}
 
       {filter === 'orphans' ? (
-        <OrphanTable part={loaded.id} orphans={loaded.orphans} playing={playing} toggle={toggle} />
+        <OrphanTable
+          part={loaded.id}
+          language={several ? active.id : undefined}
+          orphans={loaded.orphans}
+          playing={playing}
+          toggle={toggle}
+        />
       ) : (
         <div className="table-box">
           <table className="table">
@@ -292,7 +376,7 @@ export function LinesView({ part }: { part: PartSummary }) {
               <tr>
                 <th style={{ width: 130 }}>Status</th>
                 <th>Line</th>
-                <th style={{ width: 220 }}>Delivery</th>
+                {!foreign && <th style={{ width: 220 }}>Delivery</th>}
                 <th style={{ width: 70 }}>Length</th>
                 <th style={{ width: 70 }}>Heard</th>
                 <th style={{ width: 140 }}>
@@ -308,7 +392,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                     className={playing === line.key ? 'playing' : undefined}
                     data-key={line.key}
                     tabIndex={0}
-                    aria-label={`${displayName(line.speaker)}: ${line.text}`}
+                    aria-label={`${displayName(line.speaker)}: ${line.text || line.english || line.key}`}
                   >
                     <td>
                       <StatusPill status={line.status} />
@@ -323,8 +407,21 @@ export function LinesView({ part }: { part: PartSummary }) {
                         <span className="line-speaker">
                           {displayName(line.speaker)} <span className="mono muted">{line.key}</span>
                         </span>
-                        <span className="line-text">{line.text}</span>
-                        {line.status !== 'ok' && (
+                        {line.status === 'untranslated' ? (
+                          <span className="line-gap">No {active.name} text for this line yet.</span>
+                        ) : (
+                          <span className="line-text">{line.text}</span>
+                        )}
+                        {foreign &&
+                          (line.english !== null ? (
+                            <span className="line-english">
+                              <b>{source.name}</b>
+                              {line.english}
+                            </span>
+                          ) : (
+                            <span className="line-gap line-english">No {source.name} line.</span>
+                          ))}
+                        {line.status !== 'ok' && statusDetail(line, loaded.minHeard) && (
                           <span
                             className="line-detail"
                             style={{ color: STATUS[line.status].color }}
@@ -332,21 +429,25 @@ export function LinesView({ part }: { part: PartSummary }) {
                             {statusDetail(line, loaded.minHeard)}
                           </span>
                         )}
-                        <NoteCell
-                          partId={loaded.id}
-                          lineKey={line.key}
-                          note={
-                            Object.hasOwn(loaded.notes, line.key) ? loaded.notes[line.key]! : ''
-                          }
-                        />
+                        {!foreign && (
+                          <NoteCell
+                            partId={loaded.id}
+                            lineKey={line.key}
+                            note={
+                              Object.hasOwn(loaded.notes, line.key) ? loaded.notes[line.key]! : ''
+                            }
+                          />
+                        )}
                       </div>
                     </td>
-                    <td>
-                      <CueCell partId={loaded.id} line={line} playing={playing} toggle={toggle} />
-                    </td>
+                    {!foreign && (
+                      <td>
+                        <CueCell partId={loaded.id} line={line} playing={playing} toggle={toggle} />
+                      </td>
+                    )}
                     <td className="mono num">{seconds(line.duration)}</td>
                     <td className="mono num">
-                      {canCompare(line.heard) ? (
+                      {!foreign && canCompare(line.heard) ? (
                         <button
                           type="button"
                           className="heard-btn"
@@ -362,7 +463,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                     </td>
                     <td>
                       <div className="row-actions">
-                        {RECORDABLE.has(line.status) || line.status === 'ok' ? (
+                        {!foreign && (RECORDABLE.has(line.status) || line.status === 'ok') ? (
                           <button
                             type="button"
                             className="btn row-takes"
@@ -378,7 +479,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                             type="button"
                             className="icon-btn"
                             aria-label={playing === line.key ? 'Stop' : `Play ${line.key}`}
-                            onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
+                            onClick={() => toggle(line.key, clip(line.file!))}
                           >
                             {playing === line.key ? <PauseIcon /> : <PlayIcon />}
                           </button>
@@ -394,7 +495,8 @@ export function LinesView({ part }: { part: PartSummary }) {
                             <ListIcon />
                           </button>
                         )}
-                        {RECORDABLE.has(line.status) &&
+                        {!foreign &&
+                          RECORDABLE.has(line.status) &&
                           (recorder.toConfirm[line.key] !== undefined ? (
                             <>
                               <button
@@ -440,7 +542,8 @@ export function LinesView({ part }: { part: PartSummary }) {
                                   : 'Record'}
                             </button>
                           ))}
-                        {line.status === 'weak' &&
+                        {!foreign &&
+                          line.status === 'weak' &&
                           recorder.toConfirm[line.key] === undefined &&
                           !recorder.recording.has(line.key) && (
                             <>
@@ -473,7 +576,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                       )}
                     </td>
                   </tr>
-                  {comparing === line.key && canCompare(line.heard) && (
+                  {!foreign && comparing === line.key && canCompare(line.heard) && (
                     <tr className="heard-row">
                       <td />
                       <td colSpan={5}>
@@ -481,7 +584,7 @@ export function LinesView({ part }: { part: PartSummary }) {
                       </td>
                     </tr>
                   )}
-                  {takesOf === line.key && (
+                  {!foreign && takesOf === line.key && (
                     <tr className="heard-row takes-row">
                       <td />
                       <td colSpan={5}>
@@ -521,11 +624,13 @@ export function LinesView({ part }: { part: PartSummary }) {
 
 function OrphanTable({
   part,
+  language,
   orphans,
   playing,
   toggle,
 }: {
   part: string
+  language?: string
   orphans: { key: string; speaker: string | null; file: string }[]
   playing: string | null
   toggle: (id: string, url: string) => void
@@ -560,7 +665,7 @@ function OrphanTable({
                   type="button"
                   className="icon-btn"
                   aria-label={playing === orphan.key ? 'Stop' : `Play ${orphan.file}`}
-                  onClick={() => toggle(orphan.key, clipUrl(part, orphan.file))}
+                  onClick={() => toggle(orphan.key, clipUrl(part, orphan.file, language))}
                 >
                   {playing === orphan.key ? <PauseIcon /> : <PlayIcon />}
                 </button>

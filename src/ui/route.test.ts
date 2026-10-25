@@ -55,3 +55,29 @@ describe('parseRoute', () => {
     })
   })
 })
+
+describe('the language in a route', () => {
+  it('is kept in the hash on a part and on its lines', () => {
+    expect(parseRoute('#/parts/act1/lines?language=sv')).toEqual({
+      view: 'lines',
+      part: 'act1',
+      language: 'sv',
+    })
+    expect(parseRoute('#/parts/act1?language=sv')).toEqual({
+      view: 'part',
+      part: 'act1',
+      language: 'sv',
+    })
+    expect(routeHref({ view: 'lines', part: 'act1', language: 'sv' })).toBe(
+      '#/parts/act1/lines?language=sv',
+    )
+    expect(routeHref({ view: 'part', part: 'act1', language: 'sv' })).toBe(
+      '#/parts/act1?language=sv',
+    )
+  })
+
+  it('is left out when there is none', () => {
+    expect(parseRoute('#/parts/act1/lines')).toEqual({ view: 'lines', part: 'act1' })
+    expect(routeHref({ view: 'lines', part: 'act1' })).toBe('#/parts/act1/lines')
+  })
+})

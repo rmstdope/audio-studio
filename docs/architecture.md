@@ -218,6 +218,11 @@ an id and a title.
 }
 ```
 
+- `languages` lists the languages the game is narrated in, by code (`["en", "sv"]`; default
+  `["en"]`). The first is the source language: its dialog is the line shown beneath a translation.
+  Path templates may contain `{language}`; with more than one language every path (`dialog`,
+  `cues`, `lock`, `clips`, `manifest`) must, or languages would share a file. Each language is
+  named in itself in the UI (`core/languages.ts`: `sv` is Svenska).
 - `refreshDialog` is optional. When set, the UI offers **Refresh dialog**, which runs it in the
   project root and reloads the script. This is how the studio stays generic: the game owns how its
   dialog is extracted.
@@ -238,8 +243,10 @@ an id and a title.
 The formats are the ones RetroQuest uses today, so existing files work unchanged. The studio only
 **adds** fields; the game ignores what it doesn't know.
 
-**Dialog** (`script.json`, read only): `[{ key, speaker, text }]`. `key` is the game's stable id for
-the line (RetroQuest: a hash of speaker and words, so new wording gets a new key).
+**Dialog** (`script.json`, read only; one per part and language): `[{ key, speaker, text }]`. `key` is the game's stable id for
+the line (RetroQuest: a hash of speaker and words, so new wording gets a new key). Between
+languages lines are matched by key: a source line missing from a language's dialog (or blank
+there) is _Not translated_, and a line only the language has is shown with "No English line".
 
 **Characters** (`tts/cast.json`, read and written): one file for the whole project. A character is
 keyed by its name; every part whose dialog has a speaker of that name uses that entry, so its voice,
@@ -713,8 +720,9 @@ spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DE
 GET    /api/project                              project, parts
 GET    /api/credit                               the Fish account's API credit (dollars)
 GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish)
-GET    /api/parts/:part                          the part, every line with its status and reason
-GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
+GET    /api/parts/:part?language=                the part in a language (default: the first), every line
+                                                 with its status and reason, and each language's progress
+GET    /api/parts/:part/clips/:file?language=    a clip from the part's clips folder (that language's)
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
 POST   /api/parts/:part/lines/:key/try           hear the line with a cue ({ cue }): a take, nothing saved
 PATCH  /api/parts/:part/lines/:key/note          the user's note on the line ({ note }; empty removes)
@@ -955,6 +963,10 @@ Small, independently useful increments:
     7. **Orphans**: a removed track's clip removed after confirmation.
     8. **RetroQuest** (in the game's repository, not the studio's): the game reads the music
        manifest and plays a track per room or region, and the stingers.
+13. **Languages** (epic as-170), in small pull requests:
+    1. **Show a part's lines in each declared language** (built): `narration.languages`,
+       `{language}` in the paths, a language switch on the lines page with each language's
+       progress, untranslated lines, read only (no recording yet).
 
 ---
 
