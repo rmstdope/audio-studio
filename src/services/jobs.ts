@@ -64,6 +64,8 @@ export interface Jobs {
   latest(part: string, language?: string): JobState | null
   /** Whether a job of the part is running in any language. */
   running(part: string): boolean
+  /** The parts with a recording job running (or cancelling) now; measuring and checking are not recording. */
+  active(): string[]
   cancel(id: string): JobState | null
 }
 
@@ -139,6 +141,15 @@ export function createJobs(): Jobs {
         ({ state }) =>
           state.part === part && (state.status === 'running' || state.status === 'cancelling'),
       )
+    },
+    active() {
+      return [...byPart.values()]
+        .filter(
+          ({ state }) =>
+            state.kind === 'record' &&
+            (state.status === 'running' || state.status === 'cancelling'),
+        )
+        .map(({ state }) => state.part)
     },
     cancel(id) {
       const job = find(id)

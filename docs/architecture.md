@@ -139,7 +139,8 @@ audio-studio/
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
 │   │   ├── spending.ts          the record of paid recordings (.audio-studio/spending.json) and the running ones
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
-│   │   ├── models.ts            s1 → s2.1-pro in the project file's draft and final models
+│   │   ├── models.ts            s1 → s2.1-pro, and a stage's model, in the project file's `narration.models`
+│   │   ├── modelsView.ts        the whole dialog's size and what recorded clips were made with, for the Models panel
 │   │   ├── projectFile.ts       reading the project file for a change, and writing it back as it was laid out
 │   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
 │   │   ├── takes.ts             audition takes and tries: recorded once, cached by what they are made of
@@ -381,6 +382,10 @@ fp = sha256(json([
   settings                    // temperature, topP, speed (the character's own if set), chunkLimit, codec, bitrate, channels
 ]))[:16]
 ```
+
+A clip made with `s1` counts as made with `s2.1-pro` (Fish serves and bills them as one):
+`fingerprintMatches` also accepts the fingerprint computed with `s1` when the project names
+`s2.1-pro`, and `staleReasons` names no model change between them.
 
 Pronunciations go into the hash through `spokenText`, not as the whole table. Adding
 `"Elior": "El-ee-or"` therefore marks only the lines that contain "Elior" as stale, not the whole
@@ -628,7 +633,20 @@ An audition is for a character, not for a part: the result applies to every part
   (until the page is reopened; nothing stored) and Switch to s2.1-pro. Switch asks first, then
   rewrites only the models that are `s1` to `s2.1-pro` in the project file, the same careful way
   as the sound-alike save (the second change the studio makes to the project file). The audition
-  model and recorded lines are not touched.
+  model and recorded lines are not touched. A clip made with `s1` counts as up to date under
+  `s2.1-pro` (`sameModel`, `fingerprintMatches` in `core/fingerprint.ts`): Fish serves and bills
+  them as one.
+- Choose the stage models (built, as-3h4): the **Models** panel at the top of Setup shows the
+  audition, draft and final models with Fish's rate and what recording the whole dialog once
+  would cost (`GET /api/models`: the models, the dialog's lines and bytes over every part and
+  language, the clips by the model they were made with, and what is recording or auditioning).
+  A menu change is saved in `narration.models.<stage>` (`PUT /api/models/:stage`, `{ model, was }`:
+  the fourth kind of change the studio makes to the project file, the same careful way, refused
+  when the file's value differs from `was`, for a model with no price or for `s1`, and while
+  anything is recording or auditioning). The audition model, and a draft or final change that
+  makes no recorded line out of date, save at once; any other asks first (`changeOf` in
+  `core/models.ts`: lines made with a model that is in date now and would not be after). `s1`
+  is offered only to a stage still on it.
 - Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
   (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again). Or check
   a weak one again (built: Check again): Whisper hears the line's clip again, without new audio, and
@@ -865,6 +883,8 @@ PATCH  /api/characters/:id                       style, speed, keywords, phrase
 PATCH  /api/pronounce?language=                   a language's pronunciation table ({ table, was }: whole)
 PATCH  /api/sound-alike?language=                 a language's sound-alike groups ({ groups, was })
 PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
+GET    /api/models                               the stage models, the dialog's size, clips by model, and what is busy
+PUT    /api/models/:stage                        one stage's model ({ model, was }; refused if the file differs, the model is unpriced or s1, or something is recording)
 GET    /api/spending                             paid recordings: totals per part, running ones live, or the record's problems
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
 GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
@@ -1022,7 +1042,7 @@ Small, independently useful increments:
       `audio-studio.json` for all four acts with the new extractor, every act's clips adopted,
       `.audio-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
       (`level.py` stays for the music).
-8. **Paid models**, in three pull requests:
+8. **Paid models**, in pull requests:
    1. **Prices and credit** (built): a dated price list (`core/prices.ts`, from Fish's pricing
       page; a promotion ends at its moment, so `drama-3` costs $10 until 2026-11-12 17:00 UTC and
       $50 after), plans priced when they are made, and the account's API credit
@@ -1035,6 +1055,8 @@ Small, independently useful increments:
       (`core/spend.ts`).
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
+   4. **Choose the models** (built, as-3h4): the Models panel on Setup, which saves each stage's
+      model in the project file (§8.4, "Choose the stage models").
 
    What a paid account could still have (paid auditions, the `s1` retirement, your own voices) —
    everything is built or filed: cloning (as-5gk.5), voice design (as-5gk.6), the rate tier on

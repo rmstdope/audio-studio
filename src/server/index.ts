@@ -1,4 +1,4 @@
-import { dirname } from 'node:path'
+import { basename, dirname } from 'node:path'
 import { z } from 'zod'
 import {
   characterVoice,
@@ -26,7 +26,9 @@ import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
-import { switchRetiredModels } from '../services/models'
+import { setStageModel, switchRetiredModels } from '../services/models'
+import { modelsView } from '../services/modelsView'
+import type { Busy } from '../core/models'
 import { setFishTier } from '../services/fishTier'
 import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile, tryLine } from '../services/takes'
@@ -131,6 +133,12 @@ const ModelsBody = z
       .refine((takes) => new Set(takes).size === takes.length),
   })
   .strict()
+
+/** The stages whose model can be chosen. */
+const StageParam = z.enum(['audition', 'draft', 'final'])
+
+/** The model the page chose for a stage, and the one it showed. */
+const StageModelBody = z.object({ model: z.string().min(1), was: z.string().min(1) }).strict()
 
 /** Where an orphaned cue goes: a line key, or null to remove it. */
 const MoveCueBody = z.object({ to: z.string().min(1).max(200).nullable() }).strict()
@@ -279,6 +287,39 @@ export function startServer({
   const fishWork = createLimiter()
   /** Generation jobs, one per part at a time. */
   const jobs = createJobs()
+
+  /** What is asking Fish now outside a job: a part's line being recorded or tried, a character's audition. */
+  const going = new Map<string, number>()
+
+  /** Runs one request that records or auditions, which counts as going on until it answers. */
+  async function whileGoing<T>(kind: 'part' | 'character', id: string, run: () => Promise<T>) {
+    const key = `${kind}:${id}`
+    going.set(key, (going.get(key) ?? 0) + 1)
+    try {
+      return await run()
+    } finally {
+      const left = (going.get(key) ?? 1) - 1
+      if (left > 0) going.set(key, left)
+      else going.delete(key)
+    }
+  }
+
+  /** What is recording or auditioning now, which stops the models being changed; null if nothing. */
+  async function busyNow(): Promise<Busy | null> {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return null
+    const { parts } = opened.project.narration
+    const titleOf = (id: string) => parts.find((p) => p.id === id)?.title ?? id
+    const underway = (kind: 'part' | 'character') =>
+      [...going.keys()].find((key) => key.startsWith(`${kind}:`))?.slice(kind.length + 1)
+    const recording = jobs.active()[0] ?? spendLog.running()[0]?.part ?? underway('part')
+    if (recording !== undefined) return { kind: 'recording', name: titleOf(recording) }
+    const character = underway('character')
+    if (character === undefined) return null
+    const loaded = await loadProject(projectFile)
+    const name = loaded.ok ? loaded.summary.characters.find((c) => c.id === character)?.name : null
+    return { kind: 'auditioning', name: name ?? character }
+  }
 
   /** The account's remaining credit, or why it cannot be read. */
   async function creditOf(): Promise<CreditResult> {
@@ -617,15 +658,17 @@ export function startServer({
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
           try {
-            const result = await loggedOne(planned, part, admitted.budget, async () =>
-              recordLine(projectFile, part, key, fishFor, {
-                encode,
-                limiter: fishWork,
-                transcriber: await transcriberFor(),
-                stage: body.data.stage,
-                budget: admitted.budget,
-                language: languageOf(request),
-              }),
+            const result = await whileGoing('part', part, () =>
+              loggedOne(planned, part, admitted.budget, async () =>
+                recordLine(projectFile, part, key, fishFor, {
+                  encode,
+                  limiter: fishWork,
+                  transcriber: await transcriberFor(),
+                  stage: body.data.stage,
+                  budget: admitted.budget,
+                  language: languageOf(request),
+                }),
+              ),
             )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -899,12 +942,49 @@ export function startServer({
         }),
       },
       '/api/models': {
+        GET: guard(async () => {
+          const view = await modelsView(projectFile)
+          return Response.json(view.ok ? { ...view, busy: await busyNow() } : view)
+        }),
         PATCH: fromOwnPage(async (request) => {
           const body = ModelsBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
             return Response.json({ error: 'expected { takes }' }, { status: 400 })
           }
           const result = await switchRetiredModels(projectFile, body.data.takes)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/models/:stage': {
+        PUT: fromOwnPage(async (request) => {
+          const stage = StageParam.safeParse(request.params.stage)
+          if (!stage.success) return notFound()
+          const body = StageModelBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { model, was }' }, { status: 400 })
+          }
+          const busy = await busyNow()
+          if (busy) {
+            return Response.json(
+              {
+                ok: false,
+                problems: [
+                  {
+                    file: basename(projectFile),
+                    path: `narration.models.${stage.data}`,
+                    message: `${busy.name} is ${busy.kind}`,
+                  },
+                ],
+              },
+              { status: 409 },
+            )
+          }
+          const result = await setStageModel(
+            projectFile,
+            stage.data,
+            body.data.model,
+            body.data.was,
+          )
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
@@ -935,13 +1015,15 @@ export function startServer({
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
           try {
-            const result = await loggedOne(planned, part, admitted.budget, async () =>
-              takeLine(projectFile, part, key, fishFor, {
-                limiter: fishWork,
-                transcriber: await transcriberFor(),
-                budget: admitted.budget,
-                language: languageOf(request),
-              }),
+            const result = await whileGoing('part', part, () =>
+              loggedOne(planned, part, admitted.budget, async () =>
+                takeLine(projectFile, part, key, fishFor, {
+                  limiter: fishWork,
+                  transcriber: await transcriberFor(),
+                  budget: admitted.budget,
+                  language: languageOf(request),
+                }),
+              ),
             )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -984,14 +1066,8 @@ export function startServer({
           const body = CueBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { cue }' }, { status: 400 })
           const { part, key } = request.params
-          const result = await tryLine(
-            projectFile,
-            part,
-            key,
-            body.data.cue,
-            fishFor,
-            fishWork,
-            languageOf(request),
+          const result = await whileGoing('part', part, () =>
+            tryLine(projectFile, part, key, body.data.cue, fishFor, fishWork, languageOf(request)),
           )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
@@ -1017,28 +1093,30 @@ export function startServer({
           const { voice, board } = body.data
           const sitting = await sittingKey(id, request)
           const budget = board ? sittings.get(sitting) : undefined
-          const result = await recordTake(
-            projectFile,
-            id,
-            voice,
-            fishFor,
-            fishWork,
-            {
-              board,
-              budget,
-              open: () => budget !== undefined && sittings.get(sitting) === budget,
-              flight: (dollars) => {
-                if (!budget) return () => undefined
-                inFlight.set(budget, (inFlight.get(budget) ?? 0) + dollars)
-                return () => {
-                  const now = inFlight.get(budget)
-                  if (now !== undefined) inFlight.set(budget, Math.max(now - dollars, 0))
-                }
+          const result = await whileGoing('character', id, () =>
+            recordTake(
+              projectFile,
+              id,
+              voice,
+              fishFor,
+              fishWork,
+              {
+                board,
+                budget,
+                open: () => budget !== undefined && sittings.get(sitting) === budget,
+                flight: (dollars) => {
+                  if (!budget) return () => undefined
+                  inFlight.set(budget, (inFlight.get(budget) ?? 0) + dollars)
+                  return () => {
+                    const now = inFlight.get(budget)
+                    if (now !== undefined) inFlight.set(budget, Math.max(now - dollars, 0))
+                  }
+                },
+                charged: async (dollars) =>
+                  void (await recordSpent(projectFile, id, dollars, languageOf(request))),
               },
-              charged: async (dollars) =>
-                void (await recordSpent(projectFile, id, dollars, languageOf(request))),
-            },
-            languageOf(request),
+              languageOf(request),
+            ),
           )
           if (!result) return notFound()
           return Response.json(result, { status: 'problems' in result ? 409 : 200 })
@@ -1093,7 +1171,9 @@ export function startServer({
             endSitting(await sittingKey(id, request))
             sittings.set(await sittingKey(id, request), admitted)
           }
-          const started = await startAudition(projectFile, id, fishFor, languageOf(request))
+          const started = await whileGoing('character', id, () =>
+            startAudition(projectFile, id, fishFor, languageOf(request)),
+          )
           // An audition that did not start has no sitting.
           if (admitted && !started?.ok) endSitting(await sittingKey(id, request))
           return answer(id, Promise.resolve(started), { language: languageOf(request) })
@@ -1189,7 +1269,9 @@ export function startServer({
         POST: fromOwnPage((request) =>
           answer(
             request.params.id,
-            moreVoices(projectFile, request.params.id, fishFor, languageOf(request)),
+            whileGoing('character', request.params.id, () =>
+              moreVoices(projectFile, request.params.id, fishFor, languageOf(request)),
+            ),
             { language: languageOf(request) },
           ),
         ),
@@ -1200,9 +1282,15 @@ export function startServer({
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { id } = request.params
           const language = languageOf(request)
-          return answer(id, addVoiceById(projectFile, id, body.data.voice, fishFor, language), {
-            language,
-          })
+          return answer(
+            id,
+            whileGoing('character', id, () =>
+              addVoiceById(projectFile, id, body.data.voice, fishFor, language),
+            ),
+            {
+              language,
+            },
+          )
         }),
       },
       '/api/characters/:id/clone-voice': {

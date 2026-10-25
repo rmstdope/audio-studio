@@ -76,10 +76,11 @@ bundle breaks.
   `refreshDialog` command (the game's code, named in its project file) runs in the project root
   only when the user clicks Refresh dialog on the studio's page, and writes what the game writes.
   The studio runs nothing else of the consumer's.
-- The project file itself is read, and changed in three kinds of places only: the words that sound
+- The project file itself is read, and changed in four kinds of places only: the words that sound
   the same (`narration.quality.soundAlike`, and `narration.quality.soundAlikeByLanguage` for the
   other languages), saved from the Words that sound the same panel, `narration.models.draft` /
-  `final`, moved from `s1` to `s2.1-pro` when the user confirms the retirement banner, and
+  `final`, moved from `s1` to `s2.1-pro` when the user confirms the retirement banner,
+  `narration.models.audition` / `draft` / `final`, saved from the Models panel on Setup, and
   `narration.quality.fishTier`, saved from the menu on Setup's Requests at once row. Each save
   writes the whole file again in its own indentation and line endings (a hand-compacted object is
   written out).

@@ -1,5 +1,6 @@
 import { FISH_TIERS, type FishTier, type SetupCheck } from '../../../core/setup'
-import { useSetFishTier, useSetup } from '../../api'
+import { useModelsView, useSetFishTier, useSetup } from '../../api'
+import { ModelsPanel } from './ModelsPanel'
 import { AlertIcon, CheckIcon } from '../../components/icons'
 import { dollars } from '../../format'
 
@@ -15,6 +16,7 @@ const STATE: Record<SetupCheck['state'], string> = {
  */
 export function SetupView() {
   const setup = useSetup(true)
+  const models = useModelsView()
   return (
     <>
       <header className="page-header">
@@ -31,7 +33,7 @@ export function SetupView() {
             className="btn"
             type="button"
             disabled={setup.isFetching}
-            onClick={() => void setup.refetch()}
+            onClick={() => void Promise.all([setup.refetch(), models.refetch()])}
           >
             {setup.isFetching ? 'Checking…' : 'Check again'}
           </button>
@@ -44,29 +46,32 @@ export function SetupView() {
       ) : !setup.data.ok ? (
         <p className="panel muted">The project file cannot be read; fix it first.</p>
       ) : (
-        <ul className="setup-list">
-          {setup.data.checks.map((check) => (
-            <li key={check.id} className="panel setup-check">
-              <span className={`setup-state ${check.state}`}>
-                {check.state === 'ok' ? (
-                  <CheckIcon />
-                ) : check.state === 'problem' ? (
-                  <AlertIcon />
-                ) : null}
-                {STATE[check.state]}
-              </span>
-              <div className="setup-text">
-                <strong>{check.title}</strong>
-                <span className="muted">
-                  {check.detail}
-                  {check.credit !== undefined && ` ${dollars(check.credit)}`}
+        <>
+          <ModelsPanel />
+          <ul className="setup-list">
+            {setup.data.checks.map((check) => (
+              <li key={check.id} className="panel setup-check">
+                <span className={`setup-state ${check.state}`}>
+                  {check.state === 'ok' ? (
+                    <CheckIcon />
+                  ) : check.state === 'problem' ? (
+                    <AlertIcon />
+                  ) : null}
+                  {STATE[check.state]}
                 </span>
-                {check.tier && <TierMenu chosen={check.tier.chosen} />}
-                {check.fix && <code className="setup-fix mono">{check.fix}</code>}
-              </div>
-            </li>
-          ))}
-        </ul>
+                <div className="setup-text">
+                  <strong>{check.title}</strong>
+                  <span className="muted">
+                    {check.detail}
+                    {check.credit !== undefined && ` ${dollars(check.credit)}`}
+                  </span>
+                  {check.tier && <TierMenu chosen={check.tier.chosen} />}
+                  {check.fix && <code className="setup-fix mono">{check.fix}</code>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </>
   )

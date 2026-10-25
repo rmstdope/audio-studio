@@ -4,6 +4,14 @@ export const RETIRED_MODEL = 's1'
 /** The model Fish serves and bills in its place, at the same price. */
 export const REPLACEMENT_MODEL = 's2.1-pro'
 
+/**
+ * Whether a clip made with `made` is as good as one made with `now`: the same model, or `s1` and
+ * `s2.1-pro`, which Fish serves and bills as one from its retirement on.
+ */
+export function sameModel(made: string, now: string): boolean {
+  return made === now || (made === RETIRED_MODEL && now === REPLACEMENT_MODEL)
+}
+
 /** The first day on which `s1` is gone (1 January 2027, UTC). */
 const RETIRED_FROM = Date.UTC(2027, 0, 1)
 

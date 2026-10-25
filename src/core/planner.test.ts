@@ -348,3 +348,56 @@ describe('planPart, a blank source line', () => {
     expect(state.counts.untranslated).toBe(0)
   })
 })
+
+describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
+  const onS1 = { ...narration, models: { ...narration.models, draft: 's1', final: 's1' } }
+  const onS21 = {
+    ...narration,
+    models: { ...narration.models, draft: 's2.1-pro', final: 's2.1-pro' },
+  }
+  function madeOnS1(line: Line): LockEntry {
+    const inputs = clipInputs(line, cast.speakers[line.speaker], {}, cast.pronounce, onS1)!
+    const { fp, parts } = fingerprint(inputs)
+    return { fp, voice: inputs.voice, model: 's1', parts, at: 'then' }
+  }
+
+  it('keeps them up to date: Fish records s1 with s2.1-pro at the same price', () => {
+    const lock = { n1: madeOnS1(lines[0]!), m1: madeOnS1(lines[1]!) }
+    const state = planPart(input({ lock, narration: onS21 }))
+    expect(statuses(state)).toMatchObject({ n1: 'ok', m1: 'ok' })
+  })
+
+  it('still finds them stale when something else changed', () => {
+    const lock = { n1: madeOnS1(lines[0]!) }
+    const state = planPart(input({ lock, narration: onS21, cues: { n1: '[sad]' } }))
+    expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['cue'] })
+  })
+
+  it('finds a clip made with another model stale for the model', () => {
+    const other = {
+      ...narration,
+      models: { ...narration.models, draft: 's2-pro', final: 's2-pro' },
+    }
+    const inputs = clipInputs(lines[0]!, cast.speakers.narrator, {}, cast.pronounce, other)!
+    const { fp, parts } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', parts, at: 'then' } }
+    const state = planPart(input({ lock, narration: onS21 }))
+    expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['model'] })
+  })
+
+  it('names no model reason for an s1 clip that was the final recording', () => {
+    const split = {
+      ...narration,
+      models: { ...narration.models, draft: 's2.1-pro-free', final: 's2.1-pro' },
+    }
+    const wasS1 = {
+      ...narration,
+      models: { ...narration.models, draft: 's2.1-pro-free', final: 's1' },
+    }
+    const inputs = clipInputs(lines[0]!, cast.speakers.narrator, {}, cast.pronounce, wasS1, 's1')!
+    const { fp, parts } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's1', parts, at: 'then' } }
+    const state = planPart(input({ lock, narration: split, cues: { n1: '[sad]' } }))
+    expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['cue'] })
+  })
+})

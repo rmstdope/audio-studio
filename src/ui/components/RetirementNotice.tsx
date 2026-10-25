@@ -8,6 +8,7 @@ import {
 } from '../../core/retirement'
 import { useSwitchModels } from '../api'
 import { noticeReducer, startNotice } from '../retirementNotice'
+import { clearSwitched, useSwitchedTakes } from '../retirementSwitched'
 import { Confirm } from './Confirm'
 
 /** Text with the model names and the project file's name set in the mono face. */
@@ -72,6 +73,7 @@ export function RetirementNotice({
 }) {
   const [state, dispatch] = useReducer(noticeReducer, startNotice)
   const switching = useSwitchModels()
+  const switched = useSwitchedTakes()
   const switchButton = useRef<HTMLButtonElement>(null)
   const confirmButton = useRef<HTMLButtonElement>(null)
   const dismissButton = useRef<HTMLButtonElement>(null)
@@ -188,6 +190,23 @@ export function RetirementNotice({
     )
   }
 
+  // The last take left s1 through the Models panel: the same confirmation as the banner's switch.
+  if (takes.length === 0 && switched.length > 0) {
+    return (
+      <Box
+        kind="ok"
+        role="status"
+        heading="Switched to s2.1-pro"
+        actions={
+          <button className="btn btn-ghost" type="button" onClick={() => clearSwitched()}>
+            Dismiss
+          </button>
+        }
+      >
+        <Words text={doneWords(switched, file)} file={file} />
+      </Box>
+    )
+  }
   if (takes.length === 0) return null
   const words = bannerWords(takes, now)
   return (
