@@ -4,6 +4,7 @@ import { plural, tintFor, voiceLabel } from '../format'
 import { linesSummary, STATUS } from '../status'
 import { routeHref } from '../route'
 import { StatusBar } from './StatusBar'
+import { missingVoiceChips, type Language } from '../castLanguages'
 
 /** The badge a card shows: cast state first, then what needs doing. */
 function badgeFor(
@@ -30,6 +31,8 @@ export function CharacterCard({
   otherParts,
   counts,
   sharedVoice = false,
+  languages = [],
+  language,
 }: {
   character: CharacterSummary
   /** Lines in the part being shown, or across the project. */
@@ -40,6 +43,10 @@ export function CharacterCard({
   counts?: Partial<Record<LineStatus, number>>
   /** Another character is cast with the same voice. */
   sharedVoice?: boolean
+  /** The declared languages: a card adds a chip for each but the first with no voice for her. */
+  languages?: Language[]
+  /** The language the page the card is on shows, which Open keeps. */
+  language?: string
 }) {
   const cast = character.voice !== null
   const badge = badgeFor(cast, counts)
@@ -64,6 +71,11 @@ export function CharacterCard({
           Shared voice
         </span>
       )}
+      {missingVoiceChips(character, languages).map((chip) => (
+        <span key={chip} className="chip chip-warn">
+          {chip}
+        </span>
+      ))}
       {character.style ? (
         <span className="style-cue" title={character.style}>
           {character.style}
@@ -89,7 +101,11 @@ export function CharacterCard({
         ))}
         <a
           className="btn card-action"
-          href={routeHref({ view: 'character', character: character.id })}
+          href={routeHref({
+            view: 'character',
+            character: character.id,
+            ...(language ? { language } : {}),
+          })}
         >
           Open
         </a>
