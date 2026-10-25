@@ -83,6 +83,18 @@ export function linesSummary(counts: Partial<Record<LineStatus, number>>): strin
   return parts.length ? parts.join(' · ') : 'all up to date'
 }
 
+/**
+ * A character's lines in one part, as the character page shows them: `none recorded` when every
+ * line is uncast or untranslated (none can be recorded), `all up to date`, or how many are up to
+ * date.
+ */
+export function partLinesSummary(counts: Partial<Record<LineStatus, number>>): string {
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0)
+  const ok = counts.ok ?? 0
+  if ((counts.uncast ?? 0) + (counts.untranslated ?? 0) === total) return 'none recorded'
+  return ok === total ? 'all up to date' : `${ok} up to date`
+}
+
 /** How many of a speaker's lines have each status. */
 export function speakerCounts(
   lines: LineState[],
