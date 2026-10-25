@@ -10,9 +10,10 @@ import {
   STAGES,
   type Stage,
 } from '../../../core/models'
-import { failureBody } from '../../../core/retirement'
+import { failureBody, RETIRED_MODEL } from '../../../core/retirement'
 import { useModelsView, useSetStageModel, type ModelsAnswer } from '../../api'
 import { Confirm } from '../../components/Confirm'
+import { markSwitched } from '../../retirementSwitched'
 import { focusAfter, rowReducer, startRow } from '../../modelsRow'
 
 type View = Extract<ModelsAnswer, { ok: true }>
@@ -99,6 +100,8 @@ function StageRow({
   const confirm = useRef<HTMLButtonElement>(null)
   const retry = useRef<HTMLButtonElement>(null)
   const previous = useRef(state)
+  // The model the file named when the choice was made: a retry over a changed file asks again.
+  const startedFrom = useRef(view.models[stage])
   const now = new Date()
   const current = view.models[stage]
 
@@ -106,7 +109,7 @@ function StageRow({
     const target = focusAfter(previous.current, state)
     previous.current = state
     if (target === 'confirm') confirm.current?.focus()
-    else if (target === 'menu') menu.current?.focus()
+    else if (target === 'menu') requestAnimationFrame(() => menu.current?.focus())
     else if (target === 'retry') retry.current?.focus()
   }, [state])
 
@@ -114,7 +117,8 @@ function StageRow({
     save(to, current).then(
       (result) =>
         result.ok
-          ? dispatch({ type: 'saved' })
+          ? (stage !== 'audition' && current === RETIRED_MODEL && markSwitched(stage),
+            dispatch({ type: 'saved' }))
           : dispatch({ type: 'failed', reason: result.problems?.[0]?.message ?? 'refused' }),
       (error: Error) => dispatch({ type: 'failed', reason: error.message }),
     )
@@ -138,6 +142,7 @@ function StageRow({
   const pending = state.phase === 'saving' || state.phase === 'switching'
   const shown = state.phase === 'saving' ? state.to : current
   const options = modelOptions(stage, current, now)
+  const price = priceWords(shown, now, view.dialog)
   const change =
     state.phase === 'asking' || state.phase === 'switching' || state.phase === 'failed'
       ? changeOf(stage, state.to, view.models, view.recorded, now)
@@ -157,6 +162,7 @@ function StageRow({
             disabled={locked || pending || state.phase === 'asking'}
             onChange={(event) => {
               const to = event.target.value
+              startedFrom.current = current
               dispatch({
                 type: 'pick',
                 to,
@@ -164,35 +170,23 @@ function StageRow({
               })
             }}
           >
-            {options.some((o) => o.apart) ? (
-              <>
-                {options
-                  .filter((o) => !o.apart)
-                  .map((o) => (
-                    <option key={o.model} value={o.model}>
-                      {o.model} — {o.label}
-                    </option>
-                  ))}
-                <option disabled>──────────</option>
-                {options
-                  .filter((o) => o.apart)
-                  .map((o) => (
-                    <option key={o.model} value={o.model}>
-                      {o.model} — {o.label}
-                    </option>
-                  ))}
-              </>
-            ) : (
-              options.map((o) => (
+            {options
+              .filter((o) => !o.apart)
+              .map((o) => (
                 <option key={o.model} value={o.model}>
                   {o.model} — {o.label}
                 </option>
-              ))
-            )}
+              ))}
+            {options.some((o) => o.apart) && <option disabled>──────────</option>}
+            {options
+              .filter((o) => o.apart)
+              .map((o) => (
+                <option key={o.model} value={o.model}>
+                  {o.model} — {o.label}
+                </option>
+              ))}
           </select>
-          <span className={priceWords(shown, now, view.dialog) === 'Free' ? 'free' : 'price'}>
-            {priceWords(shown, now, view.dialog)}
-          </span>
+          <span className={price === 'Free' ? 'free' : 'price'}>{price}</span>
           {state.phase === 'saving' && <span className="muted">Saving…</span>}
         </div>
         {state.phase === 'asking' || state.phase === 'switching'
@@ -232,7 +226,9 @@ function StageRow({
                 ref={retry}
                 className="btn btn-primary"
                 type="button"
-                onClick={() => dispatch({ type: 'retry' })}
+                onClick={() =>
+                  dispatch({ type: startedFrom.current === current ? 'retry' : 'keep' })
+                }
               >
                 Try again
               </button>

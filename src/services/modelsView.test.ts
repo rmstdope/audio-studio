@@ -53,4 +53,32 @@ describe('modelsView', () => {
     const root = tempRepo({ 'audio-studio.json': '{' })
     expect(await modelsView(join(root, 'audio-studio.json'))).toMatchObject({ ok: false })
   })
+
+  it('counts every language’s lines once each', async () => {
+    const json = project(models)
+    const narration = json.narration as Record<string, unknown>
+    narration.languages = ['en', 'sv']
+    narration.paths = {
+      dialog: 'tts/{part}/{language}/script.json',
+      cues: 'tts/{part}/{language}/cues.json',
+      lock: 'tts/{part}/{language}/narration.lock.json',
+      clips: 'audio/{part}/{language}',
+      manifest: 'audio/{part}/{language}/manifest.json',
+    }
+    const root = tempRepo({
+      'audio-studio.json': json,
+      'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+      'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+      'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'En gång.' }],
+      'audio/act1/sv/a.mp3': 'x',
+      'audio/act1/sv/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
+      'tts/act1/sv/narration.lock.json': { a: entry('drama-3') },
+    })
+    const view = await modelsView(join(root, 'audio-studio.json'))
+    expect(view).toMatchObject({
+      ok: true,
+      dialog: { lines: 2 },
+      recorded: { 'drama-3': { lines: 1 } },
+    })
+  })
 })

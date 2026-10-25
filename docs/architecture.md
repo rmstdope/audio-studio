@@ -383,6 +383,10 @@ fp = sha256(json([
 ]))[:16]
 ```
 
+A clip made with `s1` counts as made with `s2.1-pro` (Fish serves and bills them as one):
+`fingerprintMatches` also accepts the fingerprint computed with `s1` when the project names
+`s2.1-pro`, and `staleReasons` names no model change between them.
+
 Pronunciations go into the hash through `spokenText`, not as the whole table. Adding
 `"Elior": "El-ee-or"` therefore marks only the lines that contain "Elior" as stale, not the whole
 act.
@@ -637,7 +641,7 @@ An audition is for a character, not for a part: the result applies to every part
   would cost (`GET /api/models`: the models, the dialog's lines and bytes over every part and
   language, the clips by the model they were made with, and what is recording or auditioning).
   A menu change is saved in `narration.models.<stage>` (`PUT /api/models/:stage`, `{ model, was }`:
-  the third kind of change the studio makes to the project file, the same careful way, refused
+  the fourth kind of change the studio makes to the project file, the same careful way, refused
   when the file's value differs from `was`, for a model with no price or for `s1`, and while
   anything is recording or auditioning). The audition model, and a draft or final change that
   makes no recorded line out of date, save at once; any other asks first (`changeOf` in
@@ -1038,7 +1042,7 @@ Small, independently useful increments:
       `audio-studio.json` for all four acts with the new extractor, every act's clips adopted,
       `.audio-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
       (`level.py` stays for the music).
-8. **Paid models**, in three pull requests:
+8. **Paid models**, in pull requests:
    1. **Prices and credit** (built): a dated price list (`core/prices.ts`, from Fish's pricing
       page; a promotion ends at its moment, so `drama-3` costs $10 until 2026-11-12 17:00 UTC and
       $50 after), plans priced when they are made, and the account's API credit
@@ -1049,7 +1053,9 @@ Small, independently useful increments:
       stays free); a paid job or line asks to "Pay up to $X" with a second click, X being the most
       it can cost, and the server refuses one without that confirmation or beyond the credit
       (`core/spend.ts`).
-   3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
+   3. **Choose the models** (built, as-3h4): the Models panel on Setup, which saves each stage's
+      model in the project file (§8.4, "Choose the stage models").
+   4. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
    What a paid account could still have (paid auditions, the `s1` retirement, your own voices) —
