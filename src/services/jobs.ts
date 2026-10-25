@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { MeasureResult, RecordResult } from './narration'
 
-/** What a job does to each line: record it, or measure its clip. */
-export type JobKind = 'record' | 'measure'
+/** What a job does to each line: record it, measure its clip, or check its weak clip again. */
+export type JobKind = 'record' | 'measure' | 'check'
 
 /** What doing one line gave. */
 export type StepResult = RecordResult | MeasureResult
@@ -19,8 +19,8 @@ export interface JobState {
   /** Lines finished: recorded, skipped or failed. */
   done: number
   /**
-   * Lines skipped: no longer needing recording (recorded meanwhile, adopted), or, when measuring,
-   * recorded again meanwhile.
+   * Lines skipped: no longer needing recording (recorded meanwhile, adopted), or, when measuring
+   * or checking again, no longer needing it (recorded, accepted or checked meanwhile).
    */
   skipped: number
   failed: { key: string; message: string }[]

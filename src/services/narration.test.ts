@@ -620,6 +620,23 @@ describe('measureLine', () => {
     expect(await heardFor(projectFile, 'act1', 'k4')).toMatchObject({ ok: true, heard: null })
   })
 
+  it('skips a line no longer weak when the job reaches it, if asked only when needed', async () => {
+    const half: Transcriber = {
+      transcribe: async () => [
+        { start: 0, end: 1, words: [{ word: 'Welcom', start: 0, end: 0.5 }] },
+      ],
+      close() {},
+    }
+    const { projectFile } = await recorded(half)
+    await acceptLine(projectFile, 'act1', 'k4')
+    const options = { ...measureOptions, again: true, onlyIfNeeded: true }
+    expect(await measureLine(projectFile, 'act1', 'k4', options)).toEqual({
+      ok: true,
+      key: 'k4',
+      skipped: true,
+    })
+  })
+
   it('checks again only a weak line: not one never checked, nor one accepted', async () => {
     const unchecked = await recorded()
     expect(

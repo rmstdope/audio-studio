@@ -101,8 +101,11 @@ const CueBody = z.object({ cue: z.string().max(1_000) }).strict()
  */
 const JobBody = z
   .object({
-    /** Record lines (default), or measure clips with Whisper without new audio. */
-    kind: z.enum(['record', 'measure']).default('record'),
+    /**
+     * Record lines (default), measure clips never checked, or check weak lines again: the last
+     * two with Whisper alone, without new audio.
+     */
+    kind: z.enum(['record', 'measure', 'check']).default('record'),
     /** Record with the draft model (default), or the final recording with the final one. */
     stage: z.enum(['draft', 'final']).default('draft'),
     /** Retake the weak lines among `keys` (only when the user ticked it). */
@@ -449,8 +452,11 @@ export function startServer({
           const { plan, parallel } = planned
           const shownKeys = new Set(body.data.keys)
           const shownOrphans = new Set(body.data.orphans)
-          const measuring = body.data.kind === 'measure'
-          const keys = (measuring ? plan.unmeasured : plan.keys).filter((key) => shownKeys.has(key))
+          const { kind } = body.data
+          // Measuring and checking again use Whisper alone: no new audio, nothing spent.
+          const measuring = kind !== 'record'
+          const offered = { record: plan.keys, measure: plan.unmeasured, check: plan.recheck }[kind]
+          const keys = offered.filter((key) => shownKeys.has(key))
           const orphans = measuring ? [] : plan.orphans.filter((key) => shownOrphans.has(key))
           if (!keys.length && !orphans.length) {
             return Response.json({ error: 'There is nothing to do.' }, { status: 409 })
@@ -480,7 +486,11 @@ export function startServer({
             parallel,
             record: async (key) =>
               measuring
-                ? measureLine(projectFile, part, key, { transcriber: await transcriberFor() })
+                ? measureLine(projectFile, part, key, {
+                    transcriber: await transcriberFor(),
+                    again: kind === 'check',
+                    onlyIfNeeded: true,
+                  })
                 : recordLine(projectFile, part, key, fishFor, {
                     encode,
                     limiter: fishWork,

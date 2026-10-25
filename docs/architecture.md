@@ -429,7 +429,8 @@ An audition is for a character, not for a part: the result applies to every part
    the server does only those that are still in its own fresh plan, and a line recorded meanwhile
    is skipped (as is one that became weak meanwhile, unless weak lines were to be retaken). Lines
    are recorded with `models.draft`. Up-to-date clips Whisper never checked can be measured
-   instead, without new audio (a job of kind `measure`).
+   instead, without new audio (a job of kind `measure`), and weak lines checked again with
+   today's rules (a job of kind `check`: Check N weak lines again on the Generate panel).
 3. **Generate** queues one job per line. For each line:
    1. build the spoken text and split it into sentence-sized chunks (`chunkLimit`);
    2. TTS each chunk (WAV), join them with a short gap;
@@ -501,7 +502,8 @@ An audition is for a character, not for a part: the result applies to every part
   scored before the rules improved is not weak once checked again. Whisper hears the clip as kept
   (the levelled MP3, decoded), not the take as Fish sent it, so its score and timings can move a
   little either way besides. Only weak lines are checked again (an accepted one is ok as it is).
-  Checking a part's weak lines at once waits for the next step.
+  A part's weak lines (or one character's) are checked again at once from the Generate panel (a
+  job of kind `check`).
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
@@ -548,8 +550,8 @@ phrase; one lookup, no search), `PATCH /api/characters/:id`
 `POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
 `{ confirmedCost }` on a paid model, else 409 with the ceiling to confirm),
 `GET /api/parts/:part/plan?speaker=&weak=1` (what generating would do, weak lines included if
-asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure, speaker, keys, orphans,
-retakeWeak }`: start a generation or a measuring, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
+asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
+retakeWeak }`: start a generation, a measuring or a checking again, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
 `GET`/`DELETE /api/jobs/:id` (progress, cancel).
 Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the audition model, voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE

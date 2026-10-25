@@ -13,6 +13,11 @@ export interface GenerationPlan {
    * none when takes are not checked.
    */
   unmeasured: string[]
+  /**
+   * Weak lines in scope, final or not, Whisper can check again without new audio (Check again);
+   * none when takes are not checked.
+   */
+  recheck: string[]
   /** In a final plan: clips up to date with the draft model, recorded again with the final one. */
   drafted: number
   /** Clips the studio has no record of (made before it), recorded again in a final plan. */
@@ -45,7 +50,7 @@ const encoder = new TextEncoder()
 /**
  * What generating would do, for the whole part or one speaker in it: record every missing and
  * stale line (and the weak ones, if asked), and offer to remove the orphans. Also lists the clips
- * that could be measured with Whisper without new audio.
+ * that could be measured with Whisper without new audio, and the weak lines it could check again.
  */
 export function planGeneration(
   state: { lines: LineState[]; orphans: Orphan[] },
@@ -109,6 +114,7 @@ export function planGeneration(
           .filter((line) => line.status === 'ok' && line.file && line.heard === null)
           .map((line) => line.key)
       : [],
+    recheck: checked ? lines.filter((line) => line.status === 'weak').map((line) => line.key) : [],
     missing: toRecord.filter((line) => line.status === 'missing').length,
     drafted: final
       ? toRecord.filter((line) => !line.final && (line.status === 'ok' || line.status === 'weak'))
