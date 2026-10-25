@@ -6,6 +6,8 @@ import {
   useOwnVoices,
   useRuledOut,
   useSessionAction,
+  useSitting,
+  useSittingActions,
   useTakes,
   type SessionAction,
 } from '../../api'
@@ -24,6 +26,8 @@ import { Confirm } from '../../components/Confirm'
 import { Failure } from '../../components/Failure'
 import { routeHref } from '../../route'
 import { voiceIdFrom } from '../../voiceId'
+import { SittingBox, sittingFailure } from './SittingBox'
+import { SittingMeter } from './SittingMeter'
 import { VoiceCard } from './VoiceCard'
 
 /** What the board is asking about before it acts: casting a voice, or stopping the audition. */
@@ -62,7 +66,9 @@ export function ShortlistBoard({
 }) {
   const { session, takes, audition } = view
   const act = useSessionAction(characterId)
-  const recorder = useTakes(characterId)
+  const sittingQuery = useSitting(characterId)
+  const recorder = useTakes(characterId, true)
+  const sittingActions = useSittingActions(characterId)
   const ruledOut = useRuledOut(characterId)
   const own = useOwnVoices(characterId)
   const [asking, setAsking] = useState<Asking>(null)
@@ -74,11 +80,18 @@ export function ShortlistBoard({
   // Every take is asked for once per phrase, so a take the cache cannot show is not asked again.
   const asked = useRef(new Set<string>())
   const onBoard = [...session.shortlist, ...session.yours, ...session.toHear]
-  const missing = audition
-    ? takesToRecord(onBoard, takes, recorder.recording, recorder.errors).filter(
-        (v) => !asked.current.has(`${audition.spoken}\n${v}`),
-      )
-    : []
+  // The money of a paid audition: takes wait for its sitting (a read of it, once known).
+  const money = sittingQuery.data?.ok ? sittingQuery.data : null
+  const paid = money?.paid ?? false
+  const sitting = money?.sitting ?? null
+  // Unknown money counts as free: the server refuses a paid take that has no sitting anyway.
+  const ready = !sittingQuery.isPending && (!paid || sitting !== null)
+  const missing =
+    audition && ready
+      ? takesToRecord(onBoard, takes, recorder.recording, recorder.errors).filter(
+          (v) => !asked.current.has(`${audition.spoken}\n${v}`),
+        )
+      : []
   useEffect(() => {
     for (const voice of missing) {
       asked.current.add(`${audition?.spoken}\n${voice}`)
@@ -87,6 +100,11 @@ export function ShortlistBoard({
     // `missing` is new on every render; what it holds is what matters.
   }, [missing.join(',')])
 
+  // Money added to the sitting: the voices that waited for it get their takes.
+  useEffect(() => {
+    if (sitting && !sitting.usedUp) recorder.retryWaiting()
+    // Only a change of the sitting's total is new money.
+  }, [sitting?.dollars])
   // The account's own voices are fetched when the board opens (a start, or a resume).
   useEffect(() => own.fetch(), [])
 
@@ -139,6 +157,7 @@ export function ShortlistBoard({
         recording={recorder.recording.has(id)}
         error={recorder.errors[id] ?? null}
         onRecord={() => void recorder.record(id)}
+        waiting={recorder.waiting.has(id)}
         listed={listed}
         actions={
           <>
@@ -206,6 +225,8 @@ export function ShortlistBoard({
         <a
           className="btn btn-ghost"
           href={routeHref({ view: 'character', character: characterId })}
+          // A paused audition keeps no money: Resume asks again.
+          onClick={() => sitting && sittingActions.end.mutate()}
         >
           Pause
         </a>
@@ -213,6 +234,31 @@ export function ShortlistBoard({
           Stop audition…
         </button>
       </div>
+
+      {money && paid && sitting && (
+        <SittingMeter
+          model={money.model}
+          money={sitting}
+          waiting={recorder.waiting.size}
+          suggested={money.suggested}
+          busy={sittingActions.add.isPending}
+          failure={sittingFailure(sittingActions.add.data)}
+          onAdd={(amount) => sittingActions.add.mutate(amount)}
+        />
+      )}
+      {money && paid && !sitting && (
+        // Reached without a sitting (the studio was closed meanwhile): it asks again.
+        <SittingBox
+          kind="resume"
+          view={money}
+          busy={sittingActions.resume.isPending}
+          failure={sittingFailure(sittingActions.resume.data)}
+          onPay={(amount) => sittingActions.resume.mutate(amount)}
+          onCancel={() => {
+            window.location.hash = routeHref({ view: 'character', character: characterId })
+          }}
+        />
+      )}
 
       {casting !== null && (
         // One per voice: asked about another voice, it opens (and comes into view) anew.

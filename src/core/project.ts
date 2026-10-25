@@ -23,16 +23,10 @@ export function phraseProblem(phrase: string, chunkLimit: number): string | null
 /** The file name the CLI looks for, walking up from the current directory. */
 export const PROJECT_FILE = 'audio-studio.json'
 
-/** The audition model: free only, for now (a paid audition would need its cost per round). */
-const auditionModel = z
-  .string()
-  .default(FREE_MODELS[0])
-  .refine((model) => (FREE_MODELS as readonly string[]).includes(model), {
-    error: (issue) =>
-      `"${String(issue.input)}" cannot be used for auditions yet: only ${FREE_MODELS.join(', ')} can`,
-  })
-
-/** A recording model: any whose price the studio knows, so a plan can say what it costs. */
+/**
+ * A model for a stage: any whose price the studio knows, so a plan can say what it costs. The
+ * audition stage may name a paid one too: its takes are then paid from a budget per sitting.
+ */
 const recordingModel = z
   .string()
   .default(FREE_MODELS[0])
@@ -89,7 +83,7 @@ const NarrationSchema = z
     }),
     refreshDialog: z.string().optional(),
     models: z
-      .object({ audition: auditionModel, draft: recordingModel, final: recordingModel })
+      .object({ audition: recordingModel, draft: recordingModel, final: recordingModel })
       .prefault({}),
     tts: z
       .object({

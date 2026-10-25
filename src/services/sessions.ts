@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import {
   AuditionSessionSchema,
   addVoice,
+  addSpent,
   bringMore,
   drop,
   placeOf,
@@ -15,6 +16,7 @@ import {
   type AuditionSession,
 } from '../core/audition'
 import { resolveInRoot } from '../core/paths'
+import { perTakeCost } from '../core/sitting'
 import type { Problem } from '../core/project'
 import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
@@ -24,7 +26,7 @@ import { characterFile, readJson, writeAtomic } from './files'
 import { NO_KEY } from './fish'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
-import { auditionTakes } from './takes'
+import { auditionFor, auditionTakes } from './takes'
 import {
   knownCharacter,
   loadPart,
@@ -439,4 +441,38 @@ function sessionFile(characterId: string): string {
 
 function sessionPath(projectFile: string, characterId: string): string {
   return resolveInRoot(dirname(projectFile), sessionFile(characterId))
+}
+
+/** What an audition's takes cost: the model, the price of a take of the phrase, and what was charged so far. */
+export type AuditionMoney =
+  { ok: true; model: string; perTake: number; spentBefore: number } | ProjectFailure | null
+
+/**
+ * What a board take of the character's current phrase costs on the audition model (nothing on a
+ * free one), and the dollars already charged to the audition in earlier sittings. Null for an
+ * unknown character.
+ */
+export async function auditionMoney(
+  projectFile: string,
+  characterId: string,
+): Promise<AuditionMoney> {
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
+  const { project, cast } = loaded
+  const model = project.narration.models.audition
+  const spentBefore = (await readSession(projectFile, characterId))?.spent ?? 0
+  if (!cast) return { ok: true, model, perTake: 0, spentBefore }
+  const { spoken } = auditionFor(cast, characterId, project)
+  const perTake = perTakeCost(model, new TextEncoder().encode(spoken).length, new Date()) ?? 0
+  return { ok: true, model, perTake, spentBefore }
+}
+
+/** Adds `dollars` charged for a take to the character's audition; nothing if none is going on. */
+export function recordSpent(
+  projectFile: string,
+  characterId: string,
+  dollars: number,
+): Promise<SessionResult> {
+  return changeSession(projectFile, characterId, (session) => addSpent(session, dollars))
 }

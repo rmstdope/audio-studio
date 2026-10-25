@@ -9,8 +9,8 @@ export type SpendProblem =
 /** Below this, a difference in dollars is rounding, not money (sums of per-piece prices). */
 const ROUNDING = 1e-9
 
-/** An amount in dollars, as messages write it. */
-function usd(amount: number): string {
+/** An amount in dollars, as messages and the page write it. */
+export function usd(amount: number): string {
   return `$${amount.toFixed(2)}`
 }
 
@@ -68,14 +68,21 @@ export interface Budget {
    * nothing is taken).
    */
   spend(model: string, bytes: number, at: Date): string | null
+  /** Adds `dollars` to what it was given and to what is left (a top-up). */
+  add(dollars: number): void
+  /** Gives back `dollars` of what a request cost that was not billed; what it was given stays. */
+  refund(dollars: number): void
 }
 
 /** A budget for `model` with `dollars` to spend (none, for the free model). */
 export function createBudget({ model, dollars }: { model: string; dollars: number }): Budget {
   let left = dollars
+  let given = dollars
   return {
     model,
-    dollars,
+    get dollars() {
+      return given
+    },
     get left() {
       return left
     },
@@ -91,6 +98,13 @@ export function createBudget({ model, dollars }: { model: string; dollars: numbe
       }
       left -= cost
       return null
+    },
+    add(extra) {
+      given += extra
+      left += extra
+    },
+    refund(back) {
+      left += back
     },
   }
 }

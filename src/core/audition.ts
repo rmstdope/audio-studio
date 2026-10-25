@@ -36,6 +36,8 @@ export const AuditionSessionSchema = z.object({
   voices: z.record(z.string(), VoiceSchema),
   /** The keywords each candidate matched. */
   matched: z.record(z.string(), z.array(z.string())),
+  /** Dollars charged to this audition's paid takes over all its sittings (an estimate at list price). */
+  spent: z.number().nonnegative().default(0),
 })
 
 /** An audition in progress for one character. */
@@ -72,6 +74,7 @@ export function startSession(options: {
     queue: ids.slice(perRound),
     voices,
     matched,
+    spent: 0,
   }
 }
 
@@ -212,4 +215,9 @@ export function seen(session: AuditionSession, voice: string): boolean {
     session.queue.includes(voice) ||
     session.current === voice
   )
+}
+
+/** The session with `dollars` more charged to its takes. */
+export function addSpent(session: AuditionSession, dollars: number): AuditionSession {
+  return dollars > 0 ? { ...session, spent: session.spent + dollars } : session
 }

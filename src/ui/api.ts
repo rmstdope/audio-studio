@@ -29,6 +29,8 @@ import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../services
 import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
+import type { SittingView } from '../core/sitting'
+import { takeCaches, waitingAfter } from './sitting'
 import { centsUp } from './format'
 import { isAbout, takeAnswerState, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
@@ -498,13 +500,17 @@ export function useSetCue(partId: string) {
 
 /**
  * Records audition takes: `record(voice)` asks the server for the take and adds it to the board
- * and the cast voice in the cache, without asking Fish for anything else. `recording` holds the
- * voices in progress, `errors` what went wrong per voice.
+ * and the cast voice in the cache, without asking Fish for anything else. `board` says the takes
+ * are the audition board's (on the audition model, paid from the sitting); the cast voice's on
+ * its page are on the free model; each goes only to its own cached answer (`takeCaches`). `recording` holds the voices in progress, `errors` what went
+ * wrong per voice, `waiting` the voices whose take waits for more money (`retryWaiting` asks for
+ * them again).
  */
-export function useTakes(characterId: string) {
+export function useTakes(characterId: string, board = false) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [waiting, setWaiting] = useState<Set<string>>(new Set())
 
   const record = useCallback(
     async (voice: string) => {
@@ -514,24 +520,35 @@ export function useTakes(characterId: string) {
         const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}/takes`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ voice }),
+          body: JSON.stringify({ voice, board }),
         })
         if (!response.ok && response.status !== 409) {
           throw new Error(`recording answered ${response.status}`)
         }
         const result = (await response.json()) as NonNullable<TakeResult>
         if (result.ok) {
-          client.setQueriesData<NonNullable<CharacterVoiceResult>>(
-            { queryKey: ['voice', characterId] },
-            (old) => (old?.ok ? withVoiceTake<Voiced>(old, voice, result) : old),
-          )
-          client.setQueryData<SessionView>(['session', characterId], (old) =>
-            old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,
-          )
+          setWaiting((now) => waitingAfter(now, voice, 'recorded'))
+          const caches = takeCaches(board)
+          if (caches.voice) {
+            client.setQueriesData<NonNullable<CharacterVoiceResult>>(
+              { queryKey: ['voice', characterId] },
+              (old) => (old?.ok ? withVoiceTake<Voiced>(old, voice, result) : old),
+            )
+          }
+          if (caches.session) {
+            client.setQueryData<SessionView>(['session', characterId], (old) =>
+              old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,
+            )
+          }
+        } else if ('reason' in result && result.reason === 'waits') {
+          setWaiting((now) => waitingAfter(now, voice, 'waits'))
         } else {
+          setWaiting((now) => waitingAfter(now, voice, 'failed'))
           const message = 'message' in result ? result.message : 'the project’s files need fixing'
           setErrors((now) => ({ ...now, [voice]: message }))
         }
+        // A paid take spent money: the meter reads it again.
+        if (board) void client.invalidateQueries({ queryKey: ['sitting', characterId] })
       } catch (error) {
         setErrors((now) => ({
           ...now,
@@ -545,10 +562,14 @@ export function useTakes(characterId: string) {
         })
       }
     },
-    [characterId, client],
+    [board, characterId, client],
   )
 
-  return { record, recording, errors }
+  const retryWaiting = useCallback(() => {
+    for (const voice of waiting) void record(voice)
+  }, [record, waiting])
+
+  return { record, recording, errors, waiting, retryWaiting }
 }
 
 /** A character's audition in progress, with the phrase and the takes of the voices in it. */
@@ -604,6 +625,10 @@ export function useSessionAction(characterId: string) {
         )
       }
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
+      // Starting opens a sitting, stopping ends it.
+      if (action === 'start' || action === 'discard') {
+        void client.invalidateQueries({ queryKey: ['sitting', characterId] })
+      }
       // An answer without the recorded lines (after a move on the board) keeps the ones shown;
       // takes recorded while the answer was on its way are kept too.
       client.setQueryData<SessionView>(['session', characterId], (old) => {
@@ -690,6 +715,7 @@ export function useCast(characterId: string) {
       void client.invalidateQueries({ queryKey: ['project'] })
       void client.invalidateQueries({ queryKey: ['part'] })
       void client.invalidateQueries({ queryKey: ['voice', characterId] })
+      void client.invalidateQueries({ queryKey: ['sitting', characterId] })
     },
   })
 }
@@ -860,6 +886,59 @@ export function useLineTakeActions(partId: string, key: string) {
     onSuccess: reloadTakes,
   })
   return { take, use, drop, refused, toConfirm, refusal, cancel: () => setToConfirm(null) }
+}
+
+/** The money of a character's audition, or why it cannot be shown. */
+export type SittingAnswer =
+  ({ ok: true } & SittingView) | { ok: false; message?: string; problems?: Problem[] }
+
+/**
+ * The audition model, what a take costs and the sitting's money for a character. Read from the
+ * server alone (no Fish call), and again after every paid take and every change to the sitting.
+ */
+export function useSitting(characterId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['sitting', characterId],
+    queryFn: () =>
+      getJson<SittingAnswer>(`/api/auditions/${encodeURIComponent(characterId)}/sitting`),
+    enabled,
+  })
+}
+
+/**
+ * Changes a character's sitting: `resume` opens a fresh one with an amount, `add` tops the one
+ * going on up, `end` ends it (Pause). Each answers with the sitting's money, or why it was refused.
+ */
+export function useSittingActions(characterId: string) {
+  const client = useQueryClient()
+  const base = `/api/auditions/${encodeURIComponent(characterId)}/sitting`
+  const send = async (method: string, path: string, amount?: number) => {
+    const response = await fetch(path, {
+      method,
+      headers: amount === undefined ? {} : { 'content-type': 'application/json' },
+      body: amount === undefined ? undefined : JSON.stringify({ amount }),
+    })
+    if (!response.ok && response.status !== 409) {
+      throw new Error(`the sitting answered ${response.status}`)
+    }
+    return (await response.json()) as SittingAnswer
+  }
+  const options = {
+    scope: { id: `sitting-${characterId}` },
+    onSuccess: (answer: SittingAnswer) => {
+      if (answer.ok) client.setQueryData<SittingAnswer>(['sitting', characterId], answer)
+    },
+  }
+  const resume = useMutation({
+    ...options,
+    mutationFn: (amount: number) => send('POST', base, amount),
+  })
+  const add = useMutation({
+    ...options,
+    mutationFn: (amount: number) => send('POST', `${base}/add`, amount),
+  })
+  const end = useMutation({ ...options, mutationFn: () => send('DELETE', base) })
+  return { resume, add, end }
 }
 
 /** The URL of a recorded audition take. */
