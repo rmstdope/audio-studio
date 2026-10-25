@@ -20,18 +20,19 @@ export async function setNote(
   partId: string,
   key: string,
   note: string,
+  language?: string,
 ): Promise<NoteChange> {
   return inPartTurn(projectFile, partId, async () => {
-    const part = await readPart(projectFile, partId)
+    const part = await readPart(projectFile, partId, language)
     if (!part || !part.ok) return part
     if (!part.input.lines.some((l) => l.key === key)) return null
     const root = dirname(projectFile)
-    const { notes: before, problem } = await readNotes(root, partId)
+    const { notes: before, problem } = await readNotes(root, part.cacheName)
     // Never written over: a broken file may hold notes the user wrote.
     if (problem) return { ok: false, problems: [problem] }
     const next = withNote(before, key, note)
     if (next !== before) {
-      const file = characterFile(NOTES_DIR, partId)
+      const file = characterFile(NOTES_DIR, part.cacheName)
       if (Object.keys(next.lines).length) {
         await writeAtomic(root, file, `${JSON.stringify(next, null, 1)}\n`)
       } else {

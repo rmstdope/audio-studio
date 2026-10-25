@@ -224,6 +224,20 @@ export function declaredLanguage(
     : narration.languages[0]!
 }
 
+/**
+ * What names a part's own files in the tool cache (its notes, what Whisper heard) in a language:
+ * the part's id for the source language, which keeps the names it always had, else the id with the
+ * language.
+ */
+export function partCacheName(
+  narration: Pick<Project['narration'], 'languages'>,
+  partId: string,
+  asked: string | undefined,
+): string {
+  const language = declaredLanguage(narration, asked)
+  return language === narration.languages[0] ? partId : `${partId}\0${language}`
+}
+
 /** Something wrong with a file the studio reads: which file, where in it, and what. */
 export interface Problem {
   file: string

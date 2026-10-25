@@ -18,16 +18,17 @@ export type HeardResult = { ok: true; heard: HeardLine | null } | ProjectFailure
  */
 export async function keepHeard(
   projectFile: string,
-  partId: string,
+  /** What names the part's file in the cache: the part's id, with the language besides the source. */
+  name: string,
   key: string,
   line: HeardLine | null,
 ): Promise<void> {
-  const before = await read(projectFile, partId)
+  const before = await read(projectFile, name)
   const next = withHeard(before, key, line)
   if (next === before) return
   const root = dirname(projectFile)
   // Any part id makes a safe file name this way, as any character id does.
-  const file = characterFile(HEARD_DIR, partId)
+  const file = characterFile(HEARD_DIR, name)
   if (Object.keys(next.lines).length) {
     await writeAtomic(root, file, `${JSON.stringify(next, null, 1)}\n`)
   } else {
@@ -43,26 +44,27 @@ export async function heardFor(
   projectFile: string,
   partId: string,
   key: string,
+  language?: string,
 ): Promise<HeardResult> {
   return inPartTurn(projectFile, partId, async () => {
-    const part = await readPart(projectFile, partId)
+    const part = await readPart(projectFile, partId, language)
     if (!part || !part.ok) return part
     if (!part.input.lines.some((l) => l.key === key)) return null
-    const kept = (await read(projectFile, partId)).lines
+    const kept = (await read(projectFile, part.cacheName)).lines
     const line = Object.hasOwn(kept, key) ? kept[key]! : null
     return { ok: true, heard: line && part.input.lock[key]?.at === line.at ? line : null }
   })
 }
 
 /** What was kept for a part; nothing if there is no file, or it does not fit (a hand edit). */
-async function read(projectFile: string, partId: string): Promise<Heard> {
+async function read(projectFile: string, name: string): Promise<Heard> {
   const { value } = await readCached(
     dirname(projectFile),
     HEARD_DIR,
-    partId,
+    name,
     HeardSchema,
-    emptyHeard(partId),
-    (heard) => heard.part === partId,
+    emptyHeard(name),
+    (heard) => heard.part === name,
   )
   return value
 }

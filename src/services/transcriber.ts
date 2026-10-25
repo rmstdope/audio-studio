@@ -3,8 +3,11 @@ import type { HeardSegment } from '../core/align'
 
 /** Hears what a clip says. Behind an interface, so tests use a fake. */
 export interface Transcriber {
-  /** What Whisper (`model`) heard in the audio file at `path` (WAV or MP3): segments, word timings. */
-  transcribe(model: string, path: string): Promise<HeardSegment[]>
+  /**
+   * What Whisper (`model`) heard in the audio file at `path` (WAV or MP3): segments, word timings.
+   * `language` is the code of the language spoken; without it Whisper recognises it itself.
+   */
+  transcribe(model: string, path: string, language?: string): Promise<HeardSegment[]>
   /** Stops the worker, if one is running. */
   close(): void
 }
@@ -98,7 +101,7 @@ export function createWhisperWorker({
   }
 
   return {
-    transcribe(model, path) {
+    transcribe(model, path, language) {
       if (!worker) {
         try {
           worker = start()
@@ -129,7 +132,9 @@ export function createWhisperWorker({
             reject(error)
           },
         })
-        current.proc.stdin.write(`${JSON.stringify({ id, path, model })}\n`)
+        current.proc.stdin.write(
+          `${JSON.stringify({ id, path, model, ...(language ? { language } : {}) })}\n`,
+        )
         void current.proc.stdin.flush()
       })
     },

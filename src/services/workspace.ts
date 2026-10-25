@@ -8,6 +8,7 @@ import {
   PROJECT_FILE,
   ProjectSchema,
   declaredLanguage,
+  partCacheName,
   partPathFor,
   problemsFrom,
   type Part,
@@ -161,15 +162,16 @@ export const NOTES_DIR = '.audio-studio/notes'
  */
 export async function readNotes(
   root: string,
-  partId: string,
+  /** What names the notes in the cache: the part's id, with the language besides the source. */
+  name: string,
 ): Promise<{ notes: Notes; problem: Problem | null }> {
   const { value, broken, path } = await readCached(
     root,
     NOTES_DIR,
-    partId,
+    name,
     NotesSchema,
-    emptyNotes(partId),
-    (notes) => notes.part === partId,
+    emptyNotes(name),
+    (notes) => notes.part === name,
   )
   const problem = broken
     ? {
@@ -242,7 +244,7 @@ export async function loadPart(
       total,
     })
   }
-  const notes = await readNotes(dirname(projectFile), part.id)
+  const notes = await readNotes(dirname(projectFile), read.cacheName)
   return {
     ok: true,
     part: {
@@ -318,6 +320,10 @@ export interface PartRead {
   ok: true
   /** The language read: the one asked for if the project declares it, else the source language. */
   language: string
+  /** What names the part's own files in the tool cache in this language (notes, what was heard). */
+  cacheName: string
+  /** The language Whisper is told the clips are in: only in a project with several languages. */
+  hearIn: string | undefined
   project: Project
   part: Part
   dialog: DialogState
@@ -388,6 +394,8 @@ export async function readPart(
   return {
     ok: true,
     language,
+    cacheName: partCacheName(project.narration, part.id, language),
+    hearIn: project.narration.languages.length > 1 ? language : undefined,
     project,
     part,
     dialog,

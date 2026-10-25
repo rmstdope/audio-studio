@@ -4,7 +4,7 @@
 # ///
 """Audio Studio's Whisper worker: transcribes clips with mlx-whisper, the model loaded once.
 
-Reads one JSON request per line on stdin: {"id": "...", "path": "clip.wav", "model": "..."}.
+Reads one JSON request per line on stdin: {"id": "...", "path": "clip.wav", "model": "...", "language": "sv"}; the language is optional.
 Writes one JSON answer per line on stdout: {"id": "...", "segments": [{start, end, words:
 [{word, start, end}]}]} or {"id": "...", "error": "..."}. Anything the libraries print goes to
 stderr, so stdout carries only answers. Same Whisper as RetroQuest's narrate.py.
@@ -34,7 +34,12 @@ for line in sys.stdin:
     request = json.loads(line)
     try:
         result = mlx_whisper.transcribe(
-            request["path"], path_or_hf_repo=request["model"], word_timestamps=True, verbose=None
+            request["path"],
+            path_or_hf_repo=request["model"],
+            word_timestamps=True,
+            verbose=None,
+            # The language spoken when the studio knows it; else Whisper recognises it itself.
+            **({"language": request["language"]} if request.get("language") else {}),
         )
         segments = [
             {
