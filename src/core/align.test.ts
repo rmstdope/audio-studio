@@ -756,3 +756,35 @@ describe('alignWords, in any alphabet', () => {
     expect(align('Jag har två mynt.', 'Jag har two mynt.', 'sv').missed).toEqual([2])
   })
 })
+
+describe('alignWords, names and number words in any alphabet', () => {
+  const heardAs = (line: string) =>
+    words(...line.split(' ').map((w, i): [string, number, number] => [w, i, i + 0.5]))
+  const align = (shown: string, heard: string, language = 'en', names = new Set<string>()) =>
+    alignWords(shown.split(' '), heardAs(heard), 9, undefined, names, soundAlikes([], language))
+
+  it('never takes a capitalised number word for a name one letter off', () => {
+    expect(align('Now comes Act Three.', 'Now comes Act Tree.').missed).toEqual([3])
+    expect(align('Then Seven rode out.', 'Then Steven rode out.').missed).toEqual([1])
+    expect(align('Dann kam Vier allein.', 'Dann kam Bier allein.', 'de').missed).toEqual([2])
+  })
+
+  it('takes a name outside a to z one letter off for the name, as in English', () => {
+    expect(align('Där är Åsana nu.', 'Där är Osana nu.', 'sv', new Set(['åsana'])).ratio).toBe(1)
+    expect(align('Вот Лирия идёт.', 'Вот Лирья идёт.', 'ru', new Set(['лирия'])).ratio).toBe(1)
+    expect(align('Вот лирия идёт.', 'Вот лирья идёт.', 'ru').missed).toEqual([1])
+  })
+
+  it('knows the common other forms of a number word', () => {
+    expect(align('Jag har en krona.', 'Jag har 1 krona.', 'sv').ratio).toBe(1)
+    expect(align('Jag har tjugoen kronor.', 'Jag har 21 kronor.', 'sv').ratio).toBe(1)
+    expect(align('Дай мне одну монету.', 'Дай мне 1 монету.', 'ru').ratio).toBe(1)
+    expect(align('Нет трёх монет.', 'Нет 3 монет.', 'ru').ratio).toBe(1)
+    expect(align('Μιας ώρας δρόμος.', '1 ώρας δρόμος.', 'el').ratio).toBe(1)
+  })
+
+  it('takes ё and е as one, as Russian is written both ways', () => {
+    expect(align('Он идёт домой.', 'Он идет домой.', 'ru').ratio).toBe(1)
+    expect(align('Он идет домой.', 'Он идёт домой.', 'ru').ratio).toBe(1)
+  })
+})

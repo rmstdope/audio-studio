@@ -1,4 +1,4 @@
-import { numberWords } from './numbers'
+import { baseLanguage, numberWords } from './numbers'
 import { SOUND_ALIKE } from './soundAlike'
 import { spokenText } from './spoken'
 
@@ -24,8 +24,10 @@ export interface HeardSegment {
 }
 
 /**
- * A word without case or punctuation (narrate.py `_plain`), in any alphabet: letters and their
- * marks ("får" is not "för", "Да" is a word) and digits are kept, composed as one (NFC). Apostrophes stay inside a word
+ * A word without case or punctuation (narrate.py `_plain`), for comparison, in any alphabet:
+ * letters and their marks ("får" is not "för", "Да" is a word) and digits are kept, composed as
+ * one (NFC), with Russian ё as е, as it is often written. Numbers are matched as words that sound
+ * the same (see `soundAlikes`), not here. Apostrophes stay inside a word
  * ("don't") but not at its ends, where they are single quotes around speech ("'You",
  * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. A possessive
  * is one word however it is written, since Whisper cannot hear which: "Sorceress's" and
@@ -37,21 +39,13 @@ function plain(word: string): string {
     .normalize('NFC')
     .toLowerCase()
     .replace(/&/g, 'and')
+    .replace(/ё/g, 'е')
     .replace(/[^\p{L}\p{M}\p{N}']/gu, '')
     .replace(/^'+|'+$/g, '')
     .replace(/s?'s$/, 's')
 }
 
-/**
- * A word for comparison: plain (narrate.py `_norm`, which also wrote English "one" to "twelve" as
- * digits; numbers are now matched as words that sound the same, in the line's language: see
- * `soundAlikes`).
- */
-function norm(word: string): string {
-  return plain(word)
-}
-
-/** Words matched as one, as they sound the same: each word (as `norm` gives it) → its group's. */
+/** Words matched as one, as they sound the same: each word (as `plain` gives it) → its group's. */
 export type SoundAlike = ReadonlyMap<string, string>
 
 /**
@@ -59,24 +53,26 @@ export type SoundAlike = ReadonlyMap<string, string>
  * since Whisper writes "20" for "twenty" (`numberWords`), the built-in English groups
  * (`SOUND_ALIKE`) in English only, and `extra` ones (a project's `quality.soundAlike`), groups
  * that share a word joined into one ("two", "2", "to" and "too"). Each word maps to one word of
- * its group, the same for all, as `norm` writes them.
+ * its group, the same for all, as `plain` writes them.
  */
 export function soundAlikes(
   extra: readonly (readonly string[])[] = [],
   language = 'en',
 ): SoundAlike {
-  const english = language.split('-')[0]!.toLowerCase() === 'en'
+  const english = baseLanguage(language) === 'en'
   const parent = new Map<string, string>()
   const root = (word: string): string => {
     const up = parent.get(word) ?? word
     return up === word ? word : root(up)
   }
   for (const group of [...numberWords(language), ...(english ? SOUND_ALIKE : []), ...extra]) {
-    const [first, ...rest] = group.map(norm).filter(Boolean).map(american)
+    const [first, ...rest] = group.map(plain).filter(Boolean).map(american)
     if (!first) continue
     for (const word of rest) {
       const [a, b] = [root(first), root(word)]
-      if (a !== b) parent.set(b, a)
+      // A number's digits lead its group, so a number word is known as one (see `spelledAlike`).
+      if (a !== b && /^\d+$/.test(b)) parent.set(a, b)
+      else if (a !== b) parent.set(b, a)
     }
   }
   return new Map([...parent.keys()].map((word) => [word, root(word)]))
@@ -84,19 +80,19 @@ export function soundAlikes(
 
 const BUILT_IN = soundAlikes()
 
-/** A word as it is matched exactly: `norm`, then the word of its sound-alike group, if any. */
+/** A word as it is matched exactly: `plain`, then the word of its sound-alike group, if any. */
 function key(word: string, alike: SoundAlike): string {
-  return grouped(norm(word), alike)
+  return grouped(plain(word), alike)
 }
 
-/** A word as `norm` gives it, spelled the American way, as the word of its sound-alike group. */
+/** A word as `plain` gives it, spelled the American way, as the word of its sound-alike group. */
 function grouped(word: string, alike: SoundAlike): string {
   const us = american(word)
   return alike.get(us) ?? us
 }
 
 /**
- * A word as `norm` gives it, with the British spellings Whisper writes the American way spelled
+ * A word as `plain` gives it, with the British spellings Whisper writes the American way spelled
  * so: -our as -or after two letters or more ("colour", "odours", "armoury"; not "our", "your",
  * "four"), -re as -er after a consonant ("centre", "sombre"; not "were", "fire", nor "timbre",
  * which is not "timber"), a doubled l after a or e with another vowel before, before -er, -ed,
@@ -214,12 +210,12 @@ export function knownNames(cast: {
 
 /** A word plain, without a possessive 's: what a name is looked up by ("Aren's" is "aren"). */
 function bare(word: string): string {
-  return norm(word.replace(/'s(?=[^A-Za-z0-9]*$)/i, ''))
+  return plain(word.replace(/'s(?=[^A-Za-z0-9]*$)/i, ''))
 }
 
 /** Whether a plain word is letters and apostrophes only, `min` letters or more. */
 function isWord(word: string, min = 0): boolean {
-  return /^[a-z']+$/.test(word) && word.replace(/'/g, '').length >= min
+  return /^[\p{L}\p{M}']+$/u.test(word) && word.replace(/'/g, '').length >= min
 }
 
 /** Whether two words are one letter apart: one added, removed or changed. */
@@ -268,8 +264,9 @@ function soundOf(word: string): string {
  * 's not counted) and nothing else, and the heard one is one letter apart, as spelled or as they
  * sound (`soundOf`, where that leaves four letters), or, for a known name heard as one word
  * Whisper wrote as a name (`asName`), only its vowels other as they sound (`vowelsApart`).
- * Lowercase words, short ones and numbers are left out, where one letter makes another word
- * ("never" and "ever", "was" and "has", 1984 and 1985).
+ * Lowercase words, short ones and numbers, in digits or in words ("Three" is no "Tree"), are left
+ * out, where one letter makes another word ("never" and "ever", "was" and "has", 1984 and 1985).
+ * Letters of any alphabet count; the rules of `soundOf` and `vowelsApart` are English spellings.
  */
 function spelledAlike(
   shown: string,
@@ -277,10 +274,13 @@ function spelledAlike(
   said: string,
   got: string,
   names: ReadonlySet<string>,
+  alike: SoundAlike,
   asName = false,
 ): boolean {
-  const want = norm(said)
-  if (!capitalised(shown) || !/[a-z]/.test(shown)) return false
+  const want = plain(said)
+  if (!capitalised(shown) || !/\p{Ll}/u.test(shown)) return false
+  // A number word ("Three", "Vier") is no name: its group leads with its digits.
+  if (/^\d+$/.test(grouped(want, alike))) return false
   const known = names.has(bare(shown))
   if (atStart && !known) return false
   if (!isWord(bare(said), 4) || !isWord(want) || !isWord(got)) return false
@@ -294,7 +294,7 @@ function spelledAlike(
 
 /** Whether a word starts with a capital, past any quotes or brackets. */
 function capitalised(word: string): boolean {
-  return /^[^A-Za-z0-9]*[A-Z]/.test(word)
+  return /^[^\p{L}\p{N}]*\p{Lu}/u.test(word)
 }
 
 /**
@@ -338,11 +338,11 @@ interface Piece {
  * other parts than shown is one part, as said.
  */
 function piecesOf(tokens: string[], said: string[], from: number, to: number): Piece[] {
-  const partsOf = (word: string) => word.split(JOINS).filter((part) => norm(part))
+  const partsOf = (word: string) => word.split(JOINS).filter((part) => plain(part))
   const piece = (token: number, shown: string, word: string, atStart: boolean): Piece => ({
     token,
     shown,
-    want: norm(word),
+    want: plain(word),
     said: word,
     spelled: plain(word),
     atStart,
@@ -367,7 +367,7 @@ function piecesOf(tokens: string[], said: string[], from: number, to: number): P
  */
 function heardParts(heard: HeardWord[]): HeardWord[] {
   return heard.flatMap((w) => {
-    const parts = w.word.split(JOINS).filter((part) => norm(part))
+    const parts = w.word.split(JOINS).filter((part) => plain(part))
     const step = (w.end - w.start) / parts.length
     return parts.map((word, k) => ({
       word,
@@ -384,18 +384,13 @@ function heardParts(heard: HeardWord[]): HeardWord[] {
  * run apart ("week ly" for "weakly"); 0 if none do.
  */
 function spelledBy(word: string, words: string[], alike: SoundAlike): number {
-  const sound = sounded(word, alike)
+  const sound = grouped(word, alike)
   let spelled = words[0] ?? ''
   for (let n = 2; n <= words.length; n++) {
     spelled += words[n - 1]
-    if (sounded(spelled, alike) === sound) return n
+    if (grouped(spelled, alike) === sound) return n
   }
   return 0
-}
-
-/** Words run together, as `plain` gives them, as they are matched: grouped ("twentyone" is 21). */
-function sounded(spelled: string, alike: SoundAlike): string {
-  return grouped(spelled, alike)
 }
 
 /**
@@ -420,17 +415,20 @@ function alignGap(
   // in its place one letter off, word for word; and, unlike narrate.py, a word pronounced otherwise
   // that Whisper wrote as shown ("II" for "Act II:" said "Act Two:").
   const shownWords: number[] = []
-  for (let i = from; i < to; i++) if (norm(said[i]!)) shownWords.push(i)
+  for (let i = from; i < to; i++) if (plain(said[i]!)) shownWords.push(i)
   const written = heard.map((w) => w.word.trim())
   const heardWords: number[] = []
-  for (let j = hFrom; j < hTo; j++) if (norm(heard[j]!.word)) heardWords.push(j)
+  for (let j = hFrom; j < hTo; j++) if (plain(heard[j]!.word)) heardWords.push(j)
   if (shownWords.length === heardWords.length) {
     shownWords.forEach((i, k) => {
       const w = heard[heardWords[k]!]!
       const atStart = startsSentence(tokens, i)
-      const asShown = norm(w.word) === norm(tokens[i]!)
+      const asShown = plain(w.word) === plain(tokens[i]!)
       const asName = writtenAsName(written, heardWords[k]!)
-      if (asShown || spelledAlike(tokens[i]!, atStart, said[i]!, norm(w.word), names, asName)) {
+      if (
+        asShown ||
+        spelledAlike(tokens[i]!, atStart, said[i]!, plain(w.word), names, alike, asName)
+      ) {
         times[i] = [w.start, w.end]
       }
     })
@@ -443,7 +441,7 @@ function alignGap(
   if (!pieces.length || !parts.length) return
   // Sound-alikes are one where parts match exactly or are run together; a name is guessed from
   // what Whisper wrote.
-  const heardNorm = parts.map((w) => norm(w.word))
+  const heardNorm = parts.map((w) => plain(w.word))
   const want = pieces.map((p) => grouped(p.want, alike))
   const got = heardNorm.map((w) => grouped(w, alike))
   const gotSpelled = parts.map((w) => plain(w.word))
@@ -477,7 +475,7 @@ function alignGap(
     }
     // A phrase heard as another phrase that sounds as it does ("Leer ia" as "Lee ria").
     for (let i = 2; i <= Math.min(4, sTo - s); i++) {
-      const shownRun = sounded(
+      const shownRun = grouped(
         pieces
           .slice(s, s + i)
           .map((p) => p.spelled)
@@ -485,7 +483,7 @@ function alignGap(
         alike,
       )
       for (let j = 2; j <= Math.min(4, hTo - h); j++) {
-        if (sounded(gotSpelled.slice(h, h + j).join(''), alike) !== shownRun) continue
+        if (grouped(gotSpelled.slice(h, h + j).join(''), alike) !== shownRun) continue
         const [start, end] = [parts[h]!.start, parts[h + j - 1]!.end]
         const step = (end - start) / i
         const apply = () => {
@@ -499,7 +497,8 @@ function alignGap(
     const piece = pieces[s]!
     const spelled = heardNorm.slice(h, h + n).join('')
     const asName = n === 1 && writtenAsName(partsWritten, hFrom + h)
-    if (!spelledAlike(piece.shown, piece.atStart, piece.said, spelled, names, asName)) return null
+    if (!spelledAlike(piece.shown, piece.atStart, piece.said, spelled, names, alike, asName))
+      return null
     return { shown: 1, heard: n, apply: () => take(s, h, h + n - 1) }
   }
 

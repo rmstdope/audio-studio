@@ -1,6 +1,6 @@
 /**
  * How a language writes the numbers 0 to 99 in words: the words for 0 to 19 (some numbers in
- * several forms, by gender or by speech: "två", "две", "ένας"), the tens from 20, and how a ten
+ * several forms, by gender, case or speech: "en" and "ett", "две", "ένας"), the tens from 20, and how a ten
  * and a unit make one number.
  */
 interface NumberWords {
@@ -40,7 +40,7 @@ const LANGUAGES: Record<string, NumberWords> = {
   sv: {
     units: [
       ['noll'],
-      ['ett'],
+      ['ett', 'en'],
       ['två'],
       ['tre'],
       ['fyra'],
@@ -93,9 +93,9 @@ const LANGUAGES: Record<string, NumberWords> = {
   el: {
     units: [
       ['μηδέν'],
-      ['ένα', 'ένας', 'μία', 'μια'],
+      ['ένα', 'ένας', 'μία', 'μια', 'ενός', 'μιας'],
       ['δύο'],
-      ['τρία', 'τρεις'],
+      ['τρία', 'τρεις', 'τριών'],
       ['τέσσερα', 'τέσσερις'],
       ['πέντε'],
       ['έξι'],
@@ -119,10 +119,10 @@ const LANGUAGES: Record<string, NumberWords> = {
   ru: {
     units: [
       ['ноль', 'нуль'],
-      ['один', 'одна', 'одно'],
-      ['два', 'две'],
-      ['три'],
-      ['четыре'],
+      ['один', 'одна', 'одно', 'одну', 'одного', 'одной'],
+      ['два', 'две', 'двух'],
+      ['три', 'трёх'],
+      ['четыре', 'четырёх'],
       ['пять'],
       ['шесть'],
       ['семь'],
@@ -144,6 +144,11 @@ const LANGUAGES: Record<string, NumberWords> = {
   },
 }
 
+/** The language part of a language code, lower-cased: `en-GB` is `en`. */
+export function baseLanguage(code: string): string {
+  return code.split('-')[0]!.toLowerCase()
+}
+
 /**
  * The numbers 0 to 99 of a language as groups of the words that write them and the digits Whisper
  * writes instead ("twenty", "20"; "twentyone", "21": a number of two words is matched run
@@ -151,7 +156,7 @@ const LANGUAGES: Record<string, NumberWords> = {
  * code's language part (`en-GB` is `en`); none for another language.
  */
 export function numberWords(language: string): string[][] {
-  const words = LANGUAGES[language.split('-')[0]!.toLowerCase()]
+  const words = LANGUAGES[baseLanguage(language)]
   if (!words) return []
   const groups = words.units.map((forms, n) => [String(n), ...forms])
   words.tens.forEach((ten, t) => {
