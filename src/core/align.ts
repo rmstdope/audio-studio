@@ -373,15 +373,23 @@ function heardParts(heard: HeardWord[]): HeardWord[] {
 
 /**
  * How many words in a row (two or more) spell `word` together, as a compound heard apart ("silver
- * leaf" for "silverleaf") or heard as one ("everyone" for "every one"); 0 if none do.
+ * leaf" for "silverleaf") or heard as one ("everyone" for "every one"), or, run together, sound as
+ * it does: a phrase of its group ("all right" for "alright"), a word of its group or a spelling
+ * run apart ("week ly" for "weakly"); 0 if none do.
  */
-function spelledBy(word: string, words: string[]): number {
+function spelledBy(word: string, words: string[], alike: SoundAlike): number {
+  const sound = sounded(word, alike)
   let spelled = words[0] ?? ''
-  for (let n = 2; n <= words.length && spelled.length < word.length; n++) {
+  for (let n = 2; n <= words.length; n++) {
     spelled += words[n - 1]
-    if (spelled === word) return n
+    if (sounded(spelled, alike) === sound) return n
   }
   return 0
+}
+
+/** Words run together, as `plain` gives them, as they are matched: numbers as digits, grouped. */
+function sounded(spelled: string, alike: SoundAlike): string {
+  return grouped(NUMBERS.get(spelled) ?? spelled, alike)
 }
 
 /**
@@ -427,7 +435,8 @@ function alignGap(
   // The heard words before the gap, then its parts, to tell where Whisper starts a sentence.
   const partsWritten = [...written.slice(0, hFrom), ...parts.map((p) => p.word.trim())]
   if (!pieces.length || !parts.length) return
-  // Sound-alikes are one only where parts match exactly; a name is guessed from what Whisper wrote.
+  // Sound-alikes are one where parts match exactly or are run together; a name is guessed from
+  // what Whisper wrote.
   const heardNorm = parts.map((w) => norm(w.word))
   const want = pieces.map((p) => grouped(p.want, alike))
   const got = heardNorm.map((w) => grouped(w, alike))
@@ -438,17 +447,19 @@ function alignGap(
 
   /**
    * How the parts from `s` pair with the heard ones from `h`: a compound heard apart, words heard
-   * as one (the heard word's time shared evenly), or, when `guess` allows it, a name spelled one
-   * letter off, heard as one part or more ("El-eor" for "El-ee-or") where as many are left on
-   * both sides after it, up to `sTo` and `hTo`. Null if they do not pair there.
+   * as one (the heard word's time shared evenly), a phrase heard as another of its group, or, when
+   * `guess` allows it, a name spelled one letter off, heard as one part or more ("El-eor" for
+   * "El-ee-or") where as many are left on both sides after it, up to `sTo` and `hTo`. Null if they
+   * do not pair there.
    */
   const pairing = (s: number, h: number, sTo: number, hTo: number, guess: boolean) => {
     if (s >= sTo || h >= hTo) return null
-    const apart = spelledBy(pieces[s]!.spelled, gotSpelled.slice(h, hTo))
+    const apart = spelledBy(pieces[s]!.spelled, gotSpelled.slice(h, hTo), alike)
     if (apart) return { shown: 1, heard: apart, apply: () => take(s, h, h + apart - 1) }
     const together = spelledBy(
       gotSpelled[h]!,
       pieces.slice(s, sTo).map((p) => p.spelled),
+      alike,
     )
     if (together) {
       const { start, end } = parts[h]!
@@ -457,6 +468,25 @@ function alignGap(
         for (let n = 0; n < together; n++) at[s + n] = [start + step * n, start + step * (n + 1)]
       }
       return { shown: together, heard: 1, apply }
+    }
+    // A phrase heard as another phrase that sounds as it does ("Leer ia" as "Lee ria").
+    for (let i = 2; i <= Math.min(4, sTo - s); i++) {
+      const shownRun = sounded(
+        pieces
+          .slice(s, s + i)
+          .map((p) => p.spelled)
+          .join(''),
+        alike,
+      )
+      for (let j = 2; j <= Math.min(4, hTo - h); j++) {
+        if (sounded(gotSpelled.slice(h, h + j).join(''), alike) !== shownRun) continue
+        const [start, end] = [parts[h]!.start, parts[h + j - 1]!.end]
+        const step = (end - start) / i
+        const apply = () => {
+          for (let n = 0; n < i; n++) at[s + n] = [start + step * n, start + step * (n + 1)]
+        }
+        return { shown: i, heard: j, apply }
+      }
     }
     const n = hTo - h - (sTo - s - 1)
     if (!guess || n < 1) return null
@@ -507,16 +537,16 @@ function alignGap(
 }
 
 /**
- * Every shown word with a start and end from Whisper's words (narrate.py `align`): words matched
- * to a heard word take its times; unmatched words share the gap between their matched neighbours
+ * Every shown word with a start and end from Whisper's words (narrate.py `align`): words matched to
+ * a heard word take its times; unmatched words share the gap between their matched neighbours
  * evenly. Unlike narrate.py, the words whole-word matching leaves unmatched are compared by their
  * parts, split at hyphens and dashes on both sides, with compounds, names and words written as
  * shown though said otherwise forgiven (`alignGap`); such a word is heard when all its parts are.
- * `said` is the same words as actually said (see `saidWords`), compared in place of the shown
- * ones; `names` are the known names (see `knownNames`), `alike` the words that sound the same,
- * matched as one wherever words are matched exactly (see `soundAlikes`). Returns the timed words, the share of
- * words that were heard (punctuation on its own, "—" or "…", is no word: it is only timed), and
- * the indices of the shown words that were not (`missed`).
+ * `said` is the same words as actually said (see `saidWords`), compared in place of the shown ones;
+ * `names` are the known names (see `knownNames`), `alike` the words that sound the same, matched as
+ * one wherever words are matched exactly (see `soundAlikes`). Returns the timed words, the share of
+ * words that were heard (punctuation on its own, "—" or "…", is no word: it is only timed), and the
+ * indices of the shown words that were not (`missed`).
  */
 export function alignWords(
   tokens: string[],

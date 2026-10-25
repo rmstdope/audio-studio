@@ -215,10 +215,10 @@ an id and a title.
 - `models` names the Fish model for each stage (see §8.4). `audition` must be the free model for
   now; `draft` and `final` may name any model whose price the studio knows. Anything else is
   rejected with a clear message.
-- `quality.soundAlike` lists the game's own words that sound the same (one word each, with letters),
-  a group each, added to the studio's built-in English ones (`core/soundAlike.ts`: "in" and "inn",
-  "weekly" and "weakly", "there", "their" and "they're", …); see §8.2. Optional, empty by default;
-  edited on the characters page (§8.3).
+- `quality.soundAlike` lists the game's own words that sound the same (words or phrases, a letter or
+  digit in each word: "all right" and "alright"), a group each, added to the studio's built-in
+  English ones (`core/soundAlike.ts`: "in" and "inn", "weekly" and "weakly", "there", "their" and
+  "they're", …); see §8.2. Optional, empty by default; edited on the characters page (§8.3).
 
 ---
 
@@ -444,30 +444,34 @@ An audition is for a character, not for a part: the result applies to every part
       before -er, -ed, -ing and -ous, -ise and -ize: "traveller" heard as "traveler", "colours" as
       "colors"), and words that sound the same are one word (the built-in groups and the project's
       `quality.soundAlike`: "inn" heard as "in", "weekly" as "weakly"), wherever words are matched
-      exactly, not where a compound is joined or a name guessed; a listed word's plural or
-      possessive ("knight's") is not in the list. Words are matched whole first, as narrate.py does;
-      the shown and heard words left between two matches are then compared by their parts, split at
-      hyphens and dashes on both sides (punctuation beside a dash is no part), and a compound
-      written as one word matches the same word heard as two, or the other way round ("silverleaf"
-      and "silver leaf", "every one" and "everyone"); a joined word counts as heard when all its
-      parts are, and a word pronounced in other parts than shown is compared whole, as said; a word
-      pronounced otherwise that Whisper wrote as shown counts too, word for word where as many words
-      were heard as shown ("II" for "Act II:", said "Act Two:"). And a name heard in its place one
-      letter off (word for word where as many words were heard as shown, or by parts while they line
-      up one to one, Whisper's parts joined: "El-eor" for "El-ee-or"), as Whisper spells an invented
-      name ("Aren" as "Arn"), or one letter off as it sounds where that leaves four letters or more
-      (ch as k between vowels, c as s before e, i and y and else as k, ck and q as k, igh as i, ph
-      as f, y as i, z as s, doubled letters as one: "Malakar" as "Malachar", "Lifelight" as
-      "LifeLite"), or, for a known name heard as one word Whisper wrote capitalised where it starts
-      no sentence (it capitalises every word that does), as it sounds with only its vowels other,
-      one for one, where two consonants or more tell it ("Elior" as "Ilyar", not "Mira" as "more",
-      "More, wait" or "Omar"), counts as heard and takes the heard word's times. Only a capitalised
-      shown word of four letters or more as said (a possessive 's not counted), nothing but letters
-      and not all capitals, qualifies; where a sentence starts (after . ! ? … or a colon, opening a
-      quote, single or double, or after a dash inside a word) only a known name: a one-word
-      character id of the cast ("aren", not "ancient tree spirit") or pronunciation. Lowercase
-      words, short ones, numbers and other sentence-initial words must match exactly. A title-case
-      word mid-sentence ("The Call") is taken for a name;
+      exactly or run together (a phrase of a group heard as one word, or as another phrase of it,
+      "all right" as "alright", "Leer ia" as "Lee ria"; a word or spelling run apart, "week ly" as
+      "weakly"), not where a name is guessed; words matched whole come first, so a phrase sharing a
+      word with its sound-alike ("Mac Gregor", "Mc Gregor") is listed by the words that differ
+      ("Mac", "Mc"); a listed word's plural or possessive ("knight's") is not in the list. Words are
+      matched whole first, as narrate.py does; the shown and heard words left between two matches
+      are then compared by their parts, split at hyphens and dashes on both sides (punctuation
+      beside a dash is no part), and a compound written as one word matches the same word heard as
+      two, or the other way round ("silverleaf" and "silver leaf", "every one" and "everyone"); a
+      joined word counts as heard when all its parts are, and a word pronounced in other parts than
+      shown is compared whole, as said; a word pronounced otherwise that Whisper wrote as shown
+      counts too, word for word where as many words were heard as shown ("II" for "Act II:", said
+      "Act Two:"). And a name heard in its place one letter off (word for word where as many words
+      were heard as shown, or by parts while they line up one to one, Whisper's parts joined:
+      "El-eor" for "El-ee-or"), as Whisper spells an invented name ("Aren" as "Arn"), or one letter
+      off as it sounds where that leaves four letters or more (ch as k between vowels, c as s before
+      e, i and y and else as k, ck and q as k, igh as i, ph as f, y as i, z as s, doubled letters as
+      one: "Malakar" as "Malachar", "Lifelight" as "LifeLite"), or, for a known name heard as one
+      word Whisper wrote capitalised where it starts no sentence (it capitalises every word that
+      does), as it sounds with only its vowels other, one for one, where two consonants or more tell
+      it ("Elior" as "Ilyar", not "Mira" as "more", "More, wait" or "Omar"), counts as heard and
+      takes the heard word's times. Only a capitalised shown word of four letters or more as said (a
+      possessive 's not counted), nothing but letters and not all capitals, qualifies; where a
+      sentence starts (after . ! ? … or a colon, opening a quote, single or double, or after a dash
+      inside a word) only a known name: a one-word character id of the cast ("aren", not "ancient
+      tree spirit") or pronunciation. Lowercase words, short ones, numbers and other
+      sentence-initial words must match exactly. A title-case word mid-sentence ("The Call") is
+      taken for a name;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
    5. encode MP3 into the clips folder, update the manifest and lock entries, write both; then
       keep what Whisper heard of the take in the cache if it was heard below full (forgotten
