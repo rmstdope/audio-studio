@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import type { LineState } from '../core/planner'
-import { linesSummary, percent, reasonCounts, seconds, speakerCounts, statusDetail } from './status'
+import {
+  linesSummary,
+  partLinesSummary,
+  percent,
+  reasonCounts,
+  seconds,
+  speakerCounts,
+  statusDetail,
+} from './status'
 
 function line(overrides: Partial<LineState>): LineState {
   return {
@@ -92,5 +100,20 @@ describe('linesSummary', () => {
   it('says what lines need, or that all are up to date', () => {
     expect(linesSummary({ ok: 2, weak: 1, stale: 2 })).toBe('2 stale · 1 weak')
     expect(linesSummary({ ok: 3 })).toBe('all up to date')
+  })
+})
+
+describe('partLinesSummary', () => {
+  it('says none recorded when no line has a clip, however many cannot be recorded', () => {
+    expect(partLinesSummary({ uncast: 3 })).toBe('none recorded')
+    expect(partLinesSummary({ uncast: 2, untranslated: 1 })).toBe('none recorded')
+    expect(partLinesSummary({ missing: 4 })).toBe('none recorded')
+  })
+
+  it('counts the up-to-date lines, or says all are', () => {
+    expect(partLinesSummary({ ok: 18, stale: 2 })).toBe('18 up to date')
+    expect(partLinesSummary({ ok: 1, uncast: 2 })).toBe('1 up to date')
+    expect(partLinesSummary({ ok: 3 })).toBe('all up to date')
+    expect(partLinesSummary({ weak: 2 })).toBe('0 up to date')
   })
 })

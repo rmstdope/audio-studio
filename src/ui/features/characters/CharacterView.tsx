@@ -48,7 +48,7 @@ import { compact, plural, separatorBefore, shortTitle, tintFor, voiceLabel } fro
 import { routeHref } from '../../route'
 import { inGameState, recordedLinesOf } from '../../inGame'
 import type { Clip } from '../../player'
-import { linesSummary, speakerCounts, STATUS } from '../../status'
+import { partLinesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
 import { needsResumeBox } from '../../sitting'
 import { voiceUrl } from '../../voiceId'
@@ -792,7 +792,7 @@ function PartLines({
       {counts ? <StatusBar counts={counts} height={6} /> : <span className="muted">…</span>}
       <span className="muted">
         {plural(lines, 'line')}
-        {counts ? ` · ${linesSummary(counts)}` : ''}
+        {counts ? ` · ${partLinesSummary(counts)}` : ''}
       </span>
     </a>
   )
