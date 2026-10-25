@@ -204,11 +204,13 @@ export function castProblems(project: Project, problems: Problem[]): Problem[] {
 }
 
 /** Where a character's own phrase is in the cast, as a problem path. */
-export function phrasePath(characterId: string): string {
+export function phrasePath(characterId: string, language?: string): string {
   const id = /^[A-Za-z_][\w-]*$/.test(characterId)
     ? `.${characterId}`
     : `[${JSON.stringify(characterId)}]`
-  return `speakers${id}.audition.phrase`
+  return language === undefined
+    ? `speakers${id}.audition.phrase`
+    : `speakers${id}.languages.${language}.phrase`
 }
 
 function takePath(key: string): string {

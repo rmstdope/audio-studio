@@ -226,18 +226,30 @@ export function setStyle(
 
 /**
  * Saves a character's own speaking speed in the cast (its lines and takes are spoken at it instead
- * of the project's `tts.speed`); null removes it. Its recorded lines go stale.
+ * of the project's `tts.speed`); null removes it. Its recorded lines go stale. For a language other
+ * than the source language it is that language's own speed.
  */
 export function setSpeed(
   projectFile: string,
   characterId: string,
   speed: number | null,
+  language?: string,
 ): Promise<CharacterChange> {
-  return updateCharacter(projectFile, characterId, (entry) => {
-    if (speed !== null) return { ...entry, speed }
-    const { speed: _removed, ...rest } = entry
-    return rest
-  })
+  return updateCharacter(
+    projectFile,
+    characterId,
+    (entry, which) => {
+      if (which.language !== which.source) {
+        return inLanguage(entry, which.language, (own) =>
+          withField(own, 'speed', speed ?? undefined),
+        )
+      }
+      if (speed !== null) return { ...entry, speed }
+      const { speed: _removed, ...rest } = entry
+      return rest
+    },
+    language,
+  )
 }
 
 /** Saves a character's own audition phrase in the cast; an empty phrase goes back to the standard one. */
@@ -245,18 +257,66 @@ export async function setPhrase(
   projectFile: string,
   characterId: string,
   phrase: string | null,
+  language?: string,
 ): Promise<CharacterChange> {
   const own = phrase?.trim() || undefined
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
   if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
   const { narration } = loaded.project
+  const which = languageIn(narration, language)
   const tooLong = own ? phraseProblem(own, narration.quality.chunkLimit) : null
   if (tooLong) {
-    const problem = { file: narration.characters, path: phrasePath(characterId), message: tooLong }
-    return { ok: false, problems: [problem] }
+    const path = phrasePath(characterId, which === narration.languages[0] ? undefined : which)
+    return { ok: false, problems: [{ file: narration.characters, path, message: tooLong }] }
   }
-  return updateCharacter(projectFile, characterId, (entry) => withAudition(entry, { phrase: own }))
+  return updateCharacter(
+    projectFile,
+    characterId,
+    (entry, at) =>
+      at.language === at.source
+        ? withAudition(entry, { phrase: own })
+        : inLanguage(entry, at.language, (voice) => withField(voice, 'phrase', own)),
+    language,
+  )
+}
+
+/** A language's casting with one field set, or removed when `value` is undefined. */
+function withField(
+  voice: NonNullable<Character['languages']>[string],
+  field: 'speed' | 'phrase' | 'voice' | 'voiceName',
+  value: string | number | undefined,
+): NonNullable<Character['languages']>[string] {
+  const next: Record<string, unknown> = { ...voice, [field]: value }
+  if (value === undefined) delete next[field]
+  return next
+}
+
+/**
+ * An entry with its casting in `language` (other than the source language) changed; a language
+ * left with nothing is removed, and so is `languages` when empty, so clearing leaves no trace.
+ */
+function inLanguage(
+  entry: Character,
+  language: string,
+  change: (
+    voice: NonNullable<Character['languages']>[string],
+  ) => NonNullable<Character['languages']>[string],
+): Character {
+  const next = change(entry.languages?.[language] ?? {})
+  const languages = { ...entry.languages }
+  if (Object.keys(next).length) languages[language] = next
+  else delete languages[language]
+  if (Object.keys(languages).length) return { ...entry, languages }
+  const { languages: _removed, ...rest } = entry
+  return rest
+}
+
+/** The language a request means: the one asked for if the project declares it, else the source's. */
+function languageIn(narration: Project['narration'], asked: string | undefined): string {
+  return asked !== undefined && narration.languages.includes(asked)
+    ? asked
+    : narration.languages[0]!
 }
 
 /**
@@ -279,31 +339,45 @@ function withAudition(
   )
 }
 
-/** Casts a voice for a character: its id and name in the cast; style and the rest stay as they are. */
+/**
+ * Casts a voice for a character in a language (the source language's when none is named): its id
+ * and name in the cast; style and the rest stay as they are.
+ */
 export function setVoice(
   projectFile: string,
   characterId: string,
   voice: { id: string; name: string },
+  language?: string,
 ): Promise<CharacterChange> {
-  return updateCharacter(projectFile, characterId, (entry) => {
-    if (!('voice' in entry)) {
-      const { voiceName: _old, ...rest } = entry
-      return { ...rest, voice: voice.id, voiceName: voice.name }
-    }
-    // The voice stays where it was, its name right after it.
-    return Object.fromEntries(
-      Object.entries(entry).flatMap(([key, value]): [string, unknown][] =>
-        key === 'voice'
-          ? [
-              ['voice', voice.id],
-              ['voiceName', voice.name],
-            ]
-          : key === 'voiceName'
-            ? []
-            : [[key, value]],
-      ),
-    )
-  })
+  return updateCharacter(
+    projectFile,
+    characterId,
+    (entry, which) => {
+      if (which.language !== which.source) {
+        return inLanguage(entry, which.language, (own) =>
+          withField(withField(own, 'voice', voice.id), 'voiceName', voice.name),
+        )
+      }
+      if (!('voice' in entry)) {
+        const { voiceName: _old, ...rest } = entry
+        return { ...rest, voice: voice.id, voiceName: voice.name }
+      }
+      // The voice stays where it was, its name right after it.
+      return Object.fromEntries(
+        Object.entries(entry).flatMap(([key, value]): [string, unknown][] =>
+          key === 'voice'
+            ? [
+                ['voice', voice.id],
+                ['voiceName', voice.name],
+              ]
+            : key === 'voiceName'
+              ? []
+              : [[key, value]],
+        ),
+      )
+    },
+    language,
+  )
 }
 
 /**
@@ -322,15 +396,19 @@ const castWrites = createSerial()
 function updateCharacter(
   projectFile: string,
   characterId: string,
-  change: (entry: Character) => Character,
+  change: (entry: Character, which: { language: string; source: string }) => Character,
+  language?: string,
 ): Promise<CharacterChange> {
-  return castWrites.run(projectFile, () => writeCharacter(projectFile, characterId, change))
+  return castWrites.run(projectFile, () =>
+    writeCharacter(projectFile, characterId, change, language),
+  )
 }
 
 async function writeCharacter(
   projectFile: string,
   characterId: string,
-  change: (entry: Character) => Character,
+  change: (entry: Character, which: { language: string; source: string }) => Character,
+  asked?: string,
 ): Promise<CharacterChange> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -349,7 +427,9 @@ async function writeCharacter(
       return [{ file: path, path: 'pronounce', message }]
     }
     const speakers = { ...cast.speakers }
-    speakers[characterId] = change(speakers[characterId] ?? {})
+    const { narration } = loaded.project
+    const which = { language: languageIn(narration, asked), source: narration.languages[0]! }
+    speakers[characterId] = change(speakers[characterId] ?? {}, which)
     return { ...cast, speakers }
   })
 }

@@ -574,3 +574,76 @@ describe('setPronunciations', () => {
     expect(result).toMatchObject({ ok: false, problems: [{ path: 'pronounce' }] })
   })
 })
+
+describe('casting per language', () => {
+  const several = () => {
+    const base = projectJson()
+    return {
+      ...files,
+      'audio-studio.json': {
+        ...base,
+        narration: {
+          ...(base.narration as object),
+          languages: ['en', 'sv'],
+          paths: {
+            dialog: 'tts/{part}/{language}/script.json',
+            cues: 'tts/{part}/{language}/cues.json',
+            lock: 'tts/{part}/{language}/narration.lock.json',
+            clips: 'audio/{part}/{language}',
+            manifest: 'audio/{part}/{language}/manifest.json',
+          },
+        },
+      },
+      'tts/act1/en/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Hello.' }],
+    }
+  }
+  const cast = (root: string) => JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+
+  it('casts a voice for one language only, leaving the source language alone', async () => {
+    const root = tempRepo(several())
+    const projectFile = join(root, 'audio-studio.json')
+    expect(
+      await setVoice(projectFile, 'grandmother', { id: 'v', name: 'Varm Mormor' }, 'sv'),
+    ).toEqual({ ok: true })
+    expect(cast(root).speakers.grandmother).toEqual({
+      voice: 'cur',
+      style: '[warm]',
+      audition: { keywords: ['warm'] },
+      languages: { sv: { voice: 'v', voiceName: 'Varm Mormor' } },
+    })
+  })
+
+  it('saves a speed and a phrase for one language, and removes what is cleared', async () => {
+    const root = tempRepo(several())
+    const projectFile = join(root, 'audio-studio.json')
+    await setSpeed(projectFile, 'grandmother', 0.95, 'sv')
+    await setPhrase(projectFile, 'grandmother', ' Kom in. ', 'sv')
+    expect(cast(root).speakers.grandmother.languages).toEqual({
+      sv: { speed: 0.95, phrase: 'Kom in.' },
+    })
+    expect(cast(root).speakers.grandmother.speed).toBeUndefined()
+    await setSpeed(projectFile, 'grandmother', null, 'sv')
+    await setPhrase(projectFile, 'grandmother', null, 'sv')
+    expect(cast(root).speakers.grandmother.languages).toBeUndefined()
+  })
+
+  it('treats a language the project does not declare as the source language', async () => {
+    const root = tempRepo(several())
+    await setSpeed(join(root, 'audio-studio.json'), 'grandmother', 0.8, 'fr')
+    expect(cast(root).speakers.grandmother.speed).toBe(0.8)
+  })
+
+  it('names a too-long phrase at its place in the language', async () => {
+    const root = tempRepo(several())
+    const result = await setPhrase(
+      join(root, 'audio-studio.json'),
+      'grandmother',
+      'x'.repeat(401),
+      'sv',
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      problems: [{ path: 'speakers.grandmother.languages.sv.phrase' }],
+    })
+  })
+})
