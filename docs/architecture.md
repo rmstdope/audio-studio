@@ -957,6 +957,9 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 - The server API is tested with an in-memory project fixture (a small consumer repo in
   `test/fixtures/`).
 - UI: component tests for the audition and line table; one Playwright smoke test over the fixture.
+- A component test renders into a DOM from `@happy-dom/global-registrator`, registered by the test
+  file itself before it imports React, so the other suites run without one (first:
+  `SpeedEditor.test.tsx`).
 
 ---
 

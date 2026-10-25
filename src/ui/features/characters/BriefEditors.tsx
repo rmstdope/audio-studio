@@ -283,14 +283,14 @@ export function StyleEditor({ characterId, style }: { characterId: string; style
  * A character's own speaking speed, saved in the cast: its lines and takes are spoken at it
  * instead of the project's `tts.speed`.
  */
-export function SpeedEditor({
-  characterId,
-  speed,
-  projectSpeed,
-  language,
-  label,
-  beneath,
-}: {
+export function SpeedEditor(props: SpeedEditorProps) {
+  // Keyed by language: what is typed, and a save's answer, belong to the language they were for,
+  // so switching language starts the field afresh.
+  return <SpeedField key={props.language ?? ''} {...props} />
+}
+
+/** What the speed editor is given. */
+type SpeedEditorProps = {
   characterId: string
   speed: number | null
   projectSpeed: number
@@ -300,7 +300,17 @@ export function SpeedEditor({
   label?: string
   /** The other languages' speeds, listed beneath. */
   beneath?: string
-}) {
+}
+
+/** The speed field of one language: its draft and its save. */
+function SpeedField({
+  characterId,
+  speed,
+  projectSpeed,
+  language,
+  label,
+  beneath,
+}: SpeedEditorProps) {
   const save = useSetSpeed(characterId, language)
   const [draft, setDraft] = useState<string | null>(null)
   const shown = draft ?? (speed === null ? '' : String(speed))
