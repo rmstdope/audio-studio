@@ -51,7 +51,8 @@ export function GeneratePanel({
 
   if (current && (running || shownJob === current.id)) {
     const progress = current.total ? (current.done / current.total) * 100 : 100
-    const measuring = current.kind === 'measure'
+    // Measuring and checking again hear clips with Whisper, without new audio.
+    const measuring = current.kind === 'measure' || current.kind === 'check'
     return (
       <section className="panel generate" aria-label="Generation">
         <div className="generate-head">
@@ -60,9 +61,11 @@ export function GeneratePanel({
               {running
                 ? current.status === 'cancelling'
                   ? 'Cancelling'
-                  : measuring
-                    ? 'Measuring'
-                    : 'Generating'
+                  : current.kind === 'check'
+                    ? 'Checking again'
+                    : measuring
+                      ? 'Measuring'
+                      : 'Generating'
                 : current.status === 'cancelled'
                   ? 'Cancelled'
                   : 'Done'}
@@ -94,13 +97,14 @@ export function GeneratePanel({
         </div>
         {running && current.recording.length > 0 && (
           <span className="muted">
-            {measuring ? 'Measuring' : 'Recording'} {current.recording.join(', ')}
+            {current.kind === 'check' ? 'Checking' : measuring ? 'Measuring' : 'Recording'}{' '}
+            {current.recording.join(', ')}
           </span>
         )}
         {!running && (
           <span className="muted">
             {measuring
-              ? `${plural(current.done - current.failed.length - current.skipped, 'clip')} measured`
+              ? `${plural(current.done - current.failed.length - current.skipped, 'clip')} ${current.kind === 'check' ? 'checked again' : 'measured'}`
               : `${plural(current.done - current.failed.length - current.skipped, 'line')} recorded`}
             {current.skipped
               ? ` · ${current.skipped} ${measuring ? 'recorded again meanwhile' : 'already up to date'}`
@@ -268,6 +272,27 @@ export function GeneratePanel({
             }
           >
             Measure {plural(p.unmeasured.length, 'clip')}
+          </button>
+        </div>
+      )}
+      {p.checked && p.recheck.length > 0 && (
+        <div className="measure">
+          <span className="muted">
+            {plural(p.recheck.length, 'weak line')}. Checking again has Whisper hear their takes
+            with today's rules, without new audio; lines heard well enough are weak no longer.
+          </span>
+          <button
+            className="btn"
+            type="button"
+            disabled={waiting || start.isPending}
+            onClick={() =>
+              start.mutate(
+                { kind: 'check', speaker, keys: p.recheck, orphans: [] },
+                { onSuccess: (started) => setShownJob(started.id) },
+              )
+            }
+          >
+            Check {plural(p.recheck.length, 'weak line')} again
           </button>
         </div>
       )}

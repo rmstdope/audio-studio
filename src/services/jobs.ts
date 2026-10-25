@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { MeasureResult, RecordResult } from './narration'
 
 /** What a job does to each line: record it, or measure its clip. */
-export type JobKind = 'record' | 'measure'
+export type JobKind = 'record' | 'measure' | 'check'
 
 /** What doing one line gave. */
 export type StepResult = RecordResult | MeasureResult

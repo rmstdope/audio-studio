@@ -145,6 +145,21 @@ describe('planGeneration, weak and unmeasured lines', () => {
     ).toEqual([])
     expect(planGeneration(measured, { at: AT, model: 's2.1-pro-free' }).unmeasured).toEqual([])
   })
+
+  it('lists weak lines Whisper can check again, final or not, in scope', () => {
+    const final = {
+      ...measured,
+      lines: [
+        ...measured.lines,
+        { ...line('e', 'mira', 'weak'), file: 'e.mp3', heard: 0.5, final: true },
+      ],
+    }
+    const plan = (options = {}) =>
+      planGeneration(final, { at: AT, model: 's2.1-pro-free', checked: true, ...options }).recheck
+    expect(plan()).toEqual(['c', 'e'])
+    expect(plan({ speaker: 'mira' })).toEqual(['e'])
+    expect(plan({ checked: false })).toEqual([])
+  })
 })
 
 describe('costCeiling', () => {

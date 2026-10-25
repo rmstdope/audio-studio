@@ -880,6 +880,20 @@ describe.skipIf(!Bun.which('ffmpeg'))('server, measuring clips', () => {
     expect(await recordJob(true)).toMatchObject({ status: 'done', done: 1, skipped: 0 })
   })
 
+  it('checks the weak lines again in a job, without new audio', async () => {
+    const planned = await (await fetch(at('/api/parts/act1/plan'))).json()
+    expect(planned.plan.recheck).toEqual(['a'])
+    const job = await (
+      await fetch(at('/api/parts/act1/jobs'), {
+        method: 'POST',
+        headers: own,
+        body: JSON.stringify({ kind: 'check', speaker: null, keys: ['a'], orphans: [] }),
+      })
+    ).json()
+    expect(job.kind).toBe('check')
+    expect(await finish(job.id)).toMatchObject({ status: 'done', done: 1, failed: [] })
+  })
+
   it('checks a weak line again from its own page, and no line it cannot', async () => {
     const check = (key: string, origin = server.url.origin) =>
       fetch(at(`/api/parts/act1/lines/${key}/check`), { method: 'POST', headers: { origin } })
