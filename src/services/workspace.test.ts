@@ -423,7 +423,7 @@ describe('a part in several languages', () => {
       'tts/cast.json': {
         speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } } },
       },
-      'audio/act1/sv/narration.lock.json': made,
+      'tts/act1/sv/narration.lock.json': made,
       'tts/act1/en/cues.json': { a: '[worried]' },
     })
     expect(part.lines.find((l) => l.key === 'a')).toMatchObject({
