@@ -374,7 +374,13 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
   })
 
   it('finds a clip made with another model stale for the model', () => {
-    const lock = { n1: { ...madeOnS1(lines[0]!), model: 's2-pro' } }
+    const other = {
+      ...narration,
+      models: { ...narration.models, draft: 's2-pro', final: 's2-pro' },
+    }
+    const inputs = clipInputs(lines[0]!, cast.speakers.narrator, {}, cast.pronounce, other)!
+    const { fp, parts } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', parts, at: 'then' } }
     const state = planPart(input({ lock, narration: onS21 }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['model'] })
   })
