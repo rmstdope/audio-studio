@@ -5,6 +5,7 @@ import type { JobKind } from '../../../services/jobs'
 import { useJob, useJobActions, usePlan } from '../../api'
 import { Problems } from '../../components/Problems'
 import { centsUp, dollars, plural } from '../../format'
+import { castNote, generateLabel, translatedNote } from '../../languages'
 import { REASON } from '../../status'
 
 /** How a job of each kind is told: while it runs, a line in it, and a line done. */
@@ -22,10 +23,13 @@ const WORDS: Record<JobKind, { running: string; doing: string; done: string }> =
  */
 export function GeneratePanel({
   partId,
+  language,
   speaker,
   models,
 }: {
   partId: string
+  /** The language to record, in a project with several; null in a project with one. */
+  language: { id: string; name: string } | null
   speaker: string | null
   /** The draft and final models: a final step is offered only when they differ. */
   models: { draft: string; final: string }
@@ -33,9 +37,9 @@ export function GeneratePanel({
   const [retakeWeak, setRetakeWeak] = useState(false)
   const [stage, setStage] = useState<'draft' | 'final'>('draft')
   const hasFinal = models.final !== models.draft
-  const plan = usePlan(partId, speaker, retakeWeak, hasFinal ? stage : 'draft')
-  const job = useJob(partId)
-  const { start, cancel } = useJobActions(partId)
+  const plan = usePlan(partId, speaker, retakeWeak, hasFinal ? stage : 'draft', language?.id)
+  const job = useJob(partId, language?.id)
+  const { start, cancel } = useJobActions(partId, language?.id)
   // A paid plan's Generate asks once more; a different plan clears the question.
   const [confirming, setConfirming] = useState(false)
   const [removeOrphans, setRemoveOrphans] = useState(false)
@@ -158,8 +162,11 @@ export function GeneratePanel({
       <div className="generate-head">
         <div>
           <span className="label">
-            {stage === 'final' && hasFinal ? 'Final recording' : 'Generate'} ·{' '}
-            {speaker ? displayName(speaker) : 'every character'}
+            {generateLabel(
+              stage === 'final' && hasFinal ? 'Final recording' : 'Generate',
+              language?.name ?? null,
+              speaker ? displayName(speaker) : null,
+            )}
           </span>
           <strong>
             {p.keys.length
@@ -305,9 +312,10 @@ export function GeneratePanel({
       )}
       {p.uncast.length > 0 && (
         <span className="cast-note">
-          Not recorded until cast: {p.uncast.map(displayName).join(', ')}.
+          {castNote(language?.name ?? null, p.uncast.map(displayName))}
         </span>
       )}
+      {p.untranslated > 0 && <span className="muted">{translatedNote(p.untranslated)}</span>}
       {p.orphans.length > 0 && (
         <label className="check">
           <input
@@ -322,7 +330,7 @@ export function GeneratePanel({
         {p.model} · {formatBytes(p.bytes)} of text ·{' '}
         {p.cost === null ? 'price unknown' : p.cost ? `about ${dollars(p.cost)}` : 'free'} ·{' '}
         {p.checked
-          ? `each take checked with Whisper, up to ${plural(p.takes, 'take')} a line${
+          ? `each take checked with Whisper${language ? ` in ${language.name}` : ''}, up to ${plural(p.takes, 'take')} a line${
               p.cost ? ` (at most about ${dollars(p.cost * p.takes)})` : ''
             } · `
           : 'takes not checked · '}

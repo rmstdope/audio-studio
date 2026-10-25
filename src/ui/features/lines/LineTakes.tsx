@@ -14,17 +14,20 @@ import { extraTakeWords } from '../../takes'
 export function LineTakes({
   partId,
   lineKey,
+  language,
   draftModel,
   playing,
   toggle,
 }: {
   partId: string
   lineKey: string
+  /** The language of the line, in a project with several. */
+  language?: string
   draftModel: string
   playing: string | null
   toggle: (id: string, url: string) => void
 }) {
-  const list = useLineTakes(partId, lineKey)
+  const list = useLineTakes(partId, lineKey, language)
   const {
     take,
     use,
@@ -33,7 +36,7 @@ export function LineTakes({
     toConfirm,
     refusal,
     cancel,
-  } = useLineTakeActions(partId, lineKey)
+  } = useLineTakeActions(partId, lineKey, language)
   const words = extraTakeWords(draftModel)
   const pay = useRef<HTMLButtonElement>(null)
   const another = useRef<HTMLButtonElement>(null)
@@ -65,7 +68,7 @@ export function LineTakes({
                 type="button"
                 className="icon-btn"
                 aria-label={playing === playId(t.id) ? 'Stop' : 'Play the take'}
-                onClick={() => toggle(playId(t.id), lineTakeUrl(partId, lineKey, t.id))}
+                onClick={() => toggle(playId(t.id), lineTakeUrl(partId, lineKey, t.id, language))}
               >
                 {playing === playId(t.id) ? <PauseIcon /> : <PlayIcon />}
               </button>

@@ -19,9 +19,62 @@ export function languageTab(
   }
 }
 
-/** The line above the table in a language that cannot be recorded yet. */
-export function recordingNote(name: string): string {
-  return `Recording in ${name} is not available yet: you can see and play its lines.`
+/** The Generate panel's label: what it does, in which language (none in a one-language project), for whom. */
+export function generateLabel(
+  what: string,
+  language: string | null,
+  character: string | null,
+): string {
+  return [what, language, character ?? 'every character'].filter(Boolean).join(' · ')
+}
+
+/** Who cannot be recorded for want of a voice (in the language, when there are several). */
+export function castNote(language: string | null, names: string[]): string {
+  return `Not recorded until cast${language ? ` in ${language}` : ''}: ${names.join(', ')}.`
+}
+
+/** How many lines are not recorded because they have no text in the language yet. */
+export function translatedNote(lines: number): string {
+  return `Not recorded until translated: ${lines} ${lines === 1 ? 'line' : 'lines'}.`
+}
+
+/** Where a line's cue comes from, under it: the source language's, or the character's style. */
+export function cueNote(
+  from: 'own' | 'source' | 'style',
+  character: string,
+  source: string,
+): string | null {
+  return from === 'source' ? `from ${source}` : from === 'style' ? `${character}’s style` : null
+}
+
+/**
+ * The hint under the cue field in a language besides the source: that an empty field follows the
+ * source's cue, or what the source's cue is. Nothing when the source has none to show.
+ */
+export function cueHint(
+  from: 'own' | 'source' | 'style',
+  sourceCue: string | null,
+  source: string,
+): string | null {
+  if (!sourceCue) return null
+  return from === 'source'
+    ? `Empty: this line follows the ${source} cue ${sourceCue}.`
+    : from === 'own'
+      ? `${source} cue: ${sourceCue}`
+      : null
+}
+
+/** The hover text of the cue button of a line that follows the source language's cue. */
+export function cueButtonTitle(
+  from: 'own' | 'source' | 'style',
+  language: string,
+  source: string,
+): string {
+  return from === 'source'
+    ? `Follows the ${source} cue: give this line its own ${language} cue`
+    : from === 'own'
+      ? 'This line’s own cue: edit'
+      : 'The character’s style: give this line its own cue'
 }
 
 /** The panel for a language with no dialog for the part; the button only if the game can refresh. */

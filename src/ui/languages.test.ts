@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'bun:test'
-import { languageTab, movedTo, noDialogPanel, recordingNote } from './languages'
+import {
+  castNote,
+  cueButtonTitle,
+  cueHint,
+  cueNote,
+  generateLabel,
+  languageTab,
+  movedTo,
+  noDialogPanel,
+  translatedNote,
+} from './languages'
 
 const sv = { id: 'sv', name: 'Svenska', dialog: 'ok' as const, upToDate: 40, total: 481 }
 const de = { id: 'de', name: 'Deutsch', dialog: 'missing' as const, upToDate: 0, total: 0 }
@@ -33,9 +43,42 @@ describe('languageTab', () => {
 })
 
 describe('the words around a language', () => {
-  it('says recording is not available yet', () => {
-    expect(recordingNote('Svenska')).toBe(
-      'Recording in Svenska is not available yet: you can see and play its lines.',
+  it('labels the Generate panel with the language and the character', () => {
+    expect(generateLabel('Generate', 'Svenska', null)).toBe('Generate · Svenska · every character')
+    expect(generateLabel('Generate', 'Svenska', 'Mira')).toBe('Generate · Svenska · Mira')
+    expect(generateLabel('Final recording', 'Svenska', null)).toBe(
+      'Final recording · Svenska · every character',
+    )
+    // One language declared: as it always was.
+    expect(generateLabel('Generate', null, null)).toBe('Generate · every character')
+  })
+
+  it('names who is not cast and what is not translated', () => {
+    expect(castNote('Svenska', ['Grandmother'])).toBe(
+      'Not recorded until cast in Svenska: Grandmother.',
+    )
+    expect(castNote(null, ['Grandmother', 'Mira'])).toBe(
+      'Not recorded until cast: Grandmother, Mira.',
+    )
+    expect(translatedNote(3)).toBe('Not recorded until translated: 3 lines.')
+    expect(translatedNote(1)).toBe('Not recorded until translated: 1 line.')
+  })
+
+  it('says where a cue comes from, only in a language besides the source', () => {
+    expect(cueNote('source', 'Mira', 'English')).toBe('from English')
+    expect(cueNote('style', 'Mira', 'English')).toBe('Mira’s style')
+    expect(cueNote('own', 'Mira', 'English')).toBeNull()
+  })
+
+  it('words the cue editor for a language following or not following the source', () => {
+    expect(cueHint('source', '[worried]', 'English')).toBe(
+      'Empty: this line follows the English cue [worried].',
+    )
+    expect(cueHint('own', '[worried]', 'English')).toBe('English cue: [worried]')
+    expect(cueHint('own', null, 'English')).toBeNull()
+    expect(cueHint('style', null, 'English')).toBeNull()
+    expect(cueButtonTitle('source', 'Svenska', 'English')).toBe(
+      'Follows the English cue: give this line its own Svenska cue',
     )
   })
 
