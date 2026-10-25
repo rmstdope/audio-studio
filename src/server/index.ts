@@ -26,6 +26,13 @@ import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile, tryLine } from '../services/takes'
 import { checkSetup } from '../services/setup'
 import { setNote } from '../services/notes'
+import {
+  dropLineTake,
+  lineTakeFile,
+  listLineTakes,
+  takeLine,
+  useLineTake,
+} from '../services/lineTakes'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -617,6 +624,47 @@ export function startServer({
             return Response.json({ error: 'expected { groups, was }' }, { status: 400 })
           }
           const result = await setSoundAlike(projectFile, body.data.groups, body.data.was)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/lines/:key/takes': {
+        GET: guard(async (request) => {
+          const { part, key } = request.params
+          const result = await listLineTakes(projectFile, part, key)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+        POST: fromOwnPage(async (request) => {
+          const { part, key } = request.params
+          const result = await takeLine(projectFile, part, key, fishFor, {
+            limiter: fishWork,
+            transcriber: await transcriberFor(),
+          })
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/lines/:key/takes/:file': {
+        GET: guard(async (request) => {
+          const { part, key, file } = request.params
+          const id = /^([0-9a-f]{16})\.wav$/.exec(file)?.[1]
+          const found = id ? await lineTakeFile(projectFile, part, key, id) : null
+          return found ? new Response(Bun.file(found)) : notFound()
+        }),
+        DELETE: fromOwnPage(async (request) => {
+          const { part, key, file } = request.params
+          if (!/^[0-9a-f]{16}$/.test(file)) return notFound()
+          const result = await dropLineTake(projectFile, part, key, file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/lines/:key/takes/:id/use': {
+        POST: fromOwnPage(async (request) => {
+          const { part, key, id } = request.params
+          if (!/^[0-9a-f]{16}$/.test(id)) return notFound()
+          const result = await useLineTake(projectFile, part, key, id, { encode })
+          if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

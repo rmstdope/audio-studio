@@ -17,6 +17,7 @@ import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { GeneratePanel } from './GeneratePanel'
 import { HeardComparison } from './HeardComparison'
+import { LineTakes } from './LineTakes'
 import { canCompare } from '../../heard'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
@@ -78,6 +79,8 @@ export function LinesView({ part }: { part: PartSummary }) {
   const [search, setSearch] = useState('')
   // The line whose take is compared with what Whisper heard, if any.
   const [comparing, setComparing] = useState<string | null>(null)
+  // The line whose extra takes are open, if any.
+  const [takesOf, setTakesOf] = useState<string | null>(null)
 
   const loaded = detail.data?.ok ? detail.data.part : null
   const lines = useMemo(() => {
@@ -153,6 +156,9 @@ export function LinesView({ part }: { part: PartSummary }) {
         break
       case 'note':
         click('.note-button, .note-add')
+        break
+      case 'takes':
+        click('.row-takes')
         break
     }
     event.preventDefault()
@@ -356,6 +362,17 @@ export function LinesView({ part }: { part: PartSummary }) {
                     </td>
                     <td>
                       <div className="row-actions">
+                        {RECORDABLE.has(line.status) || line.status === 'ok' ? (
+                          <button
+                            type="button"
+                            className="btn row-takes"
+                            aria-expanded={takesOf === line.key}
+                            title="Extra takes of this line: hear, compare, use one as the clip"
+                            onClick={() => setTakesOf(takesOf === line.key ? null : line.key)}
+                          >
+                            Takes
+                          </button>
+                        ) : null}
                         {line.file && (
                           <button
                             type="button"
@@ -461,6 +478,19 @@ export function LinesView({ part }: { part: PartSummary }) {
                       <td />
                       <td colSpan={5}>
                         <HeardComparison partId={loaded.id} lineKey={line.key} />
+                      </td>
+                    </tr>
+                  )}
+                  {takesOf === line.key && (
+                    <tr className="heard-row takes-row">
+                      <td />
+                      <td colSpan={5}>
+                        <LineTakes
+                          partId={loaded.id}
+                          lineKey={line.key}
+                          playing={playing}
+                          toggle={toggle}
+                        />
                       </td>
                     </tr>
                   )}

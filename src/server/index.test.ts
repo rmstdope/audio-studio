@@ -470,6 +470,32 @@ describe('server', () => {
     expect(response.status).toBe(404)
   })
 
+  it('takes a line again into the cache, serves the take, uses it as the clip, and drops it', async () => {
+    const takes = url('/api/parts/act1/lines/a/takes')
+    const own = { origin: server.url.origin }
+    expect(
+      (await fetch(takes, { method: 'POST', headers: { origin: 'https://evil.example' } })).status,
+    ).toBe(403)
+    const made = await (await fetch(takes, { method: 'POST', headers: own })).json()
+    expect(made).toMatchObject({ ok: true, take: { current: true, heard: null } })
+    const listed = await (await fetch(takes)).json()
+    expect(listed.takes.map((t: { id: string }) => t.id)).toEqual([made.take.id])
+    const wav = await fetch(url(`/api/parts/act1/lines/a/takes/${made.take.id}.wav`))
+    expect(wav.status).toBe(200)
+    expect((await fetch(url('/api/parts/act1/lines/a/takes/nope.wav'))).status).toBe(404)
+    const used = await fetch(url(`/api/parts/act1/lines/a/takes/${made.take.id}/use`), {
+      method: 'POST',
+      headers: own,
+    })
+    expect(await used.json()).toMatchObject({ ok: true, key: 'a', duration: 1 })
+    const dropped = await fetch(url(`/api/parts/act1/lines/a/takes/${made.take.id}`), {
+      method: 'DELETE',
+      headers: own,
+    })
+    expect(dropped.status).toBe(200)
+    expect((await fetch(url('/api/parts/act1/lines/nope/takes'))).status).toBe(404)
+  })
+
   it('records a line, from the studio’s own page only', async () => {
     const record = (origin: string) =>
       fetch(url('/api/parts/act1/lines/a/record'), { method: 'POST', headers: { origin } })

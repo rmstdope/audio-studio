@@ -1,0 +1,222 @@
+import { describe, expect, it } from 'bun:test'
+import { mkdir } from 'node:fs/promises'
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { projectJson, tempRepo } from '../../test/helpers'
+import { readWav, writeWav } from '../core/wav'
+import type { Encoder } from './audio'
+import type { FishClient, TtsRequest } from './fish'
+import { createLimiter } from './limit'
+import { dropLineTake, lineTakeFile, listLineTakes, takeLine, useLineTake } from './lineTakes'
+import type { Transcriber } from './transcriber'
+import { loadPart } from './workspace'
+
+const files = {
+  'audio-studio.json': projectJson(),
+  'tts/cast.json': {
+    speakers: { narrator: { voice: 'v-n', style: '[warm]' } },
+    pronounce: { Elior: 'El-ee-or' },
+  },
+  'tts/act1/script.json': [
+    { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
+    { key: 'k3', speaker: 'tilda', text: 'No voice.' },
+  ],
+}
+
+/** A second of silence as Fish would send it. */
+function silence(seconds: number): Uint8Array {
+  return writeWav({
+    format: { channels: 1, sampleRate: 1000, bitsPerSample: 16 },
+    data: new Uint8Array(Math.round(seconds * 1000) * 2),
+  })
+}
+
+function fakeFish() {
+  const requests: TtsRequest[] = []
+  const fish: FishClient = {
+    async credit() {
+      return 25
+    },
+    listVoices: () => Promise.reject(new Error('not used')),
+    getVoice: () => Promise.reject(new Error('not used')),
+    async tts(request) {
+      requests.push(request)
+      return silence(1)
+    },
+  }
+  return { fish, requests }
+}
+
+/** A transcriber hearing the words given, each 0.3 s apart. */
+function hearing(words: string[]): Transcriber {
+  return {
+    async transcribe() {
+      return [
+        {
+          start: 0,
+          end: 0.95,
+          words: words.map((word, i) => ({ word, start: i * 0.3, end: i * 0.3 + 0.25 })),
+        },
+      ]
+    },
+    close() {},
+  }
+}
+
+/** An encoder that keeps the WAV as it is, so tests need no ffmpeg. */
+const keepWav: Encoder = async (wav, file) => {
+  await mkdir(dirname(file), { recursive: true })
+  writeFileSync(file, wav)
+}
+
+const projectFileOf = (root: string) => join(root, 'audio-studio.json')
+const take = (root: string, fish: FishClient, transcriber: Transcriber | null = null) =>
+  takeLine(projectFileOf(root), 'act1', 'k1', async () => fish, {
+    limiter: createLimiter(),
+    transcriber,
+  })
+
+describe('takeLine', () => {
+  it('records a take of the line into the cache, checked, and lists it as current', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const result = await take(root, fish, hearing(['El-ee-or', 'wakes', 'up.']))
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.take).toMatchObject({ seconds: 1, heard: 1, current: true })
+    expect(requests).toEqual([
+      expect.objectContaining({ text: '[warm] El-ee-or wakes up.', voice: 'v-n', format: 'wav' }),
+    ])
+    const file = await lineTakeFile(projectFileOf(root), 'act1', 'k1', result.take.id)
+    expect(file).not.toBeNull()
+    expect(readWav(readFileSync(file!)).data.length).toBe(2000)
+    const listed = await listLineTakes(projectFileOf(root), 'act1', 'k1')
+    expect(listed).toEqual({ ok: true, takes: [result.take] })
+    // Nothing of the game's.
+    expect(existsSync(join(root, 'audio/act1'))).toBe(false)
+    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
+  })
+
+  it('records an unchecked take when the project does not check, and lists newest first', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const first = await take(root, fish)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const second = await take(root, fish)
+    if (!first?.ok || !second?.ok) throw new Error('expected takes')
+    expect(first.take.heard).toBeNull()
+    const listed = await listLineTakes(projectFileOf(root), 'act1', 'k1')
+    expect(listed?.ok && listed.takes.map((t) => t.id)).toEqual([second.take.id, first.take.id])
+  })
+
+  it('refuses a line without a voice, a paid draft model, and says when there is no key', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    const uncast = await takeLine(projectFileOf(root), 'act1', 'k3', async () => fish, {
+      limiter: createLimiter(),
+    })
+    expect(uncast).toMatchObject({ ok: false, reason: 'uncast' })
+    const paid = tempRepo({
+      ...files,
+      'audio-studio.json': {
+        ...projectJson(),
+        narration: {
+          ...(projectJson().narration as Record<string, unknown>),
+          models: { draft: 's1', final: 's1' },
+        },
+      },
+    })
+    expect(await take(paid, fish)).toMatchObject({ ok: false, reason: 'paid' })
+    expect(requests).toHaveLength(0)
+    const noKey = await takeLine(projectFileOf(root), 'act1', 'k1', async () => null, {
+      limiter: createLimiter(),
+    })
+    expect(noKey).toMatchObject({ ok: false, reason: 'no-key' })
+    expect(
+      await takeLine(projectFileOf(root), 'act9', 'k1', async () => fish, {
+        limiter: createLimiter(),
+      }),
+    ).toBeNull()
+    expect(
+      await takeLine(projectFileOf(root), 'act1', 'zz', async () => fish, {
+        limiter: createLimiter(),
+      }),
+    ).toBeNull()
+  })
+
+  it('reports Fish failing', async () => {
+    const root = tempRepo(files)
+    const failing: FishClient = { ...fakeFish().fish, tts: () => Promise.reject(new Error('boom')) }
+    expect(await take(root, failing)).toEqual({ ok: false, reason: 'fish', message: 'boom' })
+  })
+})
+
+describe('useLineTake', () => {
+  it('makes the take the line’s clip, with its timings and score, as a recording does', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const made = await take(root, fish, hearing(['El-ee-or', 'wakes', 'up.']))
+    if (!made?.ok) throw new Error('expected a take')
+    const used = await useLineTake(projectFileOf(root), 'act1', 'k1', made.take.id, {
+      encode: keepWav,
+    })
+    expect(used).toEqual({ ok: true, key: 'k1', duration: 1, heard: 1, takes: 1 })
+    const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8'))
+    expect(manifest.k1).toMatchObject({
+      file: 'k1.mp3',
+      speaker: 'narrator',
+      duration: 1,
+      words: [
+        { word: 'Elior', start: 0, end: 0.25 },
+        { word: 'wakes', start: 0.3, end: 0.55 },
+        { word: 'up.', start: 0.6, end: 0.85 },
+      ],
+    })
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(lock.k1).toMatchObject({ heard: 1, takes: 1, voice: 'v-n', model: 's2.1-pro-free' })
+    const part = await loadPart(projectFileOf(root), 'act1')
+    expect(part?.ok && part.part.lines[0]?.status).toBe('ok')
+    // The take stays in the cache, to compare with later ones.
+    expect(await listLineTakes(projectFileOf(root), 'act1', 'k1')).toMatchObject({
+      ok: true,
+      takes: [{ id: made.take.id, current: true }],
+    })
+  })
+
+  it('refuses a take made before the line changed, which the list marks stale', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const made = await take(root, fish)
+    if (!made?.ok) throw new Error('expected a take')
+    writeFileSync(join(root, 'tts/act1/cues.json'), JSON.stringify({ k1: '[hushed]' }))
+    const listed = await listLineTakes(projectFileOf(root), 'act1', 'k1')
+    expect(listed?.ok && listed.takes[0]?.current).toBe(false)
+    const used = await useLineTake(projectFileOf(root), 'act1', 'k1', made.take.id, {
+      encode: keepWav,
+    })
+    expect(used).toMatchObject({ ok: false, reason: 'stale' })
+    expect(existsSync(join(root, 'audio/act1/manifest.json'))).toBe(false)
+  })
+
+  it('knows no take that is not there', async () => {
+    const root = tempRepo(files)
+    expect(
+      await useLineTake(projectFileOf(root), 'act1', 'k1', 'f'.repeat(16), { encode: keepWav }),
+    ).toBeNull()
+  })
+})
+
+describe('dropLineTake', () => {
+  it('removes the take’s two files, and knows no other', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const made = await take(root, fish)
+    if (!made?.ok) throw new Error('expected a take')
+    const file = (await lineTakeFile(projectFileOf(root), 'act1', 'k1', made.take.id))!
+    expect(await dropLineTake(projectFileOf(root), 'act1', 'k1', made.take.id)).toEqual({
+      ok: true,
+    })
+    expect(readdirSync(dirname(file))).toEqual([])
+    expect(await dropLineTake(projectFileOf(root), 'act1', 'k1', made.take.id)).toBeNull()
+    expect(await lineTakeFile(projectFileOf(root), 'act1', 'k1', 'not-an-id')).toBeNull()
+  })
+})

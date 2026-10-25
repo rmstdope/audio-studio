@@ -25,6 +25,7 @@ import type { RuledOutResult } from '../services/ruledOut'
 import type { SoundAlikeChange } from '../services/soundAlike'
 import type { SetupResult } from '../services/setup'
 import type { NoteChange } from '../services/notes'
+import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../services/lineTakes'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
@@ -734,6 +735,59 @@ export function useSetup(fresh = false) {
     refetchOnWindowFocus: false,
     refetchOnMount: fresh ? 'always' : true,
   })
+}
+
+/** A line's extra takes, newest first, each marked current or stale. */
+export function useLineTakes(partId: string, key: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['line-takes', partId, key],
+    queryFn: () =>
+      getJson<NonNullable<LineTakesResult>>(
+        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`,
+      ),
+    enabled,
+  })
+}
+
+/** The URL of one of a line's extra takes (a WAV). */
+export function lineTakeUrl(partId: string, key: string, id: string): string {
+  return `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes/${id}.wav`
+}
+
+/**
+ * A line's extra takes: `take` records one more (free), `use` makes one the line's clip, `drop`
+ * removes one from the cache. Each reloads the list; using one reloads the part too.
+ */
+export function useLineTakeActions(partId: string, key: string) {
+  const client = useQueryClient()
+  const base = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`
+  const reloadTakes = () => client.invalidateQueries({ queryKey: ['line-takes', partId, key] })
+  const take = useMutation({
+    mutationFn: () => postJson<NonNullable<TakeLineResult>>(base),
+    onSuccess: reloadTakes,
+  })
+  const use = useMutation({
+    mutationFn: (id: string) => postJson<NonNullable<UseTakeResult>>(`${base}/${id}/use`),
+    onSuccess: async (result) => {
+      await reloadTakes()
+      if (result.ok) {
+        void client.invalidateQueries({ queryKey: ['plan', partId] })
+        void client.invalidateQueries({ queryKey: ['changes'] })
+        await client.invalidateQueries({ queryKey: ['part', partId] })
+      }
+    },
+  })
+  const drop = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`${base}/${id}`, { method: 'DELETE' })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`dropping the take answered ${response.status}`)
+      }
+      return (await response.json()) as { ok: boolean }
+    },
+    onSuccess: reloadTakes,
+  })
+  return { take, use, drop }
 }
 
 /** The URL of a recorded audition take. */
