@@ -1053,10 +1053,10 @@ Small, independently useful increments:
       stays free); a paid job or line asks to "Pay up to $X" with a second click, X being the most
       it can cost, and the server refuses one without that confirmation or beyond the credit
       (`core/spend.ts`).
-   3. **Choose the models** (built, as-3h4): the Models panel on Setup, which saves each stage's
-      model in the project file (§8.4, "Choose the stage models").
-   4. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
+   3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
+   4. **Choose the models** (built, as-3h4): the Models panel on Setup, which saves each stage's
+      model in the project file (§8.4, "Choose the stage models").
 
    What a paid account could still have (paid auditions, the `s1` retirement, your own voices) —
    everything is built or filed: cloning (as-5gk.5), voice design (as-5gk.6), the rate tier on
