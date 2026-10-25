@@ -44,6 +44,8 @@ export interface LineState {
    * the line (another language follows it), or its character's style.
    */
   cueFrom: 'own' | 'source' | 'style'
+  /** The source language's own cue for the line, when this is another language and it has one. */
+  sourceCue: string | null
   /** Whether the clip was made with the final model (when it differs from the draft one). */
   final: boolean
   status: LineStatus
@@ -87,6 +89,8 @@ export interface PlanInput {
   cues: Cues
   /** The cues written in this language itself; absent: all of `cues`. */
   ownCues?: Cues
+  /** The source language's cues, in a language besides the source; absent: none. */
+  sourceCues?: Cues
   lock: Lock
   manifest: Manifest
   /** File names present in the part's clips folder. */
@@ -111,6 +115,7 @@ export function planPart(input: PlanInput): PartState {
         english,
         cue: '',
         cueFrom: 'style',
+        sourceCue: null,
         final: false,
         status: 'untranslated',
         reasons: [],
@@ -158,6 +163,7 @@ export function planPart(input: PlanInput): PartState {
       text: line.text,
       english,
       cue: inputs?.cue ?? cueFor(cues, line.key) ?? character?.style ?? '',
+      sourceCue: (input.sourceCues && cueFor(input.sourceCues, line.key)) ?? null,
       cueFrom:
         cueFor(own, line.key) !== undefined
           ? 'own'

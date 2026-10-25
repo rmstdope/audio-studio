@@ -19,6 +19,7 @@ function line(
     english: null,
     cue: '',
     cueFrom: 'style',
+    sourceCue: null,
     final: false,
     status,
     reasons,

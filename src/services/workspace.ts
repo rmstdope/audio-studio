@@ -428,6 +428,7 @@ export async function readPart(
       ),
       cues,
       ownCues,
+      sourceCues,
       lock: lock ?? {},
       manifest: manifest ?? {},
       files,

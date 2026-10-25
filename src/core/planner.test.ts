@@ -200,6 +200,23 @@ describe('planPart, cues in a language besides the source', () => {
     expect(by.m1).toMatchObject({ cue: '[sad]', cueFrom: 'own' })
   })
 
+  it('keeps the source language’s cue beside a line’s own, for the editor to show', () => {
+    const state = planPart(
+      input({
+        lines: swedish,
+        source,
+        cues: { n1: '[worried]', m1: '[sad]' },
+        ownCues: { m1: '[sad]' },
+        sourceCues: { n1: '[worried]', m1: '[soft]' },
+      }),
+    )
+    const by = Object.fromEntries(state.lines.map((l) => [l.key, l]))
+    expect(by.n1).toMatchObject({ cueFrom: 'source', sourceCue: '[worried]' })
+    expect(by.m1).toMatchObject({ cueFrom: 'own', sourceCue: '[soft]' })
+    // The source language has no other language's cue to follow.
+    expect(planPart(input({ cues: { m1: '[sad]' } })).lines[1]!.sourceCue).toBeNull()
+  })
+
   it('falls back to the character’s style when neither language has a cue', () => {
     const state = planPart(input({ lines: swedish, source, ownCues: {} }))
     expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({

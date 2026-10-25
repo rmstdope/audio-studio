@@ -46,6 +46,7 @@ describe('setCue', () => {
     expect(part?.ok && part.part.lines.find((l) => l.key === 'a')).toMatchObject({
       cue: '[warm]',
       cueFrom: 'style',
+      sourceCue: null,
     })
   })
 
@@ -57,6 +58,7 @@ describe('setCue', () => {
     expect(part?.ok && part.part.lines.find((l) => l.key === 'b')).toMatchObject({
       cue: '[sad]',
       cueFrom: 'own',
+      sourceCue: null,
     })
   })
 
