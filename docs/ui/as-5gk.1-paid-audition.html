@@ -1,38 +1,281 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Paid audition</title><style>
-:root{--bg:#0b0c10;--panel:#12141a;--raised:#191c24;--inset:#0d0f14;--line:#1f232d;--line-strong:#2a2e39;--text:#eceef3;--soft:#c7ccd6;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--accent-ink:#1a0a02;--accent-soft-bg:#2a1b12;--accent-soft-ink:#ff9a6b;--ok:#3ddc97;--ok-bg:#10291f;--warn:#ffc24b;--warn-bg:#2d2412;--danger-bg:#2e1720;--danger-ink:#ff94a8;--kept-bg:#0f1a16;--kept-line:#1f5a40;--chip:#1a1d26;--r:14px;color-scheme:dark}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,sans-serif;padding:24px}
-.note{max-width:1100px;margin:0 auto 18px;padding:12px 16px;border:1px dashed var(--line-strong);border-radius:10px;color:var(--muted)}
-.note b{color:var(--text)}
-.frame{max-width:1100px;margin:0 auto 28px;border:1px solid var(--line);border-radius:var(--r);padding:22px;background:#0d0e13}
-.frame>h3{margin:0 0 14px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
-.crumbs{color:var(--faint);font-size:12px}h1{margin:4px 0;font-size:22px}.muted{color:var(--muted)}.faint{color:var(--faint)}
-.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
-.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
-.layout{display:grid;grid-template-columns:260px 1fr;gap:18px;margin-top:16px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px}
-.label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
-.btn{background:var(--raised);border:1px solid var(--line-strong);color:var(--text);border-radius:9px;padding:7px 12px;font:inherit;cursor:pointer}
-.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
-.btn-ghost{background:transparent}
-.chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--soft)}
-.badge{border-radius:999px;padding:2px 9px;font-size:12px}.badge.ok{background:var(--ok-bg);color:var(--ok)}.badge.paid{background:var(--accent-soft-bg);color:var(--accent-soft-ink)}.badge.warn{background:var(--warn-bg);color:var(--warn)}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
-.card.kept{background:var(--kept-bg);border-color:var(--kept-line)}
-.take{display:flex;gap:8px;align-items:center;background:var(--inset);border-radius:9px;padding:6px 8px}
-.play{width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:11px}
-.play.off{background:var(--raised);color:var(--faint)}
-.bar{border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
-.bar.ask{background:var(--accent-soft-bg);border:1px solid #5a3218}
-.bar.warn{background:var(--warn-bg);border:1px solid #5a4818}
-.bar.err{background:var(--danger-bg);border:1px solid #5a2430;color:var(--danger-ink)}
-.meter{height:6px;border-radius:9px;background:var(--inset);overflow:hidden;width:160px}.meter span{display:block;height:100%;background:var(--accent)}
-.confirm{border-color:var(--accent)}
-ul.fx{margin:0;padding-left:18px;color:var(--soft)}
-.section{font-size:15px;font-weight:600;margin:0}
-.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-input.money{background:var(--inset);border:1px solid var(--line-strong);color:var(--text);border-radius:8px;padding:6px 8px;width:80px;font:inherit}
-@media (max-width:760px){.layout,.split{grid-template-columns:1fr}}
-</style></head><body>
-<div class="note"><b>Agreed drawing: auditioning on a paid model.</b> One budget per sitting (A), resume asks again (B), the cast voice’s take on the character page stays free (A). Every state and word below is as agreed.</div>
-</body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Paid audition</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --kept-bg: #0f1a16;
+        --kept-line: #1f5a40;
+        --chip: #1a1d26;
+        --r: 14px;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        padding: 12px 16px;
+        border: 1px dashed var(--line-strong);
+        border-radius: 10px;
+        color: var(--muted);
+      }
+      .note b {
+        color: var(--text);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto 28px;
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 22px;
+        background: #0d0e13;
+      }
+      .frame > h3 {
+        margin: 0 0 14px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      h1 {
+        margin: 4px 0;
+        font-size: 22px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .between {
+        justify-content: space-between;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 18px;
+        margin-top: 16px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn-ghost {
+        background: transparent;
+      }
+      .chip {
+        background: var(--chip);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .badge {
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 12px;
+      }
+      .badge.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .badge.paid {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .badge.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .card.kept {
+        background: var(--kept-bg);
+        border-color: var(--kept-line);
+      }
+      .take {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: var(--inset);
+        border-radius: 9px;
+        padding: 6px 8px;
+      }
+      .play {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+      }
+      .play.off {
+        background: var(--raised);
+        color: var(--faint);
+      }
+      .bar {
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+      .bar.ask {
+        background: var(--accent-soft-bg);
+        border: 1px solid #5a3218;
+      }
+      .bar.warn {
+        background: var(--warn-bg);
+        border: 1px solid #5a4818;
+      }
+      .bar.err {
+        background: var(--danger-bg);
+        border: 1px solid #5a2430;
+        color: var(--danger-ink);
+      }
+      .meter {
+        height: 6px;
+        border-radius: 9px;
+        background: var(--inset);
+        overflow: hidden;
+        width: 160px;
+      }
+      .meter span {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .confirm {
+        border-color: var(--accent);
+      }
+      ul.fx {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .section {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      input.money {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 8px;
+        width: 80px;
+        font: inherit;
+      }
+      @media (max-width: 760px) {
+        .layout,
+        .split {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      <b>Agreed drawing: auditioning on a paid model.</b> One budget per sitting (A), resume asks
+      again (B), the cast voice’s take on the character page stays free (A). Every state and word
+      below is as agreed.
+    </div>
+  </body>
+</html>
