@@ -1,3 +1,11 @@
 node_modules
 bun.lock
 test/fixtures/**/*.json
+
+# The fleet's own files: Cerebro's submodule, its links and declarations, and the bead board
+.beads
+.cerebro
+.claude
+.github/agents
+.github/hooks
+.github/skills

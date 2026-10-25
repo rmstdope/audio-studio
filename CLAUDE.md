@@ -1,5 +1,7 @@
 # Audio Studio
 
+## The project
+
 A local, graphical tool for producing a game's audio, starting with narration: casting a voice per
 character by audition on Fish Audio, and recording every line of dialog with it. It runs from
 inside a checked-out game repository (the _consumer_, first of all RetroQuest), reads that
@@ -7,6 +9,18 @@ repository's `audio-studio.json`, and writes voice files and their metadata in p
 
 `docs/architecture.md` is the design: read it before changing how the tool works, and keep it up to
 date in the same change when the design moves. Its delivery plan (§12) says what comes next.
+
+## Work tracking
+
+Planned work is tracked in beads (`bd`), prefix `as`; `skills/beads-workflow` carries the commands.
+GitHub issues are the inbox for outside requests and bug reports only. Every bead is created
+unranked and ranked later with the navigator; a bead is planned in one session and implemented in
+another. `docs/architecture.md` §12 is the design's delivery plan; beads are the work queue, and a
+bead that changes the design updates §12 with it.
+
+The board syncs through the Dolt remote on `origin`, not through git. A fresh clone runs
+`bd bootstrap` once (it refuses if a database already exists, so do not run `bd list` first); after
+that it is `bd dolt pull` and `bd dolt push`.
 
 ## How we work
 
@@ -100,16 +114,21 @@ audio-studio --dev     # in a consumer repository, reloading on changes (after `
 `bun run check` passes (CI runs the same checks on every pull request and on `main`), new behaviour
 has tests, and `docs/architecture.md` matches what was built. Work on a branch, not on `main`.
 
-## Review of every pull request
+## Producer review
 
-Every pull request gets an independent review by a sub-agent before it is handed over for merge:
+Nothing merges red. Before delivery, a producer obtains and addresses one independent, full review
+of the complete diff and bead. If its changes are substantial enough to make another review useful,
+the producer chooses the right follow-up scope and obtains it; minor, self-contained answers need
+not create a review loop. Unresolved findings, a red or missing check, or a reviewer that cannot
+produce a usable result go to a person. Whether the navigator also takes part in the plan, the
+review or the merge is `navigator_gates` in `.cerebro/project.conf`; absent means none.
 
-1. Start a fresh sub-agent to review the whole diff of the pull request against `main`. Give it the
-   pull request and this file, not your own conclusions, so its reading is not anchored on yours.
-   Ask for correctness bugs first, then breaches of the rules in this file (tests, design, the
-   consumer rules), then simplifications.
+How the review is done here:
+
+1. A fresh sub-agent reviews the whole diff of the pull request against `main`. Give it the pull
+   request and this file, not your own conclusions, so its reading is not anchored on yours. Ask
+   for correctness bugs first, then breaches of the rules in this file (tests, design, the consumer
+   rules), then simplifications.
 2. Address every finding: fix it (test first, as always), or answer it with why it stays as it is.
    No finding is left without an answer.
-3. Push the fixes, and if they were substantial, have them reviewed again.
-4. Report the findings and what was done with each in the pull request, then hand it over. Never
-   merge a pull request yourself.
+3. Report the findings and what was done with each in the pull request.
