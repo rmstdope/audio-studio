@@ -300,11 +300,11 @@ describe('server', () => {
     const part = await (await fetch(url('/api/parts/act1'))).json()
     expect(part.part.lines.find((l: { key: string }) => l.key === 'a')).toMatchObject({
       cue: '[hushed]',
-      ownCue: true,
+      cueFrom: 'own',
     })
     expect((await patch('a', { cue: '' })).status).toBe(200)
     const after = await (await fetch(url('/api/parts/act1'))).json()
-    expect(after.part.lines.find((l: { key: string }) => l.key === 'a').ownCue).toBe(false)
+    expect(after.part.lines.find((l: { key: string }) => l.key === 'a').cueFrom).toBe('style')
   })
 
   it('tries a cue on a line, from the studio’s own page only, and serves the take', async () => {

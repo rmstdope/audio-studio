@@ -365,7 +365,20 @@ export async function readPart(
     })
   }
   const cast = await readCast(root, project, problems)
-  const cues = usable(await readResource(root, at(templates.cues), CuesSchema, problems))
+  const ownCues = usable(await readResource(root, at(templates.cues), CuesSchema, problems)) ?? {}
+  // Another language follows the source language's cue for a line until it has one of its own.
+  const sourceCues =
+    language === sourceLanguage
+      ? {}
+      : (usable(
+          await readResource(
+            root,
+            partPathFor(templates.cues, part.id, sourceLanguage),
+            CuesSchema,
+            problems,
+          ),
+        ) ?? {})
+  const cues = { ...sourceCues, ...ownCues }
   const lock = usable(await readResource(root, at(templates.lock), LockSchema, problems))
   const manifest = usable(
     await readResource(root, at(templates.manifest), ManifestSchema, problems),
@@ -386,7 +399,8 @@ export async function readPart(
         language,
         project.narration.languages[0]!,
       ),
-      cues: cues ?? {},
+      cues,
+      ownCues,
       lock: lock ?? {},
       manifest: manifest ?? {},
       files,

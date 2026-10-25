@@ -161,8 +161,11 @@ describe('adoptUntracked', () => {
 describe('planPart, cues', () => {
   it('tells a line’s own cue from its character’s style', () => {
     const state = planPart(input({ cues: { m1: '[sad]' } }))
-    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ cue: '[sad]', ownCue: true })
-    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({ cue: '[warm]', ownCue: false })
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ cue: '[sad]', cueFrom: 'own' })
+    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({
+      cue: '[warm]',
+      cueFrom: 'style',
+    })
   })
 
   it('takes a key named like an object property for a line key, not a cue', () => {
@@ -171,7 +174,45 @@ describe('planPart, cues', () => {
       { key: 'constructor', speaker: 'narrator', text: 'Two.' },
     ]
     const state = planPart(input({ lines: odd, manifest: {}, files: new Set() }))
-    for (const line of state.lines) expect(line).toMatchObject({ cue: '[warm]', ownCue: false })
+    for (const line of state.lines) expect(line).toMatchObject({ cue: '[warm]', cueFrom: 'style' })
+  })
+})
+
+describe('planPart, cues in a language besides the source', () => {
+  const source: Line[] = lines
+  const swedish: Line[] = [
+    { key: 'n1', speaker: 'narrator', text: 'Elior vaknar.' },
+    { key: 'm1', speaker: 'mira', text: 'Välkommen, barn.' },
+  ]
+
+  it('follows the source line’s cue, then the character’s style; its own cue wins', () => {
+    // `cues` is what the language is spoken with; `ownCues` the part of it the language wrote.
+    const state = planPart(
+      input({
+        lines: swedish,
+        source,
+        cues: { n1: '[worried]', m1: '[sad]' },
+        ownCues: { m1: '[sad]' },
+      }),
+    )
+    const by = Object.fromEntries(state.lines.map((l) => [l.key, l]))
+    expect(by.n1).toMatchObject({ cue: '[worried]', cueFrom: 'source' })
+    expect(by.m1).toMatchObject({ cue: '[sad]', cueFrom: 'own' })
+  })
+
+  it('falls back to the character’s style when neither language has a cue', () => {
+    const state = planPart(input({ lines: swedish, source, ownCues: {} }))
+    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({
+      cue: '[warm]',
+      cueFrom: 'style',
+    })
+  })
+
+  it('lists only the language’s own unused cues as orphaned', () => {
+    const state = planPart(
+      input({ lines: swedish, source, cues: { gone: '[x]', old: '[y]' }, ownCues: { old: '[y]' } }),
+    )
+    expect(state.orphanCues).toEqual([{ key: 'old', cue: '[y]' }])
   })
 })
 

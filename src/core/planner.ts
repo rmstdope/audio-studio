@@ -39,8 +39,11 @@ export interface LineState {
   english: string | null
   /** The cue the line is (or would be) delivered with. */
   cue: string
-  /** Whether that is the line's own cue (from the part's cues), not its character's style. */
-  ownCue: boolean
+  /**
+   * Where that cue comes from: the line's own cue in this language, the source language's cue for
+   * the line (another language follows it), or its character's style.
+   */
+  cueFrom: 'own' | 'source' | 'style'
   /** Whether the clip was made with the final model (when it differs from the draft one). */
   final: boolean
   status: LineStatus
@@ -77,7 +80,13 @@ export interface PlanInput {
    */
   source?: Line[]
   cast: Cast
+  /**
+   * The cues the lines are spoken with. In a language besides the source, the source's cues under
+   * the language's own, so a line follows the source's cue until it has one of its own.
+   */
   cues: Cues
+  /** The cues written in this language itself; absent: all of `cues`. */
+  ownCues?: Cues
   lock: Lock
   manifest: Manifest
   /** File names present in the part's clips folder. */
@@ -88,6 +97,7 @@ export interface PlanInput {
 /** The state of every line's clip in a part, its orphaned clips and cues, and counts per status. */
 export function planPart(input: PlanInput): PartState {
   const { cast, cues, lock, manifest, files, narration } = input
+  const own = input.ownCues ?? cues
   const lines = withSource(input.lines, input.source)
   const counts = Object.fromEntries(LINE_STATUSES.map((s) => [s, 0])) as Record<LineStatus, number>
 
@@ -100,7 +110,7 @@ export function planPart(input: PlanInput): PartState {
         text: '',
         english,
         cue: '',
-        ownCue: false,
+        cueFrom: 'style',
         final: false,
         status: 'untranslated',
         reasons: [],
@@ -148,7 +158,12 @@ export function planPart(input: PlanInput): PartState {
       text: line.text,
       english,
       cue: inputs?.cue ?? cueFor(cues, line.key) ?? character?.style ?? '',
-      ownCue: cueFor(cues, line.key) !== undefined,
+      cueFrom:
+        cueFor(own, line.key) !== undefined
+          ? 'own'
+          : cueFor(cues, line.key) !== undefined
+            ? 'source'
+            : 'style',
       final,
       status,
       reasons,
@@ -164,7 +179,7 @@ export function planPart(input: PlanInput): PartState {
     .filter(([key]) => !keys.has(key))
     .map(([key, clip]) => ({ key, speaker: clip.speaker ?? null, file: clip.file }))
     .sort((a, b) => a.key.localeCompare(b.key))
-  const orphanCues = Object.entries(cues)
+  const orphanCues = Object.entries(own)
     .filter(([key]) => !keys.has(key))
     .map(([key, cue]) => ({ key, cue }))
 

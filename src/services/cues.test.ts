@@ -45,7 +45,7 @@ describe('setCue', () => {
     const part = await loadPart(projectFile, 'act1')
     expect(part?.ok && part.part.lines.find((l) => l.key === 'a')).toMatchObject({
       cue: '[warm]',
-      ownCue: false,
+      cueFrom: 'style',
     })
   })
 
@@ -56,7 +56,7 @@ describe('setCue', () => {
     const part = await loadPart(projectFile, 'act1')
     expect(part?.ok && part.part.lines.find((l) => l.key === 'b')).toMatchObject({
       cue: '[sad]',
-      ownCue: true,
+      cueFrom: 'own',
     })
   })
 

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { clipInputs, fingerprint } from '../core/fingerprint'
+import { ProjectSchema } from '../core/project'
 import {
   adoptPart,
   clipFile,
@@ -386,6 +388,48 @@ describe('a part in several languages', () => {
     const act2 = await open('en', 'act2')
     expect(act2.part.languages.find((l) => l.id === 'en')!.dialog).toBe('invalid')
     expect(act2.part.dialog).toBe('invalid')
+  })
+
+  it('has a line follow the source language’s cue until it has its own', async () => {
+    const { part } = await open('sv', 'act1', {
+      'tts/cast.json': {
+        speakers: {
+          narrator: { voice: 'v1', style: '[warm]', languages: { sv: { voice: 'v1-sv' } } },
+        },
+      },
+      'tts/act1/en/cues.json': { a: '[worried]', b: '[soft]' },
+      'tts/act1/sv/cues.json': { b: '[mjukt]', gone: '[x]' },
+    })
+    const by = Object.fromEntries(part.lines.map((l) => [l.key, [l.cue, l.cueFrom]]))
+    expect(by.a).toEqual(['[worried]', 'source'])
+    expect(by.b).toEqual(['', 'style'])
+    expect(by.z).toEqual(['', 'style'])
+    expect(part.orphanCues).toEqual([{ key: 'gone', cue: '[x]' }])
+  })
+
+  it('makes a language’s clips stale, for the cue, when the source cue changes', async () => {
+    const cast = { speakers: { narrator: { voice: 'v1-sv' } } }
+    const narration = ProjectSchema.parse(project(['en', 'sv', 'de'])).narration
+    const inputs = clipInputs(
+      { key: 'a', text: 'En gång.' },
+      cast.speakers.narrator,
+      {},
+      {},
+      narration,
+    )!
+    const { fp, parts } = fingerprint(inputs)
+    const made = { a: { fp, voice: 'v1-sv', model: inputs.model, parts, at: 'then' } }
+    const { part } = await open('sv', 'act1', {
+      'tts/cast.json': {
+        speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } } },
+      },
+      'audio/act1/sv/narration.lock.json': made,
+      'tts/act1/en/cues.json': { a: '[worried]' },
+    })
+    expect(part.lines.find((l) => l.key === 'a')).toMatchObject({
+      status: 'stale',
+      reasons: ['cue'],
+    })
   })
 
   it('says so when the source dialog is missing, since lines cannot be matched', async () => {

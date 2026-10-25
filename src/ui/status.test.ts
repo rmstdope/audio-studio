@@ -9,7 +9,7 @@ function line(overrides: Partial<LineState>): LineState {
     text: 'Hello.',
     english: null,
     cue: '',
-    ownCue: false,
+    cueFrom: 'style',
     final: false,
     status: 'ok',
     reasons: [],

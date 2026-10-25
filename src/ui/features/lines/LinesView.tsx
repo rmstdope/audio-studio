@@ -723,7 +723,7 @@ function CueCell({
   const cell = useRef<HTMLButtonElement>(null)
   const refocus = useRef(false)
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
-  const own = line.ownCue ? line.cue : ''
+  const own = line.cueFrom === 'own' ? line.cue : ''
 
   // Back on the cue after editing, so the keyboard keeps its place in the table.
   useEffect(() => {
@@ -756,9 +756,9 @@ function CueCell({
       <button
         ref={cell}
         type="button"
-        className={`cue-button mono${line.ownCue ? '' : ' from-style'}`}
+        className={`cue-button mono${line.cueFrom === 'own' ? '' : ' from-style'}`}
         title={
-          line.ownCue
+          line.cueFrom === 'own'
             ? 'This line’s own cue: edit'
             : 'The character’s style: give this line its own cue'
         }
@@ -783,7 +783,7 @@ function CueCell({
         className="mono"
         autoFocus
         aria-label={`Cue for ${line.key}`}
-        placeholder={line.ownCue ? '' : line.cue || '[a cue for this line]'}
+        placeholder={line.cueFrom === 'own' ? '' : line.cue || '[a cue for this line]'}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => e.key === 'Escape' && close()}
@@ -792,7 +792,7 @@ function CueCell({
         <button className="btn" type="submit" disabled={save.isPending || draft.trim() === own}>
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
-        {line.ownCue && (
+        {line.cueFrom === 'own' && (
           <button
             className="btn"
             type="button"
