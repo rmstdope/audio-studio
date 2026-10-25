@@ -728,6 +728,69 @@ describe('server, retiring models', () => {
   })
 })
 
+describe('server, paid auditions in two languages', () => {
+  const base = projectJson()
+  const root = tempRepo({
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        models: { audition: 's2.1-pro' },
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+        audition: { phrases: { sv: 'Kom in.' } },
+      },
+    },
+    'tts/cast.json': { speakers: { gran: { voice: 'cur', audition: { keywords: ['warm'] } } } },
+    'tts/act1/en/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
+    'tts/act1/sv/script.json': [{ key: 'a', speaker: 'gran', text: 'Hej.' }],
+  })
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: {
+      ...fish,
+      async credit() {
+        return 5
+      },
+      async getVoice() {
+        throw new Error('gone')
+      },
+    },
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(new URL(path, server.url), {
+      method,
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const sitting = async (language: string) =>
+    (await (await send('GET', `/api/auditions/gran/sitting?language=${language}`)).json()).sitting
+
+  it('keeps a sitting for each language’s audition, so starting one leaves the other’s money', async () => {
+    expect(
+      (await send('POST', '/api/auditions/gran/start?language=en', { spendUpTo: 0.5 })).status,
+    ).toBe(200)
+    expect(
+      (await send('POST', '/api/auditions/gran/start?language=sv', { spendUpTo: 0.2 })).status,
+    ).toBe(200)
+    expect((await sitting('en')).dollars).toBe(0.5)
+    expect((await sitting('sv')).dollars).toBe(0.2)
+    await send('DELETE', '/api/auditions/gran?language=sv')
+    expect(await sitting('sv')).toBeNull()
+    expect((await sitting('en')).dollars).toBe(0.5)
+  })
+})
+
 describe('allowedHosts', () => {
   it('names both addresses with the port', () => {
     expect(allowedHosts(4801)).toEqual(['127.0.0.1:4801', 'localhost:4801'])

@@ -270,7 +270,7 @@ export function CharacterView({
               several ? language : undefined,
             )}
             paidModel={money?.paid ? money.model : null}
-            parts={character.appearances.map((a) => ({
+            parts={appearances.map((a) => ({
               id: a.part,
               title: titles.get(a.part) ?? a.part,
             }))}
@@ -452,7 +452,12 @@ function VoicePanel({
       name={character.name}
       language={language?.id}
       languageName={language?.name}
-      currentTitle={id ? answer?.voice?.title || voiceLabel(character) : null}
+      languages={languages}
+      currentTitle={
+        id
+          ? answer?.voice?.title || voiceLabel({ voice: id, voiceName: casting?.voiceName ?? null })
+          : null
+      }
       parts={parts}
       inProgress={inProgress}
       sessionKnown={sessionKnown}

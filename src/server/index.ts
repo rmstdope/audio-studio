@@ -58,6 +58,7 @@ import { heardFor } from '../services/heard'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
 import {
   adoptPart,
+  cacheNameFor,
   clipFile,
   loadPart,
   loadProject,
@@ -337,6 +338,10 @@ export function startServer({
    */
   const sittings = new Map<string, Budget>()
 
+  /** What a character's sitting is kept under: its id and the language of the audition it is for. */
+  const sittingKey = (characterId: string, request: Request) =>
+    cacheNameFor(projectFile, characterId, languageOf(request))
+
   /** Ends a character's sitting: what was left is not kept, and the credit is free again. */
   function endSitting(characterId: string) {
     const budget = sittings.get(characterId)
@@ -348,11 +353,11 @@ export function startServer({
   }
 
   /** The money of a character's audition for the page; null for an unknown character. */
-  async function sittingView(characterId: string, language?: string) {
+  async function sittingView(characterId: string, key: string, language?: string) {
     const money = await auditionMoney(projectFile, characterId, language)
     if (!money || !money.ok) return money
     const paid = isPaid(money.model, new Date())
-    const budget = paid ? sittings.get(characterId) : undefined
+    const budget = paid ? sittings.get(key) : undefined
     const view: SittingView = {
       model: money.model,
       paid,
@@ -371,7 +376,11 @@ export function startServer({
     refused?: SpendProblem | null,
   ) {
     if (refused) return Response.json({ ok: false, ...refused }, { status: 409 })
-    const view = await sittingView(characterId, languageOf(request))
+    const view = await sittingView(
+      characterId,
+      await sittingKey(characterId, request),
+      languageOf(request),
+    )
     if (!view) return notFound()
     return Response.json(view, { status: view.ok ? 200 : 409 })
   }
@@ -827,7 +836,8 @@ export function startServer({
           }
           const { id } = request.params
           const { voice, board } = body.data
-          const budget = board ? sittings.get(id) : undefined
+          const sitting = await sittingKey(id, request)
+          const budget = board ? sittings.get(sitting) : undefined
           const result = await recordTake(
             projectFile,
             id,
@@ -837,7 +847,7 @@ export function startServer({
             {
               board,
               budget,
-              open: () => budget !== undefined && sittings.get(id) === budget,
+              open: () => budget !== undefined && sittings.get(sitting) === budget,
               flight: (dollars) => {
                 if (!budget) return () => undefined
                 inFlight.set(budget, (inFlight.get(budget) ?? 0) + dollars)
@@ -870,7 +880,7 @@ export function startServer({
           const discarded = await discardSession(projectFile, id, language)
           if (!discarded) return notFound()
           if (discarded !== true) return Response.json(discarded, { status: 409 })
-          endSitting(id)
+          endSitting(await sittingKey(id, request))
           return Response.json(
             await viewOf(projectFile, id, { ok: true, session: null }, { language }),
           )
@@ -901,12 +911,12 @@ export function startServer({
             if ('problem' in got) return sittingAnswer(request, id, got.problem)
             admitted = got.budget
             // After the credit was read, so two starts at once cannot leave a budget behind.
-            endSitting(id)
-            sittings.set(id, admitted)
+            endSitting(await sittingKey(id, request))
+            sittings.set(await sittingKey(id, request), admitted)
           }
           const started = await startAudition(projectFile, id, fishFor, languageOf(request))
           // An audition that did not start has no sitting.
-          if (admitted && !started?.ok) endSitting(id)
+          if (admitted && !started?.ok) endSitting(await sittingKey(id, request))
           return answer(id, Promise.resolve(started), { language: languageOf(request) })
         }),
       },
@@ -924,13 +934,13 @@ export function startServer({
             if ('problem' in got) return sittingAnswer(request, id, got.problem)
             // Resuming is a fresh sitting; what the last one had left is not kept. It was held
             // while the new amount was checked, which is less than one take (a used-up sitting).
-            endSitting(id)
-            sittings.set(id, got.budget)
+            endSitting(await sittingKey(id, request))
+            sittings.set(await sittingKey(id, request), got.budget)
           }
           return sittingAnswer(request, id)
         }),
-        DELETE: fromOwnPage((request) => {
-          endSitting(request.params.id)
+        DELETE: fromOwnPage(async (request) => {
+          endSitting(await sittingKey(request.params.id, request))
           return sittingAnswer(request, request.params.id)
         }),
       },
@@ -939,7 +949,7 @@ export function startServer({
           const body = AmountBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { amount }' }, { status: 400 })
           const { id } = request.params
-          const budget = sittings.get(id)
+          const budget = sittings.get(await sittingKey(id, request))
           if (!budget) {
             return sittingAnswer(request, id, {
               reason: 'confirm',
@@ -1053,6 +1063,7 @@ export function startServer({
             languageOf(request),
           )
           if (!result) return notFound()
+          if (result.ok) endSitting(await sittingKey(request.params.id, request))
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
@@ -1067,7 +1078,7 @@ export function startServer({
             languageOf(request),
           )
           if (!result) return notFound()
-          if (result.ok) endSitting(request.params.id)
+          if (result.ok) endSitting(await sittingKey(request.params.id, request))
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

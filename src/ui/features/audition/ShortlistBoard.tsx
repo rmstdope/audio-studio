@@ -289,7 +289,7 @@ export function ShortlistBoard({
           failure={sittingFailure(sittingActions.resume.data)}
           onPay={(amount) => sittingActions.resume.mutate(amount)}
           onCancel={() => {
-            window.location.hash = routeHref({ view: 'character', character: characterId })
+            window.location.hash = page
           }}
         />
       )}

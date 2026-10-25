@@ -13,6 +13,7 @@ import {
 } from '../../api'
 import { audioSeconds } from '../../audioLength'
 import { castEffects } from '../../board'
+import { castInLanguage, type Language } from '../../castLanguages'
 import { Confirm } from '../../components/Confirm'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { recordedLinesOf } from '../../inGame'
@@ -88,9 +89,12 @@ export function CloneVoice({
   toggle,
   language,
   languageName,
+  languages = [],
 }: {
   characterId: string
   name: string
+  /** Every declared language, for saying what casting leaves alone. */
+  languages?: Language[]
   /** The language it is cast for, in a project with several; left out otherwise. */
   language?: string
   languageName?: string
@@ -265,6 +269,7 @@ export function CloneVoice({
             characterId={characterId}
             language={language}
             languageName={languageName}
+            languages={languages}
             name={name}
             current={currentTitle}
             voice={made}
@@ -489,6 +494,7 @@ function CastOwnConfirm({
   characterId,
   language,
   languageName,
+  languages,
   name,
   current,
   voice,
@@ -500,6 +506,7 @@ function CastOwnConfirm({
   characterId: string
   language?: string
   languageName?: string
+  languages: Language[]
   name: string
   current: string | null
   voice: { id: string; name: string }
@@ -541,7 +548,21 @@ function CastOwnConfirm({
         dropped: inProgress?.dropped.length ?? 0,
         unheard: inProgress ? inProgress.toHear.length + inProgress.queue.length : 0,
         auditioning: inProgress !== null,
-        ...(languageName ? { language: languageName } : {}),
+        ...(language && languageName
+          ? {
+              language: languageName,
+              stale: castInLanguage(
+                voice.name,
+                name,
+                languages,
+                language,
+                recorded.map((a) => ({
+                  title: parts.find((p) => p.id === a.part)?.title ?? a.part,
+                  lines: a.lines,
+                })),
+              ).stale,
+            }
+          : {}),
       })}
       onBack={onBack}
     >
