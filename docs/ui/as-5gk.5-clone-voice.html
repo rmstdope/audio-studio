@@ -1,0 +1,480 @@
+<!doctype html><meta charset="utf-8" /><meta
+  name="viewport"
+  content="width=device-width,initial-scale=1"
+/>
+<style>
+  :root {
+    --bg: #0b0c10;
+    --panel: #12141a;
+    --raised: #191c24;
+    --inset: #0d0f14;
+    --line: #1f232d;
+    --line-strong: #2a2e39;
+    --text: #eceef3;
+    --soft: #c7ccd6;
+    --muted: #a9b0bd;
+    --faint: #8a91a0;
+    --accent: #ff6b2c;
+    --accent-ink: #1a0a02;
+    --ok: #3ddc97;
+    --warn: #ffc24b;
+    --danger-ink: #ff94a8;
+    --danger-bg: #2e1720;
+    --note: #7aa7ff;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font:
+      14px/1.45 -apple-system,
+      system-ui,
+      sans-serif;
+    padding: 24px 16px;
+  }
+  h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+  }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+    margin: 28px 0 8px;
+  }
+  .intro {
+    color: var(--muted);
+    max-width: 760px;
+    margin: 0 0 8px;
+  }
+  .cap {
+    color: var(--faint);
+    font-size: 12px;
+    max-width: 820px;
+    margin: 4px 0 0;
+  }
+  .page {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    max-width: 820px;
+    padding: 14px;
+    background: var(--bg);
+    position: relative;
+  }
+  .hdr {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .av {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #2b3f6b;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+  }
+  .hdr .sp {
+    flex: 1;
+  }
+  .crumb {
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .big {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .panel {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+  }
+  .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .faint {
+    color: var(--faint);
+    font-size: 12px;
+  }
+  .mono {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+  }
+  .btn {
+    background: var(--raised);
+    color: var(--text);
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 5px 11px;
+    font: inherit;
+    font-size: 13px;
+  }
+  .primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .ghost {
+    background: none;
+    border-color: transparent;
+    color: var(--note);
+  }
+  .btn[disabled] {
+    opacity: 0.5;
+  }
+  .focus {
+    outline: 2px solid var(--note);
+    outline-offset: 2px;
+  }
+  .acts {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 10px;
+  }
+  .field label {
+    font-size: 12px;
+    color: var(--soft);
+  }
+  input[type='text'] {
+    background: var(--inset);
+    border: 1px solid var(--line-strong);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font: inherit;
+    max-width: 360px;
+  }
+  .drop {
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+    color: var(--muted);
+    background: var(--inset);
+  }
+  ul.files {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+  }
+  ul.files li {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  ul.files .n {
+    flex: 1;
+    min-width: 160px;
+  }
+  .x {
+    color: var(--faint);
+    background: none;
+    border: none;
+    font-size: 15px;
+  }
+  .chip {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--raised);
+    color: var(--soft);
+  }
+  .ok {
+    background: #10291f;
+    color: #5be3ae;
+  }
+  .warn {
+    background: #2e2610;
+    color: var(--warn);
+  }
+  .bad {
+    background: var(--danger-bg);
+    color: var(--danger-ink);
+  }
+  .err {
+    color: var(--danger-ink);
+    display: block;
+    margin-top: 8px;
+  }
+  .check {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-top: 10px;
+    color: var(--soft);
+    font-size: 13px;
+  }
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 8px;
+  }
+  .dialog {
+    position: relative;
+    margin: 30px auto;
+    max-width: 520px;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 10px 40px #000;
+  }
+  .dialog h3 {
+    margin: 0 0 4px;
+    font-size: 16px;
+  }
+  .ghostpage {
+    opacity: 0.35;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #1b2440;
+    color: var(--note);
+    margin-left: 6px;
+  }
+</style>
+<title>Clone a voice</title>
+<h1>Clone a voice from recordings on a character page (agreed)</h1>
+<p class="intro">
+  Everything below is what a person would see and read. Words in quotes are the exact words that
+  would ship.
+</p>
+<h2>1 · Closed: the button in the Voice panel</h2>
+<div class="panel" style="max-width: 820px">
+  <span class="label">Voice</span><strong>No voice yet</strong>
+  <div class="muted">
+    Start an audition to find one, or clone one from recordings you have. Until then Elior’s lines
+    cannot be recorded.
+  </div>
+  <div class="acts"><button class="btn">Clone a voice from recordings</button></div>
+</div>
+<p class="cap">
+  With a voice already cast, the same button sits at the right of the panel’s play row (drawing A,
+  1b).
+</p>
+<h2>2 · Opened: focus lands in the name, which is the character’s name</h2>
+<div class="panel" style="max-width: 820px">
+  <span class="label">Voice · clone from recordings</span>
+  <div class="muted">
+    Makes a private voice on your Fish account from speech you have recorded. Only you can use it.
+  </div>
+  <div class="field">
+    <label>Name of the voice</label><input type="text" class="focus" value="Elior" />
+  </div>
+  <div class="field">
+    <label>Recordings</label>
+    <div class="drop">
+      Drop audio files here, or <button class="btn">Choose files…</button>
+      <div class="faint">
+        1 to 20 files, at least 10 seconds each. A minute or two in all gives the closest likeness.
+      </div>
+    </div>
+  </div>
+  <label class="check"
+    ><input type="checkbox" /> These recordings are mine, or I have permission to clone this
+    voice.</label
+  >
+  <div class="acts">
+    <button class="btn primary" disabled>Clone voice</button><button class="btn">Cancel</button>
+  </div>
+</div>
+<p class="cap">
+  Esc or Cancel closes it; focus returns to “Clone a voice from recordings”. Nothing was sent or
+  written. Clone voice stays greyed out until there is a name, a recording long enough, and the
+  tick.
+</p>
+<h2>3 · Files chosen, ticked</h2>
+<div class="panel" style="max-width: 820px">
+  <span class="label">Voice · clone from recordings</span>
+  <div class="field"><label>Name of the voice</label><input type="text" value="Elior" /></div>
+  <div class="field">
+    <label>Recordings</label>
+    <div class="drop" style="padding: 8px">
+      Drop more files here, or <button class="btn">Choose files…</button>
+    </div>
+    <ul class="files">
+      <li>
+        <span class="n">elior-cave-take1.wav</span><span class="mono">0:48</span
+        ><button class="x" title="Remove elior-cave-take1.wav">✕</button>
+      </li>
+      <li>
+        <span class="n">elior-cave-take2.wav</span><span class="mono">0:37</span
+        ><button class="x">✕</button>
+      </li>
+      <li>
+        <span class="n" style="text-decoration: line-through; color: var(--faint)"
+          >elior-laugh.m4a</span
+        ><span class="mono">0:06</span><span class="chip bad">under 10 s — left out</span
+        ><button class="x">✕</button>
+      </li>
+    </ul>
+    <div class="faint" style="margin-top: 6px">2 recordings will be sent · 1 min 25 s in all.</div>
+  </div>
+  <label class="check"
+    ><input type="checkbox" checked /> These recordings are mine, or I have permission to clone this
+    voice.</label
+  >
+  <div class="acts">
+    <button class="btn primary">Clone voice</button><button class="btn">Cancel</button>
+  </div>
+</div>
+<p class="cap">
+  A very long file name is cut short with “…” and shown whole on hover. Other edge states as in
+  drawing C: “not an audio file — left out”, “23 recordings chosen; Fish takes up to 20. Remove 3 to
+  clone.”, “No recording is long enough. Each needs at least 10 seconds of speech.”
+</p>
+<h2>4 · Cloning</h2>
+<div class="panel" style="max-width: 820px">
+  <span class="label">Voice · clone from recordings</span>
+  <div class="muted">
+    Sending 2 recordings to Fish and making the voice… this can take a minute.
+  </div>
+  <div class="acts"><button class="btn primary" disabled>Cloning…</button></div>
+</div>
+<p class="cap">
+  No Cancel while cloning: once sent, Fish makes the voice either way. Leaving the page or reloading
+  while cloning asks first: “The voice is still being made. If you leave, it is still made on your
+  Fish account, but you won’t see it here.”
+</p>
+<h2>5 · Made: a sample of the new voice, focus on Cast</h2>
+<div class="panel" style="max-width: 820px">
+  <span class="label">Voice · clone from recordings</span>
+  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+    <button class="btn" title="Play">▶</button>
+    <div>
+      <strong>Elior</strong> <span class="tag">your voice</span>
+      <div class="faint">Made on your Fish account, private.</div>
+    </div>
+  </div>
+  <div class="acts">
+    <button class="btn primary focus">Cast for Elior</button
+    ><button class="btn">Bring into the audition</button><button class="btn ghost">Close</button>
+  </div>
+</div>
+<p class="cap">
+  ▶ plays the new voice saying the audition phrase, recorded by itself as for a cast voice. Cast
+  asks first with the same confirmation as casting from the audition (“Cast Elior as Elior?”,
+  listing what changes — recorded lines, an audition going on). When another voice is cast the
+  button reads “Cast instead of Old Sage”. Bring into the audition puts it first among the voices to
+  hear, starting an audition if none is going on, and goes to the audition. Close leaves the voice
+  on your Fish account and Elior unchanged.
+</p>
+<h2>5b · Made, but it cannot speak on this account</h2>
+<div class="panel" style="max-width: 820px">
+  <span class="label">Voice · clone from recordings</span>
+  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+    <button class="btn" title="Play">▶</button>
+    <div>
+      <strong>Elior</strong> <span class="tag">your voice</span>
+      <div class="faint">Made on your Fish account, private.</div>
+    </div>
+  </div>
+  <span class="err"
+    >The voice was made, but Fish will not speak with it on your account: &lt;Fish’s own
+    message&gt;. A private voice may need a paid Fish account.</span
+  >
+  <div class="acts"><button class="btn ghost">Close</button></div>
+</div>
+<p class="cap">
+  Offered to every account, free or paid: nobody is turned away on a guess. Cast and Bring into the
+  audition are not offered here.
+</p>
+<h2>6 · Fish refused</h2>
+<div class="panel" style="max-width: 820px">
+  <span class="label">Voice · clone from recordings</span>
+  <div class="field"><label>Name of the voice</label><input type="text" value="Elior" /></div>
+  <div class="field">
+    <label>Recordings</label>
+    <ul class="files">
+      <li>
+        <span class="n">elior-cave-take1.wav</span><span class="mono">0:48</span
+        ><button class="x" title="Remove elior-cave-take1.wav">✕</button>
+      </li>
+      <li>
+        <span class="n">elior-cave-take2.wav</span><span class="mono">0:37</span
+        ><button class="x">✕</button>
+      </li>
+      <li>
+        <span class="n" style="text-decoration: line-through; color: var(--faint)"
+          >elior-laugh.m4a</span
+        ><span class="mono">0:06</span><span class="chip bad">under 10 s — left out</span
+        ><button class="x">✕</button>
+      </li>
+    </ul>
+    <div class="faint" style="margin-top: 6px">2 recordings will be sent · 1 min 25 s in all.</div>
+  </div>
+  <label class="check"
+    ><input type="checkbox" checked /> These recordings are mine, or I have permission to clone this
+    voice.</label
+  ><span class="err"
+    >Fish Audio could not make the voice: &lt;Fish’s own message&gt;. Nothing was made; your
+    recordings are still here.</span
+  >
+  <div class="acts">
+    <button class="btn primary">Clone voice</button><button class="btn">Cancel</button>
+  </div>
+</div>
+<h2>7 · No Fish key set up</h2>
+<div class="panel" style="max-width: 820px">
+  <span class="label">Voice</span><strong>No voice yet</strong>
+  <div class="acts">
+    <button class="btn" disabled>Clone a voice from recordings</button
+    ><span class="faint">Needs a Fish Audio key — see Setup.</span>
+  </div>
+</div>
+<h2>8 · A narrow window</h2>
+<div style="width: 360px; border: 1px solid var(--line); border-radius: 8px; padding: 8px">
+  <div class="panel" style="margin: 0">
+    <span class="label">Voice · clone from recordings</span>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+      <button class="btn" title="Play">▶</button>
+      <div>
+        <strong>Elior</strong> <span class="tag">your voice</span>
+        <div class="faint">Made on your Fish account, private.</div>
+      </div>
+    </div>
+    <div class="acts" style="flex-direction: column; align-items: stretch">
+      <button class="btn primary">Cast for Elior</button
+      ><button class="btn">Bring into the audition</button><button class="btn ghost">Close</button>
+    </div>
+  </div>
+</div>
+<p class="cap">Buttons stack; file rows wrap their marks under the name.</p>
+<h2>What is kept</h2>
+<p class="cap" style="font-size: 13px; color: var(--muted)">
+  A reload or leaving the page clears the form and its chosen files; nothing is saved by the studio
+  until you cast or bring the voice into the audition. A voice once made stays on your Fish account.
+</p>
