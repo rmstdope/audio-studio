@@ -14,6 +14,8 @@ export const DesignsSchema = z.object({
   /** How many designs were made for the character in all. */
   made: z.number().int().nonnegative(),
   voices: z.record(z.string(), VoiceSchema),
+  /** Designs already saved to the user's Fish account and not cast yet (a cast that failed), by design id. */
+  saved: z.record(z.string(), z.object({ id: z.string(), name: z.string() })).default({}),
 })
 
 /** The designs kept for one character. */
@@ -21,7 +23,7 @@ export type Designs = z.infer<typeof DesignsSchema>
 
 /** No design made for the character yet. */
 export function emptyDesigns(character: string): Designs {
-  return { version: 1, character, description: null, made: 0, voices: {} }
+  return { version: 1, character, description: null, made: 0, voices: {}, saved: {} }
 }
 
 /**
@@ -56,7 +58,17 @@ export function addDesigns(
 /** Without the design `id` (it was cast); the others keep their numbers. */
 export function removeDesign(designs: Designs, id: string): Designs {
   const { [id]: _removed, ...voices } = designs.voices
-  return { ...designs, voices }
+  const { [id]: _saved, ...saved } = designs.saved
+  return { ...designs, voices, saved }
+}
+
+/** With the design `id` noted as saved to the Fish account as `voice`, so casting it again saves nothing. */
+export function markSaved(
+  designs: Designs,
+  id: string,
+  voice: { id: string; name: string },
+): Designs {
+  return { ...designs, saved: { ...designs.saved, [id]: voice } }
 }
 
 /** The kept designs, in the order made. */

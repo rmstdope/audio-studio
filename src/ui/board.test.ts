@@ -4,6 +4,7 @@ import {
   droppedRuledOut,
   ownSectionState,
   playsVoice,
+  designFailureLine,
   recordable,
   saveFailedLine,
   sampleClip,
@@ -297,5 +298,26 @@ describe('saveFailedLine', () => {
     expect(saveFailedLine('Audio too short.')).toBe(
       'Fish couldn’t save this voice: Audio too short. It wasn’t cast.',
     )
+  })
+})
+
+describe('designFailureLine', () => {
+  it('says nothing was charged only when Fish refused', () => {
+    expect(designFailureLine({ reason: 'fish', message: 'Too busy.' })).toBe(
+      'Fish couldn’t design voices: Too busy. Nothing was charged.',
+    )
+  })
+
+  it('says Fish may have charged when the studio failed after asking', () => {
+    expect(designFailureLine({ reason: 'failed', message: 'ffmpeg is needed' })).toBe(
+      'The voices weren’t kept: ffmpeg is needed. Fish may have charged $0.01.',
+    )
+  })
+
+  it('gives the studio’s own reasons as they are, without blaming Fish', () => {
+    for (const reason of ['confirm', 'credit', 'invalid', 'no-key', 'no-phrase']) {
+      expect(designFailureLine({ reason, message: 'Say it.' })).toBe('Say it.')
+    }
+    expect(designFailureLine({ ok: false } as never)).toBe('The project’s files need fixing.')
   })
 })

@@ -15,6 +15,24 @@ export function takesToRecord(
   return voices.filter((v) => !takes[v] && !recording.has(v) && !errors[v])
 }
 
+/**
+ * What a design that did not work says. Fish refusing is the only case where nothing was charged;
+ * the studio failing after Fish answered may have cost $0.01; the studio's own reasons are said
+ * as they are.
+ */
+export function designFailureLine(
+  failure: { reason?: string; message?: string } | undefined,
+): string {
+  if (!failure?.message) return 'The project’s files need fixing.'
+  if (failure.reason === 'fish') {
+    return `Fish couldn’t design voices: ${failure.message.replace(/\.$/, '')}. Nothing was charged.`
+  }
+  if (failure.reason === 'failed') {
+    return `The voices weren’t kept: ${failure.message.replace(/\.$/, '')}. Fish may have charged $0.01.`
+  }
+  return failure.message
+}
+
 /** The line on a designed voice's card when Fish could not save it to the account. */
 export function saveFailedLine(reason: string): string {
   return `Fish couldn’t save this voice: ${reason.replace(/\.$/, '')}. It wasn’t cast.`

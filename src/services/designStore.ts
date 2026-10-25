@@ -14,9 +14,9 @@ export const DESIGNS_DIR = '.audio-studio/designs'
 /** Changes to one character's designs, one at a time. */
 const writes = createSerial()
 
-/** The id of a designed voice: the studio's own, from the request it was made in and its place in it. */
-export function designId(characterId: string, at: string, index: number): string {
-  const hash = createHash('sha256').update(JSON.stringify([characterId, at, index]))
+/** The id of a designed voice: the studio's own, from the character, language, request and its place in it. */
+export function designId(characterId: string, language: string, at: string, index: number): string {
+  const hash = createHash('sha256').update(JSON.stringify([characterId, language, at, index]))
   return `design-${hash.digest('hex').slice(0, 12)}`
 }
 

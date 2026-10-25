@@ -136,7 +136,7 @@ describe('designCredit', () => {
     expect(designCredit(0)).toEqual({
       kind: 'cannot',
       message:
-        'Your credit is $0.00, not enough for a design ($0.01). Add credit on Fish and try again.',
+        'Your Fish credit is $0.00, not enough for a design ($0.01). Add credit on Fish and try again.',
     })
     expect(designCredit(null)).toEqual({
       kind: 'cannot',

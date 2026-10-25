@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { isDesignId } from '../core/design'
@@ -9,7 +9,7 @@ import { designPreviewPath, readDesigns } from './designStore'
 import type { Encoder } from './audio'
 import type { DesignVoiceRequest, FishClient } from './fish'
 import { FishError } from './fish'
-import { moveVoice, sessionFor, startAudition, viewOf } from './sessions'
+import { discardSession, moveVoice, sessionFor, startAudition, viewOf } from './sessions'
 
 const files = {
   'audio-studio.json': projectJson(),
@@ -132,6 +132,20 @@ describe('designVoices', () => {
     expect(store.made).toBe(0)
   })
 
+  it('says Fish may have charged when the studio fails after Fish answered', async () => {
+    const { projectFile } = setup()
+    const broken: Encoder = async () => {
+      throw new Error('ffmpeg is needed to encode clips')
+    }
+    const result = await designVoices(projectFile, 'mira', 'old', fishThat().fishFor, broken)
+    expect(result).toEqual({
+      ok: false,
+      reason: 'failed',
+      message: 'ffmpeg is needed to encode clips',
+    })
+    expect((await readDesigns(projectFile, 'mira')).voices).toEqual({})
+  })
+
   it('refuses an empty or too long description without asking Fish', async () => {
     const { projectFile } = setup()
     const { fishFor, designed } = fishThat()
@@ -153,6 +167,29 @@ describe('designVoices', () => {
 })
 
 describe('designs between auditions', () => {
+  it('keeps designs when the audition is stopped, and shows them in the next', async () => {
+    const { projectFile } = setup()
+    const { fishFor } = fishThat()
+    await designVoices(projectFile, 'mira', 'old', fishFor, encode)
+    await startAudition(projectFile, 'mira', fishFor)
+    await discardSession(projectFile, 'mira')
+    const next = await startAudition(projectFile, 'mira', fishFor)
+    expect(next?.ok && next.session.designed.length).toBe(4)
+  })
+
+  it('leaves a design out of the board’s takes once its preview is gone', async () => {
+    const { root, projectFile } = setup()
+    const { fishFor } = fishThat()
+    await designVoices(projectFile, 'mira', 'old', fishFor, encode)
+    const started = await startAudition(projectFile, 'mira', fishFor)
+    if (!started?.ok) throw new Error('no session')
+    const [gone] = started.session.designed as [string]
+    rmSync(join(root, designPreviewPath(gone)))
+    const view = await viewOf(projectFile, 'mira', started)
+    expect(view.ok && Object.keys(view.takes)).not.toContain(gone)
+    expect(view.ok && Object.keys(view.takes).length).toBe(3)
+  })
+
   it('shows kept designs in a new audition, but not a dropped one', async () => {
     const { projectFile } = setup()
     const { fishFor } = fishThat()
@@ -222,6 +259,42 @@ describe('castDesign', () => {
     const found = await sessionFor(projectFile, 'mira')
     expect(found?.ok && found.session?.shortlist).toContain(first)
     expect(Object.keys((await readDesigns(projectFile, 'mira')).voices)).toContain(first)
+  })
+
+  it('says the preview is gone from the cache, and saves nothing', async () => {
+    const { root, projectFile, fish, first } = await shortlisted()
+    rmSync(join(root, designPreviewPath(first)))
+    const result = await castDesign(projectFile, 'mira', first, fish.fishFor)
+    expect(result).toMatchObject({ ok: false, reason: 'save', voice: first })
+    expect(fish.created).toEqual([])
+  })
+
+  it('reuses the voice already saved when casting it failed, instead of saving another', async () => {
+    const { root, projectFile, fish, first } = await shortlisted()
+    const cast = join(root, 'tts/cast.json')
+    const good = readFileSync(cast, 'utf8')
+    // The save works, but the cast file cannot be read right after it.
+    const original = fish.created.push.bind(fish.created)
+    fish.created.push = (...items) => {
+      writeFileSync(cast, '{ not json')
+      return original(...items)
+    }
+    const failed = await castDesign(projectFile, 'mira', first, fish.fishFor)
+    expect(failed?.ok).toBe(false)
+    expect(fish.created.length).toBe(1)
+    writeFileSync(cast, good)
+    const again = await castDesign(projectFile, 'mira', first, fish.fishFor)
+    expect(again).toMatchObject({ ok: true, voice: { id: 'saved1' } })
+    expect(fish.created.length).toBe(1)
+  })
+
+  it('saves once when asked to cast the same design twice at once', async () => {
+    const { projectFile, fish, first } = await shortlisted()
+    await Promise.all([
+      castDesign(projectFile, 'mira', first, fish.fishFor),
+      castDesign(projectFile, 'mira', first, fish.fishFor),
+    ])
+    expect(fish.created.length).toBe(1)
   })
 
   it('only casts a design that is on the shortlist', async () => {

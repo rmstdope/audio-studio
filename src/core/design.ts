@@ -140,7 +140,7 @@ export function designCredit(credit: number | null | undefined): DesignCredit {
   if (credit + 1e-9 < DESIGN_PRICE) {
     return {
       kind: 'cannot',
-      message: `Your credit is ${usd(credit)}, not enough for a design (${usd(DESIGN_PRICE)}). Add credit on Fish and try again.`,
+      message: `Your Fish credit is ${usd(credit)}, not enough for a design (${usd(DESIGN_PRICE)}). Add credit on Fish and try again.`,
     }
   }
   return { kind: 'ask', credit }

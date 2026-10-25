@@ -298,6 +298,30 @@ describe('tts', () => {
   })
 })
 
+describe('rate limit on a design', () => {
+  it('waits and asks again when Fish answers 429', async () => {
+    let calls = 0
+    const fetch = (async () => {
+      calls++
+      return calls === 1
+        ? Response.json({ message: 'Too many requests' }, { status: 429 })
+        : Response.json({
+            candidates: [{ id: 'c', audio_base64: Buffer.from([1]).toString('base64') }],
+          })
+    }) as unknown as typeof globalThis.fetch
+    const waits: number[] = []
+    const client = createFishClient('k', { fetch, sleep: async (ms) => void waits.push(ms) })
+    const made = await client.designVoice({
+      instruction: 'x',
+      referenceText: 'y',
+      language: null,
+      count: 4,
+    })
+    expect(made.length).toBe(1)
+    expect(waits).toEqual([1000])
+  })
+})
+
 describe('rate limit', () => {
   const request = { text: 'x', voice: 'v', model: 'm', temperature: 0.7, topP: 0.7, speed: 1 }
 

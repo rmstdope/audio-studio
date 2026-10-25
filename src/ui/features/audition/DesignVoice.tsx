@@ -8,18 +8,8 @@ import {
 } from '../../../core/design'
 import { usd } from '../../../core/spend'
 import { useCredit, useDesigns, useDesignVoices } from '../../api'
+import { designFailureLine } from '../../board'
 import { Confirm } from '../../components/Confirm'
-
-/** What a design that did not work says: Fish's reason, or the studio's own. */
-function failureLine(
-  result: { ok: false; reason?: string; message?: string } | { ok: false } | undefined,
-): string {
-  const failure = result as { reason?: string; message?: string } | undefined
-  if (!failure?.message) return 'The project’s files need fixing.'
-  // Money or confirmation refused by the studio before Fish was asked: its own words.
-  if (failure.reason === 'confirm' || failure.reason === 'credit') return failure.message
-  return `Fish couldn’t design voices: ${failure.message.replace(/\.$/, '')}. Nothing was charged.`
-}
 
 /**
  * The box that designs voices from a description, on the character page and on the audition
@@ -123,7 +113,7 @@ export function DesignVoice({
         {design.isError && <span className="adopt-error">{design.error.message}</span>}
         {failure && (
           <span className="adopt-error" role="alert">
-            {failureLine(failure)}
+            {designFailureLine(failure as { reason?: string; message?: string })}
           </span>
         )}
         <div className="design-actions">

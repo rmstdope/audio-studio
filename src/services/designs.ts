@@ -1,18 +1,19 @@
 import { readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { setDesigned } from '../core/audition'
-import { DESIGN_COUNT, descriptionState, isDesignId, previewText, savedName } from '../core/design'
-import { addDesigns, listDesigns, removeDesign } from '../core/designs'
+import { DESIGN_COUNT, descriptionState, previewText, savedName } from '../core/design'
+import { addDesigns, listDesigns, markSaved, removeDesign } from '../core/designs'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import { ffmpegEncoder, type Encoder } from './audio'
 import type { FishFactory } from './auditions'
+import { createSerial } from './serial'
 import { changeDesigns, designId, designPreviewPath, readDesigns } from './designStore'
 import { FishError, NO_KEY } from './fish'
 import { ruledOutIds } from './ruledOut'
 import { castOwnVoice, changeSession, sessionFor, type CastResult } from './sessions'
 import { auditionIn, castProblems } from './takes'
-import { knownCharacter, loadWorkspace, type ProjectFailure } from './workspace'
+import { cacheNameFor, knownCharacter, loadWorkspace, type ProjectFailure } from './workspace'
 
 /** The description to start the design box with, or why it cannot be read. Null for an unknown character. */
 export async function designsFor(
@@ -92,7 +93,7 @@ export async function designVoices(
       language: seen.language,
       count: DESIGN_COUNT,
     })
-    const ids = candidates.map((_, index) => designId(characterId, stamp, index))
+    const ids = candidates.map((_, index) => designId(characterId, seen.language, stamp, index))
     await Promise.all(
       candidates.map((candidate, index) =>
         encode(candidate.wav, resolveInRoot(root, designPreviewPath(ids[index]!)), {
@@ -119,19 +120,20 @@ export async function designVoices(
     return { ok: true, added: ids.length }
   } catch (error) {
     if (error instanceof FishError) return { ok: false, reason: 'fish', message: error.detail }
-    return {
-      ok: false,
-      reason: 'failed',
-      message: error instanceof Error ? error.message : String(error),
-    }
+    // Not Fish refusing: whether it billed is unknown (it answered, or never did).
+    return { ok: false, reason: 'failed', message: errorText(error) }
   }
 }
+
+/** Casts of designs, one at a time per character and language: a second press waits for the first. */
+const casts = createSerial()
 
 /**
  * Casts a shortlisted designed voice: first saves its preview to the user's Fish account as a
  * private voice named `<name> (designed)` (Fish makes no voice from a design until then), then
  * casts that voice, which ends the audition. If Fish cannot save it nothing is cast and the design
- * stays shortlisted. The saved voice leaves the character's kept designs.
+ * stays shortlisted. A voice saved whose cast then failed is remembered, so trying again casts it
+ * and saves no second one. The saved voice leaves the character's kept designs once cast.
  */
 export async function castDesign(
   projectFile: string,
@@ -140,58 +142,58 @@ export async function castDesign(
   fishFor: FishFactory,
   language?: string,
 ): Promise<CastResult> {
-  const loaded = await loadWorkspace(projectFile)
-  if (!loaded.ok) return loaded
-  const character = loaded.summary.characters.find((c) => c.id === characterId)
-  if (!character) return null
-  const found = await sessionFor(projectFile, characterId, language)
-  if (!found?.ok || !found.session) {
-    return { ok: false, reason: 'no-session', message: 'There is no audition to cast from.' }
-  }
-  if (
-    !isDesignId(voiceId) ||
-    !found.session.shortlist.includes(voiceId) ||
-    !found.session.voices[voiceId]?.design
-  ) {
-    return {
-      ok: false,
-      reason: 'not-shortlisted',
-      message: 'Only a shortlisted voice can be cast; shortlist it first.',
+  const name = await cacheNameFor(projectFile, characterId, language)
+  return casts.run(`${projectFile}\n${name}`, async () => {
+    const loaded = await loadWorkspace(projectFile)
+    if (!loaded.ok) return loaded
+    const character = loaded.summary.characters.find((c) => c.id === characterId)
+    if (!character) return null
+    const found = await sessionFor(projectFile, characterId, language)
+    if (!found?.ok || !found.session) {
+      return { ok: false, reason: 'no-session', message: 'There is no audition to cast from.' }
     }
-  }
-  const root = dirname(projectFile)
-  const failed = (message: string): CastResult => ({
-    ok: false,
-    reason: 'save',
-    voice: voiceId,
-    message,
-  })
-  const fish = await fishFor(root, loaded.project)
-  if (!fish) return failed(NO_KEY)
-  let saved
-  try {
-    const existing = (await fish.listOwnVoices()).map((v) => v.title)
-    const title = savedName(character.name, existing)
-    const bytes = await readFile(resolveInRoot(root, designPreviewPath(voiceId))).catch(() => null)
-    if (!bytes) return failed('The preview of this design is gone from the studio’s cache.')
-    const made = await fish.createVoice({
-      title,
-      files: [{ name: `${voiceId}.mp3`, type: 'audio/mpeg', bytes: new Uint8Array(bytes) }],
+    if (!found.session.shortlist.includes(voiceId) || !found.session.voices[voiceId]?.design) {
+      return {
+        ok: false,
+        reason: 'not-shortlisted',
+        message: 'Only a shortlisted voice can be cast; shortlist it first.',
+      }
+    }
+    const root = dirname(projectFile)
+    const failed = (message: string): CastResult => ({
+      ok: false,
+      reason: 'save',
+      voice: voiceId,
+      message,
     })
-    saved = { id: made.id, name: made.title || title }
-  } catch (error) {
-    return failed(error instanceof FishError ? error.detail : errorText(error))
-  }
-  const cast = await castOwnVoice(projectFile, characterId, saved, language)
-  if (cast?.ok) {
-    await changeDesigns(
-      projectFile,
-      characterId,
-      (designs) => removeDesign(designs, voiceId),
-      language,
-    )
-  }
-  return cast
+    let saved = (await readDesigns(projectFile, characterId, language)).saved[voiceId]
+    if (!saved) {
+      const fish = await fishFor(root, loaded.project)
+      if (!fish) return failed(NO_KEY)
+      try {
+        const existing = (await fish.listOwnVoices()).map((v) => v.title)
+        const title = savedName(character.name, existing)
+        const bytes = await readFile(resolveInRoot(root, designPreviewPath(voiceId))).catch(
+          () => null,
+        )
+        if (!bytes) return failed('The preview of this design is gone from the studio’s cache.')
+        const made = await fish.createVoice({
+          title,
+          files: [{ name: `${voiceId}.mp3`, type: 'audio/mpeg', bytes: new Uint8Array(bytes) }],
+        })
+        saved = { id: made.id, name: made.title || title }
+      } catch (error) {
+        return failed(error instanceof FishError ? error.detail : errorText(error))
+      }
+      const voice = saved
+      await changeDesigns(projectFile, characterId, (d) => markSaved(d, voiceId, voice), language)
+    }
+    const cast = await castOwnVoice(projectFile, characterId, saved, language)
+    if (cast?.ok) {
+      await changeDesigns(projectFile, characterId, (d) => removeDesign(d, voiceId), language)
+    }
+    return cast
+  })
 }
 
 function errorText(error: unknown): string {
