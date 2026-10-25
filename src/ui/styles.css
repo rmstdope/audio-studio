@@ -2199,6 +2199,8 @@ a.btn {
 
   .notice-actions {
     justify-content: flex-end;
+  }
+}
 
 .clone-open {
   display: flex;
