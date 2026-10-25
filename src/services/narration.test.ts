@@ -594,6 +594,50 @@ describe('measureLine', () => {
     expect(result).toMatchObject({ ok: true, heard: 1 })
   })
 
+  it('checks a clip already checked again when asked, with the rules of today', async () => {
+    const half: Transcriber = {
+      transcribe: async () => [
+        { start: 0, end: 1, words: [{ word: 'Welcom', start: 0, end: 0.5 }] },
+      ],
+      close() {},
+    }
+    const { root, projectFile } = await recorded(half)
+    const lockOf = () =>
+      JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const at = lockOf().k4.at
+    expect(lockOf().k4.heard).toBe(0)
+    // Without asking, a clip already checked is not measured again.
+    expect(await measureLine(projectFile, 'act1', 'k4', measureOptions)).toMatchObject({
+      ok: false,
+      reason: 'not-recorded',
+    })
+    const again = await measureLine(projectFile, 'act1', 'k4', { ...measureOptions, again: true })
+    expect(again).toEqual({ ok: true, key: 'k4', heard: 1, duration: 1.25 })
+    const { heard: _, ...kept } = lockOf().k4
+    expect(lockOf().k4).toEqual({ ...kept, heard: 1, at })
+    const loaded = await loadPart(projectFile, 'act1')
+    expect(loaded?.ok && loaded.part.lines.find((l) => l.key === 'k4')?.status).toBe('ok')
+    expect(await heardFor(projectFile, 'act1', 'k4')).toMatchObject({ ok: true, heard: null })
+  })
+
+  it('checks again only a weak line: not one never checked, nor one accepted', async () => {
+    const unchecked = await recorded()
+    expect(
+      await measureLine(unchecked.projectFile, 'act1', 'k4', { ...measureOptions, again: true }),
+    ).toMatchObject({ ok: false, reason: 'not-recorded' })
+    const half: Transcriber = {
+      transcribe: async () => [
+        { start: 0, end: 1, words: [{ word: 'Welcom', start: 0, end: 0.5 }] },
+      ],
+      close() {},
+    }
+    const weak = await recorded(half)
+    await acceptLine(weak.projectFile, 'act1', 'k4')
+    expect(
+      await measureLine(weak.projectFile, 'act1', 'k4', { ...measureOptions, again: true }),
+    ).toMatchObject({ ok: false, reason: 'not-recorded' })
+  })
+
   it('keeps what Whisper heard of a measured clip heard poorly', async () => {
     const { root, projectFile } = await recorded()
     const half: Transcriber = {

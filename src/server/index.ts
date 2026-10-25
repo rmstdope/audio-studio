@@ -368,6 +368,15 @@ export function startServer({
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
+      '/api/parts/:part/lines/:key/check': {
+        POST: fromOwnPage(async (request) => {
+          const { part, key } = request.params
+          const transcriber = await transcriberFor()
+          const result = await measureLine(projectFile, part, key, { transcriber, again: true })
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
       '/api/parts/:part/lines/:key/accept': {
         POST: fromOwnPage(async (request) => {
           const result = await acceptLine(projectFile, request.params.part, request.params.key)

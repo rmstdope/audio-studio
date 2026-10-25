@@ -20,7 +20,7 @@ import type { GenerationPlan } from '../core/generation'
 import type { Problem } from '../core/project'
 import type { JobState } from '../services/jobs'
 import type { HeardResult } from '../services/heard'
-import type { AcceptResult, RecordResult } from '../services/narration'
+import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { SoundAlikeChange } from '../services/soundAlike'
 import type { CastResult, SessionView } from '../services/sessions'
@@ -133,6 +133,25 @@ export function useSetSoundAlike() {
     },
     // Refused or not, the page shows the file's groups again: a refusal may mean they changed.
     onSuccess: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
+}
+
+/**
+ * Has Whisper check a line's clip again with today's rules (no new audio), then reloads the part,
+ * its plan and what was heard.
+ */
+export function useCheckAgain(partId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) =>
+      postJson<MeasureResult>(
+        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/check`,
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['heard', partId] })
+      return client.invalidateQueries({ queryKey: ['part', partId] })
+    },
   })
 }
 

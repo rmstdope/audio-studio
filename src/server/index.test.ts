@@ -879,6 +879,24 @@ describe.skipIf(!Bun.which('ffmpeg'))('server, measuring clips', () => {
     expect(await recordJob()).toEqual({ error: 'There is nothing to do.' })
     expect(await recordJob(true)).toMatchObject({ status: 'done', done: 1, skipped: 0 })
   })
+
+  it('checks a weak line again from its own page, and no line it cannot', async () => {
+    const check = (key: string, origin = server.url.origin) =>
+      fetch(at(`/api/parts/act1/lines/${key}/check`), { method: 'POST', headers: { origin } })
+    expect((await check('a', 'http://evil.test')).status).toBe(403)
+    expect((await check('nope')).status).toBe(404)
+    const answer = await check('a')
+    expect([answer.status, await answer.json()]).toEqual([
+      200,
+      { ok: true, key: 'a', heard: 0.5, duration: expect.any(Number) },
+    ])
+    // Accepted, the line is no longer weak, and is not checked again.
+    await fetch(at('/api/parts/act1/lines/a/accept'), {
+      method: 'POST',
+      headers: { origin: server.url.origin },
+    })
+    expect((await check('a')).status).toBe(409)
+  })
 })
 
 describe('server, a paid draft model', () => {

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
-import { clipUrl, useAccept, usePart, useRecordLines, useSetCue } from '../../api'
+import { clipUrl, useAccept, useCheckAgain, usePart, useRecordLines, useSetCue } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
@@ -31,12 +31,35 @@ export function LinesView({ part }: { part: PartSummary }) {
   const { playing, toggle } = useClipPlayer()
   const recorder = useRecordLines(part.id)
   const accept = useAccept(part.id)
-  // Why the last line accepted was not, shown on its row.
-  const refused = (key: string): string | null => {
-    if (accept.variables !== key) return null
-    if (accept.error) return accept.error.message
-    if (!accept.data || accept.data.ok) return null
-    return 'message' in accept.data ? accept.data.message : 'The line could not be accepted.'
+  const check = useCheckAgain(part.id)
+  // The lines Whisper is checking again, and why a line's last Accept or Check again failed.
+  const [checking, setChecking] = useState<ReadonlySet<string>>(new Set())
+  const [refused, setRefused] = useState<Record<string, string>>({})
+  const onRow = async (
+    key: string,
+    action: (key: string) => Promise<{ ok: boolean } | null>,
+    what: string,
+  ) => {
+    setRefused(({ [key]: _, ...rest }) => rest)
+    let why: string | null = null
+    try {
+      const result = await action(key)
+      if (result && !result.ok) {
+        why = 'message' in result ? String(result.message) : `The line could not be ${what}.`
+      }
+    } catch (error) {
+      why = error instanceof Error ? error.message : String(error)
+    }
+    if (why) setRefused((all) => ({ ...all, [key]: why }))
+  }
+  const checkAgain = async (key: string) => {
+    setChecking((all) => new Set(all).add(key))
+    await onRow(key, check.mutateAsync, 'checked again')
+    setChecking((all) => {
+      const left = new Set(all)
+      left.delete(key)
+      return left
+    })
   }
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
@@ -280,22 +303,33 @@ export function LinesView({ part }: { part: PartSummary }) {
                         {line.status === 'weak' &&
                           recorder.toConfirm[line.key] === undefined &&
                           !recorder.recording.has(line.key) && (
-                            <button
-                              type="button"
-                              className="btn"
-                              title="Keep this take as it is: the line no longer shows as weak, until it is recorded again"
-                              disabled={accept.isPending && accept.variables === line.key}
-                              onClick={() => accept.mutate(line.key)}
-                            >
-                              Accept
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="btn"
+                                title="Keep this take as it is: the line no longer shows as weak, until it is recorded again"
+                                disabled={checking.has(line.key)}
+                                onClick={() => void onRow(line.key, accept.mutateAsync, 'accepted')}
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                className="btn"
+                                title="Have Whisper hear this take again with today's rules, without recording anything"
+                                disabled={checking.has(line.key)}
+                                onClick={() => void checkAgain(line.key)}
+                              >
+                                {checking.has(line.key) ? 'Checking…' : 'Check again'}
+                              </button>
+                            </>
                           )}
                       </div>
                       {recorder.errors[line.key] && (
                         <span className="adopt-error row-error">{recorder.errors[line.key]}</span>
                       )}
-                      {refused(line.key) && (
-                        <span className="adopt-error row-error">{refused(line.key)}</span>
+                      {refused[line.key] && (
+                        <span className="adopt-error row-error">{refused[line.key]}</span>
                       )}
                     </td>
                   </tr>
