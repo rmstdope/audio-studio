@@ -516,6 +516,11 @@ An audition is for a character, not for a part: the result applies to every part
   little either way besides. Only weak lines are checked again (an accepted one is ok as it is).
   A part's weak lines (or one character's) are checked again at once from the Generate panel (a
   job of kind `check`).
+- Hear a part as the game plays it (built): on the lines page, **Play N lines in turn** plays the
+  lines shown (filtered as the table is: one character, one status, a search) one after another
+  in dialog order, every speaker; a row's **from here** button starts there. The list is fixed
+  when it starts: filtering afterwards does not change it, and Stop stays offered. The row
+  playing is marked and kept in view; a clip that fails is skipped.
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
@@ -555,7 +560,7 @@ generation while the script and cast still change) and `final` (the recording th
 The music workspace makes the game's **tracks**: looping background music, one per room or region
 as the game chooses, and short **stingers** (victory, game over). A track is made like a voice is
 cast: a brief, several generated takes to listen to, and one take chosen. The steps are in §12,
-step 11. What the spike (11.1) has not confirmed yet is marked _to confirm_: the model's name and
+step 12. What the spike (12.1) has not confirmed yet is marked _to confirm_: the model's name and
 sizes, its shortest take, its licence for the weights, and how it runs on Apple Silicon.
 
 **Project file.** An optional `music` section beside `narration`. Only the paths are settled; the
@@ -863,12 +868,16 @@ Small, independently useful increments:
       audition page shows only the board; the list of matching voices before an audition is gone.
    4. **Hear it in the game** (built): the character's recorded lines on its page, part by part
       in dialog order, with cue and status, played one by one or all in turn.
-10. **What was heard**, in two pull requests:
+10. **The lines page as a studio**, in small pull requests:
+    1. **Hear it** (built): a line's cue heard before it is saved, as a free take (§8.3).
+    2. **Playthrough** (built): the lines shown played in turn, from the first or from a row, the
+       row playing marked and kept in view (§8.3).
+11. **What was heard**, in two pull requests:
     1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
        when it is checked; the lines page shows it beside the text, missed words marked.
     2. **Listen again**: a line checked before that has Whisper hear its clip again, from the
        comparison, keeping what it heard.
-11. **Music** (§8.5), in small pull requests:
+12. **Music** (§8.5), in small pull requests:
     1. **Spike** (outside the studio's code; the findings written into §8.5 and §13): ACE-Step 1.5
        on the M5 Pro, run from Python through uv. Its models, sizes and licence of the weights;
        time and memory for a 90-second take with the larger and smaller model, also with Whisper
