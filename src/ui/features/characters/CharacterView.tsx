@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditionSession } from '../../../core/audition'
+import type { SittingView } from '../../../core/sitting'
+import { usd } from '../../../core/spend'
 import { sharesVoiceWith, type CharacterSummary, type ProjectSummary } from '../../../core/summary'
 import {
   clipUrl,
@@ -10,6 +12,8 @@ import {
   useRuledOut,
   useSession,
   useSessionAction,
+  useSitting,
+  useSittingActions,
   useTakes,
   type Voiced,
 } from '../../api'
@@ -28,6 +32,7 @@ import { linesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
 import { voiceUrl } from '../../voiceId'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
+import { SittingBox, sittingFailure } from '../audition/SittingBox'
 import { KeywordsEditor, PhraseEditor, SpeedEditor, StyleEditor } from './BriefEditors'
 
 /**
@@ -46,6 +51,10 @@ export function CharacterView({
   const session = useSession(characterId, Boolean(character))
   const voice = useCharacterVoice(characterId, character?.voice ?? null, Boolean(character))
   const start = useSessionAction(characterId)
+  const sittingQuery = useSitting(characterId, Boolean(character))
+  const sittingActions = useSittingActions(characterId)
+  // Which question is open: starting an audition on a paid model, or carrying one on.
+  const [asking, setAsking] = useState<'start' | 'resume' | null>(null)
   const player = useClipPlayer()
   const { playing, toggle } = player
 
@@ -66,6 +75,7 @@ export function CharacterView({
   // An answer about the voice cast now: one about an earlier voice is not shown.
   const answer = voice.data?.ok && isAbout(voice.data, character.voice) ? voice.data : null
   const audition = routeHref({ view: 'audition', character: character.id })
+  const money = sittingQuery.data?.ok ? sittingQuery.data : null
 
   return (
     <>
@@ -88,9 +98,16 @@ export function CharacterView({
           </div>
         </div>
         {inProgress ? (
-          <a className="btn btn-primary" href={audition}>
-            <HeadphonesIcon /> Resume audition
-          </a>
+          // On a paid model, with no money left in this sitting, Resume asks for more first.
+          money?.paid && !money.sitting ? (
+            <button className="btn btn-primary" type="button" onClick={() => setAsking('resume')}>
+              <HeadphonesIcon /> Resume…
+            </button>
+          ) : (
+            <a className="btn btn-primary" href={audition}>
+              <HeadphonesIcon /> Resume audition
+            </a>
+          )
         ) : (
           // Only once it is known that no audition is going on: starting would replace one.
           view && (
@@ -98,12 +115,14 @@ export function CharacterView({
               className="btn btn-primary"
               type="button"
               // While the audition is read again, one may have been started elsewhere.
-              disabled={start.isPending || session.isFetching}
+              disabled={start.isPending || session.isFetching || !money}
               onClick={() =>
-                start.mutate(
-                  { action: 'start' },
-                  { onSuccess: (result) => result.ok && (window.location.hash = audition) },
-                )
+                money?.paid
+                  ? setAsking('start')
+                  : start.mutate(
+                      { action: 'start' },
+                      { onSuccess: (result) => result.ok && (window.location.hash = audition) },
+                    )
               }
             >
               <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
@@ -117,7 +136,32 @@ export function CharacterView({
       {session.data && !session.data.ok && 'problems' in session.data && (
         <Problems title="The audition could not be read" problems={session.data.problems} />
       )}
-      <Failure title="The audition could not start" result={start.data} />
+      {money && asking && (
+        <SittingBox
+          kind={asking}
+          view={money}
+          busy={start.isPending || sittingActions.resume.isPending}
+          failure={
+            asking === 'start'
+              ? start.data && !start.data.ok && 'message' in start.data
+                ? start.data.message
+                : undefined
+              : sittingFailure(sittingActions.resume.data)
+          }
+          onPay={(amount) =>
+            asking === 'start'
+              ? start.mutate(
+                  { action: 'start', body: { spendUpTo: amount } },
+                  { onSuccess: (result) => result.ok && (window.location.hash = audition) },
+                )
+              : sittingActions.resume.mutate(amount, {
+                  onSuccess: (answer) => answer.ok && (window.location.hash = audition),
+                })
+          }
+          onCancel={() => setAsking(null)}
+        />
+      )}
+      <Failure title="The audition could not start" result={asking ? undefined : start.data} />
       {start.isError && <span className="adopt-error">{start.error.message}</span>}
       {voice.isError && (
         <span className="adopt-error">Could not load the voice: {voice.error.message}</span>
@@ -134,6 +178,7 @@ export function CharacterView({
             playing={playing}
             toggle={toggle}
             sharedWith={sharesVoiceWith(summary.characters, character.id)}
+            paidModel={money?.paid ? money.model : null}
           />
           <section className="panel character-lines" aria-label="Lines">
             <div className="section-head">
@@ -176,6 +221,8 @@ export function CharacterView({
               lines={character.totalLines}
               session={inProgress}
               href={audition}
+              money={money}
+              onResume={() => setAsking('resume')}
             />
           )}
           <section className="panel brief-panel" aria-label="Delivery">
@@ -215,6 +262,7 @@ function VoicePanel({
   playing,
   toggle,
   sharedWith,
+  paidModel,
 }: {
   character: CharacterSummary
   /** What the server says about the voice cast now; null until it has. */
@@ -223,6 +271,8 @@ function VoicePanel({
   toggle: (id: string, url: string) => void
   /** The other characters cast with this voice. */
   sharedWith: CharacterSummary[]
+  /** The audition model when it is a paid one: the cast voice's take is on the free model all the same. */
+  paidModel: string | null
 }) {
   const recorder = useTakes(character.id)
   const id = character.voice
@@ -317,8 +367,11 @@ function VoicePanel({
             </button>
           )}
           <span>
-            <strong>Take</strong>
+            <strong>Take {paidModel && <span className="chip">free model</span>}</strong>
             <span className="muted">The audition phrase, in {character.name}’s style</span>
+            {paidModel && (
+              <span className="muted">Recorded with s2.1-pro-free. Auditions use {paidModel}.</span>
+            )}
           </span>
         </div>
         <div className="listen-box">
@@ -495,12 +548,18 @@ function InProgress({
   lines,
   session,
   href,
+  money,
+  onResume,
 }: {
   characterId: string
   name: string
   lines: number
   session: AuditionSession
   href: string
+  /** The audition's money, once known. */
+  money: SittingView | null
+  /** Opens the box that asks what the audition may spend as it goes on. */
+  onResume: () => void
 }) {
   const act = useSessionAction(characterId)
   const ruledOut = useRuledOut(characterId)
@@ -512,6 +571,11 @@ function InProgress({
       <span>
         {plural(session.shortlist.length, 'voice')} shortlisted, {session.toHear.length} to hear.
       </span>
+      {money?.paid && session.spent > 0 && (
+        <span className="muted">
+          {usd(session.spent)} spent so far · {money.model}
+        </span>
+      )}
       {asking ? (
         <Confirm
           title="Stop without casting?"
@@ -533,9 +597,15 @@ function InProgress({
           <button className="btn btn-ghost" type="button" onClick={() => setAsking(true)}>
             Stop…
           </button>
-          <a className="btn btn-primary" href={href}>
-            Resume
-          </a>
+          {money?.paid && !money.sitting ? (
+            <button className="btn btn-primary" type="button" onClick={onResume}>
+              Resume…
+            </button>
+          ) : (
+            <a className="btn btn-primary" href={href}>
+              Resume
+            </a>
+          )}
         </div>
       )}
       <Failure title="The audition could not be stopped" result={act.data} />
