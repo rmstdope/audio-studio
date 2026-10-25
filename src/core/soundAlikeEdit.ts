@@ -1,5 +1,8 @@
-/** A sound-alike word the project may list: one word, no spaces, with a letter or digit in it. */
-export const SOUND_ALIKE_WORD = /^\S*[\p{L}\p{N}]\S*$/u
+/**
+ * A sound-alike word the project may list: one word, no spaces or commas (which part the words of
+ * a row), with a letter or digit in it.
+ */
+export const SOUND_ALIKE_WORD = /^[^\s,]*[\p{L}\p{N}][^\s,]*$/u
 
 /** The groups written in rows, one group a row, words split at commas; empty ones dropped. */
 export function groupsFrom(rows: string[]): string[][] {
@@ -18,16 +21,17 @@ export function rowsFrom(groups: string[][]): string[] {
   return groups.map((group) => group.join(', '))
 }
 
-/** What is wrong with the groups, said for the page, or null: each needs two words or more. */
+/**
+ * What is wrong with the groups, said for the page by their words, or null: each needs two words
+ * or more, each a word that can match.
+ */
 export function groupsProblem(groups: string[][]): string | null {
-  for (const [i, group] of groups.entries()) {
+  for (const group of groups) {
     if (group.length < 2) {
-      return `Group ${i + 1} has one word: add another that sounds the same, or remove it.`
+      return `“${group[0]}” is alone in its group: add another word that sounds the same, or remove it.`
     }
     const odd = group.find((word) => !SOUND_ALIKE_WORD.test(word))
-    if (odd !== undefined) {
-      return `Group ${i + 1}: “${odd}” is not one word (no spaces, some letters).`
-    }
+    if (odd !== undefined) return `“${odd}” is not one word (no spaces or commas, some letters).`
   }
   return null
 }

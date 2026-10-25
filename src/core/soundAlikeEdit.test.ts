@@ -13,6 +13,12 @@ describe('groupsFrom', () => {
     expect(groupsFrom(rowsFrom([['Lyria', 'Liria']]))).toEqual([['Lyria', 'Liria']])
     expect(rowsFrom([['Lyria', 'Liria']])).toEqual(['Lyria, Liria'])
   })
+
+  it('takes no word with a comma in it, as a row could not give it back', () => {
+    expect(groupsProblem([['1,000', 'thousand']])).toBe(
+      '“1,000” is not one word (no spaces or commas, some letters).',
+    )
+  })
 })
 
 describe('groupsProblem', () => {
@@ -23,13 +29,13 @@ describe('groupsProblem', () => {
 
   it('says which group has one word, or a word that could never match', () => {
     expect(groupsProblem([['inn', 'in'], ['Lyria']])).toBe(
-      'Group 2 has one word: add another that sounds the same, or remove it.',
+      '“Lyria” is alone in its group: add another word that sounds the same, or remove it.',
     )
     expect(groupsProblem([['Lyria', 'Leer ia']])).toBe(
-      'Group 1: “Leer ia” is not one word (no spaces, some letters).',
+      '“Leer ia” is not one word (no spaces or commas, some letters).',
     )
     expect(groupsProblem([['Lyria', '!!']])).toBe(
-      'Group 1: “!!” is not one word (no spaces, some letters).',
+      '“!!” is not one word (no spaces or commas, some letters).',
     )
   })
 })

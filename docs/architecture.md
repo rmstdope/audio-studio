@@ -667,6 +667,9 @@ Small, independently useful increments:
       Nothing is trimmed (spaces anchor an entry: `"Al "`), an empty said form leaves the words
       out (as narrate.py does); each written form once, no `__proto__`, and no number-like key
       among others. The table is shown in the order the studio applies it.
+      Under it, **Words that sound the same** (built): the project's own sound-alike groups,
+      one a row, words separated by commas, saved as a whole in the project file's
+      `narration.quality.soundAlike`, refused if the file's groups changed since editing began.
    3. **Changes panel** (built): `git status` for the project's own files only (the project file,
       the cast, each part's dialog, cues, lock, manifest and clips), grouped by part with clips
       counted, merge conflicts marked; read again every few seconds, and counted in the sidebar.

@@ -54,13 +54,29 @@ describe('setSoundAlike', () => {
     expect(await setSoundAlike(projectFile, [['Lyria']], [])).toMatchObject({
       ok: false,
       problems: [
-        { message: 'Group 1 has one word: add another that sounds the same, or remove it.' },
+        {
+          message:
+            '“Lyria” is alone in its group: add another word that sounds the same, or remove it.',
+        },
       ],
     })
     expect(await setSoundAlike(projectFile, [['Lyria', 'Leer ia']], [])).toMatchObject({
       ok: false,
     })
     expect(read()).toBe(before)
+  })
+
+  it('adds quality at the end of narration, and keeps a quality written empty by hand', async () => {
+    const project = projectJson()
+    const { projectFile, read } = repo(project)
+    await setSoundAlike(projectFile, [['inn', 'Inne']], [])
+    const quality =
+      '"quality": {\n      "soundAlike": [\n        ["inn", "Inne"]\n      ]\n    }\n  }\n}\n'
+    expect(read().endsWith(quality)).toBe(true)
+    ;(project.narration as { quality?: unknown }).quality = {}
+    const empty = repo(project)
+    expect(await setSoundAlike(empty.projectFile, [], [])).toEqual({ ok: true })
+    expect(JSON.parse(empty.read()).narration.quality).toEqual({})
   })
 
   it('writes words with $ in them as they are', async () => {

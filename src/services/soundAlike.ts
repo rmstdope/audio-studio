@@ -63,11 +63,14 @@ export function setSoundAlike(
     if (wrong) return problem(wrong)
 
     const narration = (raw as { narration: Record<string, unknown> }).narration
-    const quality = { ...(isObject(narration.quality) ? narration.quality : {}) }
+    const had = isObject(narration.quality) ? narration.quality : {}
+    const quality = { ...had }
     if (clean.length) quality.soundAlike = clean
     else delete quality.soundAlike
-    if (Object.keys(quality).length) narration.quality = quality
-    else delete narration.quality
+    // A quality left empty goes only when the groups were all it held, not when it was empty.
+    const emptied = !Object.keys(quality).length && 'soundAlike' in had
+    if (emptied || !('quality' in narration || clean.length)) delete narration.quality
+    else narration.quality = quality
     const parsed = ProjectSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
 
