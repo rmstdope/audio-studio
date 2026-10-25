@@ -797,6 +797,22 @@ a.btn {
   background: var(--panel);
 }
 
+.table tr.playing td {
+  background: var(--accent-soft-bg);
+}
+.table tr.playing td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Shown only while its row is hovered or focused, so the row stays quiet. */
+.from-here {
+  opacity: 0;
+}
+.table tr:hover .from-here,
+.table tr:focus-within .from-here {
+  opacity: 1;
+}
+
 .table .num {
   font-size: 12px;
   color: var(--muted);

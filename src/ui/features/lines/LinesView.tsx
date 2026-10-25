@@ -11,7 +11,7 @@ import {
   useSetCue,
   useTryCue,
 } from '../../api'
-import { PauseIcon, PlayIcon } from '../../components/icons'
+import { ListIcon, PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { GeneratePanel } from './GeneratePanel'
@@ -22,6 +22,7 @@ import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
+import { clipsInTurn, playthroughLabel } from '../../playthrough'
 
 type Filter = 'all' | 'attention' | LineStatus | 'orphans'
 
@@ -37,7 +38,7 @@ const needsAttention = (line: LineState) => line.status !== 'ok'
 /** Every line of a part with the state of its clip, filtered by status, speaker and words. */
 export function LinesView({ part }: { part: PartSummary }) {
   const detail = usePart(part.id, part.dialog === 'ok')
-  const { playing, toggle } = useClipPlayer()
+  const { playing, inTurn, toggle, playInTurn, stop } = useClipPlayer()
   const recorder = useRecordLines(part.id)
   const accept = useAccept(part.id)
   const check = useCheckAgain(part.id)
@@ -87,6 +88,15 @@ export function LinesView({ part }: { part: PartSummary }) {
         (!words || line.text.toLowerCase().includes(words) || line.key.includes(words)),
     )
   }, [loaded, filter, speaker, search])
+
+  // A playthrough: the lines shown with a clip, in turn, from the first or from one line.
+  const turn = clipsInTurn(lines)
+  const playFrom = (key?: string) =>
+    playInTurn(clipsInTurn(lines, key).map((c) => ({ id: c.key, url: clipUrl(part.id, c.file) })))
+  const playingRow = useRef<HTMLTableRowElement>(null)
+  useEffect(() => {
+    if (inTurn) playingRow.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [playing, inTurn])
 
   const header = (
     <header className="page-header">
@@ -159,6 +169,24 @@ export function LinesView({ part }: { part: PartSummary }) {
           ))}
         </div>
         <div className="filters">
+          {filter !== 'orphans' && turn.length > 0 && (
+            <button
+              className="btn"
+              type="button"
+              title="Hear the lines shown one after another, as the game plays them"
+              onClick={() => (inTurn ? stop() : playFrom())}
+            >
+              {inTurn ? (
+                <>
+                  <PauseIcon /> Stop
+                </>
+              ) : (
+                <>
+                  <PlayIcon /> {playthroughLabel(turn.length, lines.length)}
+                </>
+              )}
+            </button>
+          )}
           <label className="field">
             <span>Character</span>
             <select value={speaker} onChange={(e) => setSpeaker(e.target.value)}>
@@ -207,7 +235,10 @@ export function LinesView({ part }: { part: PartSummary }) {
             <tbody>
               {lines.map((line) => (
                 <Fragment key={line.key}>
-                  <tr>
+                  <tr
+                    ref={playing === line.key ? playingRow : undefined}
+                    className={playing === line.key ? 'playing' : undefined}
+                  >
                     <td>
                       <StatusPill status={line.status} />
                       {line.final && (
@@ -261,6 +292,17 @@ export function LinesView({ part }: { part: PartSummary }) {
                             onClick={() => toggle(line.key, clipUrl(loaded.id, line.file!))}
                           >
                             {playing === line.key ? <PauseIcon /> : <PlayIcon />}
+                          </button>
+                        )}
+                        {line.file && !inTurn && (
+                          <button
+                            type="button"
+                            className="icon-btn from-here"
+                            aria-label={`Play from ${line.key} onward`}
+                            title="Play from here onward, as the game plays them"
+                            onClick={() => playFrom(line.key)}
+                          >
+                            <ListIcon />
                           </button>
                         )}
                         {RECORDABLE.has(line.status) &&
