@@ -89,7 +89,7 @@ function joinNames(names: string[]): string {
 
 /** A speed as the page writes it: `0.9×`. */
 export function speedText(speed: number): string {
-  return `${speed}×`
+  return `${Number.isInteger(speed) ? speed.toFixed(1) : speed}×`
 }
 
 /**

@@ -117,7 +117,7 @@ describe('speedInLanguage', () => {
       others: 'English 0.9× · Svenska 0.95×',
     })
     expect(speedInLanguage(gran, languages, 'sv', 1).others).toBe(
-      'English 0.9× · Deutsch 1× (project’s speed)',
+      'English 0.9× · Deutsch 1.0× (project’s speed)',
     )
   })
 })
