@@ -99,8 +99,9 @@ export function createSpendLog(projectFile: string): SpendLog {
       return {
         async end({ lines, outcome }) {
           try {
+            // Saving the spend must never undo or crash the recording it describes.
             if (budget.spent > 0) {
-              await appendRecording(projectFile, {
+              const saved = await appendRecording(projectFile, {
                 id,
                 at,
                 part,
@@ -112,7 +113,17 @@ export function createSpendLog(projectFile: string): SpendLog {
                 cost: budget.spent,
                 outcome,
               })
+              if (!saved.ok) {
+                console.error(
+                  'Audio Studio: a paid recording was not saved: the spending record is damaged.',
+                )
+              }
             }
+          } catch (error) {
+            console.error(
+              'Audio Studio: could not save a paid recording to the spending record:',
+              error,
+            )
           } finally {
             live.delete(id)
           }

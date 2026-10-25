@@ -2437,6 +2437,41 @@ describe('server, the spending record', () => {
     }
   })
 
+  it('logs a job stopped part-way as stopped, with the lines it got through', async () => {
+    writeFileSync(
+      join(repo, 'tts/act1/script.json'),
+      JSON.stringify(script.map((l) => ({ ...l, text: `${l.text} Once more.` }))),
+    )
+    const before = (await spending()).count
+    requests.length = 0
+    hold = true
+    const job = await startJob(['a', 'b', 'c'])
+    await until(() => requests.length >= 1)
+    await fetch(at(`/api/jobs/${job.id}`), { method: 'DELETE', headers: own })
+    hold = false
+    for (const r of requests) r.open()
+    await waitJob(job.id)
+    const now = await settle(before + 1)
+    expect(now.rows[0]).toMatchObject({ state: 'stopped', planned: 3 })
+    expect(now.rows[0].lines).toBeGreaterThan(0)
+    expect(now.rows[0].lines).toBeLessThan(3)
+  })
+
+  it('logs a paid take whose request failed after it was charged as ended on an error', async () => {
+    const before = (await spending()).count
+    const ceiling = await ceilingOf()
+    sent = 0
+    failFrom = 0
+    const res = await post('/api/parts/act1/lines/a/takes', { confirmedCost: ceiling })
+    failFrom = Infinity
+    expect((await res.json()).ok).toBe(false)
+    const now = await spending()
+    expect(now.count).toBe(before + 1)
+    expect(now.rows[0]).toMatchObject({ state: 'error', lines: 0, planned: 1 })
+    expect(now.rows[0].cost).toBeGreaterThan(0)
+    expect(now.rows.some((r: { state: string }) => r.state === 'running')).toBe(false)
+  })
+
   it('logs a paid extra take', async () => {
     const before = (await spending()).count
     const ceiling = await ceilingOf()

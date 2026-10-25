@@ -89,7 +89,8 @@ export function createBudget({ model, dollars }: { model: string; dollars: numbe
       return left
     },
     get spent() {
-      return given - left
+      // Rounded to a billionth of a dollar: a spend and its refund leave float dust, not money.
+      return Math.max(0, Math.round((given - left) * 1e9) / 1e9)
     },
     spend(asked, bytes, at) {
       if (asked !== model) {

@@ -651,6 +651,7 @@ export function startServer({
               { status: 409 },
             )
           }
+          // Set once the job has started; `onEnd` only runs after the job's first await, so it is set.
           let jobId = ''
           const progress = () => {
             const state = jobs.get(jobId)

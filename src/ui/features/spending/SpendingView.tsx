@@ -72,7 +72,10 @@ function SpendingBody({ summary }: { summary: ProjectSummary }) {
         {answer.acts.map((act) => (
           <div className="spending-tile" key={act.part}>
             <b>{dollars(act.total)}</b>
-            <span>{act.removed ? `${act.title} (no longer in the project)` : act.title}</span>
+            <span>
+              {act.title}
+              {act.removed && <span className="muted"> (no longer in the project)</span>}
+            </span>
           </div>
         ))}
       </div>

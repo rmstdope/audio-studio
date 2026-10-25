@@ -37,7 +37,10 @@ export function totalsLabel(count: number, partLabel: string): string {
   return `All ${partLabel.toLowerCase()}s · ${plural(count, 'recording')}`
 }
 
-/** A language written out in English (`sv` → `Swedish`); the code itself if it has no name. */
+/**
+ * A language written out in English (`sv` → `Swedish`), as the page's Language column wants; `languageName` gives the endonym
+ * (`Svenska`) and is not used here. The code itself if it has no name.
+ */
 export function languageText(code: string): string {
   return new Intl.DisplayNames(['en'], { type: 'language', fallback: 'code' }).of(code) ?? code
 }
