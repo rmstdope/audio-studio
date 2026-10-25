@@ -117,6 +117,40 @@ describe('jobs', () => {
   })
 })
 
+describe('jobs in several languages', () => {
+  const slow = (language?: string) => ({
+    part: 'act1',
+    ...(language ? { language } : {}),
+    speaker: null,
+    keys: ['a'],
+    orphans: [],
+    parallel: 1,
+    record: async (key: string) => {
+      await tick(20)
+      return { ok: true as const, key, duration: 1 }
+    },
+    removeOrphans: async () => 0,
+  })
+
+  it('runs a job per part and language, each found by its own language', async () => {
+    const jobs = createJobs()
+    const english = jobs.start(slow())
+    const swedish = jobs.start(slow('sv'))
+    if ('error' in english || 'error' in swedish) throw new Error('both should start')
+    expect(jobs.start(slow('sv'))).toEqual({
+      error: 'A generation is already running for act1 in sv.',
+    })
+    expect(jobs.latest('act1')?.id).toBe(english.id)
+    expect(jobs.latest('act1', 'sv')?.id).toBe(swedish.id)
+    expect(jobs.latest('act1', 'de')).toBeNull()
+    expect(swedish.language).toBe('sv')
+    expect(jobs.running('act1')).toBe(true)
+    await finished(() => jobs.get(english.id))
+    await finished(() => jobs.get(swedish.id))
+    expect(jobs.running('act1')).toBe(false)
+  })
+})
+
 describe('jobs, ending', () => {
   it('says when a job has ended, done or cancelled, once', async () => {
     const jobs = createJobs()
