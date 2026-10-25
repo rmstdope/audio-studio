@@ -14,7 +14,7 @@ describe('noticeReducer', () => {
     expect(state.phase).toBe('saving')
     state = noticeReducer(state, { type: 'saved' })
     expect(state).toEqual({ phase: 'done', takes: ['draft', 'final'] })
-    expect(noticeReducer(state, { type: 'dismiss' })).toEqual({ phase: 'gone' })
+    expect(noticeReducer(state, { type: 'dismiss' })).toEqual(startNotice)
   })
 
   it('fails with the reason, and can try again or keep s1', () => {
@@ -26,6 +26,12 @@ describe('noticeReducer', () => {
     expect(state).toEqual({ phase: 'failed', takes: ['final'], reason: 'busy' })
     expect(noticeReducer(state, { type: 'save' })).toEqual({ phase: 'saving', takes: ['final'] })
     expect(noticeReducer(state, { type: 'keep' })).toEqual(startNotice)
+  })
+
+  it('tries again from a failure, and gives up when told to keep s1', () => {
+    const failed: NoticeState = { phase: 'failed', takes: ['draft'], reason: 'changed' }
+    expect(noticeReducer(failed, { type: 'save' }).phase).toBe('saving')
+    expect(noticeReducer(failed, { type: 'keep' })).toEqual(startNotice)
   })
 
   it('ignores actions that do not fit the phase', () => {

@@ -115,7 +115,7 @@ const ModelsBody = z
     takes: z
       .array(z.enum(['draft', 'final']))
       .min(1)
-      .max(2),
+      .refine((takes) => new Set(takes).size === takes.length),
   })
   .strict()
 

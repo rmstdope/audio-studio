@@ -31,6 +31,15 @@ describe('switchRetiredModels', () => {
     expect(read()).toBe(`${JSON.stringify(switched, null, 4)}\n`)
   })
 
+  it('keeps each sound-alike group on its line, so only the model lines change', async () => {
+    const { projectFile, read } = repo(projectWith({ draft: 's1', final: 's1' }))
+    await setSoundAlike(projectFile, [['inn', 'in']], [])
+    const before = read()
+    expect(before).toContain('["inn", "in"]')
+    await switchRetiredModels(projectFile, ['draft', 'final'])
+    expect(read()).toBe(before.replaceAll('"s1"', '"s2.1-pro"'))
+  })
+
   it('leaves a model that is not s1 alone', async () => {
     const { projectFile, read } = repo(projectWith({ draft: 's1', final: 's2-pro' }))
     expect(await switchRetiredModels(projectFile, ['draft'])).toEqual({ ok: true })

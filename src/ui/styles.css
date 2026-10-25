@@ -2175,7 +2175,7 @@ a.btn {
 
 .notice-ok {
   background: var(--ok-bg);
-  border-color: #1f5a40;
+  border-color: var(--kept-line);
 }
 
 .notice-ok strong {

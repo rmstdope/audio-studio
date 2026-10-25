@@ -1,8 +1,8 @@
 import type { Take } from '../core/retirement'
 
 /**
- * Where the s1 notice is: the banner, the question before switching, saving, done, failed, or
- * gone (dismissed). The takes are those the question was opened with, so the words after a
+ * Where the s1 notice is: the banner (shown only while the project names s1), the question before
+ * switching, saving, done, or failed. The takes are those the question was opened with, so the words after a
  * switch stay right when the project no longer names s1.
  */
 export type NoticeState =
@@ -11,7 +11,6 @@ export type NoticeState =
   | { phase: 'saving'; takes: Take[] }
   | { phase: 'done'; takes: Take[] }
   | { phase: 'failed'; takes: Take[]; reason: string }
-  | { phase: 'gone' }
 
 /** What happens to the notice. */
 export type NoticeAction =
@@ -43,6 +42,6 @@ export function noticeReducer(state: NoticeState, action: NoticeAction): NoticeS
         ? { phase: 'failed', takes: state.takes, reason: action.reason }
         : state
     case 'dismiss':
-      return state.phase === 'done' ? { phase: 'gone' } : state
+      return state.phase === 'done' ? startNotice : state
   }
 }

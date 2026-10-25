@@ -63,3 +63,23 @@ export async function saveProject(
     render(indent).replace(/\n/g, eol) + (/\n$/.test(text) ? eol : ''),
   )
 }
+
+/**
+ * The project file's JSON in `indent`, each sound-alike group on one line (`["inn", "in"]`), as
+ * the groups would be written by hand: every save of the file lays it out the same way.
+ */
+export function projectJson(raw: unknown, indent: string): string {
+  const quality = (raw as { narration?: { quality?: { soundAlike?: unknown } } }).narration?.quality
+  const groups = Array.isArray(quality?.soundAlike) ? (quality.soundAlike as string[][]) : []
+  const mark = (i: number) => `\u0000group ${i}`
+  const original = quality?.soundAlike
+  if (quality && groups.length) quality.soundAlike = groups.map((_, i) => mark(i))
+  const oneLine = (group: string[]) => `[${group.map((w) => JSON.stringify(w)).join(', ')}]`
+  const json = JSON.stringify(raw, null, indent)
+  if (quality && groups.length) quality.soundAlike = original
+  // A function, not a string, as the replacement: a "$" in a word is not a pattern.
+  return groups.reduce(
+    (text, group, i) => text.replace(JSON.stringify(mark(i)), () => oneLine(group)),
+    json,
+  )
+}

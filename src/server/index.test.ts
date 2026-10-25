@@ -627,6 +627,7 @@ describe('server, retiring models', () => {
     expect((await patch({ takes }, 'http://evil.test')).status).toBe(403)
     expect((await patch({ takes: ['both'] })).status).toBe(400)
     expect((await patch({ takes: [] })).status).toBe(400)
+    expect((await patch({ takes: ['draft', 'draft'] })).status).toBe(400)
     const saved = await patch({ takes })
     expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
     expect((await patch({ takes })).status).toBe(409)

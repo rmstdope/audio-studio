@@ -1,7 +1,7 @@
 import { basename } from 'node:path'
 import { ProjectSchema, problemsFrom, type Problem } from '../core/project'
 import { cleanGroups, groupsProblem, sameGroups } from '../core/soundAlikeEdit'
-import { openProject, projectWrites, saveProject } from './projectFile'
+import { openProject, projectJson, projectWrites, saveProject } from './projectFile'
 import type { ProjectFailure } from './workspace'
 
 /** A saved list of sound-alike groups, or why it was not saved. */
@@ -54,25 +54,9 @@ export function setSoundAlike(
     const parsed = ProjectSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
 
-    await saveProject(projectFile, opened, (indent) => layout(raw, indent, clean))
+    await saveProject(projectFile, opened, (indent) => projectJson(raw, indent))
     return { ok: true }
   })
-}
-
-/**
- * The project file's JSON in `indent`, each sound-alike group on one line (`["inn", "in"]`), as
- * the groups would be written by hand.
- */
-function layout(raw: unknown, indent: string, groups: string[][]): string {
-  const mark = (i: number) => `\u0000group ${i}`
-  const quality = (raw as { narration: { quality?: { soundAlike?: unknown } } }).narration.quality
-  if (quality?.soundAlike) quality.soundAlike = groups.map((_, i) => mark(i))
-  const oneLine = (group: string[]) => `[${group.map((w) => JSON.stringify(w)).join(', ')}]`
-  // A function, not a string, as the replacement: a "$" in a word is not a pattern.
-  return groups.reduce(
-    (text, group, i) => text.replace(JSON.stringify(mark(i)), () => oneLine(group)),
-    JSON.stringify(raw, null, indent),
-  )
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

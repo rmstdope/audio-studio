@@ -75,6 +75,7 @@ export function RetirementNotice({
   const switchButton = useRef<HTMLButtonElement>(null)
   const confirmButton = useRef<HTMLButtonElement>(null)
   const dismissButton = useRef<HTMLButtonElement>(null)
+  const retryButton = useRef<HTMLButtonElement>(null)
   const previous = useRef(state.phase)
 
   useEffect(() => {
@@ -83,9 +84,11 @@ export function RetirementNotice({
     if (was === state.phase) return
     if (state.phase === 'question') confirmButton.current?.focus()
     else if (state.phase === 'done') dismissButton.current?.focus()
-    else if (state.phase === 'banner' && (was === 'question' || was === 'failed')) {
-      switchButton.current?.focus()
-    } else if (state.phase === 'gone') focusHeading()
+    else if (state.phase === 'failed') retryButton.current?.focus()
+    else if (state.phase === 'banner') {
+      if (was === 'done') focusHeading()
+      else switchButton.current?.focus()
+    }
   }, [state.phase])
 
   const save = (which: Take[]) => {
@@ -99,7 +102,9 @@ export function RetirementNotice({
     })
   }
 
-  if (state.phase === 'gone') return null
+  // The page's own reading of the file, since a refusal may mean it changed: nothing on s1 now
+  // means nothing to switch.
+  const tryAgain = () => (takes.length > 0 ? save(takes) : dispatch({ type: 'keep' }))
 
   if (state.phase === 'done') {
     return (
@@ -138,7 +143,12 @@ export function RetirementNotice({
             >
               Keep s1 for now
             </button>
-            <button className="btn btn-primary" type="button" onClick={() => save(state.takes)}>
+            <button
+              ref={retryButton}
+              className="btn btn-primary"
+              type="button"
+              onClick={() => tryAgain()}
+            >
               Try again
             </button>
           </>
