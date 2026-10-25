@@ -1,4 +1,5 @@
 import type { LanguageProgress } from '../services/workspace'
+import { plural } from './format'
 
 /** What a language shows in the switch: its count, hover text, and whether it is dimmed. */
 export function languageTab(
@@ -26,6 +27,21 @@ export function generateLabel(
   character: string | null,
 ): string {
   return [what, language, character ?? 'every character'].filter(Boolean).join(' · ')
+}
+
+/**
+ * The Generate panel's heading: how many lines it would record; with none, that every line is
+ * recorded (or final) only when no line in scope is waiting for a voice or a translation.
+ */
+export function planHeadline(plan: {
+  keys: string[]
+  final: boolean
+  uncast: string[]
+  untranslated: number
+}): string {
+  if (plan.keys.length) return `Record ${plural(plan.keys.length, 'line')}`
+  if (plan.uncast.length || plan.untranslated) return 'Nothing to record yet'
+  return plan.final ? 'Every line is final' : 'Every line is recorded'
 }
 
 /** Who cannot be recorded for want of a voice (in the language, when there are several). */

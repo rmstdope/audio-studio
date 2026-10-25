@@ -6,8 +6,8 @@ import { routeHref } from '../route'
 import { StatusBar } from './StatusBar'
 import { cardVoice, missingVoiceChips, type Language } from '../castLanguages'
 
-/** The badge a card shows: cast state first, then what needs doing. */
-function badgeFor(
+/** The badge a card shows: cast state first, then what needs doing; Ready only when nothing does. */
+export function badgeFor(
   cast: boolean,
   counts: Partial<Record<LineStatus, number>> | undefined,
 ): { label: string; color: string; bg: string } {
@@ -17,6 +17,8 @@ function badgeFor(
   if (toRecord) return { label: `${toRecord} to record`, ...pick('stale') }
   if (counts.untracked) return { label: `${counts.untracked} untracked`, ...pick('untracked') }
   if (counts.weak) return { label: 'Check takes', ...pick('weak') }
+  if (counts.uncast) return { label: STATUS.uncast.label, ...pick('uncast') }
+  if (counts.untranslated) return { label: STATUS.untranslated.label, ...pick('untranslated') }
   return { label: 'Ready', ...pick('ok') }
 }
 
