@@ -38,6 +38,8 @@ export interface SetupCheck {
   detail: string
   /** What to do about a problem: a command or a setting. */
   fix?: string
+  /** The account's credit in dollars, when Fish answered. */
+  credit?: number
 }
 
 /**
@@ -56,7 +58,7 @@ function ffmpeg(facts: SetupFacts): SetupCheck {
         title: 'ffmpeg',
         state: 'problem',
         detail: 'Not found on the PATH. Recording a line needs it to encode and level the clip.',
-        fix: 'brew install ffmpeg',
+        fix: 'brew install ffmpeg (then start the studio again if it is still not found)',
       }
 }
 
@@ -68,7 +70,7 @@ function whisper(facts: SetupFacts): SetupCheck {
       title,
       state: 'off',
       detail:
-        'quality.transcriber is "none": one take a line, unchecked, word timings spread evenly.',
+        'The project sets quality.transcriber to "none": one take a line, not checked, with word timings spread evenly.',
     }
   }
   if (!facts.appleSilicon) {
@@ -86,7 +88,7 @@ function whisper(facts: SetupFacts): SetupCheck {
       title,
       state: 'problem',
       detail: 'uv is not on the PATH. It runs the Whisper worker and installs mlx-whisper for it.',
-      fix: 'brew install uv',
+      fix: 'brew install uv (then start the studio again if it is still not found)',
     }
   }
   return {
@@ -105,7 +107,7 @@ function key(facts: SetupFacts): SetupCheck {
         title: 'Fish Audio API key',
         state: 'problem',
         detail: `No ${FISH_KEY} in the environment or in ${facts.envPath}.`,
-        fix: `Put FISH_AUDIO_API_KEY=... in ${facts.envPath} (from fish.audio, API keys), or export it.`,
+        fix: `Put ${FISH_KEY}=... in ${facts.envPath} (from fish.audio, API keys), or export it.`,
       }
 }
 
@@ -116,7 +118,8 @@ function fish(facts: SetupFacts): SetupCheck {
       id: 'fish',
       title,
       state: 'ok',
-      detail: `Answers; ${dollars(facts.fish.credit)} credit for paid models.`,
+      detail: 'Answers. Credit for paid models:',
+      credit: facts.fish.credit,
     }
   }
   if (facts.fish.reason === 'no-key') {
@@ -146,9 +149,4 @@ function refresh(facts: SetupFacts): SetupCheck {
         detail:
           'No refreshDialog command in the project file (optional): extract the dialog outside the studio.',
       }
-}
-
-/** `12.5` → `$12.50`. */
-function dollars(amount: number): string {
-  return `$${amount.toFixed(2)}`
 }

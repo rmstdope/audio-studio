@@ -696,13 +696,18 @@ export function useTryCue(partId: string) {
   })
 }
 
-/** The setup checks: what the studio needs on this machine and in the project, each with a fix. */
-export function useSetup() {
+/**
+ * The setup checks: what the studio needs on this machine and in the project, each with a fix.
+ * Asked for once in a while (the sidebar shows the count on every page, and the check asks Fish),
+ * or afresh each time the Setup page opens (`fresh`): the user installs things meanwhile.
+ */
+export function useSetup(fresh = false) {
   return useQuery({
     queryKey: ['setup'],
     queryFn: () => getJson<SetupResult>('/api/setup'),
-    // Checked again when the page is opened or regains focus: the user installs things meanwhile.
-    staleTime: 0,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: fresh ? 'always' : true,
   })
 }
 

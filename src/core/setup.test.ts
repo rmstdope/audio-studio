@@ -20,7 +20,7 @@ describe('setupChecks', () => {
     const checks = setupChecks(ready)
     expect(checks.map((c) => c.id)).toEqual(['ffmpeg', 'whisper', 'key', 'fish', 'refresh'])
     expect(checks.every((c) => c.state === 'ok')).toBe(true)
-    expect(byId(ready).fish!.detail).toContain('$12.50')
+    expect(byId(ready).fish!.credit).toBe(12.5)
   })
 
   it('names what is missing, and how to put it right', () => {
@@ -33,7 +33,6 @@ describe('setupChecks', () => {
       state: 'problem',
       fix: expect.stringContaining('brew install uv'),
     })
-    // One matcher: a matcher used on a property replaces it in the object under bun test.
     expect(checks.key).toMatchObject({
       state: 'problem',
       fix: expect.stringMatching(/FISH_AUDIO_API_KEY=.*\.env/),

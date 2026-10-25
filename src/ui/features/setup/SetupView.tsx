@@ -1,11 +1,12 @@
 import type { SetupCheck } from '../../../core/setup'
 import { useSetup } from '../../api'
 import { AlertIcon, CheckIcon } from '../../components/icons'
+import { dollars } from '../../format'
 
-const STATE: Record<SetupCheck['state'], { label: string; color: string }> = {
-  ok: { label: 'Ready', color: 'var(--ok)' },
-  problem: { label: 'Needs attention', color: 'var(--warn)' },
-  off: { label: 'Not used', color: 'var(--faint)' },
+const STATE: Record<SetupCheck['state'], string> = {
+  ok: 'Ready',
+  problem: 'Needs attention',
+  off: 'Not used',
 }
 
 /**
@@ -13,7 +14,7 @@ const STATE: Record<SetupCheck['state'], { label: string; color: string }> = {
  * it: ffmpeg, uv for Whisper, the Fish key, whether Fish answers, the refresh command.
  */
 export function SetupView() {
-  const setup = useSetup()
+  const setup = useSetup(true)
   return (
     <>
       <header className="page-header">
@@ -21,7 +22,8 @@ export function SetupView() {
           <span className="crumbs">Project</span>
           <h1>Setup</h1>
           <span className="muted">
-            What recording needs on this machine, checked each time this page opens.
+            What recording needs on this machine and in the project, checked each time this page
+            opens.
           </span>
         </div>
         <div className="header-actions">
@@ -45,17 +47,20 @@ export function SetupView() {
         <ul className="setup-list">
           {setup.data.checks.map((check) => (
             <li key={check.id} className="panel setup-check">
-              <span className="setup-state" style={{ color: STATE[check.state].color }}>
+              <span className={`setup-state ${check.state}`}>
                 {check.state === 'ok' ? (
                   <CheckIcon />
                 ) : check.state === 'problem' ? (
                   <AlertIcon />
                 ) : null}
-                {STATE[check.state].label}
+                {STATE[check.state]}
               </span>
               <div className="setup-text">
                 <strong>{check.title}</strong>
-                <span className="muted">{check.detail}</span>
+                <span className="muted">
+                  {check.detail}
+                  {check.credit !== undefined && ` ${dollars(check.credit)}`}
+                </span>
                 {check.fix && <code className="setup-fix mono">{check.fix}</code>}
               </div>
             </li>

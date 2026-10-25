@@ -1,8 +1,7 @@
 import { dirname } from 'node:path'
 import { setupChecks, type SetupCheck, type SetupFacts } from '../core/setup'
-import type { FishFactory } from './auditions'
 import { fishApiKey } from './env'
-import { NO_KEY } from './fish'
+import type { CreditResult } from './fish'
 import { openProject, type ProjectFailure } from './workspace'
 
 /** The setup as checked, or why the project file could not be read. */
@@ -24,12 +23,12 @@ const thisMachine: Machine = {
 
 /**
  * Checks what the studio needs on this machine and in the project (ffmpeg, uv for Whisper, the
- * Fish key and whether Fish answers, the refresh command), each with a fix. Fish is asked once,
- * for the credit, only when there is a key.
+ * Fish key and whether Fish answers, the refresh command), each with a fix. `credit` is the
+ * server's lookup of the account's credit (which asks Fish); it is called only when there is a key.
  */
 export async function checkSetup(
   projectFile: string,
-  fishFor: FishFactory,
+  credit: () => Promise<CreditResult>,
   machine: Machine = thisMachine,
   environment: Record<string, string | undefined> = process.env,
 ): Promise<SetupResult> {
@@ -47,19 +46,8 @@ export async function checkSetup(
     whisperModel: narration.quality.whisperModel,
     envPath: project.env,
     key,
-    fish: await askFish(),
+    fish: key ? await credit() : { ok: false, reason: 'no-key', message: 'no key' },
     refreshDialog: Boolean(narration.refreshDialog),
   }
   return { ok: true, checks: setupChecks(facts) }
-
-  async function askFish(): Promise<SetupFacts['fish']> {
-    const fish = key ? await fishFor(root, project) : null
-    if (!fish) return { ok: false, reason: 'no-key', message: NO_KEY }
-    try {
-      return { ok: true, credit: await fish.credit() }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      return { ok: false, reason: 'fish', message }
-    }
-  }
 }

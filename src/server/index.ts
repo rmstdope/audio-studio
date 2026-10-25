@@ -580,7 +580,7 @@ export function startServer({
         GET: guard(async () => Response.json(await creditOf())),
       },
       '/api/setup': {
-        GET: guard(async () => Response.json(await checkSetup(projectFile, fishFor))),
+        GET: guard(async () => Response.json(await checkSetup(projectFile, creditOf))),
       },
       '/api/changes': {
         GET: guard(async () => Response.json(await gitChanges(projectFile))),

@@ -247,13 +247,12 @@ describe('server', () => {
   it('checks the setup', async () => {
     const body = await (await fetch(url('/api/setup'))).json()
     expect(body.ok).toBe(true)
-    expect(body.checks.map((c: { id: string }) => c.id)).toEqual([
-      'ffmpeg',
-      'whisper',
-      'key',
-      'fish',
-      'refresh',
-    ])
+    const states = Object.fromEntries(
+      body.checks.map((c: { id: string; state: string }) => [c.id, c.state]),
+    )
+    // No key in this fixture: Fish is not asked. The tools depend on the machine running the tests.
+    expect(states).toMatchObject({ key: 'problem', fish: 'off', refresh: 'off' })
+    expect(Object.keys(states)).toEqual(['ffmpeg', 'whisper', 'key', 'fish', 'refresh'])
   })
 
   it('tells the account’s credit', async () => {

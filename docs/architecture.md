@@ -125,6 +125,7 @@ audio-studio/
 │   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
 │   │   ├── heard.ts             what Whisper heard of a part's lines below full, as saved
 │   │   ├── soundAlike.ts        English words that sound the same, matched as one
+│   │   ├── setup.ts             what the machine and project lack, from facts, with a fix each
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
@@ -135,7 +136,8 @@ audio-studio/
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
 │   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
-│   │   ├── takes.ts             audition takes: recorded once, cached by what they are made of
+│   │   ├── takes.ts             audition takes and tries: recorded once, cached by what they are made of
+│   │   ├── setup.ts             the facts for the setup checks: tools on the PATH, the key, Fish
 │   │   ├── transcriber.ts       Transcriber interface + mlx-whisper worker
 │   │   ├── audio.ts             encode MP3 with ffmpeg, level its loudness (as level.py)
 │   │   ├── files.ts             read resources, write atomically, lock formatting
@@ -734,9 +736,11 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
 - Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
   ffmpeg, uv for Whisper (off when `quality.transcriber` is `none`; a problem off Apple silicon),
-  the Fish key in the environment or the env file, whether Fish answers (asked once, for the
-  credit, only with a key) and the optional `refreshDialog`, each with what to do about it. The
-  sidebar counts the problems. Checked when the page opens; the CLI still warns about ffmpeg.
+  the Fish key in the environment or the env file, whether Fish answers (the server's credit
+  lookup, only with a key) and the optional `refreshDialog`, each with what to do about it.
+  Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
+  the problems from a check at most five minutes old and never on a window focus, so the studio
+  does not ask Fish more than it did. The CLI still warns about ffmpeg, and recording says so.
 - Writes outside the project root throw. Deleting clips (orphans) always needs confirmation.
 - Fish errors (no credit, voice removed) mark the line as failed with the reason; the rest of the
   job carries on. Too many requests at once (429: Fish allows 5 at a time until $100 has been

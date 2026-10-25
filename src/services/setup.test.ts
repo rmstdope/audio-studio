@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import type { FishClient } from './fish'
+import type { CreditResult } from './fish'
 import { checkSetup, type Machine } from './setup'
 
-const fish: FishClient = {
-  credit: async () => 3,
-  listVoices: () => Promise.reject(new Error('not used')),
-  getVoice: () => Promise.reject(new Error('not used')),
-  tts: () => Promise.reject(new Error('not used')),
-}
+const credit = async (): Promise<CreditResult> => ({ ok: true, credit: 3 })
 const mac: Machine = { which: () => true, platform: 'darwin', arch: 'arm64' }
 const byId = (checks: { id: string; state: string }[]) =>
   Object.fromEntries(checks.map((c) => [c.id, c.state]))
@@ -17,8 +12,9 @@ const byId = (checks: { id: string; state: string }[]) =>
 describe('checkSetup', () => {
   it('finds the tools, the key in the env file, and asks Fish', async () => {
     const root = tempRepo({ 'audio-studio.json': projectJson(), '.env': 'FISH_AUDIO_API_KEY=k\n' })
-    const result = await checkSetup(join(root, 'audio-studio.json'), async () => fish, mac, {})
+    const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {})
     if (!result.ok) throw new Error('expected checks')
+    expect(result.checks.find((c) => c.id === 'fish')).toMatchObject({ credit: 3 })
     expect(byId(result.checks)).toEqual({
       ffmpeg: 'ok',
       whisper: 'ok',
@@ -36,7 +32,7 @@ describe('checkSetup', () => {
       join(root, 'audio-studio.json'),
       async () => {
         asked++
-        return fish
+        return { ok: true, credit: 3 }
       },
       machine,
       {},
@@ -54,8 +50,12 @@ describe('checkSetup', () => {
 
   it('takes the key from the environment too, and reports Fish not answering', async () => {
     const root = tempRepo({ 'audio-studio.json': projectJson() })
-    const silent = { ...fish, credit: () => Promise.reject(new Error('Fish Audio answered 401')) }
-    const result = await checkSetup(join(root, 'audio-studio.json'), async () => silent, mac, {
+    const silent = async (): Promise<CreditResult> => ({
+      ok: false,
+      reason: 'fish',
+      message: 'Fish Audio answered 401',
+    })
+    const result = await checkSetup(join(root, 'audio-studio.json'), silent, mac, {
       FISH_AUDIO_API_KEY: 'k',
     })
     if (!result.ok) throw new Error('expected checks')
@@ -67,7 +67,7 @@ describe('checkSetup', () => {
 
   it('says when the project file cannot be read', async () => {
     const root = tempRepo({ 'audio-studio.json': { name: 3 } })
-    const result = await checkSetup(join(root, 'audio-studio.json'), async () => fish, mac, {})
+    const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {})
     expect(result.ok).toBe(false)
   })
 })
