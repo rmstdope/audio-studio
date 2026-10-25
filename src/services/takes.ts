@@ -36,7 +36,7 @@ export type TryResult =
 export interface TakeOptions {
   board?: boolean
   budget?: Budget
-  charged?: (dollars: number) => void
+  charged?: (dollars: number) => void | Promise<void>
 }
 
 /**
@@ -181,7 +181,7 @@ async function speak(
         budget?.refund(cost)
         throw error
       }
-      if (cost > 0) options.charged?.(cost)
+      if (cost > 0) await options.charged?.(cost)
       return false
     })
     // Also for a request that shared another's recording, which the money did not cover.

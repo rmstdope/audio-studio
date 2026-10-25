@@ -1528,3 +1528,145 @@ describe('server, a final stage without a final model', () => {
     expect(final.plan).toMatchObject({ final: false, keys: draft.plan.keys })
   })
 })
+
+describe('server, a paid audition', () => {
+  const paid = projectJson({
+    narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
+  })
+  const paidRoot = tempRepo({
+    'audio-studio.json': paid,
+    'tts/cast.json': {
+      speakers: { gran: { voice: 'cur', style: '[warm]' }, kid: { voice: 'k1' } },
+    },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'gran', text: 'Hello.' },
+      { key: 'b', speaker: 'kid', text: 'Hi.' },
+    ],
+  })
+  let credit = 4.82
+  const models: string[] = []
+  const account: FishClient = {
+    ...fish,
+    async credit() {
+      return credit
+    },
+    async tts(request) {
+      models.push(request.model)
+      return new Uint8Array([1, 2, 3])
+    },
+  }
+  const server = startServer({
+    projectFile: join(paidRoot, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: own,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const sitting = async (id: string) => (await fetch(at(`/api/auditions/${id}/sitting`))).json()
+  const takeOf = async (id: string, voice: string, board = true) =>
+    (await send('POST', `/api/characters/${id}/takes`, { voice, board })).json()
+  const startWith = (id: string, spendUpTo?: number) =>
+    send('POST', `/api/auditions/${id}/start`, spendUpTo === undefined ? {} : { spendUpTo })
+
+  it('tells the audition model, what a take costs, and an amount to suggest', async () => {
+    const body = await sitting('gran')
+    expect(body).toMatchObject({ ok: true, model: 's2.1-pro', paid: true, sitting: null })
+    expect(body.perTake).toBeGreaterThan(0)
+    expect(body.suggested).toBeGreaterThanOrEqual(0.05)
+  })
+
+  it('does not start without an amount, nor for more than the credit', async () => {
+    const asked = await startWith('gran')
+    expect(asked.status).toBe(409)
+    expect(await asked.json()).toMatchObject({ ok: false, reason: 'confirm' })
+    const over = await startWith('gran', 5)
+    expect(await over.json()).toMatchObject({ ok: false, reason: 'credit' })
+    expect(await (await fetch(at('/api/auditions/gran'))).json()).toMatchObject({ session: null })
+    expect((await sitting('gran')).sitting).toBeNull()
+  })
+
+  it('starts with an amount, and charges board takes to it on the audition model', async () => {
+    const started = await startWith('gran', 0.01)
+    expect(started.status).toBe(200)
+    expect((await sitting('gran')).sitting).toMatchObject({
+      dollars: 0.01,
+      spent: 0,
+      usedUp: false,
+    })
+    models.length = 0
+    expect(await takeOf('gran', 'cur')).toMatchObject({ ok: true })
+    expect(models).toEqual(['s2.1-pro'])
+    const after = await sitting('gran')
+    expect(after.sitting.spent).toBeGreaterThan(0)
+    expect(after.sitting.dollars).toBe(0.01)
+    // The saved audition keeps it for the character's page.
+    const again = await sitting('gran')
+    expect(again.spentBefore).toBeCloseTo(after.sitting.spent, 12)
+  })
+
+  it('keeps the cast voice’s page take on the free model', async () => {
+    models.length = 0
+    expect(await takeOf('gran', 'cur', false)).toMatchObject({ ok: true })
+    expect(models).toEqual(['s2.1-pro-free'])
+  })
+
+  it('makes takes wait when the money is used, and lets them record after an addition', async () => {
+    const per = (await sitting('gran')).perTake
+    // Use up what is left in whole takes: the next one would go past the budget.
+    let n = 0
+    while ((await takeOf('gran', `v${n++}`)).ok && n < 200) {}
+    expect(n).toBeLessThan(200)
+    const used = await sitting('gran')
+    expect(used.sitting).toMatchObject({ usedUp: true })
+    expect(await takeOf('gran', 'late')).toMatchObject({ ok: false, reason: 'waits' })
+
+    const added = await send('POST', '/api/auditions/gran/sitting/add', { amount: per * 2 })
+    expect(added.status).toBe(200)
+    const topped = await sitting('gran')
+    expect(topped.sitting.dollars).toBeCloseTo(0.01 + per * 2, 12)
+    expect(topped.sitting.usedUp).toBe(false)
+    expect(await takeOf('gran', 'late')).toMatchObject({ ok: true })
+
+    const tooMuch = await send('POST', '/api/auditions/gran/sitting/add', { amount: 100 })
+    expect(await tooMuch.json()).toMatchObject({ ok: false, reason: 'credit' })
+  })
+
+  it('holds a sitting’s money back from another one, and gives it back when it ends', async () => {
+    credit = 0.015
+    // gran's sitting holds 0.01+; only about 0.005 is free for kid.
+    const refused = await startWith('kid', 0.01)
+    expect(await refused.json()).toMatchObject({ ok: false, reason: 'credit' })
+    const ended = await send('DELETE', '/api/auditions/gran/sitting')
+    expect(ended.status).toBe(200)
+    expect((await sitting('gran')).sitting).toBeNull()
+    expect(await takeOf('gran', 'again')).toMatchObject({ ok: false, reason: 'no-sitting' })
+    expect((await startWith('kid', 0.01)).status).toBe(200)
+  })
+
+  it('resumes with a fresh sitting, and Stop and Cast end it', async () => {
+    credit = 4.82
+    const resumed = await send('POST', '/api/auditions/kid/sitting', { amount: 0.05 })
+    expect(resumed.status).toBe(200)
+    expect((await sitting('kid')).sitting).toMatchObject({ dollars: 0.05, spent: 0 })
+    await send('DELETE', '/api/auditions/kid')
+    expect((await sitting('kid')).sitting).toBeNull()
+
+    await startWith('gran', 0.05)
+    await send('POST', '/api/auditions/gran/cast', { voice: 'cur' })
+    expect((await sitting('gran')).sitting).toBeNull()
+  })
+
+  it('only takes sitting changes from its own page', async () => {
+    const denied = await fetch(at('/api/auditions/gran/sitting'), { method: 'DELETE' })
+    expect(denied.status).toBe(403)
+  })
+})
