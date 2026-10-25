@@ -263,6 +263,8 @@ export async function loadPart(
       notes: onLines(notes.notes.lines, input.lines),
       problems: notes.problem ? [...problems, notes.problem] : problems,
       ...plan,
+      // An unreadable dialog says nothing about which lines left it: no clip or cue is orphaned.
+      ...(dialog.status === 'invalid' ? { orphans: [], orphanCues: [] } : {}),
     },
   }
 }

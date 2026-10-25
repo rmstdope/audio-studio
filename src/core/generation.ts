@@ -77,7 +77,7 @@ export function planGeneration(
     /** Retake the weak lines too. */
     includeWeak?: boolean
     /**
-     * The final recording: every cast line whose clip is not final yet, with `model` (the final
+     * The final recording: every cast, translated line whose clip is not final yet, with `model` (the final
      * one), whatever its status.
      */
     final?: boolean
@@ -90,8 +90,10 @@ export function planGeneration(
   const recordable = new Set(['missing', 'stale', ...(includeWeak ? ['weak'] : [])])
   const toRecord = lines.filter((line) =>
     final
-      ? // Everything not final yet; a weak final clip only when asked.
-        line.status !== 'uncast' && (!line.final || (includeWeak && line.status === 'weak'))
+      ? // Everything recordable not final yet; a weak final clip only when asked.
+        line.status !== 'uncast' &&
+        line.status !== 'untranslated' &&
+        (!line.final || (includeWeak && line.status === 'weak'))
       : // A final clip is never taken back to the draft model by a retake.
         recordable.has(line.status) && !(line.final && line.status === 'weak'),
   )

@@ -75,9 +75,12 @@ export function seconds(value: number | null): string {
   return value === null ? '—' : `${value.toFixed(1)}s`
 }
 
-/** What a character's lines need, in words: `2 stale · 1 missing`, or `all up to date`. */
+/**
+ * What a character's lines need, in words: `2 stale · 1 missing · 3 not translated`, or
+ * `all up to date` when every line is.
+ */
 export function linesSummary(counts: Partial<Record<LineStatus, number>>): string {
-  const parts = (['missing', 'stale', 'weak', 'untracked'] as const)
+  const parts = (['missing', 'stale', 'weak', 'untracked', 'uncast', 'untranslated'] as const)
     .filter((s) => counts[s])
     .map((s) => `${counts[s]} ${STATUS[s].label.toLowerCase()}`)
   return parts.length ? parts.join(' · ') : 'all up to date'

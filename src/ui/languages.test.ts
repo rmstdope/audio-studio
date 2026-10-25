@@ -8,6 +8,7 @@ import {
   languageTab,
   movedTo,
   noDialogPanel,
+  planHeadline,
   translatedNote,
 } from './languages'
 
@@ -62,6 +63,15 @@ describe('the words around a language', () => {
     )
     expect(translatedNote(3)).toBe('Not recorded until translated: 3 lines.')
     expect(translatedNote(1)).toBe('Not recorded until translated: 1 line.')
+  })
+
+  it('heads a generation plan, never calling uncast or untranslated lines recorded', () => {
+    const plan = { keys: [], final: false, uncast: [], untranslated: 0 }
+    expect(planHeadline({ ...plan, keys: ['a', 'b'] })).toBe('Record 2 lines')
+    expect(planHeadline(plan)).toBe('Every line is recorded')
+    expect(planHeadline({ ...plan, final: true })).toBe('Every line is final')
+    expect(planHeadline({ ...plan, uncast: ['wren'] })).toBe('Nothing to record yet')
+    expect(planHeadline({ ...plan, final: true, untranslated: 6 })).toBe('Nothing to record yet')
   })
 
   it('says where a cue comes from, only in a language besides the source', () => {

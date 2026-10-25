@@ -407,7 +407,9 @@ The **planner** gives every line one status:
 | `uncast`    | speaker has no voice                                                   | blocked until cast                  |
 
 Clips in the manifest whose key is no longer in the dialog are listed as **orphans** (removed after
-confirmation when generating), and cues whose key is gone as **orphaned cues**.
+confirmation when generating), and cues whose key is gone as **orphaned cues**. While the dialog
+file is there but cannot be read, neither is listed: its problem is shown instead, and generation
+is refused until it is fixed.
 
 A stale line's reasons come from comparing the lock entry with today's inputs: `voice`, `model`,
 `cue`, `text`, `pronunciation` (the words as said changed but the words did not) and `settings`.
@@ -726,7 +728,7 @@ generation while the script and cast still change) and `final` (the recording th
   and a job when it ends, give theirs back. An audition on a paid model works the same with a
   budget per sitting, asked for by amount rather than by a ceiling (§8.1).
 - **Final recording** (built): when `final` names another model than `draft`, the Generate panel
-  offers **Draft** and **Final**. The final plan records every cast line whose clip was not made
+  offers **Draft** and **Final**. The final plan records every cast, translated line whose clip was not made
   with the final model yet (missing, stale, drafted, untracked), with the final model, priced and
   confirmed like any paid job. A clip is up to date if its lock matches the inputs with either
   model; one made with the final model is marked `final` in the line table, and draft plans
@@ -966,6 +968,9 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 - The server API is tested with an in-memory project fixture (a small consumer repo in
   `test/fixtures/`).
 - UI: component tests for the audition and line table; one Playwright smoke test over the fixture.
+- A component test renders into a DOM from `@happy-dom/global-registrator`, registered by the test
+  file itself before it imports React, so the other suites run without one (first:
+  `SpeedEditor.test.tsx`).
 
 ---
 

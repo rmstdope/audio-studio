@@ -101,6 +101,14 @@ describe('linesSummary', () => {
     expect(linesSummary({ ok: 2, weak: 1, stale: 2 })).toBe('2 stale · 1 weak')
     expect(linesSummary({ ok: 3 })).toBe('all up to date')
   })
+
+  it('never calls uncast or untranslated lines up to date', () => {
+    expect(linesSummary({ uncast: 1 })).toBe('1 uncast')
+    expect(linesSummary({ untranslated: 6 })).toBe('6 not translated')
+    expect(linesSummary({ ok: 2, missing: 1, uncast: 2, untranslated: 3 })).toBe(
+      '1 missing · 2 uncast · 3 not translated',
+    )
+  })
 })
 
 describe('partLinesSummary', () => {

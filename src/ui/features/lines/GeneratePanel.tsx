@@ -5,7 +5,7 @@ import type { JobKind } from '../../../services/jobs'
 import { useJob, useJobActions, usePlan } from '../../api'
 import { Problems } from '../../components/Problems'
 import { centsUp, dollars, plural } from '../../format'
-import { castNote, generateLabel, translatedNote } from '../../languages'
+import { castNote, generateLabel, planHeadline, translatedNote } from '../../languages'
 import { REASON } from '../../status'
 
 /** How a job of each kind is told: while it runs, a line in it, and a line done. */
@@ -168,13 +168,7 @@ export function GeneratePanel({
               speaker ? displayName(speaker) : null,
             )}
           </span>
-          <strong>
-            {p.keys.length
-              ? `Record ${plural(p.keys.length, 'line')}`
-              : p.final
-                ? 'Every line is final'
-                : 'Every line is recorded'}
-          </strong>
+          <strong>{planHeadline(p)}</strong>
         </div>
         <div className="header-actions">
           {confirming && (
