@@ -5,6 +5,7 @@ import {
   bringMore,
   drop,
   queueMore,
+  setDesigned,
   setOwnVoices,
   shortlist,
   startSession,
@@ -259,5 +260,56 @@ describe('your own voices', () => {
     const { yours: _y, mine: _m, ...old } = start()
     const parsed = AuditionSessionSchema.parse(old)
     expect([parsed.yours, parsed.mine]).toEqual([[], []])
+  })
+})
+
+describe('designed voices', () => {
+  function design(id: string, n: number): Voice {
+    return { ...voice(id), title: `Design ${n}`, design: { n, description: 'warm', at: 't1' } }
+  }
+
+  it('puts kept designs in their own section, leaving out placed and ruled-out ones', () => {
+    const session = shortlist(start(), 'a')
+    const next = setDesigned(session, [design('d1', 1), design('d2', 2), design('d3', 3)], ['d3'])
+    expect(next.designed).toEqual(['d1', 'd2'])
+    expect(next.voices.d1?.design?.n).toBe(1)
+    expect(next.voices.d3).toBeUndefined()
+  })
+
+  it('leaves a design that is shortlisted or dropped where it is, and is idempotent', () => {
+    let session = setDesigned(start(), [design('d1', 1), design('d2', 2)], [])
+    session = shortlist(session, 'd1')
+    session = drop(session, 'd2')
+    const again = setDesigned(session, [design('d1', 1), design('d2', 2)], [])
+    expect(again).toBe(session)
+    expect(again.designed).toEqual([])
+  })
+
+  it('drops a design leaving the section and undoes it back there', () => {
+    const session = setDesigned(start(), [design('d1', 1), design('d2', 2)], [])
+    const dropped = drop(session, 'd2')
+    expect(dropped.designed).toEqual(['d1'])
+    expect(dropped.dropped).toEqual([{ id: 'd2', from: 'designed' }])
+    expect(undoDrop(dropped).designed).toEqual(['d2', 'd1'])
+  })
+
+  it('shortlists a design and unlists it back to the section', () => {
+    const session = setDesigned(start(), [design('d1', 1), design('d2', 2)], [])
+    const listed = shortlist(session, 'd2')
+    expect(listed.shortlist).toEqual(['d2'])
+    expect(listed.designed).toEqual(['d1'])
+    const back = unlist(listed, 'd2')
+    expect(back.designed).toEqual(['d2', 'd1'])
+    expect(back.toHear).toEqual(session.toHear)
+  })
+
+  it('removes designs that are gone from the store from the section', () => {
+    const session = setDesigned(start(), [design('d1', 1), design('d2', 2)], [])
+    expect(setDesigned(session, [design('d2', 2)], []).designed).toEqual(['d2'])
+  })
+
+  it('reads a saved session from before designs', () => {
+    const { designed: _none, ...old } = start()
+    expect(AuditionSessionSchema.parse(old).designed).toEqual([])
   })
 })
