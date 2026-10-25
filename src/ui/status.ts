@@ -84,14 +84,14 @@ export function linesSummary(counts: Partial<Record<LineStatus, number>>): strin
 }
 
 /**
- * A character's lines in one part, as the character page shows them: `none recorded` when no line
- * has a clip yet (uncast, untranslated or missing), `all up to date`, or how many are up to date.
+ * A character's lines in one part, as the character page shows them: `none recorded` when every
+ * line is uncast or untranslated (none can be recorded), `all up to date`, or how many are up to
+ * date.
  */
 export function partLinesSummary(counts: Partial<Record<LineStatus, number>>): string {
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0)
   const ok = counts.ok ?? 0
-  const recorded = ok + (counts.weak ?? 0) + (counts.stale ?? 0) + (counts.untracked ?? 0)
-  if (recorded === 0) return 'none recorded'
+  if ((counts.uncast ?? 0) + (counts.untranslated ?? 0) === total) return 'none recorded'
   return ok === total ? 'all up to date' : `${ok} up to date`
 }
 
