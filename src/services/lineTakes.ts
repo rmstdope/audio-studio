@@ -12,13 +12,12 @@ import { ffmpegEncoder, type Encoder } from './audio'
 import { characterFile, listFiles, readJson, writeAtomic } from './files'
 import { NO_KEY } from './fish'
 import type { Limiter } from './limit'
-import { checkTake, commitClip, speakLine, type RecordResult } from './narration'
-import { castProblems } from './takes'
+import { checkTake, commitClip, finalFingerprint, speakLine, type RecordResult } from './narration'
 import type { Transcriber } from './transcriber'
 import { readPart, type PartRead, type ProjectFailure } from './workspace'
 
 /** Where a line's extra takes are kept, in the project's tool cache: a folder per part and line. */
-export const LINE_TAKES_DIR = '.audio-studio/line-takes'
+const LINE_TAKES_DIR = '.audio-studio/line-takes'
 
 /** A line's extra takes, newest first, or why they cannot be listed. Null for an unknown part or line. */
 export type LineTakesResult =
@@ -37,7 +36,7 @@ export type TakeLineResult =
   | null
 
 /** Making a take the line's clip: as a recording, or refused because the take is stale. */
-export type UseTakeResult = RecordResult | { ok: false; reason: 'stale'; message: string }
+export type UseTakeResult = RecordResult | { ok: false; reason: 'stale' | 'final'; message: string }
 
 /** The free model only: an extra take never costs anything. */
 const FREE_ONLY = createBudget({ model: FREE_MODELS[0], dollars: 0 })
@@ -52,6 +51,7 @@ export async function listLineTakes(
   key: string,
 ): Promise<LineTakesResult> {
   const found = await lineAndInputs(projectFile, partId, key)
+  if (found.kind === 'problems') return { ok: false, problems: found.problems }
   if (found.kind === 'failed') return found.failure
   const takes = await readTakes(dirname(projectFile), partId, key)
   return { ok: true, takes: takesView(takes, found.fp) }
@@ -71,6 +71,7 @@ export async function takeLine(
   { limiter, transcriber = null }: { limiter: Limiter; transcriber?: Transcriber | null },
 ): Promise<TakeLineResult> {
   const found = await lineAndInputs(projectFile, partId, key)
+  if (found.kind === 'problems') return { ok: false, problems: found.problems }
   if (found.kind === 'failed') return found.failure
   const { read, line, inputs, fp } = found
   if (!inputs) {
@@ -102,15 +103,8 @@ export async function takeLine(
     limiter,
     limiterKey: `line-take\n${projectFile}\n${partId}\n${key}\n${id}`,
   })
-  if (!spoken.ok) {
-    const failure = spoken.failure
-    if (failure && !failure.ok && 'reason' in failure) {
-      // The budget is the free model's, so a refusal to spend cannot happen here.
-      const reason = failure.reason === 'audio' ? 'audio' : 'fish'
-      return { ok: false, reason, message: failure.message }
-    }
-    return { ok: false, reason: 'fish', message: 'Fish Audio did not speak the line.' }
-  }
+  // The budget is the free model's, so a refusal to spend cannot happen here.
+  if (!spoken.ok) return { ...spoken, reason: spoken.reason === 'audio' ? 'audio' : 'fish' }
   const checker = narration.quality.transcriber === 'none' ? null : transcriber
   let checked
   try {
@@ -151,6 +145,7 @@ export async function useLineTake(
   { encode = ffmpegEncoder }: { encode?: Encoder } = {},
 ): Promise<UseTakeResult> {
   const found = await lineAndInputs(projectFile, partId, key)
+  if (found.kind === 'problems') return { ok: false, problems: found.problems }
   if (found.kind === 'failed') return found.failure
   const { read, line, inputs, fp } = found
   if (!inputs) {
@@ -163,6 +158,17 @@ export async function useLineTake(
   const root = dirname(projectFile)
   const take = (await readTakes(root, partId, key)).find((t) => t.id === id)
   if (!take) return null
+  // A take is a draft one: a final clip is never taken back to the draft model (§8.4).
+  const { cast, cues, lock } = read.input
+  const finalFp = finalFingerprint(line, cast, cues, read.project.narration)
+  if (finalFp && lock[key]?.fp === finalFp) {
+    return {
+      ok: false,
+      reason: 'final',
+      message:
+        'This line has a final clip, and a take is a draft one: it would replace the paid clip. Record the line again from its row with the final model instead.',
+    }
+  }
   if (take.fp !== fp) {
     return {
       ok: false,
@@ -190,7 +196,7 @@ export async function useLineTake(
       missed: take.missed,
     },
     takes: 1,
-    finalFp: null,
+    finalFp,
   })
 }
 
@@ -202,13 +208,8 @@ export async function dropLineTake(
   id: string,
 ): Promise<{ ok: true } | ProjectFailure | null> {
   const found = await lineAndInputs(projectFile, partId, key)
-  // A take of a line can be dropped though the cast is broken: it is the studio's own file.
-  if (
-    found.kind === 'failed' &&
-    (!found.failure || !('problems' in found.failure) || 'file' in found.failure)
-  ) {
-    return found.failure as ProjectFailure | null
-  }
+  // A take can be dropped though a file of the part is broken: it is the studio's own file.
+  if (found.kind === 'failed') return found.failure
   const root = dirname(projectFile)
   const takes = await readTakes(root, partId, key)
   if (!takes.some((t) => t.id === id)) return null
@@ -245,7 +246,9 @@ async function readTakes(root: string, partId: string, key: string): Promise<Lin
     const json = await readJson(join(folder, name))
     if (json.status !== 'ok') continue
     const parsed = LineTakeSchema.safeParse(json.value)
-    if (parsed.success && name === `${parsed.data.id}.json`) takes.push(parsed.data)
+    if (!parsed.success || name !== `${parsed.data.id}.json`) continue
+    // A take whose audio is gone (a half-done drop, a hand clean-up) is not a take.
+    if (await Bun.file(join(folder, `${parsed.data.id}.wav`)).exists()) takes.push(parsed.data)
   }
   return takes
 }
@@ -260,18 +263,21 @@ type Found =
       /** The fingerprint of the inputs; empty for an uncast line. */
       fp: string
     }
-  | { kind: 'failed'; failure: { ok: false; problems: Problem[] } | ProjectFailure | null }
+  /** A file of the part cannot be read: the problems, with file and path. */
+  | { kind: 'problems'; problems: Problem[] }
+  /** The project file cannot be used, or (null) the part or line is unknown. */
+  | { kind: 'failed'; failure: ProjectFailure | null }
 
 /**
  * The part read, the line and its inputs as they are now (null when uncast) with their
- * fingerprint; or why not: the cast's problems, the project file's failure, or null for an
+ * fingerprint; or why not: a broken file of the part, the project file's failure, or null for an
  * unknown part or line.
  */
 async function lineAndInputs(projectFile: string, partId: string, key: string): Promise<Found> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return { kind: 'failed', failure: read }
-  const problems = castProblems(read.project, read.problems)
-  if (problems.length) return { kind: 'failed', failure: { ok: false, problems } }
+  // As a recording: any broken file of the part is reported, with its file and path.
+  if (read.problems.length) return { kind: 'problems', problems: read.problems }
   const line = read.input.lines.find((l) => l.key === key)
   if (!line) return { kind: 'failed', failure: null }
   const { cast, cues } = read.input

@@ -738,14 +738,13 @@ export function useSetup(fresh = false) {
 }
 
 /** A line's extra takes, newest first, each marked current or stale. */
-export function useLineTakes(partId: string, key: string, enabled: boolean) {
+export function useLineTakes(partId: string, key: string) {
   return useQuery({
     queryKey: ['line-takes', partId, key],
     queryFn: () =>
       getJson<NonNullable<LineTakesResult>>(
         `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`,
       ),
-    enabled,
   })
 }
 
@@ -762,13 +761,24 @@ export function useLineTakeActions(partId: string, key: string) {
   const client = useQueryClient()
   const base = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`
   const reloadTakes = () => client.invalidateQueries({ queryKey: ['line-takes', partId, key] })
+  // The last refusal, of either action, shown until the next action.
+  const [refused, setRefused] = useState<{
+    what: string
+    answer: NonNullable<TakeLineResult> | NonNullable<UseTakeResult>
+  } | null>(null)
   const take = useMutation({
     mutationFn: () => postJson<NonNullable<TakeLineResult>>(base),
-    onSuccess: reloadTakes,
+    onMutate: () => setRefused(null),
+    onSuccess: (result) => {
+      if (!result.ok) setRefused({ what: 'The take could not be made', answer: result })
+      return reloadTakes()
+    },
   })
   const use = useMutation({
     mutationFn: (id: string) => postJson<NonNullable<UseTakeResult>>(`${base}/${id}/use`),
+    onMutate: () => setRefused(null),
     onSuccess: async (result) => {
+      if (!result.ok) setRefused({ what: 'The take could not be used', answer: result })
       await reloadTakes()
       if (result.ok) {
         void client.invalidateQueries({ queryKey: ['plan', partId] })
@@ -787,7 +797,7 @@ export function useLineTakeActions(partId: string, key: string) {
     },
     onSuccess: reloadTakes,
   })
-  return { take, use, drop }
+  return { take, use, drop, refused }
 }
 
 /** The URL of a recorded audition take. */

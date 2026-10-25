@@ -147,18 +147,7 @@ export async function recordLine(
   const model = final ? narration.models.final : narration.models.draft
   // In a draft recording: the fingerprint the line would have as a final clip, so one that lands
   // meanwhile is never overwritten.
-  const finalInputs =
-    !final && narration.models.final !== narration.models.draft
-      ? clipInputs(
-          line,
-          cast.speakers[line.speaker],
-          cues,
-          cast.pronounce,
-          narration,
-          narration.models.final,
-        )
-      : null
-  const finalFp = finalInputs ? fingerprint(finalInputs).fp : null
+  const finalFp = final ? null : finalFingerprint(line, cast, cues, narration)
   const inputs = clipInputs(
     line,
     cast.speakers[line.speaker],
@@ -197,7 +186,9 @@ export async function recordLine(
 
   /** One take: the line spoken by Fish (holding a Fish slot only while speaking), joined. */
   async function makeTake(take: number): Promise<Spoken> {
-    if (!inputs || !fish || !line) return { ok: false, failure: null }
+    if (!inputs || !fish || !line) {
+      return { ok: false, reason: 'fish', message: 'nothing to speak' }
+    }
     return speakLine({
       fish,
       line,
@@ -244,7 +235,7 @@ export async function recordLine(
       // A later take that cannot be made keeps the best one already paid for.
       if (!made.ok) {
         if (best) break
-        return made.failure
+        return made
       }
       let attempt: Take
       try {
@@ -273,9 +264,33 @@ export async function recordLine(
   }
 }
 
-/** A line spoken by Fish: its joined audio, or why not (as a recording reports it). */
+/** A line spoken by Fish: its joined audio, or why not. */
 export type Spoken =
-  { ok: true; clip: { wav: Uint8Array; seconds: number } } | { ok: false; failure: RecordResult }
+  | { ok: true; clip: { wav: Uint8Array; seconds: number } }
+  | { ok: false; reason: 'spend' | 'fish' | 'audio'; message: string }
+
+/**
+ * The fingerprint a line's clip would have made with the final model, when that differs from the
+ * draft one: a draft recording (or an extra take) must never write over such a clip. Null with
+ * one model for both, or for an uncast line.
+ */
+export function finalFingerprint(
+  line: Line,
+  cast: Cast,
+  cues: Record<string, string>,
+  narration: Project['narration'],
+): string | null {
+  if (narration.models.final === narration.models.draft) return null
+  const inputs = clipInputs(
+    line,
+    cast.speakers[line.speaker],
+    cues,
+    cast.pronounce,
+    narration,
+    narration.models.final,
+  )
+  return inputs ? fingerprint(inputs).fp : null
+}
 
 /**
  * Has Fish speak a line once: each sentence-sized piece in the speaker's voice with the cue, at the
@@ -329,13 +344,13 @@ export async function speakLine({
     })
   } catch (error) {
     const reason = error instanceof SpendRefused ? 'spend' : 'fish'
-    return { ok: false, failure: { ok: false, reason, message: messageOf(error) } }
+    return { ok: false, reason, message: messageOf(error) }
   }
   try {
     return { ok: true, clip: joinWavs(pieces, GAP_SECONDS) }
   } catch (error) {
     const message = `Fish sent audio that could not be joined: ${messageOf(error)}`
-    return { ok: false, failure: { ok: false, reason: 'audio', message } }
+    return { ok: false, reason: 'audio', message }
   }
 }
 

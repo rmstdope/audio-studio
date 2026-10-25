@@ -542,7 +542,9 @@ An audition is for a character, not for a part: the result applies to every part
   by score and length, and **Use this take** makes it the line's clip, encoded and written with the
   manifest and lock exactly as a recording is (the same `commitClip`), or dropped. A take made from
   other inputs than today's (the cue, text, voice or settings changed) is marked stale: heard, not
-  used. Whisper's best is not always the best read; this lets the ear decide.
+  used. A take is a draft one: a line whose clip is final is never taken back to the draft model
+  (§8.4), so Use is refused for it, and a final clip landing meanwhile is kept as a recording
+  keeps it. A broken file of the part is reported with its path, as a recording reports it. Whisper's best is not always the best read; this lets the ear decide.
 - Keys on the lines table (built): a row takes focus (Tab, or a click); j/k and the arrows
   move, space or Enter plays, f plays from there, r records or retakes, a accepts, h shows what
   was heard, c edits the cue, n the note, t opens the takes. A hint under the table lists them. Nothing while typing

@@ -19,9 +19,8 @@ export function LineTakes({
   playing: string | null
   toggle: (id: string, url: string) => void
 }) {
-  const list = useLineTakes(partId, lineKey, true)
-  const { take, use, drop } = useLineTakeActions(partId, lineKey)
-  const failed = [take.data, use.data].find((r) => r && !r.ok)
+  const list = useLineTakes(partId, lineKey)
+  const { take, use, drop, refused: failed } = useLineTakeActions(partId, lineKey)
   const playId = (id: string) => `take/${lineKey}/${id}`
   return (
     <div className="line-takes">
@@ -97,10 +96,12 @@ export function LineTakes({
           {take.isPending ? 'Recording…' : 'Another take'}
         </button>
       </div>
-      {failed && 'problems' in failed && (
-        <Problems title="The take could not be made" problems={failed.problems} />
+      {failed && 'problems' in failed.answer && (
+        <Problems title={failed.what} problems={failed.answer.problems} />
       )}
-      {failed && 'message' in failed && <span className="adopt-error">{failed.message}</span>}
+      {failed && 'message' in failed.answer && (
+        <span className="adopt-error">{failed.answer.message}</span>
+      )}
       {(take.isError || use.isError || drop.isError) && (
         <span className="adopt-error">{(take.error ?? use.error ?? drop.error)?.message}</span>
       )}

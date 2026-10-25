@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { mkdir } from 'node:fs/promises'
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { clipInputs, fingerprint } from '../core/fingerprint'
+import { ProjectSchema } from '../core/project'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import type { FishClient, TtsRequest } from './fish'
@@ -197,6 +199,55 @@ describe('useLineTake', () => {
     expect(existsSync(join(root, 'audio/act1/manifest.json'))).toBe(false)
   })
 
+  it('never replaces a final clip: a take is a draft one', async () => {
+    const project = {
+      ...projectJson(),
+      narration: {
+        ...(projectJson().narration as Record<string, unknown>),
+        models: { draft: 's2.1-pro-free', final: 's1' },
+      },
+    }
+    const parsed = ProjectSchema.parse(project)
+    const cast = {
+      speakers: { narrator: { voice: 'v-n', style: '[warm]' } },
+      pronounce: { Elior: 'El-ee-or' },
+    }
+    const line = { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }
+    const finalInputs = clipInputs(
+      line,
+      cast.speakers.narrator,
+      {},
+      cast.pronounce,
+      parsed.narration,
+      's1',
+    )!
+    const { fp, parts } = fingerprint(finalInputs)
+    const root = tempRepo({
+      ...files,
+      'audio-studio.json': project,
+      'audio/act1/manifest.json': { k1: { file: 'k1.mp3', speaker: 'narrator', duration: 1 } },
+      'audio/act1/k1.mp3': 'paid',
+      'tts/act1/narration.lock.json': { k1: { fp, voice: 'v-n', model: 's1', parts, at: 'then' } },
+    })
+    const { fish } = fakeFish()
+    const made = await take(root, fish)
+    if (!made?.ok) throw new Error(JSON.stringify(made))
+    const used = await useLineTake(projectFileOf(root), 'act1', 'k1', made.take.id, {
+      encode: keepWav,
+    })
+    expect(used).toMatchObject({ ok: false, reason: 'final' })
+    expect(readFileSync(join(root, 'audio/act1/k1.mp3'), 'utf8')).toBe('paid')
+  })
+
+  it('reports a broken file of the part with its path, as a recording does', async () => {
+    const root = tempRepo({ ...files, 'tts/act1/narration.lock.json': 'not json' })
+    const { fish } = fakeFish()
+    expect(await take(root, fish)).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/act1/narration.lock.json' }],
+    })
+  })
+
   it('knows no take that is not there', async () => {
     const root = tempRepo(files)
     expect(
@@ -218,5 +269,17 @@ describe('dropLineTake', () => {
     expect(readdirSync(dirname(file))).toEqual([])
     expect(await dropLineTake(projectFileOf(root), 'act1', 'k1', made.take.id)).toBeNull()
     expect(await lineTakeFile(projectFileOf(root), 'act1', 'k1', 'not-an-id')).toBeNull()
+  })
+
+  it('does not list a take whose audio is gone', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const made = await take(root, fish)
+    if (!made?.ok) throw new Error('expected a take')
+    rmSync((await lineTakeFile(projectFileOf(root), 'act1', 'k1', made.take.id))!)
+    expect(await listLineTakes(projectFileOf(root), 'act1', 'k1')).toEqual({ ok: true, takes: [] })
+    expect(
+      await useLineTake(projectFileOf(root), 'act1', 'k1', made.take.id, { encode: keepWav }),
+    ).toBeNull()
   })
 })
