@@ -58,7 +58,7 @@ prepaid spend: 5 requests at a time under $100, 15 from $100, 50 from $1,000. Fi
 way to ask for the tier, so the user enters it once in a menu on Setup's Requests at once row,
 saved in the project file as `quality.fishTier`.
 
-## Spend log
+## Spend log (built, as-5gk.8)
 
 Paid recordings are held to a budget but nothing records what they cost. A history per part (when,
 which model, how many lines, the dollars charged), kept in `.audio-studio/` since it is the
