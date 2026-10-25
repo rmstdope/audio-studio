@@ -12,12 +12,20 @@ import {
   type HeardSegment,
   type TimedWord,
 } from '../core/align'
-import { clipInputs, fingerprint } from '../core/fingerprint'
+import { clipInputs, fingerprint, type ClipInputs } from '../core/fingerprint'
 import { planPart } from '../core/planner'
 import { resolveInRoot } from '../core/paths'
-import type { Problem } from '../core/project'
+import type { Problem, Project } from '../core/project'
 import { pythonJson } from '../core/pyjson'
-import { LockSchema, ManifestSchema, ttsFor, type Lock, type Manifest } from '../core/resources'
+import {
+  LockSchema,
+  ManifestSchema,
+  ttsFor,
+  type Cast,
+  type Line,
+  type Lock,
+  type Manifest,
+} from '../core/resources'
 import { FREE_MODELS } from '../core/project'
 import { createBudget, type Budget } from '../core/spend'
 import { spokenPieces } from '../core/spoken'
@@ -30,7 +38,7 @@ import type { Transcriber } from './transcriber'
 import { keepHeard } from './heard'
 import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
-import { NO_KEY } from './fish'
+import { NO_KEY, type FishClient } from './fish'
 
 /** Seconds of silence between the pieces of a long line (as in RetroQuest's narrate.py). */
 export const GAP_SECONDS = 0.25
@@ -88,8 +96,11 @@ export interface RecordOptions {
   transcriber?: Transcriber | null
 }
 
-/** One take of a line: its joined audio, its word timings, and the share of words heard. */
-interface Take {
+/**
+ * One take of a line: its joined audio, its word timings, and the share of words heard. Made by
+ * `speakLine` and `checkTake`, kept by a recording or as one of a line's extra takes.
+ */
+export interface Take {
   clip: { wav: Uint8Array; seconds: number }
   timed: TimedWord[]
   /** Null when takes are not checked. */
@@ -185,48 +196,18 @@ export async function recordLine(
   return recording
 
   /** One take: the line spoken by Fish (holding a Fish slot only while speaking), joined. */
-  async function makeTake(
-    take: number,
-  ): Promise<
-    { ok: true; clip: { wav: Uint8Array; seconds: number } } | { ok: false; failure: RecordResult }
-  > {
+  async function makeTake(take: number): Promise<Spoken> {
     if (!inputs || !fish || !line) return { ok: false, failure: null }
-    let pieces: Uint8Array[]
-    try {
-      pieces = await limiter.run(`line\n${id}\n${take}`, narration.quality.parallel, async () => {
-        const spoken: Uint8Array[] = []
-        const texts = spokenPieces(
-          line.text,
-          inputs.cue,
-          cast.pronounce,
-          narration.quality.chunkLimit,
-        )
-        for (const text of texts) {
-          // Charged before it is sent: nothing beyond what was confirmed reaches Fish.
-          const refused = budget.spend(inputs.model, utf8.encode(text).length, new Date())
-          if (refused) throw new SpendRefused(refused)
-          spoken.push(
-            await fish.tts({
-              text,
-              voice: inputs.voice,
-              model: inputs.model,
-              ...ttsFor(narration.tts, cast.speakers[line.speaker]),
-              format: 'wav',
-            }),
-          )
-        }
-        return spoken
-      })
-    } catch (error) {
-      const reason = error instanceof SpendRefused ? 'spend' : 'fish'
-      return { ok: false, failure: { ok: false, reason, message: messageOf(error) } }
-    }
-    try {
-      return { ok: true, clip: joinWavs(pieces, GAP_SECONDS) }
-    } catch (error) {
-      const message = `Fish sent audio that could not be joined: ${messageOf(error)}`
-      return { ok: false, failure: { ok: false, reason: 'audio', message } }
-    }
+    return speakLine({
+      fish,
+      line,
+      inputs,
+      cast,
+      narration,
+      budget,
+      limiter,
+      limiterKey: `line\n${id}\n${take}`,
+    })
   }
 
   async function record(): Promise<RecordResult> {
@@ -256,10 +237,6 @@ export async function recordLine(
     }
     // Takes until one is heard well enough (up to quality.takes), keeping the best: as narrate.py.
     const checker = narration.quality.transcriber === 'none' ? null : transcriber
-    const tokens = line.text.split(' ')
-    const said = saidWords(line.text, cast.pronounce)
-    const names = knownNames(cast)
-    const alike = soundAlikes(narration.quality.soundAlike)
     let best: Take | null = null
     let takes = 0
     for (let take = 1; take <= (checker ? narration.quality.takes : 1); take++) {
@@ -269,99 +246,227 @@ export async function recordLine(
         if (best) break
         return made.failure
       }
-      const { clip } = made
       let attempt: Take
-      if (!checker) {
-        const timed = alignWords(tokens, [], clip.seconds).timed
-        attempt = { clip, timed, heard: null, words: [], missed: [] }
-      } else {
-        try {
-          const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav)
-          const words = heardWords(segments, clip.seconds)
-          const aligned = alignWords(tokens, words, clip.seconds, said, names, alike)
-          // Rounded as the lock keeps it, so the line's status agrees with this decision.
-          attempt = {
-            clip,
-            timed: aligned.timed,
-            heard: pyRound(aligned.ratio),
-            words: words.map((w) => w.word.trim()),
-            missed: aligned.missed,
-          }
-        } catch (error) {
-          if (best) break
-          return { ok: false, reason: 'transcribe', message: messageOf(error) }
-        }
+      try {
+        attempt = await checkTake(checker, made.clip, line, cast, narration)
+      } catch (error) {
+        if (best) break
+        return { ok: false, reason: 'transcribe', message: messageOf(error) }
       }
       takes = take
       if (!best || (attempt.heard ?? 0) > (best.heard ?? 0)) best = attempt
       if (attempt.heard === null || attempt.heard >= narration.quality.minHeard) break
     }
     if (!best) return null
-    const { clip } = best
+    return commitClip({
+      projectFile,
+      partId,
+      line,
+      inputs,
+      paths: read.paths,
+      narration,
+      encode,
+      take: best,
+      takes,
+      finalFp,
+    })
+  }
+}
 
-    // Encoded beside the clip under a hidden name (never served, never a stray clip), and moved
-    // into place only in the part's turn, once the manifest and lock could be read.
-    const file = `${key}.mp3`
-    const paths = read.paths
-    const target = resolveInRoot(root, join(paths.clipsPath, file))
-    const temporary = resolveInRoot(root, join(paths.clipsPath, `.${key}.${randomUUID()}.mp3`))
-    try {
-      await encode(clip.wav, temporary, narration.output)
-    } catch (error) {
-      await rm(temporary, { force: true }).catch(() => {})
-      return { ok: false, reason: 'encode', message: messageOf(error) }
-    }
+/** A line spoken by Fish: its joined audio, or why not (as a recording reports it). */
+export type Spoken =
+  { ok: true; clip: { wav: Uint8Array; seconds: number } } | { ok: false; failure: RecordResult }
 
-    const duration = pyRound(clip.seconds)
-    const { fp, parts } = fingerprint(inputs)
-    try {
-      const problems = await inPartTurn(
-        projectFile,
-        partId,
-        async (): Promise<Problem[] | 'final'> => {
-          // Read again in the part's turn: other lines may have been written meanwhile.
-          const found: Problem[] = []
-          const manifest = await manifestNow(root, paths.manifestPath, found)
-          const lock = await lockNow(root, paths.lockPath, found)
-          if (!manifest || !lock) return found
-          // A final clip of the line landed while this draft was made: it is kept, paid for.
-          if (finalFp && lock[key]?.fp === finalFp) return 'final'
-          manifest[key] = {
-            file,
-            speaker: line.speaker,
-            duration,
-            words: best.timed,
-          }
-          const at = new Date().toISOString()
-          lock[key] = {
-            fp,
+/**
+ * Has Fish speak a line once: each sentence-sized piece in the speaker's voice with the cue, at the
+ * character's settings, charged to the budget before it is sent, holding a Fish slot (`limiter`,
+ * under `limiterKey`) only while speaking; the pieces joined with a short pause.
+ */
+export async function speakLine({
+  fish,
+  line,
+  inputs,
+  cast,
+  narration,
+  budget,
+  limiter,
+  limiterKey,
+}: {
+  fish: FishClient
+  line: Line
+  inputs: ClipInputs
+  cast: Cast
+  narration: Project['narration']
+  budget: Budget
+  limiter: Limiter
+  limiterKey: string
+}): Promise<Spoken> {
+  let pieces: Uint8Array[]
+  try {
+    pieces = await limiter.run(limiterKey, narration.quality.parallel, async () => {
+      const spoken: Uint8Array[] = []
+      const texts = spokenPieces(
+        line.text,
+        inputs.cue,
+        cast.pronounce,
+        narration.quality.chunkLimit,
+      )
+      for (const text of texts) {
+        // Charged before it is sent: nothing beyond what was confirmed reaches Fish.
+        const refused = budget.spend(inputs.model, utf8.encode(text).length, new Date())
+        if (refused) throw new SpendRefused(refused)
+        spoken.push(
+          await fish.tts({
+            text,
             voice: inputs.voice,
             model: inputs.model,
-            parts,
-            takes,
-            ...(best.heard === null ? {} : { heard: best.heard }),
-            at,
-          }
-          // The lock last: if anything fails before it, the line shows as stale (its old lock entry)
-          // or untracked (none), never as up to date.
-          await rename(temporary, target)
-          await writeAtomic(root, paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
-          await writeAtomic(root, paths.lockPath, formatEntriesPerLine(lock))
-          await keepWhatWasHeard(projectFile, partId, key, { ...best, at, text: line.text })
-          return []
-        },
-      )
-      if (problems === 'final') return { ok: true, key, skipped: true }
-      if (problems.length) return { ok: false, problems }
-      return best.heard === null
-        ? { ok: true, key, duration }
-        : { ok: true, key, duration, heard: best.heard, takes }
-    } catch (error) {
-      return { ok: false, reason: 'write', message: messageOf(error) }
-    } finally {
-      // Gone already once renamed; otherwise never left behind.
-      await rm(temporary, { force: true }).catch(() => {})
-    }
+            ...ttsFor(narration.tts, cast.speakers[line.speaker]),
+            format: 'wav',
+          }),
+        )
+      }
+      return spoken
+    })
+  } catch (error) {
+    const reason = error instanceof SpendRefused ? 'spend' : 'fish'
+    return { ok: false, failure: { ok: false, reason, message: messageOf(error) } }
+  }
+  try {
+    return { ok: true, clip: joinWavs(pieces, GAP_SECONDS) }
+  } catch (error) {
+    const message = `Fish sent audio that could not be joined: ${messageOf(error)}`
+    return { ok: false, failure: { ok: false, reason: 'audio', message } }
+  }
+}
+
+/**
+ * A spoken line as a take: checked by Whisper (`checker`) and its words aligned to the text, with
+ * the share heard rounded as the lock keeps it; or, without a checker, the words spread evenly over
+ * the clip and no score. Throws what Whisper throws.
+ */
+export async function checkTake(
+  checker: Transcriber | null,
+  clip: { wav: Uint8Array; seconds: number },
+  line: Line,
+  cast: Cast,
+  narration: Project['narration'],
+): Promise<Take> {
+  const tokens = line.text.split(' ')
+  if (!checker) {
+    const timed = alignWords(tokens, [], clip.seconds).timed
+    return { clip, timed, heard: null, words: [], missed: [] }
+  }
+  const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav)
+  const words = heardWords(segments, clip.seconds)
+  const said = saidWords(line.text, cast.pronounce)
+  const aligned = alignWords(
+    tokens,
+    words,
+    clip.seconds,
+    said,
+    knownNames(cast),
+    soundAlikes(narration.quality.soundAlike),
+  )
+  return {
+    clip,
+    timed: aligned.timed,
+    heard: pyRound(aligned.ratio),
+    words: words.map((w) => w.word.trim()),
+    missed: aligned.missed,
+  }
+}
+
+/**
+ * Makes a take the line's clip: encoded beside the clip under a hidden name (never served, never a
+ * stray clip) and moved into place only in the part's turn, once the manifest and lock could be
+ * read, with the manifest entry (the take's word timings) and the lock entry (`takes` tried, the
+ * share heard) written after it. The lock last: if anything fails before it, the line shows as
+ * stale or untracked, never as up to date. With `finalFp`, a final clip of the line that landed
+ * meanwhile is kept and the take dropped (`skipped`).
+ */
+export async function commitClip({
+  projectFile,
+  partId,
+  line,
+  inputs,
+  paths,
+  narration,
+  encode,
+  take,
+  takes,
+  finalFp,
+}: {
+  projectFile: string
+  partId: string
+  line: Line
+  inputs: ClipInputs
+  paths: { clipsPath: string; manifestPath: string; lockPath: string }
+  narration: Project['narration']
+  encode: Encoder
+  take: Take
+  takes: number
+  finalFp: string | null
+}): Promise<RecordResult> {
+  const root = dirname(projectFile)
+  const { key } = line
+  const { clip } = take
+  const file = `${key}.mp3`
+  const target = resolveInRoot(root, join(paths.clipsPath, file))
+  const temporary = resolveInRoot(root, join(paths.clipsPath, `.${key}.${randomUUID()}.mp3`))
+  try {
+    await encode(clip.wav, temporary, narration.output)
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {})
+    return { ok: false, reason: 'encode', message: messageOf(error) }
+  }
+
+  const duration = pyRound(clip.seconds)
+  const { fp, parts } = fingerprint(inputs)
+  try {
+    const problems = await inPartTurn(
+      projectFile,
+      partId,
+      async (): Promise<Problem[] | 'final'> => {
+        // Read again in the part's turn: other lines may have been written meanwhile.
+        const found: Problem[] = []
+        const manifest = await manifestNow(root, paths.manifestPath, found)
+        const lock = await lockNow(root, paths.lockPath, found)
+        if (!manifest || !lock) return found
+        // A final clip of the line landed while this draft was made: it is kept, paid for.
+        if (finalFp && lock[key]?.fp === finalFp) return 'final'
+        manifest[key] = {
+          file,
+          speaker: line.speaker,
+          duration,
+          words: take.timed,
+        }
+        const at = new Date().toISOString()
+        lock[key] = {
+          fp,
+          voice: inputs.voice,
+          model: inputs.model,
+          parts,
+          takes,
+          ...(take.heard === null ? {} : { heard: take.heard }),
+          at,
+        }
+        await rename(temporary, target)
+        await writeAtomic(root, paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
+        await writeAtomic(root, paths.lockPath, formatEntriesPerLine(lock))
+        await keepWhatWasHeard(projectFile, partId, key, { ...take, at, text: line.text })
+        return []
+      },
+    )
+    if (problems === 'final') return { ok: true, key, skipped: true }
+    if (problems.length) return { ok: false, problems }
+    return take.heard === null
+      ? { ok: true, key, duration }
+      : { ok: true, key, duration, heard: take.heard, takes }
+  } catch (error) {
+    return { ok: false, reason: 'write', message: messageOf(error) }
+  } finally {
+    // Gone already once renamed; otherwise never left behind.
+    await rm(temporary, { force: true }).catch(() => {})
   }
 }
 
