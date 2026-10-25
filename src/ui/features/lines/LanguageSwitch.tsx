@@ -1,22 +1,27 @@
-import type { LanguageProgress } from '../../../services/workspace'
-import { languageTab, movedTo } from '../../languages'
+import { movedTo } from '../../languages'
+
+/** One tab of the switch: a language, what it says beside the name, and its hover text. */
+export interface LanguageTab {
+  id: string
+  name: string
+  /** What the tab says beside the language (a line count, a casting state); null until known. */
+  count: string | null
+  title?: string
+  dimmed: boolean
+}
 
 /**
- * The languages of a part, one tab each with how many of its lines are up to date. It wraps onto
- * more rows rather than becoming a menu, so every language's progress stays in view.
+ * The languages of a page, one tab each with how its language stands (a part's lines up to date,
+ * a character's casting). It wraps onto more rows rather than becoming a menu, so every
+ * language's state stays in view.
  */
 export function LanguageSwitch({
-  languages,
-  progress,
+  tabs,
   active,
-  partTitle,
   onChoose,
 }: {
-  languages: { id: string; name: string }[]
-  /** How far each language has come, once known. */
-  progress: LanguageProgress[] | null
+  tabs: LanguageTab[]
   active: string
-  partTitle: string
   onChoose: (language: string) => void
 }) {
   return (
@@ -26,7 +31,7 @@ export function LanguageSwitch({
       aria-label="Language"
       onKeyDown={(event) => {
         const next = movedTo(
-          languages.map((l) => l.id),
+          tabs.map((t) => t.id),
           active,
           event.key,
         )
@@ -36,29 +41,23 @@ export function LanguageSwitch({
         event.currentTarget.querySelector<HTMLElement>(`[data-language="${next}"]`)?.focus()
       }}
     >
-      {languages.map((language) => {
-        const known = progress?.find((p) => p.id === language.id)
-        const { count, title, dimmed } = known
-          ? languageTab(known, partTitle)
-          : { count: null, title: undefined, dimmed: false }
-        return (
-          <button
-            key={language.id}
-            type="button"
-            role="tab"
-            lang={language.id}
-            data-language={language.id}
-            tabIndex={active === language.id ? 0 : -1}
-            className={dimmed ? 'tab tab-dim' : 'tab'}
-            aria-selected={active === language.id}
-            title={title}
-            onClick={() => onChoose(language.id)}
-          >
-            {language.name}
-            {count !== null && <span className="mono tab-count">{count}</span>}
-          </button>
-        )
-      })}
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          lang={tab.id}
+          data-language={tab.id}
+          tabIndex={active === tab.id ? 0 : -1}
+          className={tab.dimmed ? 'tab tab-dim' : 'tab'}
+          aria-selected={active === tab.id}
+          title={tab.title}
+          onClick={() => onChoose(tab.id)}
+        >
+          {tab.name}
+          {tab.count !== null && <span className="mono tab-count">{tab.count}</span>}
+        </button>
+      ))}
     </div>
   )
 }

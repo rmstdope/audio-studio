@@ -1,4 +1,5 @@
 import type { ProjectSummary } from '../../../core/summary'
+import { castSaved, isMultilingual, languageShown, nameOf } from '../../castLanguages'
 import type { CastResult } from '../../../services/sessions'
 import { useCast, useSession, useSessionAction } from '../../api'
 import { CheckIcon } from '../../components/icons'
@@ -16,14 +17,21 @@ import { ShortlistBoard } from './ShortlistBoard'
 export function AuditionView({
   summary,
   characterId,
+  asked,
 }: {
   summary: ProjectSummary
   characterId: string
+  /** The language the address names, if any. */
+  asked?: string
 }) {
   const character = summary.characters.find((c) => c.id === characterId)
-  const sessionQuery = useSession(characterId, Boolean(character))
-  const start = useSessionAction(characterId)
-  const cast = useCast(characterId)
+  const several = isMultilingual(summary.languages)
+  const language = languageShown(summary.languages, asked)
+  const languageName = nameOf(summary.languages, language)
+  const inLanguage = several ? { id: language, name: languageName } : null
+  const sessionQuery = useSession(characterId, Boolean(character), language)
+  const start = useSessionAction(characterId, language)
+  const cast = useCast(characterId, language)
   const { playing, toggle, stop } = useClipPlayer()
 
   if (!character) {
@@ -37,7 +45,11 @@ export function AuditionView({
     )
   }
 
-  const page = routeHref({ view: 'character', character: character.id })
+  const page = routeHref({
+    view: 'character',
+    character: character.id,
+    ...(several ? { language } : {}),
+  })
   const titles = new Map(summary.parts.map((p) => [p.id, shortTitle(p.title)]))
   const view = sessionQuery.data?.ok ? sessionQuery.data : null
   const board = view?.session ? { ...view, session: view.session } : null
@@ -51,7 +63,10 @@ export function AuditionView({
             <a href={routeHref({ view: 'characters' })}>Characters</a> /{' '}
             <a href={page}>{character.name}</a> / Audition
           </span>
-          <h1>Audition for {character.name}</h1>
+          <h1>
+            Audition for {character.name}
+            {inLanguage ? ` in ${languageName}` : ''}
+          </h1>
           <span className="muted">
             Each voice says the phrase in {character.name}’s style, with the free audition model.
             Takes record by themselves.
@@ -78,21 +93,37 @@ export function AuditionView({
               </span>
             </div>
             {board.audition && (
-              <PhraseEditor characterId={character.id} audition={board.audition} />
+              <PhraseEditor
+                characterId={character.id}
+                characterName={character.name}
+                audition={board.audition}
+                language={inLanguage?.id}
+                languageName={inLanguage?.name}
+              />
             )}
             <StyleEditor characterId={character.id} style={character.style} />
           </aside>
         )}
 
         <section className="audition-main" aria-label="Audition">
-          {casted && <CastBanner result={casted} summary={summary} name={character.name} />}
+          {casted && (
+            <CastBanner
+              result={casted}
+              summary={summary}
+              name={character.name}
+              language={inLanguage?.id}
+            />
+          )}
           {sessionQuery.isError ? (
             <p className="panel muted">Could not load the audition: {sessionQuery.error.message}</p>
           ) : board ? (
             <ShortlistBoard
               characterId={character.id}
+              character={character}
+              languages={summary.languages}
+              language={inLanguage}
               name={character.name}
-              lines={character.totalLines}
+              lines={character.languages[language]?.totalLines ?? character.totalLines}
               view={board}
               playing={playing}
               toggle={toggle}
@@ -144,10 +175,12 @@ function CastBanner({
   result,
   summary,
   name,
+  language,
 }: {
   result: Extract<NonNullable<CastResult>, { ok: true }>
   summary: ProjectSummary
   name: string
+  language?: string
 }) {
   const titles = new Map(summary.parts.map((p) => [p.id, p.title]))
   const lines = result.stale.reduce((sum, a) => sum + a.lines, 0)
@@ -157,18 +190,24 @@ function CastBanner({
       <div className="cast-text">
         <strong>
           {result.changed
-            ? `${result.voice.name} is now ${name}’s voice`
+            ? `${result.voice.name} is now ${name}’s ${language ? `${nameOf(summary.languages, language)} ` : ''}voice`
             : `${name} keeps ${result.voice.name}`}
         </strong>
         <span>
           {result.changed
-            ? `Saved to the cast for every ${summary.partLabel.toLowerCase()}. ${plural(lines, 'line')} ${lines === 1 ? 'is' : 'are'} now stale and need recording again.`
+            ? language
+              ? castSaved(summary.languages, language, lines)
+              : `Saved to the cast for every ${summary.partLabel.toLowerCase()}. ${plural(lines, 'line')} ${lines === 1 ? 'is' : 'are'} now stale and need recording again.`
             : 'Nothing changed in the cast.'}
         </span>
         {result.stale.length > 0 && (
           <span className="chips">
             {result.stale.map((a) => (
-              <a key={a.part} className="chip" href={routeHref({ view: 'lines', part: a.part })}>
+              <a
+                key={a.part}
+                className="chip"
+                href={routeHref({ view: 'lines', part: a.part, ...(language ? { language } : {}) })}
+              >
                 {shortTitle(titles.get(a.part) ?? a.part)}: {plural(a.lines, 'line')}
               </a>
             ))}

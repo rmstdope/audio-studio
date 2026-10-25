@@ -618,6 +618,20 @@ describe('an audition per language', () => {
     expect(result).toMatchObject({ ok: true, changed: true })
   })
 
+  it('does not start without a phrase to say, and says why', async () => {
+    const root = tempRepo({
+      ...several,
+      'tts/act1/sv/script.json': [],
+      'audio/act1/sv/manifest.json': {},
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await startAudition(projectFile, 'mira', fishFor, 'sv')).toMatchObject({
+      ok: false,
+      reason: 'no-phrase',
+    })
+    expect(await sessionFor(projectFile, 'mira', 'sv')).toEqual({ ok: true, session: null })
+  })
+
   it('discards one language’s audition and leaves the others', async () => {
     const { projectFile } = await begin()
     await startAudition(projectFile, 'mira', fishFor)

@@ -115,9 +115,9 @@ function partQuery(partId: string, language?: string) {
 }
 
 /** Several parts, as `usePart` loads each (sharing its cache), in the order given. */
-export function useParts(partIds: string[]) {
+export function useParts(partIds: string[], language?: string) {
   return useQueries({
-    queries: partIds.map((id) => partQuery(id)),
+    queries: partIds.map((id) => partQuery(id, language)),
   })
 }
 
@@ -189,18 +189,28 @@ export function useAdopt(partId: string) {
   })
 }
 
+/** `path` asking for `language` (the source language when none is named). */
+function inLanguage(path: string, language: string | undefined): string {
+  return language === undefined ? path : `${path}?language=${encodeURIComponent(language)}`
+}
+
 /**
  * A character's cast voice as Fish knows it, its take and the audition phrase, for its page.
  * Cached for a while: it asks Fish each time.
  */
-export function useCharacterVoice(characterId: string, voiceId: string | null, enabled = true) {
+export function useCharacterVoice(
+  characterId: string,
+  voiceId: string | null,
+  enabled = true,
+  language?: string,
+) {
   return useQuery({
     enabled,
     // Keyed by the voice too: a voice cast since (in the file, or by an audition) is asked anew.
-    queryKey: ['voice', characterId, voiceId],
+    queryKey: ['voice', characterId, language ?? '', voiceId],
     queryFn: () =>
       getJson<NonNullable<CharacterVoiceResult>>(
-        `/api/characters/${encodeURIComponent(characterId)}/voice`,
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/voice`, language),
       ),
     // An answer about another voice (the file changed between) is asked again at once.
     staleTime: (query) => {
@@ -237,16 +247,19 @@ export function useSetKeywords(characterId: string) {
 }
 
 /** Saves a character's own audition phrase (null for the standard one), then reloads its takes. */
-export function useSetPhrase(characterId: string) {
+export function useSetPhrase(characterId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
-    scope: { id: `phrase-${characterId}` },
+    scope: { id: `phrase-${characterId}-${language ?? ''}` },
     mutationFn: async (phrase: string | null) => {
-      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ phrase }),
-      })
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}`, language),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ phrase }),
+        },
+      )
       if (!response.ok && response.status !== 409) {
         throw new Error(`saving the phrase answered ${response.status}`)
       }
@@ -299,16 +312,19 @@ export function useSetStyle(characterId: string) {
 }
 
 /** Saves a character's own speed (null: the project's), then reloads what it changes. */
-export function useSetSpeed(characterId: string) {
+export function useSetSpeed(characterId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
-    scope: { id: `speed-${characterId}` },
+    scope: { id: `speed-${characterId}-${language ?? ''}` },
     mutationFn: async (speed: number | null) => {
-      const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ speed }),
-      })
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}`, language),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ speed }),
+        },
+      )
       if (!response.ok && response.status !== 409) {
         throw new Error(`saving the speed answered ${response.status}`)
       }
@@ -501,7 +517,7 @@ export function useSetCue(partId: string) {
  * and the cast voice in the cache, without asking Fish for anything else. `recording` holds the
  * voices in progress, `errors` what went wrong per voice.
  */
-export function useTakes(characterId: string) {
+export function useTakes(characterId: string, language?: string) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -511,21 +527,24 @@ export function useTakes(characterId: string) {
       setRecording((now) => new Set(now).add(voice))
       setErrors(({ [voice]: _gone, ...rest }) => rest)
       try {
-        const response = await fetch(`/api/characters/${encodeURIComponent(characterId)}/takes`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ voice }),
-        })
+        const response = await fetch(
+          inLanguage(`/api/characters/${encodeURIComponent(characterId)}/takes`, language),
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ voice }),
+          },
+        )
         if (!response.ok && response.status !== 409) {
           throw new Error(`recording answered ${response.status}`)
         }
         const result = (await response.json()) as NonNullable<TakeResult>
         if (result.ok) {
           client.setQueriesData<NonNullable<CharacterVoiceResult>>(
-            { queryKey: ['voice', characterId] },
+            { queryKey: ['voice', characterId, language ?? ''] },
             (old) => (old?.ok ? withVoiceTake<Voiced>(old, voice, result) : old),
           )
-          client.setQueryData<SessionView>(['session', characterId], (old) =>
+          client.setQueryData<SessionView>(['session', characterId, language ?? ''], (old) =>
             old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,
           )
         } else {
@@ -545,19 +564,49 @@ export function useTakes(characterId: string) {
         })
       }
     },
-    [characterId, client],
+    [characterId, client, language],
   )
 
   return { record, recording, errors }
 }
 
 /** A character's audition in progress, with the phrase and the takes of the voices in it. */
-export function useSession(characterId: string, enabled = true) {
+export function useSession(characterId: string, enabled = true, language?: string) {
   return useQuery({
     enabled,
-    queryKey: ['session', characterId],
-    queryFn: () => getJson<SessionView>(`/api/auditions/${encodeURIComponent(characterId)}`),
+    queryKey: ['session', characterId, language ?? ''],
+    queryFn: () =>
+      getJson<SessionView>(
+        inLanguage(`/api/auditions/${encodeURIComponent(characterId)}`, language),
+      ),
   })
+}
+
+/**
+ * Whether an audition is going on in each of `languages`, by language: null until known. The
+ * switch on a character's page shows it.
+ */
+export function useAuditionsGoingOn(
+  characterId: string,
+  languages: string[],
+  enabled = true,
+): Record<string, boolean | null> {
+  const answers = useQueries({
+    queries: languages.map((language) => ({
+      enabled,
+      queryKey: ['session', characterId, language],
+      queryFn: () =>
+        getJson<SessionView>(
+          inLanguage(`/api/auditions/${encodeURIComponent(characterId)}`, language),
+        ),
+    })),
+  })
+  return Object.fromEntries(
+    languages.map((language, i) => {
+      const data = answers[i]?.data
+      return [language, data?.ok ? data.session !== null : null]
+    }),
+  )
 }
 
 /** What a session action sends: the path after the session's (`start`, `move`, …), and a body. */
@@ -571,17 +620,20 @@ export interface SessionAction {
  * more voices, add by id, stop) and shows the answer. Actions run one after another, in the order
  * asked.
  */
-export function useSessionAction(characterId: string) {
+export function useSessionAction(characterId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
-    scope: { id: `session-${characterId}` },
+    scope: { id: `session-${characterId}-${language ?? ''}` },
     mutationFn: async ({ action, body }: SessionAction) => {
       const base = `/api/auditions/${encodeURIComponent(characterId)}`
-      const response = await fetch(action === 'discard' ? base : `${base}/${action}`, {
-        method: action === 'discard' ? 'DELETE' : 'POST',
-        headers: body === undefined ? {} : { 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      })
+      const response = await fetch(
+        inLanguage(action === 'discard' ? base : `${base}/${action}`, language),
+        {
+          method: action === 'discard' ? 'DELETE' : 'POST',
+          headers: body === undefined ? {} : { 'content-type': 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        },
+      )
       if (!response.ok && response.status !== 409) {
         throw new Error(`the audition answered ${response.status}`)
       }
@@ -594,19 +646,21 @@ export function useSessionAction(characterId: string) {
       const dropped = action === 'move' ? droppedBy(body) : null
       if (dropped && view.session && dropped !== view.session.current) {
         const title = view.session.voices[dropped]?.title ?? dropped
-        client.setQueryData<NonNullable<RuledOutResult>>(['ruled-out', characterId], (old) =>
-          old?.ok && !old.voices.some((v) => v.id === dropped)
-            ? {
-                ...old,
-                voices: [{ id: dropped, title, at: new Date().toISOString() }, ...old.voices],
-              }
-            : old,
+        client.setQueryData<NonNullable<RuledOutResult>>(
+          ['ruled-out', characterId, language ?? ''],
+          (old) =>
+            old?.ok && !old.voices.some((v) => v.id === dropped)
+              ? {
+                  ...old,
+                  voices: [{ id: dropped, title, at: new Date().toISOString() }, ...old.voices],
+                }
+              : old,
         )
       }
-      void client.invalidateQueries({ queryKey: ['ruled-out', characterId] })
+      void client.invalidateQueries({ queryKey: ['ruled-out', characterId, language ?? ''] })
       // An answer without the recorded lines (after a move on the board) keeps the ones shown;
       // takes recorded while the answer was on its way are kept too.
-      client.setQueryData<SessionView>(['session', characterId], (old) => {
+      client.setQueryData<SessionView>(['session', characterId, language ?? ''], (old) => {
         if (!old?.ok) return view
         const recorded = view.recorded ?? old.recorded
         if (!view.audition || !old.audition) return { ...view, recorded }
@@ -622,13 +676,14 @@ export function useSessionAction(characterId: string) {
  * per board and again for Try again). It has no scope of its own, so the board's buttons work
  * while Fish answers. `fetched` is true once an answer came, `error` Fish's reason when it failed.
  */
-export function useOwnVoices(characterId: string) {
+export function useOwnVoices(characterId: string, language?: string) {
   const client = useQueryClient()
   const mutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/auditions/${encodeURIComponent(characterId)}/own`, {
-        method: 'POST',
-      })
+      const response = await fetch(
+        inLanguage(`/api/auditions/${encodeURIComponent(characterId)}/own`, language),
+        { method: 'POST' },
+      )
       if (!response.ok && response.status !== 409) {
         throw new Error(`the audition answered ${response.status}`)
       }
@@ -637,7 +692,8 @@ export function useOwnVoices(characterId: string) {
     // Not the answer itself: moves made meanwhile may have been answered after it, so the
     // board is read again, in the server's order.
     onSuccess: (view) => {
-      if (view.ok) void client.invalidateQueries({ queryKey: ['session', characterId] })
+      if (view.ok)
+        void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
     },
   })
   const failure = mutation.data && !mutation.data.ok ? mutation.data : null
@@ -662,16 +718,19 @@ function droppedBy(body: unknown): string | null {
  * Casts a shortlisted voice, ending the audition. Afterwards the project, its parts (whose lines
  * are now stale) and the character's cast voice are loaded again.
  */
-export function useCast(characterId: string) {
+export function useCast(characterId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
-    scope: { id: `session-${characterId}` },
+    scope: { id: `session-${characterId}-${language ?? ''}` },
     mutationFn: async (voice: string) => {
-      const response = await fetch(`/api/auditions/${encodeURIComponent(characterId)}/cast`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ voice }),
-      })
+      const response = await fetch(
+        inLanguage(`/api/auditions/${encodeURIComponent(characterId)}/cast`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ voice }),
+        },
+      )
       if (!response.ok && response.status !== 409) {
         throw new Error(`casting answered ${response.status}`)
       }
@@ -686,20 +745,23 @@ export function useCast(characterId: string) {
         takes: {},
         recorded: [],
       }
-      client.setQueryData<SessionView>(['session', characterId], () => ended)
+      client.setQueryData<SessionView>(['session', characterId, language ?? ''], () => ended)
       void client.invalidateQueries({ queryKey: ['project'] })
       void client.invalidateQueries({ queryKey: ['part'] })
-      void client.invalidateQueries({ queryKey: ['voice', characterId] })
+      void client.invalidateQueries({ queryKey: ['voice', characterId, language ?? ''] })
     },
   })
 }
 
 /** The voices ruled out for a character (dropped in auditions), the latest first. */
-export function useRuledOut(characterId: string) {
+export function useRuledOut(characterId: string, language?: string) {
   return useQuery({
-    queryKey: ['ruled-out', characterId],
+    queryKey: ['ruled-out', characterId, language ?? ''],
     queryFn: async () => {
-      const path = `/api/characters/${encodeURIComponent(characterId)}/ruled-out`
+      const path = inLanguage(
+        `/api/characters/${encodeURIComponent(characterId)}/ruled-out`,
+        language,
+      )
       const response = await fetch(path)
       if (!response.ok && response.status !== 409)
         throw new Error(`${path} answered ${response.status}`)
@@ -718,13 +780,16 @@ function okRuledOut(result: NonNullable<RuledOutResult>) {
  * Allows ruled-out voices again: one by its id, or every one (null), forgetting them all. Later
  * searches for the character may show them again.
  */
-export function useAllowVoices(characterId: string) {
+export function useAllowVoices(characterId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
-    scope: { id: `ruled-out-${characterId}` },
+    scope: { id: `ruled-out-${characterId}-${language ?? ''}` },
     mutationFn: async (voice: string | null) => {
       const base = `/api/characters/${encodeURIComponent(characterId)}/ruled-out`
-      const path = voice === null ? base : `${base}/${encodeURIComponent(voice)}`
+      const path = inLanguage(
+        voice === null ? base : `${base}/${encodeURIComponent(voice)}`,
+        language,
+      )
       const response = await fetch(path, { method: 'DELETE' })
       if (!response.ok && response.status !== 409) {
         throw new Error(`allowing voices again answered ${response.status}`)
@@ -732,7 +797,7 @@ export function useAllowVoices(characterId: string) {
       return okRuledOut((await response.json()) as NonNullable<RuledOutResult>)
     },
     onSuccess: (result) => {
-      client.setQueryData(['ruled-out', characterId], result)
+      client.setQueryData(['ruled-out', characterId, language ?? ''], result)
     },
   })
 }

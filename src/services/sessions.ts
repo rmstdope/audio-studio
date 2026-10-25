@@ -41,7 +41,7 @@ export const SESSIONS_DIR = '.audio-studio/auditions'
 export type SessionFailure =
   | {
       ok: false
-      reason: 'no-session' | 'no-key' | 'fish' | 'seen' | 'exhausted'
+      reason: 'no-session' | 'no-key' | 'fish' | 'seen' | 'exhausted' | 'no-phrase'
       message: string
     }
   | { ok: false; problems: Problem[] }
@@ -78,6 +78,13 @@ export async function startAudition(
   return sessionWrites.run(key(projectFile, name), async () => {
     const found = await findCandidates(projectFile, characterId, fishFor, {}, language)
     if (!found || !found.ok) return found
+    if (found.audition.phrase === null) {
+      return {
+        ok: false,
+        reason: 'no-phrase',
+        message: 'There is no audition phrase to start with; write one first.',
+      }
+    }
     const { voice, voiceName } = found.casting
     // Fish not finding the cast voice just now does not make the character uncast.
     const current = found.current ?? (voice ? unknownVoice(voice, voiceName) : null)

@@ -9,9 +9,20 @@ const SHOWN = 3
  * The voices ruled out for a character: dropped in its auditions and left out of every later
  * search for it. Each can be allowed again, or all forgotten so every voice is in the running.
  */
-export function RuledOutPanel({ characterId, name }: { characterId: string; name: string }) {
-  const ruledOut = useRuledOut(characterId)
-  const allow = useAllowVoices(characterId)
+export function RuledOutPanel({
+  characterId,
+  name,
+  language,
+  languageName,
+}: {
+  characterId: string
+  name: string
+  /** The language whose list this is, in a project with several; left out otherwise. */
+  language?: string
+  languageName?: string
+}) {
+  const ruledOut = useRuledOut(characterId, language)
+  const allow = useAllowVoices(characterId, language)
   const [all, setAll] = useState(false)
   // Forget all asks once more first: the list cannot be got back.
   const [confirming, setConfirming] = useState(false)
@@ -23,11 +34,15 @@ export function RuledOutPanel({ characterId, name }: { characterId: string; name
   return (
     <div className="brief-item">
       <span className="label">
-        Ruled out · {voices.length ? plural(voices.length, 'voice') : 'none'}
+        Ruled out · {languageName ?? (voices.length ? plural(voices.length, 'voice') : 'none')}
       </span>
       <span className="muted brief-hint">
-        Voices you dropped. They are left out of every new search for {name}.
+        Voices you dropped. They are left out of every new search for {name}
+        {languageName ? ` in ${languageName}` : ''}.
       </span>
+      {languageName && ruledOut.data?.ok && voices.length === 0 && (
+        <span className="muted">No voices ruled out in {languageName}.</span>
+      )}
       {shown.length > 0 && (
         <ul className="ruled-out">
           {shown.map((voice) => (
