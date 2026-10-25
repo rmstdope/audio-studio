@@ -292,35 +292,502 @@
         }
       }
 
-.slist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-.sc{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:start}
-.ss{font-size:12px;font-weight:500}.ss.ok{color:var(--ok)}.ss.pr{color:var(--warn)}.ss.off{color:var(--faint)}
-.stx{display:flex;flex-direction:column;gap:6px}
-.fix{font-size:12px;padding:6px 10px;border-radius:8px;background:#0d0f14;border:1px solid var(--line);width:fit-content}
-select{background:var(--raised);color:var(--text);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px;font:inherit}
-.tiers td{padding:5px 8px}.tiers .over{color:var(--warn)}.tiers .fine{color:var(--ok)}.tiers .cur{background:#191c24}
-.focus{outline:2px solid var(--accent);outline-offset:2px}
-@media (max-width:700px){.sc{grid-template-columns:1fr;gap:4px}}
+      .slist {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sc {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 16px;
+        align-items: start;
+      }
+      .ss {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .ss.ok {
+        color: var(--ok);
+      }
+      .ss.pr {
+        color: var(--warn);
+      }
+      .ss.off {
+        color: var(--faint);
+      }
+      .stx {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .fix {
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: #0d0f14;
+        border: 1px solid var(--line);
+        width: fit-content;
+      }
+      select {
+        background: var(--raised);
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 5px 8px;
+        font: inherit;
+      }
+      .tiers td {
+        padding: 5px 8px;
+      }
+      .tiers .over {
+        color: var(--warn);
+      }
+      .tiers .fine {
+        color: var(--ok);
+      }
+      .tiers .cur {
+        background: #191c24;
+      }
+      .focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      @media (max-width: 700px) {
+        .sc {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+      }
     </style>
-
   </head>
   <body>
-<p class="note"><b>The agreed design.</b> A “Requests at once” check, its own row after Fish Audio. The tier is chosen in the menu, saved at once in the project file. 1 — no tier chosen, setting 5 or less: Ready, since every account allows 5:</p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span><span class="muted">$12.40 credit for paid models</span></div>
-<div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
-<div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni on">Setup</span></div></aside><main class="main"><div class="row"><div class="grow"><span class="crumbs">Project</span><h1>Setup</h1><span class="muted">What recording needs on this machine and in the project, checked each time this page opens.</span></div><button class="btn">Check again</button></div><ul class="slist"><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio API key</strong><span class="muted">Found.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio</strong><span class="muted">Answers. Credit for paid models: $12.40</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Requests at once</strong><span class="muted">Recording sends <span class="mono">4</span> at a time, which every Fish account allows.</span><label class="row muted">What you have paid Fish in total <select><option selected>Choose…</option><option>Under $100 — 5 at once</option><option>$100 or more — 15 at once</option><option>$1,000 or more — 50 at once</option></select></label><span class="muted" style="font-size:12px">Saved in the project file for everyone on the project.</span></div></li></ul></main></div>
-<p class="note">2 — no tier chosen, setting above 5: asks for the tier (counts in the sidebar’s needs-attention number):</p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span><span class="muted">$12.40 credit for paid models</span></div>
-<div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
-<div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni on">Setup</span></div></aside><main class="main"><div class="row"><div class="grow"><span class="crumbs">Project</span><h1>Setup</h1><span class="muted">What recording needs on this machine and in the project, checked each time this page opens.</span></div><button class="btn">Check again</button></div><ul class="slist"><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio API key</strong><span class="muted">Found.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio</strong><span class="muted">Answers. Credit for paid models: $12.40</span></div></li><li class="panel sc"><span class="ss pr">⚠ Needs attention</span><div class="stx"><strong>Requests at once</strong><span class="muted">Recording sends <span class="mono">8</span> at a time. Fish allows 5 at once unless you have paid it $100 or more in total; say which to check it.</span><label class="row muted">What you have paid Fish in total <select><option selected>Choose…</option><option>Under $100 — 5 at once</option><option>$100 or more — 15 at once</option><option>$1,000 or more — 50 at once</option></select></label><span class="muted" style="font-size:12px">Saved in the project file for everyone on the project.</span></div></li></ul></main></div>
-<p class="note">3 — tier chosen, within the limit:</p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span><span class="muted">$12.40 credit for paid models</span></div>
-<div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
-<div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni on">Setup</span></div></aside><main class="main"><div class="row"><div class="grow"><span class="crumbs">Project</span><h1>Setup</h1><span class="muted">What recording needs on this machine and in the project, checked each time this page opens.</span></div><button class="btn">Check again</button></div><ul class="slist"><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio API key</strong><span class="muted">Found.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio</strong><span class="muted">Answers. Credit for paid models: $12.40</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Requests at once</strong><span class="muted">Recording sends <span class="mono">8</span> at a time; your account allows 15.</span><label class="row muted">What you have paid Fish in total <select><option>Choose…</option><option>Under $100 — 5 at once</option><option selected>$100 or more — 15 at once</option><option>$1,000 or more — 50 at once</option></select></label><span class="muted" style="font-size:12px">Saved in the project file for everyone on the project.</span></div></li></ul></main></div>
-<p class="note">4 — tier chosen, above the limit (the warning):</p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span><span class="muted">$12.40 credit for paid models</span></div>
-<div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
-<div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni on">Setup</span></div></aside><main class="main"><div class="row"><div class="grow"><span class="crumbs">Project</span><h1>Setup</h1><span class="muted">What recording needs on this machine and in the project, checked each time this page opens.</span></div><button class="btn">Check again</button></div><ul class="slist"><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio API key</strong><span class="muted">Found.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio</strong><span class="muted">Answers. Credit for paid models: $12.40</span></div></li><li class="panel sc"><span class="ss pr">⚠ Needs attention</span><div class="stx"><strong>Requests at once</strong><span class="muted">Recording sends <span class="mono">8</span> at a time, but your account allows 5. Fish will turn the extra requests away and recording will slow down while the studio waits and retries.</span><label class="row muted">What you have paid Fish in total <select><option>Choose…</option><option selected>Under $100 — 5 at once</option><option>$100 or more — 15 at once</option><option>$1,000 or more — 50 at once</option></select></label><span class="muted" style="font-size:12px">Saved in the project file for everyone on the project.</span><code class="fix mono">Set quality.parallel to 5 or less in the project file.</code></div></li></ul></main></div>
-<p class="note">5 — the save failed: the menu goes back to what was saved, with a red line under it:</p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span><span class="muted">$12.40 credit for paid models</span></div>
-<div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
-<div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni on">Setup</span></div></aside><main class="main"><div class="row"><div class="grow"><span class="crumbs">Project</span><h1>Setup</h1><span class="muted">What recording needs on this machine and in the project, checked each time this page opens.</span></div><button class="btn">Check again</button></div><ul class="slist"><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio API key</strong><span class="muted">Found.</span></div></li><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>Fish Audio</strong><span class="muted">Answers. Credit for paid models: $12.40</span></div></li><li class="panel sc"><span class="ss pr">⚠ Needs attention</span><div class="stx"><strong>Requests at once</strong><span class="muted">Recording sends <span class="mono">8</span> at a time. Fish allows 5 at once unless you have paid it $100 or more in total; say which to check it.</span><label class="row muted">What you have paid Fish in total <select><option selected>Choose…</option><option>Under $100 — 5 at once</option><option>$100 or more — 15 at once</option><option>$1,000 or more — 50 at once</option></select></label><span style="color:var(--danger-ink);font-size:12px">Could not save the tier: the project file could not be written. Your choice is not saved.</span></div></li></ul></main></div>
-<p class="note">6 — no API key:</p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span><span class="muted">$12.40 credit for paid models</span></div>
-<div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
-<div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni on">Setup</span></div></aside><main class="main"><div class="row"><div class="grow"><span class="crumbs">Project</span><h1>Setup</h1><span class="muted">What recording needs on this machine and in the project, checked each time this page opens.</span></div><button class="btn">Check again</button></div><ul class="slist"><li class="panel sc"><span class="ss ok">✓ Ready</span><div class="stx"><strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span></div></li><li class="panel sc"><span class="ss pr">⚠ Needs attention</span><div class="stx"><strong>Fish Audio API key</strong><span class="muted">No FISH_API_KEY in the environment or in .env.</span></div></li><li class="panel sc"><span class="ss off">Not used</span><div class="stx"><strong>Fish Audio</strong><span class="muted">Not asked: there is no key.</span></div></li><li class="panel sc"><span class="ss off">Not used</span><div class="stx"><strong>Requests at once</strong><span class="muted">Not checked: there is no key.</span></div></li></ul></main></div>
-</body></html>
+    <p class="note">
+      <b>The agreed design.</b> A “Requests at once” check, its own row after Fish Audio. The tier
+      is chosen in the menu, saved at once in the project file. 1 — no tier chosen, setting 5 or
+      less: Ready, since every account allows 5:
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <ul class="slist">
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio API key</strong><span class="muted">Found.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio</strong
+              ><span class="muted">Answers. Credit for paid models: $12.40</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Requests at once</strong
+              ><span class="muted"
+                >Recording sends <span class="mono">4</span> at a time, which every Fish account
+                allows.</span
+              ><label class="row muted"
+                >What you have paid Fish in total
+                <select>
+                  <option selected>Choose…</option>
+                  <option>Under $100 — 5 at once</option>
+                  <option>$100 or more — 15 at once</option>
+                  <option>$1,000 or more — 50 at once</option>
+                </select></label
+              ><span class="muted" style="font-size: 12px"
+                >Saved in the project file for everyone on the project.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </main>
+    </div>
+    <p class="note">
+      2 — no tier chosen, setting above 5: asks for the tier (counts in the sidebar’s
+      needs-attention number):
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <ul class="slist">
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio API key</strong><span class="muted">Found.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio</strong
+              ><span class="muted">Answers. Credit for paid models: $12.40</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss pr">⚠ Needs attention</span>
+            <div class="stx">
+              <strong>Requests at once</strong
+              ><span class="muted"
+                >Recording sends <span class="mono">8</span> at a time. Fish allows 5 at once unless
+                you have paid it $100 or more in total; say which to check it.</span
+              ><label class="row muted"
+                >What you have paid Fish in total
+                <select>
+                  <option selected>Choose…</option>
+                  <option>Under $100 — 5 at once</option>
+                  <option>$100 or more — 15 at once</option>
+                  <option>$1,000 or more — 50 at once</option>
+                </select></label
+              ><span class="muted" style="font-size: 12px"
+                >Saved in the project file for everyone on the project.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </main>
+    </div>
+    <p class="note">3 — tier chosen, within the limit:</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <ul class="slist">
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio API key</strong><span class="muted">Found.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio</strong
+              ><span class="muted">Answers. Credit for paid models: $12.40</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Requests at once</strong
+              ><span class="muted"
+                >Recording sends <span class="mono">8</span> at a time; your account allows
+                15.</span
+              ><label class="row muted"
+                >What you have paid Fish in total
+                <select>
+                  <option>Choose…</option>
+                  <option>Under $100 — 5 at once</option>
+                  <option selected>$100 or more — 15 at once</option>
+                  <option>$1,000 or more — 50 at once</option>
+                </select></label
+              ><span class="muted" style="font-size: 12px"
+                >Saved in the project file for everyone on the project.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </main>
+    </div>
+    <p class="note">4 — tier chosen, above the limit (the warning):</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <ul class="slist">
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio API key</strong><span class="muted">Found.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio</strong
+              ><span class="muted">Answers. Credit for paid models: $12.40</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss pr">⚠ Needs attention</span>
+            <div class="stx">
+              <strong>Requests at once</strong
+              ><span class="muted"
+                >Recording sends <span class="mono">8</span> at a time, but your account allows 5.
+                Fish will turn the extra requests away and recording will slow down while the studio
+                waits and retries.</span
+              ><label class="row muted"
+                >What you have paid Fish in total
+                <select>
+                  <option>Choose…</option>
+                  <option selected>Under $100 — 5 at once</option>
+                  <option>$100 or more — 15 at once</option>
+                  <option>$1,000 or more — 50 at once</option>
+                </select></label
+              ><span class="muted" style="font-size: 12px"
+                >Saved in the project file for everyone on the project.</span
+              ><code class="fix mono">Set quality.parallel to 5 or less in the project file.</code>
+            </div>
+          </li>
+        </ul>
+      </main>
+    </div>
+    <p class="note">
+      5 — the save failed: the menu goes back to what was saved, with a red line under it:
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <ul class="slist">
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio API key</strong><span class="muted">Found.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>Fish Audio</strong
+              ><span class="muted">Answers. Credit for paid models: $12.40</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss pr">⚠ Needs attention</span>
+            <div class="stx">
+              <strong>Requests at once</strong
+              ><span class="muted"
+                >Recording sends <span class="mono">8</span> at a time. Fish allows 5 at once unless
+                you have paid it $100 or more in total; say which to check it.</span
+              ><label class="row muted"
+                >What you have paid Fish in total
+                <select>
+                  <option selected>Choose…</option>
+                  <option>Under $100 — 5 at once</option>
+                  <option>$100 or more — 15 at once</option>
+                  <option>$1,000 or more — 50 at once</option>
+                </select></label
+              ><span style="color: var(--danger-ink); font-size: 12px"
+                >Could not save the tier: the project file could not be written. Your choice is not
+                saved.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </main>
+    </div>
+    <p class="note">6 — no API key:</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span></div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Project</span>
+            <h1>Setup</h1>
+            <span class="muted"
+              >What recording needs on this machine and in the project, checked each time this page
+              opens.</span
+            >
+          </div>
+          <button class="btn">Check again</button>
+        </div>
+        <ul class="slist">
+          <li class="panel sc">
+            <span class="ss ok">✓ Ready</span>
+            <div class="stx">
+              <strong>ffmpeg</strong><span class="muted">Found: clips can be encoded.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss pr">⚠ Needs attention</span>
+            <div class="stx">
+              <strong>Fish Audio API key</strong
+              ><span class="muted">No FISH_API_KEY in the environment or in .env.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss off">Not used</span>
+            <div class="stx">
+              <strong>Fish Audio</strong><span class="muted">Not asked: there is no key.</span>
+            </div>
+          </li>
+          <li class="panel sc">
+            <span class="ss off">Not used</span>
+            <div class="stx">
+              <strong>Requests at once</strong
+              ><span class="muted">Not checked: there is no key.</span>
+            </div>
+          </li>
+        </ul>
+      </main>
+    </div>
+  </body>
+</html>
