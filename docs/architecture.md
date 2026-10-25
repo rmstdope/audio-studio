@@ -885,6 +885,8 @@ Small, independently useful increments:
     3. **A character's speed** (built): `speed` in the cast, edited on the character page; its
        lines, takes and tries spoken at it, and its lines stale when it changes (§6, §7).
     4. **Setup page** (built): what the machine and the project lack, with the fix for each (§10).
+    5. **Shared voices** (built): a character cast with another's voice says so on its page, card
+       and the characters page; it may be meant, so it is a note, not a problem.
 11. **What was heard**, in two pull requests:
     1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
        when it is checked; the lines page shows it beside the text, missed words marked.

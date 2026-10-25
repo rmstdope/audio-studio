@@ -37,6 +37,20 @@ export interface CharacterSummary {
   totalLines: number
 }
 
+/**
+ * The other characters cast with the same voice as `characterId`: two characters in one voice are
+ * hard to tell apart in a scene, so the UI points it out (it may be meant: a narrator and a
+ * character in a prologue). Empty for an uncast or unknown character.
+ */
+export function sharesVoiceWith(
+  characters: CharacterSummary[],
+  characterId: string,
+): CharacterSummary[] {
+  const voice = characters.find((c) => c.id === characterId)?.voice
+  if (!voice) return []
+  return characters.filter((c) => c.id !== characterId && c.voice === voice)
+}
+
 /** Everything the overview needs about the project, from the project file and its resources. */
 export interface ProjectSummary {
   name: string
