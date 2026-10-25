@@ -322,3 +322,63 @@ describe('dropLineTake', () => {
     ).toBeNull()
   })
 })
+
+describe('takes of a line in a language besides the source', () => {
+  const several = projectJson()
+  const narration = several.narration as Record<string, unknown>
+  narration.languages = ['en', 'sv']
+  narration.paths = {
+    dialog: 'tts/{part}/{language}/script.json',
+    cues: 'tts/{part}/{language}/cues.json',
+    lock: 'tts/{part}/{language}/narration.lock.json',
+    clips: 'audio/{part}/{language}',
+    manifest: 'audio/{part}/{language}/manifest.json',
+  }
+  const swedish = {
+    'audio-studio.json': several,
+    'tts/cast.json': {
+      speakers: {
+        narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-sv' } } },
+      },
+    },
+    'tts/act1/en/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }],
+    'tts/act1/sv/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Elior vaknar.' }],
+    'tts/act1/en/cues.json': { k1: '[worried]' },
+  }
+
+  it('keeps a language’s takes apart, makes one the clip of that language only, and drops it', async () => {
+    const root = tempRepo(swedish)
+    const { fish, requests } = fakeFish()
+    const result = await takeLine(projectFileOf(root), 'act1', 'k1', async () => fish, {
+      limiter: createLimiter(),
+      budget: free,
+      language: 'sv',
+    })
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(requests.map((r) => [r.text, r.voice])).toEqual([['[worried] Elior vaknar.', 'v-sv']])
+    const sv = (file: string | null) => file !== null
+    expect(sv(await lineTakeFile(projectFileOf(root), 'act1', 'k1', result.take.id, 'sv'))).toBe(
+      true,
+    )
+    expect(await lineTakeFile(projectFileOf(root), 'act1', 'k1', result.take.id)).toBeNull()
+    expect(await listLineTakes(projectFileOf(root), 'act1', 'k1')).toEqual({ ok: true, takes: [] })
+    const listed = await listLineTakes(projectFileOf(root), 'act1', 'k1', 'sv')
+    expect(listed).toEqual({ ok: true, takes: [result.take] })
+
+    const used = await useLineTake(projectFileOf(root), 'act1', 'k1', result.take.id, {
+      encode: keepWav,
+      language: 'sv',
+    })
+    expect(used).toMatchObject({ ok: true, key: 'k1' })
+    expect(existsSync(join(root, 'audio/act1/sv/k1.mp3'))).toBe(true)
+    expect(existsSync(join(root, 'audio/act1/en/k1.mp3'))).toBe(false)
+
+    expect(await dropLineTake(projectFileOf(root), 'act1', 'k1', result.take.id, 'sv')).toEqual({
+      ok: true,
+    })
+    expect(await listLineTakes(projectFileOf(root), 'act1', 'k1', 'sv')).toEqual({
+      ok: true,
+      takes: [],
+    })
+  })
+})

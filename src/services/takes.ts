@@ -10,7 +10,7 @@ import {
 } from '../core/project'
 import type { Budget } from '../core/spend'
 import { isPaid } from '../core/sitting'
-import { projectCast, ttsFor, type Cast } from '../core/resources'
+import { cueFor, projectCast, ttsFor, type Cast } from '../core/resources'
 import type { ProjectSummary } from '../core/summary'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
 import { spokenText } from '../core/spoken'
@@ -115,8 +115,9 @@ export async function tryLine(
   cue: string,
   fishFor: FishFactory,
   limiter: Limiter,
+  language?: string,
 ): Promise<TryResult> {
-  const read = await readPart(projectFile, partId)
+  const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return read
   // Only the cast is needed besides the dialog (a line of a broken dialog is not found): a broken
   // manifest or lock, which the lines page lists lines under, does not stop a try.
@@ -133,7 +134,8 @@ export async function tryLine(
       message: `${line.speaker} has no voice yet; cast one first.`,
     }
   }
-  const tried = cue.trim() || (character.style ?? '')
+  // Nothing typed: the cue the line would follow, the source language's, else the character's style.
+  const tried = cue.trim() || cueFor(read.sourceCues, key) || (character.style ?? '')
   const spoken = spokenText(line.text, tried, cast.pronounce)
   const tts = ttsFor(read.project.narration.tts, character)
   return speak(

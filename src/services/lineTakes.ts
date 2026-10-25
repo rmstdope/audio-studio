@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { clipInputs, fingerprint, type ClipInputs } from '../core/fingerprint'
 import { LineTakeSchema, takesView, type LineTake, type LineTakeView } from '../core/lineTakes'
 import { resolveInRoot } from '../core/paths'
-import { type Problem } from '../core/project'
+import { partCacheName, type Problem } from '../core/project'
 import type { Line } from '../core/resources'
 import type { Budget, SpendProblem } from '../core/spend'
 import type { FishFactory } from './auditions'
@@ -14,7 +14,7 @@ import { NO_KEY } from './fish'
 import type { Limiter } from './limit'
 import { checkTake, commitClip, finalFingerprint, speakLine, type RecordResult } from './narration'
 import type { Transcriber } from './transcriber'
-import { readPart, type PartRead, type ProjectFailure } from './workspace'
+import { openProject, readPart, type PartRead, type ProjectFailure } from './workspace'
 
 /** Where a line's extra takes are kept, in the project's tool cache: a folder per part and line. */
 const LINE_TAKES_DIR = '.audio-studio/line-takes'
@@ -47,11 +47,12 @@ export async function listLineTakes(
   projectFile: string,
   partId: string,
   key: string,
+  language?: string,
 ): Promise<LineTakesResult> {
-  const found = await lineAndInputs(projectFile, partId, key)
+  const found = await lineAndInputs(projectFile, partId, key, language)
   if (found.kind === 'problems') return { ok: false, problems: found.problems }
   if (found.kind === 'failed') return found.failure
-  const takes = await readTakes(dirname(projectFile), partId, key)
+  const takes = await readTakes(dirname(projectFile), found.read.cacheName, key)
   return { ok: true, takes: takesView(takes, found.fp) }
 }
 
@@ -71,9 +72,10 @@ export async function takeLine(
     limiter,
     transcriber = null,
     budget,
-  }: { limiter: Limiter; transcriber?: Transcriber | null; budget: Budget },
+    language,
+  }: { limiter: Limiter; transcriber?: Transcriber | null; budget: Budget; language?: string },
 ): Promise<TakeLineResult> {
-  const found = await lineAndInputs(projectFile, partId, key)
+  const found = await lineAndInputs(projectFile, partId, key, language)
   if (found.kind === 'problems') return { ok: false, problems: found.problems }
   if (found.kind === 'failed') return found.failure
   const { read, line, inputs, fp } = found
@@ -97,13 +99,13 @@ export async function takeLine(
     narration,
     budget,
     limiter,
-    limiterKey: `line-take\n${projectFile}\n${partId}\n${key}\n${id}`,
+    limiterKey: `line-take\n${projectFile}\n${partId}\n${read.language}\n${key}\n${id}`,
   })
   if (!spoken.ok) return spoken
   const checker = narration.quality.transcriber === 'none' ? null : transcriber
   let checked
   try {
-    checked = await checkTake(checker, spoken.clip, line, read.input.cast, narration)
+    checked = await checkTake(checker, spoken.clip, line, read.input.cast, narration, read.ears)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return { ok: false, reason: 'transcribe', message }
@@ -120,7 +122,7 @@ export async function takeLine(
     words: checked.words,
     missed: checked.missed,
   }
-  const folder = takesFolder(partId, key)
+  const folder = takesFolder(read.cacheName, key)
   // The WAV first: a take file without its audio would be listed but could not be heard.
   await writeAtomic(root, `${folder}/${id}.wav`, checked.clip.wav)
   await writeAtomic(root, `${folder}/${id}.json`, `${JSON.stringify(take, null, 1)}\n`)
@@ -137,9 +139,9 @@ export async function useLineTake(
   partId: string,
   key: string,
   id: string,
-  { encode = ffmpegEncoder }: { encode?: Encoder } = {},
+  { encode = ffmpegEncoder, language }: { encode?: Encoder; language?: string } = {},
 ): Promise<UseTakeResult> {
-  const found = await lineAndInputs(projectFile, partId, key)
+  const found = await lineAndInputs(projectFile, partId, key, language)
   if (found.kind === 'problems') return { ok: false, problems: found.problems }
   if (found.kind === 'failed') return found.failure
   const { read, line, inputs, fp } = found
@@ -151,7 +153,7 @@ export async function useLineTake(
     }
   }
   const root = dirname(projectFile)
-  const take = (await readTakes(root, partId, key)).find((t) => t.id === id)
+  const take = (await readTakes(root, read.cacheName, key)).find((t) => t.id === id)
   if (!take) return null
   // A take is a draft one: a final clip is never taken back to the draft model (§8.4).
   const { cast, cues, lock } = read.input
@@ -173,7 +175,9 @@ export async function useLineTake(
     }
   }
   const wav = new Uint8Array(
-    await Bun.file(resolveInRoot(root, `${takesFolder(partId, key)}/${id}.wav`)).arrayBuffer(),
+    await Bun.file(
+      resolveInRoot(root, `${takesFolder(read.cacheName, key)}/${id}.wav`),
+    ).arrayBuffer(),
   )
   return commitClip({
     projectFile,
@@ -181,6 +185,7 @@ export async function useLineTake(
     line,
     inputs,
     paths: read.paths,
+    cacheName: read.cacheName,
     narration: read.project.narration,
     encode,
     take: {
@@ -201,14 +206,19 @@ export async function dropLineTake(
   partId: string,
   key: string,
   id: string,
+  language?: string,
 ): Promise<{ ok: true } | ProjectFailure | null> {
-  const found = await lineAndInputs(projectFile, partId, key)
+  const found = await lineAndInputs(projectFile, partId, key, language)
   // A take can be dropped though a file of the part is broken: it is the studio's own file.
   if (found.kind === 'failed') return found.failure
   const root = dirname(projectFile)
-  const takes = await readTakes(root, partId, key)
+  // The name comes from the project file alone: the part's own files may be broken.
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return opened
+  const name = partCacheName(opened.project.narration, partId, language)
+  const takes = await readTakes(root, name, key)
   if (!takes.some((t) => t.id === id)) return null
-  const folder = takesFolder(partId, key)
+  const folder = takesFolder(name, key)
   await rm(resolveInRoot(root, `${folder}/${id}.json`), { force: true })
   await rm(resolveInRoot(root, `${folder}/${id}.wav`), { force: true })
   return { ok: true }
@@ -220,21 +230,28 @@ export async function lineTakeFile(
   partId: string,
   key: string,
   id: string,
+  language?: string,
 ): Promise<string | null> {
   if (!/^[0-9a-f]{16}$/.test(id) || !/^[A-Za-z0-9_-]+$/.test(key)) return null
   const root = dirname(projectFile)
-  const file = resolveInRoot(root, `${takesFolder(partId, key)}/${id}.wav`)
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return null
+  const name = partCacheName(opened.project.narration, partId, language)
+  const file = resolveInRoot(root, `${takesFolder(name, key)}/${id}.wav`)
   return (await Bun.file(file).exists()) ? file : null
 }
 
-/** The folder of a line's extra takes: a readable part name plus a hash, then the line's key. */
-function takesFolder(partId: string, key: string): string {
-  return `${characterFile(LINE_TAKES_DIR, partId).replace(/\.json$/, '')}/${key}`
+/**
+ * The folder of a line's extra takes: a readable part name plus a hash, then the line's key. The
+ * part is named by its cache name: its id, with the language besides the source.
+ */
+function takesFolder(name: string, key: string): string {
+  return `${characterFile(LINE_TAKES_DIR, name).replace(/\.json$/, '')}/${key}`
 }
 
 /** The takes kept for a line, each as its file says; a file that does not fit is left out. */
-async function readTakes(root: string, partId: string, key: string): Promise<LineTake[]> {
-  const folder = resolveInRoot(root, takesFolder(partId, key))
+async function readTakes(root: string, name: string, key: string): Promise<LineTake[]> {
+  const folder = resolveInRoot(root, takesFolder(name, key))
   const takes: LineTake[] = []
   for (const name of await listFiles(folder)) {
     if (!name.endsWith('.json')) continue
@@ -268,8 +285,13 @@ type Found =
  * fingerprint; or why not: a broken file of the part, the project file's failure, or null for an
  * unknown part or line.
  */
-async function lineAndInputs(projectFile: string, partId: string, key: string): Promise<Found> {
-  const read = await readPart(projectFile, partId)
+async function lineAndInputs(
+  projectFile: string,
+  partId: string,
+  key: string,
+  language?: string,
+): Promise<Found> {
+  const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return { kind: 'failed', failure: read }
   // As a recording: any broken file of the part is reported, with its file and path.
   if (read.problems.length) return { kind: 'problems', problems: read.problems }

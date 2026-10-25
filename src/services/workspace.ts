@@ -25,6 +25,7 @@ import {
   ManifestSchema,
   projectCast,
   type Cast,
+  type Cues,
 } from '../core/resources'
 import { summarize, type DialogState, type ProjectSummary } from '../core/summary'
 import {
@@ -331,6 +332,8 @@ export interface PartRead {
   language: string
   /** What names the part's own files in the tool cache in this language (notes, what was heard). */
   cacheName: string
+  /** The source language's cues a line follows until it has its own (none in the source language). */
+  sourceCues: Cues
   /** How a take is checked in this language: what Whisper is told, and the words that sound the same. */
   ears: Ears
   project: Project
@@ -404,6 +407,7 @@ export async function readPart(
     ok: true,
     language,
     cacheName: partCacheName(project.narration, part.id, language),
+    sourceCues,
     ears: {
       // Told the language only in a project with several, so a single-language project is as it was.
       language: project.narration.languages.length > 1 ? language : undefined,
