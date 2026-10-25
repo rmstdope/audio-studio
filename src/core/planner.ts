@@ -5,6 +5,7 @@ import {
   staleReasons,
   type StaleReason,
 } from './fingerprint'
+import { sameModel } from './retirement'
 import type { Project } from './project'
 import { cueFor, type Cast, type Cues, type Line, type Lock, type Manifest } from './resources'
 
@@ -153,7 +154,7 @@ export function planPart(input: PlanInput): PartState {
       // Made with the final model: stale for what changed besides the model it may be made with.
       reasons = staleReasons(
         entry,
-        finalInputs && entry.model === finalModel ? finalInputs : inputs,
+        finalInputs && sameModel(entry.model, finalModel) ? finalInputs : inputs,
       )
     } else if (
       entry.heard !== undefined &&

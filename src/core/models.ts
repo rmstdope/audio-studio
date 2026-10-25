@@ -1,6 +1,5 @@
 import { priceDetail, pricedModels } from './prices'
-import { RETIRED_MODEL } from './retirement'
-import { sameModel } from './fingerprint'
+import { RETIRED_MODEL, sameModel } from './retirement'
 import { usd } from './spend'
 
 /** The three stages that each use a Fish model. */

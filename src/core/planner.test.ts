@@ -384,4 +384,20 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
     const state = planPart(input({ lock, narration: onS21 }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['model'] })
   })
+
+  it('names no model reason for an s1 clip that was the final recording', () => {
+    const split = {
+      ...narration,
+      models: { ...narration.models, draft: 's2.1-pro-free', final: 's2.1-pro' },
+    }
+    const wasS1 = {
+      ...narration,
+      models: { ...narration.models, draft: 's2.1-pro-free', final: 's1' },
+    }
+    const inputs = clipInputs(lines[0]!, cast.speakers.narrator, {}, cast.pronounce, wasS1, 's1')!
+    const { fp, parts } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's1', parts, at: 'then' } }
+    const state = planPart(input({ lock, narration: split, cues: { n1: '[sad]' } }))
+    expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['cue'] })
+  })
 })
