@@ -1747,6 +1747,14 @@ a.btn {
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
+.cue-from,
+.cue-hint {
+  display: block;
+  font-size: 12px;
+}
+.cue-from {
+  margin-top: 4px;
+}
 .cue-edit {
   display: flex;
   flex-direction: column;
@@ -2135,11 +2143,6 @@ a.btn {
   color: var(--faint);
   font-style: italic;
   line-height: 1.45;
-}
-
-.language-note {
-  margin: 0;
-  font-size: 13px;
 }
 
 .notice {

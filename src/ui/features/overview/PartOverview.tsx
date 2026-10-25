@@ -4,6 +4,8 @@ import { sharesVoiceWith, type PartSummary, type ProjectSummary } from '../../..
 import type { PartDetail } from '../../../services/workspace'
 import { useAdopt, useMoveCue, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
+import { PartLanguageSwitch } from '../lines/PartLanguageSwitch'
+import { noDialogPanel } from '../../languages'
 import { CharacterCard } from '../../components/CharacterCard'
 import { AlertIcon, ListIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
@@ -24,11 +26,18 @@ export function PartOverview({
   /** The language in the address, kept on the links to the lines page. */
   language?: string
 }) {
+  const several = summary.languages.length > 1
+  const active = summary.languages.find((l) => l.id === language) ?? summary.languages[0]!
+  const asked = several ? active.id : undefined
   const hasDialog = part.dialog === 'ok'
-  const detail = usePart(part.id, hasDialog)
+  const detail = usePart(part.id, hasDialog || several, asked)
   const loaded = detail.data?.ok ? detail.data.part : null
   const toRecord = loaded ? loaded.counts.missing + loaded.counts.stale : 0
   const refresh = useRefreshDialog(part.id)
+  // Another language than the source may have no dialog yet, whatever the source has.
+  const noLanguageDialog = several && loaded?.dialog === 'missing'
+  const showsLines = (several ? loaded?.dialog === 'ok' : hasDialog) && loaded !== null
+  const lineCount = several ? (loaded?.lines.length ?? 0) : part.lineCount
 
   return (
     <>
@@ -37,9 +46,20 @@ export function PartOverview({
           <span className="crumbs">Narration / {shortTitle(part.title)}</span>
           <h1>{longTitle(part.title)}</h1>
           <span className="mono muted" style={{ fontSize: 12 }}>
-            {part.dialogPath}
+            {loaded?.dialogPath ?? part.dialogPath}
           </span>
         </div>
+        {several && (
+          <PartLanguageSwitch
+            summary={summary}
+            part={part}
+            active={active.id}
+            progress={loaded?.languages ?? null}
+            onChoose={(id) => {
+              window.location.hash = routeHref({ view: 'part', part: part.id, language: id })
+            }}
+          />
+        )}
         {(hasDialog || summary.canRefresh) && (
           <div className="header-actions">
             {summary.canRefresh && (
@@ -53,9 +73,9 @@ export function PartOverview({
                 {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
               </button>
             )}
-            {hasDialog && (
+            {showsLines && (
               <a className="btn" href={routeHref({ view: 'lines', part: part.id, language })}>
-                <ListIcon /> All {part.lineCount} lines
+                <ListIcon /> All {lineCount} lines
               </a>
             )}
             {toRecord > 0 && (
@@ -77,7 +97,7 @@ export function PartOverview({
         />
       )}
 
-      {!hasDialog ? (
+      {!hasDialog && !several ? (
         <NoDialog summary={summary} part={part} />
       ) : (
         <>
@@ -87,9 +107,11 @@ export function PartOverview({
               problems={loaded.problems}
             />
           )}
-          {loaded && loaded.orphanCues.length > 0 && <OrphanCues part={loaded} />}
-          {loaded ? (
-            <StatusPanel part={loaded} />
+          {loaded && loaded.orphanCues.length > 0 && <OrphanCues part={loaded} language={asked} />}
+          {noLanguageDialog ? (
+            <NoLanguageDialog summary={summary} part={part} name={active.name} refresh={refresh} />
+          ) : loaded ? (
+            <StatusPanel part={loaded} language={asked} />
           ) : (
             <section className="panel muted">
               {detail.isError
@@ -97,14 +119,40 @@ export function PartOverview({
                 : 'Checking clips…'}
             </section>
           )}
-          <CastSection summary={summary} part={part} detail={loaded} language={language} />
+          <CastSection summary={summary} part={part} detail={loaded} language={asked} />
         </>
       )}
     </>
   )
 }
 
-function StatusPanel({ part }: { part: PartDetail }) {
+/** The panel for a language the part has no dialog in yet, as on the lines page. */
+function NoLanguageDialog({
+  summary,
+  part,
+  name,
+  refresh,
+}: {
+  summary: ProjectSummary
+  part: PartSummary
+  name: string
+  refresh: ReturnType<typeof useRefreshDialog>
+}) {
+  const panel = noDialogPanel(shortTitle(part.title), name, summary.canRefresh, summary.partLabel)
+  return (
+    <section className="panel language-empty">
+      <h2>{panel.heading}</h2>
+      <p className="muted">{panel.text}</p>
+      {panel.refresh && (
+        <button className="btn" type="button" disabled={refresh.pending} onClick={refresh.start}>
+          {refresh.pending ? 'Refreshing dialog…' : 'Refresh dialog'}
+        </button>
+      )}
+    </section>
+  )
+}
+
+function StatusPanel({ part, language }: { part: PartDetail; language?: string }) {
   const { counts } = part
   const total = part.lines.length
   const reasons = reasonCounts(part.lines)
@@ -151,13 +199,13 @@ function StatusPanel({ part }: { part: PartDetail }) {
           offer to remove them.
         </p>
       )}
-      {counts.untracked > 0 && <AdoptBanner part={part} />}
+      {counts.untracked > 0 && <AdoptBanner part={part} language={language} />}
     </section>
   )
 }
 
-function AdoptBanner({ part }: { part: PartDetail }) {
-  const adopt = useAdopt(part.id)
+function AdoptBanner({ part, language }: { part: PartDetail; language?: string }) {
+  const adopt = useAdopt(part.id, language)
   const result = adopt.data
   const count = part.counts.untracked
   return (
@@ -207,7 +255,16 @@ function CastSection({
     counts[line.status] = (counts[line.status] ?? 0) + 1
     countsBySpeaker.set(line.speaker, counts)
   }
-  const characters = part.characters.flatMap(({ id, lines }) => {
+  // In a language besides the source, who speaks in the part in that language (when it has
+  // dialog there), with the lines they have in it.
+  const spoken =
+    detail?.dialog === 'ok' && language && language !== summary.languages[0]?.id
+      ? summary.characters.flatMap((character) => {
+          const lines = character.languages[language]?.appearances.find((a) => a.part === part.id)
+          return lines ? [{ id: character.id, lines: lines.lines }] : []
+        })
+      : part.characters
+  const characters = spoken.flatMap(({ id, lines }) => {
     const character = byId.get(id)
     return character ? [{ character, lines }] : []
   })
@@ -232,7 +289,7 @@ function CastSection({
             otherParts={character.appearances
               .filter((a) => a.part !== part.id)
               .map((a) => `Also in ${titles.get(a.part) ?? a.part}`)}
-            sharedVoice={sharesVoiceWith(summary.characters, character.id).length > 0}
+            sharedVoice={sharesVoiceWith(summary.characters, character.id, language).length > 0}
             languages={summary.languages}
             language={language}
           />
@@ -333,7 +390,7 @@ export function RefreshOutcome({
  * given to a line, or removed. The picker lists lines without their own cue, those without a clip
  * first (a reworded line has none yet), and suggests the one line without a clip if there is one.
  */
-function OrphanCues({ part }: { part: PartDetail }) {
+function OrphanCues({ part, language }: { part: PartDetail; language?: string }) {
   const targets = cueTargets(part.lines)
   return (
     <section className="panel orphan-cues" aria-label="Orphaned cues">
@@ -347,7 +404,13 @@ function OrphanCues({ part }: { part: PartDetail }) {
       </span>
       <ul>
         {part.orphanCues.map((orphan) => (
-          <OrphanCue key={orphan.key} partId={part.id} orphan={orphan} targets={targets} />
+          <OrphanCue
+            key={orphan.key}
+            partId={part.id}
+            language={language}
+            orphan={orphan}
+            targets={targets}
+          />
         ))}
       </ul>
     </section>
@@ -356,14 +419,16 @@ function OrphanCues({ part }: { part: PartDetail }) {
 
 function OrphanCue({
   partId,
+  language,
   orphan,
   targets,
 }: {
   partId: string
+  language?: string
   orphan: { key: string; cue: string }
   targets: ReturnType<typeof cueTargets>
 }) {
-  const move = useMoveCue(partId)
+  const move = useMoveCue(partId, language)
   const [picked, setPicked] = useState<string | null>(null)
   // Only a line still offered counts: after a reload the picked one may have its own cue now.
   const offered = (key: string | null) =>

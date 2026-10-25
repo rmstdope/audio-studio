@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
-import type { LanguageProgress } from '../../../services/workspace'
 import type { PartSummary, ProjectSummary } from '../../../core/summary'
 import {
   clipUrl,
@@ -19,14 +18,14 @@ import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { RefreshOutcome } from '../overview/PartOverview'
 import { GeneratePanel } from './GeneratePanel'
-import { LanguageSwitch } from './LanguageSwitch'
+import { PartLanguageSwitch } from './PartLanguageSwitch'
 import { HeardComparison } from './HeardComparison'
 import { LineTakes } from './LineTakes'
 import { canCompare } from '../../heard'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
-import { cueButtonTitle, cueHint, cueNote, languageTab, noDialogPanel } from '../../languages'
+import { cueButtonTitle, cueHint, cueNote, noDialogPanel } from '../../languages'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
@@ -65,8 +64,6 @@ export function LinesView({
   const detail = usePart(part.id, several || part.dialog === 'ok', several ? active.id : undefined)
   const refresh = useRefreshDialog(part.id)
   const clip = (file: string) => clipUrl(part.id, file, several ? active.id : undefined)
-  // The last counts seen, so the switch keeps them while another language loads.
-  const seen = useRef<LanguageProgress[] | null>(null)
   const { playing, inTurn, toggle, playInTurn, stop } = useClipPlayer()
   const recorder = useRecordLines(part.id, asked)
   const accept = useAccept(part.id, asked)
@@ -115,7 +112,6 @@ export function LinesView({
   const [takesOf, setTakesOf] = useState<string | null>(null)
 
   const loaded = detail.data?.ok ? detail.data.part : null
-  if (loaded) seen.current = loaded.languages
   const lines = useMemo(() => {
     const words = search.trim().toLowerCase()
     return (loaded?.lines ?? []).filter(
@@ -214,19 +210,11 @@ export function LinesView({
         </span>
       </div>
       {several && (
-        <LanguageSwitch
-          tabs={declared.map((language) => {
-            const known = seen.current?.find((p) => p.id === language.id)
-            const tab = known ? languageTab(known, shortTitle(part.title)) : null
-            return {
-              id: language.id,
-              name: language.name,
-              count: tab?.count ?? null,
-              title: tab?.title,
-              dimmed: tab?.dimmed ?? false,
-            }
-          })}
+        <PartLanguageSwitch
+          summary={summary}
+          part={part}
           active={active.id}
+          progress={loaded?.languages ?? null}
           onChoose={(id) => {
             window.location.hash = routeHref({ view: 'lines', part: part.id, language: id })
           }}
