@@ -10,6 +10,7 @@ export function Confirm({
   note,
   back = 'Back to the audition',
   onBack,
+  backDisabled = false,
   children,
 }: {
   title: string
@@ -18,6 +19,8 @@ export function Confirm({
   /** What the button that goes back without acting says. */
   back?: string
   onBack: () => void
+  /** Whether the button that goes back is off, while something is being done. */
+  backDisabled?: boolean
   children: ReactNode
 }) {
   const panel = useRef<HTMLElement>(null)
@@ -39,7 +42,7 @@ export function Confirm({
       </ul>
       {note && <span className="muted">{note}</span>}
       <div className="confirm-actions">
-        <button className="btn btn-ghost" type="button" onClick={onBack}>
+        <button className="btn btn-ghost" type="button" onClick={onBack} disabled={backDisabled}>
           {back}
         </button>
         {children}

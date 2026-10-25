@@ -76,9 +76,10 @@ bundle breaks.
   `refreshDialog` command (the game's code, named in its project file) runs in the project root
   only when the user clicks Refresh dialog on the studio's page, and writes what the game writes.
   The studio runs nothing else of the consumer's.
-- The project file itself is read, and changed in one place only: `narration.quality.soundAlike`,
-  saved from the Words that sound the same panel. The save writes the whole file again in its own
-  indentation and line endings (a hand-compacted object is written out).
+- The project file itself is read, and changed in two places only: `narration.quality.soundAlike`,
+  saved from the Words that sound the same panel, and `narration.models.draft` / `final`, moved
+  from `s1` to `s2.1-pro` when the user confirms the retirement banner. Each save writes the whole
+  file again in its own indentation and line endings (a hand-compacted object is written out).
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
 - The game reads `manifest.json`: keep its format exactly. The studio's own state goes in the lock

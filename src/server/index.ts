@@ -23,6 +23,7 @@ import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
+import { switchRetiredModels } from '../services/models'
 import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile, tryLine } from '../services/takes'
 import { checkSetup } from '../services/setup'
@@ -107,6 +108,16 @@ const PronounceBody = z.object({ table: Table, was: Table }).strict()
 /** The project's own sound-alike groups, and the ones the editing began from. */
 const Groups = z.array(z.array(z.string().max(200)).max(50)).max(1000)
 const SoundAlikeBody = z.object({ groups: Groups, was: Groups }).strict()
+
+/** The takes whose model the page offered to switch from s1. */
+const ModelsBody = z
+  .object({
+    takes: z
+      .array(z.enum(['draft', 'final']))
+      .min(1)
+      .refine((takes) => new Set(takes).size === takes.length),
+  })
+  .strict()
 
 /** Where an orphaned cue goes: a line key, or null to remove it. */
 const MoveCueBody = z.object({ to: z.string().min(1).max(200).nullable() }).strict()
@@ -701,6 +712,16 @@ export function startServer({
             return Response.json({ error: 'expected { groups, was }' }, { status: 400 })
           }
           const result = await setSoundAlike(projectFile, body.data.groups, body.data.was)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/models': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = ModelsBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { takes }' }, { status: 400 })
+          }
+          const result = await switchRetiredModels(projectFile, body.data.takes)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

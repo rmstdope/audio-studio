@@ -600,6 +600,42 @@ describe('server, words that sound the same', () => {
   })
 })
 
+describe('server, retiring models', () => {
+  const project = projectJson()
+  ;(project.narration as { models?: unknown }).models = { draft: 's1', final: 's1' }
+  const ownRoot = tempRepo({
+    'audio-studio.json': project,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+  })
+  const server = startServer({
+    projectFile: join(ownRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const patch = (body: unknown, origin: string | null = server.url.origin) =>
+    fetch(new URL('/api/models', server.url), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
+      body: JSON.stringify(body),
+    })
+
+  it('switches the models from its own page, and the project then shows them', async () => {
+    const takes = ['draft', 'final']
+    expect((await patch({ takes }, 'http://evil.test')).status).toBe(403)
+    expect((await patch({ takes: ['both'] })).status).toBe(400)
+    expect((await patch({ takes: [] })).status).toBe(400)
+    expect((await patch({ takes: ['draft', 'draft'] })).status).toBe(400)
+    const saved = await patch({ takes })
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await patch({ takes })).status).toBe(409)
+    const shown = await (await fetch(new URL('/api/project', server.url))).json()
+    expect(shown.summary.models).toEqual({ draft: 's2.1-pro', final: 's2.1-pro' })
+  })
+})
+
 describe('allowedHosts', () => {
   it('names both addresses with the port', () => {
     expect(allowedHosts(4801)).toEqual(['127.0.0.1:4801', 'localhost:4801'])

@@ -137,6 +137,8 @@ audio-studio/
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
+│   │   ├── models.ts            s1 → s2.1-pro in the project file's draft and final models
+│   │   ├── projectFile.ts       reading the project file for a change, and writing it back as it was laid out
 │   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
 │   │   ├── takes.ts             audition takes and tries: recorded once, cached by what they are made of
 │   │   ├── setup.ts             the facts for the setup checks: tools on the PATH, the key, Fish
@@ -553,6 +555,12 @@ An audition is for a character, not for a part: the result applies to every part
   changed since editing began. The project file is otherwise only read; the save keeps the rest of
   it, in its own indentation (a hand-compacted object is written out). Takes already recorded keep
   their heard share; the groups count from the next take on.
+- Warn that `s1` retires (built): while the project file names `s1` for `models.draft` or
+  `models.final`, a banner on every page says so (past tense from 1 January 2027, UTC) with Not now
+  (until the page is reopened; nothing stored) and Switch to s2.1-pro. Switch asks first, then
+  rewrites only the models that are `s1` to `s2.1-pro` in the project file, the same careful way
+  as the sound-alike save (the second change the studio makes to the project file). The audition
+  model and recorded lines are not touched.
 - Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
   (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again). Or check
   a weak one again (built: Check again): Whisper hears the line's clip again, without new audio, and
@@ -771,6 +779,7 @@ GET    /api/characters                           all characters, with the parts 
 PATCH  /api/characters/:id                       style, speed, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
 PATCH  /api/sound-alike                          the project's sound-alike groups ({ groups, was })
+PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
 GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
 DELETE /api/characters/:id/ruled-out             forget them all

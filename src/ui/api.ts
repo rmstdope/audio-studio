@@ -22,6 +22,8 @@ import type { JobState } from '../services/jobs'
 import type { HeardResult } from '../services/heard'
 import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
+import type { Take } from '../core/retirement'
+import type { ModelsChange } from '../services/models'
 import type { SoundAlikeChange } from '../services/soundAlike'
 import type { SetupResult } from '../services/setup'
 import type { NoteChange } from '../services/notes'
@@ -141,6 +143,27 @@ export function useSetSoundAlike() {
     },
     // Refused or not, the page shows the file's groups again: a refusal may mean they changed.
     onSuccess: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
+}
+
+/** Switches the takes' models from s1 to s2.1-pro in the project file, then reloads what shows them. */
+export function useSwitchModels() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'models' },
+    mutationFn: async (takes: Take[]) => {
+      const response = await fetch('/api/models', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ takes }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`switching the models answered ${response.status}`)
+      }
+      return (await response.json()) as ModelsChange
+    },
+    // Refused or not, the page shows the file's models again; the parts and plans carry them too.
+    onSuccess: () => client.invalidateQueries(),
   })
 }
 
