@@ -1,0 +1,664 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>s1 retirement warning</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --miss: #8fb5ff;
+        --miss-bg: #142033;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #050608;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .note {
+        max-width: 1180px;
+        margin: 18px auto 8px;
+        padding: 0 16px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .note b {
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1180px;
+        margin: 0 auto 28px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        min-height: 420px;
+        background: var(--bg);
+      }
+      .side {
+        width: 220px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: none;
+      }
+      .brand {
+        font-weight: 600;
+      }
+      .lbl {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .pbox {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 13px;
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .ni {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 8px;
+        border-radius: 8px;
+        color: var(--soft);
+        font-size: 13px;
+      }
+      .ni.on {
+        background: #2a1b12;
+        color: #ff9a6b;
+      }
+      .cnt {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-radius: 99px;
+        padding: 0 7px;
+        font-size: 12px;
+      }
+      .main {
+        flex: 1;
+        padding: 22px 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn.p {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.g {
+        background: transparent;
+        border-color: transparent;
+        color: var(--muted);
+      }
+      .warnbox {
+        background: var(--warn-bg);
+        border: 1px solid #5a4a1e;
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .warnbox .t {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .warnbox strong {
+        color: var(--warn);
+      }
+      .okbox {
+        background: var(--ok-bg);
+        border: 1px solid #1f5a40;
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .okbox strong {
+        color: var(--ok);
+      }
+      .errbox {
+        background: var(--danger-bg);
+        border: 1px solid #6a2a3a;
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .errbox strong {
+        color: var(--danger-ink);
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .grow {
+        flex: 1;
+      }
+      .chip {
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 12px;
+      }
+      .c-ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .c-st {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .c-mi {
+        background: var(--miss-bg);
+        color: var(--miss);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      td {
+        padding: 7px 6px;
+        border-top: 1px solid var(--line);
+      }
+      .stage {
+        display: flex;
+        gap: 8px;
+      }
+      .stage label {
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        padding: 5px 10px;
+      }
+      .stage .on {
+        border-color: var(--accent);
+        color: #ff9a6b;
+      }
+      .tag {
+        display: inline-block;
+        background: #ffc24b;
+        color: #1a1200;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        margin-right: 8px;
+      }
+      ul.eff {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .setup {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .st {
+        width: 150px;
+        flex: none;
+        font-size: 13px;
+      }
+      .st.ok {
+        color: var(--ok);
+      }
+      .st.pr {
+        color: var(--warn);
+      }
+      @media (max-width: 700px) {
+        .side {
+          display: none;
+        }
+        .warnbox,
+        .okbox {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="note">
+      <b>The agreed design.</b> A banner at the top of every page while the project names s1 for its
+      draft or final takes. 1 — draft and final both use s1:
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="warnbox">
+          <div class="t">
+            <strong>s1 retires on 31 December 2026</strong
+            ><span class="muted"
+              >This project records its draft and final takes with <span class="mono">s1</span>.
+              From 1 January Fish records them with <span class="mono">s2.1-pro</span> instead, at
+              the same price.</span
+            >
+          </div>
+          <button class="btn g">Not now</button><button class="btn p">Switch to s2.1-pro</button>
+        </div>
+      </main>
+    </div>
+    <p class="note">2 — only the draft uses s1; the final model is left alone:</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="warnbox">
+          <div class="t">
+            <strong>s1 retires on 31 December 2026</strong
+            ><span class="muted"
+              >This project records its draft takes with <span class="mono">s1</span>. From 1
+              January Fish records them with <span class="mono">s2.1-pro</span> instead, at the same
+              price.</span
+            >
+          </div>
+          <button class="btn g">Not now</button><button class="btn p">Switch to s2.1-pro</button>
+        </div>
+      </main>
+    </div>
+    <p class="note">3 — only the final uses s1:</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="warnbox">
+          <div class="t">
+            <strong>s1 retires on 31 December 2026</strong
+            ><span class="muted"
+              >This project records its final takes with <span class="mono">s1</span>. From 1
+              January Fish records them with <span class="mono">s2.1-pro</span> instead, at the same
+              price.</span
+            >
+          </div>
+          <button class="btn g">Not now</button><button class="btn p">Switch to s2.1-pro</button>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      4 — after pressing <b>Switch to s2.1-pro</b>, the question opens in place of the banner (both
+      models s1):
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="panel" style="border-color: #5a4a1e">
+          <strong>Switch this project to s2.1-pro?</strong>
+          <ul class="eff">
+            <li>Draft: <span class="mono">s1</span> → <span class="mono">s2.1-pro</span></li>
+            <li>Final: <span class="mono">s1</span> → <span class="mono">s2.1-pro</span></li>
+            <li>
+              Saved in <span class="mono">audio-studio.json</span>; nothing else in it changes.
+            </li>
+            <li>Lines already recorded with s1 stay as they are.</li>
+          </ul>
+          <div class="row" style="margin-top: 12px; justify-content: flex-end">
+            <button class="btn g">Keep s1 for now</button
+            ><button class="btn p">Switch to s2.1-pro</button>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">4b — the same question when only the draft uses s1:</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="panel" style="border-color: #5a4a1e">
+          <strong>Switch this project to s2.1-pro?</strong>
+          <ul class="eff">
+            <li>Draft: <span class="mono">s1</span> → <span class="mono">s2.1-pro</span></li>
+            <li>
+              Saved in <span class="mono">audio-studio.json</span>; nothing else in it changes.
+            </li>
+            <li>Lines already recorded with s1 stay as they are.</li>
+          </ul>
+          <div class="row" style="margin-top: 12px; justify-content: flex-end">
+            <button class="btn g">Keep s1 for now</button
+            ><button class="btn p">Switch to s2.1-pro</button>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      5 — while saving the button reads "Switching…" and both buttons are disabled; then done:
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="okbox">
+          <div style="flex: 1">
+            <strong>Switched to s2.1-pro</strong><br /><span class="muted"
+              >Draft and final now use s2.1-pro, saved in
+              <span class="mono">audio-studio.json</span>. Lines already recorded with s1 stay as
+              they are.</span
+            >
+          </div>
+          <button class="btn g">Dismiss</button>
+        </div>
+      </main>
+    </div>
+    <p class="note">6 — saving failed; the file stays as it was:</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="errbox">
+          <div style="flex: 1">
+            <strong>Could not switch to s2.1-pro</strong><br /><span class="muted"
+              ><span class="mono">audio-studio.json</span> could not be saved: permission denied.
+              Nothing was changed.</span
+            >
+          </div>
+          <button class="btn g">Keep s1 for now</button><button class="btn">Try again</button>
+        </div>
+      </main>
+    </div>
+    <p class="note">7 — from 1 January 2027, while the project still names s1:</p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="warnbox">
+          <div class="t">
+            <strong>s1 retired on 31 December 2026</strong
+            ><span class="muted"
+              >Fish no longer has <span class="mono">s1</span>: this project's draft and final takes
+              are now recorded with <span class="mono">s2.1-pro</span>, at the same price. Switch to
+              say so in the project file.</span
+            >
+          </div>
+          <button class="btn g">Not now</button><button class="btn p">Switch to s2.1-pro</button>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      8 — the project does not use s1, or "Not now" was pressed (until the page is reloaded or the
+      studio reopened): nothing is shown.
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span
+          ><span class="muted">$12.40 credit for paid models</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni on">Narration</span
+          ><span class="ni">Music <span class="muted">Soon</span></span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Acts</span
+          ><span class="ni on">1 The Lantern <span class="muted">42 lines</span></span
+          ><span class="ni">2 The Road <span class="muted">57 lines</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup </span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Narration › Act 1</span>
+          <h1>The Lantern</h1>
+        </div>
+      </main>
+    </div>
+    <p class="note">Narrow window: the buttons drop below the text.</p>
+    <div class="frame">
+      <main class="main" style="max-width: 380px">
+        <div class="warnbox">
+          <div class="t">
+            <strong>s1 retires on 31 December 2026</strong
+            ><span class="muted"
+              >This project records its draft and final takes with <span class="mono">s1</span>.
+              From 1 January Fish records them with <span class="mono">s2.1-pro</span> instead, at
+              the same price.</span
+            >
+          </div>
+          <button class="btn g">Not now</button><button class="btn p">Switch to s2.1-pro</button>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
