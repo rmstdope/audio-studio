@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary } from '../../../core/summary'
-import { clipUrl, useAccept, usePart, useRecordLines, useSetCue } from '../../api'
+import { clipUrl, useAccept, useCheckAgain, usePart, useRecordLines, useSetCue } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
@@ -31,12 +31,19 @@ export function LinesView({ part }: { part: PartSummary }) {
   const { playing, toggle } = useClipPlayer()
   const recorder = useRecordLines(part.id)
   const accept = useAccept(part.id)
-  // Why the last line accepted was not, shown on its row.
+  const check = useCheckAgain(part.id)
+  // Why the last line accepted or checked again was not, shown on its row.
   const refused = (key: string): string | null => {
-    if (accept.variables !== key) return null
-    if (accept.error) return accept.error.message
-    if (!accept.data || accept.data.ok) return null
-    return 'message' in accept.data ? accept.data.message : 'The line could not be accepted.'
+    for (const [action, what] of [
+      [accept, 'accepted'],
+      [check, 'checked again'],
+    ] as const) {
+      if (action.variables !== key) continue
+      if (action.error) return action.error.message
+      if (!action.data || action.data.ok) continue
+      return 'message' in action.data ? action.data.message : `The line could not be ${what}.`
+    }
+    return null
   }
   const [filter, setFilter] = useState<Filter>('attention')
   const [speaker, setSpeaker] = useState('')
@@ -288,6 +295,21 @@ export function LinesView({ part }: { part: PartSummary }) {
                               onClick={() => accept.mutate(line.key)}
                             >
                               Accept
+                            </button>
+                          )}
+                        {line.status === 'weak' &&
+                          recorder.toConfirm[line.key] === undefined &&
+                          !recorder.recording.has(line.key) && (
+                            <button
+                              type="button"
+                              className="btn"
+                              title="Have Whisper hear this take again with today's rules, without recording anything"
+                              disabled={check.isPending && check.variables === line.key}
+                              onClick={() => check.mutate(line.key)}
+                            >
+                              {check.isPending && check.variables === line.key
+                                ? 'Checking…'
+                                : 'Check again'}
                             </button>
                           )}
                       </div>

@@ -495,8 +495,11 @@ An audition is for a character, not for a part: the result applies to every part
   their heard share; the groups count from the next take on.
 - Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
   (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again).
-  Re-timing one line, or clips already measured, waits until it is needed: measuring covers clips
-  never checked (§8.2).
+  Or check a weak one again (built: Check again): Whisper hears the line's clip again, without new
+  audio, and the line is scored and timed with today's rules (heard share and word timings in the
+  lock and manifest, what was heard in the cache), as measuring does for clips never checked
+  (§8.2); a take scored before the rules improved is not weak once checked again. Checking a
+  part's weak lines at once waits for the next step.
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
@@ -560,6 +563,7 @@ GET    /api/parts/:part                          the part, every line with its s
 GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
 POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
+POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
 POST   /api/parts/:part/refresh                  run refreshDialog
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
@@ -654,12 +658,14 @@ Small, independently useful increments:
       `quality.takes` takes per line until one is heard at `minHeard`, keeping the best: real
       word timings in the manifest, the heard share and takes in the lock. `quality.transcriber:
 "none"` records one unchecked take, as before.
-   2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when
-      asked, or accepted as they are (Accept, until recorded again); clips never checked (adopted from narrate.py, or recorded unchecked) measured
-      without new audio (narrate.py `--retime`): the clip decoded to WAV, its length from that and
-      what Whisper hears in that WAV (not the MP3, which Whisper hears slightly differently), so
-      the timings match narrate.py's exactly; a poorly heard clip shows as weak. (Since then,
-      names Whisper spells one letter off count as heard, see §8.2, so such lines differ.)
+   2. **Weak lines and re-timing**: weak lines retaken from their row, or from Generate when asked,
+      accepted as they are (Accept, until recorded again), or checked again by Whisper without new
+      audio (Check again); clips never checked (adopted from narrate.py, or recorded unchecked)
+      measured without new audio (narrate.py `--retime`): the clip decoded to WAV, its length from
+      that and what Whisper hears in that WAV (not the MP3, which Whisper hears slightly
+      differently), so the timings match narrate.py's exactly; a poorly heard clip shows as weak.
+      (Since then, names Whisper spells one letter off count as heard, see §8.2, so such lines
+      differ.)
 6. **Editing**, in small pull requests:
    1. **Style and cues** (built): a character's style on its audition page, saved in the cast; a
       line's own cue in the lines table, saved in the part's cues file (its order kept, written

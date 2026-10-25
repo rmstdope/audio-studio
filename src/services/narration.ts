@@ -520,6 +520,8 @@ export type MeasureResult =
 /** How clips are measured: Whisper, and how a clip is decoded to WAV (ffmpeg unless replaced). */
 export interface MeasureOptions {
   transcriber: Transcriber | null
+  /** Check a clip Whisper already checked again (Check again), with the rules of today. */
+  again?: boolean
   decode?: (file: string) => Promise<{ wav: Uint8Array; seconds: number }>
 }
 
@@ -527,14 +529,15 @@ export interface MeasureOptions {
  * Measures a recorded clip without new audio (narrate.py `--retime`): its length from the decoded
  * audio, what Whisper hears in it, the words aligned. The manifest gets the word timings and
  * length, the lock how well the clip is heard, so a clip heard poorly shows as weak. Only
- * up-to-date clips never measured are, and nothing is written if the clip was recorded again
+ * up-to-date clips never measured are, or, `again`, up-to-date clips already checked (weak ones
+ * too), scored with the rules of today; nothing is written if the clip was recorded again
  * meanwhile (its lock entry's time changed).
  */
 export async function measureLine(
   projectFile: string,
   partId: string,
   key: string,
-  { transcriber, decode = decodeClip }: MeasureOptions,
+  { transcriber, decode = decodeClip, again = false }: MeasureOptions,
 ): Promise<MeasureResult> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
@@ -552,12 +555,16 @@ export async function measureLine(
   const state = planPart(read.input).lines.find((l) => l.key === key)
   const entry = read.input.manifest[key]
   const before = read.input.lock[key]
-  // Only what plans offer: up-to-date clips never measured (adopted, or recorded unchecked).
-  if (!state || state.status !== 'ok' || !entry || !before || before.heard !== undefined) {
+  // What plans offer: up-to-date clips never measured (adopted, or recorded unchecked); asked
+  // again, up-to-date clips already checked, weak ones too.
+  const upToDate = state?.status === 'ok' || (again && state?.status === 'weak')
+  if (!upToDate || !entry || !before || (before.heard !== undefined) !== Boolean(again)) {
     return {
       ok: false,
       reason: 'not-recorded',
-      message: 'Only up-to-date clips never checked by Whisper can be measured.',
+      message: again
+        ? 'Only up-to-date clips Whisper checked can be checked again.'
+        : 'Only up-to-date clips never checked by Whisper can be measured.',
     }
   }
   const root = dirname(projectFile)
