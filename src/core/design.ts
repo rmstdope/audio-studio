@@ -21,6 +21,14 @@ const PREVIEW_CHARS = 150
 /** The longest description a group heading shows before it is cut. */
 const HEADING_CHARS = 80
 
+/** What a designed voice's id looks like: the studio's own, since Fish makes no voice until it is cast. */
+const DESIGN_ID = /^design-[0-9a-f]{12}$/
+
+/** Whether `id` is a designed voice's, not one of Fish's. */
+export function isDesignId(id: string): boolean {
+  return DESIGN_ID.test(id)
+}
+
 /** What the description box allows and shows for the text in it. */
 export interface DescriptionState {
   /** Whether Design voices… is enabled. */

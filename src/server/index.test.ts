@@ -20,6 +20,7 @@ const fish: FishClient = {
     return []
   },
   createVoice: () => Promise.reject(new Error('not used')),
+  designVoice: () => Promise.reject(new Error('not used')),
   async credit() {
     return 25
   },
@@ -1269,6 +1270,7 @@ describe('server, a paid draft model', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1459,6 +1461,7 @@ describe('server, paid recording and what changes meanwhile', () => {
   const held: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       creditCalls++
       if (creditGate) await creditGate
@@ -1666,6 +1669,7 @@ describe('server, a paid job refused for a refresh', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1724,6 +1728,7 @@ describe('server, the final recording', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 10
     },
