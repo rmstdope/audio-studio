@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import type { AuditionText } from '../../../core/takes'
-import { useSetKeywords, useSetPhrase, useSetStyle } from '../../api'
+import { useSetKeywords, useSetPhrase, useSetSpeed, useSetStyle } from '../../api'
+import { SPEED } from '../../../core/resources'
+import { speedDraft } from '../../speedDraft'
 import { Problems } from '../../components/Problems'
 import { addKeyword } from '../../keywords'
 
@@ -172,6 +174,83 @@ export function StyleEditor({ characterId, style }: { characterId: string; style
       </span>
       {save.data && !save.data.ok && 'problems' in save.data && (
         <Problems title="The style could not be saved" problems={save.data.problems} />
+      )}
+      {save.isError && <span className="adopt-error">{save.error.message}</span>}
+    </form>
+  )
+}
+
+/**
+ * A character's own speaking speed, saved in the cast: its lines and takes are spoken at it
+ * instead of the project's `tts.speed`.
+ */
+export function SpeedEditor({
+  characterId,
+  speed,
+  projectSpeed,
+}: {
+  characterId: string
+  speed: number | null
+  projectSpeed: number
+}) {
+  const save = useSetSpeed(characterId)
+  const [draft, setDraft] = useState<string | null>(null)
+  const shown = draft ?? (speed === null ? '' : String(speed))
+  const parsed = speedDraft(shown, speed)
+  const done = (result: { ok: boolean }) => result.ok && setDraft(null)
+
+  return (
+    <form
+      className="brief-item"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (parsed.ok && parsed.changed) save.mutate(parsed.speed, { onSuccess: done })
+      }}
+    >
+      <label className="label" htmlFor="speed">
+        Speed · {speed === null ? `the project’s, ${projectSpeed}` : 'this character’s own'}
+      </label>
+      <div className="keyword-add">
+        <input
+          id="speed"
+          className="style-input mono"
+          type="number"
+          inputMode="decimal"
+          min={SPEED.min}
+          max={SPEED.max}
+          step={0.05}
+          placeholder={String(projectSpeed)}
+          value={shown}
+          onChange={(e) => {
+            if (save.data || save.error) save.reset()
+            setDraft(e.target.value)
+          }}
+        />
+        <button
+          className="btn"
+          type="submit"
+          disabled={!parsed.ok || !parsed.changed || save.isPending}
+        >
+          {save.isPending ? 'Saving…' : 'Save speed'}
+        </button>
+        {speed !== null && (
+          <button
+            className="btn"
+            type="button"
+            disabled={save.isPending}
+            onClick={() => save.mutate(null, { onSuccess: done })}
+          >
+            Use the project’s
+          </button>
+        )}
+      </div>
+      <span className="muted brief-hint">
+        {parsed.ok
+          ? `From ${SPEED.min} (half) to ${SPEED.max} (double). Saved in the cast; recorded lines show as stale until generated again.`
+          : parsed.message}
+      </span>
+      {save.data && !save.data.ok && 'problems' in save.data && (
+        <Problems title="The speed could not be saved" problems={save.data.problems} />
       )}
       {save.isError && <span className="adopt-error">{save.error.message}</span>}
     </form>

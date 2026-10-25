@@ -10,7 +10,12 @@ const files = {
   'audio-studio.json': projectJson(),
   'tts/cast.json': {
     speakers: {
-      grandmother: { voice: 'cur', style: '[warm]', audition: { phrase: 'Elior, dear.' } },
+      grandmother: {
+        voice: 'cur',
+        style: '[warm]',
+        speed: 0.9,
+        audition: { phrase: 'Elior, dear.' },
+      },
     },
     pronounce: { Elior: 'El-ee-or' },
   },
@@ -55,7 +60,7 @@ describe('recordTake', () => {
         model: 's2.1-pro-free',
         temperature: 0.7,
         topP: 0.7,
-        speed: 1,
+        speed: 0.9,
       },
     ])
     const file = await takeFile(projectFile, result.key)
@@ -267,7 +272,7 @@ describe('tryLine', () => {
         model: 's2.1-pro-free',
         temperature: 0.7,
         topP: 0.7,
-        speed: 1,
+        speed: 0.9,
       },
     ])
     expect(await takeFile(projectFileOf(root), result.key)).toBe(

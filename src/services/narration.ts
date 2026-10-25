@@ -17,7 +17,7 @@ import { planPart } from '../core/planner'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
-import { LockSchema, ManifestSchema, type Lock, type Manifest } from '../core/resources'
+import { LockSchema, ManifestSchema, ttsFor, type Lock, type Manifest } from '../core/resources'
 import { FREE_MODELS } from '../core/project'
 import { createBudget, type Budget } from '../core/spend'
 import { spokenPieces } from '../core/spoken'
@@ -210,9 +210,7 @@ export async function recordLine(
               text,
               voice: inputs.voice,
               model: inputs.model,
-              temperature: narration.tts.temperature,
-              topP: narration.tts.topP,
-              speed: narration.tts.speed,
+              ...ttsFor(narration.tts, cast.speakers[line.speaker]),
               format: 'wav',
             }),
           )

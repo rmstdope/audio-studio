@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { problemsFrom } from './project'
-import { CastSchema } from './resources'
+import { CastSchema, ttsFor } from './resources'
 
 describe('CastSchema', () => {
   it('explains a pronunciation without the word it replaces', () => {
@@ -22,5 +22,22 @@ describe('CastSchema', () => {
       path: 'pronounce',
       message: expect.stringContaining('__proto__'),
     })
+  })
+})
+
+describe('ttsFor', () => {
+  const tts = { temperature: 0.7, topP: 0.7, speed: 1 }
+
+  it('speaks a character at the project’s settings, with its own speed when it has one', () => {
+    expect(ttsFor(tts, {})).toEqual(tts)
+    expect(ttsFor(tts, undefined)).toEqual(tts)
+    expect(ttsFor(tts, { speed: 0.85 })).toEqual({ ...tts, speed: 0.85 })
+  })
+
+  it('refuses a speed Fish cannot speak at', () => {
+    const slow = CastSchema.safeParse({ speakers: { a: { speed: 0.2 } } })
+    const fast = CastSchema.safeParse({ speakers: { a: { speed: 2.5 } } })
+    expect(slow.success || fast.success).toBe(false)
+    expect(CastSchema.safeParse({ speakers: { a: { speed: 1.5 } } }).success).toBe(true)
   })
 })

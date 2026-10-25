@@ -111,7 +111,7 @@ export async function findCandidates(
       current,
       candidates,
       audition,
-      takes: recordedTakes(root, project, audition, voices),
+      takes: recordedTakes(root, project, cast, characterId, audition, voices),
       perRound: project.narration.audition.candidatesPerRound,
     }
   } catch (error) {
@@ -173,7 +173,8 @@ export async function characterVoice(
     language,
   }
   if (!id) return answer
-  const take = recordedTakes(dirname(projectFile), project, audition, [id])[id] ?? null
+  const take =
+    recordedTakes(dirname(projectFile), project, cast, characterId, audition, [id])[id] ?? null
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_KEY } }
   try {
@@ -219,6 +220,22 @@ export function setStyle(
   return updateCharacter(projectFile, characterId, (entry) => {
     if (own) return { ...entry, style: own }
     const { style: _removed, ...rest } = entry
+    return rest
+  })
+}
+
+/**
+ * Saves a character's own speaking speed in the cast (its lines and takes are spoken at it instead
+ * of the project's `tts.speed`); null removes it. Its recorded lines go stale.
+ */
+export function setSpeed(
+  projectFile: string,
+  characterId: string,
+  speed: number | null,
+): Promise<CharacterChange> {
+  return updateCharacter(projectFile, characterId, (entry) => {
+    if (speed !== null) return { ...entry, speed }
+    const { speed: _removed, ...rest } = entry
     return rest
   })
 }

@@ -28,7 +28,7 @@ import { linesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
 import { voiceUrl } from '../../voiceId'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
-import { KeywordsEditor, PhraseEditor, StyleEditor } from './BriefEditors'
+import { KeywordsEditor, PhraseEditor, SpeedEditor, StyleEditor } from './BriefEditors'
 
 /**
  * A character's page, the one place about it: its cast voice (Fish's details, its take and
@@ -174,6 +174,11 @@ export function CharacterView({
           )}
           <section className="panel brief-panel" aria-label="Delivery">
             <StyleEditor characterId={character.id} style={character.style} />
+            <SpeedEditor
+              characterId={character.id}
+              speed={character.speed}
+              projectSpeed={summary.speed}
+            />
           </section>
           <section className="panel brief-panel" aria-label="Casting brief">
             <KeywordsEditor characterId={character.id} keywords={character.keywords} />

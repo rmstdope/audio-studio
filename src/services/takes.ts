@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import { phraseProblem, type Problem, type Project } from '../core/project'
-import type { Cast } from '../core/resources'
+import { ttsFor, type Cast } from '../core/resources'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
 import { spokenText } from '../core/spoken'
 import type { FishFactory } from './auditions'
@@ -52,7 +52,8 @@ export async function recordTake(
     const file = text.own ? project.narration.characters : basename(projectFile)
     return { ok: false, problems: [{ file, path: where, message: tooLong }] }
   }
-  return speak(root, project, voiceId, text.spoken, fishFor, limiter)
+  const tts = ttsFor(project.narration.tts, cast.speakers[characterId])
+  return speak(root, project, voiceId, text.spoken, tts, fishFor, limiter)
 }
 
 /**
@@ -89,22 +90,25 @@ export async function tryLine(
   }
   const tried = cue.trim() || (character.style ?? '')
   const spoken = spokenText(line.text, tried, cast.pronounce)
-  return speak(dirname(projectFile), read.project, character.voice, spoken, fishFor, limiter)
+  const tts = ttsFor(read.project.narration.tts, character)
+  return speak(dirname(projectFile), read.project, character.voice, spoken, tts, fishFor, limiter)
 }
 
 /**
- * `voice` saying `spoken` with the audition model, kept in the tool cache under its take key; a
- * take already there is not recorded again, and requests for the same take share one recording.
+ * `voice` saying `spoken` with the audition model at `tts` (the character's settings), kept in
+ * the tool cache under its take key; a take already there is not recorded again, and requests
+ * for the same take share one recording.
  */
 async function speak(
   root: string,
   project: Project,
   voice: string,
   spoken: string,
+  tts: Project['narration']['tts'],
   fishFor: FishFactory,
   limiter: Limiter,
 ): Promise<TakeResult> {
-  const { tts, models, quality } = project.narration
+  const { models, quality } = project.narration
   const key = takeKey({ model: models.audition, voice, spoken, tts })
   const file = resolveInRoot(root, takePath(key))
   const recorded = { ok: true as const, key, spoken }
@@ -165,7 +169,7 @@ export async function auditionTakes(
   return {
     ok: true,
     audition,
-    takes: recordedTakes(dirname(projectFile), project, audition, voiceIds),
+    takes: recordedTakes(dirname(projectFile), project, cast, characterId, audition, voiceIds),
   }
 }
 
@@ -178,12 +182,14 @@ export function auditionFor(cast: Cast, characterId: string, project: Project): 
 export function recordedTakes(
   root: string,
   project: Project,
+  cast: Cast,
+  characterId: string,
   text: AuditionText,
   voiceIds: string[],
 ): Record<string, string> {
   const takes: Record<string, string> = {}
   for (const voice of voiceIds) {
-    const key = takeOf(project, voice, text)
+    const key = takeOf(project, voice, text, cast, characterId)
     if (existsSync(resolveInRoot(root, takePath(key)))) takes[voice] = key
   }
   return takes
@@ -213,7 +219,18 @@ function takePath(key: string): string {
   return `${TAKES_DIR}/${key}.mp3`
 }
 
-function takeOf(project: Project, voice: string, text: AuditionText): string {
+function takeOf(
+  project: Project,
+  voice: string,
+  text: AuditionText,
+  cast: Cast,
+  characterId: string,
+): string {
   const { models, tts } = project.narration
-  return takeKey({ model: models.audition, voice, spoken: text.spoken, tts })
+  return takeKey({
+    model: models.audition,
+    voice,
+    spoken: text.spoken,
+    tts: ttsFor(tts, cast.speakers[characterId]),
+  })
 }

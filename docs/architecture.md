@@ -249,6 +249,7 @@ part's cues.
       "voice": "e48a228e21a443d6a4302dc6238c8128",
       "voiceName": "Gentle Granny",
       "style": "[warm, gentle, a little worried]",
+      "speed": 0.9,
       "audition": { "keywords": ["elderly female", "warm", "storyteller"], "phrase": null }
     }
   },
@@ -256,8 +257,10 @@ part's cues.
 }
 ```
 
-New fields: `voiceName` (shown in the UI; the id alone is unreadable) and `audition` (the keywords,
-plus an optional phrase that replaces the project's standard one). A speaker in the script with no
+New fields: `voiceName` (shown in the UI; the id alone is unreadable), `audition` (the keywords,
+plus an optional phrase that replaces the project's standard one) and `speed` (the character's own
+speaking speed, half to double as Fish allows, in place of the project's `tts.speed`; its lines,
+audition takes and tries are all spoken at it). A speaker in the script with no
 entry in `cast.json` shows as **Uncast**. The UI shows, for each character, which parts it appears
 in and how many lines it has in each, because recasting it makes its lines stale in all of them.
 
@@ -320,7 +323,7 @@ fp = sha256(json([
   voiceId,
   cue,                        // the line's cue, else the character's style
   said,                       // the line with pronunciations applied and checklist bullets read as a list
-  settings                    // temperature, topP, speed, chunkLimit, codec, bitrate, channels
+  settings                    // temperature, topP, speed (the character's own if set), chunkLimit, codec, bitrate, channels
 ]))[:16]
 ```
 
@@ -491,8 +494,8 @@ An audition is for a character, not for a part: the result applies to every part
 
 ### 8.3 Smaller actions
 
-- Edit a character's style cue or keywords, a line's cue, or the pronunciation table (built):
-  saved at once, and affected lines show as stale.
+- Edit a character's style cue, speed or keywords, a line's cue, or the pronunciation table
+  (built): saved at once, and affected lines show as stale (a speed is a settings change).
 - Hear a cue before saving it (built: **Hear it** while editing a line's cue): the speaker's cast
   voice says the line after the cue as typed (empty: the character's style), as the cast says it.
   It is a take, not a clip: recorded with the audition model (free), the whole line in one
@@ -691,7 +694,7 @@ PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the s
 POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
 GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
-PATCH  /api/characters/:id                       style, keywords, phrase
+PATCH  /api/characters/:id                       style, speed, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
 PATCH  /api/sound-alike                          the project's sound-alike groups ({ groups, was })
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
@@ -872,6 +875,8 @@ Small, independently useful increments:
     1. **Hear it** (built): a line's cue heard before it is saved, as a free take (§8.3).
     2. **Playthrough** (built): the lines shown played in turn, from the first or from a row, the
        row playing marked and kept in view (§8.3).
+    3. **A character's speed** (built): `speed` in the cast, edited on the character page; its
+       lines, takes and tries spoken at it, and its lines stale when it changes (§6, §7).
 11. **What was heard**, in two pull requests:
     1. **Kept and compared** (built): what Whisper heard of a take below full kept in the cache
        when it is checked; the lines page shows it beside the text, missed words marked.

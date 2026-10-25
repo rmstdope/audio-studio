@@ -190,6 +190,26 @@ describe('server', () => {
     expect(cast.speakers.narrator.style).toBe('[grave]')
   })
 
+  it('saves a character’s own speed, within what Fish speaks at', async () => {
+    const patch = (body: unknown) =>
+      fetch(url('/api/characters/narrator'), {
+        method: 'PATCH',
+        headers: { origin: server.url.origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    expect((await patch({ speed: 3 })).status).toBe(400)
+    expect((await patch({ speed: 1.2 })).status).toBe(200)
+    let cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.narrator.speed).toBe(1.2)
+    const summary = await (await fetch(url('/api/project'))).json()
+    expect(summary.summary.characters.find((c: { id: string }) => c.id === 'narrator').speed).toBe(
+      1.2,
+    )
+    expect((await patch({ speed: null })).status).toBe(200)
+    cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect('speed' in cast.speakers.narrator).toBe(false)
+  })
+
   it('refreshes a part’s dialog from the studio’s own page only, here with no command', async () => {
     const refresh = (origin: string) =>
       fetch(url('/api/parts/act1/refresh'), { method: 'POST', headers: { origin } })

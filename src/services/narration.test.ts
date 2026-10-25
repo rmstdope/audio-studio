@@ -53,7 +53,7 @@ const manifestText =
 const files = {
   'audio-studio.json': project,
   'tts/cast.json': {
-    speakers: { narrator: { voice: 'v-n', style: '[warm]' }, mira: { voice: 'v-m' } },
+    speakers: { narrator: { voice: 'v-n', style: '[warm]' }, mira: { voice: 'v-m', speed: 1.15 } },
     pronounce: { Elior: 'El-ee-or' },
   },
   'tts/act1/script.json': [
@@ -77,6 +77,13 @@ function record(root: string, key: string, fish: FishClient, encode: Encoder = k
 }
 
 describe('recordLine', () => {
+  it('speaks a character at its own speed', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    await record(root, 'k4', fish)
+    expect(requests.map((r) => r.speed)).toEqual([1.15])
+  })
+
   it('records a line in its voice and style, and updates the manifest and lock', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
