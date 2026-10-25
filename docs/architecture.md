@@ -6,7 +6,9 @@ voice files and their metadata **in place**. Committing and pushing is left to t
 
 The first workspace is **Narration**: casting a voice for every character by audition, and
 recording every line of dialog with the cast voice, regenerating only what is missing or out of
-date. Music and sound effects are later workspaces on the same foundation.
+date. The second is **Music** (§8.5, planned): looping background tracks and short stingers, each
+chosen by audition from takes generated locally with ACE-Step. Sound effects are a later workspace
+on the same foundation.
 
 The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py`,
 `tts/narrate.py`) this tool replaces.
@@ -35,7 +37,9 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Music and sound effects (the architecture leaves room for them).
+- Sound effects (the architecture leaves room for them).
+- Deciding where a track plays. The game decides which track a room or region plays, and when a
+  stinger sounds; the studio makes the tracks it lists.
 
 ---
 
@@ -89,6 +93,7 @@ Installed once from this repo with `bun link` (later `bun add -g`), then run in 
 | TTS and voice library                       | **Fish Audio REST API** via a thin `fetch` client                | The calls in use are few (search, voice, TTS, credits); no SDK needed.                                                                                  |
 | Transcription (word timings, quality check) | **mlx-whisper** in a long-lived Python worker (`uv run`)         | Same model and quality bar as today; the model loads once, not once per clip. Behind an interface, so whisper.cpp can replace it on non-Apple machines. |
 | Encoding and joining                        | **ffmpeg** (subprocess)                                          | Already a dependency; MP3 64 kbps mono as today.                                                                                                        |
+| Music generation (planned, §8.5)            | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free, runs on the Mac (MLX), MIT licence, instrumental tracks from 10 s up. No hosted music API is free with rights to use the result.                  |
 
 A native window (Electrobun) can wrap the same web UI later; nothing in the design depends on it.
 
@@ -538,6 +543,94 @@ generation while the script and cast still change) and `final` (the recording th
   model for both, there is no final step: a final plan or recording is a draft one. A paid
   `audition` model is still to come, with its cost per take.
 
+### 8.5 Music (planned)
+
+The music workspace makes the game's **tracks**: looping background music, one per room or region
+as the game chooses, and short **stingers** (victory, game over). A track is made like a voice is
+cast: a brief, several generated takes to listen to, a shortlist, and one take chosen. The steps
+are in §12, step 11; the spike (11.1) may still change what follows here.
+
+**Project file.** An optional `music` section beside `narration`:
+
+```json
+"music": {
+  "tracks": "music/tracks.json",
+  "paths": {
+    "lock": "music/music.lock.json",
+    "clips": "web/public/audio/music/generated",
+    "manifest": "web/public/audio/music/generated/manifest.json"
+  },
+  "model": "acestep-v15-xl-turbo",
+  "takesPerRound": 4,
+  "output": { "codec": "mp3", "bitrate": "160k", "channels": 2, "lufs": -20 }
+}
+```
+
+The clips folder is the studio's own: tracks that are not the studio's (RetroQuest's freetouse.com
+files) stay where they are, untouched.
+
+**Track list** (`music/tracks.json`, read and written by the studio, edited on the Music page):
+
+```json
+{
+  "tracks": {
+    "willowbrook-village": {
+      "title": "Willowbrook village",
+      "kind": "loop",
+      "brief": "gentle medieval village, lute and recorder, warm, unhurried",
+      "seconds": 90,
+      "bpm": 84,
+      "key": "D major"
+    },
+    "victory": {
+      "title": "Victory",
+      "kind": "stinger",
+      "brief": "short triumphant brass fanfare",
+      "seconds": 5
+    }
+  }
+}
+```
+
+`kind` is `loop` or `stinger`; `bpm` and `key` are optional and passed to ACE-Step, which takes
+them as metadata. Tracks are always instrumental (no lyrics).
+
+**Takes.** A take is the brief generated with a seed. Each round generates `takesPerRound` takes
+with new seeds; a take is cached in `.audio-studio/music-takes/` by a hash of the model, brief,
+kind, seconds, bpm, key and seed, so it is generated once and can be made again. The board for a
+track works as the audition's (§8.1): takes to hear, Drop, Shortlist, more takes, and **Choose**
+one of the shortlist. Sessions are kept in `.audio-studio/music/<track>-<hash>.json`. A dropped take
+is just gone: seeds don't come back, so there is nothing to rule out.
+
+**Shaping.** ACE-Step makes at least 10 seconds, and nothing it makes loops by itself, so a chosen
+take is shaped before it is written:
+
+- a **loop** is generated a few seconds longer than `seconds`, and that tail is crossfaded over its
+  start, so the end runs into the beginning without a seam. The board plays every loop take around
+  its seam (its last seconds, then its first), so the seam is judged by ear before choosing;
+- a **stinger** is cut to `seconds` with a short fade-out.
+
+Then it is levelled to `output.lufs` as narration is (`level.py`'s commands) and encoded into the
+clips folder as `<track>.mp3`.
+
+**Manifest** (`manifest.json` in the clips folder, what the game reads):
+`{ track: { file, kind, duration } }`. MP3 adds a little silence at both ends, so a looping
+`<audio>` element can click at the seam; the spike checks whether the game must loop through Web
+Audio, or whether another codec loops cleanly in the browsers the game supports.
+
+**Lock** (`music.lock.json`, committed): per track, the chosen take's model, seed, a hash of its
+brief and settings, and when it was chosen. A track shows as `missing` (nothing chosen), `ok`, or
+`changed` (its brief or settings changed since its take was chosen: the old one keeps playing in
+the game until another take is chosen). Nothing is generated again by itself: a new brief means a
+new audition. A track removed from the list leaves its clip as an orphan, removed after
+confirmation as narration's are.
+
+**Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
+seconds, bpm, key and seed; a fake in tests. The real one is a Python worker
+(`worker/music.py`, ACE-Step through uv, the model loaded once on the first take and stopped with
+the studio), the same JSON-lines protocol as the Whisper worker. Takes run one at a time (one GPU).
+On a MacBook M5 Pro with 48 GB the XL (4B) model fits without offloading.
+
 ---
 
 ## 9. Server API
@@ -750,6 +843,24 @@ Small, independently useful increments:
        when it is checked; the lines page shows it beside the text, missed words marked.
     2. **Listen again**: a line checked before that has Whisper hear its clip again, from the
        comparison, keeping what it heard.
+11. **Music** (§8.5), in small pull requests:
+    1. **Spike** (outside the studio's code; the findings written into §8.5 and §13): ACE-Step 1.5
+       on the M5 Pro, run from Python through uv. Time for a 90-second take with the XL and 2B
+       models, quality of instrumental loops and stingers in RetroQuest's style, how bpm and key
+       come through, whether the crossfaded seam is heard, and how a loop plays without a click
+       in the game's browsers (MP3 in `<audio>`, another codec, or Web Audio).
+    2. **Track list**: the project file's `music` section and `tracks.json` (schemas, problems with
+       file and path), and a Music page listing the tracks, each with its brief edited and saved.
+       Adding and removing tracks. Nothing generated yet.
+    3. **Takes**: the ACE-Step worker behind `MusicGenerator`, a take generated and cached per
+       click on a track's page, and played.
+    4. **Board**: rounds of takes to hear, Drop, Shortlist, more takes; loops played around their
+       seam; sessions saved.
+    5. **Choose**: the chosen take shaped (loop crossfade, stinger cut and fade), levelled,
+       encoded and written with the manifest and lock; each track's status on the Music page;
+       orphaned clips removed after confirmation.
+    6. **RetroQuest** (in the game's repository, not the studio's): the game reads the music
+       manifest and plays a track per room or region, and the stingers.
 
 ---
 
@@ -762,3 +873,10 @@ Small, independently useful increments:
 3. **Models: free only, for now.** The project file already has `audition`, `draft` and `final`
    model stages, but all must be the free model. Paid models, mainly for a final generation step and
    optionally for auditions and drafts, come later (§8.4).
+4. **Music is generated locally with ACE-Step 1.5.** No hosted music API has a lasting free tier
+   with rights to use the result (ElevenLabs Music's free plan is watermarked and non-commercial;
+   others give signup credits only). Of the open models, MusicGen's weights are non-commercial
+   (CC-BY-NC) and Stable Audio Open is limited to 47 seconds and stronger at effects than at
+   melody; ACE-Step is MIT-licensed, makes full instrumental tracks, and runs on Apple Silicon.
+   Behind `MusicGenerator`, so a paid API can be added as another generator if it falls short.
+   Tracks are chosen by audition, since every generation differs.
