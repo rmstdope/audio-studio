@@ -16,7 +16,7 @@ import {
   sameTable,
   type Pronunciation,
 } from '../core/pronounce'
-import { CastSchema, type Cast, type Character } from '../core/resources'
+import { CastSchema, pronounceOf, type Cast, type Character } from '../core/resources'
 import type { CharacterSummary } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
@@ -525,19 +525,35 @@ export function setPronunciations(
   projectFile: string,
   table: Pronunciation[],
   was: Pronunciation[],
+  language?: string,
 ): Promise<CharacterChange> {
   const clean = cleanPronunciations(table)
-  return castWrites.run(projectFile, () =>
-    writeCast(projectFile, (raw, parsed, path) => {
-      const problem = (message: string): Problem[] => [{ file: path, path: 'pronounce', message }]
-      if (!sameTable(Object.entries(parsed.pronounce), was)) {
+  return castWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const { narration } = opened.project
+    const which = declaredLanguage(narration, language)
+    // The source language's table is `pronounce`; another's is `languages.<code>.pronounce`.
+    const own = which !== narration.languages[0]
+    const where = own ? `languages.${which}.pronounce` : 'pronounce'
+    return writeCast(projectFile, (raw, parsed, path) => {
+      const problem = (message: string): Problem[] => [{ file: path, path: where, message }]
+      if (!sameTable(Object.entries(pronounceOf(parsed, which, narration.languages[0]!)), was)) {
         return problem(
           'the pronunciations in the file changed since editing began; discard your changes to see them',
         )
       }
       const why = pronounceProblem(clean)
       if (why) return problem(why)
-      return { ...raw, pronounce: Object.fromEntries(clean) }
-    }),
-  )
+      if (!own) return { ...raw, pronounce: Object.fromEntries(clean) }
+      const { languages: had = {} } = raw as { languages?: Record<string, Record<string, unknown>> }
+      const { pronounce: _was, ...rest } = had[which] ?? {}
+      const entry = clean.length ? { ...rest, pronounce: Object.fromEntries(clean) } : rest
+      // A language left with nothing goes, and so does the key when no language is left.
+      const { [which]: _gone, ...others } = had
+      const kept = Object.keys(entry).length ? { ...others, [which]: entry } : others
+      const { languages: _languages, ...withoutLanguages } = raw
+      return Object.keys(kept).length ? { ...withoutLanguages, languages: kept } : withoutLanguages
+    })
+  })
 }

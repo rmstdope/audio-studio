@@ -11,6 +11,7 @@ export function formatCast(cast: Record<string, unknown>): string {
     const prefix = `  ${JSON.stringify(key)}: `
     if (key === 'speakers' && isRecord(value)) return prefix + block(value, 2)
     if (key === 'pronounce' && isRecord(value)) return prefix + fitting(value, prefix)
+    if (key === 'languages' && isRecord(value)) return prefix + languages(value)
     return prefix + inline(value)
   })
   return `{\n${sections.join(',\n')}\n}\n`
@@ -18,6 +19,26 @@ export function formatCast(cast: Record<string, unknown>): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/**
+ * The per-language part of the cast: a language each, its pronunciations laid out as the source
+ * language's are (inline if they fit its line, else one to a line).
+ */
+function languages(record: Record<string, unknown>): string {
+  const entries = Object.entries(record)
+  if (!entries.length) return '{}'
+  const lines = entries.map(([language, value]) => {
+    if (!isRecord(value)) return `    ${JSON.stringify(language)}: ${inline(value)}`
+    const fields = Object.entries(value).map(([key, field]) => {
+      const prefix = `      ${JSON.stringify(key)}: `
+      return key === 'pronounce' && isRecord(field)
+        ? prefix + fitting(field, prefix)
+        : prefix + inline(field)
+    })
+    return `    ${JSON.stringify(language)}: {\n${fields.join(',\n')}\n    }`
+  })
+  return `{\n${lines.join(',\n')}\n  }`
 }
 
 /** An object with one entry per line, each value inline. */

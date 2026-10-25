@@ -11,6 +11,7 @@ import {
   loadPart,
   loadProject,
   projectFileProblem,
+  readPart,
 } from './workspace'
 
 const script = [
@@ -430,6 +431,37 @@ describe('a part in several languages', () => {
       status: 'stale',
       reasons: ['cue'],
     })
+  })
+
+  it('hears a language with its own words that sound the same, the built-in English ones for English only', async () => {
+    const narration = project(['en', 'sv', 'de']).narration as Record<string, unknown>
+    const withGroups = {
+      ...project(['en', 'sv', 'de']),
+      narration: {
+        ...narration,
+        quality: {
+          soundAlike: [['Lyra', 'Lira']],
+          soundAlikeByLanguage: { sv: [['Lyria', 'Liria']] },
+        },
+      },
+    }
+    const root = tempRepo({ ...files, 'audio-studio.json': withGroups })
+    const projectFile = join(root, 'audio-studio.json')
+    const alike = async (language: string) => {
+      const read = await readPart(projectFile, 'act1', language)
+      if (!read?.ok) throw new Error('no part')
+      return read.ears.alike
+    }
+    const same = (map: Awaited<ReturnType<typeof alike>>, a: string, b: string) =>
+      (map.get(a) ?? a) === (map.get(b) ?? b)
+    const en = await alike('en')
+    expect(same(en, 'inn', 'in')).toBe(true)
+    expect(same(en, 'lira', 'lyra')).toBe(true)
+    expect(same(en, 'liria', 'lyria')).toBe(false)
+    const sv = await alike('sv')
+    expect(same(sv, 'liria', 'lyria')).toBe(true)
+    expect(same(sv, 'inn', 'in')).toBe(false)
+    expect(same(sv, 'lira', 'lyra')).toBe(false)
   })
 
   it('says so when the source dialog is missing, since lines cannot be matched', async () => {

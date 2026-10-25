@@ -28,6 +28,31 @@ describe('setSoundAlike', () => {
     expect(read()).toBe(`${expected}\n`)
   })
 
+  it('saves a language’s groups under its own key, the source language’s untouched', async () => {
+    const project = projectJson()
+    const narration = project.narration as Record<string, unknown>
+    narration.languages = ['en', 'sv']
+    narration.paths = {
+      dialog: 'tts/{part}/{language}/script.json',
+      cues: 'tts/{part}/{language}/cues.json',
+      lock: 'tts/{part}/{language}/lock.json',
+      clips: 'audio/{part}/{language}',
+      manifest: 'audio/{part}/{language}/manifest.json',
+    }
+    narration.quality = { soundAlike: [['inn', 'Inne']] }
+    const { projectFile, read } = repo(project)
+    expect(await setSoundAlike(projectFile, [['Lyria', 'Liria']], [], 'sv')).toEqual({ ok: true })
+    const quality = JSON.parse(read()).narration.quality
+    expect(quality).toEqual({
+      soundAlike: [['inn', 'Inne']],
+      soundAlikeByLanguage: { sv: [['Lyria', 'Liria']] },
+    })
+    // The groups are compared with that language's own.
+    expect(await setSoundAlike(projectFile, [['a', 'b']], [], 'sv')).toMatchObject({ ok: false })
+    expect(await setSoundAlike(projectFile, [], [['Lyria', 'Liria']], 'sv')).toEqual({ ok: true })
+    expect(JSON.parse(read()).narration.quality).toEqual({ soundAlike: [['inn', 'Inne']] })
+  })
+
   it('leaves the key out when no group is left, and quality out if nothing else is in it', async () => {
     const project = projectJson()
     const { projectFile, read } = repo(project)

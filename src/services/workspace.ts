@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+import { soundAlikes, type SoundAlike } from '../core/align'
 import { languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
@@ -11,6 +12,7 @@ import {
   partCacheName,
   partPathFor,
   problemsFrom,
+  soundAlikeOf,
   type Part,
   type Problem,
   type Project,
@@ -315,6 +317,13 @@ export async function clipFile(
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
 
+/** How a take is checked: the language Whisper is told, and the words counted as heard for each other. */
+export interface Ears {
+  /** The code of the language spoken; absent in a project with one language, where Whisper recognises it. */
+  language: string | undefined
+  alike: SoundAlike
+}
+
 /** Everything read about a part, for planning it or acting on it. */
 export interface PartRead {
   ok: true
@@ -322,8 +331,8 @@ export interface PartRead {
   language: string
   /** What names the part's own files in the tool cache in this language (notes, what was heard). */
   cacheName: string
-  /** The language Whisper is told the clips are in: only in a project with several languages. */
-  hearIn: string | undefined
+  /** How a take is checked in this language: what Whisper is told, and the words that sound the same. */
+  ears: Ears
   project: Project
   part: Part
   dialog: DialogState
@@ -395,7 +404,12 @@ export async function readPart(
     ok: true,
     language,
     cacheName: partCacheName(project.narration, part.id, language),
-    hearIn: project.narration.languages.length > 1 ? language : undefined,
+    ears: {
+      // Told the language only in a project with several, so a single-language project is as it was.
+      language: project.narration.languages.length > 1 ? language : undefined,
+      // The built-in groups are English words: they apply to English only.
+      alike: soundAlikes(soundAlikeOf(project.narration, language), language === 'en'),
+    },
     project,
     part,
     dialog,

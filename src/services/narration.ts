@@ -38,7 +38,7 @@ import type { Limiter } from './limit'
 import type { Transcriber } from './transcriber'
 import { keepHeard } from './heard'
 import { inPartTurn } from './partFiles'
-import { readPart, type ProjectFailure } from './workspace'
+import { readPart, type Ears, type ProjectFailure } from './workspace'
 import { NO_KEY, type FishClient } from './fish'
 
 /** Seconds of silence between the pieces of a long line (as in RetroQuest's narrate.py). */
@@ -260,7 +260,7 @@ export async function recordLine(
       }
       let attempt: Take
       try {
-        attempt = await checkTake(checker, made.clip, line, cast, narration, read.hearIn)
+        attempt = await checkTake(checker, made.clip, line, cast, narration, read.ears)
       } catch (error) {
         if (best) break
         return { ok: false, reason: 'transcribe', message: messageOf(error) }
@@ -387,24 +387,22 @@ export async function checkTake(
   line: Line,
   cast: Cast,
   narration: Project['narration'],
-  language?: string,
+  ears: Ears = { language: undefined, alike: soundAlikes(narration.quality.soundAlike) },
 ): Promise<Take> {
   const tokens = line.text.split(' ')
   if (!checker) {
     const timed = alignWords(tokens, [], clip.seconds).timed
     return { clip, timed, heard: null, words: [], missed: [] }
   }
-  const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav, language)
+  const segments = await transcribeWav(
+    checker,
+    narration.quality.whisperModel,
+    clip.wav,
+    ears.language,
+  )
   const words = heardWords(segments, clip.seconds)
   const said = saidWords(line.text, cast.pronounce)
-  const aligned = alignWords(
-    tokens,
-    words,
-    clip.seconds,
-    said,
-    knownNames(cast),
-    soundAlikes(narration.quality.soundAlike),
-  )
+  const aligned = alignWords(tokens, words, clip.seconds, said, knownNames(cast), ears.alike)
   return {
     clip,
     timed: aligned.timed,
@@ -744,12 +742,12 @@ export async function measureLine(
       transcriber,
       narration.quality.whisperModel,
       decoded.wav,
-      read.hearIn,
+      read.ears.language,
     )
     const said = saidWords(line.text, read.input.cast.pronounce)
     const heardNow = heardWords(segments, seconds)
     const names = knownNames(read.input.cast)
-    const alike = soundAlikes(narration.quality.soundAlike)
+    const alike = read.ears.alike
     aligned = alignWords(line.text.split(' '), heardNow, seconds, said, names, alike)
     words = heardNow.map((w) => w.word.trim())
   } catch (error) {

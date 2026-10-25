@@ -1147,14 +1147,12 @@ describe('recording in a language besides the source', () => {
       language: 'sv',
     })
 
-  it('records into the language’s own clips, manifest and lock, with its voice and the source cue', async () => {
+  it('records into the language’s own clips, manifest and lock, with its voice, the source cue and no English pronunciation', async () => {
     const root = tempRepo(swedish)
     const { fish, requests } = fakeFish()
     const result = await recordSv(root, 'k1', fish)
     expect(result).toMatchObject({ ok: true, key: 'k1' })
-    expect(requests.map((r) => [r.text, r.voice])).toEqual([
-      ['[worried] El-ee-or vaknar.', 'v-n-sv'],
-    ])
+    expect(requests.map((r) => [r.text, r.voice])).toEqual([['[worried] Elior vaknar.', 'v-n-sv']])
     expect(existsSync(join(root, 'audio/act1/sv/k1.mp3'))).toBe(true)
     expect(existsSync(join(root, 'audio/act1/en/k1.mp3'))).toBe(false)
     const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/sv/manifest.json'), 'utf8'))

@@ -34,6 +34,20 @@ const recordingModel = z
     error: (issue) => `"${String(issue.input)}" has no known price, so its cost cannot be shown`,
   })
 
+/** Groups of words or phrases that sound the same: two or more each. */
+const soundAlikeGroups = z.array(
+  z
+    .array(
+      z
+        .string()
+        .regex(
+          SOUND_ALIKE_WORD,
+          'expected a word or phrase: words parted by one space, no commas, a letter or digit in each',
+        ),
+    )
+    .min(2),
+)
+
 /** A path that differs per part, so it must contain `{part}`. */
 const partPath = z.string().refine((path) => path.includes('{part}'), {
   error: 'must contain {part}, or every part would share one file',
@@ -118,20 +132,12 @@ const NarrationSchema = z
          * The game's own words that sound the same ("Lyria" and "Liria"), a group each, added to
          * the built-in ones: Whisper writing one for another still counts as heard.
          */
-        soundAlike: z
-          .array(
-            z
-              .array(
-                z
-                  .string()
-                  .regex(
-                    SOUND_ALIKE_WORD,
-                    'expected a word or phrase: words parted by one space, no commas, a letter or digit in each',
-                  ),
-              )
-              .min(2),
-          )
-          .default([]),
+        soundAlike: soundAlikeGroups.default([]),
+        /**
+         * The same for the languages besides the source (by code), whose own groups are
+         * `soundAlike`. The built-in groups are English and apply to `en` only.
+         */
+        soundAlikeByLanguage: z.record(z.string(), soundAlikeGroups).optional(),
       })
       .prefault({}),
     audition: z
@@ -163,6 +169,17 @@ const NarrationSchema = z
             'must contain {language} when the project has several languages, or they would share one file',
         })
       }
+    }
+    for (const language of Object.keys(narration.quality.soundAlikeByLanguage ?? {})) {
+      if (narration.languages.slice(1).includes(language)) continue
+      context.addIssue({
+        code: 'custom',
+        path: ['quality', 'soundAlikeByLanguage', language],
+        message:
+          narration.languages[0] === language
+            ? `the groups of the source language “${language}” are quality.soundAlike`
+            : `"${language}" is not one of the project’s languages`,
+      })
     }
     for (const language of Object.keys(narration.audition.phrases ?? {})) {
       if (narration.languages.includes(language)) continue
@@ -236,6 +253,16 @@ export function partCacheName(
 ): string {
   const language = declaredLanguage(narration, asked)
   return language === narration.languages[0] ? partId : `${partId}\0${language}`
+}
+
+/** The groups of words that sound the same the project gives `language`: the source's are `soundAlike`. */
+export function soundAlikeOf(
+  narration: Pick<Project['narration'], 'languages' | 'quality'>,
+  language: string,
+): string[][] {
+  return language === narration.languages[0]
+    ? narration.quality.soundAlike
+    : (narration.quality.soundAlikeByLanguage?.[language] ?? [])
 }
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */
