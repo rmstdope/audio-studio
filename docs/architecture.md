@@ -93,7 +93,7 @@ Installed once from this repo with `bun link` (later `bun add -g`), then run in 
 | TTS and voice library                       | **Fish Audio REST API** via a thin `fetch` client                | The calls in use are few (search, voice, TTS, credits); no SDK needed.                                                                                  |
 | Transcription (word timings, quality check) | **mlx-whisper** in a long-lived Python worker (`uv run`)         | Same model and quality bar as today; the model loads once, not once per clip. Behind an interface, so whisper.cpp can replace it on non-Apple machines. |
 | Encoding and joining                        | **ffmpeg** (subprocess)                                          | Already a dependency; MP3 64 kbps mono as today.                                                                                                        |
-| Music generation (planned, §8.5)            | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free, runs on the Mac (MLX), MIT licence, instrumental tracks from 10 s up. No hosted music API is free with rights to use the result.                  |
+| Music generation (planned, §8.5)            | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free and local; why, in §13 decision 4.                                                                                                                 |
 
 A native window (Electrobun) can wrap the same web UI later; nothing in the design depends on it.
 
@@ -547,10 +547,13 @@ generation while the script and cast still change) and `final` (the recording th
 
 The music workspace makes the game's **tracks**: looping background music, one per room or region
 as the game chooses, and short **stingers** (victory, game over). A track is made like a voice is
-cast: a brief, several generated takes to listen to, a shortlist, and one take chosen. The steps
-are in §12, step 11; the spike (11.1) may still change what follows here.
+cast: a brief, several generated takes to listen to, and one take chosen. The steps are in §12,
+step 11. What the spike (11.1) has not confirmed yet is marked _to confirm_: the model's name and
+sizes, its shortest take, its licence for the weights, and how it runs on Apple Silicon.
 
-**Project file.** An optional `music` section beside `narration`:
+**Project file.** An optional `music` section beside `narration`. Only the paths are settled; the
+model, the number of takes and the output settings are fixed in the code until a project needs
+another value:
 
 ```json
 "music": {
@@ -559,15 +562,12 @@ are in §12, step 11; the spike (11.1) may still change what follows here.
     "lock": "music/music.lock.json",
     "clips": "web/public/audio/music/generated",
     "manifest": "web/public/audio/music/generated/manifest.json"
-  },
-  "model": "acestep-v15-xl-turbo",
-  "takesPerRound": 4,
-  "output": { "codec": "mp3", "bitrate": "160k", "channels": 2, "lufs": -20 }
+  }
 }
 ```
 
 The clips folder is the studio's own: tracks that are not the studio's (RetroQuest's freetouse.com
-files) stay where they are, untouched.
+files) stay where they are, untouched. The music files join the Changes panel (§8.3).
 
 **Track list** (`music/tracks.json`, read and written by the studio, edited on the Music page):
 
@@ -577,10 +577,8 @@ files) stay where they are, untouched.
     "willowbrook-village": {
       "title": "Willowbrook village",
       "kind": "loop",
-      "brief": "gentle medieval village, lute and recorder, warm, unhurried",
-      "seconds": 90,
-      "bpm": 84,
-      "key": "D major"
+      "brief": "gentle medieval village, lute and recorder, warm, unhurried, 84 bpm, D major",
+      "seconds": 90
     },
     "victory": {
       "title": "Victory",
@@ -592,44 +590,56 @@ files) stay where they are, untouched.
 }
 ```
 
-`kind` is `loop` or `stinger`; `bpm` and `key` are optional and passed to ACE-Step, which takes
-them as metadata. Tracks are always instrumental (no lyrics).
+A track's id names its file, so it is a slug (`^[a-z0-9]+(-[a-z0-9]+)*$`); `kind` is `loop` or
+`stinger`. Tracks are always instrumental (no lyrics). Tempo and key are written in the brief for
+now; they become fields of their own if the spike shows ACE-Step follows them better that way.
+The file is validated like every resource (problems with file and JSON path) and written through
+`writeAtomic` in stable key order.
 
-**Takes.** A take is the brief generated with a seed. Each round generates `takesPerRound` takes
-with new seeds; a take is cached in `.audio-studio/music-takes/` by a hash of the model, brief,
-kind, seconds, bpm, key and seed, so it is generated once and can be made again. The board for a
-track works as the audition's (§8.1): takes to hear, Drop, Shortlist, more takes, and **Choose**
-one of the shortlist. Sessions are kept in `.audio-studio/music/<track>-<hash>.json`. A dropped take
-is just gone: seeds don't come back, so there is nothing to rule out.
-
-**Shaping.** ACE-Step makes at least 10 seconds, and nothing it makes loops by itself, so a chosen
-take is shaped before it is written:
+**Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
+the board is what the game will play:
 
 - a **loop** is generated a few seconds longer than `seconds`, and that tail is crossfaded over its
-  start, so the end runs into the beginning without a seam. The board plays every loop take around
-  its seam (its last seconds, then its first), so the seam is judged by ear before choosing;
-- a **stinger** is cut to `seconds` with a short fade-out.
+  start, so the end runs into the beginning without a seam. The board plays a loop take around its
+  seam (its last seconds, then its first) as well as from the start;
+- a **stinger** is cut to `seconds` with a short fade-out (ACE-Step makes at least 10 seconds, _to
+  confirm_).
 
-Then it is levelled to `output.lufs` as narration is (`level.py`'s commands) and encoded into the
-clips folder as `<track>.mp3`.
+A take is cached in `.audio-studio/music-takes/` by a hash of the model, brief, kind, seconds and
+seed. The seed is kept to say where a take came from; whether the same seed makes the same take
+again on the Mac is for the spike. The board for a track lists its takes: **More takes** generates
+four more, **Drop** removes one, **Choose** writes one. The board is kept in
+`.audio-studio/music/<track>-<hash>.json`. A dropped take is just gone: seeds don't come back, so
+nothing is ruled out.
 
-**Manifest** (`manifest.json` in the clips folder, what the game reads):
-`{ track: { file, kind, duration } }`. MP3 adds a little silence at both ends, so a looping
-`<audio>` element can click at the seam; the spike checks whether the game must loop through Web
-Audio, or whether another codec loops cleanly in the browsers the game supports.
+**Choose** levels the take to −20 LUFS as narration is levelled (`level.py`'s commands; RetroQuest
+levels its music to −20 today) and encodes it into the clips folder as `<track>.<ext>`, the codec
+settled by the spike (MP3 adds a little silence at both ends, so a looping `<audio>` element can
+click at the seam; the spike checks whether the game must loop through Web Audio, or whether
+another codec loops cleanly in the browsers the game supports). As for narration, the encoder
+writes a hidden temporary file in the clips folder, renamed into place together with the manifest
+and lock update. Clips are served only as plain files in the music clips folder.
 
-**Lock** (`music.lock.json`, committed): per track, the chosen take's model, seed, a hash of its
-brief and settings, and when it was chosen. A track shows as `missing` (nothing chosen), `ok`, or
-`changed` (its brief or settings changed since its take was chosen: the old one keeps playing in
-the game until another take is chosen). Nothing is generated again by itself: a new brief means a
-new audition. A track removed from the list leaves its clip as an orphan, removed after
+**Manifest** (`manifest.json` in the clips folder, what the game reads): `{ track: { file,
+duration } }`, its layout fixed once written. The game decides where a track plays, so the kind is
+not in it.
+
+**Lock** (`music.lock.json`, committed, one entry per line): per track, the chosen take's model,
+seed, a hash of what went into it (model, brief, kind, seconds; not the output settings, as
+narration leaves the loudness out), and when it was chosen. A track is `missing` (nothing chosen,
+or its clip is gone from disk), `ok`, or `changed` (its brief, kind or length changed since its
+take was chosen: the old one keeps playing in the game until another is chosen). A manifest entry
+without a lock entry is reported as a problem. Nothing is generated again by itself: a new brief
+means new takes. A track removed from the list leaves its clip as an orphan, removed after
 confirmation as narration's are.
 
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
-seconds, bpm, key and seed; a fake in tests. The real one is a Python worker
-(`worker/music.py`, ACE-Step through uv, the model loaded once on the first take and stopped with
-the studio), the same JSON-lines protocol as the Whisper worker. Takes run one at a time (one GPU).
-On a MacBook M5 Pro with 48 GB the XL (4B) model fits without offloading.
+seconds and seed, so tests run with a fake. The real one is a Python worker (`worker/music.py`,
+ACE-Step through uv, the model loaded on the first take and stopped with the studio), the same
+JSON-lines protocol as the Whisper worker. Generation and Whisper share the one GPU: a take does
+not start while a narration job runs, and the other way round, unless the spike shows both fit
+and run well side by side. The setup checklist (§10) names ACE-Step's environment and its model
+download.
 
 ---
 
@@ -845,21 +855,25 @@ Small, independently useful increments:
        comparison, keeping what it heard.
 11. **Music** (§8.5), in small pull requests:
     1. **Spike** (outside the studio's code; the findings written into §8.5 and §13): ACE-Step 1.5
-       on the M5 Pro, run from Python through uv. Time for a 90-second take with the XL and 2B
-       models, quality of instrumental loops and stingers in RetroQuest's style, how bpm and key
-       come through, whether the crossfaded seam is heard, and how a loop plays without a click
-       in the game's browsers (MP3 in `<audio>`, another codec, or Web Audio).
+       on the M5 Pro, run from Python through uv. Its models, sizes and licence of the weights;
+       time and memory for a 90-second take with the larger and smaller model, also with Whisper
+       loaded; quality of instrumental loops and stingers in RetroQuest's style; whether tempo
+       and key in the brief come through; whether a take runs on to its end or closes as a song
+       does (which the loop's crossfade needs to know); whether the same seed makes the same
+       take; whether the crossfaded seam is heard; and how a loop plays without a click in the
+       game's browsers (MP3 in `<audio>`, another codec, or Web Audio).
     2. **Track list**: the project file's `music` section and `tracks.json` (schemas, problems with
-       file and path), and a Music page listing the tracks, each with its brief edited and saved.
-       Adding and removing tracks. Nothing generated yet.
-    3. **Takes**: the ACE-Step worker behind `MusicGenerator`, a take generated and cached per
-       click on a track's page, and played.
-    4. **Board**: rounds of takes to hear, Drop, Shortlist, more takes; loops played around their
-       seam; sessions saved.
-    5. **Choose**: the chosen take shaped (loop crossfade, stinger cut and fade), levelled,
-       encoded and written with the manifest and lock; each track's status on the Music page;
-       orphaned clips removed after confirmation.
-    6. **RetroQuest** (in the game's repository, not the studio's): the game reads the music
+       file and path), and a Music page listing the tracks, read only.
+    3. **Editing tracks**: a track's brief, kind and length edited and saved; tracks added and
+       removed.
+    4. **Takes**: the ACE-Step worker behind `MusicGenerator` (and in the setup checklist), a take
+       generated, shaped and cached per click on a track's page, and played, loops around their
+       seam too.
+    5. **Board**: a track's takes listed, More takes, Drop; the board saved.
+    6. **Choose**: the chosen take levelled, encoded and written with the manifest and lock; each
+       track's status on the Music page; the music files in the Changes panel.
+    7. **Orphans**: a removed track's clip removed after confirmation.
+    8. **RetroQuest** (in the game's repository, not the studio's): the game reads the music
        manifest and plays a track per room or region, and the stingers.
 
 ---
@@ -874,9 +888,8 @@ Small, independently useful increments:
    model stages, but all must be the free model. Paid models, mainly for a final generation step and
    optionally for auditions and drafts, come later (§8.4).
 4. **Music is generated locally with ACE-Step 1.5.** No hosted music API has a lasting free tier
-   with rights to use the result (ElevenLabs Music's free plan is watermarked and non-commercial;
-   others give signup credits only). Of the open models, MusicGen's weights are non-commercial
-   (CC-BY-NC) and Stable Audio Open is limited to 47 seconds and stronger at effects than at
-   melody; ACE-Step is MIT-licensed, makes full instrumental tracks, and runs on Apple Silicon.
-   Behind `MusicGenerator`, so a paid API can be added as another generator if it falls short.
-   Tracks are chosen by audition, since every generation differs.
+   with rights to use the result (ElevenLabs Music's free plan is non-commercial; others give
+   signup credits only). Of the open models, MusicGen's weights are non-commercial (CC-BY-NC) and
+   Stable Audio Open is limited to 47 seconds and stronger at effects than at melody; ACE-Step's
+   code is MIT-licensed (its weights' licence _to confirm_), makes full instrumental tracks, and
+   runs on Apple Silicon. Tracks are chosen from takes, since every generation differs.
