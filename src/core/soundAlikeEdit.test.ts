@@ -17,7 +17,7 @@ describe('groupsFrom', () => {
 
   it('takes no word with a comma in it, as a row could not give it back', () => {
     expect(groupsProblem([['1,000', 'thousand']])).toBe(
-      '“1,000” is not a word or phrase (no commas, some letters in each word).',
+      '“1,000” is not a word or phrase (no commas, a letter or digit in each word).',
     )
   })
 })
@@ -34,10 +34,10 @@ describe('groupsProblem', () => {
     )
     expect(groupsProblem([['all right', 'alright']])).toBeNull()
     expect(groupsProblem([['Lyria', '!!']])).toBe(
-      '“!!” is not a word or phrase (no commas, some letters in each word).',
+      '“!!” is not a word or phrase (no commas, a letter or digit in each word).',
     )
     expect(groupsProblem([['Lyria', 'Leer !!']])).toBe(
-      '“Leer !!” is not a word or phrase (no commas, some letters in each word).',
+      '“Leer !!” is not a word or phrase (no commas, a letter or digit in each word).',
     )
   })
 })

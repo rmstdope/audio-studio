@@ -79,6 +79,12 @@ describe('setSoundAlike', () => {
     expect(JSON.parse(empty.read()).narration.quality).toEqual({})
   })
 
+  it('saves a phrase, its spaces made one', async () => {
+    const { projectFile, read } = repo()
+    await setSoundAlike(projectFile, [['all  right', 'alright']], [])
+    expect(JSON.parse(read()).narration.quality.soundAlike).toEqual([['all right', 'alright']])
+  })
+
   it('writes words with $ in them as they are', async () => {
     const { projectFile, read } = repo()
     expect(await setSoundAlike(projectFile, [["a$'", 'b$&', 'c$$']], [])).toEqual({ ok: true })

@@ -110,7 +110,16 @@ const NarrationSchema = z
          */
         soundAlike: z
           .array(
-            z.array(z.string().regex(SOUND_ALIKE_WORD, 'expected one word, with letters')).min(2),
+            z
+              .array(
+                z
+                  .string()
+                  .regex(
+                    SOUND_ALIKE_WORD,
+                    'expected a word or phrase: words parted by one space, no commas, a letter or digit in each',
+                  ),
+              )
+              .min(2),
           )
           .default([]),
       })

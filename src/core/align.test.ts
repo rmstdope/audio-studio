@@ -579,6 +579,22 @@ describe('alignWords, words that sound the same', () => {
     expect(align("It's all bright now.", "It's alright now.").missed).toEqual([1, 2])
   })
 
+  it('counts a phrase heard as another phrase of its group, and number words in phrases', () => {
+    const alike = soundAlikes([
+      ['Leer ia', 'Lee ria'],
+      ['Mac Gregor', 'Mc Gregor'],
+      ['one', 'Wa n'],
+    ])
+    expect(align('Ask Leer ia now', 'Ask Lee ria now', alike).ratio).toBe(1)
+    expect(align('Ask one now', 'Ask Wa n now', alike).ratio).toBe(1)
+    expect(align('Ask Wa n now', 'Ask one now', alike).ratio).toBe(1)
+    expect(align('Ask Leer ia now', 'Ask Lo rye now', alike).missed).toEqual([1, 2])
+  })
+
+  it('counts any word of a group, or a spelling, heard run apart', () => {
+    expect(align('He comes weakly.', 'He comes week ly.').ratio).toBe(1)
+  })
+
   it("adds a project's own groups to the built-in ones, joining groups that share a word", () => {
     const alike = soundAlikes([
       ['Lyria', 'Liria'],

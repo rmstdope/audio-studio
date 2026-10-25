@@ -91,7 +91,7 @@ describe('ProjectSchema', () => {
     expect(problems(alike([['alone']])).map((p) => p.path)).toEqual([
       'narration.quality.soundAlike[0]',
     ])
-    // One word each, with letters: a phrase or punctuation could never match.
+    // Words or phrases, each word with a letter or digit: punctuation alone could never match.
     expect(parse(alike([['all right', 'alright']])).success).toBe(true)
     expect(problems(alike([['Lyria', 'Leer !!']])).map((p) => p.path)).toEqual([
       'narration.quality.soundAlike[0][1]',
