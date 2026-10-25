@@ -721,7 +721,8 @@ function CueCell({
   const refocus = useRef(false)
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
   const own = line.cueFrom === 'own' ? line.cue : ''
-  const note = names ? cueNote(line.cueFrom, displayName(line.speaker), names.source) : null
+  const note =
+    names && line.cue ? cueNote(line.cueFrom, displayName(line.speaker), names.source) : null
   const hint = names ? cueHint(line.cueFrom, line.sourceCue, names.source) : null
 
   // Back on the cue after editing, so the keyboard keeps its place in the table.

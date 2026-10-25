@@ -240,6 +240,8 @@ an id and a title.
   digit in each word: "all right" and "alright"), a group each, added to the studio's built-in
   English ones (`core/soundAlike.ts`: "in" and "inn", "weekly" and "weakly", "there", "their" and
   "they're", …); see §8.2. Optional, empty by default; edited on the characters page (§8.3).
+  The same for a language besides the source in `quality.soundAlikeByLanguage` (`{ "sv": [[…]] }`,
+  declared languages only); the built-in groups are English words and apply to `en` only.
 
 ---
 
@@ -286,6 +288,12 @@ none (and no audition can start). Her audition and ruled-out voices are kept per
 cache, the source language's under the names they always had; an audition's shortlist starts
 with her voices in the other languages, so they can be heard saying this language's phrase.
 
+**Pronunciations per language** (as-170.3): the source language's table is `pronounce`; another
+language's is `languages: { "sv": { "pronounce": {…} } }` at the top of the cast. `projectCast`
+puts the language's own table in `pronounce`, so what is said, priced and fingerprinted is that
+language's alone; a language without one has none (English respellings are never sent to another
+voice).
+
 New fields: `voiceName` (shown in the UI; the id alone is unreadable), `audition` (the keywords,
 plus an optional phrase that replaces the project's standard one) and `speed` (the character's own
 speaking speed, half to double as Fish allows, in place of the project's `tts.speed`; its lines,
@@ -302,6 +310,12 @@ RetroQuest today has `tts/act1/cast.json`; switching over moves it to `tts/cast.
 is cast so far, so there is nothing to merge).
 
 **Cues** (`cues.json`, read and written): `{ key: cue }`, replacing a character's style for one line.
+Cues are per language (as-170.3): a line in a language besides the source follows the source
+language's cue for the line until the language's own file gives it one, then the character's style.
+The planner is given the merged cues (`readPart` builds them), so a changed source cue makes the
+language's clips stale for the cue, and `LineState.cueFrom` (`own`, `source`, `style`) and
+`sourceCue` tell the page where a cue comes from. Editing a cue in a language writes that
+language's file only.
 
 **Manifest** (`manifest.json`, written): unchanged, `{ key: { file, speaker, duration, words[] } }`.
 This is what the game reads.
@@ -800,7 +814,7 @@ POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to
 GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, speed, keywords, phrase
-PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
+PATCH  /api/pronounce?language=                   a language's pronunciation table ({ table, was }: whole)
 PATCH  /api/sound-alike                          the project's sound-alike groups ({ groups, was })
 PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
@@ -1032,7 +1046,12 @@ Small, independently useful increments:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's
        progress, untranslated lines, read only (no recording yet).
-    2. **Cast each character per language** (built): a voice, speed and phrase per language in the
+    2. **Record a part's lines per language** (built): recording, Whisper's check (told the
+       language in a project with several), measuring, accepting, extra takes, orphans and jobs
+       (one per part and language) work in every declared language, into its own clips, manifest and
+       lock; cues follow the source language's; pronunciations and words that sound the same are
+       per language; the overview, All characters and the cards follow the language switch.
+    3. **Cast each character per language** (built): a voice, speed and phrase per language in the
        cast, an audition and ruled-out voices per language, a language switch on a character's
        page and its audition, and a chip on a card for each language without a voice.
 
