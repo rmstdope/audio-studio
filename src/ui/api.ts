@@ -18,6 +18,7 @@ import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
 import type { Problem } from '../core/project'
+import type { SpendingAnswer } from '../core/spending'
 import type { JobState } from '../services/jobs'
 import type { HeardResult } from '../services/heard'
 import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
@@ -74,6 +75,21 @@ export function useChanges() {
     queryKey: ['changes'],
     queryFn: () => getJson<ChangesResult>('/api/changes'),
     refetchInterval: 5000,
+  })
+}
+
+/**
+ * What paid recordings cost: read again every couple of seconds while one runs (its cost and
+ * lines are live), else every so often, since recordings end from other pages.
+ */
+export function useSpending() {
+  return useQuery({
+    queryKey: ['spending'],
+    queryFn: () => getJson<SpendingAnswer>('/api/spending'),
+    refetchInterval: (query) =>
+      query.state.data?.ok && query.state.data.rows.some((r) => r.state === 'running')
+        ? 2000
+        : 15_000,
   })
 }
 

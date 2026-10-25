@@ -9,13 +9,14 @@ export type Route =
   | { view: 'lines'; part: string; language?: string }
   | { view: 'characters' }
   | { view: 'changes' }
+  | { view: 'spending' }
   | { view: 'setup' }
   | { view: 'character'; character: string; language?: string }
   | { view: 'audition'; character: string; language?: string }
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/setup`; anything else is the
+ * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`; anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
@@ -23,6 +24,7 @@ export function parseRoute(hash: string): Route {
   const language = new URLSearchParams(query).get('language') ?? undefined
   const [, first, second, third] = path.split('/')
   if (first === 'changes') return { view: 'changes' }
+  if (first === 'spending') return { view: 'spending' }
   if (first === 'setup') return { view: 'setup' }
   if (first === 'characters') {
     if (!second) return { view: 'characters' }
@@ -42,6 +44,7 @@ export function parseRoute(hash: string): Route {
 export function routeHref(route: Route): string {
   if (route.view === 'characters') return '#/characters'
   if (route.view === 'changes') return '#/changes'
+  if (route.view === 'spending') return '#/spending'
   if (route.view === 'setup') return '#/setup'
   const query = route.language ? `?language=${encodeURIComponent(route.language)}` : ''
   if (route.view === 'character')

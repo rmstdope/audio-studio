@@ -10,6 +10,7 @@ import { CharacterView } from './features/characters/CharacterView'
 import { CharactersView } from './features/characters/CharactersView'
 import { LinesView } from './features/lines/LinesView'
 import { PartOverview } from './features/overview/PartOverview'
+import { SpendingView } from './features/spending/SpendingView'
 import { SetupView } from './features/setup/SetupView'
 import { useRoute } from './route'
 
@@ -83,6 +84,8 @@ export function App() {
         )}
         {route.view === 'changes' ? (
           <ChangesView summary={summary} />
+        ) : route.view === 'spending' ? (
+          <SpendingView summary={summary} />
         ) : route.view === 'setup' ? (
           <SetupView />
         ) : route.view === 'characters' ? (

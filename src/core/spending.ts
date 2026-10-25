@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { Problem } from './project'
 
 /**
  * What the studio remembers of its paid recordings, kept in `.audio-studio/spending.json`: one
@@ -124,3 +125,7 @@ export function summariseSpending(
     rows,
   }
 }
+
+/** What the Spending page is told: the summary, or why the record could not be read. */
+export type SpendingAnswer =
+  ({ ok: true; languages: number } & SpendingSummary) | { ok: false; problems: Problem[] }
