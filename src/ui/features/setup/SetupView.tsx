@@ -1,5 +1,5 @@
-import type { SetupCheck } from '../../../core/setup'
-import { useSetup } from '../../api'
+import { FISH_TIERS, type FishTier, type SetupCheck } from '../../../core/setup'
+import { useSetFishTier, useSetup } from '../../api'
 import { AlertIcon, CheckIcon } from '../../components/icons'
 import { dollars } from '../../format'
 
@@ -61,11 +61,47 @@ export function SetupView() {
                   {check.detail}
                   {check.credit !== undefined && ` ${dollars(check.credit)}`}
                 </span>
+                {check.tier && <TierMenu chosen={check.tier.chosen} />}
                 {check.fix && <code className="setup-fix mono">{check.fix}</code>}
               </div>
             </li>
           ))}
         </ul>
+      )}
+    </>
+  )
+}
+
+/**
+ * The menu on the Requests at once row: what the user has paid Fish in total. A choice is saved
+ * at once in the project file; the menu always shows what the last check found saved, so a failed
+ * save leaves it where it was, with a line saying so.
+ */
+function TierMenu({ chosen }: { chosen: FishTier | null }) {
+  const save = useSetFishTier()
+  return (
+    <>
+      <label className="setup-tier muted">
+        What you have paid Fish in total
+        <select
+          value={chosen ?? ''}
+          onChange={(e) => save.mutate((e.target.value || null) as FishTier | null)}
+        >
+          <option value="">Choose…</option>
+          {FISH_TIERS.map((tier) => (
+            <option key={tier.value} value={tier.value}>
+              {tier.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="muted setup-hint">
+        Saved in the project file for everyone on the project.
+      </span>
+      {save.isError && (
+        <span className="adopt-error setup-hint" role="alert">
+          Could not save the tier: the project file could not be written. Your choice is not saved.
+        </span>
       )}
     </>
   )

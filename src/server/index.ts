@@ -24,6 +24,7 @@ import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import { switchRetiredModels } from '../services/models'
+import { setFishTier } from '../services/fishTier'
 import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile, tryLine } from '../services/takes'
 import { checkSetup } from '../services/setup'
@@ -111,6 +112,9 @@ const PronounceBody = z.object({ table: Table, was: Table }).strict()
 /** The project's own sound-alike groups, and the ones the editing began from. */
 const Groups = z.array(z.array(z.string().max(200)).max(50)).max(1000)
 const SoundAlikeBody = z.object({ groups: Groups, was: Groups }).strict()
+
+/** The Fish tier the user chose, or null to clear it. */
+const FishTierBody = z.object({ tier: z.enum(['under-100', '100', '1000']).nullable() }).strict()
 
 /** The takes whose model the page offered to switch from s1. */
 const ModelsBody = z
@@ -732,6 +736,16 @@ export function startServer({
             return Response.json({ error: 'expected { groups, was }' }, { status: 400 })
           }
           const result = await setSoundAlike(projectFile, body.data.groups, body.data.was)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/fish-tier': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = FishTierBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { tier }' }, { status: 400 })
+          }
+          const result = await setFishTier(projectFile, body.data.tier)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

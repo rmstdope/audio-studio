@@ -109,6 +109,11 @@ const NarrationSchema = z
         chunkLimit: z.number().int().min(MIN_CHUNK).default(400),
         parallel: z.number().int().min(1).default(4),
         /**
+         * What the user has paid Fish in total, which sets how many requests it takes at once
+         * (Setup compares it with `parallel`). Absent: not told.
+         */
+        fishTier: z.enum(['under-100', '100', '1000']).optional(),
+        /**
          * How takes are checked: mlx-whisper (Apple silicon, through uv), or none (one take each,
          * word timings spread evenly).
          */

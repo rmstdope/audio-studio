@@ -256,7 +256,7 @@ describe('server', () => {
     )
     // No key in this fixture: Fish is not asked. The tools depend on the machine running the tests.
     expect(states).toMatchObject({ key: 'problem', fish: 'off', refresh: 'off' })
-    expect(Object.keys(states)).toEqual(['ffmpeg', 'whisper', 'key', 'fish', 'refresh'])
+    expect(Object.keys(states)).toEqual(['ffmpeg', 'whisper', 'key', 'fish', 'requests', 'refresh'])
   })
 
   it('tells the account’s credit', async () => {
@@ -788,6 +788,43 @@ describe('server, paid auditions in two languages', () => {
     await send('DELETE', '/api/auditions/gran?language=sv')
     expect(await sitting('sv')).toBeNull()
     expect((await sitting('en')).dollars).toBe(0.5)
+  })
+})
+
+describe('server, the Fish tier', () => {
+  const ownRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    '.env': 'FISH_AUDIO_API_KEY=k\n',
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+  })
+  const server = startServer({
+    projectFile: join(ownRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const patch = (body: unknown, origin: string | null = server.url.origin) =>
+    fetch(new URL('/api/fish-tier', server.url), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
+      body: JSON.stringify(body),
+    })
+  const tierShown = async () => {
+    const setup = await (await fetch(new URL('/api/setup', server.url))).json()
+    return setup.checks.find((c: { id: string }) => c.id === 'requests')
+  }
+
+  it('saves the tier from its own page, and the setup then shows it', async () => {
+    expect((await patch({ tier: '100' }, 'http://evil.test')).status).toBe(403)
+    expect((await patch({ tier: '50' })).status).toBe(400)
+    expect((await patch({})).status).toBe(400)
+    const saved = await patch({ tier: '100' })
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await tierShown()).tier).toEqual({ chosen: '100' })
+    expect((await patch({ tier: null })).status).toBe(200)
+    expect((await tierShown()).tier).toEqual({ chosen: null })
   })
 })
 

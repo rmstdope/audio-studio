@@ -6,6 +6,19 @@ export type FishAnswer =
   | { ok: true; credit: number }
   | { ok: false; reason: 'no-key' | 'fish' | 'project'; message: string }
 
+/** What the user has paid Fish in total, which sets its requests-at-once limit. */
+export type FishTier = 'under-100' | '100' | '1000'
+
+/** Fish's published tiers: the menu's words and how many requests each allows at once. */
+export const FISH_TIERS: readonly { value: FishTier; label: string; limit: number }[] = [
+  { value: 'under-100', label: 'Under $100 — 5 at once', limit: 5 },
+  { value: '100', label: '$100 or more — 15 at once', limit: 15 },
+  { value: '1000', label: '$1,000 or more — 50 at once', limit: 50 },
+]
+
+/** What every Fish account allows at once. */
+const EVERY_ACCOUNT = 5
+
 /** What the setup checks are made from: the machine, the project file and Fish, as found. */
 export interface SetupFacts {
   /** `ffmpeg` is on the PATH. */
@@ -24,6 +37,10 @@ export interface SetupFacts {
   fish: FishAnswer
   /** The project file names a `refreshDialog` command. */
   refreshDialog: boolean
+  /** The project's `quality.parallel`: requests recording sends to Fish at a time. */
+  parallel: number
+  /** The tier the user told the studio (`quality.fishTier`), or none. */
+  fishTier: FishTier | null
 }
 
 /**
@@ -31,7 +48,7 @@ export interface SetupFacts {
  * optional and not set).
  */
 export interface SetupCheck {
-  id: 'ffmpeg' | 'whisper' | 'key' | 'fish' | 'refresh'
+  id: 'ffmpeg' | 'whisper' | 'key' | 'fish' | 'requests' | 'refresh'
   title: string
   state: 'ok' | 'problem' | 'off'
   /** What was found, in a sentence. */
@@ -40,6 +57,8 @@ export interface SetupCheck {
   fix?: string
   /** The account's credit in dollars, when Fish answered. */
   credit?: number
+  /** Set when the row offers the tier menu: the tier chosen so far. */
+  tier?: { chosen: FishTier | null }
 }
 
 /**
@@ -47,7 +66,7 @@ export interface SetupCheck {
  * the first run says what to install or set instead of failing on the first recording.
  */
 export function setupChecks(facts: SetupFacts): SetupCheck[] {
-  return [ffmpeg(facts), whisper(facts), key(facts), fish(facts), refresh(facts)]
+  return [ffmpeg(facts), whisper(facts), key(facts), fish(facts), requests(facts), refresh(facts)]
 }
 
 function ffmpeg(facts: SetupFacts): SetupCheck {
@@ -132,6 +151,51 @@ function fish(facts: SetupFacts): SetupCheck {
     detail: `Did not answer: ${facts.fish.message}`,
     fix: 'Check the key, and that api.fish.audio can be reached.',
   }
+}
+
+function requests(facts: SetupFacts): SetupCheck {
+  const title = 'Requests at once'
+  if (!facts.key) {
+    return { id: 'requests', title, state: 'off', detail: 'Not checked: there is no key.' }
+  }
+  const { parallel } = facts
+  const sends = `Recording sends ${parallel} at a time`
+  const chosen = facts.fishTier
+  const tier = { chosen }
+  if (chosen === null) {
+    return parallel <= EVERY_ACCOUNT
+      ? {
+          id: 'requests',
+          title,
+          state: 'ok',
+          detail: `${sends}, which every Fish account allows.`,
+          tier,
+        }
+      : {
+          id: 'requests',
+          title,
+          state: 'problem',
+          detail: `${sends}. Fish allows ${EVERY_ACCOUNT} at once unless you have paid it $100 or more in total; say which to check it.`,
+          tier,
+        }
+  }
+  const { limit } = FISH_TIERS.find((t) => t.value === chosen)!
+  return parallel <= limit
+    ? {
+        id: 'requests',
+        title,
+        state: 'ok',
+        detail: `${sends}; your account allows ${limit}.`,
+        tier,
+      }
+    : {
+        id: 'requests',
+        title,
+        state: 'problem',
+        detail: `${sends}, but your account allows ${limit}. Fish will turn the extra requests away and recording will slow down while the studio waits and retries.`,
+        fix: `Set quality.parallel to ${limit} or less in the project file.`,
+        tier,
+      }
 }
 
 function refresh(facts: SetupFacts): SetupCheck {

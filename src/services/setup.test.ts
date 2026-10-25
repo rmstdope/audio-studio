@@ -20,6 +20,7 @@ describe('checkSetup', () => {
       whisper: 'ok',
       key: 'ok',
       fish: 'ok',
+      requests: 'ok',
       refresh: 'off',
     })
   })
@@ -43,6 +44,7 @@ describe('checkSetup', () => {
       whisper: 'problem',
       key: 'problem',
       fish: 'off',
+      requests: 'off',
       refresh: 'off',
     })
     expect(asked).toBe(0)

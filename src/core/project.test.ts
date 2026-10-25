@@ -136,6 +136,20 @@ describe('ProjectSchema', () => {
     ])
   })
 
+  it('takes the Fish tier the user chose, or none', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    const tier = (fishTier: unknown) => ({
+      ...base,
+      narration: { ...narration, quality: { fishTier } },
+    })
+    expect(parse(base).data!.narration.quality.fishTier).toBeUndefined()
+    for (const t of ['under-100', '100', '1000'] as const) {
+      expect(parse(tier(t)).data!.narration.quality.fishTier).toBe(t)
+    }
+    expect(problems(tier('50')).map((p) => p.path)).toEqual(['narration.quality.fishTier'])
+  })
+
   it('requires {part} in part paths', () => {
     const base = projectJson()
     const narration = base.narration as { paths: Record<string, string> }
