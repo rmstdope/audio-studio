@@ -3,6 +3,8 @@ import { setDesigned, startSession } from './audition'
 import {
   MAX_CHARS,
   descriptionState,
+  designCredit,
+  designPoints,
   designGroups,
   designStart,
   previewText,
@@ -123,5 +125,37 @@ describe('designGroups', () => {
       perRound: 3,
     })
     expect(designGroups(empty)).toEqual([])
+  })
+})
+
+describe('designCredit', () => {
+  it('asks while the credit covers a design, and says why not otherwise', () => {
+    expect(designCredit(undefined)).toEqual({ kind: 'reading' })
+    expect(designCredit(4.82)).toEqual({ kind: 'ask', credit: 4.82 })
+    expect(designCredit(0.01)).toEqual({ kind: 'ask', credit: 0.01 })
+    expect(designCredit(0)).toEqual({
+      kind: 'cannot',
+      message:
+        'Your credit is $0.00, not enough for a design ($0.01). Add credit on Fish and try again.',
+    })
+    expect(designCredit(null)).toEqual({
+      kind: 'cannot',
+      message:
+        'The studio couldn’t read your Fish credit, so it can’t tell whether a design is covered. Check the Fish key on Setup and try again.',
+    })
+  })
+})
+
+describe('designPoints', () => {
+  it('says what a design does, with a third point when it starts an audition', () => {
+    const two = designPoints('Mara', true)
+    expect(two).toEqual([
+      'Fish makes 4 voices from your description, each saying the audition phrase.',
+      'It costs $0.01, charged to your Fish account only if it works.',
+    ])
+    expect(designPoints('Mara', false)).toEqual([
+      ...two,
+      'No audition is going on for Mara: this starts one, and the voices join its board.',
+    ])
   })
 })

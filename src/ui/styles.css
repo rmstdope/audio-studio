@@ -60,6 +60,9 @@
   --own-bg: #16223a;
   --own-ink: #8fb4ff;
   --own-line: #2a3f66;
+  --design-bg: #1f1936;
+  --design-ink: #c4b5ff;
+  --design-line: #4a3d80;
   --success-bg: #0f2219;
   --chip-hover: #262a35;
   --shadow: 0 12px 32px rgb(0 0 0 / 45%);
@@ -2416,4 +2419,85 @@ a.btn {
 .spending-table td.mono,
 .spending-table td:first-child {
   white-space: nowrap;
+}
+
+/* Designing a voice from a description (as-5gk.6). */
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.design {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.design-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.design-box p {
+  margin: 0;
+}
+
+.design-text {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.design-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.design-actions .btn {
+  align-self: auto;
+}
+
+.voice-card.designed {
+  border-color: var(--design-line);
+}
+
+.voice-card.designed.kept {
+  border-color: var(--kept-line);
+  box-shadow: inset 0 0 0 1px var(--design-line);
+}
+
+.badge.designed {
+  background: var(--design-bg);
+  color: var(--design-ink);
+  border: 1px solid var(--design-line);
+}
+
+.design-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.design-group-heading {
+  margin: 8px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .design-actions .btn,
+  .header-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .design-group .cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditionSession } from '../../../core/audition'
+import { designStart } from '../../../core/design'
 import { FREE_MODELS } from '../../../core/project'
 import type { SittingView } from '../../../core/sitting'
 import { usd } from '../../../core/spend'
@@ -39,7 +40,7 @@ import {
 import { sampleClip, stopEffectsFor, takeClip } from '../../board'
 import { Confirm } from '../../components/Confirm'
 import { Failure } from '../../components/Failure'
-import { AlertIcon, HeadphonesIcon, PauseIcon, PlayIcon } from '../../components/icons'
+import { AlertIcon, HeadphonesIcon, PauseIcon, PlayIcon, SparkIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusBar } from '../../components/StatusBar'
 import { useClipPlayer } from '../../components/useClipPlayer'
@@ -51,6 +52,7 @@ import { linesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
 import { needsResumeBox } from '../../sitting'
 import { voiceUrl } from '../../voiceId'
+import { DesignVoice } from '../audition/DesignVoice'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
 import { CloneVoice } from './CloneVoice'
@@ -90,6 +92,8 @@ export function CharacterView({
   const sittingActions = useSittingActions(characterId, queried)
   // Which question is open: starting an audition on a paid model, or carrying one on.
   const [asking, setAsking] = useState<'start' | 'resume' | null>(null)
+  const [designing, setDesigning] = useState(false)
+  const designButton = useRef<HTMLButtonElement>(null)
   const player = useClipPlayer()
   const { playing, toggle } = player
   const appearances = casting?.appearances ?? []
@@ -134,6 +138,14 @@ export function CharacterView({
   const blocked = answer ? startBlocked(answer.audition, languageName) : null
   const inLanguage: Language | null = several ? { id: language, name: languageName } : null
   const money = sittingQuery.data?.ok ? sittingQuery.data : null
+  /** Starts the audition, after asking what it may spend when its model is paid. */
+  const beginAudition = () =>
+    money?.paid
+      ? setAsking('start')
+      : start.mutate(
+          { action: 'start' },
+          { onSuccess: (result) => result.ok && (window.location.hash = audition) },
+        )
 
   return (
     <>
@@ -178,42 +190,69 @@ export function CharacterView({
             }}
           />
         )}
-        {inProgress ? (
-          // On a paid model, with no money left in this sitting, Resume asks for more first.
-          needsResumeBox(money) ? (
-            <button className="btn btn-primary" type="button" onClick={() => setAsking('resume')}>
-              <HeadphonesIcon /> Resume…
-            </button>
+        <div className="header-actions">
+          <button
+            ref={designButton}
+            className="btn"
+            type="button"
+            // Only once it is known whether an audition is going on: paying starts one if not.
+            disabled={!view || designing || blocked !== null}
+            title={blocked ?? undefined}
+            onClick={() => setDesigning(true)}
+          >
+            <SparkIcon /> Design a voice…
+          </button>
+          {inProgress ? (
+            // On a paid model, with no money left in this sitting, Resume asks for more first.
+            needsResumeBox(money) ? (
+              <button className="btn btn-primary" type="button" onClick={() => setAsking('resume')}>
+                <HeadphonesIcon /> Resume…
+              </button>
+            ) : (
+              <a className="btn btn-primary" href={audition}>
+                <HeadphonesIcon /> Resume audition
+              </a>
+            )
           ) : (
-            <a className="btn btn-primary" href={audition}>
-              <HeadphonesIcon /> Resume audition
-            </a>
-          )
-        ) : (
-          // Only once it is known that no audition is going on: starting would replace one.
-          view && (
-            <button
-              className="btn btn-primary"
-              type="button"
-              // While the audition is read again, one may have been started elsewhere.
-              disabled={
-                start.isPending || session.isFetching || sittingQuery.isPending || blocked !== null
-              }
-              title={blocked ?? undefined}
-              onClick={() =>
-                money?.paid
-                  ? setAsking('start')
-                  : start.mutate(
-                      { action: 'start' },
-                      { onSuccess: (result) => result.ok && (window.location.hash = audition) },
-                    )
-              }
-            >
-              <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
-            </button>
-          )
-        )}
+            // Only once it is known that no audition is going on: starting would replace one.
+            view && (
+              <button
+                className="btn btn-primary"
+                type="button"
+                // While the audition is read again, one may have been started elsewhere.
+                disabled={
+                  start.isPending ||
+                  session.isFetching ||
+                  sittingQuery.isPending ||
+                  blocked !== null
+                }
+                title={blocked ?? undefined}
+                onClick={beginAudition}
+              >
+                <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
+              </button>
+            )
+          )}
+        </div>
       </header>
+      {designing && (
+        <DesignVoice
+          characterId={character.id}
+          name={character.name}
+          start={designStart(character.keywords, character.style)}
+          auditioning={inProgress !== null}
+          onClose={() => {
+            setDesigning(false)
+            designButton.current?.focus()
+          }}
+          onDone={() => {
+            setDesigning(false)
+            // The designs are in the audition going on; with none, paying starts one.
+            if (inProgress) window.location.hash = audition
+            else beginAudition()
+          }}
+        />
+      )}
       {session.isError && (
         <span className="adopt-error">Could not read the audition: {session.error.message}</span>
       )}

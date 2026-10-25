@@ -15,6 +15,18 @@ export function takesToRecord(
   return voices.filter((v) => !takes[v] && !recording.has(v) && !errors[v])
 }
 
+/** The line on a designed voice's card when Fish could not save it to the account. */
+export function saveFailedLine(reason: string): string {
+  return `Fish couldn’t save this voice: ${reason.replace(/\.$/, '')}. It wasn’t cast.`
+}
+
+/** The voices of the board that get a take recorded; a designed voice already has its preview. */
+export function recordable(session: AuditionSession): string[] {
+  return [...session.shortlist, ...session.yours, ...session.toHear].filter(
+    (id) => !session.voices[id]?.design,
+  )
+}
+
 /** What casting a voice does, in sentences, for the page to ask before casting. */
 export function castEffects({
   name,
@@ -27,6 +39,7 @@ export function castEffects({
   language,
   stale,
   auditioning = true,
+  saves = false,
 }: {
   /** The character's name. */
   name: string
@@ -48,9 +61,16 @@ export function castEffects({
   unheard: number
   /** Whether an audition is going on, which casting ends (false: casting from the character's page). */
   auditioning?: boolean
+  /** Whether the voice is a design, which is saved to the user's Fish account before it is cast. */
+  saves?: boolean
 }): string[] {
   const lines = replacing ? recorded.reduce((sum, a) => sum + a.lines, 0) : 0
   const effects: string[] = []
+  if (saves) {
+    effects.push(
+      `It is saved to your Fish account first, as a private voice named “${name} (designed)” (“${name} (designed 2)” and so on if that name is taken).`,
+    )
+  }
   if (stale !== undefined) {
     if (stale && lines) effects.push(stale)
   } else if (lines) {

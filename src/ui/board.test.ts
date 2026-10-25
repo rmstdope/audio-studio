@@ -4,6 +4,8 @@ import {
   droppedRuledOut,
   ownSectionState,
   playsVoice,
+  recordable,
+  saveFailedLine,
   sampleClip,
   stopEffects,
   stopEffectsFor,
@@ -254,6 +256,46 @@ describe('ownSectionState', () => {
     expect(ownSectionState(some, { fetched: true, error: 'down' })).toBe('cards')
     expect(ownSectionState({ yours: [], mine: [] }, { fetched: false, error: 'down' })).toBe(
       'error',
+    )
+  })
+})
+
+describe('recordable', () => {
+  it('leaves out designed voices: their preview is their take, kept when they were made', () => {
+    const designed = { design: { n: 1, description: 'd', at: 't' } }
+    const session = {
+      shortlist: ['s', 'd1'],
+      yours: ['y'],
+      toHear: ['h'],
+      designed: ['d2'],
+      voices: { d1: designed, d2: designed },
+    }
+    expect(recordable(session as never)).toEqual(['s', 'y', 'h'])
+  })
+})
+
+describe('castEffects for a designed voice', () => {
+  it('says it is saved to the Fish account first', () => {
+    const effects = castEffects({
+      name: 'Mara',
+      current: null,
+      replacing: true,
+      recorded: [],
+      titles: new Map(),
+      dropped: 0,
+      unheard: 0,
+      saves: true,
+    })
+    expect(effects[0]).toBe(
+      'It is saved to your Fish account first, as a private voice named “Mara (designed)” (“Mara (designed 2)” and so on if that name is taken).',
+    )
+  })
+})
+
+describe('saveFailedLine', () => {
+  it('gives Fish’s reason and says the voice was not cast', () => {
+    expect(saveFailedLine('Audio too short.')).toBe(
+      'Fish couldn’t save this voice: Audio too short. It wasn’t cast.',
     )
   })
 })

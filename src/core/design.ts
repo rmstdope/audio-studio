@@ -1,4 +1,5 @@
 import type { AuditionSession } from './audition'
+import { usd } from './spend'
 
 /** The Fish model that designs voices. */
 export const DESIGN_MODEL = 'voice-design-1'
@@ -117,4 +118,44 @@ export function designGroups(session: AuditionSession): DesignGroup[] {
     groups.set(at, group)
   }
   return [...groups.values()].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+}
+
+/** What the confirm box shows of the credit: still being read, enough to ask, or why it cannot. */
+export type DesignCredit =
+  { kind: 'reading' } | { kind: 'ask'; credit: number } | { kind: 'cannot'; message: string }
+
+/**
+ * Judges the account's credit for one design: `undefined` while it is being read, `null` when it
+ * could not be.
+ */
+export function designCredit(credit: number | null | undefined): DesignCredit {
+  if (credit === undefined) return { kind: 'reading' }
+  if (credit === null) {
+    return {
+      kind: 'cannot',
+      message:
+        'The studio couldn’t read your Fish credit, so it can’t tell whether a design is covered. Check the Fish key on Setup and try again.',
+    }
+  }
+  if (credit + 1e-9 < DESIGN_PRICE) {
+    return {
+      kind: 'cannot',
+      message: `Your credit is ${usd(credit)}, not enough for a design (${usd(DESIGN_PRICE)}). Add credit on Fish and try again.`,
+    }
+  }
+  return { kind: 'ask', credit }
+}
+
+/** The points of the confirm box: what Fish makes, what it costs, and that it starts an audition if none is going. */
+export function designPoints(name: string, auditioning: boolean): string[] {
+  const points = [
+    `Fish makes ${DESIGN_COUNT} voices from your description, each saying the audition phrase.`,
+    `It costs ${usd(DESIGN_PRICE)}, charged to your Fish account only if it works.`,
+  ]
+  if (!auditioning) {
+    points.push(
+      `No audition is going on for ${name}: this starts one, and the voices join its board.`,
+    )
+  }
+  return points
 }
