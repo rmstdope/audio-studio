@@ -85,6 +85,23 @@ describe('castEffects', () => {
     ])
   })
 
+  it('does not end an audition when none is going on', () => {
+    expect(
+      castEffects({
+        name: 'Mira',
+        current: 'Old Sage',
+        replacing: true,
+        recorded: [],
+        titles,
+        dropped: 0,
+        unheard: 0,
+        auditioning: false,
+      }),
+    ).toEqual([
+      'Old Sage is no longer Mira’s voice. It is not ruled out: it can come back in a later audition.',
+    ])
+  })
+
   it('leaves out what does not apply to a character without a voice or lines', () => {
     expect(
       castEffects({

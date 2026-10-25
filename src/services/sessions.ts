@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import {
   AuditionSessionSchema,
   addVoice,
+  addSpent,
   bringMore,
   drop,
   placeOf,
@@ -15,6 +16,7 @@ import {
   type AuditionSession,
 } from '../core/audition'
 import { resolveInRoot } from '../core/paths'
+import { perTakeCost } from '../core/sitting'
 import { declaredLanguage, type Problem } from '../core/project'
 import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
@@ -24,7 +26,7 @@ import { characterFile, readJson, writeAtomic } from './files'
 import { NO_KEY } from './fish'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
-import { auditionTakes } from './takes'
+import { auditionIn, auditionTakes } from './takes'
 import {
   cacheNameFor,
   knownCharacter,
@@ -400,15 +402,59 @@ export async function castVoice(
       }
     }
     const voice = { id: winner, name: session.voices[winner]?.title ?? winner }
-    const changed = winner !== character.languages[language]?.voice
-    const stale = changed ? await recordedLines(projectFile, characterId, language) : []
-    if (changed) {
-      const written = await setVoice(projectFile, characterId, voice, language)
-      if (!written || !written.ok) return written
-    }
-    await rm(await sessionPath(projectFile, characterId, language), { force: true })
-    return { ok: true, voice, changed, stale }
+    return writeCast(
+      projectFile,
+      characterId,
+      character.languages[language]?.voice,
+      voice,
+      language,
+    )
   })
+}
+
+/**
+ * Casts a voice that is on no audition's shortlist, such as one just made from the user's own
+ * recordings. Like casting from an audition it ends the audition going on, if any.
+ */
+export async function castOwnVoice(
+  projectFile: string,
+  characterId: string,
+  voice: { id: string; name: string },
+  asked?: string,
+): Promise<CastResult> {
+  const name = await cacheNameFor(projectFile, characterId, asked)
+  return sessionWrites.run(key(projectFile, name), async () => {
+    const loaded = await loadWorkspace(projectFile)
+    if (!loaded.ok) return loaded
+    const character = loaded.summary.characters.find((c) => c.id === characterId)
+    if (!character) return null
+    const language = declaredLanguage(loaded.project.narration, asked)
+    return writeCast(
+      projectFile,
+      characterId,
+      character.languages[language]?.voice,
+      voice,
+      language,
+    )
+  })
+}
+
+/** Writes the voice to the cast (for the language) unless it is the one cast now, and ends the audition. */
+async function writeCast(
+  projectFile: string,
+  characterId: string,
+  current: string | null | undefined,
+  voice: { id: string; name: string },
+  language?: string,
+): Promise<CastResult> {
+  const changed = voice.id !== current
+  const stale = changed ? await recordedLines(projectFile, characterId, language) : []
+  if (changed) {
+    const written = await setVoice(projectFile, characterId, voice, language)
+    if (!written || !written.ok) return written
+  }
+  await rm(await sessionPath(projectFile, characterId, language), { force: true })
+  return { ok: true, voice, changed, stale }
 }
 
 /** Ends the character's audition without casting; null for an unknown character. */
@@ -510,4 +556,46 @@ async function sessionPath(
 ): Promise<string> {
   const name = await cacheNameFor(projectFile, characterId, language)
   return resolveInRoot(dirname(projectFile), sessionFile(name))
+}
+
+/** What an audition's takes cost: the model, the price of a take of the phrase, and what was charged so far. */
+export type AuditionMoney =
+  { ok: true; model: string; perTake: number; spentBefore: number } | ProjectFailure | null
+
+/**
+ * What a board take of the character's current phrase costs on the audition model (nothing on a
+ * free one), and the dollars already charged to the audition in earlier sittings. Null for an
+ * unknown character.
+ */
+export async function auditionMoney(
+  projectFile: string,
+  characterId: string,
+  language?: string,
+): Promise<AuditionMoney> {
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
+  const { project, cast, summary } = loaded
+  const model = project.narration.models.audition
+  const spentBefore = (await readSession(projectFile, characterId, language))?.spent ?? 0
+  if (!cast) return { ok: true, model, perTake: 0, spentBefore }
+  const { spoken } = auditionIn(project, cast, summary, characterId, language).audition
+  const perTake = perTakeCost(model, new TextEncoder().encode(spoken).length, new Date()) ?? 0
+  return { ok: true, model, perTake, spentBefore }
+}
+
+/** Adds `dollars` charged for a take to the character's audition; nothing if none is going on. */
+export function recordSpent(
+  projectFile: string,
+  characterId: string,
+  dollars: number,
+  language?: string,
+): Promise<SessionResult> {
+  return changeSession(
+    projectFile,
+    characterId,
+    (session) => addSpent(session, dollars),
+    undefined,
+    language,
+  )
 }

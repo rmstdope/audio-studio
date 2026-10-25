@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
+import { createBudget } from '../core/spend'
 import { auditionTakes, recordTake, takeFile, tryLine } from './takes'
 
 const files = {
@@ -28,6 +29,7 @@ function fakeFish() {
     async listOwnVoices() {
       return []
     },
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 25
     },
@@ -367,5 +369,214 @@ describe('tryLine', () => {
     expect(
       await tryLine(projectFileOf(root), 'act1', 'a', '', async () => failing, limiter),
     ).toEqual({ ok: false, reason: 'fish', message: 'boom' })
+  })
+})
+
+describe('takes on a paid audition model', () => {
+  const paid = {
+    ...files,
+    'audio-studio.json': projectJson({
+      narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
+    }),
+  }
+  // '[warm] El-ee-or, dear.' is 22 bytes: $0.00033 at $15 per million.
+  const COST = (22 / 1e6) * 15
+  const board = (budget?: ReturnType<typeof createBudget>, charged?: (d: number) => void) => ({
+    board: true,
+    budget,
+    charged,
+  })
+
+  it('records a board take with the audition model and charges it to the budget', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const budget = createBudget({ model: 's2.1-pro', dollars: 0.01 })
+    const charged: number[] = []
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+      board(budget, (d) => charged.push(d)),
+    )
+    expect(result?.ok).toBe(true)
+    expect(requests.map((r) => r.model)).toEqual(['s2.1-pro'])
+    expect(budget.left).toBeCloseTo(0.01 - COST, 12)
+    expect(charged).toHaveLength(1)
+    expect(charged[0]).toBeCloseTo(COST, 12)
+  })
+
+  it('needs a sitting for a board take: nothing is sent to Fish without one', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+      board(),
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'no-sitting' })
+    expect(requests).toEqual([])
+  })
+
+  it('waits when the budget cannot pay for the take, and sends nothing', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const budget = createBudget({ model: 's2.1-pro', dollars: COST / 2 })
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+      board(budget),
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'waits' })
+    expect(requests).toEqual([])
+    expect(budget.left).toBeCloseTo(COST / 2, 12)
+  })
+
+  it('charges a take already recorded nothing', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const budget = createBudget({ model: 's2.1-pro', dollars: 0.01 })
+    const limiter = createLimiter()
+    await recordTake(projectFile, 'grandmother', 'v9', async () => fish, limiter, board(budget))
+    const left = budget.left
+    const again = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => fish,
+      limiter,
+      board(budget),
+    )
+    expect(again).toMatchObject({ ok: true, cached: true })
+    expect(requests).toHaveLength(1)
+    expect(budget.left).toBe(left)
+  })
+
+  it('gives the money back when Fish fails', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const failing: FishClient = {
+      createVoice: () => Promise.reject(new Error('not used')),
+      credit: async () => 25,
+      listVoices: () => Promise.reject(new Error('not used')),
+      listOwnVoices: () => Promise.reject(new Error('not used')),
+      getVoice: () => Promise.reject(new Error('not used')),
+      tts: () => Promise.reject(new Error('Fish said no')),
+    }
+    const budget = createBudget({ model: 's2.1-pro', dollars: 0.01 })
+    const charged: number[] = []
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => failing,
+      createLimiter(),
+      board(budget, (d) => charged.push(d)),
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'fish' })
+    expect(budget.left).toBeCloseTo(0.01, 12)
+    expect(charged).toEqual([])
+  })
+
+  it('sends nothing once the sitting has ended while the take was queued', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish, requests } = fakeFish()
+    const budget = createBudget({ model: 's2.1-pro', dollars: 0.01 })
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+      {
+        board: true,
+        budget,
+        open: () => false,
+      },
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'no-sitting' })
+    expect(requests).toEqual([])
+    expect(budget.left).toBe(0.01)
+  })
+
+  it('keeps a take that was made when saving what it cost fails', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish } = fakeFish()
+    const budget = createBudget({ model: 's2.1-pro', dollars: 0.01 })
+    const result = await recordTake(
+      projectFile,
+      'grandmother',
+      'v9',
+      async () => fish,
+      createLimiter(),
+      {
+        board: true,
+        budget,
+        charged: () => Promise.reject(new Error('disk full')),
+      },
+    )
+    expect(result).toMatchObject({ ok: true, cached: false })
+  })
+
+  it('keeps the cast voice’s page take on the free model, and a try too', async () => {
+    const projectFile = join(
+      tempRepo({
+        ...paid,
+        'tts/cast.json': {
+          ...(files['tts/cast.json'] as object),
+          speakers: { grandmother: { voice: 'cur', style: '[warm]' } },
+        },
+      }),
+      'audio-studio.json',
+    )
+    const { fish, requests } = fakeFish()
+    const page = await recordTake(
+      projectFile,
+      'grandmother',
+      'cur',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(page?.ok).toBe(true)
+    const tried = await tryLine(
+      projectFile,
+      'act1',
+      'a',
+      '[soft]',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(tried?.ok).toBe(true)
+    expect(requests.map((r) => r.model)).toEqual(['s2.1-pro-free', 's2.1-pro-free'])
+  })
+
+  it('finds the takes of the audition model for the board and the free ones for the page', async () => {
+    const projectFile = join(tempRepo(paid), 'audio-studio.json')
+    const { fish } = fakeFish()
+    const budget = createBudget({ model: 's2.1-pro', dollars: 0.01 })
+    const onBoard = await recordTake(
+      projectFile,
+      'grandmother',
+      'cur',
+      async () => fish,
+      createLimiter(),
+      board(budget),
+    )
+    const onPage = await recordTake(
+      projectFile,
+      'grandmother',
+      'cur',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(onBoard?.ok && onPage?.ok && onBoard.key !== onPage.key).toBe(true)
+    const found = await auditionTakes(projectFile, 'grandmother', ['cur'])
+    expect(found?.ok && found.takes).toEqual({ cur: onBoard?.ok ? onBoard.key : '' })
   })
 })

@@ -1,5 +1,8 @@
+import { useState } from 'react'
+import { retiringTakes } from '../core/retirement'
 import { useProject } from './api'
 import { Problems } from './components/Problems'
+import { RetirementNotice } from './components/RetirementNotice'
 import { Sidebar } from './components/Sidebar'
 import { AuditionView } from './features/audition/AuditionView'
 import { ChangesView } from './features/changes/ChangesView'
@@ -14,6 +17,8 @@ import { useRoute } from './route'
 export function App() {
   const project = useProject()
   const route = useRoute()
+  // Not now: kept here, so it lasts across pages and is gone when the page is opened again.
+  const [notNow, setNotNow] = useState(false)
 
   if (project.isPending) {
     return <div className="center-page muted">Opening project…</div>
@@ -54,6 +59,7 @@ export function App() {
   }
 
   const { summary } = result
+  const retiring = retiringTakes(summary.models)
   const requested = route.view === 'part' || route.view === 'lines' ? route.part : null
   const part =
     summary.parts.find((p) => p.id === requested) ??
@@ -64,6 +70,14 @@ export function App() {
     <div className="shell">
       <Sidebar summary={summary} route={route} activePart={part.id} />
       <main className="content">
+        {!notNow && (
+          <RetirementNotice
+            takes={retiring}
+            file={summary.projectFile}
+            now={new Date()}
+            onNotNow={() => setNotNow(true)}
+          />
+        )}
         {summary.problems.length > 0 && (
           <Problems title="Some files could not be read" problems={summary.problems} />
         )}

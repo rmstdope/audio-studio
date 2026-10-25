@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ProjectSummary } from '../../../core/summary'
 import {
   castSaved,
@@ -7,7 +8,7 @@ import {
   queryLanguage,
 } from '../../castLanguages'
 import type { CastResult } from '../../../services/sessions'
-import { useCast, useParts, useSession, useSessionAction } from '../../api'
+import { useCast, useParts, useSession, useSessionAction, useSitting } from '../../api'
 import { CheckIcon } from '../../components/icons'
 import { Failure } from '../../components/Failure'
 import { useClipPlayer } from '../../components/useClipPlayer'
@@ -15,6 +16,7 @@ import { plural, shortTitle } from '../../format'
 import { routeHref } from '../../route'
 import { PhraseEditor, StyleEditor } from '../characters/BriefEditors'
 import { ShortlistBoard } from './ShortlistBoard'
+import { SittingBox } from './SittingBox'
 
 /**
  * A character's audition: the board while one is in progress, with the phrase and style the takes
@@ -35,14 +37,16 @@ export function AuditionView({
   const language = languageShown(summary.languages, asked)
   const languageName = nameOf(summary.languages, language)
   const inLanguage = several ? { id: language, name: languageName } : null
-  const asking = queryLanguage(summary.languages, asked)
-  const sessionQuery = useSession(characterId, Boolean(character), asking)
-  const start = useSessionAction(characterId, asking)
-  const cast = useCast(characterId, asking)
+  const queried = queryLanguage(summary.languages, asked)
+  const sessionQuery = useSession(characterId, Boolean(character), queried)
+  const start = useSessionAction(characterId, queried)
+  const cast = useCast(characterId, queried)
+  const sittingQuery = useSitting(characterId, Boolean(character), queried)
+  const [asking, setAsking] = useState(false)
   const parts = character?.languages[language]?.appearances ?? []
   const loadedParts = useParts(
     parts.map((a) => a.part),
-    asking,
+    queried,
   )
   const lineTexts = [
     ...new Set(
@@ -77,6 +81,7 @@ export function AuditionView({
   const view = sessionQuery.data?.ok ? sessionQuery.data : null
   const board = view?.session ? { ...view, session: view.session } : null
   const casted = cast.data?.ok ? cast.data : null
+  const money = sittingQuery.data?.ok ? sittingQuery.data : null
 
   return (
     <>
@@ -91,8 +96,9 @@ export function AuditionView({
             {inLanguage ? ` in ${languageName}` : ''}
           </h1>
           <span className="muted">
-            Each voice says the phrase in {character.name}’s style, with the free audition model.
-            Takes record by themselves.
+            {money?.paid
+              ? `Each voice says the phrase in ${character.name}’s style, with ${money.model}. Takes record by themselves until the audition’s money is used.`
+              : `Each voice says the phrase in ${character.name}’s style, with the free audition model. Takes record by themselves.`}
           </span>
         </div>
       </header>
@@ -177,14 +183,38 @@ export function AuditionView({
                   <button
                     className="btn btn-primary"
                     type="button"
-                    disabled={start.isPending}
-                    onClick={() => start.mutate({ action: 'start' })}
+                    disabled={start.isPending || sittingQuery.isPending}
+                    onClick={() =>
+                      money?.paid ? setAsking(true) : start.mutate({ action: 'start' })
+                    }
                   >
                     {start.isPending ? 'Starting…' : 'Start audition'}
                   </button>
                 )}
               </span>
-              <Failure title="The audition could not start" result={start.data} />
+              {money && asking && (
+                <SittingBox
+                  kind="start"
+                  view={money}
+                  busy={start.isPending}
+                  failure={
+                    start.data && !start.data.ok && 'message' in start.data
+                      ? start.data.message
+                      : undefined
+                  }
+                  onPay={(amount) =>
+                    start.mutate(
+                      { action: 'start', body: { spendUpTo: amount } },
+                      { onSuccess: (result) => result.ok && setAsking(false) },
+                    )
+                  }
+                  onCancel={() => setAsking(false)}
+                />
+              )}
+              <Failure
+                title="The audition could not start"
+                result={asking ? undefined : start.data}
+              />
               {start.isError && <span className="adopt-error">{start.error.message}</span>}
             </div>
           )}

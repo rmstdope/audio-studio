@@ -28,6 +28,7 @@ function fakeFish() {
     async listOwnVoices() {
       return []
     },
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 25
     },

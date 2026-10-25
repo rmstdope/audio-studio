@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditionSession } from '../../../core/audition'
+import { FREE_MODELS } from '../../../core/project'
+import type { SittingView } from '../../../core/sitting'
+import { usd } from '../../../core/spend'
 import {
   sharesVoiceWith,
   type CharacterLanguage,
@@ -28,6 +31,8 @@ import {
   useRuledOut,
   useSession,
   useSessionAction,
+  useSitting,
+  useSittingActions,
   useTakes,
   type Voiced,
 } from '../../api'
@@ -44,8 +49,11 @@ import { inGameState, recordedLinesOf } from '../../inGame'
 import type { Clip } from '../../player'
 import { linesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
+import { needsResumeBox } from '../../sitting'
 import { voiceUrl } from '../../voiceId'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
+import { SittingBox, sittingFailure } from '../audition/SittingBox'
+import { CloneVoice } from './CloneVoice'
 import { KeywordsEditor, PhraseEditor, SpeedEditor, StyleEditor } from './BriefEditors'
 
 /**
@@ -69,22 +77,26 @@ export function CharacterView({
   const languageName = nameOf(summary.languages, language)
   const casting = character?.languages[language]
   // Every hook of the page and its panels asks with the same language, or none in a project with one.
-  const asking = queryLanguage(summary.languages, asked)
-  const session = useSession(characterId, Boolean(character), asking)
-  const voice = useCharacterVoice(characterId, casting?.voice ?? null, Boolean(character), asking)
-  const start = useSessionAction(characterId, asking)
+  const queried = queryLanguage(summary.languages, asked)
+  const session = useSession(characterId, Boolean(character), queried)
+  const voice = useCharacterVoice(characterId, casting?.voice ?? null, Boolean(character), queried)
+  const start = useSessionAction(characterId, queried)
   const going = useAuditionsGoingOn(
     characterId,
     summary.languages.map((l) => l.id),
     Boolean(character) && several,
   )
+  const sittingQuery = useSitting(characterId, Boolean(character), queried)
+  const sittingActions = useSittingActions(characterId, queried)
+  // Which question is open: starting an audition on a paid model, or carrying one on.
+  const [asking, setAsking] = useState<'start' | 'resume' | null>(null)
   const player = useClipPlayer()
   const { playing, toggle } = player
   const appearances = casting?.appearances ?? []
   // Her lines in this language, to pick an audition phrase from.
   const loadedParts = useParts(
     appearances.map((a) => a.part),
-    asking,
+    queried,
   )
   const lineTexts = [
     ...new Set(
@@ -121,6 +133,7 @@ export function CharacterView({
   })
   const blocked = answer ? startBlocked(answer.audition, languageName) : null
   const inLanguage: Language | null = several ? { id: language, name: languageName } : null
+  const money = sittingQuery.data?.ok ? sittingQuery.data : null
 
   return (
     <>
@@ -166,9 +179,16 @@ export function CharacterView({
           />
         )}
         {inProgress ? (
-          <a className="btn btn-primary" href={audition}>
-            <HeadphonesIcon /> Resume audition
-          </a>
+          // On a paid model, with no money left in this sitting, Resume asks for more first.
+          needsResumeBox(money) ? (
+            <button className="btn btn-primary" type="button" onClick={() => setAsking('resume')}>
+              <HeadphonesIcon /> Resume…
+            </button>
+          ) : (
+            <a className="btn btn-primary" href={audition}>
+              <HeadphonesIcon /> Resume audition
+            </a>
+          )
         ) : (
           // Only once it is known that no audition is going on: starting would replace one.
           view && (
@@ -176,13 +196,17 @@ export function CharacterView({
               className="btn btn-primary"
               type="button"
               // While the audition is read again, one may have been started elsewhere.
-              disabled={start.isPending || session.isFetching || blocked !== null}
+              disabled={
+                start.isPending || session.isFetching || sittingQuery.isPending || blocked !== null
+              }
               title={blocked ?? undefined}
               onClick={() =>
-                start.mutate(
-                  { action: 'start' },
-                  { onSuccess: (result) => result.ok && (window.location.hash = audition) },
-                )
+                money?.paid
+                  ? setAsking('start')
+                  : start.mutate(
+                      { action: 'start' },
+                      { onSuccess: (result) => result.ok && (window.location.hash = audition) },
+                    )
               }
             >
               <HeadphonesIcon /> {start.isPending ? 'Starting…' : 'Start audition'}
@@ -196,7 +220,32 @@ export function CharacterView({
       {session.data && !session.data.ok && 'problems' in session.data && (
         <Problems title="The audition could not be read" problems={session.data.problems} />
       )}
-      <Failure title="The audition could not start" result={start.data} />
+      {money && asking && (
+        <SittingBox
+          kind={asking}
+          view={money}
+          busy={start.isPending || sittingActions.resume.isPending}
+          failure={
+            asking === 'start'
+              ? start.data && !start.data.ok && 'message' in start.data
+                ? start.data.message
+                : undefined
+              : sittingFailure(sittingActions.resume.data)
+          }
+          onPay={(amount) =>
+            asking === 'start'
+              ? start.mutate(
+                  { action: 'start', body: { spendUpTo: amount } },
+                  { onSuccess: (result) => result.ok && (window.location.hash = audition) },
+                )
+              : sittingActions.resume.mutate(amount, {
+                  onSuccess: (answer) => answer.ok && (window.location.hash = audition),
+                })
+          }
+          onCancel={() => setAsking(null)}
+        />
+      )}
+      <Failure title="The audition could not start" result={asking ? undefined : start.data} />
       {start.isError && <span className="adopt-error">{start.error.message}</span>}
       {voice.isError && (
         <span className="adopt-error">Could not load the voice: {voice.error.message}</span>
@@ -220,6 +269,13 @@ export function CharacterView({
               character.id,
               several ? language : undefined,
             )}
+            paidModel={money?.paid ? money.model : null}
+            parts={character.appearances.map((a) => ({
+              id: a.part,
+              title: titles.get(a.part) ?? a.part,
+            }))}
+            inProgress={inProgress}
+            sessionKnown={view !== null && !session.isFetching}
           />
           <section className="panel character-lines" aria-label="Lines">
             <div className="section-head">
@@ -274,6 +330,8 @@ export function CharacterView({
               session={inProgress}
               href={audition}
               language={inLanguage}
+              money={money}
+              onResume={() => setAsking('resume')}
             />
           )}
           <section className="panel brief-panel" aria-label="Delivery">
@@ -350,6 +408,10 @@ function VoicePanel({
   playing,
   toggle,
   sharedWith,
+  paidModel,
+  parts,
+  inProgress,
+  sessionKnown,
 }: {
   character: CharacterSummary
   /** Her casting in the language shown. */
@@ -363,8 +425,16 @@ function VoicePanel({
   toggle: (id: string, url: string) => void
   /** The other characters cast with this voice. */
   sharedWith: CharacterSummary[]
+  /** The audition model when it is a paid one: the cast voice's take is on the free model all the same. */
+  paidModel: string | null
+  /** The character's parts, for what casting a cloned voice makes stale. */
+  parts: { id: string; title: string }[]
+  /** The audition going on, if any. */
+  inProgress: AuditionSession | null
+  /** Whether the audition has been read: only then is it known whether one is going on. */
+  sessionKnown: boolean
 }) {
-  const recorder = useTakes(character.id, language?.id)
+  const recorder = useTakes(character.id, false, language?.id)
   const id = casting?.voice ?? null
   // The take is asked for once per phrase, so one the page cannot show is not asked again.
   const asked = useRef(new Set<string>())
@@ -376,6 +446,20 @@ function VoicePanel({
     void record(id)
   }, [wanted, id, record])
 
+  const clone = (
+    <CloneVoice
+      characterId={character.id}
+      name={character.name}
+      language={language?.id}
+      languageName={language?.name}
+      currentTitle={id ? answer?.voice?.title || voiceLabel(character) : null}
+      parts={parts}
+      inProgress={inProgress}
+      sessionKnown={sessionKnown}
+      playing={playing}
+      toggle={toggle}
+    />
+  )
   if (!id) {
     return (
       <section className="panel voice-panel" aria-label="Voice">
@@ -384,8 +468,9 @@ function VoicePanel({
         <span className="muted">
           {language
             ? noVoiceText(character, languages, language.id)
-            : `Start an audition to find one. Until then ${character.name}’s lines cannot be recorded.`}
+            : `Start an audition to find one, or clone one from recordings you have. Until then ${character.name}’s lines cannot be recorded.`}
         </span>
+        {clone}
       </section>
     )
   }
@@ -469,8 +554,13 @@ function VoicePanel({
             </button>
           )}
           <span>
-            <strong>Take</strong>
+            <strong>Take {paidModel && <span className="chip">free model</span>}</strong>
             <span className="muted">The audition phrase, in {character.name}’s style</span>
+            {paidModel && (
+              <span className="muted">
+                Recorded with {FREE_MODELS[0]}. Auditions use {paidModel}.
+              </span>
+            )}
           </span>
         </div>
         <div className="listen-box">
@@ -497,6 +587,7 @@ function VoicePanel({
             </span>
           </span>
         </div>
+        {clone}
       </div>
       {recorder.errors[id] && <span className="adopt-error">{recorder.errors[id]}</span>}
       <div className="voice-foot">
@@ -661,6 +752,8 @@ function InProgress({
   session,
   href,
   language,
+  money,
+  onResume,
 }: {
   characterId: string
   name: string
@@ -668,6 +761,10 @@ function InProgress({
   session: AuditionSession
   href: string
   language: Language | null
+  /** The audition's money, once known. */
+  money: SittingView | null
+  /** Opens the box that asks what the audition may spend as it goes on. */
+  onResume: () => void
 }) {
   const act = useSessionAction(characterId, language?.id)
   const ruledOut = useRuledOut(characterId, language?.id)
@@ -679,6 +776,11 @@ function InProgress({
       <span>
         {plural(session.shortlist.length, 'voice')} shortlisted, {session.toHear.length} to hear.
       </span>
+      {money?.paid && (
+        <span className="muted">
+          {usd(money.spentBefore)} spent so far · {money.model}
+        </span>
+      )}
       {asking ? (
         <Confirm
           title="Stop without casting?"
@@ -700,9 +802,15 @@ function InProgress({
           <button className="btn btn-ghost" type="button" onClick={() => setAsking(true)}>
             Stop…
           </button>
-          <a className="btn btn-primary" href={href}>
-            Resume
-          </a>
+          {needsResumeBox(money) ? (
+            <button className="btn btn-primary" type="button" onClick={onResume}>
+              Resume…
+            </button>
+          ) : (
+            <a className="btn btn-primary" href={href}>
+              Resume
+            </a>
+          )}
         </div>
       )}
       <Failure title="The audition could not be stopped" result={act.data} />

@@ -10,23 +10,12 @@ The items below are not built. Each is small enough for one pull request, unless
 otherwise. Facts about Fish come from its docs as checked on 2026-10-25; check them again before
 building. Read `architecture.md` and `CLAUDE.md` first.
 
-## Paid auditions
+## Paid auditions (built)
 
-Takes are always recorded with the free model: `narration.models.audition` accepts only
-`s2.1-pro-free` (`auditionModel` in `core/project.ts`). Hearing candidates on the model you will
-ship with needs a priced audition stage, in more than one pull request:
-
-- Takes record by themselves today, which is fine only because they are free. A paid audition
-  model must ask to confirm the cost first (§8.1 says "a paid audition model will ask first").
-- Audition takes call `fish.tts` directly (`speak` in `services/takes.ts`), with no budget. A paid
-  model needs that path charged through `core/spend.ts` and held against the credit, as recordings
-  are.
-- Cue tries (**Hear it**, `tryLine` in the same file) also record with the audition model, so a
-  paid audition model would make every try paid too. Decide whether tries follow the audition
-  model or stay free.
-
-The take cache key already includes the model (`takeKey` in `core/takes.ts`), so takes on two
-models do not mix.
+`narration.models.audition` may name any priced model; a paid audition is paid from one budget per
+sitting, asked for up front (§8.1 of `architecture.md`). Cue tries (**Hear it**) and the cast
+voice's take on its character page stay on the free model. The take cache key includes the model,
+so takes on two models do not mix.
 
 ## The `s1` retirement
 
@@ -34,7 +23,8 @@ Fish retires `s1` on 31 December 2026; after that, requests for it are served an
 `s2.1-pro` at the same price. `core/prices.ts` lists `s1` with no end date. The studio should warn
 when the project file names `s1` for `draft` or `final`, and offer to switch it. The project file
 is changed in one place only today (`narration.quality.soundAlike`, see `CLAUDE.md`), so changing
-`models` there is a new rule for the consumer repository and needs agreeing first.
+`models` there was a new rule for the consumer repository; it is built (bead as-5gk.3) and written
+into `CLAUDE.md` and `docs/architecture.md`.
 
 ## Your own voices in casting
 
@@ -43,6 +33,8 @@ voices** section (§8.1). Bringing a private voice in by its id (`getVoice`, an 
 `GET /model/{id}`) is still not verified against a real private voice.
 
 ## Voice cloning
+
+_Built (as-5gk.5): offered to every account; a private voice that Fish will not speak with on the account says so on its card (the free-model question is answered there, not before)._
 
 Creating a private voice from recorded speech: `POST /model` with `multipart/form-data`, fields
 `type=tts`, `title`, `visibility=private`, `train_mode=fast` and the audio as `voices` (1 to 20

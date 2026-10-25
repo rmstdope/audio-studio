@@ -93,6 +93,8 @@ export interface ProjectSummary {
   pronounce: Pronunciation[] | null
   /** The project's own words that sound the same, a group each (`quality.soundAlike`). */
   soundAlike: string[][]
+  /** The draft and final recording models (`models.draft`, `models.final`). */
+  models: { draft: string; final: string }
   /** The project's speaking speed (`tts.speed`), which a character may have its own in place of. */
   speed: number
   /** The project file's name, where `soundAlike` is saved. */
@@ -231,6 +233,7 @@ export function summarize({
     canRefresh: Boolean(narration.refreshDialog),
     pronounce: cast ? Object.entries(cast.pronounce) : null,
     soundAlike: narration.quality.soundAlike,
+    models: { draft: narration.models.draft, final: narration.models.final },
     speed: narration.tts.speed,
     projectFile,
     problems,

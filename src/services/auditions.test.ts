@@ -41,6 +41,7 @@ const fish: FishClient = {
   async listOwnVoices() {
     return []
   },
+  createVoice: () => Promise.reject(new Error('not used')),
   async credit() {
     return 25
   },
@@ -731,7 +732,15 @@ describe('casting per language', () => {
       const projectFile = join(root, 'audio-studio.json')
       const limiter = createLimiter()
       const en = await recordTake(projectFile, 'grandmother', 'w1', async () => fish, limiter)
-      const sv = await recordTake(projectFile, 'grandmother', 'w1', async () => fish, limiter, 'sv')
+      const sv = await recordTake(
+        projectFile,
+        'grandmother',
+        'w1',
+        async () => fish,
+        limiter,
+        {},
+        'sv',
+      )
       expect(en?.ok && sv?.ok && en.key !== sv.key).toBe(true)
       expect(sv?.ok && sv.spoken).toBe('[warm] Kom in.')
       const none = tempRepo(withCast({ speakers: { grandmother } }))
@@ -741,6 +750,7 @@ describe('casting per language', () => {
         'w1',
         async () => fish,
         limiter,
+        {},
         'sv',
       )
       expect(refused).toMatchObject({ ok: false, reason: 'no-phrase' })

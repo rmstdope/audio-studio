@@ -1,0 +1,812 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Design a voice</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --kept-bg: #0f1a16;
+        --kept-line: #1f5a40;
+        --chip: #1a1d26;
+        --r: 14px;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        padding: 12px 16px;
+        border: 1px dashed var(--line-strong);
+        border-radius: 10px;
+        color: var(--muted);
+      }
+      .note b {
+        color: var(--text);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto 28px;
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 22px;
+        background: #0d0e13;
+      }
+      .frame > h3 {
+        margin: 0 0 14px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      h1 {
+        margin: 4px 0;
+        font-size: 22px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .between {
+        justify-content: space-between;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 18px;
+        margin-top: 16px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn-ghost {
+        background: transparent;
+      }
+      .chip {
+        background: var(--chip);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .badge {
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 12px;
+      }
+      .badge.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .badge.paid {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .badge.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .card.kept {
+        background: var(--kept-bg);
+        border-color: var(--kept-line);
+      }
+      .take {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: var(--inset);
+        border-radius: 9px;
+        padding: 6px 8px;
+      }
+      .play {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+      }
+      .play.off {
+        background: var(--raised);
+        color: var(--faint);
+      }
+      .bar {
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+      .bar.ask {
+        background: var(--accent-soft-bg);
+        border: 1px solid #5a3218;
+      }
+      .bar.warn {
+        background: var(--warn-bg);
+        border: 1px solid #5a4818;
+      }
+      .bar.err {
+        background: var(--danger-bg);
+        border: 1px solid #5a2430;
+        color: var(--danger-ink);
+      }
+      .meter {
+        height: 6px;
+        border-radius: 9px;
+        background: var(--inset);
+        overflow: hidden;
+        width: 160px;
+      }
+      .meter span {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .confirm {
+        border-color: var(--accent);
+      }
+      ul.fx {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .section {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      input.money {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 8px;
+        width: 80px;
+        font: inherit;
+      }
+      @media (max-width: 760px) {
+        .layout,
+        .split {
+          grid-template-columns: 1fr;
+        }
+      }
+      .badge.mine {
+        background: #16223a;
+        color: #8fb4ff;
+        border: 1px solid #2a3f66;
+      }
+      .card.mine {
+        border-color: #2a3f66;
+      }
+      .sec {
+        margin-top: 18px;
+      }
+      .sec h2 {
+        font-size: 15px;
+        margin: 0 0 4px;
+      }
+      .sec .sub {
+        color: var(--muted);
+        margin: 0 0 10px;
+        font-size: 13px;
+      }
+      .empty {
+        border: 1px dashed var(--line-strong);
+        border-radius: 12px;
+        padding: 14px;
+        color: var(--muted);
+      }
+      .tags {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .acts {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 2px;
+      }
+      .btn-small {
+        padding: 4px 9px;
+        font-size: 12px;
+      }
+      .id {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .callout {
+        outline: 2px dashed #8fb4ff;
+        outline-offset: 4px;
+        border-radius: 12px;
+      }
+      .legend {
+        color: #8fb4ff;
+        font-size: 12px;
+        margin: 6px 0 0;
+      }
+      textarea.desc {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 9px 10px;
+        font: inherit;
+        width: 100%;
+        min-height: 84px;
+        resize: vertical;
+      }
+      .badge.made {
+        background: #2a1838;
+        color: #d7a6ff;
+        border: 1px solid #4a2d66;
+      }
+      .card.made {
+        border-color: #4a2d66;
+      }
+      .vlabel {
+        display: inline-block;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 700;
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+      .err {
+        color: var(--danger-ink);
+        font-size: 13px;
+      }
+      .hdr {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      <b>Agreed drawing: design a voice from a description.</b> “Design a voice…” beside Start
+      audition on a character page, and in the audition board’s bottom bar, opens a box holding the
+      last description written for the character (the first time, one made from the casting brief).
+      “Design voices…” asks “Pay up to $0.01” in a confirm box, the box waits while Fish works, and
+      the 4 voices join the board in a “Designed for &lt;name&gt;” section, grouped by description.
+      With no audition going on, paying starts one. A design is saved to the Fish account only when
+      cast, as “&lt;name&gt; (designed)”; designs never cast are kept for the character’s next
+      audition.
+    </div>
+    <div class="frame">
+      <h3>
+        Character page: “Design a voice…” beside Start audition opens the box beneath the header
+      </h3>
+      <div class="hdr">
+        <div>
+          <div class="crumbs">Characters / Old Mara</div>
+          <h1>Old Mara</h1>
+          <div class="muted">14 lines in 3 acts · one voice in every act</div>
+        </div>
+        <div class="row">
+          <button class="btn">✦ Design a voice…</button
+          ><button class="btn btn-primary">🎧 Start audition</button>
+        </div>
+      </div>
+      <p class="legend">Pressed: the box opens beneath the header. Cancel closes it again.</p>
+      <div style="margin-top: 12px">
+        <div class="panel">
+          <h2 class="section">Design a voice</h2>
+          <p class="muted" style="margin: 0">
+            Describe the voice you want. Fish makes 4 voices from it, each saying the audition
+            phrase; they join the audition board.
+          </p>
+          <textarea class="desc">
+An old woman, warm and slow, slightly hoarse, a storyteller by a fire. Rural accent, a smile in her voice.</textarea>
+          <div class="row">
+            <button class="btn btn-primary">Design voices…</button
+            ><span class="faint">Fish charges $0.01 per design.</span
+            ><button class="btn btn-ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <div class="layout">
+        <div>
+          <div class="panel">
+            <span class="label">Delivery</span
+            ><span class="muted">Slow, warm, a little hoarse.</span>
+          </div>
+          <div class="panel" style="margin-top: 12px">
+            <span class="label">Casting brief</span
+            ><span class="muted">Keywords: elderly female, warm, storyteller</span>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <span class="label">Voice</span><strong>No voice yet</strong
+            ><span class="muted">Start an audition to hear voices and cast one.</span>
+          </div>
+          <div class="panel" style="margin-top: 12px">
+            <span class="label">Lines</span
+            ><span class="muted"
+              >Act I · 6 lines &nbsp; Act II · 5 lines &nbsp; Act III · 3 lines</span
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame">
+      <h3>Design voices… opens the confirm box</h3>
+      <div class="panel">
+        <h2 class="section">Design a voice</h2>
+        <p class="muted" style="margin: 0">
+          Describe the voice you want. Fish makes 4 voices from it, each saying the audition phrase;
+          they join the audition board.
+        </p>
+        <textarea class="desc">
+An old woman, warm and slow, slightly hoarse, a storyteller by a fire. Rural accent, a smile in her voice.</textarea>
+        <div class="row">
+          <button class="btn btn-primary">Design voices…</button
+          ><span class="faint">Fish charges $0.01 per design.</span>
+        </div>
+      </div>
+      <div class="panel confirm" style="margin-top: 12px">
+        <h2 class="section">Design voices with Fish?</h2>
+        <ul class="fx">
+          <li>Fish makes 4 voices from your description, each saying the audition phrase.</li>
+          <li>It costs $0.01, charged to your Fish account only if it works.</li>
+        </ul>
+        <div class="row">
+          <span class="muted">Your credit: $4.82</span><span style="flex: 1"></span
+          ><button class="btn btn-ghost">Cancel</button
+          ><button class="btn btn-primary">Pay up to $0.01</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame">
+      <h3>Audition board: the same button in the bottom bar opens the same box there</h3>
+      <div class="panel row">
+        <button class="btn">Bring in more</button><button class="btn">✦ Design a voice…</button
+        ><span style="flex: 1"></span><span class="muted">Bring in a specific voice</span
+        ><input class="money" style="width: 200px" placeholder="Fish voice id or URL" /><button
+          class="btn"
+        >
+          Bring in
+        </button>
+      </div>
+    </div>
+
+    <div class="frame">
+      <h3>Audition board: designed voices, grouped by description, newest first</h3>
+      <div class="sec">
+        <h2>Designed for Old Mara</h2>
+        <p class="sub">Not on your Fish account until you cast one.</p>
+        <p class="muted" style="margin: 8px 0">“Older, rougher, more of a whisper…”</p>
+        <div class="cards">
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 5</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 6</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 7</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 8</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+        </div>
+        <p class="muted" style="margin: 14px 0 8px">
+          “An old woman, warm and slow, slightly hoarse…”
+        </p>
+        <div class="cards">
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 1</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 2</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 3</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 4</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame">
+      <h3>Casting a designed voice saves it to your Fish account under the character’s name</h3>
+      <div class="card made" style="max-width: 300px">
+        <div class="row between">
+          <strong>Design 3</strong><span class="badge made">Designed</span>
+        </div>
+        <div class="take">
+          <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+        </div>
+        <div class="acts">
+          <button class="btn btn-small btn-ghost">Unlist</button
+          ><button class="btn btn-small btn-primary">Save and cast as Old Mara</button>
+        </div>
+      </div>
+      <p class="legend">
+        Saved on Fish as “Old Mara (designed)”; a second one becomes “Old Mara (designed 2)”.
+      </p>
+    </div>
+
+    <div class="frame">
+      <h3>Designs never cast are kept for the character</h3>
+      <div class="panel">
+        <span class="label">Audition</span
+        ><span class="muted"
+          >Stopped. 7 designed voices are kept for Old Mara; they’ll be on the board next
+          time.</span
+        >
+      </div>
+      <p class="legend">A dropped design is ruled out like any voice and never comes back.</p>
+    </div>
+
+    <div class="frame">
+      <h3>Every state and word</h3>
+      <div class="split">
+        <div class="panel">
+          <h2 class="section">Design a voice</h2>
+          <p class="muted" style="margin: 0">
+            Describe the voice you want. Fish makes 4 voices from it, each saying the audition
+            phrase; they join the audition board.
+          </p>
+          <textarea class="desc"></textarea>
+          <div class="row">
+            <button class="btn btn-primary" disabled style="opacity: 0.5">Design voices…</button
+            ><button class="btn btn-ghost">Cancel</button>
+          </div>
+          <span class="faint">Empty: Design voices… is greyed out.</span>
+        </div>
+        <div class="panel">
+          <h2 class="section">Design a voice</h2>
+          <textarea class="desc">An old woman… (2,040 characters)</textarea>
+          <div class="row between">
+            <span class="err">That’s longer than Fish takes: 2,000 characters at most.</span
+            ><span class="faint">2,040 / 2,000</span>
+          </div>
+          <div class="row">
+            <button class="btn btn-primary" disabled style="opacity: 0.5">Design voices…</button
+            ><button class="btn btn-ghost">Cancel</button>
+          </div>
+          <span class="faint">The count shows from 1,800 characters.</span>
+        </div>
+        <div class="panel confirm">
+          <h2 class="section">Design voices with Fish?</h2>
+          <ul class="fx">
+            <li>Fish makes 4 voices from your description, each saying the audition phrase.</li>
+            <li>It costs $0.01, charged to your Fish account only if it works.</li>
+          </ul>
+          <div class="row">
+            <span class="muted">Your credit: $4.82</span><span style="flex: 1"></span
+            ><button class="btn btn-ghost">Cancel</button
+            ><button class="btn btn-primary">Pay up to $0.01</button>
+          </div>
+        </div>
+        <div class="panel confirm">
+          <h2 class="section">Design voices with Fish?</h2>
+          <ul class="fx">
+            <li>Fish makes 4 voices from your description, each saying the audition phrase.</li>
+            <li>It costs $0.01, charged to your Fish account only if it works.</li>
+            <li>
+              No audition is going on for Old Mara: this starts one, and the voices join its board.
+            </li>
+          </ul>
+          <div class="row">
+            <span class="muted">Your credit: $4.82</span><span style="flex: 1"></span
+            ><button class="btn btn-ghost">Cancel</button
+            ><button class="btn btn-primary">Pay up to $0.01</button>
+          </div>
+          <span class="faint"
+            >If auditions use a paid model, its own “Audition on s2.1-pro?” box follows.</span
+          >
+        </div>
+        <div class="panel confirm">
+          <h2 class="section">Fish can’t design voices now</h2>
+          <p class="muted" style="margin: 0">
+            The studio couldn’t read your Fish credit, so it can’t tell whether a design is covered.
+            Check the Fish key on Setup and try again.
+          </p>
+          <div class="row">
+            <span style="flex: 1"></span><button class="btn btn-ghost">Cancel</button
+            ><button class="btn">Try again</button>
+          </div>
+        </div>
+        <div class="panel confirm">
+          <h2 class="section">Fish can’t design voices now</h2>
+          <p class="muted" style="margin: 0">
+            Your Fish credit is $0.00, not enough for a design ($0.01). Add credit on Fish and try
+            again.
+          </p>
+          <div class="row">
+            <span style="flex: 1"></span><button class="btn btn-ghost">Cancel</button
+            ><button class="btn">Try again</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="section">Design a voice</h2>
+          <textarea class="desc" disabled>An old woman, warm and slow…</textarea>
+          <div class="row">
+            <button class="btn btn-primary" disabled style="opacity: 0.6">Designing…</button
+            ><span class="faint">Fish is making 4 voices.</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="section">Design a voice</h2>
+          <textarea class="desc">An old woman, warm and slow…</textarea>
+          <div class="err">
+            Fish couldn’t design voices: &lt;the reason&gt;. Nothing was charged.
+          </div>
+          <div class="row">
+            <button class="btn btn-primary">Design voices…</button
+            ><button class="btn btn-ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <h3 style="margin-top: 22px">On the board</h3>
+      <div class="split">
+        <div class="panel">
+          <h2 class="section">Designed for Old Mara</h2>
+          <p class="muted" style="margin: 0">Not on your Fish account until you cast one.</p>
+          <p class="muted" style="margin: 0">“An old woman, warm and slow, slightly hoarse…”</p>
+          <div class="card made">
+            <div class="row between">
+              <div>
+                <strong>Design 1</strong>
+                <div class="muted" style="font-size: 12px">Designed · not saved</div>
+              </div>
+              <span class="badge made">Designed</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase, as designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <span class="label">On the shortlist, casting</span>
+          <div class="card made kept">
+            <div class="row between">
+              <strong>Design 1</strong><span class="badge made">Designed</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small" disabled>Saving to your Fish account…</button>
+            </div>
+          </div>
+          <div class="card made kept">
+            <div class="row between">
+              <strong>Design 1</strong><span class="badge made">Designed</span>
+            </div>
+            <div class="err">
+              Fish couldn’t save this voice: &lt;the reason&gt;. It wasn’t cast.
+            </div>
+            <div class="acts">
+              <button class="btn btn-small btn-ghost">Unlist</button
+              ><button class="btn btn-small btn-primary">Save and cast as Old Mara</button>
+            </div>
+          </div>
+          <span class="faint"
+            >Once saved and cast, it’s one of your own voices: on Old Mara’s page it shows “Yours”
+            and “Your voice · private”.</span
+          >
+        </div>
+      </div>
+      <p class="legend">
+        Not offered: a section with no designs is not shown at all. The take of a designed voice is
+        Fish’s preview: it costs nothing more, even with a paid audition model, and there is no Fish
+        sample.
+      </p>
+    </div>
+  </body>
+</html>

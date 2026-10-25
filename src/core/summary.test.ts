@@ -23,6 +23,13 @@ function input(overrides: Partial<SummaryInput> = {}): SummaryInput {
 }
 
 describe('summarize', () => {
+  it('carries the draft and final models', () => {
+    expect(summarize(input()).models).toEqual({
+      draft: project.narration.models.draft,
+      final: project.narration.models.final,
+    })
+  })
+
   it('counts each part’s lines per character, most lines first', () => {
     const summary = summarize(
       input({ dialogs: { act1: { status: 'ok', lines: lines('mira', 'narrator', 'narrator') } } }),

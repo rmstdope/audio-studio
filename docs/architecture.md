@@ -131,12 +131,14 @@ audio-studio/
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
-│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit)
+│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
+│   │   ├── models.ts            s1 → s2.1-pro in the project file's draft and final models
+│   │   ├── projectFile.ts       reading the project file for a change, and writing it back as it was laid out
 │   │   ├── heard.ts             what Whisper heard of each take below full, saved in the cache
 │   │   ├── takes.ts             audition takes and tries: recorded once, cached by what they are made of
 │   │   ├── setup.ts             the facts for the setup checks: tools on the PATH, the key, Fish
@@ -231,9 +233,9 @@ an id and a title.
   dialog is extracted.
 - `env` names the file holding `FISH_AUDIO_API_KEY`. The environment variable wins if set.
 - `characters` is one file for the whole project, not a per-part path (see §6).
-- `models` names the Fish model for each stage (see §8.4). `audition` must be the free model for
-  now; `draft` and `final` may name any model whose price the studio knows. Anything else is
-  rejected with a clear message.
+- `models` names the Fish model for each stage (see §8.4). Each stage, `audition` too, may name
+  any model whose price the studio knows (a paid audition model is paid from a budget per sitting,
+  §8.1). Anything else is rejected with a clear message.
 - `quality.soundAlike` lists the game's own words that sound the same (words or phrases, a letter or
   digit in each word: "all right" and "alright"), a group each, added to the studio's built-in
   English ones (`core/soundAlike.ts`: "in" and "inn", "weekly" and "weakly", "there", "their" and
@@ -414,6 +416,14 @@ a failure leaves the session as it was. The session keeps them in `yours` (the s
 "Yours" badge and blue border on the shortlist and as the cast voice. Shortlist, Unlist (back to
 Your voices) and Drop (ruled out like any voice) work as elsewhere; an own voice ruled out is not
 put back by a later fetch.
+The Voice panel also offers **Clone a voice from recordings**, to every account (whether a private
+voice speaks on the free model is unverified, so the sample on the new voice's card says when it
+does not). The form opens in the panel: a name, 1 to 20 recordings (their length read in the
+browser; under 10 seconds or not audio is left out before sending), a permission tick. The
+recordings go to `POST /api/characters/:id/clone-voice`, which makes a private voice on the Fish
+account (`FishClient.createVoice`) and writes nothing to the project. The card then offers to cast
+the voice (`POST /api/characters/:id/cast-voice`, with the usual confirmation), to bring it into
+the audition (the existing `start` and `add`), or to leave it on the Fish account.
 
 ```
  keywords ──► search Fish's library, leaving out ruled-out voices ──► ranked candidates
@@ -455,10 +465,26 @@ An audition is for a character, not for a part: the result applies to every part
   pools the results, keeps voices whose title, description or tags contain the keywords, and ranks
   by match, then popularity (the search `fish_tts.py` already does, ported). Ruled-out voices,
   voices the audition has shown, and the current voice are left out of new candidates.
-- **Takes** use `models.audition` (for now the free model, so an audition costs nothing, and takes
-  record by themselves for every voice shown, each once; one that fails is recorded again only
-  when asked; a paid audition model will ask first). Each voice
-  also offers Fish's own sample clip.
+- **Takes** of the board use `models.audition`. On the free model an audition costs nothing, and
+  takes record by themselves for every voice shown, each once; one that fails is recorded again
+  only when asked. Each voice also offers Fish's own sample clip.
+- **A paid audition model** is paid from one budget per _sitting_. **Start audition** (and
+  **Resume…** after a pause) first opens a box titled with the model: what is charged, the cost of
+  a take (the phrase's bytes at the model's price), an editable "Spend up to" amount (suggested:
+  about 50 takes, to the next five cents) beside the account's credit, and Cancel / Pay up to $X.
+  Paying admits the amount as a budget (`core/spend.ts`, held back from the credit like a
+  recording's) and the board records by itself until it is used: every take the board records is
+  charged to it just before it is sent, a take that fails is refunded, a take already recorded is
+  free. The board shows a meter (model, used of given, about N takes left); when what is left
+  cannot pay for one more take, a bar says so and takes "Add" money (`POST …/sitting/add`);
+  voices without a take show "Take waits for more money" and record once money is added. The
+  sitting lives in the server's memory (`sittings` in `server/index.ts`): it ends on Pause, Stop,
+  Cast or when the studio closes, and what was left is not kept; a reload keeps it. The saved
+  session keeps `spent`, the dollars charged over all its sittings, for the character page. A
+  credit that cannot be read, or cannot pay for one take, shows "The audition can't start" instead
+  of the amount; there is no fallback to the free model. The cast voice's take on the character
+  page and **Hear it** tries stay on the free model (`s2.1-pro-free`), labelled "free model" on
+  the page; the take key includes the model, so the two never mix.
 - **Phrase**: the project's standard phrase, the character's own phrase, or any of their lines
   picked from the script of any part ("hear it say something it will actually say").
 - Both belong to the tool, not the game, so they live in the gitignored cache: audition sessions
@@ -539,7 +565,7 @@ An audition is for a character, not for a part: the result applies to every part
   (built): saved at once, and affected lines show as stale (a speed is a settings change).
 - Hear a cue before saving it (built: **Hear it** while editing a line's cue): the speaker's cast
   voice says the line after the cue as typed (empty: the character's style), as the cast says it.
-  It is a take, not a clip: recorded with the audition model (free), the whole line in one
+  It is a take, not a clip: recorded with the free model (whatever the audition model is), the whole line in one
   request (Fish splits long text itself), kept in `.audio-studio/takes/` under the take key, so
   the same cue on the same line is recorded once; nothing of the game's is written. The clip
   recorded afterwards uses the draft model, chunked and checked, so it can sound a little
@@ -550,6 +576,12 @@ An audition is for a character, not for a part: the result applies to every part
   changed since editing began. The project file is otherwise only read; the save keeps the rest of
   it, in its own indentation (a hand-compacted object is written out). Takes already recorded keep
   their heard share; the groups count from the next take on.
+- Warn that `s1` retires (built): while the project file names `s1` for `models.draft` or
+  `models.final`, a banner on every page says so (past tense from 1 January 2027, UTC) with Not now
+  (until the page is reopened; nothing stored) and Switch to s2.1-pro. Switch asks first, then
+  rewrites only the models that are `s1` to `s2.1-pro` in the project file, the same careful way
+  as the sound-alike save (the second change the studio makes to the project file). The audition
+  model and recorded lines are not touched.
 - Retake a single line (built: Record, or Retake for a weak one), or accept a weak one as it is
   (built: Accept; the line shows as ok, "heard 80%, accepted", until it is recorded again). Or check
   a weak one again (built: Check again): Whisper hears the line's clip again, without new audio, and
@@ -597,8 +629,7 @@ An audition is for a character, not for a part: the result applies to every part
 There are three model stages in the project file: `audition` (candidate takes), `draft` (everyday
 generation while the script and cast still change) and `final` (the recording that ships).
 
-- **Now:** `audition` is the free model only. `draft` and `final` may name any model whose price
-  the studio knows (`core/prices.ts`). A paid recording, a job or one line, starts only when the user
+- **Now:** any stage may name any model whose price the studio knows (`core/prices.ts`). A paid recording, a job or one line, starts only when the user
   has confirmed the most it can cost (every line needing every take, priced when asked), and the
   account's credit covers it: the server works the ceiling out itself and refuses a request without
   a confirmation at least that high (answering with the ceiling to confirm), or when the credit is
@@ -608,8 +639,8 @@ generation while the script and cast still change) and `final` (the recording th
   takes, a promotion ending) spends more than was agreed; without a budget only the free model
   can be used. All that running recordings were given is held back from the credit until they
   end (Fish may bill a request after it was charged); a recording refused after it was admitted,
-  and a job when it ends, give theirs back. There is no
-  separate step for auditions yet: they are always free.
+  and a job when it ends, give theirs back. An audition on a paid model works the same with a
+  budget per sitting, asked for by amount rather than by a ceiling (§8.1).
 - **Final recording** (built): when `final` names another model than `draft`, the Generate panel
   offers **Draft** and **Final**. The final plan records every cast line whose clip was not made
   with the final model yet (missing, stale, drafted, untracked), with the final model, priced and
@@ -736,10 +767,10 @@ and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, m
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
 retakeWeak }`: start a generation, a measuring or a checking again, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
 `GET`/`DELETE /api/jobs/:id` (progress, cancel).
-Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the audition model, voice,
+Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries), voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
-`undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
+`undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model; `GET`, `POST` (`{ amount }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }`) are the audition's money; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
 `DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
 voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
@@ -771,6 +802,7 @@ GET    /api/characters                           all characters, with the parts 
 PATCH  /api/characters/:id                       style, speed, keywords, phrase
 PATCH  /api/pronounce                            pronunciation table ({ table, was }: whole)
 PATCH  /api/sound-alike                          the project's sound-alike groups ({ groups, was })
+PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
 GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
 DELETE /api/characters/:id/ruled-out             forget them all
@@ -783,6 +815,8 @@ POST   /api/auditions/:id/undo                   undo the last drop
 POST   /api/auditions/:id/more                   more candidates to hear
 POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json
+POST   /api/characters/:id/clone-voice           a private voice on the Fish account from recordings (multipart: title, voices)
+POST   /api/characters/:id/cast-voice            cast a voice no audition holds ({ voice, name }); ends an audition going on
 POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
                                                  part at a time); a paid
                                                  one with { confirmedCost }, else 409 with
@@ -934,8 +968,10 @@ Small, independently useful increments:
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
-   What a paid account could still have (paid auditions, the `s1` retirement,
+   Paid auditions are built (§8.1: a budget per sitting). What a paid account could still have (the `s1` retirement,
    cloning and design, the rate tier, a spend log) is in `docs/paid-account.md`, not planned yet.
+   What a paid account could still have (paid auditions, the `s1` retirement, your own voices,
+   voice design, the rate tier, a spend log; cloning is built, as-5gk.5) is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in
@@ -1009,8 +1045,7 @@ Small, independently useful increments:
    Hence one project-wide `cast.json`.
 2. **UI framework: React.**
 3. **Models: free only, for now.** The project file already has `audition`, `draft` and `final`
-   model stages, but all must be the free model. Paid models, mainly for a final generation step and
-   optionally for auditions and drafts, come later (§8.4).
+   model stages; paid models are allowed for every stage (§8.4).
 4. **Music is generated locally with ACE-Step 1.5.** No hosted music API has a lasting free tier
    with rights to use the result (ElevenLabs Music's free plan is non-commercial; others give
    signup credits only). Of the open models, MusicGen's weights are non-commercial (CC-BY-NC) and

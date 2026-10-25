@@ -6,6 +6,9 @@ import type { Voice } from '../core/voiceSearch'
 import type { FishClient } from './fish'
 import {
   addVoiceById,
+  auditionMoney,
+  recordSpent,
+  castOwnVoice,
   castVoice,
   changeSession,
   discardSession,
@@ -56,6 +59,7 @@ const fish: FishClient = {
   async listOwnVoices() {
     return ownVoices
   },
+  createVoice: () => Promise.reject(new Error('not used')),
   async credit() {
     return 25
   },
@@ -272,6 +276,54 @@ describe('addVoiceById', () => {
   })
 })
 
+describe('castOwnVoice', () => {
+  const own = { id: 'mine', name: 'My Mira' }
+
+  it('casts a voice no audition holds, and says which recorded lines go stale', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const result = await castOwnVoice(projectFile, 'mira', own)
+    expect(result).toEqual({
+      ok: true,
+      voice: own,
+      changed: true,
+      stale: [{ part: 'act1', lines: 1 }],
+    })
+    expect(
+      JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).speakers.mira,
+    ).toMatchObject({
+      voice: 'mine',
+      voiceName: 'My Mira',
+      style: '[low]',
+    })
+  })
+
+  it('ends an audition going on, as casting does', async () => {
+    const { projectFile } = await started()
+    await castOwnVoice(projectFile, 'mira', own)
+    expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
+  })
+
+  it('changes nothing for the voice already cast', async () => {
+    const projectFile = join(tempRepo(files), 'audio-studio.json')
+    expect(await castOwnVoice(projectFile, 'mira', { id: 'cur', name: 'Old' })).toMatchObject({
+      ok: true,
+      changed: false,
+      stale: [],
+    })
+  })
+
+  it('says when the project will not load', async () => {
+    const projectFile = join(tempRepo({ 'audio-studio.json': '{' }), 'audio-studio.json')
+    expect(await castOwnVoice(projectFile, 'mira', own)).toMatchObject({ ok: false })
+  })
+
+  it('knows no character it was not asked about', async () => {
+    const projectFile = join(tempRepo(files), 'audio-studio.json')
+    expect(await castOwnVoice(projectFile, 'nobody', own)).toBeNull()
+  })
+})
+
 describe('castVoice', () => {
   it('writes a shortlisted voice to the cast, says which recorded lines go stale, and ends the audition', async () => {
     const { root, projectFile } = await started()
@@ -441,6 +493,43 @@ describe('ruled-out voices in an audition', () => {
     const again = await addVoiceById(projectFile, 'mira', 'b', fishFor)
     expect(again?.ok && [again.session.toHear[0], again.session.dropped]).toEqual(['b', []])
     expect(await ruledOutIds(projectFile, 'mira')).toEqual([])
+  })
+})
+
+describe('the money of an audition', () => {
+  const paidFiles = {
+    ...files,
+    'audio-studio.json': {
+      ...project,
+      narration: { ...(project.narration as object), models: { audition: 's2.1-pro' } },
+    },
+  }
+
+  it('prices a take of the phrase on the audition model; a free model costs nothing', async () => {
+    const paid = join(tempRepo(paidFiles), 'audio-studio.json')
+    const money = await auditionMoney(paid, 'mira')
+    if (!money?.ok) throw new Error(JSON.stringify(money))
+    expect(money.model).toBe('s2.1-pro')
+    expect(money.perTake).toBeGreaterThan(0)
+    expect(money.spentBefore).toBe(0)
+    const free = await auditionMoney(join(tempRepo(files), 'audio-studio.json'), 'mira')
+    expect(free).toMatchObject({ ok: true, model: 's2.1-pro-free', perTake: 0 })
+  })
+
+  it('keeps what takes were charged in the saved audition, across sittings', async () => {
+    const projectFile = join(tempRepo(paidFiles), 'audio-studio.json')
+    await startAudition(projectFile, 'mira', fishFor)
+    await recordSpent(projectFile, 'mira', 0.01)
+    await recordSpent(projectFile, 'mira', 0.02)
+    const money = await auditionMoney(projectFile, 'mira')
+    expect(money?.ok && money.spentBefore).toBeCloseTo(0.03, 12)
+  })
+
+  it('is null for an unknown character, and records nothing without an audition', async () => {
+    const projectFile = join(tempRepo(paidFiles), 'audio-studio.json')
+    expect(await auditionMoney(projectFile, 'nobody')).toBeNull()
+    await recordSpent(projectFile, 'mira', 0.01)
+    expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
   })
 })
 

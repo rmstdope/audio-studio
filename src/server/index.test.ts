@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
-import type { FishClient } from '../services/fish'
+import { FishError, type FishClient } from '../services/fish'
 import { createLimiter } from '../services/limit'
 import { recordLine } from '../services/narration'
 import { allowedHosts, startServer } from './index'
@@ -19,6 +19,7 @@ const fish: FishClient = {
   async listOwnVoices() {
     return []
   },
+  createVoice: () => Promise.reject(new Error('not used')),
   async credit() {
     return 25
   },
@@ -691,6 +692,42 @@ describe('server, a character per language', () => {
   })
 })
 
+describe('server, retiring models', () => {
+  const project = projectJson()
+  ;(project.narration as { models?: unknown }).models = { draft: 's1', final: 's1' }
+  const ownRoot = tempRepo({
+    'audio-studio.json': project,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+  })
+  const server = startServer({
+    projectFile: join(ownRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const patch = (body: unknown, origin: string | null = server.url.origin) =>
+    fetch(new URL('/api/models', server.url), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
+      body: JSON.stringify(body),
+    })
+
+  it('switches the models from its own page, and the project then shows them', async () => {
+    const takes = ['draft', 'final']
+    expect((await patch({ takes }, 'http://evil.test')).status).toBe(403)
+    expect((await patch({ takes: ['both'] })).status).toBe(400)
+    expect((await patch({ takes: [] })).status).toBe(400)
+    expect((await patch({ takes: ['draft', 'draft'] })).status).toBe(400)
+    const saved = await patch({ takes })
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await patch({ takes })).status).toBe(409)
+    const shown = await (await fetch(new URL('/api/project', server.url))).json()
+    expect(shown.summary.models).toEqual({ draft: 's2.1-pro', final: 's2.1-pro' })
+  })
+})
+
 describe('allowedHosts', () => {
   it('names both addresses with the port', () => {
     expect(allowedHosts(4801)).toEqual(['127.0.0.1:4801', 'localhost:4801'])
@@ -1131,6 +1168,7 @@ describe('server, a paid draft model', () => {
   let spoken = 0
   const account: FishClient = {
     ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1320,6 +1358,7 @@ describe('server, paid recording and what changes meanwhile', () => {
   const requests: { model: string; gate: ReturnType<typeof gate> }[] = []
   const held: FishClient = {
     ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       creditCalls++
       if (creditGate) await creditGate
@@ -1526,6 +1565,7 @@ describe('server, a paid job refused for a refresh', () => {
   let credit = 10
   const account: FishClient = {
     ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1583,6 +1623,7 @@ describe('server, the final recording', () => {
   const models: string[] = []
   const account: FishClient = {
     ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 10
     },
@@ -1697,6 +1738,281 @@ describe('server, a final stage without a final model', () => {
   })
 })
 
+describe('server, a paid audition', () => {
+  const paid = projectJson({
+    narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
+  })
+  const paidRoot = tempRepo({
+    'audio-studio.json': paid,
+    'tts/cast.json': {
+      speakers: { gran: { voice: 'cur', style: '[warm]' }, kid: { voice: 'k1' } },
+    },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'gran', text: 'Hello.' },
+      { key: 'b', speaker: 'kid', text: 'Hi.' },
+    ],
+  })
+  let credit = 4.82
+  const models: string[] = []
+  const account: FishClient = {
+    ...fish,
+    async credit() {
+      return credit
+    },
+    async tts(request) {
+      models.push(request.model)
+      return new Uint8Array([1, 2, 3])
+    },
+  }
+  const server = startServer({
+    projectFile: join(paidRoot, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: own,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const sitting = async (id: string) => (await fetch(at(`/api/auditions/${id}/sitting`))).json()
+  const takeOf = async (id: string, voice: string, board = true) =>
+    (await send('POST', `/api/characters/${id}/takes`, { voice, board })).json()
+  const startWith = (id: string, spendUpTo?: number) =>
+    send('POST', `/api/auditions/${id}/start`, spendUpTo === undefined ? {} : { spendUpTo })
+
+  it('tells the audition model, what a take costs, and an amount to suggest', async () => {
+    const body = await sitting('gran')
+    expect(body).toMatchObject({ ok: true, model: 's2.1-pro', paid: true, sitting: null })
+    expect(body.perTake).toBeGreaterThan(0)
+    expect(body.suggested).toBeGreaterThanOrEqual(0.05)
+  })
+
+  it('does not start without an amount, nor for more than the credit', async () => {
+    const asked = await startWith('gran')
+    expect(asked.status).toBe(409)
+    expect(await asked.json()).toMatchObject({ ok: false, reason: 'confirm' })
+    const over = await startWith('gran', 5)
+    expect(await over.json()).toMatchObject({ ok: false, reason: 'credit' })
+    expect(await (await fetch(at('/api/auditions/gran'))).json()).toMatchObject({ session: null })
+    expect((await sitting('gran')).sitting).toBeNull()
+  })
+
+  it('starts with an amount, and charges board takes to it on the audition model', async () => {
+    const started = await startWith('gran', 0.01)
+    expect(started.status).toBe(200)
+    expect((await sitting('gran')).sitting).toMatchObject({
+      dollars: 0.01,
+      spent: 0,
+      usedUp: false,
+    })
+    models.length = 0
+    expect(await takeOf('gran', 'cur')).toMatchObject({ ok: true })
+    expect(models).toEqual(['s2.1-pro'])
+    const after = await sitting('gran')
+    expect(after.sitting.spent).toBeGreaterThan(0)
+    expect(after.sitting.dollars).toBe(0.01)
+    // The saved audition keeps it for the character's page.
+    const again = await sitting('gran')
+    expect(again.spentBefore).toBeCloseTo(after.sitting.spent, 12)
+  })
+
+  it('keeps the cast voice’s page take on the free model', async () => {
+    models.length = 0
+    expect(await takeOf('gran', 'cur', false)).toMatchObject({ ok: true })
+    expect(models).toEqual(['s2.1-pro-free'])
+  })
+
+  it('makes takes wait when the money is used, and lets them record after an addition', async () => {
+    const per = (await sitting('gran')).perTake
+    // Use up what is left in whole takes: the next one would go past the budget.
+    let n = 0
+    while ((await takeOf('gran', `v${n++}`)).ok && n < 200) {}
+    expect(n).toBeLessThan(200)
+    const used = await sitting('gran')
+    expect(used.sitting).toMatchObject({ usedUp: true })
+    expect(await takeOf('gran', 'late')).toMatchObject({ ok: false, reason: 'waits' })
+
+    const added = await send('POST', '/api/auditions/gran/sitting/add', { amount: per * 2 })
+    expect(added.status).toBe(200)
+    const topped = await sitting('gran')
+    expect(topped.sitting.dollars).toBeCloseTo(0.01 + per * 2, 12)
+    expect(topped.sitting.usedUp).toBe(false)
+    expect(await takeOf('gran', 'late')).toMatchObject({ ok: true })
+
+    const tooMuch = await send('POST', '/api/auditions/gran/sitting/add', { amount: 100 })
+    expect(await tooMuch.json()).toMatchObject({ ok: false, reason: 'credit' })
+  })
+
+  it('holds a sitting’s money back from another one, and gives it back when it ends', async () => {
+    credit = 0.015
+    // gran's sitting holds what is left of it: add 0.01, and only about 0.005 is free for kid.
+    await send('POST', '/api/auditions/gran/sitting/add', { amount: 0.01 })
+    const refused = await startWith('kid', 0.01)
+    expect(await refused.json()).toMatchObject({ ok: false, reason: 'credit' })
+    const ended = await send('DELETE', '/api/auditions/gran/sitting')
+    expect(ended.status).toBe(200)
+    expect((await sitting('gran')).sitting).toBeNull()
+    expect(await takeOf('gran', 'again')).toMatchObject({ ok: false, reason: 'no-sitting' })
+    expect((await startWith('kid', 0.01)).status).toBe(200)
+  })
+
+  it('resumes with a fresh sitting, and Stop and Cast end it', async () => {
+    credit = 4.82
+    const resumed = await send('POST', '/api/auditions/kid/sitting', { amount: 0.05 })
+    expect(resumed.status).toBe(200)
+    expect((await sitting('kid')).sitting).toMatchObject({ dollars: 0.05, spent: 0 })
+    await send('DELETE', '/api/auditions/kid')
+    expect((await sitting('kid')).sitting).toBeNull()
+
+    await startWith('gran', 0.05)
+    await send('POST', '/api/auditions/gran/cast', { voice: 'cur' })
+    expect((await sitting('gran')).sitting).toBeNull()
+  })
+
+  it('counts money a sitting has spent once against the credit, not twice', async () => {
+    credit = 0.02
+    await send('DELETE', '/api/auditions/gran/sitting')
+    await startWith('gran', 0.01)
+    expect(await takeOf('gran', 'one')).toMatchObject({ ok: true })
+    const spent = (await sitting('gran')).sitting.spent
+    // Fish has billed what the take cost: its credit fell by that much.
+    credit = 0.02 - spent
+    const added = await send('POST', '/api/auditions/gran/sitting/add', { amount: 0.01 })
+    expect(added.status).toBe(200)
+    credit = 4.82
+  })
+
+  it('leaves no money held when two resumes arrive at once', async () => {
+    credit = 4.82
+    await send('DELETE', '/api/auditions/gran/sitting')
+    await Promise.all([
+      send('POST', '/api/auditions/gran/sitting', { amount: 0.01 }),
+      send('POST', '/api/auditions/gran/sitting', { amount: 0.01 }),
+    ])
+    await send('DELETE', '/api/auditions/gran/sitting')
+    credit = 0.015
+    expect((await startWith('kid', 0.01)).status).toBe(200)
+    await send('DELETE', '/api/auditions/kid/sitting')
+    credit = 4.82
+  })
+
+  it('only takes sitting changes from its own page', async () => {
+    const denied = await fetch(at('/api/auditions/gran/sitting'), { method: 'DELETE' })
+    expect(denied.status).toBe(403)
+  })
+})
+
+describe('server, a paid audition ended with takes queued', () => {
+  const paid = projectJson({
+    narration: {
+      ...(projectJson().narration as object),
+      models: { audition: 's2.1-pro' },
+      quality: { parallel: 1 },
+    },
+  })
+  const root = tempRepo({
+    'audio-studio.json': paid,
+    'tts/cast.json': { speakers: { gran: { voice: 'cur' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
+  })
+  let calls = 0
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  const account: FishClient = {
+    ...fish,
+    async tts() {
+      calls++
+      await gate
+      return new Uint8Array([1])
+    },
+  }
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: own,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('does not send takes that were still waiting their turn when the sitting ended', async () => {
+    await send('POST', '/api/auditions/gran/start', { spendUpTo: 0.05 })
+    const takes = ['v1', 'v2', 'v3'].map((voice) =>
+      send('POST', '/api/characters/gran/takes', { voice, board: true }).then((r) => r.json()),
+    )
+    while (calls === 0) await new Promise((resolve) => setTimeout(resolve, 5))
+    await send('DELETE', '/api/auditions/gran/sitting')
+    release()
+    const answers = await Promise.all(takes)
+    expect(calls).toBe(1)
+    expect(answers.filter((a) => a.reason === 'no-sitting')).toHaveLength(2)
+  })
+})
+
+describe('server, a paid audition with a take in flight', () => {
+  const paid = projectJson({
+    narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
+  })
+  const root = tempRepo({
+    'audio-studio.json': paid,
+    'tts/cast.json': { speakers: { gran: { voice: 'cur' }, kid: { voice: 'k1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
+  })
+  let calls = 0
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  const account: FishClient = {
+    ...fish,
+    credit: async () => 0.011,
+    async tts() {
+      calls++
+      await gate
+      return new Uint8Array([1])
+    },
+  }
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: own,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('still holds what a take in flight cost, which Fish’s credit does not show yet', async () => {
+    expect((await send('POST', '/api/auditions/gran/start', { spendUpTo: 0.01 })).status).toBe(200)
+    const take = send('POST', '/api/characters/gran/takes', { voice: 'v1', board: true })
+    while (calls === 0) await new Promise((resolve) => setTimeout(resolve, 5))
+    // Credit 0.011, 0.01 held: only 0.001 is free, though gran's sitting has already been charged.
+    const refused = await send('POST', '/api/auditions/kid/start', { spendUpTo: 0.0015 })
+    expect(await refused.json()).toMatchObject({ ok: false, reason: 'credit' })
+    release()
+    await take
+  })
+})
+
 describe('server, a part in another language', () => {
   const base = projectJson()
   const many = tempRepo({
@@ -1744,5 +2060,103 @@ describe('server, a part in another language', () => {
     expect(body.part.lines[0]).toMatchObject({ text: 'En gång.', english: 'Once.' })
     expect(await (await get('/api/parts/act1/clips/a.mp3?language=sv')).text()).toBe('swedish-clip')
     expect((await get('/api/parts/act1/clips/a.mp3')).status).toBe(404)
+  })
+})
+
+describe('cloning a voice', () => {
+  const repo = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const made: { title: FormDataEntryValue | null; names: string[] }[] = []
+  const cloning = startServer({
+    projectFile: join(repo, 'audio-studio.json'),
+    port: 0,
+    fish: {
+      ...fish,
+      async createVoice({ title, files }) {
+        if (title === 'Refused') throw new FishError(400, 'Audio too short')
+        made.push({ title, names: files.map((f) => f.name) })
+        return {
+          id: 'f'.repeat(32),
+          title,
+          description: '',
+          tags: [],
+          languages: [],
+          uses: 0,
+          likes: 0,
+          author: '',
+          sample: null,
+        }
+      },
+    },
+    transcriber: null,
+  })
+  afterAll(() => cloning.stop(true))
+  const send = (path: string, body: BodyInit, headers: Record<string, string> = {}) =>
+    fetch(new URL(path, cloning.url), {
+      method: 'POST',
+      body,
+      headers: { origin: cloning.url.origin, ...headers },
+    })
+  const form = (title: string, names: string[]) => {
+    const data = new FormData()
+    data.set('title', title)
+    for (const name of names) data.append('voices', new File([new Uint8Array([1, 2])], name))
+    return data
+  }
+
+  it('sends the recordings to Fish and gives the voice made', async () => {
+    const response = await send(
+      '/api/characters/narrator/clone-voice',
+      form('Nora', ['a.wav', 'b.wav']),
+    )
+    expect(await response.json()).toEqual({ ok: true, voice: { id: 'f'.repeat(32), name: 'Nora' } })
+    expect(made).toEqual([{ title: 'Nora', names: ['a.wav', 'b.wav'] }])
+  })
+
+  it('gives Fish’s refusal with a 409, and refuses a body that is not the form', async () => {
+    const refused = await send('/api/characters/narrator/clone-voice', form('Refused', ['a.wav']))
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toEqual({ ok: false, reason: 'fish', message: 'Audio too short' })
+    const bad = await send('/api/characters/narrator/clone-voice', '{}', {
+      'content-type': 'application/json',
+    })
+    expect(bad.status).toBe(400)
+  })
+
+  it('refuses another page, and an unknown character', async () => {
+    const other = await send('/api/characters/narrator/clone-voice', form('Nora', ['a.wav']), {
+      origin: 'https://evil.example',
+    })
+    expect(other.status).toBe(403)
+    const unknown = await send('/api/characters/nobody/clone-voice', form('Nora', ['a.wav']))
+    expect(unknown.status).toBe(404)
+  })
+
+  it('refuses to cast from another page or with a body that names no voice', async () => {
+    const json = { 'content-type': 'application/json' }
+    const other = await send('/api/characters/narrator/cast-voice', '{}', {
+      ...json,
+      origin: 'https://evil.example',
+    })
+    expect(other.status).toBe(403)
+    expect((await send('/api/characters/narrator/cast-voice', '{}', json)).status).toBe(400)
+  })
+
+  it('casts the voice made without an audition', async () => {
+    const response = await send(
+      '/api/characters/narrator/cast-voice',
+      JSON.stringify({ voice: 'f'.repeat(32), name: 'Nora' }),
+      { 'content-type': 'application/json' },
+    )
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      voice: { name: 'Nora' },
+      changed: true,
+    })
+    const cast = JSON.parse(readFileSync(join(repo, 'tts/cast.json'), 'utf8'))
+    expect(cast.speakers.narrator).toMatchObject({ voice: 'f'.repeat(32), voiceName: 'Nora' })
   })
 })

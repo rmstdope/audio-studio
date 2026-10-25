@@ -21,6 +21,7 @@ export function VoiceCard({
   recording,
   error,
   onRecord,
+  waiting = false,
   listed = false,
   actions,
 }: {
@@ -35,6 +36,8 @@ export function VoiceCard({
   recording: boolean
   error: string | null
   onRecord: () => void
+  /** Whether its take waits for more money (a paid audition whose money is used). */
+  waiting?: boolean
   /** Whether the voice is on the shortlist, which is shown apart. */
   listed?: boolean
   /** On the board: buttons for what can be done with the voice. */
@@ -96,6 +99,8 @@ export function VoiceCard({
             </button>
             <span className="take-label">Take: the audition phrase in character</span>
           </>
+        ) : waiting ? (
+          <span className="muted take-waits">Take waits for more money</span>
         ) : (
           <button className="btn" type="button" disabled={recording} onClick={onRecord}>
             {recording ? 'Recording take…' : 'Record take'}
