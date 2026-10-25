@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditionSession } from '../../../core/audition'
-import type { CharacterSummary, ProjectSummary } from '../../../core/summary'
+import { sharesVoiceWith, type CharacterSummary, type ProjectSummary } from '../../../core/summary'
 import {
   clipUrl,
   takeUrl,
@@ -16,11 +16,11 @@ import {
 import { sampleClip, stopEffectsFor, takeClip } from '../../board'
 import { Confirm } from '../../components/Confirm'
 import { Failure } from '../../components/Failure'
-import { HeadphonesIcon, PauseIcon, PlayIcon } from '../../components/icons'
+import { AlertIcon, HeadphonesIcon, PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusBar } from '../../components/StatusBar'
 import { useClipPlayer } from '../../components/useClipPlayer'
-import { compact, plural, shortTitle, tintFor, voiceLabel } from '../../format'
+import { compact, plural, separatorBefore, shortTitle, tintFor, voiceLabel } from '../../format'
 import { routeHref } from '../../route'
 import { inGameState, recordedLinesOf } from '../../inGame'
 import type { Clip } from '../../player'
@@ -128,7 +128,13 @@ export function CharacterView({
 
       <div className="audition">
         <div className="audition-main">
-          <VoicePanel character={character} answer={answer} playing={playing} toggle={toggle} />
+          <VoicePanel
+            character={character}
+            answer={answer}
+            playing={playing}
+            toggle={toggle}
+            sharedWith={sharesVoiceWith(summary.characters, character.id)}
+          />
           <section className="panel character-lines" aria-label="Lines">
             <div className="section-head">
               <h2 className="section-title">Lines</h2>
@@ -208,12 +214,15 @@ function VoicePanel({
   answer,
   playing,
   toggle,
+  sharedWith,
 }: {
   character: CharacterSummary
   /** What the server says about the voice cast now; null until it has. */
   answer: Voiced | null
   playing: string | null
   toggle: (id: string, url: string) => void
+  /** The other characters cast with this voice. */
+  sharedWith: CharacterSummary[]
 }) {
   const recorder = useTakes(character.id)
   const id = character.voice
@@ -270,6 +279,21 @@ function VoicePanel({
         <span className="muted">
           Fish Audio could not give this voice’s details: {answer.lookup.message}
         </span>
+      )}
+      {sharedWith.length > 0 && (
+        <p className="status-note shared-voice">
+          <AlertIcon />
+          <span>
+            Also the voice of{' '}
+            {sharedWith.map((other, i) => (
+              <span key={other.id}>
+                {separatorBefore(i, sharedWith.length)}
+                <a href={routeHref({ view: 'character', character: other.id })}>{other.name}</a>
+              </span>
+            ))}
+            . Characters in one voice are hard to tell apart in a scene.
+          </span>
+        </p>
       )}
       <div className="voice-listen">
         <div className="listen-box">

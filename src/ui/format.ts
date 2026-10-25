@@ -19,6 +19,11 @@ export function voiceLabel(character: Pick<CharacterSummary, 'voice' | 'voiceNam
   return 'No voice yet'
 }
 
+/** What goes before the `i`th of `n` items read out as a list: nothing, ", " or " and ". */
+export function separatorBefore(i: number, n: number): string {
+  return i === 0 ? '' : i === n - 1 ? ' and ' : ', '
+}
+
 /** `1 line`, `2 lines`. */
 export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { projectJson } from '../../test/helpers'
 import { ProjectSchema } from './project'
 import type { Line } from './resources'
-import { displayName, summarize, type SummaryInput } from './summary'
+import { displayName, sharesVoiceWith, summarize, type SummaryInput } from './summary'
 
 const project = ProjectSchema.parse(projectJson())
 
@@ -136,5 +136,27 @@ describe('summarize, refreshing', () => {
 describe('displayName', () => {
   it('upper-cases the first letter only', () => {
     expect(displayName('narrator-act2')).toBe('Narrator-act2')
+  })
+})
+
+describe('sharesVoiceWith', () => {
+  const characters = summarize(
+    input({
+      dialogs: { act1: { status: 'ok', lines: lines('mira', 'tilda', 'narrator', 'aren') } },
+      cast: {
+        speakers: { mira: { voice: 'v1' }, tilda: { voice: 'v1' }, narrator: { voice: 'v2' } },
+        pronounce: {},
+      },
+    }),
+  ).characters
+
+  it('names the other characters cast with the same voice', () => {
+    expect(sharesVoiceWith(characters, 'mira').map((c) => c.id)).toEqual(['tilda'])
+    expect(sharesVoiceWith(characters, 'narrator')).toEqual([])
+  })
+
+  it('is nobody for an uncast or unknown character', () => {
+    expect(sharesVoiceWith(characters, 'aren')).toEqual([])
+    expect(sharesVoiceWith(characters, 'nobody')).toEqual([])
   })
 })

@@ -1273,6 +1273,20 @@ a.btn {
   color: var(--ok-ink);
 }
 
+.chip-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  width: fit-content;
+}
+
+.shared-voice {
+  margin: 0;
+  color: var(--warn);
+}
+.shared-voice a {
+  color: inherit;
+}
+
 .chip-danger {
   background: var(--danger-bg);
   color: var(--danger-ink);

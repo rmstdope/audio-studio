@@ -29,6 +29,7 @@ export function CharacterCard({
   lines,
   otherParts,
   counts,
+  sharedVoice = false,
 }: {
   character: CharacterSummary
   /** Lines in the part being shown, or across the project. */
@@ -37,6 +38,8 @@ export function CharacterCard({
   otherParts: string[]
   /** How many of the character's lines in the part have each status, once known. */
   counts?: Partial<Record<LineStatus, number>>
+  /** Another character is cast with the same voice. */
+  sharedVoice?: boolean
 }) {
   const cast = character.voice !== null
   const badge = badgeFor(cast, counts)
@@ -56,6 +59,11 @@ export function CharacterCard({
           {badge.label}
         </span>
       </div>
+      {sharedVoice && (
+        <span className="chip chip-warn" title="Another character has this voice">
+          Shared voice
+        </span>
+      )}
       {character.style ? (
         <span className="style-cue" title={character.style}>
           {character.style}
