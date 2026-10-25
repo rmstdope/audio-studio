@@ -25,6 +25,9 @@ function silence(seconds: number): Uint8Array {
 function fakeFish() {
   const requests: TtsRequest[] = []
   const fish: FishClient = {
+    async listOwnVoices() {
+      return []
+    },
     async credit() {
       return 25
     },

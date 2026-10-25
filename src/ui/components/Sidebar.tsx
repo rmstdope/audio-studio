@@ -78,7 +78,12 @@ export function Sidebar({
           <a
             key={part.id}
             className="nav-item"
-            href={routeHref({ view: 'part', part: part.id })}
+            href={routeHref({
+              view: 'part',
+              part: part.id,
+              language:
+                route.view === 'part' || route.view === 'lines' ? route.language : undefined,
+            })}
             aria-current={
               (route.view === 'part' || route.view === 'lines') && activePart === part.id
                 ? 'page'

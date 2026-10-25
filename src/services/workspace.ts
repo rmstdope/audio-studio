@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+import { languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
 import { adoptUntracked, planPart, type PartState, type PlanInput } from '../core/planner'
@@ -149,6 +150,16 @@ export async function readNotes(
   return { notes: value, problem }
 }
 
+/** How far one language of a part has come: its dialog, and its lines whose clip is up to date. */
+export interface LanguageProgress {
+  id: string
+  name: string
+  dialog: DialogState['status']
+  upToDate: number
+  /** All the language's lines, those not translated included; 0 without a dialog. */
+  total: number
+}
+
 /** One part with the state of every clip in it. */
 export interface PartDetail extends PartState {
   id: string
@@ -164,6 +175,10 @@ export interface PartDetail extends PartState {
   draftModel: string
   /** The model of the final recording; the same as the draft one when there is no final step. */
   finalModel: string
+  /** The language these lines are in (the one asked for, or the source language). */
+  language: string
+  /** Every declared language with how far it has come, in the order the project declares them. */
+  languages: LanguageProgress[]
   /** The user's notes on lines, by key (the studio's own, from the tool cache). */
   notes: Record<string, string>
   problems: Problem[]
@@ -173,10 +188,29 @@ export interface PartDetail extends PartState {
 export type PartResult = { ok: true; part: PartDetail } | ProjectFailure | null
 
 /** Reads a part's dialog, cues, lock, manifest and clips folder, and plans every line. */
-export async function loadPart(projectFile: string, partId: string): Promise<PartResult> {
-  const read = await readPart(projectFile, partId)
+export async function loadPart(
+  projectFile: string,
+  partId: string,
+  language?: string,
+): Promise<PartResult> {
+  const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return read
   const { project, part, input, dialog, problems } = read
+  const plan = planPart(input)
+  const languages: LanguageProgress[] = []
+  for (const id of project.narration.languages) {
+    const other = id === read.language ? read : await readPart(projectFile, partId, id)
+    if (!other?.ok) continue
+    const state = id === read.language ? plan : planPart(other.input)
+    const total = other.dialog.status === 'ok' ? state.lines.length : 0
+    languages.push({
+      id,
+      name: languageName(id),
+      dialog: other.dialog.status,
+      upToDate: total ? state.counts.ok : 0,
+      total,
+    })
+  }
   const notes = await readNotes(dirname(projectFile), part.id)
   return {
     ok: true,
@@ -185,12 +219,14 @@ export async function loadPart(projectFile: string, partId: string): Promise<Par
       title: part.title,
       dialog: dialog.status,
       ...read.paths,
+      language: read.language,
+      languages,
       minHeard: project.narration.quality.minHeard,
       draftModel: project.narration.models.draft,
       finalModel: project.narration.models.final,
       notes: onLines(notes.notes.lines, input.lines),
       problems: notes.problem ? [...problems, notes.problem] : problems,
-      ...planPart(input),
+      ...plan,
     },
   }
 }
@@ -233,18 +269,24 @@ export async function clipFile(
   projectFile: string,
   partId: string,
   file: string,
+  language?: string,
 ): Promise<string | null> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return null
   const { narration } = opened.project
   if (!narration.parts.some((p) => p.id === partId) || file.startsWith('.')) return null
-  const folder = resolveInRoot(dirname(projectFile), partPathFor(narration.paths.clips, partId))
+  const folder = resolveInRoot(
+    dirname(projectFile),
+    partPathFor(narration.paths.clips, partId, languageOf(narration, language)),
+  )
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
 
 /** Everything read about a part, for planning it or acting on it. */
 export interface PartRead {
   ok: true
+  /** The language read: the one asked for if the project declares it, else the source language. */
+  language: string
   project: Project
   part: Part
   dialog: DialogState
@@ -263,6 +305,7 @@ export interface PartRead {
 export async function readPart(
   projectFile: string,
   partId: string,
+  asked?: string,
 ): Promise<PartRead | ProjectFailure | null> {
   const root = dirname(projectFile)
   const opened = await openProject(projectFile)
@@ -273,9 +316,23 @@ export async function readPart(
 
   const problems: Problem[] = []
   const templates = project.narration.paths
-  const at = (template: string) => partPathFor(template, part.id)
+  const language = languageOf(project.narration, asked)
+  const at = (template: string) => partPathFor(template, part.id, language)
 
-  const dialog = await readDialog(root, project, part, problems)
+  const dialog = await readDialog(root, project, part, problems, language)
+  // Another language is shown beside the source language's lines, so those are read too.
+  const sourceLanguage = project.narration.languages[0]!
+  const source =
+    language !== sourceLanguage && dialog.status === 'ok'
+      ? await readDialog(root, project, part, problems, sourceLanguage)
+      : null
+  if (source?.status === 'missing') {
+    problems.push({
+      file: partPathFor(templates.dialog, part.id, sourceLanguage),
+      path: '',
+      message: `the ${languageName(sourceLanguage)} dialog is missing, so lines cannot be matched with it`,
+    })
+  }
   const cast = await readCast(root, project, problems)
   const cues = usable(await readResource(root, at(templates.cues), CuesSchema, problems))
   const lock = usable(await readResource(root, at(templates.lock), LockSchema, problems))
@@ -286,11 +343,13 @@ export async function readPart(
 
   return {
     ok: true,
+    language,
     project,
     part,
     dialog,
     input: {
       lines: dialog.status === 'ok' ? dialog.lines : [],
+      ...(source?.status === 'ok' ? { source: source.lines } : {}),
       cast: cast ?? { speakers: {}, pronounce: {} },
       cues: cues ?? {},
       lock: lock ?? {},
@@ -307,6 +366,13 @@ export async function readPart(
     },
     problems,
   }
+}
+
+/** The language to read: the one asked for if the project declares it, else its first. */
+function languageOf(narration: Project['narration'], asked: string | undefined): string {
+  return asked !== undefined && narration.languages.includes(asked)
+    ? asked
+    : narration.languages[0]!
 }
 
 /** A resource read's value, or null when there is no file or it is broken (already a problem). */
@@ -326,8 +392,9 @@ async function readDialog(
   project: Project,
   part: Part,
   problems: Problem[],
+  language: string = project.narration.languages[0]!,
 ): Promise<DialogState> {
-  const path = partPathFor(project.narration.paths.dialog, part.id)
+  const path = partPathFor(project.narration.paths.dialog, part.id, language)
   const read = await readResource(root, path, DialogSchema, problems)
   return read === 'missing' || read === 'invalid' ? { status: read } : { status: 'ok', lines: read }
 }
@@ -369,7 +436,9 @@ function projectPaths(project: Project): [string, string][] {
   ]
   for (const [name, template] of Object.entries(narration.paths)) {
     for (const part of narration.parts) {
-      paths.push([`narration.paths.${name}`, partPathFor(template, part.id)])
+      for (const language of narration.languages) {
+        paths.push([`narration.paths.${name}`, partPathFor(template, part.id, language)])
+      }
     }
   }
   return paths

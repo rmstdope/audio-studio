@@ -4,16 +4,27 @@
   "narration": {
     "partLabel": "Act",
     "parts": [
-      { "id": "act1", "title": "Act I: The Lantern" },
-      { "id": "act2", "title": "Act II: The Road" }
+      {
+        "id": "act1",
+        "title": "Act I: The Lantern"
+      },
+      {
+        "id": "act2",
+        "title": "Act II: The Road"
+      }
     ],
     "characters": "tts/cast.json",
     "paths": {
-      "dialog": "tts/{part}/script.json",
-      "cues": "tts/{part}/cues.json",
-      "lock": "tts/{part}/narration.lock.json",
-      "clips": "audio/narration/{part}",
-      "manifest": "audio/narration/{part}/manifest.json"
-    }
+      "dialog": "tts/{part}/{language}/script.json",
+      "cues": "tts/{part}/{language}/cues.json",
+      "lock": "tts/{part}/{language}/narration.lock.json",
+      "clips": "audio/narration/{part}/{language}",
+      "manifest": "audio/narration/{part}/{language}/manifest.json"
+    },
+    "languages": [
+      "en",
+      "sv",
+      "de"
+    ]
   }
 }

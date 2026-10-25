@@ -218,6 +218,11 @@ an id and a title.
 }
 ```
 
+- `languages` lists the languages the game is narrated in, by code (`["en", "sv"]`; default
+  `["en"]`). The first is the source language: its dialog is the line shown beneath a translation.
+  Path templates may contain `{language}`; with more than one language every path (`dialog`,
+  `cues`, `lock`, `clips`, `manifest`) must, or languages would share a file. Each language is
+  named in itself in the UI (`core/languages.ts`: `sv` is Svenska).
 - `refreshDialog` is optional. When set, the UI offers **Refresh dialog**, which runs it in the
   project root and reloads the script. This is how the studio stays generic: the game owns how its
   dialog is extracted.
@@ -238,8 +243,10 @@ an id and a title.
 The formats are the ones RetroQuest uses today, so existing files work unchanged. The studio only
 **adds** fields; the game ignores what it doesn't know.
 
-**Dialog** (`script.json`, read only): `[{ key, speaker, text }]`. `key` is the game's stable id for
-the line (RetroQuest: a hash of speaker and words, so new wording gets a new key).
+**Dialog** (`script.json`, read only; one per part and language): `[{ key, speaker, text }]`. `key` is the game's stable id for
+the line (RetroQuest: a hash of speaker and words, so new wording gets a new key). Between
+languages lines are matched by key: a source line missing from a language's dialog (or blank
+there) is _Not translated_, and a line only the language has is shown with "No English line".
 
 **Characters** (`tts/cast.json`, read and written): one file for the whole project. A character is
 keyed by its name; every part whose dialog has a speaker of that name uses that entry, so its voice,
@@ -384,6 +391,16 @@ resumed and stopped from there; the page shows no candidates. The **audition pag
 (`#/characters/<id>/audition`) shows the board, with the phrase and style the takes are recorded
 with beside it and the keywords the audition started with; with no audition in progress, it
 offers to start one.
+
+**Your voices** sit on the board between the Shortlist and To hear: every voice on the user's own
+Fish account (`GET /model?self=true`, `listOwnVoices`), whatever the keywords, never ranked and
+never in To hear. They are fetched by their own request (`POST /api/auditions/:id/own`) when a
+board opens, on a start or a resume, and again on Try again, so the board does not wait for Fish;
+a failure leaves the session as it was. The session keeps them in `yours` (the section) and
+`mine` (the whole account, for the "none" and "all used up" lines); a voice marked `own` keeps its
+"Yours" badge and blue border on the shortlist and as the cast voice. Shortlist, Unlist (back to
+Your voices) and Drop (ruled out like any voice) work as elsewhere; an own voice ruled out is not
+put back by a later fetch.
 
 ```
  keywords ──► search Fish's library, leaving out ruled-out voices ──► ranked candidates
@@ -552,15 +569,19 @@ An audition is for a character, not for a part: the result applies to every part
   when it starts: filtering afterwards does not change it, and Stop stays offered. The row
   playing is marked and kept in view; a clip that fails is skipped.
 - Extra takes of a line (built: **Takes** on its row, opening a list under it): **Another take**
-  has Fish speak the line once more (the draft model, free only: a take is for comparing and asks
-  no one to pay), checked by Whisper when the project checks takes, and kept in the tool cache as a
-  WAV with its score and timings; nothing of the game's is written. Each take is played, compared
+  has Fish speak the line once more with the draft model, checked by Whisper when the project
+  checks takes, and kept in the tool cache as a WAV with its score and timings; nothing of the game's is written. Each take is played, compared
   by score and length, and **Use this take** makes it the line's clip, encoded and written with the
   manifest and lock exactly as a recording is (the same `commitClip`), or dropped. A take made from
   other inputs than today's (the cue, text, voice or settings changed) is marked stale: heard, not
   used. A take is a draft one: a line whose clip is final is never taken back to the draft model
   (§8.4), so Use is refused for it, and a final clip landing meanwhile is kept as a recording
-  keeps it. A broken file of the part is reported with its path, as a recording reports it. Whisper's best is not always the best read; this lets the ear decide.
+  keeps it. A broken file of the part is reported with its path, as a recording reports it. With a paid
+  draft model Another take first asks what it can cost (the same `admit` as Record, priced for one
+  take, not the `quality.takes` a recording is held to): **Pay up to $X** and **Cancel** replace the
+  button, every take asks again, and nothing of the ask is kept; the take is charged to the budget
+  confirmed, so no more than that reaches Fish. Whisper's best is not always the best read; this
+  lets the ear decide.
 - Keys on the lines table (built): a row takes focus (Tab, or a click); j/k and the arrows
   move, space or Enter plays, f plays from there, r records or retakes, a accepts, h shows what
   was heard, c edits the cue, n the note, t opens the takes. A hint under the table lists them. Nothing while typing
@@ -728,13 +749,14 @@ spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DE
 GET    /api/project                              project, parts
 GET    /api/credit                               the Fish account's API credit (dollars)
 GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish)
-GET    /api/parts/:part                          the part, every line with its status and reason
-GET    /api/parts/:part/clips/:file              a clip from the part's clips folder
+GET    /api/parts/:part?language=                the part in a language (default: the first), every line
+                                                 with its status and reason, and each language's progress
+GET    /api/parts/:part/clips/:file?language=    a clip from the part's clips folder (that language's)
 GET    /api/parts/:part/lines/:key/heard         what Whisper heard of the line's take, if kept
 POST   /api/parts/:part/lines/:key/try           hear the line with a cue ({ cue }): a take, nothing saved
 PATCH  /api/parts/:part/lines/:key/note          the user's note on the line ({ note }; empty removes)
 GET    /api/parts/:part/lines/:key/takes         the line's extra takes, newest first, current or stale
-POST   /api/parts/:part/lines/:key/takes         one more take into the cache (free model only)
+POST   /api/parts/:part/lines/:key/takes         one more take into the cache; a paid draft model asks for `{ confirmedCost }`
 GET    /api/parts/:part/lines/:key/takes/:id.wav a take's audio
 POST   /api/parts/:part/lines/:key/takes/:id/use make the take the line's clip (as a recording)
 DELETE /api/parts/:part/lines/:key/takes/:id     drop the take
@@ -912,7 +934,7 @@ Small, independently useful increments:
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
-   Paid auditions are built (§8.1: a budget per sitting). What a paid account could still have (paid extra takes, the `s1` retirement, your own voices,
+   Paid auditions are built (§8.1: a budget per sitting). What a paid account could still have (the `s1` retirement,
    cloning and design, the rate tier, a spend log) is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:
@@ -970,6 +992,10 @@ Small, independently useful increments:
     7. **Orphans**: a removed track's clip removed after confirmation.
     8. **RetroQuest** (in the game's repository, not the studio's): the game reads the music
        manifest and plays a track per room or region, and the stingers.
+13. **Languages** (epic as-170), in small pull requests:
+    1. **Show a part's lines in each declared language** (built): `narration.languages`,
+       `{language}` in the paths, a language switch on the lines page with each language's
+       progress, untranslated lines, read only (no recording yet).
 
 ---
 

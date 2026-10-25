@@ -26,6 +26,9 @@ const files = {
 function fakeFish() {
   const requests: TtsRequest[] = []
   const fish: FishClient = {
+    async listOwnVoices() {
+      return []
+    },
     async credit() {
       return 25
     },
@@ -460,6 +463,7 @@ describe('takes on a paid audition model', () => {
     const failing: FishClient = {
       credit: async () => 25,
       listVoices: () => Promise.reject(new Error('not used')),
+      listOwnVoices: () => Promise.reject(new Error('not used')),
       getVoice: () => Promise.reject(new Error('not used')),
       tts: () => Promise.reject(new Error('Fish said no')),
     }

@@ -14,7 +14,16 @@ import { routeHref } from '../../route'
 import { REASON, STATUS, reasonCounts } from '../../status'
 
 /** One part: how its clips stand, and a card per character speaking in it. */
-export function PartOverview({ summary, part }: { summary: ProjectSummary; part: PartSummary }) {
+export function PartOverview({
+  summary,
+  part,
+  language,
+}: {
+  summary: ProjectSummary
+  part: PartSummary
+  /** The language in the address, kept on the links to the lines page. */
+  language?: string
+}) {
   const hasDialog = part.dialog === 'ok'
   const detail = usePart(part.id, hasDialog)
   const loaded = detail.data?.ok ? detail.data.part : null
@@ -45,12 +54,15 @@ export function PartOverview({ summary, part }: { summary: ProjectSummary; part:
               </button>
             )}
             {hasDialog && (
-              <a className="btn" href={routeHref({ view: 'lines', part: part.id })}>
+              <a className="btn" href={routeHref({ view: 'lines', part: part.id, language })}>
                 <ListIcon /> All {part.lineCount} lines
               </a>
             )}
             {toRecord > 0 && (
-              <a className="btn btn-primary" href={routeHref({ view: 'lines', part: part.id })}>
+              <a
+                className="btn btn-primary"
+                href={routeHref({ view: 'lines', part: part.id, language })}
+              >
                 Generate {plural(toRecord, 'line')}
               </a>
             )}
@@ -247,7 +259,7 @@ function NoDialog({ summary, part }: { summary: ProjectSummary; part: PartSummar
 }
 
 /** What the last Refresh dialog did: the lines added, removed and changed, or why it failed. */
-function RefreshOutcome({
+export function RefreshOutcome({
   result,
   error,
   onClose,

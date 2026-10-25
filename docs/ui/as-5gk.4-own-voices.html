@@ -1,0 +1,783 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Your own voices</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --kept-bg: #0f1a16;
+        --kept-line: #1f5a40;
+        --chip: #1a1d26;
+        --r: 14px;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        padding: 12px 16px;
+        border: 1px dashed var(--line-strong);
+        border-radius: 10px;
+        color: var(--muted);
+      }
+      .note b {
+        color: var(--text);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto 28px;
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 22px;
+        background: #0d0e13;
+      }
+      .frame > h3 {
+        margin: 0 0 14px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      h1 {
+        margin: 4px 0;
+        font-size: 22px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .between {
+        justify-content: space-between;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 18px;
+        margin-top: 16px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn-ghost {
+        background: transparent;
+      }
+      .chip {
+        background: var(--chip);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .badge {
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 12px;
+      }
+      .badge.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .badge.paid {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .badge.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .card.kept {
+        background: var(--kept-bg);
+        border-color: var(--kept-line);
+      }
+      .take {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: var(--inset);
+        border-radius: 9px;
+        padding: 6px 8px;
+      }
+      .play {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+      }
+      .play.off {
+        background: var(--raised);
+        color: var(--faint);
+      }
+      .bar {
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+      .bar.ask {
+        background: var(--accent-soft-bg);
+        border: 1px solid #5a3218;
+      }
+      .bar.warn {
+        background: var(--warn-bg);
+        border: 1px solid #5a4818;
+      }
+      .bar.err {
+        background: var(--danger-bg);
+        border: 1px solid #5a2430;
+        color: var(--danger-ink);
+      }
+      .meter {
+        height: 6px;
+        border-radius: 9px;
+        background: var(--inset);
+        overflow: hidden;
+        width: 160px;
+      }
+      .meter span {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .confirm {
+        border-color: var(--accent);
+      }
+      ul.fx {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .section {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      input.money {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 8px;
+        width: 80px;
+        font: inherit;
+      }
+      @media (max-width: 760px) {
+        .layout,
+        .split {
+          grid-template-columns: 1fr;
+        }
+      }
+      .badge.mine {
+        background: #16223a;
+        color: #8fb4ff;
+        border: 1px solid #2a3f66;
+      }
+      .card.mine {
+        border-color: #2a3f66;
+      }
+      .sec {
+        margin-top: 18px;
+      }
+      .sec h2 {
+        font-size: 15px;
+        margin: 0 0 4px;
+      }
+      .sec .sub {
+        color: var(--muted);
+        margin: 0 0 10px;
+        font-size: 13px;
+      }
+      .empty {
+        border: 1px dashed var(--line-strong);
+        border-radius: 12px;
+        padding: 14px;
+        color: var(--muted);
+      }
+      .tags {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .acts {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 2px;
+      }
+      .btn-small {
+        padding: 4px 9px;
+        font-size: 12px;
+      }
+      .id {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .callout {
+        outline: 2px dashed #8fb4ff;
+        outline-offset: 4px;
+        border-radius: 12px;
+      }
+      .legend {
+        color: #8fb4ff;
+        font-size: 12px;
+        margin: 6px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      <b>Agreed drawing: your own Fish voices on the audition board.</b> A Your voices section above
+      To hear holds every voice on your own Fish account, whatever the keywords (placement B). Each
+      one wears a “Yours” badge and a tinted border, and says “Your voice · private” in place of its
+      author, uses and likes (mark A). With none, the section says so in one line (empty A). With
+      many, all are shown (many A). There is no count in the bar at the top. The buttons on each
+      card are the ones every voice has today. Every state and word below is as agreed.
+    </div>
+    <div class="frame">
+      <div class="crumbs">Characters / Old Mira / Audition</div>
+      <h1>Audition: Old Mira</h1>
+      <div class="muted">
+        Keywords: elderly female, warm, storyteller · Phrase: “Come closer, child, and I’ll tell you
+        how the lantern went out.”
+      </div>
+      <div class="row" style="margin-top: 12px">
+        <span class="chip" style="color: var(--ok)">1 shortlisted</span
+        ><span class="chip">5 to hear</span><span class="chip">8 more waiting</span
+        ><span style="flex: 1"></span><button class="btn btn-ghost">Pause</button
+        ><button class="btn">Stop audition</button>
+      </div>
+      <div class="sec panel">
+        <h2>Shortlist</h2>
+        <p class="sub">Cast one of them; casting ends the audition.</p>
+        <div class="cards">
+          <div class="card kept">
+            <div class="row between">
+              <div>
+                <strong>Elder Narrator</strong>
+                <div class="muted" style="font-size: 12px">by fishfan · 40k uses · 2.1k likes</div>
+              </div>
+              <span class="badge ok">Current voice</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small btn-ghost">Unlist</button
+              ><button class="btn btn-small btn-primary">Cast</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+        </div>
+      </div>
+      <div class="sec callout">
+        <h2>Your voices</h2>
+        <p class="sub">The voices on your own Fish account. They’re here whatever the keywords.</p>
+        <div class="cards">
+          <div class="card mine">
+            <div class="row between">
+              <div>
+                <strong>Mira (cloned from Anna)</strong>
+                <div class="muted" style="font-size: 12px">Your voice · private</div>
+              </div>
+              <span class="badge mine">Yours</span>
+            </div>
+            <div class="muted" style="font-size: 13px">Cloned from Anna’s session recordings.</div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+          <div class="card mine">
+            <div class="row between">
+              <div>
+                <strong>Mira rough v2</strong>
+                <div class="muted" style="font-size: 12px">Your voice · private</div>
+              </div>
+              <span class="badge mine">Yours</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+        </div>
+      </div>
+      <div class="sec">
+        <h2>To hear</h2>
+        <p class="sub">
+          Best match first. A dropped voice leaves the board and never comes back for Old Mira.
+        </p>
+        <div class="cards">
+          <div class="card">
+            <div class="row between">
+              <div>
+                <strong>Grandma Tales</strong>
+                <div class="muted" style="font-size: 12px">
+                  by vocalist_88 · 12.4k uses · 830 likes
+                </div>
+              </div>
+              <span class="chip">2/3 keywords</span>
+            </div>
+            <div class="muted" style="font-size: 13px">
+              A soft, slow elderly woman, good for bedtime stories.
+            </div>
+            <div class="tags">
+              <span class="chip">elderly</span><span class="chip">warm</span
+              ><span class="chip">female</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+          <div class="card">
+            <div class="row between">
+              <div>
+                <strong>Old Storyteller</strong>
+                <div class="muted" style="font-size: 12px">
+                  by narrations · 3.1k uses · 210 likes
+                </div>
+              </div>
+              <span class="chip">2/3 keywords</span>
+            </div>
+            <div class="tags">
+              <span class="chip">storyteller</span><span class="chip">old</span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+          <div class="card">
+            <div class="row between">
+              <div>
+                <strong>Wise Woman</strong>
+                <div class="muted" style="font-size: 12px">by mx · 980 uses · 44 likes</div>
+              </div>
+              <span class="chip">1/3 keywords</span>
+            </div>
+            <div class="tags"><span class="chip">female</span><span class="chip">calm</span></div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel sec">
+        <div class="row">
+          <button class="btn">Bring in more</button><span style="flex: 1"></span
+          ><span class="muted">Bring in a specific voice</span
+          ><span class="chip" style="padding: 6px 10px">Fish voice id or URL</span
+          ><button class="btn">Bring in</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="cards" style="max-width: 760px">
+        <div class="card mine">
+          <div class="row between">
+            <div>
+              <strong>Mira (cloned from Anna)</strong>
+              <div class="muted" style="font-size: 12px">Your voice · private</div>
+            </div>
+            <span class="badge mine">Yours</span>
+          </div>
+          <div class="muted" style="font-size: 13px">Cloned from Anna’s session recordings.</div>
+          <div class="take">
+            <span class="play">▶</span><span>Take: the audition phrase in character</span>
+          </div>
+          <div class="take">
+            <span class="play off">▶</span><span class="muted">Fish sample</span>
+          </div>
+          <div class="acts">
+            <button class="btn btn-small">Drop</button
+            ><button class="btn btn-small">Shortlist</button>
+          </div>
+          <div class="id">7f3a…c21e</div>
+        </div>
+        <div class="card">
+          <div class="row between">
+            <div>
+              <strong>Grandma Tales</strong>
+              <div class="muted" style="font-size: 12px">
+                by vocalist_88 · 12.4k uses · 830 likes
+              </div>
+            </div>
+            <span class="chip">2/3 keywords</span>
+          </div>
+          <div class="muted" style="font-size: 13px">
+            A soft, slow elderly woman, good for bedtime stories.
+          </div>
+          <div class="tags">
+            <span class="chip">elderly</span><span class="chip">warm</span
+            ><span class="chip">female</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span>Take: the audition phrase in character</span>
+          </div>
+          <div class="take">
+            <span class="play off">▶</span><span class="muted">Fish sample</span>
+          </div>
+          <div class="acts">
+            <button class="btn btn-small">Drop</button
+            ><button class="btn btn-small">Shortlist</button>
+          </div>
+          <div class="id">7f3a…c21e</div>
+        </div>
+      </div>
+    </div>
+    <div class="frame" style="">
+      <h3>Your account has no voices of its own</h3>
+      <div class="sec">
+        <h2>Your voices</h2>
+        <div class="empty">
+          No voices on your Fish account yet. Voices you clone or make on Fish show up here.
+        </div>
+      </div>
+      <div class="sec">
+        <h2>To hear</h2>
+        <p class="sub">
+          Best match first. A dropped voice leaves the board and never comes back for Old Mira.
+        </p>
+        <div class="cards">
+          <div class="card">
+            <div class="row between">
+              <div>
+                <strong>Grandma Tales</strong>
+                <div class="muted" style="font-size: 12px">
+                  by vocalist_88 · 12.4k uses · 830 likes
+                </div>
+              </div>
+              <span class="row" style="gap: 4px"><span class="chip">2/3 keywords</span></span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame" style="">
+      <h3>Loading: the audition is starting and Fish hasn’t answered yet</h3>
+      <div class="sec">
+        <h2>Your voices</h2>
+        <p class="sub">The voices on your own Fish account. They’re here whatever the keywords.</p>
+        <div class="empty">Getting your voices from Fish…</div>
+      </div>
+    </div>
+    <div class="frame" style="">
+      <h3>Fish couldn’t list them: the rest of the audition carries on</h3>
+      <div class="sec">
+        <h2>Your voices</h2>
+        <p class="sub">The voices on your own Fish account. They’re here whatever the keywords.</p>
+        <div class="bar err">
+          Fish didn’t send your own voices: it timed out.
+          <button class="btn btn-small">Try again</button>
+        </div>
+      </div>
+    </div>
+    <div class="frame" style="">
+      <h3>Shortlisted: it moves to the Shortlist and keeps its badge</h3>
+      <div class="sec panel">
+        <h2>Shortlist</h2>
+        <p class="sub">Cast one of them; casting ends the audition.</p>
+        <div class="cards">
+          <div class="card kept">
+            <div class="row between">
+              <div>
+                <strong>Elder Narrator</strong>
+                <div class="muted" style="font-size: 12px">by fishfan · 40k uses · 2.1k likes</div>
+              </div>
+              <span class="row" style="gap: 4px"><span class="badge ok">Current voice</span></span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small btn-ghost">Unlist</button
+              ><button class="btn btn-small">Keep current voice</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+          <div class="card kept mine">
+            <div class="row between">
+              <div>
+                <strong>Mira (cloned from Anna)</strong>
+                <div class="muted" style="font-size: 12px">Your voice · private</div>
+              </div>
+              <span class="row" style="gap: 4px"><span class="badge mine">Yours</span></span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small btn-ghost">Unlist</button
+              ><button class="btn btn-small btn-primary">Cast</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame" style="">
+      <h3>Your cast voice is one of your own: both marks</h3>
+      <div class="cards" style="max-width: 300px">
+        <div class="card kept mine">
+          <div class="row between">
+            <div>
+              <strong>Mira (cloned from Anna)</strong>
+              <div class="muted" style="font-size: 12px">Your voice · private</div>
+            </div>
+            <span class="row" style="gap: 4px"
+              ><span class="badge ok">Current voice</span
+              ><span class="badge mine">Yours</span></span
+            >
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span>Take: the audition phrase in character</span>
+          </div>
+          <div class="take">
+            <span class="play off">▶</span><span class="muted">Fish sample</span>
+          </div>
+          <div class="acts">
+            <button class="btn btn-small btn-ghost">Unlist</button
+            ><button class="btn btn-small">Keep current voice</button>
+          </div>
+          <div class="id">7f3a…c21e</div>
+        </div>
+      </div>
+    </div>
+    <div class="frame" style="">
+      <h3>
+        Dropped: like any voice, it leaves the board and is ruled out for Old Mira; the last drop
+        can be undone
+      </h3>
+      <div
+        class="toast bar"
+        style="background: var(--raised); border: 1px solid var(--line-strong)"
+      >
+        Dropped Mira rough v2. It won’t come back for Old Mira.
+        <button class="btn btn-small">Undo</button>
+      </div>
+      <div class="sec">
+        <h2>Your voices</h2>
+        <p class="sub">The voices on your own Fish account. They’re here whatever the keywords.</p>
+        <div class="cards">
+          <div class="card mine">
+            <div class="row between">
+              <div>
+                <strong>Mira (cloned from Anna)</strong>
+                <div class="muted" style="font-size: 12px">Your voice · private</div>
+              </div>
+              <span class="row" style="gap: 4px"><span class="badge mine">Yours</span></span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame" style="">
+      <h3>Every one of yours shortlisted or dropped: the section says so</h3>
+      <div class="sec">
+        <h2>Your voices</h2>
+        <p class="sub">The voices on your own Fish account. They’re here whatever the keywords.</p>
+        <div class="empty">All your voices are on the shortlist or ruled out for Old Mira.</div>
+      </div>
+    </div>
+    <div class="frame" style="max-width: 380px">
+      <h3>A narrow window: cards stack one to a row, the section heading wraps above them</h3>
+      <div class="sec">
+        <h2>Your voices</h2>
+        <p class="sub">The voices on your own Fish account. They’re here whatever the keywords.</p>
+        <div class="cards">
+          <div class="card mine">
+            <div class="row between">
+              <div>
+                <strong>Mira (cloned from Anna)</strong>
+                <div class="muted" style="font-size: 12px">Your voice · private</div>
+              </div>
+              <span class="row" style="gap: 4px"><span class="badge mine">Yours</span></span>
+            </div>
+            <div class="take">
+              <span class="play">▶</span><span>Take: the audition phrase in character</span>
+            </div>
+            <div class="take">
+              <span class="play off">▶</span><span class="muted">Fish sample</span>
+            </div>
+            <div class="acts">
+              <button class="btn btn-small">Drop</button
+              ><button class="btn btn-small">Shortlist</button>
+            </div>
+            <div class="id">7f3a…c21e</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

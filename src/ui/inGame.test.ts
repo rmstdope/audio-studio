@@ -7,6 +7,7 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     key,
     speaker: 'mira',
     text: `Line ${key}.`,
+    english: null,
     cue: '[warm]',
     ownCue: false,
     final: false,

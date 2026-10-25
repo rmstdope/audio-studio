@@ -5,6 +5,7 @@ import {
   bringMore,
   drop,
   queueMore,
+  setOwnVoices,
   shortlist,
   startSession,
   undoDrop,
@@ -158,5 +159,77 @@ describe('what an audition has cost', () => {
   it('adds up what takes were charged', () => {
     expect(addSpent(addSpent(fresh, 0.01), 0.02).spent).toBeCloseTo(0.03, 12)
     expect(addSpent(fresh, 0)).toBe(fresh)
+  })
+})
+
+const mine = (id: string): Voice => ({ ...voice(id), own: true })
+
+describe('your own voices', () => {
+  it('puts every own voice in Your voices, whatever the keywords, marked as own', () => {
+    const session = setOwnVoices(start(), [mine('m1'), mine('m2')])
+    expect(session.yours).toEqual(['m1', 'm2'])
+    expect(session.mine).toEqual(['m1', 'm2'])
+    expect(session.voices.m1?.own).toBe(true)
+    expect(session.matched.m1).toBeUndefined()
+  })
+
+  it('moves an own voice found by the search out of To hear and the queue', () => {
+    const session = setOwnVoices(start(), [mine('a'), mine('e')])
+    expect(session.yours).toEqual(['a', 'e'])
+    expect(session.toHear).toEqual(['b', 'c'])
+    expect(session.queue).toEqual(['d', 'f'])
+  })
+
+  it('leaves alone an own voice shortlisted or dropped, and is idempotent', () => {
+    let session = start()
+    session = setOwnVoices(session, [mine('m1'), mine('m2'), mine('m3')])
+    session = shortlist(session, 'm1')
+    session = drop(session, 'm2')
+    const again = setOwnVoices(session, [mine('m1'), mine('m2'), mine('m3'), mine('m4')])
+    expect(again.yours).toEqual(['m3', 'm4'])
+    expect(again.shortlist).toEqual(['m1'])
+    expect(again.voices.m1?.own).toBe(true)
+    expect(setOwnVoices(again, [mine('m1'), mine('m2'), mine('m3'), mine('m4')])).toBe(again)
+  })
+
+  it('keeps an own voice ruled out in an earlier audition out of Your voices', () => {
+    const session = setOwnVoices(start(), [mine('m1'), mine('m2')], ['m1'])
+    expect(session.yours).toEqual(['m2'])
+    expect(session.mine).toEqual(['m1', 'm2'])
+  })
+
+  it('marks the current voice as own without moving it off the shortlist', () => {
+    const session = setOwnVoices(start(voice('cur')), [mine('cur'), mine('m1')])
+    expect(session.shortlist).toEqual(['cur'])
+    expect(session.yours).toEqual(['m1'])
+    expect(session.voices.cur?.own).toBe(true)
+  })
+
+  it('shortlists from Your voices, unlists back to it, and drops and undoes there', () => {
+    const base = setOwnVoices(start(), [mine('m1'), mine('m2')])
+    const listed = shortlist(base, 'm2')
+    expect([listed.yours, listed.shortlist]).toEqual([['m1'], ['m2']])
+    const unlisted = unlist(listed, 'm2')
+    expect(unlisted.yours).toEqual(['m2', 'm1'])
+    expect(unlisted.toHear).toEqual(['a', 'b', 'c'])
+    const dropped = drop(base, 'm1')
+    expect(dropped.yours).toEqual(['m2'])
+    expect(dropped.dropped).toEqual([{ id: 'm1', from: 'yours' }])
+    expect(undoDrop(dropped).yours).toEqual(['m1', 'm2'])
+  })
+
+  it('brings an own voice in by id into Your voices', () => {
+    const base = setOwnVoices(start(), [mine('m1')])
+    const dropped = drop(base, 'm1')
+    const added = addVoice(dropped, voice('m1'))
+    expect(added.yours).toEqual(['m1'])
+    expect(added.voices.m1?.own).toBe(true)
+    expect(added.dropped).toEqual([])
+  })
+
+  it('reads a saved session from before Your voices existed', () => {
+    const { yours: _y, mine: _m, ...old } = start()
+    const parsed = AuditionSessionSchema.parse(old)
+    expect([parsed.yours, parsed.mine]).toEqual([[], []])
   })
 })

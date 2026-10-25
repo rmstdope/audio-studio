@@ -1,26 +1,51 @@
+import { useEffect, useRef } from 'react'
 import { lineTakeUrl, useLineTakeActions, useLineTakes } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
+import { dollars } from '../../format'
 import { percent, seconds } from '../../status'
+import { extraTakeWords } from '../../takes'
 
 /**
  * A line's extra takes, under its row: each played, compared by its score and length, and made
- * the line's clip or dropped; Another take records one more with the free model into the cache.
- * A take made before the line changed is marked stale: it can be heard but not used.
+ * the line's clip or dropped; Another take records one more with the draft model into the cache,
+ * on a paid one only after the user pays the most it can cost. A take made before the line changed is marked stale: it can be heard but not used.
  */
 export function LineTakes({
   partId,
   lineKey,
+  draftModel,
   playing,
   toggle,
 }: {
   partId: string
   lineKey: string
+  draftModel: string
   playing: string | null
   toggle: (id: string, url: string) => void
 }) {
   const list = useLineTakes(partId, lineKey)
-  const { take, use, drop, refused: failed } = useLineTakeActions(partId, lineKey)
+  const {
+    take,
+    use,
+    drop,
+    refused: failed,
+    toConfirm,
+    refusal,
+    cancel,
+  } = useLineTakeActions(partId, lineKey)
+  const words = extraTakeWords(draftModel)
+  const pay = useRef<HTMLButtonElement>(null)
+  const another = useRef<HTMLButtonElement>(null)
+  // The price appearing takes focus, so Enter pays; backing out returns it to Another take.
+  useEffect(() => {
+    if (toConfirm !== null) pay.current?.focus()
+  }, [toConfirm])
+  const back = () => {
+    cancel()
+    // Another take is rendered again by the time the browser can focus it.
+    setTimeout(() => another.current?.focus(), 0)
+  }
   const playId = (id: string) => `take/${lineKey}/${id}`
   return (
     <div className="line-takes">
@@ -31,10 +56,7 @@ export function LineTakes({
       ) : !list.data.ok ? (
         <Problems title="The takes cannot be listed" problems={list.data.problems} />
       ) : list.data.takes.length === 0 ? (
-        <span className="muted">
-          No extra takes yet. Another take records the line once more, with the free model, to
-          compare with the clip; it costs nothing and changes nothing until you use it.
-        </span>
+        <span className="muted">{words.empty}</span>
       ) : (
         <ol className="take-list">
           {list.data.takes.map((t) => (
@@ -85,17 +107,44 @@ export function LineTakes({
           ))}
         </ol>
       )}
-      <div className="row-actions">
-        <button
-          type="button"
-          className="btn"
-          disabled={take.isPending}
-          title="Record the line once more, with the free model, into the cache"
-          onClick={() => take.mutate()}
-        >
-          {take.isPending ? 'Recording…' : 'Another take'}
-        </button>
+      <div
+        className="row-actions take-actions"
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && toConfirm !== null) {
+            e.stopPropagation()
+            back()
+          }
+        }}
+      >
+        {toConfirm !== null ? (
+          <>
+            <button
+              ref={pay}
+              type="button"
+              className="btn btn-primary"
+              title="The most this take can cost on your Fish account"
+              onClick={() => take.mutate(toConfirm)}
+            >
+              Pay up to {dollars(toConfirm)}
+            </button>
+            <button type="button" className="btn" onClick={back}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            ref={another}
+            type="button"
+            className="btn"
+            disabled={take.isPending}
+            title={words.hover}
+            onClick={() => take.mutate(undefined)}
+          >
+            {take.isPending ? 'Recording…' : 'Another take'}
+          </button>
+        )}
       </div>
+      {refusal && <span className="adopt-error">{refusal}</span>}
       {failed && 'problems' in failed.answer && (
         <Problems title={failed.what} problems={failed.answer.problems} />
       )}

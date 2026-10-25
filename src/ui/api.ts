@@ -32,7 +32,7 @@ import type { AuditionText } from '../core/takes'
 import type { SittingView } from '../core/sitting'
 import { takeCaches, waitingAfter } from './sitting'
 import { centsUp } from './format'
-import { isAbout, withAuditionTakes, withTake, withVoiceTake } from './takes'
+import { isAbout, takeAnswerState, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
 /** A successful answer about a character's cast voice. */
@@ -87,8 +87,8 @@ export function useCredit() {
 }
 
 /** A part with the state of every line's clip. */
-export function usePart(partId: string, enabled = true) {
-  return useQuery({ ...partQuery(partId), enabled })
+export function usePart(partId: string, enabled = true, language?: string) {
+  return useQuery({ ...partQuery(partId, language), enabled })
 }
 
 /**
@@ -106,17 +106,20 @@ export function useHeard(partId: string, key: string) {
 }
 
 /** How a part is asked for and cached, the same for one part as for several. */
-function partQuery(partId: string) {
+function partQuery(partId: string, language?: string) {
   return {
-    queryKey: ['part', partId],
-    queryFn: () => getJson<NonNullable<PartResult>>(`/api/parts/${encodeURIComponent(partId)}`),
+    queryKey: language ? ['part', partId, language] : ['part', partId],
+    queryFn: () =>
+      getJson<NonNullable<PartResult>>(
+        `/api/parts/${encodeURIComponent(partId)}${language ? `?language=${encodeURIComponent(language)}` : ''}`,
+      ),
   }
 }
 
 /** Several parts, as `usePart` loads each (sharing its cache), in the order given. */
 export function useParts(partIds: string[]) {
   return useQueries({
-    queries: partIds.map(partQuery),
+    queries: partIds.map((id) => partQuery(id)),
   })
 }
 
@@ -639,6 +642,41 @@ export function useSessionAction(characterId: string) {
   })
 }
 
+/**
+ * Fetches the voices on the user's own Fish account into the character's audition (`fetch`, once
+ * per board and again for Try again). It has no scope of its own, so the board's buttons work
+ * while Fish answers. `fetched` is true once an answer came, `error` Fish's reason when it failed.
+ */
+export function useOwnVoices(characterId: string) {
+  const client = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/auditions/${encodeURIComponent(characterId)}/own`, {
+        method: 'POST',
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`the audition answered ${response.status}`)
+      }
+      return (await response.json()) as SessionView
+    },
+    // Not the answer itself: moves made meanwhile may have been answered after it, so the
+    // board is read again, in the server's order.
+    onSuccess: (view) => {
+      if (view.ok) void client.invalidateQueries({ queryKey: ['session', characterId] })
+    },
+  })
+  const failure = mutation.data && !mutation.data.ok ? mutation.data : null
+  const error =
+    mutation.error?.message ??
+    (failure ? ('message' in failure ? failure.message : 'the project’s files need fixing') : null)
+  return {
+    fetch: () => mutation.mutate(),
+    pending: mutation.isPending,
+    fetched: mutation.isSuccess && !failure,
+    error,
+  }
+}
+
 /** The voice a move drops, if it is a drop. */
 function droppedBy(body: unknown): string | null {
   const move = body as { voice?: unknown; move?: unknown } | undefined
@@ -780,8 +818,10 @@ export function lineTakeUrl(partId: string, key: string, id: string): string {
 }
 
 /**
- * A line's extra takes: `take` records one more (free), `use` makes one the line's clip, `drop`
- * removes one from the cache. Each reloads the list; using one reloads the part too.
+ * A line's extra takes: `take` records one more, `use` makes one the line's clip, `drop` removes
+ * one from the cache. Each reloads the list; using one reloads the part too. On a paid draft model
+ * `take` first answers with the most it can cost: `toConfirm` holds it until the user pays (`take`
+ * again with that amount) or `cancel`s; nothing about the ask outlives the list.
  */
 export function useLineTakeActions(partId: string, key: string) {
   const client = useQueryClient()
@@ -792,11 +832,33 @@ export function useLineTakeActions(partId: string, key: string) {
     what: string
     answer: NonNullable<TakeLineResult> | NonNullable<UseTakeResult>
   } | null>(null)
+  const [toConfirm, setToConfirm] = useState<number | null>(null)
+  const [refusal, setRefusal] = useState<string | null>(null)
   const take = useMutation({
-    mutationFn: () => postJson<NonNullable<TakeLineResult>>(base),
-    onMutate: () => setRefused(null),
+    mutationFn: async (confirmedCost?: number) => {
+      const response = await fetch(base, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(confirmedCost === undefined ? {} : { confirmedCost }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`${base} answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<TakeLineResult>
+    },
+    onMutate: () => {
+      setRefused(null)
+      setRefusal(null)
+      setToConfirm(null)
+    },
     onSuccess: (result) => {
-      if (!result.ok) setRefused({ what: 'The take could not be made', answer: result })
+      const state = takeAnswerState(result)
+      setToConfirm(state.toConfirm)
+      setRefusal(state.refusal)
+      if (!result.ok && !state.toConfirm && !state.refusal) {
+        setRefused({ what: 'The take could not be made', answer: result })
+      }
+      void client.invalidateQueries({ queryKey: ['credit'] })
       return reloadTakes()
     },
   })
@@ -823,7 +885,7 @@ export function useLineTakeActions(partId: string, key: string) {
     },
     onSuccess: reloadTakes,
   })
-  return { take, use, drop, refused }
+  return { take, use, drop, refused, toConfirm, refusal, cancel: () => setToConfirm(null) }
 }
 
 /** The money of a character's audition, or why it cannot be shown. */
@@ -1058,6 +1120,7 @@ export function useJobActions(partId: string) {
 }
 
 /** The URL of a clip in a part. */
-export function clipUrl(partId: string, file: string): string {
-  return `/api/parts/${encodeURIComponent(partId)}/clips/${encodeURIComponent(file)}`
+export function clipUrl(partId: string, file: string, language?: string): string {
+  const query = language ? `?language=${encodeURIComponent(language)}` : ''
+  return `/api/parts/${encodeURIComponent(partId)}/clips/${encodeURIComponent(file)}${query}`
 }

@@ -16,6 +16,9 @@ const root = tempRepo({
   'audio/act1/a.mp3': 'ID3-not-really-audio',
 })
 const fish: FishClient = {
+  async listOwnVoices() {
+    return []
+  },
   async credit() {
     return 25
   },
@@ -415,6 +418,8 @@ describe('server', () => {
       recorded: [],
     })
     const started = await (await post('/api/auditions/narrator/start')).json()
+    const own = await (await post('/api/auditions/narrator/own')).json()
+    expect(own).toMatchObject({ ok: true, session: { yours: [], mine: [] } })
     expect(started.session.toHear).toEqual(['w1'])
     expect(started.audition.spoken).toContain('Once upon a time.')
     for (const body of [
@@ -448,7 +453,7 @@ describe('server', () => {
   it('refuses every audition change from another page', async () => {
     const changes: [string, string][] = [
       ['DELETE', '/api/auditions/narrator'],
-      ...['start', 'move', 'undo', 'more', 'add', 'cast'].map((action): [string, string] => [
+      ...['start', 'move', 'undo', 'more', 'add', 'cast', 'own'].map((action): [string, string] => [
         'POST',
         `/api/auditions/narrator/${action}`,
       ]),
@@ -1081,6 +1086,78 @@ describe('server, a paid draft model', () => {
     credit = 10
     expect(await (await record(body.ceiling)).json()).toMatchObject({ ok: true, key: 'a' })
     expect(spoken).toBeGreaterThan(0)
+  })
+
+  describe('an extra take', () => {
+    const takes = () => at('/api/parts/act1/lines/a/takes')
+    const takeAgain = (confirmedCost?: number) =>
+      fetch(takes(), {
+        method: 'POST',
+        headers: own,
+        body: confirmedCost === undefined ? undefined : JSON.stringify({ confirmedCost }),
+      })
+
+    it('is recorded only once its cost is confirmed, and priced for one take', async () => {
+      credit = 10
+      const before = spoken
+      const asked = await takeAgain()
+      expect(asked.status).toBe(409)
+      const body = await asked.json()
+      expect(body).toMatchObject({ ok: false, reason: 'confirm' })
+      // 17 bytes of text at $15 per million: one take, not the three a recording is held to.
+      expect(body.ceiling).toBeCloseTo((17 / 1_000_000) * 15, 12)
+      const small = await takeAgain(body.ceiling / 2)
+      expect(small.status).toBe(409)
+      expect(await small.json()).toMatchObject({ ok: false, reason: 'confirm' })
+      expect(spoken).toBe(before)
+      credit = body.ceiling / 2
+      expect(await (await takeAgain(body.ceiling)).json()).toMatchObject({
+        ok: false,
+        reason: 'credit',
+      })
+      expect(spoken).toBe(before)
+      credit = 10
+      expect(await (await takeAgain(body.ceiling)).json()).toMatchObject({
+        ok: true,
+        take: { current: true },
+      })
+      expect(spoken).toBe(before + 1)
+      const listed = await (await fetch(takes())).json()
+      expect(listed.takes).toHaveLength(1)
+    })
+
+    it('records nothing when the account’s credit is unknown', async () => {
+      const before = spoken
+      const was = account.credit
+      account.credit = async () => {
+        throw new Error('Fish is down')
+      }
+      try {
+        const answer = await takeAgain(1)
+        expect(answer.status).toBe(409)
+        expect(await answer.json()).toMatchObject({
+          ok: false,
+          reason: 'credit',
+          message: 'The account’s credit is unknown, so nothing is recorded.',
+        })
+        expect(spoken).toBe(before)
+      } finally {
+        account.credit = was
+      }
+    })
+
+    it('answers a body it cannot read with 400', async () => {
+      const bad = await fetch(takes(), { method: 'POST', headers: own, body: '{ not json' })
+      expect(bad.status).toBe(400)
+    })
+
+    it('refuses a request from another page', async () => {
+      const response = await fetch(takes(), {
+        method: 'POST',
+        headers: { origin: 'https://evil.example' },
+      })
+      expect(response.status).toBe(403)
+    })
   })
 
   it('answers a body it cannot read with 400', async () => {
@@ -1801,5 +1878,55 @@ describe('server, a paid audition with a take in flight', () => {
     expect(await refused.json()).toMatchObject({ ok: false, reason: 'credit' })
     release()
     await take
+  })
+})
+
+describe('server, a part in another language', () => {
+  const base = projectJson()
+  const many = tempRepo({
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+      },
+    },
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+    'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'En gång.' }],
+    'audio/act1/sv/a.mp3': 'swedish-clip',
+    'audio/act1/sv/manifest.json': { a: { file: 'a.mp3' } },
+  })
+  const swedish = startServer({
+    projectFile: join(many, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => swedish.stop(true))
+  const get = (path: string) => fetch(new URL(path, swedish.url))
+
+  it('lists the languages in the project summary', async () => {
+    const body = await (await get('/api/project')).json()
+    expect(body.summary.languages).toEqual([
+      { id: 'en', name: 'English' },
+      { id: 'sv', name: 'Svenska' },
+    ])
+  })
+
+  it('serves a part in the language asked for, and its clips from that language', async () => {
+    const body = await (await get('/api/parts/act1?language=sv')).json()
+    expect(body.part.language).toBe('sv')
+    expect(body.part.lines[0]).toMatchObject({ text: 'En gång.', english: 'Once.' })
+    expect(await (await get('/api/parts/act1/clips/a.mp3?language=sv')).text()).toBe('swedish-clip')
+    expect((await get('/api/parts/act1/clips/a.mp3')).status).toBe(404)
   })
 })

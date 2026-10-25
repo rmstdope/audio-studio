@@ -13,6 +13,11 @@ export const STATUS: Record<LineStatus, { label: string; color: string; bg: stri
     bg: 'var(--status-untracked-bg)',
   },
   uncast: { label: 'Uncast', color: 'var(--status-uncast)', bg: 'var(--status-uncast-bg)' },
+  untranslated: {
+    label: 'Not translated',
+    color: 'var(--status-untracked)',
+    bg: 'var(--status-untracked-bg)',
+  },
 }
 
 /** Why a clip is stale, as a phrase. */
@@ -47,6 +52,8 @@ export function statusDetail(line: LineState, minHeard: number): string {
       return 'recorded before Audio Studio; adopt to track it'
     case 'uncast':
       return `${line.speaker} has no voice yet`
+    case 'untranslated':
+      return ''
     case 'ok':
       // Said while the clip is below the bar; above it (the bar lowered since) it is just ok.
       return line.accepted && line.heard !== null && line.heard < minHeard

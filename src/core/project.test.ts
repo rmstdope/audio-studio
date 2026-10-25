@@ -176,3 +176,63 @@ describe('ProjectSchema, paid models', () => {
     expect(withModels({ audition: 'brand-new' }).success).toBe(false)
   })
 })
+
+describe('narration.languages', () => {
+  function withLanguages(languages: unknown, paths: Record<string, string> = {}) {
+    const base = projectJson()
+    const narration = base.narration as { paths: Record<string, string> }
+    return {
+      ...base,
+      narration: { ...narration, languages, paths: { ...narration.paths, ...paths } },
+    }
+  }
+  const everyPath = {
+    dialog: 'tts/{part}/{language}/script.json',
+    cues: 'tts/{part}/{language}/cues.json',
+    lock: 'tts/{part}/{language}/narration.lock.json',
+    clips: 'audio/{part}/{language}',
+    manifest: 'audio/{part}/{language}/manifest.json',
+  }
+
+  it('is English alone by default', () => {
+    expect(parse(projectJson()).data!.narration.languages).toEqual(['en'])
+  })
+
+  it('takes several languages when every path has {language}', () => {
+    const result = parse(withLanguages(['en', 'sv', 'de'], everyPath))
+    expect(result.data!.narration.languages).toEqual(['en', 'sv', 'de'])
+  })
+
+  it('accepts {language} with one language', () => {
+    expect(parse(withLanguages(['en'], everyPath)).success).toBe(true)
+  })
+
+  it('names each path that would be shared between languages', () => {
+    const found = problems(
+      withLanguages(['en', 'sv'], {
+        ...everyPath,
+        lock: 'tts/{part}/narration.lock.json',
+      }),
+    )
+    expect(found.map((p) => p.path)).toEqual(['narration.paths.lock'])
+    expect(found[0]!.message).toContain('{language}')
+  })
+
+  it('rejects an empty list, repeats and unknown codes', () => {
+    expect(problems(withLanguages([])).length).toBeGreaterThan(0)
+    expect(problems(withLanguages(['en', 'en'], everyPath))[0]!.message).toContain('unique')
+    expect(problems(withLanguages(['en', 'Swedish'], everyPath))[0]!.path).toBe(
+      'narration.languages[1]',
+    )
+  })
+})
+
+describe('partPathFor with a language', () => {
+  it('replaces {language} too', () => {
+    expect(partPathFor('tts/{part}/{language}.json', 'act2', 'sv')).toBe('tts/act2/sv.json')
+  })
+
+  it('leaves {language} alone when none is given', () => {
+    expect(partPathFor('tts/{part}/{language}.json', 'act2')).toBe('tts/act2/{language}.json')
+  })
+})

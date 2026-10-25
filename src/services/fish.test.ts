@@ -29,6 +29,28 @@ function fakeFetch(body: unknown, status = 200) {
 }
 
 describe('createFishClient', () => {
+  it('lists the account’s own voices (self=true), page after page, marked as its own', async () => {
+    const requests: URL[] = []
+    const pages = [
+      { total: 3, items: [apiVoice, { ...apiVoice, _id: 'v2' }] },
+      { total: 3, items: [{ ...apiVoice, _id: 'v3' }] },
+    ]
+    const fetch = (async (input: string | URL | Request) => {
+      const url = new URL(input instanceof Request ? input.url : input)
+      requests.push(url)
+      return Response.json(pages[Number(url.searchParams.get('page_number')) - 1] ?? pages[1])
+    }) as typeof globalThis.fetch
+    const voices = await createFishClient('k', { fetch }).listOwnVoices()
+    expect(voices.map((v) => v.id)).toEqual(['v1', 'v2', 'v3'])
+    expect(voices.every((v) => v.own === true)).toBe(true)
+    expect(requests.map((u) => u.searchParams.get('self'))).toEqual(['true', 'true'])
+  })
+
+  it('says why Fish would not list the account’s own voices', async () => {
+    const { fetch } = fakeFetch({ message: 'nope' }, 401)
+    await expect(createFishClient('k', { fetch }).listOwnVoices()).rejects.toThrow('nope')
+  })
+
   it('lists voices with the query and the key, as the studio’s Voice', async () => {
     const { fetch, requests } = fakeFetch({ total: 1, items: [apiVoice] })
     const client = createFishClient('secret', { fetch })

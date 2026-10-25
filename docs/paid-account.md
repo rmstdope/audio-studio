@@ -3,7 +3,8 @@
 What the studio already does for a paid account: it prices every current model (`core/prices.ts`),
 shows the account's API credit, asks for a spending ceiling before a paid recording and holds it
 to that budget (`core/spend.ts`), offers a final recording with the final model (§8.4 of
-`architecture.md`), and asks Fish again after a 429 (§10).
+`architecture.md`), asks Fish again after a 429 (§10), and takes a line again on a paid draft
+model after asking what the take can cost and getting a yes (**Another take**, §8.3).
 
 The items below are not built. Each is small enough for one pull request, unless it says
 otherwise. Facts about Fish come from its docs as checked on 2026-10-25; check them again before
@@ -16,13 +17,6 @@ sitting, asked for up front (§8.1 of `architecture.md`). Cue tries (**Hear it**
 voice's take on its character page stay on the free model. The take cache key includes the model,
 so takes on two models do not mix.
 
-## Paid extra takes of a line
-
-Extra takes (**Takes** on a line's row) use the draft model, free only: `takeLine` in
-`services/lineTakes.ts` refuses them when the draft model is paid, and §8.3 says so. With a paid
-draft model, an extra take would need the same confirm-and-budget flow as recording a line from
-its row.
-
 ## The `s1` retirement
 
 Fish retires `s1` on 31 December 2026; after that, requests for it are served and billed as
@@ -33,11 +27,9 @@ is changed in one place only today (`narration.quality.soundAlike`, see `CLAUDE.
 
 ## Your own voices in casting
 
-Search covers Fish's public library only (`listVoices` in `services/fish.ts` never asks for your
-own). Fish lists the account's own voices with `GET /model?self=true`; on 2026-10-25 the account
-behind RetroQuest's key had none. They should appear on the audition board, marked as your own,
-and be castable like any other. Bringing a voice in by its id (`getVoice`, an authenticated
-`GET /model/{id}`) probably already works for a private voice you own, but that is not verified.
+Built: the audition board lists the account's own voices (`GET /model?self=true`) in a **Your
+voices** section (§8.1). Bringing a private voice in by its id (`getVoice`, an authenticated
+`GET /model/{id}`) is still not verified against a real private voice.
 
 ## Voice cloning
 
