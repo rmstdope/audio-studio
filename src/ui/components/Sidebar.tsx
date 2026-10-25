@@ -1,5 +1,5 @@
 import type { ProjectSummary } from '../../core/summary'
-import { useChanges, useCredit, useSetup } from '../api'
+import { useChanges, useCredit, useSetup, useSpending } from '../api'
 import { routeHref, type Route } from '../route'
 import {
   MicIcon,
@@ -8,6 +8,7 @@ import {
   SpeakerIcon,
   WaveIcon,
   ChangesIcon,
+  SpendingIcon,
   CheckIcon,
 } from './icons'
 import { dollars, longTitle, plural } from '../format'
@@ -25,6 +26,7 @@ export function Sidebar({
   const changes = useChanges()
   const credit = useCredit()
   const setup = useSetup()
+  const spending = useSpending()
   const problems = setup.data?.ok
     ? setup.data.checks.filter((c) => c.state === 'problem').length
     : 0
@@ -123,6 +125,16 @@ export function Sidebar({
         >
           <ChangesIcon /> <span className="grow">Changes</span>
           {changes.data?.ok && <span className="meta">{changes.data.groups.total}</span>}
+        </a>
+        <a
+          className="nav-item"
+          href={routeHref({ view: 'spending' })}
+          aria-current={route.view === 'spending' ? 'page' : undefined}
+        >
+          <SpendingIcon /> <span className="grow">Spending</span>
+          {spending.data?.ok && spending.data.count > 0 && (
+            <span className="meta">{dollars(spending.data.total)}</span>
+          )}
         </a>
         <a
           className="nav-item"

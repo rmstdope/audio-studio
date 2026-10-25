@@ -13,17 +13,21 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
+import { FishTierSchema } from '../core/project'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
 import { SPEED } from '../core/resources'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
+import { createSpendLog, readSpending } from '../services/spending'
+import { outcomeOf, summariseSpending } from '../core/spending'
 import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { isRefreshing, refreshDialog } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import { switchRetiredModels } from '../services/models'
+import { setFishTier } from '../services/fishTier'
 import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile, tryLine } from '../services/takes'
 import { checkSetup } from '../services/setup'
@@ -36,6 +40,8 @@ import {
   useLineTake,
 } from '../services/lineTakes'
 import { cloneVoice } from '../services/cloneVoice'
+import { DESIGN_MODEL, DESIGN_PRICE, isDesignId } from '../core/design'
+import { castDesign, designVoices, designsFor } from '../services/designs'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -112,6 +118,9 @@ const PronounceBody = z.object({ table: Table, was: Table }).strict()
 /** The project's own sound-alike groups, and the ones the editing began from. */
 const Groups = z.array(z.array(z.string().max(200)).max(50)).max(1000)
 const SoundAlikeBody = z.object({ groups: Groups, was: Groups }).strict()
+
+/** The Fish tier the user chose, or null to clear it. */
+const FishTierBody = z.object({ tier: FishTierSchema.nullable() }).strict()
 
 /** The takes whose model the page offered to switch from s1. */
 const ModelsBody = z
@@ -194,6 +203,10 @@ const AmountBody = z.object({ amount: z.number().positive().max(10_000) }).stric
 
 /** Starting an audition; a paid audition model needs the amount its sitting may spend. */
 const StartBody = z.object({ spendUpTo: z.number().positive().max(10_000).optional() }).strict()
+/** Designing voices: the description, and the most the user agreed to spend on the design. */
+const DesignBody = z
+  .object({ description: z.string(), spendUpTo: z.number().positive().max(10_000).optional() })
+  .strict()
 /** What casting a voice made from recordings sends: the voice and the name to cast it under. */
 const CastOwnBody = z.object({ voice: z.string().regex(VOICE_ID), name: z.string().trim().min(1) })
 
@@ -419,7 +432,7 @@ export function startServer({
     if (read.problems.length) return { ok: false as const, problems: read.problems }
     const { narration } = read.project
     // With one model for both, there is no final step: the final plan is the draft one.
-    const stage =
+    const stage: 'draft' | 'final' =
       asked === 'final' && narration.models.final !== narration.models.draft ? 'final' : 'draft'
     const { pronounce } = read.input.cast
     const state = planPart(read.input)
@@ -447,6 +460,39 @@ export function startServer({
       model: pricing.model,
       ceilingOf,
       parallel: narration.quality.parallel,
+      stage,
+      // Recording is in the source language.
+      language: narration.languages[0] ?? 'en',
+    }
+  }
+
+  /** The paid recordings of this studio: running ones live, finished ones saved. */
+  const spendLog = createSpendLog(projectFile)
+
+  /**
+   * Runs one request's recording of a single line, following it in the spend log: it counts as one
+   * line recorded when the result is a recording, and is saved if it spent anything.
+   */
+  async function loggedOne<T extends { ok: boolean } | null>(
+    planned: { model: string; stage: 'draft' | 'final'; language: string },
+    part: string,
+    budget: Budget,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const followed = spendLog.follow({
+      part,
+      ...planned,
+      planned: 1,
+      budget,
+      progress: () => ({ lines: 0 }),
+    })
+    let result: T | undefined
+    try {
+      result = await run()
+      return result
+    } finally {
+      const recorded = result?.ok === true && !(result && 'skipped' in result)
+      await followed.end({ lines: recorded ? 1 : 0, outcome: recorded ? 'done' : 'error' })
     }
   }
 
@@ -567,14 +613,16 @@ export function startServer({
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
           try {
-            const result = await recordLine(projectFile, part, key, fishFor, {
-              encode,
-              limiter: fishWork,
-              transcriber: await transcriberFor(),
-              stage: body.data.stage,
-              budget: admitted.budget,
-              language: languageOf(request),
-            })
+            const result = await loggedOne(planned, part, admitted.budget, async () =>
+              recordLine(projectFile, part, key, fishFor, {
+                encode,
+                limiter: fishWork,
+                transcriber: await transcriberFor(),
+                stage: body.data.stage,
+                budget: admitted.budget,
+                language: languageOf(request),
+              }),
+            )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
           } finally {
@@ -650,6 +698,21 @@ export function startServer({
               { status: 409 },
             )
           }
+          // Set once the job has started; `onEnd` only runs after the job's first await, so it is set.
+          let jobId = ''
+          const progress = () => {
+            const state = jobs.get(jobId)
+            return { lines: state ? state.done - state.skipped - state.failed.length : 0 }
+          }
+          const followed = measuring
+            ? null
+            : spendLog.follow({
+                part,
+                ...planned,
+                planned: keys.length,
+                budget,
+                progress,
+              })
           const job = jobs.start({
             kind: body.data.kind,
             part,
@@ -677,10 +740,24 @@ export function startServer({
                     language,
                   }),
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys, language),
-            onEnd: () => budgets.delete(budget),
+            onEnd: () => {
+              budgets.delete(budget)
+              const state = jobs.get(jobId)
+              if (!followed || !state || state.status === 'running') return
+              void followed.end({
+                lines: progress().lines,
+                outcome: outcomeOf({
+                  status: state.status === 'done' ? 'done' : 'cancelled',
+                  failed: state.failed.length,
+                }),
+              })
+            },
           })
           // Not started (another job runs for the part): nothing is held back for it.
-          if ('error' in job) budgets.delete(budget)
+          if ('error' in job) {
+            budgets.delete(budget)
+            void followed?.end({ lines: 0, outcome: 'error' })
+          } else jobId = job.id
           return Response.json(job, { status: 'error' in job ? 409 : 200 })
         }),
       },
@@ -750,6 +827,23 @@ export function startServer({
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
+      '/api/spending': {
+        GET: guard(async () => {
+          const [project, saved] = await Promise.all([
+            loadProject(projectFile),
+            readSpending(projectFile),
+          ])
+          if (!saved.ok) return Response.json({ ok: false, problems: saved.problems })
+          const parts = project.ok
+            ? project.summary.parts.map((p) => ({ id: p.id, title: p.title }))
+            : []
+          return Response.json({
+            ok: true,
+            ...summariseSpending(saved.recordings, spendLog.running(), parts),
+            languages: project.ok ? project.summary.languages.length : 1,
+          })
+        }),
+      },
       '/api/credit': {
         GET: guard(async () => Response.json(await creditOf())),
       },
@@ -790,6 +884,16 @@ export function startServer({
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
+      '/api/fish-tier': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = FishTierBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { tier }' }, { status: 400 })
+          }
+          const result = await setFishTier(projectFile, body.data.tier)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
       '/api/models': {
         PATCH: fromOwnPage(async (request) => {
           const body = ModelsBody.safeParse(await request.json().catch(() => null))
@@ -827,12 +931,14 @@ export function startServer({
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
           try {
-            const result = await takeLine(projectFile, part, key, fishFor, {
-              limiter: fishWork,
-              transcriber: await transcriberFor(),
-              budget: admitted.budget,
-              language: languageOf(request),
-            })
+            const result = await loggedOne(planned, part, admitted.budget, async () =>
+              takeLine(projectFile, part, key, fishFor, {
+                limiter: fishWork,
+                transcriber: await transcriberFor(),
+                budget: admitted.budget,
+                language: languageOf(request),
+              }),
+            )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
           } finally {
@@ -1118,6 +1224,40 @@ export function startServer({
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
+      '/api/characters/:id/designs': {
+        GET: guard(async (request) => {
+          const result = await designsFor(projectFile, request.params.id, languageOf(request))
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/characters/:id/design': {
+        POST: fromOwnPage(async (request) => {
+          const body = DesignBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { description, spendUpTo? }' }, { status: 400 })
+          }
+          const { id } = request.params
+          if ((await designsFor(projectFile, id, languageOf(request))) === null) return notFound()
+          // Held back from the credit while Fish designs; Fish bills a request that works.
+          const got = await admit(DESIGN_MODEL, DESIGN_PRICE, body.data.spendUpTo)
+          if ('problem' in got) return Response.json({ ok: false, ...got.problem }, { status: 409 })
+          try {
+            const result = await designVoices(
+              projectFile,
+              id,
+              body.data.description,
+              fishFor,
+              encode,
+              languageOf(request),
+            )
+            if (!result) return notFound()
+            return Response.json(result, { status: 'added' in result ? 200 : 409 })
+          } finally {
+            budgets.delete(got.budget)
+          }
+        }),
+      },
       '/api/characters/:id/cast-voice': {
         POST: fromOwnPage(async (request) => {
           const body = CastOwnBody.safeParse(await request.json().catch(() => null))
@@ -1140,12 +1280,12 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const body = TakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
-          const result = await castVoice(
-            projectFile,
-            request.params.id,
-            body.data.voice,
-            languageOf(request),
-          )
+          const { voice } = body.data
+          const language = languageOf(request)
+          // A designed voice is saved to the account first; Fish makes no voice from a design.
+          const result = isDesignId(voice)
+            ? await castDesign(projectFile, request.params.id, voice, fishFor, language)
+            : await castVoice(projectFile, request.params.id, voice, language)
           if (!result) return notFound()
           if (result.ok) endSitting(await sittingKey(request.params.id, request))
           return Response.json(result, { status: result.ok ? 200 : 409 })

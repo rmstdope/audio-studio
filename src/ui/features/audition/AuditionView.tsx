@@ -12,6 +12,7 @@ import { useCast, useParts, useSession, useSessionAction, useSitting } from '../
 import { CheckIcon } from '../../components/icons'
 import { Failure } from '../../components/Failure'
 import { useClipPlayer } from '../../components/useClipPlayer'
+import { designStart } from '../../../core/design'
 import { plural, shortTitle } from '../../format'
 import { routeHref } from '../../route'
 import { PhraseEditor, StyleEditor } from '../characters/BriefEditors'
@@ -154,6 +155,7 @@ export function AuditionView({
               language={inLanguage}
               name={character.name}
               lines={character.languages[language]?.totalLines ?? character.totalLines}
+              designStart={designStart(character.keywords, character.style)}
               view={board}
               playing={playing}
               toggle={toggle}

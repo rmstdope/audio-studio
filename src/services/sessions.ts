@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import {
   AuditionSessionSchema,
   addVoice,
+  setDesigned,
   addSpent,
   bringMore,
   drop,
@@ -15,6 +16,7 @@ import {
   unlist,
   type AuditionSession,
 } from '../core/audition'
+import { listDesigns } from '../core/designs'
 import { resolveInRoot } from '../core/paths'
 import { perTakeCost } from '../core/sitting'
 import { declaredLanguage, type Problem } from '../core/project'
@@ -22,6 +24,7 @@ import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import type { Candidate, Voice } from '../core/voiceSearch'
 import { findCandidates, setVoice, type FishFactory } from './auditions'
+import { designTakes, readDesigns } from './designStore'
 import { characterFile, readJson, writeAtomic } from './files'
 import { NO_KEY } from './fish'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
@@ -90,7 +93,7 @@ export async function startAudition(
     const { voice, voiceName } = found.casting
     // Fish not finding the cast voice just now does not make the character uncast.
     const current = found.current ?? (voice ? unknownVoice(voice, voiceName) : null)
-    const session = startSession({
+    const started = startSession({
       character: characterId,
       keywords: found.keywords,
       current,
@@ -98,6 +101,13 @@ export async function startAudition(
       candidates: found.candidates,
       perRound: found.perRound,
     })
+    // The designs kept for the character in this language come back, except those dropped for good.
+    const designs = listDesigns(await readDesigns(projectFile, characterId, language))
+    const session = setDesigned(
+      started,
+      designs,
+      await ruledOutIds(projectFile, characterId, language),
+    )
     await writeSession(projectFile, characterId, session, language)
     return { ok: true, session }
   })
@@ -369,6 +379,8 @@ export type CastResult =
       stale: Appearance[]
     }
   | { ok: false; reason: 'no-session' | 'not-shortlisted'; message: string }
+  /** A designed voice that Fish could not save to the account, so was not cast. */
+  | { ok: false; reason: 'save'; voice: string; message: string }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
@@ -501,7 +513,7 @@ export async function viewOf(
   const recorded = withRecorded
     ? await recordedLines(projectFile, characterId, language)
     : undefined
-  const { shortlist: listed, yours, toHear } = result.session
+  const { shortlist: listed, yours, designed, toHear } = result.session
   const lookup = await auditionTakes(
     projectFile,
     characterId,
@@ -513,7 +525,8 @@ export async function viewOf(
     ok: true,
     session: result.session,
     audition: lookup.audition,
-    takes: lookup.takes,
+    // A design's preview is its take, kept apart from the takes the audition phrase is recorded to.
+    takes: { ...lookup.takes, ...designTakes(projectFile, [...listed, ...designed]) },
     recorded,
   }
 }

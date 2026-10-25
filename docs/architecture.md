@@ -113,6 +113,7 @@ audio-studio/
 │   │   ├── soundAlikeEdit.ts    the project's sound-alike groups as edited (rows, problems)
 │   │   ├── prices.ts            Fish's prices per model, promotions with their end
 │   │   ├── spend.ts             whether a paid recording may start (confirmed, covered)
+│   │   ├── spending.ts          paid recordings as saved, and the page's totals and rows
 │   │   ├── changes.ts           git status output parsed and grouped by part
 │   │   ├── dialogDiff.ts        what a refreshed dialog added, removed and changed
 │   │   ├── fingerprint.ts       hash of everything that affects a clip
@@ -131,11 +132,12 @@ audio-studio/
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish API key, from the environment or the env file
-│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice)
+│   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice, designVoice)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
+│   │   ├── spending.ts          the record of paid recordings (.audio-studio/spending.json) and the running ones
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
 │   │   ├── models.ts            s1 → s2.1-pro in the project file's draft and final models
 │   │   ├── projectFile.ts       reading the project file for a change, and writing it back as it was laid out
@@ -242,6 +244,10 @@ an id and a title.
   "they're", …); see §8.2. Optional, empty by default; edited on the characters page (§8.3).
   The same for a language besides the source in `quality.soundAlikeByLanguage` (`{ "sv": [[…]] }`,
   declared languages only); the built-in groups are English words and apply to `en` only.
+- `quality.fishTier` (`under-100`, `100` or `1000`) is what the user has paid Fish in total, which
+  sets how many requests Fish takes at once (5, 15, 50). Fish offers no way to ask, so the user
+  says it once in the menu on Setup's Requests at once row, saved at once
+  (`PATCH /api/fish-tier`, `services/fishTier.ts`). Optional; absent means not told.
 
 ---
 
@@ -438,6 +444,31 @@ recordings go to `POST /api/characters/:id/clone-voice`, which makes a private v
 account (`FishClient.createVoice`) and writes nothing to the project. The card then offers to cast
 the voice (`POST /api/characters/:id/cast-voice`, with the usual confirmation), to bring it into
 the audition (the existing `start` and `add`), or to leave it on the Fish account.
+
+**Design a voice from a description** (`voice-design-1`, `POST /v1/voice-design`: $0.01 per
+successful request, four voices, each saying the audition phrase cut to the 150 characters Fish's
+API reference allows). A **Design a voice…** button on the character page (beside Start/Resume
+audition) and in the board's bottom bar opens a box with a text of at most 2,000 characters; it
+opens with the last description sent, else a start made from the casting brief (`designStart`).
+**Design voices…** opens a confirm (credit, **Pay up to $0.01**; without a readable or sufficient
+credit, "Fish can't design voices now"). Paying calls `POST /api/characters/:id/design` with
+`{ description, spendUpTo }`: the server admits $0.01 as a budget (`admit`, held back from the
+credit while Fish works), asks Fish, and charges nothing when it refuses. With no audition going on
+the page starts one afterwards (a paid audition model's own box follows).
+Fish makes no voice on the account from a design, only audio, so a design has no Fish id until it
+is cast. The studio gives each a local id `design-<12 hex>` and keeps them per character in
+`.audio-studio/designs/<character>-<hash>.json` (one per language in a project with several, named as the audition's and ruled-out files are; `core/designs.ts`: the voices with their number
+"Design n", the description, when they were asked for, how many were ever made, and the last
+description sent); the preview is encoded to MP3 into `.audio-studio/takes/` under a key made from
+the id, so it plays as the voice's take (a design is never recorded on a paid model). The session
+only references them (`designed`, a place like `yours`; `setDesigned` refreshes it from the store
+when an audition starts or a design is made), so a design never cast is back on the next audition
+for the character; a dropped one is ruled out like any voice and `setDesigned` leaves ruled-out
+ids out. The board's **Designed for <name>** section groups them by request, newest first.
+Casting a design (`castDesign`, through `POST …/cast`) first saves its preview to the account as a
+private voice named `<name> (designed)` (then `(designed 2)`, …: the first name the account does
+not have) with `FishClient.createVoice`, then casts that voice like one made from recordings and
+removes the design from the store. If Fish cannot save it nothing is cast and the card says so.
 
 ```
  keywords ──► search Fish's library, leaving out ruled-out voices ──► ranked candidates
@@ -637,6 +668,16 @@ An audition is for a character, not for a part: the result applies to every part
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
+- **Spending** page (built): what paid recordings cost, project-wide and read only. Every
+  recording made with a paid model (a whole part's, draft or final, or one line's record or extra
+  take) is added to `.audio-studio/spending.json` when it ends: when it started, part, language
+  (the source language, as recording is), model, lines recorded out of lines planned, how it ended
+  (done, stopped, or a failed line), and the dollars charged to its budget (`Budget.spent`: the
+  studio's own price estimate as each line was sent, not Fish's bill). A recording that cost
+  nothing is not saved, nor is a free model's. A recording running now is not in the file: the page
+  reads it live from the job and its budget, shows it at the top and counts it in the totals. A
+  studio killed mid-recording loses that recording's entry. A damaged file is reported with its
+  file and path and never written over. The sidebar entry shows the total.
 
 ### 8.4 Model stages and final generation
 
@@ -794,6 +835,7 @@ not declared), and casting changes that language only. The rest is the plan:
 GET    /api/project                              project, parts
 GET    /api/credit                               the Fish account's API credit (dollars)
 GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish)
+PATCH  /api/fish-tier                            { tier } the Fish tier (or null) in the project file
 GET    /api/parts/:part?language=                the part in a language (default: the first), every line
                                                  with its status and reason, and each language's progress
 GET    /api/parts/:part/clips/:file?language=    a clip from the part's clips folder (that language's)
@@ -817,6 +859,7 @@ PATCH  /api/characters/:id                       style, speed, keywords, phrase
 PATCH  /api/pronounce?language=                   a language's pronunciation table ({ table, was }: whole)
 PATCH  /api/sound-alike                          the project's sound-alike groups ({ groups, was })
 PATCH  /api/models                               the draft/final takes on s1 to s2.1-pro ({ takes }; refused if the file's s1 takes differ)
+GET    /api/spending                             paid recordings: totals per part, running ones live, or the record's problems
 GET    /api/characters/:id/voice                 the cast voice from Fish, its take, the phrase
 GET    /api/characters/:id/ruled-out             voices ruled out for it, the latest first
 DELETE /api/characters/:id/ruled-out             forget them all
@@ -831,6 +874,8 @@ POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json
 POST   /api/characters/:id/clone-voice           a private voice on the Fish account from recordings (multipart: title, voices)
 POST   /api/characters/:id/cast-voice            cast a voice no audition holds ({ voice, name }); ends an audition going on
+GET    /api/characters/:id/designs               the description the design box starts with
+POST   /api/characters/:id/design                have Fish design voices ({ description, spendUpTo: 0.01 }); 409 until the cost is confirmed and covered
 POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
                                                  part at a time); a paid
                                                  one with { confirmedCost }, else 409 with
@@ -856,7 +901,10 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
 - Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
   ffmpeg, uv for Whisper (off when `quality.transcriber` is `none`; a problem off Apple silicon),
   the Fish key in the environment or the env file, whether Fish answers (the server's credit
-  lookup, only with a key) and the optional `refreshDialog`, each with what to do about it.
+  lookup, only with a key), Requests at once (`quality.parallel` against the Fish account's limit
+  from `quality.fishTier`: ready up to 5 with no tier, a problem above it until the tier is
+  chosen, and above the chosen tier's limit; off without a key; saving the tier checks again,
+  which asks Fish once more) and the optional `refreshDialog`, each with what to do about it.
   Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
   the problems from a check at most five minutes old and never on a window focus, so the studio
   does not ask Fish more than it did. The CLI still warns about ffmpeg, and recording says so.
@@ -982,10 +1030,9 @@ Small, independently useful increments:
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
-   Paid auditions are built (§8.1: a budget per sitting). What a paid account could still have (the `s1` retirement,
-   cloning and design, the rate tier, a spend log) is in `docs/paid-account.md`, not planned yet.
-   What a paid account could still have (paid auditions, the `s1` retirement, your own voices,
-   voice design, the rate tier, a spend log; cloning is built, as-5gk.5) is in `docs/paid-account.md`, not planned yet.
+   What a paid account could still have (paid auditions, the `s1` retirement, your own voices) —
+   everything is built or filed: cloning (as-5gk.5), voice design (as-5gk.6), the rate tier on
+   Setup (as-5gk.7) and the spend log (as-5gk.8); the rest is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in

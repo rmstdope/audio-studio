@@ -20,6 +20,7 @@ const fish: FishClient = {
     return []
   },
   createVoice: () => Promise.reject(new Error('not used')),
+  designVoice: () => Promise.reject(new Error('not used')),
   async credit() {
     return 25
   },
@@ -256,7 +257,7 @@ describe('server', () => {
     )
     // No key in this fixture: Fish is not asked. The tools depend on the machine running the tests.
     expect(states).toMatchObject({ key: 'problem', fish: 'off', refresh: 'off' })
-    expect(Object.keys(states)).toEqual(['ffmpeg', 'whisper', 'key', 'fish', 'refresh'])
+    expect(Object.keys(states)).toEqual(['ffmpeg', 'whisper', 'key', 'fish', 'requests', 'refresh'])
   })
 
   it('tells the account’s credit', async () => {
@@ -301,6 +302,7 @@ describe('server', () => {
     expect(part.part.lines.find((l: { key: string }) => l.key === 'a')).toMatchObject({
       cue: '[hushed]',
       cueFrom: 'own',
+      sourceCue: null,
     })
     expect((await patch('a', { cue: '' })).status).toBe(200)
     const after = await (await fetch(url('/api/parts/act1'))).json()
@@ -791,6 +793,43 @@ describe('server, paid auditions in two languages', () => {
   })
 })
 
+describe('server, the Fish tier', () => {
+  const ownRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    '.env': 'FISH_AUDIO_API_KEY=k\n',
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+  })
+  const server = startServer({
+    projectFile: join(ownRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const patch = (body: unknown, origin: string | null = server.url.origin) =>
+    fetch(new URL('/api/fish-tier', server.url), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
+      body: JSON.stringify(body),
+    })
+  const tierShown = async () => {
+    const setup = await (await fetch(new URL('/api/setup', server.url))).json()
+    return setup.checks.find((c: { id: string }) => c.id === 'requests')
+  }
+
+  it('saves the tier from its own page, and the setup then shows it', async () => {
+    expect((await patch({ tier: '100' }, 'http://evil.test')).status).toBe(403)
+    expect((await patch({ tier: '50' })).status).toBe(400)
+    expect((await patch({})).status).toBe(400)
+    const saved = await patch({ tier: '100' })
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await tierShown()).tier).toEqual({ chosen: '100' })
+    expect((await patch({ tier: null })).status).toBe(200)
+    expect((await tierShown()).tier).toEqual({ chosen: null })
+  })
+})
+
 describe('allowedHosts', () => {
   it('names both addresses with the port', () => {
     expect(allowedHosts(4801)).toEqual(['127.0.0.1:4801', 'localhost:4801'])
@@ -1232,6 +1271,7 @@ describe('server, a paid draft model', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1422,6 +1462,7 @@ describe('server, paid recording and what changes meanwhile', () => {
   const held: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       creditCalls++
       if (creditGate) await creditGate
@@ -1629,6 +1670,7 @@ describe('server, a paid job refused for a refresh', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return credit
     },
@@ -1687,6 +1729,7 @@ describe('server, the final recording', () => {
   const account: FishClient = {
     ...fish,
     createVoice: () => Promise.reject(new Error('not used')),
+    designVoice: () => Promise.reject(new Error('not used')),
     async credit() {
       return 10
     },
@@ -2221,6 +2264,344 @@ describe('cloning a voice', () => {
     })
     const cast = JSON.parse(readFileSync(join(repo, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.narrator).toMatchObject({ voice: 'f'.repeat(32), voiceName: 'Nora' })
+  })
+})
+
+describe('server, the spending record', () => {
+  const oneAtATime = { ...(projectJson().narration as object), quality: { parallel: 1 } }
+  const freeProject = projectJson({ narration: oneAtATime })
+  const paidProject = projectJson({ narration: { ...oneAtATime, models: { draft: 's2-pro' } } })
+  const script = ['a', 'b', 'c'].map((key) => ({ key, speaker: 'narrator', text: `Line ${key}.` }))
+  const repo = tempRepo({
+    'audio-studio.json': paidProject,
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': script,
+  })
+  const projectFile = join(repo, 'audio-studio.json')
+  const requests: ReturnType<typeof gate>[] = []
+  let hold = false
+  let failFrom = Infinity
+  let sent = 0
+  const account: FishClient = {
+    ...fish,
+    createVoice: () => Promise.reject(new Error('not used')),
+    async credit() {
+      return 100
+    },
+    async tts(request) {
+      if (++sent > failFrom) throw new FishError(500, 'boom')
+      if (hold) {
+        const waiting = gate()
+        requests.push(waiting)
+        await waiting.opened
+      }
+      return fish.tts(request)
+    },
+  }
+  const server = startServer({ projectFile, port: 0, fish: account, encode, transcriber: null })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const post = (path: string, body: unknown) =>
+    fetch(at(path), { method: 'POST', headers: own, body: JSON.stringify(body) })
+  const spending = async () => (await fetch(at('/api/spending'))).json()
+  const ceilingOf = async () =>
+    (await (await fetch(at('/api/parts/act1/plan'))).json()).plan.ceiling as number
+  const startJob = async (keys: string[]) => {
+    const ceiling = (await (await fetch(at('/api/parts/act1/plan'))).json()).plan.ceiling
+    return (
+      await post('/api/parts/act1/jobs', {
+        speaker: null,
+        keys,
+        orphans: [],
+        confirmedCost: ceiling,
+      })
+    ).json()
+  }
+  const waitJob = async (id: string) => {
+    for (;;) {
+      const state = await (await fetch(at(`/api/jobs/${id}`))).json()
+      if (state.status !== 'running' && state.status !== 'cancelling') return state
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+  }
+  const settle = async (rows: number) => {
+    const giveUp = Date.now() + 2000
+    for (;;) {
+      const now = await spending()
+      if (now.ok && now.rows.filter((r: { state: string }) => r.state !== 'running').length >= rows)
+        return now
+      if (Date.now() > giveUp) throw new Error('waited in vain')
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+  }
+
+  it('is empty before anything is recorded', async () => {
+    expect(await spending()).toMatchObject({ ok: true, total: 0, count: 0, rows: [] })
+  })
+
+  it('logs a paid one-line recording with what it was charged', async () => {
+    const ceiling = await ceilingOf()
+    const line = (await (await fetch(at('/api/parts/act1/plan'))).json()).plan.cost / 3
+    const done = await post('/api/parts/act1/lines/a/record', { confirmedCost: ceiling })
+    expect(await done.json()).toMatchObject({ ok: true })
+    const now = await spending()
+    expect(now.count).toBe(1)
+    expect(now.rows[0]).toMatchObject({
+      part: 'act1',
+      language: 'en',
+      model: 's2-pro',
+      lines: 1,
+      planned: 1,
+      state: 'done',
+    })
+    expect(now.rows[0].cost).toBeGreaterThan(0)
+    expect(now.rows[0].cost).toBeLessThan(line * 1.01)
+    expect(now.acts[0]).toMatchObject({ part: 'act1', title: 'Act I' })
+    expect(now.total).toBeCloseTo(now.rows[0].cost, 12)
+    expect(existsSync(join(repo, '.audio-studio/spending.json'))).toBe(true)
+  })
+
+  it('logs a whole-part job, and shows it live while it runs', async () => {
+    hold = true
+    const job = await startJob(['b', 'c'])
+    await until(() => requests.length >= 1)
+    const live = await spending()
+    expect(live.rows[0]).toMatchObject({ state: 'running', planned: 2, lines: 0 })
+    expect(live.rows[0].cost).toBeGreaterThan(0)
+    expect(live.count).toBe(2)
+    hold = false
+    for (const r of requests) r.open()
+    await waitJob(job.id)
+    const now = await settle(2)
+    expect(now.rows.map((r: { state: string }) => r.state)).toEqual(['done', 'done'])
+    expect(now.rows[0]).toMatchObject({ lines: 2, planned: 2 })
+  })
+
+  it('logs a job that stopped, or ended on an error, with the lines it got through', async () => {
+    writeFileSync(
+      join(repo, 'tts/act1/script.json'),
+      JSON.stringify(script.map((l) => ({ ...l, text: `${l.text} Again.` }))),
+    )
+    sent = 0
+    failFrom = 1
+    const failing = await startJob(['a', 'b', 'c'])
+    await waitJob(failing.id)
+    const now = await settle(3)
+    expect(now.rows[0]).toMatchObject({ state: 'error', lines: 1, planned: 3 })
+    failFrom = Infinity
+  })
+
+  it('keeps the record across a restart of the studio', async () => {
+    const again = startServer({ projectFile, port: 0, fish: account, encode, transcriber: null })
+    try {
+      const body = await (await fetch(new URL('/api/spending', again.url))).json()
+      expect(body.count).toBe(3)
+    } finally {
+      again.stop(true)
+    }
+  })
+
+  it('says so when the record is damaged', async () => {
+    const path = join(repo, '.audio-studio/spending.json')
+    const good = readFileSync(path, 'utf8')
+    writeFileSync(path, '{ nope')
+    const body = await spending()
+    expect(body).toMatchObject({ ok: false })
+    expect(body.problems[0].file).toBe('.audio-studio/spending.json')
+    writeFileSync(path, good)
+  })
+
+  it('logs nothing for a free model', async () => {
+    const freeRepo = tempRepo({
+      'audio-studio.json': freeProject,
+      'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+      'tts/act1/script.json': script,
+    })
+    const free = startServer({
+      projectFile: join(freeRepo, 'audio-studio.json'),
+      port: 0,
+      fish: account,
+      encode,
+      transcriber: null,
+    })
+    try {
+      const o = { origin: free.url.origin, 'content-type': 'application/json' }
+      const res = await fetch(new URL('/api/parts/act1/lines/a/record', free.url), {
+        method: 'POST',
+        headers: o,
+        body: '{}',
+      })
+      expect(await res.json()).toMatchObject({ ok: true })
+      expect(await (await fetch(new URL('/api/spending', free.url))).json()).toMatchObject({
+        ok: true,
+        count: 0,
+      })
+      expect(existsSync(join(freeRepo, '.audio-studio/spending.json'))).toBe(false)
+    } finally {
+      free.stop(true)
+    }
+  })
+
+  it('logs a job stopped part-way as stopped, with the lines it got through', async () => {
+    writeFileSync(
+      join(repo, 'tts/act1/script.json'),
+      JSON.stringify(script.map((l) => ({ ...l, text: `${l.text} Once more.` }))),
+    )
+    const before = (await spending()).count
+    requests.length = 0
+    hold = true
+    const job = await startJob(['a', 'b', 'c'])
+    await until(() => requests.length >= 1)
+    await fetch(at(`/api/jobs/${job.id}`), { method: 'DELETE', headers: own })
+    hold = false
+    for (const r of requests) r.open()
+    await waitJob(job.id)
+    const now = await settle(before + 1)
+    expect(now.rows[0]).toMatchObject({ state: 'stopped', planned: 3 })
+    expect(now.rows[0].lines).toBeGreaterThan(0)
+    expect(now.rows[0].lines).toBeLessThan(3)
+  })
+
+  it('logs a paid take whose request failed after it was charged as ended on an error', async () => {
+    const before = (await spending()).count
+    const ceiling = await ceilingOf()
+    sent = 0
+    failFrom = 0
+    const res = await post('/api/parts/act1/lines/a/takes', { confirmedCost: ceiling })
+    failFrom = Infinity
+    expect((await res.json()).ok).toBe(false)
+    const now = await spending()
+    expect(now.count).toBe(before + 1)
+    expect(now.rows[0]).toMatchObject({ state: 'error', lines: 0, planned: 1 })
+    expect(now.rows[0].cost).toBeGreaterThan(0)
+    expect(now.rows.some((r: { state: string }) => r.state === 'running')).toBe(false)
+  })
+
+  it('logs a paid extra take', async () => {
+    const before = (await spending()).count
+    const ceiling = await ceilingOf()
+    const res = await post('/api/parts/act1/lines/a/takes', { confirmedCost: ceiling })
+    expect(await res.json()).toMatchObject({ ok: true })
+    const now = await spending()
+    expect(now.count).toBe(before + 1)
+    expect(now.rows[0]).toMatchObject({ lines: 1, planned: 1, state: 'done' })
+  })
+})
+
+describe('designing a voice', () => {
+  const repo = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const asked: string[] = []
+  const saved: string[] = []
+  let credit: number | Error = 25
+  const designing = startServer({
+    projectFile: join(repo, 'audio-studio.json'),
+    port: 0,
+    fish: {
+      ...fish,
+      async credit() {
+        if (credit instanceof Error) throw credit
+        return credit
+      },
+      async designVoice({ instruction, count }) {
+        asked.push(instruction)
+        if (instruction === 'refused') throw new FishError(503, 'Too busy')
+        return Array.from({ length: count }, (_, i) => ({ id: `c${i}`, wav: new Uint8Array([i]) }))
+      },
+      async createVoice({ title }) {
+        saved.push(title)
+        return {
+          id: 'f'.repeat(32),
+          title,
+          description: '',
+          tags: [],
+          languages: [],
+          uses: 0,
+          likes: 0,
+          author: '',
+          sample: null,
+        }
+      },
+    },
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => designing.stop(true))
+  const send = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+    fetch(new URL(path, designing.url), {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { origin: designing.url.origin, 'content-type': 'application/json', ...headers },
+    })
+  const design = (description: string, spendUpTo?: number) =>
+    send('/api/characters/narrator/design', { description, spendUpTo })
+
+  it('does not design until the cost is confirmed, or when the credit does not cover it', async () => {
+    const unconfirmed = await design('an old woman')
+    expect(unconfirmed.status).toBe(409)
+    expect(await unconfirmed.json()).toMatchObject({ ok: false, reason: 'confirm' })
+    credit = 0.005
+    const short = await design('an old woman', 0.01)
+    expect(short.status).toBe(409)
+    expect(await short.json()).toMatchObject({ ok: false, reason: 'credit' })
+    credit = new Error('wallet down')
+    const unknown = await design('an old woman', 0.01)
+    expect(await unknown.json()).toMatchObject({ ok: false, reason: 'credit' })
+    credit = 25
+    expect(asked).toEqual([])
+  })
+
+  it('designs once the cost is confirmed, and remembers the description', async () => {
+    const response = await design('an old woman', 0.01)
+    expect(await response.json()).toEqual({ ok: true, added: 4 })
+    expect(asked).toEqual(['an old woman'])
+    const last = await fetch(new URL('/api/characters/narrator/designs', designing.url))
+    expect(await last.json()).toEqual({ ok: true, description: 'an old woman' })
+  })
+
+  it('gives Fish’s refusal with a 409', async () => {
+    const refused = await design('refused', 0.01)
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toEqual({ ok: false, reason: 'fish', message: 'Too busy' })
+  })
+
+  it('refuses another page, a body that is not a description, and an unknown character', async () => {
+    const other = await send(
+      '/api/characters/narrator/design',
+      { description: 'x', spendUpTo: 0.01 },
+      { origin: 'https://evil.example' },
+    )
+    expect(other.status).toBe(403)
+    expect((await send('/api/characters/narrator/design', {})).status).toBe(400)
+    const unknown = await send('/api/characters/nobody/design', {
+      description: 'x',
+      spendUpTo: 0.01,
+    })
+    expect(unknown.status).toBe(404)
+  })
+
+  it('shows the designs on the board, saves one to the account on cast, and casts it', async () => {
+    const started = await send('/api/auditions/narrator/start', {})
+    const board = await started.json()
+    expect(board.session.designed.length).toBe(4)
+    const [id] = board.session.designed as string[]
+    expect(board.takes[id!]).toMatch(/^[0-9a-f]{16}$/)
+    expect((await fetch(new URL(`/api/takes/${board.takes[id!]}.mp3`, designing.url))).status).toBe(
+      200,
+    )
+    await send('/api/auditions/narrator/move', { voice: id, move: 'shortlist' })
+    const cast = await send('/api/auditions/narrator/cast', { voice: id })
+    expect(await cast.json()).toMatchObject({
+      ok: true,
+      voice: { id: 'f'.repeat(32), name: 'Narrator (designed)' },
+    })
+    expect(saved).toEqual(['Narrator (designed)'])
+    const file = JSON.parse(readFileSync(join(repo, 'tts/cast.json'), 'utf8'))
+    expect(file.speakers.narrator.voice).toBe('f'.repeat(32))
   })
 })
 

@@ -104,6 +104,65 @@ describe('createFishClient', () => {
     expect((error as FishError).detail).toBe('Audio too short')
   })
 
+  it('asks Fish to design voices with the model header, and decodes the candidates', async () => {
+    const wav = new Uint8Array([82, 73, 70, 70, 1, 2, 3])
+    const { fetch, requests } = fakeFetch({
+      candidates: [
+        {
+          id: 'c0',
+          index: 0,
+          audio_base64: Buffer.from(wav).toString('base64'),
+          sample_rate: 44100,
+          duration_ms: 3100,
+        },
+        {
+          id: 'c1',
+          index: 1,
+          audio_base64: Buffer.from([9]).toString('base64'),
+          sample_rate: 44100,
+          duration_ms: 10,
+        },
+      ],
+    })
+    const client = createFishClient('secret', { fetch })
+    const designed = await client.designVoice({
+      instruction: 'A warm old woman',
+      referenceText: 'Hello there.',
+      language: 'en',
+      count: 4,
+    })
+    const request = requests[0]!
+    expect(request.method).toBe('POST')
+    expect(new URL(request.url).pathname).toBe('/v1/voice-design')
+    expect(request.headers.get('authorization')).toBe('Bearer secret')
+    expect(request.headers.get('model')).toBe('voice-design-1')
+    expect(await request.json()).toEqual({
+      instruction: 'A warm old woman',
+      reference_text: 'Hello there.',
+      language: 'en',
+      n: 4,
+    })
+    expect(designed.map((d) => [...d.wav])).toEqual([[...wav], [9]])
+  })
+
+  it('gives Fish’s own reason when it refuses to design, and treats no candidates as a failure', async () => {
+    const refused = fakeFetch({ status: 402, message: 'Insufficient credit' }, 402)
+    const error = await createFishClient('k', { fetch: refused.fetch })
+      .designVoice({ instruction: 'x', referenceText: 'y', language: null, count: 4 })
+      .catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(FishError)
+    expect((error as FishError).detail).toBe('Insufficient credit')
+    const empty = fakeFetch({ candidates: [] })
+    await expect(
+      createFishClient('k', { fetch: empty.fetch }).designVoice({
+        instruction: 'x',
+        referenceText: 'y',
+        language: null,
+        count: 4,
+      }),
+    ).rejects.toThrow('no voices')
+  })
+
   it('lists voices with the query and the key, as the studio’s Voice', async () => {
     const { fetch, requests } = fakeFetch({ total: 1, items: [apiVoice] })
     const client = createFishClient('secret', { fetch })
@@ -236,6 +295,30 @@ describe('tts', () => {
       speed: 1,
     })
     await expect(failing).rejects.toThrow('Fish Audio answered 402: No credit')
+  })
+})
+
+describe('rate limit on a design', () => {
+  it('waits and asks again when Fish answers 429', async () => {
+    let calls = 0
+    const fetch = (async () => {
+      calls++
+      return calls === 1
+        ? Response.json({ message: 'Too many requests' }, { status: 429 })
+        : Response.json({
+            candidates: [{ id: 'c', audio_base64: Buffer.from([1]).toString('base64') }],
+          })
+    }) as unknown as typeof globalThis.fetch
+    const waits: number[] = []
+    const client = createFishClient('k', { fetch, sleep: async (ms) => void waits.push(ms) })
+    const made = await client.designVoice({
+      instruction: 'x',
+      referenceText: 'y',
+      language: null,
+      count: 4,
+    })
+    expect(made.length).toBe(1)
+    expect(waits).toEqual([1000])
   })
 })
 

@@ -48,6 +48,31 @@ export interface FishClient {
    * gives it as Fish describes it. Fish refusing is a `FishError` with its own message.
    */
   createVoice(request: CreateVoiceRequest): Promise<Voice>
+  /**
+   * Has Fish design voices from a description ($0.01 per successful request, not per voice), each
+   * saying `referenceText`. Fish makes no voice on the account: what comes back is audio only.
+   * Fish refusing is a `FishError` with its own message; nothing is billed then.
+   */
+  designVoice(request: DesignVoiceRequest): Promise<DesignedVoice[]>
+}
+
+/** A request to design voices from a description. */
+export interface DesignVoiceRequest {
+  /** The description (1 to 2,000 characters). */
+  instruction: string
+  /** What each voice says (up to 150 characters). */
+  referenceText: string
+  /** A language hint such as `en`, or null for none. */
+  language: string | null
+  /** How many voices (1 to 4). */
+  count: number
+}
+
+/** A voice Fish designed: its preview, as WAV. */
+export interface DesignedVoice {
+  /** Fish's identifier for the candidate, within its answer. */
+  id: string
+  wav: Uint8Array
 }
 
 /** A request to make a private voice from recordings. */
@@ -94,6 +119,10 @@ const ApiVoiceSchema = z.looseObject({
 const ApiPageSchema = z.looseObject({
   total: z.number().default(0),
   items: z.array(ApiVoiceSchema).default([]),
+})
+
+const ApiDesignSchema = z.looseObject({
+  candidates: z.array(z.looseObject({ id: z.string(), audio_base64: z.string() })).default([]),
 })
 
 function toVoice(api: z.infer<typeof ApiVoiceSchema>): Voice {
@@ -253,6 +282,32 @@ export function createFishClient(
           }
           throw error
         }
+      })
+    },
+    async designVoice({ instruction, referenceText, language, count }) {
+      return timed(async () => {
+        const response = await fetch(new URL('/v1/voice-design', baseUrl), {
+          signal: AbortSignal.timeout(timeoutMs),
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+            model: 'voice-design-1',
+          },
+          body: JSON.stringify({
+            instruction,
+            reference_text: referenceText,
+            language,
+            n: count,
+          }),
+        })
+        if (!response.ok) throw new FishError(response.status, await errorMessage(response))
+        const { candidates } = ApiDesignSchema.parse(await response.json())
+        if (!candidates.length) throw new Error('Fish made no voices from that description')
+        return candidates.map((c) => ({
+          id: c.id,
+          wav: new Uint8Array(Buffer.from(c.audio_base64, 'base64')),
+        }))
       })
     },
     async tts({ text, voice, model, temperature, topP, speed, format = 'mp3' }) {

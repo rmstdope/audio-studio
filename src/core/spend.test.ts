@@ -105,3 +105,30 @@ describe('createBudget, topped up and refunded', () => {
     expect(budget.dollars).toBe(0.001)
   })
 })
+
+describe('Budget.spent', () => {
+  it('is what was charged, less refunds, and keeps counting after a top-up', () => {
+    const budget = createBudget({ model: 's2.1-pro', dollars: 1 })
+    expect(budget.spent).toBe(0)
+    expect(budget.spend('s2.1-pro', 10_000, new Date())).toBeNull()
+    expect(budget.spent).toBeCloseTo(0.15, 9)
+    budget.refund(0.05)
+    expect(budget.spent).toBeCloseTo(0.1, 9)
+    budget.add(2)
+    expect(budget.spent).toBeCloseTo(0.1, 9)
+  })
+})
+
+describe('Budget.spent, after a refund', () => {
+  it('is exactly nothing when everything charged was given back', () => {
+    for (let cents = 1; cents <= 400; cents++) {
+      const budget = createBudget({ model: 's2.1-pro', dollars: cents / 100 })
+      const cost = (cents * 7) / 10_000
+      expect(budget.spend('s2.1-pro', Math.round((cost / 15) * 1_000_000), new Date())).toBeNull()
+      budget.refund(budget.spent)
+      expect(budget.spent).toBe(0)
+      budget.refund(0.1 + 0.2 - 0.3)
+      expect(budget.spent).toBe(0)
+    }
+  })
+})

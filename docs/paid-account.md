@@ -46,18 +46,21 @@ this needs a paid account at all.
 
 ## Voice design
 
+_Built (as-5gk.6, §8.1): designs are kept per character, saved to the account only when cast. Facts it rests on: Fish's design endpoint creates no voice, so a cast design is uploaded as a reference through the cloning endpoint; its preview text is limited to 150 characters in the API reference (300 on the guide page); an answer with no candidates is not billed._
+
 Making a voice from a text description (`voice-design-1`, `POST /v1/voice-design`): $0.01 per
 successful request, so it needs credit. Like a paid audition, it must ask to confirm and be charged
 to a budget before it spends.
 
-## Rate tier in the UI
+## Rate tier in the UI (built)
 
-The 429 backoff is built (§10). What is missing is showing the account's concurrency limit next to
-`quality.parallel`, so a 429 is explained before it happens. Fish sets the limit by total prepaid
-spend: 5 requests at a time under $100, 15 from $100, 50 from $1,000. Fish's docs name no way to
-ask for the tier, so it may have to be inferred, or entered by the user.
+The 429 backoff is built (§10), and so is showing the account's concurrency limit next to
+`quality.parallel`, so a 429 is explained before it happens (as-5gk.7). Fish sets the limit by total
+prepaid spend: 5 requests at a time under $100, 15 from $100, 50 from $1,000. Fish's docs name no
+way to ask for the tier, so the user enters it once in a menu on Setup's Requests at once row,
+saved in the project file as `quality.fishTier`.
 
-## Spend log
+## Spend log (built, as-5gk.8)
 
 Paid recordings are held to a budget but nothing records what they cost. A history per part (when,
 which model, how many lines, the dollars charged), kept in `.audio-studio/` since it is the

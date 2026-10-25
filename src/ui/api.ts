@@ -9,6 +9,7 @@ import {
   type MutationState,
   type QueryClient,
 } from '@tanstack/react-query'
+import { DESIGN_PRICE } from '../core/design'
 import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
@@ -18,18 +19,22 @@ import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
 import type { Problem } from '../core/project'
+import type { SpendingAnswer } from '../core/spending'
 import type { JobState } from '../services/jobs'
 import type { HeardResult } from '../services/heard'
 import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { Take } from '../core/retirement'
+import type { FishTier } from '../core/setup'
 import type { ModelsChange } from '../services/models'
 import type { SoundAlikeChange } from '../services/soundAlike'
+import type { FishTierChange } from '../services/fishTier'
 import type { SetupResult } from '../services/setup'
 import type { NoteChange } from '../services/notes'
 import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../services/lineTakes'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { CloneResult } from '../services/cloneVoice'
+import type { DesignResult } from '../services/designs'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import type { SittingView } from '../core/sitting'
@@ -72,6 +77,21 @@ export function useChanges() {
     queryKey: ['changes'],
     queryFn: () => getJson<ChangesResult>('/api/changes'),
     refetchInterval: 5000,
+  })
+}
+
+/**
+ * What paid recordings cost: read again every couple of seconds while one runs (its cost and
+ * lines are live), else every so often, since recordings end from other pages.
+ */
+export function useSpending() {
+  return useQuery({
+    queryKey: ['spending'],
+    queryFn: () => getJson<SpendingAnswer>('/api/spending'),
+    refetchInterval: (query) =>
+      query.state.data?.ok && query.state.data.rows.some((r) => r.state === 'running')
+        ? 2000
+        : 15_000,
   })
 }
 
@@ -849,6 +869,48 @@ export function useCloneVoice(characterId: string) {
   })
 }
 
+/** The description the character's design box starts with: the last one sent, null before any. */
+export function useDesigns(characterId: string, language?: string) {
+  return useQuery({
+    queryKey: ['designs', characterId, language ?? ''],
+    queryFn: () =>
+      getJson<{ ok: true; description: string | null } | ProjectFailure>(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/designs`, language),
+      ),
+  })
+}
+
+/**
+ * Has Fish design voices from the description, once the user has confirmed the cost. The answer
+ * says what was made, or why not; the audition (the designs join it), the last description and the
+ * credit are read again after one that was made.
+ */
+export function useDesignVoices(characterId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (description: string) => {
+      const response = await fetch(
+        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/design`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ description, spendUpTo: DESIGN_PRICE }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`designing answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<DesignResult> | { ok: false; message: string }
+    },
+    onSettled: (result) => {
+      void client.invalidateQueries({ queryKey: ['designs', characterId, language ?? ''] })
+      if (!result?.ok) return
+      void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
+      void client.invalidateQueries({ queryKey: ['credit'] })
+    },
+  })
+}
+
 /** Has the voice say the character's audition phrase; the take's key, or why there is none. */
 export async function recordVoiceTake(
   characterId: string,
@@ -990,6 +1052,32 @@ export function useSetup(fresh = false) {
   })
 }
 
+/** Saves what the user has paid Fish in total (or clears it), then checks the setup again. */
+export function useSetFishTier() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'fish-tier' },
+    mutationFn: async (tier: FishTier | null) => {
+      const response = await fetch('/api/fish-tier', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the tier answered ${response.status}`)
+      }
+      const change = (await response.json()) as FishTierChange
+      if (!change.ok) throw new Error('the tier was not saved')
+    },
+    // Saved or not, the row checks again, so it shows what the file holds.
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['setup'] }),
+        client.invalidateQueries({ queryKey: ['project'] }),
+      ]),
+  })
+}
+
 /** A line's extra takes, newest first, each marked current or stale. */
 export function useLineTakes(partId: string, key: string, language?: string) {
   return useQuery({
@@ -1054,6 +1142,7 @@ export function useLineTakeActions(partId: string, key: string, language?: strin
         setRefused({ what: 'The take could not be made', answer: result })
       }
       void client.invalidateQueries({ queryKey: ['credit'] })
+      void client.invalidateQueries({ queryKey: ['spending'] })
       return reloadTakes()
     },
   })
@@ -1197,6 +1286,8 @@ export function useRecordLines(partId: string, language?: string) {
         // The line stays "recording" until its new status is shown, so it is never offered twice.
         void client.invalidateQueries({ queryKey: ['plan', partId] })
         void client.invalidateQueries({ queryKey: ['credit'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
         void client.invalidateQueries({ queryKey: ['heard', partId] })
         await client.invalidateQueries({ queryKey: ['part', partId] })
         setRecording((now) => {
@@ -1279,6 +1370,8 @@ export function useJob(partId: string, language?: string) {
       // A finished job may have spent credit.
       if (job && !running && before?.status !== job.status) {
         void client.invalidateQueries({ queryKey: ['credit'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
+        void client.invalidateQueries({ queryKey: ['spending'] })
       }
       return job
     },
@@ -1316,7 +1409,11 @@ export function useJobActions(partId: string, language?: string) {
       if (!response.ok) throw new Error(`generating answered ${response.status}`)
       return body
     },
-    onSuccess: (job) => client.setQueryData(['job', partId, language], job),
+    onSuccess: (job) => {
+      client.setQueryData(['job', partId, language], job)
+      // A paid job is on the Spending page from its first moment.
+      void client.invalidateQueries({ queryKey: ['spending'] })
+    },
     // Refused (the cost changed, a promotion ended): the plan shows what to confirm now.
     onError: () => client.invalidateQueries({ queryKey: ['plan', partId] }),
   })
