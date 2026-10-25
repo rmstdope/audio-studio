@@ -11,17 +11,38 @@ import { cueFor, type Cast, type Cues, type Line, type Lock, type Manifest } fro
  * - `missing`: there is no clip
  * - `untracked`: there is a clip, but nothing says what it was made from (made before the studio)
  * - `uncast`: the speaker has no voice, so nothing can be recorded
+ * - `untranslated`: the line is in the source language but has no text in this one
  */
-export type LineStatus = 'ok' | 'weak' | 'stale' | 'missing' | 'untracked' | 'uncast'
+export type LineStatus =
+  | 'ok'
+  | 'weak'
+  | 'stale'
+  | 'missing'
+  | 'untracked'
+  | 'uncast'
+  | 'untranslated'
 
 /** Every status, in the order the UI lists them. */
-export const LINE_STATUSES: LineStatus[] = ['ok', 'weak', 'stale', 'missing', 'untracked', 'uncast']
+export const LINE_STATUSES: LineStatus[] = [
+  'ok',
+  'weak',
+  'stale',
+  'missing',
+  'untracked',
+  'uncast',
+  'untranslated',
+]
 
 /** One line of a part with the state of its clip. */
 export interface LineState {
   key: string
   speaker: string
   text: string
+  /**
+   * The source language's text of the line, when this is another language and the source has the
+   * line; null otherwise.
+   */
+  english: string | null
   /** The cue the line is (or would be) delivered with. */
   cue: string
   /** Whether that is the line's own cue (from the part's cues), not its character's style. */
@@ -56,6 +77,11 @@ export interface PartState {
 /** What the planner reads about a part. */
 export interface PlanInput {
   lines: Line[]
+  /**
+   * The source language's dialog, when `lines` is another language's: lines are matched by key, a
+   * source line missing from `lines` (or blank there) is listed as untranslated.
+   */
+  source?: Line[]
   cast: Cast
   cues: Cues
   lock: Lock
@@ -67,10 +93,29 @@ export interface PlanInput {
 
 /** The state of every line's clip in a part, its orphaned clips and cues, and counts per status. */
 export function planPart(input: PlanInput): PartState {
-  const { lines, cast, cues, lock, manifest, files, narration } = input
+  const { cast, cues, lock, manifest, files, narration } = input
+  const lines = withSource(input.lines, input.source)
   const counts = Object.fromEntries(LINE_STATUSES.map((s) => [s, 0])) as Record<LineStatus, number>
 
-  const states = lines.map((line): LineState => {
+  const states = lines.map(({ line, english }): LineState => {
+    if (line.text.trim() === '' && english !== null) {
+      counts.untranslated++
+      return {
+        key: line.key,
+        speaker: line.speaker,
+        text: '',
+        english,
+        cue: '',
+        ownCue: false,
+        final: false,
+        status: 'untranslated',
+        reasons: [],
+        heard: null,
+        accepted: false,
+        duration: null,
+        file: null,
+      }
+    }
     const character = cast.speakers[line.speaker]
     const inputs = clipInputs(line, character, cues, cast.pronounce, narration)
     const clip = manifest[line.key]
@@ -107,6 +152,7 @@ export function planPart(input: PlanInput): PartState {
       key: line.key,
       speaker: line.speaker,
       text: line.text,
+      english,
       cue: inputs?.cue ?? cueFor(cues, line.key) ?? character?.style ?? '',
       ownCue: cueFor(cues, line.key) !== undefined,
       final,
@@ -119,7 +165,7 @@ export function planPart(input: PlanInput): PartState {
     }
   })
 
-  const keys = new Set(lines.map((line) => line.key))
+  const keys = new Set(lines.map(({ line }) => line.key))
   const orphans = Object.entries(manifest)
     .filter(([key]) => !keys.has(key))
     .map(([key, clip]) => ({ key, speaker: clip.speaker ?? null, file: clip.file }))
@@ -129,6 +175,29 @@ export function planPart(input: PlanInput): PartState {
     .map(([key, cue]) => ({ key, cue }))
 
   return { lines: states, orphans, orphanCues, counts }
+}
+
+/**
+ * The lines of a part in a language as they are planned: with a source dialog, the source's lines
+ * in its order (an untranslated one with empty text), then the lines only this language has.
+ */
+function withSource(
+  lines: Line[],
+  source: Line[] | undefined,
+): { line: Line; english: string | null }[] {
+  if (!source) return lines.map((line) => ({ line, english: null }))
+  const own = new Map(lines.map((line) => [line.key, line]))
+  const inSource = new Set(source.map((line) => line.key))
+  return [
+    ...source.map((line) => {
+      const translated = own.get(line.key)
+      return {
+        line: translated && translated.text.trim() !== '' ? translated : { ...line, text: '' },
+        english: line.text,
+      }
+    }),
+    ...lines.filter((line) => !inSource.has(line.key)).map((line) => ({ line, english: null })),
+  ]
 }
 
 /**
