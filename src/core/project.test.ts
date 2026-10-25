@@ -34,18 +34,25 @@ describe('ProjectSchema', () => {
     expect(project.narration.audition.candidatesPerRound).toBe(5)
   })
 
-  it('rejects a paid audition model, naming the stage', () => {
+  it('accepts a paid audition model whose price is known', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    const parsed = parse({ ...base, narration: { ...narration, models: { audition: 's2.1-pro' } } })
+    expect(parsed.success && parsed.data.narration.models.audition).toBe('s2.1-pro')
+  })
+
+  it('rejects an audition model without a known price, naming the stage', () => {
     const base = projectJson()
     const narration = base.narration as Record<string, unknown>
     const found = problems({
       ...base,
-      narration: { ...narration, models: { audition: 'drama-3' } },
+      narration: { ...narration, models: { audition: 'mystery-9' } },
     })
     expect(found).toEqual([
       {
         file: 'audio-studio.json',
         path: 'narration.models.audition',
-        message: '"drama-3" cannot be used for auditions yet: only s2.1-pro-free can',
+        message: '"mystery-9" has no known price, so its cost cannot be shown',
       },
     ])
   })
@@ -164,8 +171,8 @@ describe('ProjectSchema, paid models', () => {
     })
   })
 
-  it('refuses a model without a known price, and a paid audition for now', () => {
+  it('refuses a model without a known price', () => {
     expect(withModels({ draft: 'brand-new' }).success).toBe(false)
-    expect(withModels({ audition: 's2-pro' }).success).toBe(false)
+    expect(withModels({ audition: 'brand-new' }).success).toBe(false)
   })
 })

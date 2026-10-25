@@ -85,3 +85,23 @@ describe('createBudget, its dollars', () => {
     expect(budget.left).toBeLessThan(1)
   })
 })
+
+describe('createBudget, topped up and refunded', () => {
+  const at = new Date('2026-10-24T12:00:00Z')
+
+  it('add raises both what it was given and what is left', () => {
+    const budget = createBudget({ model: 's2-pro', dollars: 0.001 })
+    budget.spend('s2-pro', 50, at) // $0.00075
+    budget.add(0.01)
+    expect(budget.dollars).toBeCloseTo(0.011, 12)
+    expect(budget.left).toBeCloseTo(0.01025, 12)
+  })
+
+  it('refund gives back what a take cost without changing what it was given', () => {
+    const budget = createBudget({ model: 's2-pro', dollars: 0.001 })
+    budget.spend('s2-pro', 50, at)
+    budget.refund(0.00075)
+    expect(budget.left).toBeCloseTo(0.001, 12)
+    expect(budget.dollars).toBe(0.001)
+  })
+})
