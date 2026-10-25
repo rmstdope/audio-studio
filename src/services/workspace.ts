@@ -414,8 +414,8 @@ export async function readPart(
     ears: {
       // Told the language only in a project with several, so a single-language project is as it was.
       language: project.narration.languages.length > 1 ? language : undefined,
-      // The built-in groups are English words: they apply to English only.
-      alike: soundAlikes(soundAlikeOf(project.narration, language), language === 'en'),
+      // Its numbers as words; the built-in groups are English words and apply to English only.
+      alike: soundAlikes(soundAlikeOf(project.narration, language), language),
     },
     project,
     part,

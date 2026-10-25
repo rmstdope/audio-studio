@@ -476,6 +476,10 @@ describe('a part in several languages', () => {
     expect(same(sv, 'liria', 'lyria')).toBe(true)
     expect(same(sv, 'inn', 'in')).toBe(false)
     expect(same(sv, 'lira', 'lyra')).toBe(false)
+    // Numbers in the part's own language.
+    expect(same(sv, 'tjugo', '20')).toBe(true)
+    expect(same(en, 'tjugo', '20')).toBe(false)
+    expect(same(en, 'twenty', '20')).toBe(true)
   })
 
   it('says so when the source dialog is missing, since lines cannot be matched', async () => {

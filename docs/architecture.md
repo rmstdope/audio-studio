@@ -122,6 +122,7 @@ audio-studio/
 │   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
 │   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
 │   │   ├── align.ts             Whisper words → word timings, heard ratio (narrate.py's, + names)
+│   │   ├── numbers.ts           the numbers 0–99 in words, per language, matched to digits
 │   │   ├── audition.ts          the audition board: to hear, shortlist, drop and undo
 │   │   ├── ruledOut.ts          voices ruled out per character (dropped, left out of searches)
 │   │   ├── heard.ts             what Whisper heard of a part's lines below full, as saved
@@ -244,7 +245,10 @@ an id and a title.
   English ones (`core/soundAlike.ts`: "in" and "inn", "weekly" and "weakly", "there", "their" and
   "they're", …); see §8.2. Optional, empty by default; edited on the characters page (§8.3).
   The same for a language besides the source in `quality.soundAlikeByLanguage` (`{ "sv": [[…]] }`,
-  declared languages only); the built-in groups are English words and apply to `en` only.
+  declared languages only); the built-in groups are English words and apply to `en` only. Words
+  are compared in any alphabet (letters and their marks kept: "får" is not "för"), and the numbers
+  0 to 99 of `en`, `sv`, `de`, `el` and `ru` are built-in groups of their language with the digits
+  Whisper writes ("tjugo" and "20", "twenty one" and "21"; `core/numbers.ts`).
 - `quality.fishTier` (`under-100`, `100` or `1000`) is what the user has paid Fish in total, which
   sets how many requests Fish takes at once (5, 15, 50). Fish offers no way to ask, so the user
   says it once in the menu on Setup's Requests at once row, saved at once
@@ -599,8 +603,13 @@ An audition is for a character, not for a part: the result applies to every part
       possessive 's not counted), nothing but letters and not all capitals, qualifies; where a
       sentence starts (after . ! ? … or a colon, opening a quote, single or double, or after a dash
       inside a word) only a known name: a one-word character id of the cast ("aren", not "ancient
-      tree spirit") or pronunciation. Lowercase words, short ones, numbers and other
-      sentence-initial words must match exactly. A title-case word mid-sentence ("The Call") is
+      tree spirit") or pronunciation. Lowercase words, short ones, numbers (in digits or in words:
+      "Act Three" heard as "Act Tree" is missed) and other sentence-initial words must match
+      exactly. Words are compared in any alphabet, letters and their marks kept ("får" is not "för",
+      Russian ё read as е), and a name in any alphabet is guessed the same way ("Лирия" as
+      "Лирья"); the as-it-sounds spellings are English ones. The numbers 0 to 99 of `en`, `sv`,
+      `de`, `el` and `ru`, in their common forms ("en" and "ett", "одну"), are words that sound the
+      same as their digits, in the part's own language (`core/numbers.ts`). A title-case word mid-sentence ("The Call") is
       taken for a name;
    4. retry up to `takes` times until the heard ratio reaches `minHeard`, keep the best take;
    5. encode MP3 into the clips folder, update the manifest and lock entries, write both; then
