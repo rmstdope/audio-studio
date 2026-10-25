@@ -20,7 +20,7 @@ import { AlertIcon, HeadphonesIcon, PauseIcon, PlayIcon } from '../../components
 import { Problems } from '../../components/Problems'
 import { StatusBar } from '../../components/StatusBar'
 import { useClipPlayer } from '../../components/useClipPlayer'
-import { compact, plural, shortTitle, tintFor, voiceLabel } from '../../format'
+import { compact, plural, separatorBefore, shortTitle, tintFor, voiceLabel } from '../../format'
 import { routeHref } from '../../route'
 import { inGameState, recordedLinesOf } from '../../inGame'
 import type { Clip } from '../../player'
@@ -281,16 +281,19 @@ function VoicePanel({
         </span>
       )}
       {sharedWith.length > 0 && (
-        <span className="shared-voice">
-          <AlertIcon /> Also the voice of{' '}
-          {sharedWith.map((other, i) => (
-            <span key={other.id}>
-              {i > 0 && (i === sharedWith.length - 1 ? ' and ' : ', ')}
-              <a href={routeHref({ view: 'character', character: other.id })}>{other.name}</a>
-            </span>
-          ))}
-          . Two characters in one voice are hard to tell apart in a scene.
-        </span>
+        <p className="status-note shared-voice">
+          <AlertIcon />
+          <span>
+            Also the voice of{' '}
+            {sharedWith.map((other, i) => (
+              <span key={other.id}>
+                {separatorBefore(i, sharedWith.length)}
+                <a href={routeHref({ view: 'character', character: other.id })}>{other.name}</a>
+              </span>
+            ))}
+            . Characters in one voice are hard to tell apart in a scene.
+          </span>
+        </p>
       )}
       <div className="voice-listen">
         <div className="listen-box">

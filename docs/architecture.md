@@ -242,7 +242,8 @@ keyed by its name; every part whose dialog has a speaker of that name uses that 
 style and audition keywords are the same in every part. To give a character a different voice in
 another part, the game names the speaker differently (`narrator-act2`), and it becomes a character
 of its own. The pronunciation table is project-wide too. Per-part differences in delivery go in the
-part's cues.
+part's cues. Two characters may be cast with one voice (a narrator and a character in a prologue,
+say); the studio points it out on their pages and cards, as a note, not a problem.
 
 ```json
 {
@@ -366,7 +367,7 @@ This is the audition built in step 9 (§12).
 
 Every character has a **character page** (`#/characters/<id>`), the one place about it: its
 cast voice (Fish's details, its take and Fish's sample, its id and a link to Fish; the take
-records by itself when missing), its lines per part, its delivery (the style cue and its own speed) and casting
+records by itself when missing; a note when another character has the same voice), its lines per part, its delivery (the style cue and its own speed) and casting
 brief (search keywords and audition phrase), the voices ruled out for it, the audition in
 progress, if there is one, and **Hear it in the game**: its recorded lines with their part, cue
 and status, as the game plays them, one by one or all in turn (the first five shown until asked

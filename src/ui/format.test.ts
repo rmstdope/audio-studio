@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  centsUp,
   compact,
+  dollars,
   longTitle,
   plural,
+  separatorBefore,
   shortTitle,
   tintFor,
   voiceLabel,
-  centsUp,
-  dollars,
 } from './format'
 
 describe('titles', () => {
@@ -27,6 +28,16 @@ describe('voiceLabel', () => {
     expect(voiceLabel({ voice: 'abcdef123456', voiceName: 'Gentle Granny' })).toBe('Gentle Granny')
     expect(voiceLabel({ voice: 'abcdef123456', voiceName: null })).toBe('voice abcdef12…')
     expect(voiceLabel({ voice: null, voiceName: null })).toBe('No voice yet')
+  })
+})
+
+describe('separatorBefore', () => {
+  it('parts a list with commas, and "and" before the last', () => {
+    const join = (names: string[]) =>
+      names.map((n, i) => separatorBefore(i, names.length) + n).join('')
+    expect(join(['A'])).toBe('A')
+    expect(join(['A', 'B'])).toBe('A and B')
+    expect(join(['A', 'B', 'C'])).toBe('A, B and C')
   })
 })
 

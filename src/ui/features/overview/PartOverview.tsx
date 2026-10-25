@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { LineStatus } from '../../../core/planner'
-import type { PartSummary, ProjectSummary } from '../../../core/summary'
+import { sharesVoiceWith, type PartSummary, type ProjectSummary } from '../../../core/summary'
 import type { PartDetail } from '../../../services/workspace'
 import { useAdopt, useMoveCue, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
@@ -217,6 +217,7 @@ function CastSection({
             otherParts={character.appearances
               .filter((a) => a.part !== part.id)
               .map((a) => `Also in ${titles.get(a.part) ?? a.part}`)}
+            sharedVoice={sharesVoiceWith(summary.characters, character.id).length > 0}
           />
         ))}
       </div>
