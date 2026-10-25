@@ -55,9 +55,10 @@ export type CreditResult =
 export class FishError extends Error {
   constructor(
     readonly status: number,
-    message: string,
+    /** Fish's own message, without the status. */
+    readonly detail: string,
   ) {
-    super(`Fish Audio answered ${status}: ${message}`)
+    super(`Fish Audio answered ${status}: ${detail}`)
     this.name = 'FishError'
   }
 }
@@ -97,6 +98,9 @@ function toVoice(api: z.infer<typeof ApiVoiceSchema>): Voice {
   }
 }
 
+/** The waits, in ms, before asking Fish again after a 429: 1 s, then doubling, to 32 s. */
+const RETRY_WAITS = [1000, 2000, 4000, 8000, 16000, 32000]
+
 /**
  * A client for Fish Audio's REST API (https://docs.fish.audio). `fetch` and the base URL can be
  * replaced, for tests.
@@ -107,20 +111,45 @@ export function createFishClient(
     fetch = globalThis.fetch,
     baseUrl = 'https://api.fish.audio',
     timeoutMs = 120_000,
-  }: { fetch?: typeof globalThis.fetch; baseUrl?: string; timeoutMs?: number } = {},
+    sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  }: {
+    fetch?: typeof globalThis.fetch
+    baseUrl?: string
+    timeoutMs?: number
+    /** How to wait between tries, replaced in tests. */
+    sleep?: (ms: number) => Promise<void>
+  } = {},
 ): FishClient {
-  /** A request that gives up after `timeoutMs`, saying so, so a stuck request never blocks a job. */
+  /**
+   * A request that gives up after `timeoutMs`, saying so, so a stuck request never blocks a job;
+   * and that is asked again, after each of `RETRY_WAITS`, when Fish answers 429 (too many
+   * requests at once for the account's tier; Fish sends no Retry-After). After the last wait the
+   * 429 is thrown like any refusal, saying what to do about it.
+   */
   async function timed<T>(request: () => Promise<T>): Promise<T> {
-    try {
-      return await request()
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.name === 'TimeoutError' || error.name === 'AbortError')
-      ) {
-        throw new Error(`Fish Audio did not answer within ${timeoutMs / 1000} s`)
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await request()
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.name === 'TimeoutError' || error.name === 'AbortError')
+        ) {
+          throw new Error(`Fish Audio did not answer within ${timeoutMs / 1000} s`)
+        }
+        if (error instanceof FishError && error.status === 429) {
+          const wait = RETRY_WAITS[attempt]
+          if (wait !== undefined) {
+            await sleep(wait)
+            continue
+          }
+          throw new FishError(
+            429,
+            `${error.detail} (${attempt + 1} tries over a minute): lower quality.parallel, or wait for other work on this key`,
+          )
+        }
+        throw error
       }
-      throw error
     }
   }
 
