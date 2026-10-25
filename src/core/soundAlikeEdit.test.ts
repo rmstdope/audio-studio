@@ -3,6 +3,7 @@ import { groupsFrom, groupsProblem, rowsFrom, sameGroups } from './soundAlikeEdi
 
 describe('groupsFrom', () => {
   it('reads each row as words split at commas, trimmed, empty words and rows dropped', () => {
+    expect(groupsFrom(['all  right , alright'])).toEqual([['all right', 'alright']])
     expect(groupsFrom(['Lyria, Liria', ' inn ,in, ', '', ' , '])).toEqual([
       ['Lyria', 'Liria'],
       ['inn', 'in'],
@@ -16,7 +17,7 @@ describe('groupsFrom', () => {
 
   it('takes no word with a comma in it, as a row could not give it back', () => {
     expect(groupsProblem([['1,000', 'thousand']])).toBe(
-      '“1,000” is not one word (no spaces or commas, some letters).',
+      '“1,000” is not a word or phrase (no commas, some letters in each word).',
     )
   })
 })
@@ -31,11 +32,12 @@ describe('groupsProblem', () => {
     expect(groupsProblem([['inn', 'in'], ['Lyria']])).toBe(
       '“Lyria” is alone in its group: add another word that sounds the same, or remove it.',
     )
-    expect(groupsProblem([['Lyria', 'Leer ia']])).toBe(
-      '“Leer ia” is not one word (no spaces or commas, some letters).',
-    )
+    expect(groupsProblem([['all right', 'alright']])).toBeNull()
     expect(groupsProblem([['Lyria', '!!']])).toBe(
-      '“!!” is not one word (no spaces or commas, some letters).',
+      '“!!” is not a word or phrase (no commas, some letters in each word).',
+    )
+    expect(groupsProblem([['Lyria', 'Leer !!']])).toBe(
+      '“Leer !!” is not a word or phrase (no commas, some letters in each word).',
     )
   })
 })

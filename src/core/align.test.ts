@@ -571,6 +571,14 @@ describe('alignWords, words that sound the same', () => {
     expect(align('the Thrones-keep wall', 'the Throne keep wall').ratio).toBe(1)
   })
 
+  it('counts a phrase heard as one word, or one word as a phrase, in the same group', () => {
+    expect(align("It's all right now.", "It's alright now.").ratio).toBe(1)
+    expect(align("It's alright now.", "It's all right now.").ratio).toBe(1)
+    const alike = soundAlikes([['Lyria', 'Leer ia']])
+    expect(align('Ask Leer ia now', 'Ask Lyria now', alike).ratio).toBe(1)
+    expect(align("It's all bright now.", "It's alright now.").missed).toEqual([1, 2])
+  })
+
   it("adds a project's own groups to the built-in ones, joining groups that share a word", () => {
     const alike = soundAlikes([
       ['Lyria', 'Liria'],

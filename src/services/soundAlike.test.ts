@@ -60,7 +60,7 @@ describe('setSoundAlike', () => {
         },
       ],
     })
-    expect(await setSoundAlike(projectFile, [['Lyria', 'Leer ia']], [])).toMatchObject({
+    expect(await setSoundAlike(projectFile, [['Lyria', 'Leer !!']], [])).toMatchObject({
       ok: false,
     })
     expect(read()).toBe(before)

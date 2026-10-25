@@ -1,18 +1,18 @@
 /**
- * A sound-alike word the project may list: one word, no spaces or commas (which part the words of
- * a row), with a letter or digit in it.
+ * A sound-alike word or phrase the project may list ("Lyria", "all right"): words parted by one
+ * space, each with a letter or digit in it, and no commas (which part the words of a row).
  */
-export const SOUND_ALIKE_WORD = /^[^\s,]*[\p{L}\p{N}][^\s,]*$/u
+export const SOUND_ALIKE_WORD = /^[^\s,]*[\p{L}\p{N}][^\s,]*(?: [^\s,]*[\p{L}\p{N}][^\s,]*)*$/u
 
 /** The groups written in rows, one group a row, words split at commas; empty ones dropped. */
 export function groupsFrom(rows: string[]): string[][] {
   return cleanGroups(rows.map((row) => row.split(',')))
 }
 
-/** The groups with their words trimmed, and empty words and groups dropped. */
+/** The groups with their words trimmed, spaces inside as one, and empty words and groups dropped. */
 export function cleanGroups(groups: string[][]): string[][] {
   return groups
-    .map((group) => group.map((word) => word.trim()).filter(Boolean))
+    .map((group) => group.map((word) => word.trim().replace(/\s+/g, ' ')).filter(Boolean))
     .filter((group) => group.length > 0)
 }
 
@@ -31,7 +31,9 @@ export function groupsProblem(groups: string[][]): string | null {
       return `“${group[0]}” is alone in its group: add another word that sounds the same, or remove it.`
     }
     const odd = group.find((word) => !SOUND_ALIKE_WORD.test(word))
-    if (odd !== undefined) return `“${odd}” is not one word (no spaces or commas, some letters).`
+    if (odd !== undefined) {
+      return `“${odd}” is not a word or phrase (no commas, some letters in each word).`
+    }
   }
   return null
 }

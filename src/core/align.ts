@@ -373,13 +373,15 @@ function heardParts(heard: HeardWord[]): HeardWord[] {
 
 /**
  * How many words in a row (two or more) spell `word` together, as a compound heard apart ("silver
- * leaf" for "silverleaf") or heard as one ("everyone" for "every one"); 0 if none do.
+ * leaf" for "silverleaf") or heard as one ("everyone" for "every one"), or say it as a phrase of
+ * its sound-alike group ("all right" for "alright"); 0 if none do.
  */
-function spelledBy(word: string, words: string[]): number {
+function spelledBy(word: string, words: string[], alike: SoundAlike): number {
+  const sound = grouped(word, alike)
   let spelled = words[0] ?? ''
-  for (let n = 2; n <= words.length && spelled.length < word.length; n++) {
+  for (let n = 2; n <= words.length; n++) {
     spelled += words[n - 1]
-    if (spelled === word) return n
+    if (spelled === word || grouped(spelled, alike) === sound) return n
   }
   return 0
 }
@@ -444,11 +446,12 @@ function alignGap(
    */
   const pairing = (s: number, h: number, sTo: number, hTo: number, guess: boolean) => {
     if (s >= sTo || h >= hTo) return null
-    const apart = spelledBy(pieces[s]!.spelled, gotSpelled.slice(h, hTo))
+    const apart = spelledBy(pieces[s]!.spelled, gotSpelled.slice(h, hTo), alike)
     if (apart) return { shown: 1, heard: apart, apply: () => take(s, h, h + apart - 1) }
     const together = spelledBy(
       gotSpelled[h]!,
       pieces.slice(s, sTo).map((p) => p.spelled),
+      alike,
     )
     if (together) {
       const { start, end } = parts[h]!

@@ -215,10 +215,10 @@ an id and a title.
 - `models` names the Fish model for each stage (see §8.4). `audition` must be the free model for
   now; `draft` and `final` may name any model whose price the studio knows. Anything else is
   rejected with a clear message.
-- `quality.soundAlike` lists the game's own words that sound the same (one word each, with letters),
-  a group each, added to the studio's built-in English ones (`core/soundAlike.ts`: "in" and "inn",
-  "weekly" and "weakly", "there", "their" and "they're", …); see §8.2. Optional, empty by default;
-  edited on the characters page (§8.3).
+- `quality.soundAlike` lists the game's own words that sound the same (words or phrases, with
+  letters in each word: "all right" and "alright"), a group each, added to the studio's built-in
+  English ones (`core/soundAlike.ts`: "in" and "inn", "weekly" and "weakly", "there", "their" and
+  "they're", …); see §8.2. Optional, empty by default; edited on the characters page (§8.3).
 
 ---
 
@@ -444,7 +444,8 @@ An audition is for a character, not for a part: the result applies to every part
       before -er, -ed, -ing and -ous, -ise and -ize: "traveller" heard as "traveler", "colours" as
       "colors"), and words that sound the same are one word (the built-in groups and the project's
       `quality.soundAlike`: "inn" heard as "in", "weekly" as "weakly"), wherever words are matched
-      exactly, not where a compound is joined or a name guessed; a listed word's plural or
+      exactly, and a phrase of a group heard as one word or the other way round ("all right" as
+      "alright"), not where a compound is joined or a name guessed; a listed word's plural or
       possessive ("knight's") is not in the list. Words are matched whole first, as narrate.py does;
       the shown and heard words left between two matches are then compared by their parts, split at
       hyphens and dashes on both sides (punctuation beside a dash is no part), and a compound

@@ -53,8 +53,8 @@ export function SoundAlikePanel({
         </div>
         <span className="muted">
           When Whisper writes one word of a group for another (“Liria” for “Lyria”), it still counts
-          as heard, as for the studio’s built-in English ones (“inn” and “in”). Words are separated
-          by commas. Counts from the next take on. Saved in{' '}
+          as heard, as for the studio’s built-in English ones (“inn” and “in”). Words or phrases
+          (“all right”, “alright”) are separated by commas. Counts from the next take on. Saved in{' '}
           <span className="mono">{projectFile}</span>.
         </span>
       </div>

@@ -113,6 +113,7 @@ export const SOUND_ALIKE: readonly (readonly string[])[] = [
   ['principal', 'principle'],
   ['draught', 'draft'],
   ['grey', 'gray'],
+  ['alright', 'all right'],
   ['defence', 'defense'],
   ['offence', 'offense'],
   ['plough', 'plow'],
