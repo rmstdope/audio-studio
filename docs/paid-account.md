@@ -46,6 +46,8 @@ this needs a paid account at all.
 
 ## Voice design
 
+_Built (as-5gk.6, §8.1): designs are kept per character, saved to the account only when cast. Facts it rests on: Fish's design endpoint creates no voice, so a cast design is uploaded as a reference through the cloning endpoint; its preview text is limited to 150 characters in the API reference (300 on the guide page); an answer with no candidates is not billed._
+
 Making a voice from a text description (`voice-design-1`, `POST /v1/voice-design`): $0.01 per
 successful request, so it needs credit. Like a paid audition, it must ask to confirm and be charged
 to a budget before it spends.
