@@ -592,6 +592,22 @@ describe('setPronunciations', () => {
     expect(await setStyle(projectFile, 'grandmother', '[x]')).toEqual({ ok: true })
   })
 
+  it('refuses a character change that would reorder a language’s number key, too', async () => {
+    const root = tempRepo({
+      ...withTable,
+      'audio-studio.json': languageProject(),
+      'tts/cast.json': {
+        speakers: { grandmother: { voice: 'cur' } },
+        languages: { sv: { pronounce: { Eldoria: 'x', '10': 'tio' } } },
+      },
+    })
+    const result = await setStyle(join(root, 'audio-studio.json'), 'grandmother', '[x]')
+    expect(result).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/cast.json', path: 'languages.sv.pronounce' }],
+    })
+  })
+
   it('keeps a character change made at the same time', async () => {
     const root = tempRepo(withTable)
     const projectFile = join(root, 'audio-studio.json')

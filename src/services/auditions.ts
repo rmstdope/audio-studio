@@ -467,15 +467,23 @@ async function writeCharacter(
   return writeCast(projectFile, (cast, parsed, path) => {
     // A number-like pronunciation among others: parsing has already lost the file's order, so
     // writing would change the order they apply in. The table itself can be fixed on its own.
-    const keys = Object.keys(parsed.pronounce)
-    const reordered = keys.filter((k) => INTEGER_LIKE.test(k))
-    if (reordered.length && keys.length > 1) {
-      const message =
-        `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move to the ` +
-        'top if the studio wrote this file, changing the order pronunciations apply in. Make ' +
-        'the key longer under Pronunciations on All characters, e.g. "Act 10" or "10 " (any key ' +
-        'that is not a plain number keeps its place).'
-      return [{ file: path, path: 'pronounce', message }]
+    const tables: [string, string[]][] = [
+      ['pronounce', Object.keys(parsed.pronounce)],
+      ...Object.entries(parsed.languages ?? {}).map(([language, own]): [string, string[]] => [
+        `languages.${language}.pronounce`,
+        Object.keys(own.pronounce ?? {}),
+      ]),
+    ]
+    for (const [where, keys] of tables) {
+      const reordered = keys.filter((k) => INTEGER_LIKE.test(k))
+      if (reordered.length && keys.length > 1) {
+        const message =
+          `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move to the ` +
+          'top if the studio wrote this file, changing the order pronunciations apply in. Make ' +
+          'the key longer under Pronunciations on All characters, e.g. "Act 10" or "10 " (any key ' +
+          'that is not a plain number keeps its place).'
+        return [{ file: path, path: where, message }]
+      }
     }
     const speakers = { ...cast.speakers }
     const { narration } = loaded.project
