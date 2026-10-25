@@ -1,0 +1,551 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Lines in each language</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --chip: #1a1d26;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --stale: #ffc24b;
+        --stale-bg: #2d2412;
+        --missing: #8fb5ff;
+        --missing-bg: #142033;
+        --weak: #ff94a8;
+        --weak-bg: #2e1720;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .note {
+        background: #1d1a10;
+        border-bottom: 1px solid #3a3420;
+        color: #e8d9a8;
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+      .shell {
+        display: flex;
+        min-height: 100vh;
+      }
+      .sidebar {
+        flex: 0 0 240px;
+        background: var(--sidebar);
+        border-right: 1px solid #1e212a;
+        padding: 20px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .brand {
+        font-weight: 600;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: var(--accent);
+      }
+      .box {
+        padding: 12px;
+        border-radius: 12px;
+        background: #151821;
+        border: 1px solid #222632;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nav .label {
+        padding: 0 10px 6px;
+      }
+      .ni {
+        padding: 9px 10px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 13.5px;
+        display: flex;
+        gap: 10px;
+      }
+      .ni.on {
+        background: var(--chip);
+        color: var(--text);
+      }
+      .ni .g {
+        flex: 1;
+      }
+      .ni .m {
+        font:
+          11px ui-monospace,
+          monospace;
+        color: var(--faint);
+      }
+      .content {
+        flex: 1;
+        min-width: 0;
+        padding: 28px 36px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .hdr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .crumbs {
+        font-size: 12.5px;
+        color: var(--faint);
+      }
+      h1 {
+        font-size: 30px;
+        font-weight: 600;
+        margin: 6px 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .tab {
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        color: var(--muted);
+      }
+      .tab.on {
+        background: var(--chip);
+        border-color: var(--line-strong);
+        color: var(--text);
+      }
+      .cnt {
+        font:
+          11.5px ui-monospace,
+          monospace;
+        color: var(--faint);
+      }
+      .filters {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .field {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .sel,
+      .search {
+        font-size: 13px;
+        color: var(--text);
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        min-height: 36px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .search {
+        width: 180px;
+        color: var(--faint);
+      }
+      .btn {
+        font-size: 13px;
+        padding: 8px 12px;
+        border-radius: 9px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .seg {
+        display: inline-flex;
+        padding: 3px;
+        border-radius: 11px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        gap: 2px;
+      }
+      .seg span {
+        padding: 7px 14px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .seg .on {
+        background: var(--chip);
+        color: var(--text);
+        box-shadow: inset 0 0 0 1px var(--line-strong);
+      }
+      .tb {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--sidebar);
+        overflow: hidden;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        font-weight: 500;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 12px;
+        border-bottom: 1px solid #181b22;
+        vertical-align: top;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 4px 9px;
+        border-radius: 99px;
+      }
+      .pill:before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 9px;
+        background: currentColor;
+      }
+      .ok {
+        color: var(--ok);
+        background: var(--ok-bg);
+      }
+      .stale {
+        color: var(--stale);
+        background: var(--stale-bg);
+      }
+      .missing {
+        color: var(--missing);
+        background: var(--missing-bg);
+      }
+      .weak {
+        color: var(--weak);
+        background: var(--weak-bg);
+      }
+      .sp {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .tx {
+        color: #d5d9e1;
+        line-height: 1.45;
+        display: block;
+        margin-top: 4px;
+      }
+      .ref {
+        display: block;
+        margin-top: 4px;
+        font-size: 12.5px;
+        color: var(--faint);
+        line-height: 1.4;
+      }
+      .ref b {
+        font-weight: 500;
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-right: 6px;
+        color: #6f7686;
+      }
+      .ib {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+      }
+      .panel {
+        padding: 20px 22px;
+        border-radius: 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+      .bar {
+        height: 6px;
+        width: 60px;
+        border-radius: 9px;
+        background: #1b1e27;
+        overflow: hidden;
+        display: inline-block;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--ok);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      <b>Agreed drawing — Svenska chosen.</b> Mira’s first line is recorded; Old Tom’s is not
+      translated yet; the last line exists only in Svenska. Below the table, the same page with
+      Deutsch chosen.
+    </div>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark"></div>
+          Audio Studio
+        </div>
+        <div class="box">
+          <span class="label">Project</span><strong>RetroQuest</strong
+          ><span class="mono faint" style="font-size: 11px">~/repos/retroquest</span>
+        </div>
+
+        <div class="nav">
+          <span class="label">Workspace</span>
+          <div class="ni on"><span class="g">Narration</span></div>
+          <div class="ni"><span class="g">Music</span><span class="m">Soon</span></div>
+        </div>
+        <div class="nav">
+          <span class="label">Acts</span>
+          <div class="ni">
+            <span class="m">1</span><span class="g">Act I: The Call to Adventure</span>
+          </div>
+          <div class="ni on"><span class="m">2</span><span class="g">Act II</span></div>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <div class="ni"><span class="g">All characters</span><span class="m">14</span></div>
+          <div class="ni"><span class="g">Changes</span></div>
+          <div class="ni"><span class="g">Setup</span></div>
+        </div>
+      </aside>
+      <main class="content">
+        <header class="hdr">
+          <div>
+            <span class="crumbs">Narration / Act II</span>
+            <h1>Lines</h1>
+            <span class="muted">Act II · 480 lines</span>
+          </div>
+          <div class="seg" role="tablist" aria-label="Language" style="flex-wrap: wrap">
+            <span class="" title="412 of 480 lines up to date"
+              >English <span class="cnt">412/480</span></span
+            ><span class="on" title="40 of 481 lines up to date"
+              >Svenska <span class="cnt">40/481</span></span
+            ><span class="" title="Act II has no Deutsch dialog yet"
+              >Deutsch <span class="cnt">No dialog</span></span
+            >
+          </div>
+        </header>
+        <div class="toolbar">
+          <div class="tabs">
+            <span class="tab on">Needs attention<span class="cnt">441</span></span
+            ><span class="tab">Up to date<span class="cnt">40</span></span
+            ><span class="tab">Missing<span class="cnt">440</span></span
+            ><span class="tab">Not translated<span class="cnt">1</span></span
+            ><span class="tab">All<span class="cnt">481</span></span>
+          </div>
+          <div class="filters">
+            <span class="btn">▶ Play all</span
+            ><span class="field">Character <span class="sel">All ▾</span></span
+            ><span class="search">Search lines</span>
+          </div>
+        </div>
+        <p class="muted" style="margin: 0; font-size: 13px">
+          Recording in Svenska is not available yet: you can see and play its lines.
+        </p>
+        <div class="tb">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 130px">Status</th>
+                <th>Line</th>
+                <th style="width: 70px">Length</th>
+                <th style="width: 70px">Heard</th>
+                <th style="width: 100px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="pill ok">Up to date</span></td>
+                <td>
+                  <span class="sp"
+                    >Mira <span class="mono faint" style="font-weight: 400">act2.mira.1</span></span
+                  ><span class="tx">Kom in ur regnet, barn. Sätt dig vid elden.</span
+                  ><span class="ref"
+                    ><b>English</b>Come in out of the rain, child. Sit by the fire.</span
+                  >
+                </td>
+                <td class="mono faint">2.4s</td>
+                <td class="mono faint">97%</td>
+                <td>
+                  <span class="ib" title="Play act2.mira.1">▶</span>
+                  <span class="ib" title="Play from here onward">≡</span>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="pill" style="color: #b8bfcc; background: #1d2029"
+                    >Not translated</span
+                  >
+                </td>
+                <td>
+                  <span class="sp"
+                    >Old Tom
+                    <span class="mono faint" style="font-weight: 400">act2.tom.3</span></span
+                  ><span class="tx faint" style="font-style: italic"
+                    >No Svenska text for this line yet.</span
+                  ><span class="ref"
+                    ><b>English</b>The bridge washed out three nights ago. Nobody crosses now.</span
+                  >
+                </td>
+                <td class="mono faint">—</td>
+                <td class="mono faint">—</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><span class="pill missing">Missing</span></td>
+                <td>
+                  <span class="sp"
+                    >Narrator
+                    <span class="mono faint" style="font-weight: 400">act2.n.7</span></span
+                  ><span class="tx">Lyktan fladdrar, och vägen framför är mörk.</span
+                  ><span class="ref"
+                    ><b>English</b>The lantern flickers, and the road ahead is dark.</span
+                  >
+                </td>
+                <td class="mono faint">—</td>
+                <td class="mono faint">—</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><span class="pill missing">Missing</span></td>
+                <td>
+                  <span class="sp"
+                    >Mira <span class="mono faint" style="font-weight: 400">act2.mira.9</span></span
+                  ><span class="tx">Ta lyktan med dig.</span
+                  ><span class="ref" style="font-style: italic"
+                    ><b>English</b>No English line.</span
+                  >
+                </td>
+                <td class="mono faint">—</td>
+                <td class="mono faint">—</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2
+          style="
+            margin: 24px 0 0;
+            font-size: 13px;
+            color: var(--faint);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+          "
+        >
+          The same page with Deutsch chosen
+        </h2>
+        <header class="hdr">
+          <div>
+            <span class="crumbs">Narration / Act II</span>
+            <h1>Lines</h1>
+            <span class="muted">Act II · 480 lines</span>
+          </div>
+          <div class="seg" role="tablist" aria-label="Language" style="flex-wrap: wrap">
+            <span class="" title="412 of 480 lines up to date"
+              >English <span class="cnt">412/480</span></span
+            ><span class="" title="40 of 481 lines up to date"
+              >Svenska <span class="cnt">40/481</span></span
+            ><span class="on" title="Act II has no Deutsch dialog yet"
+              >Deutsch <span class="cnt">No dialog</span></span
+            >
+          </div>
+        </header>
+        <section
+          class="panel muted"
+          style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start"
+        >
+          <strong style="color: var(--text)">Act II has no Deutsch dialog yet</strong
+          ><span
+            >The game has not written Deutsch lines for this act. Once it does, Refresh dialog reads
+            them in.</span
+          ><span class="btn">Refresh dialog</span>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
