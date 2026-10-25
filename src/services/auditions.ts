@@ -36,6 +36,8 @@ export type CandidatesResult =
       language: string
       /** The character's current voice, if it has one and Fish still has it. */
       current: Voice | null
+      /** Her casting in this language: the cast voice's id and name, whether or not Fish has it. */
+      casting: { voice: string | null; voiceName: string | null }
       /** Her voices in the other languages that Fish knows, to hear in this one. */
       others: Voice[]
       candidates: Candidate[]
@@ -120,6 +122,7 @@ export async function findCandidates(
       keywords,
       language: seen.language,
       current,
+      casting: { voice: own?.voice ?? null, voiceName: own?.voiceName ?? null },
       others,
       candidates,
       audition,
