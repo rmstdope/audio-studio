@@ -68,6 +68,8 @@ retroquest/                      ← user runs `audio-studio` here
    code, named in its project file) in the project root, only when the user clicks it on the
    studio's page; what that command writes is the game's business, and the studio does not check
    it beyond reading the dialog again.
+   Besides those paths, the studio writes the project file itself in one place only: the project's
+   own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3).
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 

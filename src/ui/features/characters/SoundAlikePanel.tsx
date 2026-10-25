@@ -1,20 +1,16 @@
 import { useState } from 'react'
-import { groupsFrom, groupsProblem, rowsFrom, sameGroups } from '../../../core/soundAlikeEdit'
+import { groupsProblem, sameGroups } from '../../../core/soundAlikeEdit'
 import { useSetSoundAlike } from '../../api'
 import { Problems } from '../../components/Problems'
 import { plural } from '../../format'
-
-/** The groups being edited: the file's when editing began, and the rows as typed. */
-interface Draft {
-  base: string[][]
-  rows: { id: number; text: string }[]
-}
-
-let nextId = 0
-const draftOf = (groups: string[][]): Draft => ({
-  base: groups,
-  rows: rowsFrom(groups).map((text) => ({ id: nextId++, text })),
-})
+import {
+  addGroup,
+  editGroup,
+  groupsOf,
+  removeGroup,
+  startDraft,
+  type SoundAlikeDraft,
+} from '../../soundAlikeDraft'
 
 /**
  * The project's own words that sound the same, a group each: Whisper writing one for another
@@ -30,19 +26,18 @@ export function SoundAlikePanel({
   projectFile: string
 }) {
   const save = useSetSoundAlike()
-  const [draft, setDraft] = useState<Draft | null>(null)
-  const rows = draft?.rows ?? draftOf(groups).rows
-  const edited = draft ? groupsFrom(draft.rows.map((r) => r.text)) : groups
+  const [draft, setDraft] = useState<SoundAlikeDraft | null>(null)
+  const rows = draft?.rows ?? startDraft(groups).rows
+  const edited = draft ? groupsOf(draft) : groups
   const changed = draft !== null && !sameGroups(edited, draft.base)
   // Someone changed the file since editing began: saving would be refused.
   const moved = draft !== null && !sameGroups(draft.base, groups)
   const problem = groupsProblem(edited)
   const problems = save.data && !save.data.ok ? save.data.problems : []
 
-  const edit = (change: (rows: Draft['rows']) => Draft['rows']) => {
+  const edit = (change: (draft: SoundAlikeDraft) => SoundAlikeDraft) => {
     if (save.data || save.error) save.reset()
-    const from = draft ?? draftOf(groups)
-    setDraft({ ...from, rows: change(from.rows) })
+    setDraft(change(draft ?? startDraft(groups)))
   }
   const discard = () => {
     save.reset()
@@ -74,16 +69,14 @@ export function SoundAlikePanel({
                   aria-label={`Words, group ${i + 1}`}
                   placeholder="Lyria, Liria"
                   value={text}
-                  onChange={(e) =>
-                    edit((all) => all.map((r) => (r.id === id ? { id, text: e.target.value } : r)))
-                  }
+                  onChange={(e) => edit((d) => editGroup(d, i, e.target.value))}
                 />
                 <div className="pronounce-actions">
                   <button
                     className="btn"
                     type="button"
                     aria-label={`Remove group ${i + 1}`}
-                    onClick={() => edit((all) => all.filter((r) => r.id !== id))}
+                    onClick={() => edit((d) => removeGroup(d, i))}
                   >
                     Remove
                   </button>
@@ -98,7 +91,7 @@ export function SoundAlikePanel({
           className="btn"
           type="button"
           disabled={save.isPending}
-          onClick={() => edit((all) => [...all, { id: nextId++, text: '' }])}
+          onClick={() => edit(addGroup)}
         >
           Add group
         </button>

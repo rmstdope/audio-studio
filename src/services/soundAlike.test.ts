@@ -63,6 +63,24 @@ describe('setSoundAlike', () => {
     expect(read()).toBe(before)
   })
 
+  it('writes words with $ in them as they are', async () => {
+    const { projectFile, read } = repo()
+    expect(await setSoundAlike(projectFile, [["a$'", 'b$&', 'c$$']], [])).toEqual({ ok: true })
+    expect(JSON.parse(read()).narration.quality.soundAlike).toEqual([["a$'", 'b$&', 'c$$']])
+  })
+
+  it('keeps the line endings, and a missing last newline', async () => {
+    const root = tempRepo({})
+    const projectFile = join(root, 'audio-studio.json')
+    writeFileSync(projectFile, JSON.stringify(projectJson(), null, 2).replace(/\n/g, '\r\n'))
+    await setSoundAlike(projectFile, [['inn', 'Inne']], [])
+    const text = readFileSync(projectFile, 'utf8')
+    expect(
+      text.split('\n').every((line, i, all) => i === all.length - 1 || line.endsWith('\r')),
+    ).toBe(true)
+    expect(text.endsWith('}')).toBe(true)
+  })
+
   it('writes nothing to a project file that cannot be used', async () => {
     const { projectFile, read } = repo({ name: 'broken' })
     const before = read()
