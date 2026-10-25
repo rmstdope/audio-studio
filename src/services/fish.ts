@@ -97,6 +97,9 @@ function toVoice(api: z.infer<typeof ApiVoiceSchema>): Voice {
   }
 }
 
+/** The waits, in ms, before asking Fish again after a 429: 1 s, then doubling, to 32 s. */
+const RETRY_WAITS = [1000, 2000, 4000, 8000, 16000, 32000]
+
 /**
  * A client for Fish Audio's REST API (https://docs.fish.audio). `fetch` and the base URL can be
  * replaced, for tests.
@@ -107,20 +110,38 @@ export function createFishClient(
     fetch = globalThis.fetch,
     baseUrl = 'https://api.fish.audio',
     timeoutMs = 120_000,
-  }: { fetch?: typeof globalThis.fetch; baseUrl?: string; timeoutMs?: number } = {},
+    sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  }: {
+    fetch?: typeof globalThis.fetch
+    baseUrl?: string
+    timeoutMs?: number
+    /** How to wait between tries, replaced in tests. */
+    sleep?: (ms: number) => Promise<void>
+  } = {},
 ): FishClient {
-  /** A request that gives up after `timeoutMs`, saying so, so a stuck request never blocks a job. */
+  /**
+   * A request that gives up after `timeoutMs`, saying so, so a stuck request never blocks a job;
+   * and that is asked again, after a wait that doubles each time, when Fish answers 429 (too many
+   * requests at once for the account's tier; Fish sends no Retry-After). The last of the waits
+   * is 32 s; after that the 429 is thrown like any refusal.
+   */
   async function timed<T>(request: () => Promise<T>): Promise<T> {
-    try {
-      return await request()
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.name === 'TimeoutError' || error.name === 'AbortError')
-      ) {
-        throw new Error(`Fish Audio did not answer within ${timeoutMs / 1000} s`)
+    for (let wait = RETRY_WAITS[0]!; ; wait *= 2) {
+      try {
+        return await request()
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.name === 'TimeoutError' || error.name === 'AbortError')
+        ) {
+          throw new Error(`Fish Audio did not answer within ${timeoutMs / 1000} s`)
+        }
+        if (error instanceof FishError && error.status === 429 && RETRY_WAITS.includes(wait)) {
+          await sleep(wait)
+          continue
+        }
+        throw error
       }
-      throw error
     }
   }
 

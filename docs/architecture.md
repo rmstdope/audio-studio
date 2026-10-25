@@ -718,8 +718,11 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   checklist. So far: the CLI warns when ffmpeg is missing, and recording says so; the checklist in
   the UI comes later.
 - Writes outside the project root throw. Deleting clips (orphans) always needs confirmation.
-- Fish errors (rate limit, no credit, voice removed) mark the line as failed with the reason; the
-  rest of the job carries on.
+- Fish errors (no credit, voice removed) mark the line as failed with the reason; the rest of the
+  job carries on. Too many requests at once (429: Fish allows 5 at a time until $100 has been
+  paid in, 15 until $1,000, then 50; it sends no `Retry-After`) is not an error: the client asks
+  again after 1 s, then 2, 4, 8, 16 and 32 s, and only then gives up. `quality.parallel` counts
+  lines, and audition takes record beside them, so the limit can be met even below it.
 - The studio never runs `git add`, `commit` or `push`.
 
 ---

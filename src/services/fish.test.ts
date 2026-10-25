@@ -119,7 +119,7 @@ describe('tts', () => {
     const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
       requests.push(new Request(input, init))
       return new Response(new Uint8Array([1, 2, 3]))
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
     const audio = await createFishClient('secret', { fetch }).tts({
       text: '[warm] Hello.',
       voice: 'v1',
@@ -164,6 +164,74 @@ describe('tts', () => {
   })
 })
 
+describe('rate limit', () => {
+  const request = { text: 'x', voice: 'v', model: 'm', temperature: 0.7, topP: 0.7, speed: 1 }
+
+  /** A fetch that answers 429 `limited` times, then the audio. */
+  function limitedFetch(limited: number) {
+    let calls = 0
+    const fetch = (async () => {
+      calls++
+      return calls <= limited
+        ? Response.json({ message: 'Too many requests' }, { status: 429 })
+        : new Response(new Uint8Array([7]))
+    }) as unknown as typeof globalThis.fetch
+    return { fetch, calls: () => calls }
+  }
+
+  it('waits and asks again when Fish answers 429, doubling the wait each time', async () => {
+    const waits: number[] = []
+    const sleep = async (ms: number) => {
+      waits.push(ms)
+    }
+    const { fetch, calls } = limitedFetch(3)
+    const audio = await createFishClient('k', { fetch, sleep }).tts(request)
+    expect([...audio]).toEqual([7])
+    expect(calls()).toBe(4)
+    expect(waits).toEqual([1000, 2000, 4000])
+  })
+
+  it('gives up after the last wait, with Fish’s answer', async () => {
+    const waits: number[] = []
+    const sleep = async (ms: number) => {
+      waits.push(ms)
+    }
+    const { fetch, calls } = limitedFetch(100)
+    const failing = createFishClient('k', { fetch, sleep }).tts(request)
+    await expect(failing).rejects.toThrow('Fish Audio answered 429: Too many requests')
+    expect(waits).toEqual([1000, 2000, 4000, 8000, 16000, 32000])
+    expect(calls()).toBe(7)
+  })
+
+  it('asks again for searches too, and not for other refusals', async () => {
+    const sleep = async () => {}
+    let calls = 0
+    const fetch = (async () => {
+      calls++
+      return calls === 1
+        ? Response.json({}, { status: 429 })
+        : Response.json({ total: 0, items: [] })
+    }) as unknown as typeof globalThis.fetch
+    const page = await createFishClient('k', { fetch, sleep }).listVoices({
+      title: 'x',
+      pageSize: 1,
+      pageNumber: 1,
+    })
+    expect(page.total).toBe(0)
+    expect(calls).toBe(2)
+
+    let refusals = 0
+    const refusing = (async () => {
+      refusals++
+      return Response.json({ message: 'No credit' }, { status: 402 })
+    }) as unknown as typeof globalThis.fetch
+    await expect(createFishClient('k', { fetch: refusing, sleep }).tts(request)).rejects.toThrow(
+      '402',
+    )
+    expect(refusals).toBe(1)
+  })
+})
+
 describe('tts, timeout', () => {
   it('gives up on a request that never answers', async () => {
     const fetch = ((_input: string | URL | Request, init?: RequestInit) =>
@@ -188,7 +256,7 @@ describe('requests, a stalled body', () => {
       return Promise.resolve(
         new Response(body, { headers: { 'content-type': 'application/json' } }),
       )
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
     const client = createFishClient('k', { fetch, timeoutMs: 20 })
     await expect(client.listVoices({ title: 'x', pageSize: 1, pageNumber: 1 })).rejects.toThrow(
       'did not answer within',
