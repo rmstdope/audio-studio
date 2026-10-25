@@ -609,7 +609,7 @@ A take is cached in `.audio-studio/music-takes/` by a hash of the model, brief, 
 seed. The seed is kept to say where a take came from; whether the same seed makes the same take
 again on the Mac is for the spike. The board for a track lists its takes: **More takes** generates
 four more, **Drop** removes one, **Choose** writes one. The board is kept in
-`.audio-studio/music/<track>-<hash>.json`. A dropped take is just gone: seeds don't come back, so
+`.audio-studio/music/<track>.json` (a track id is a safe file name). A dropped take is just gone: seeds don't come back, so
 nothing is ruled out.
 
 **Choose** levels the take to −20 LUFS as narration is levelled (`level.py`'s commands; RetroQuest
@@ -626,7 +626,8 @@ not in it.
 
 **Lock** (`music.lock.json`, committed, one entry per line): per track, the chosen take's model,
 seed, a hash of what went into it (model, brief, kind, seconds; not the output settings, as
-narration leaves the loudness out), and when it was chosen. A track is `missing` (nothing chosen,
+narration leaves the loudness out), and when it was chosen. Changing the model in the code marks
+every track `changed`, as a new model makes new music. A track is `missing` (nothing chosen,
 or its clip is gone from disk), `ok`, or `changed` (its brief, kind or length changed since its
 take was chosen: the old one keeps playing in the game until another is chosen). A manifest entry
 without a lock entry is reported as a problem. Nothing is generated again by itself: a new brief
@@ -636,9 +637,8 @@ confirmation as narration's are.
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
 seconds and seed, so tests run with a fake. The real one is a Python worker (`worker/music.py`,
 ACE-Step through uv, the model loaded on the first take and stopped with the studio), the same
-JSON-lines protocol as the Whisper worker. Generation and Whisper share the one GPU: a take does
-not start while a narration job runs, and the other way round, unless the spike shows both fit
-and run well side by side. The setup checklist (§10) names ACE-Step's environment and its model
+JSON-lines protocol as the Whisper worker. Generation and Whisper share the one GPU: ACE-Step and Whisper never run at
+once, unless the spike shows both fit and run well side by side. The setup checklist (§10) names ACE-Step's environment and its model
 download.
 
 ---
