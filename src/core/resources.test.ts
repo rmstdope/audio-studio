@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { problemsFrom } from './project'
-import { CastSchema, projectCast, ttsFor, voiceOf } from './resources'
+import { CastSchema, pronounceOf, projectCast, ttsFor, voiceOf } from './resources'
 
 describe('CastSchema', () => {
   it('explains a pronunciation without the word it replaces', () => {
@@ -107,6 +107,28 @@ describe('a character per language', () => {
       audition: { keywords: ['warm'], phrase: 'Kom in.' },
     })
     expect(sv.speakers.mira?.voice).toBeUndefined()
-    expect(sv.pronounce).toEqual(cast.pronounce)
+    // Pronunciations are kept per language: this one has none of its own.
+    expect(sv.pronounce).toEqual({})
+  })
+
+  it('reads a language’s own pronunciations, and applies them to that language only', () => {
+    const withTables = CastSchema.parse({
+      speakers: {},
+      pronounce: { Elior: 'El-ee-or' },
+      languages: { sv: { pronounce: { Elior: 'Eli-or' } } },
+    })
+    expect(pronounceOf(withTables, 'en', 'en')).toEqual({ Elior: 'El-ee-or' })
+    expect(pronounceOf(withTables, 'sv', 'en')).toEqual({ Elior: 'Eli-or' })
+    expect(pronounceOf(withTables, 'de', 'en')).toEqual({})
+    expect(projectCast(withTables, 'sv', 'en').pronounce).toEqual({ Elior: 'Eli-or' })
+  })
+
+  it('reports a bad pronunciation of a language with its path', () => {
+    const result = CastSchema.safeParse({
+      speakers: {},
+      languages: { sv: { pronounce: { '': 'nothing' } } },
+    })
+    if (result.success) throw new Error('expected an empty key to be refused')
+    expect(problemsFrom('tts/cast.json', result.error)[0]?.path).toBe('languages.sv.pronounce')
   })
 })

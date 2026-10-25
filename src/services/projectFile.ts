@@ -69,17 +69,39 @@ export async function saveProject(
  * the groups would be written by hand: every save of the file lays it out the same way.
  */
 export function projectJson(raw: unknown, indent: string): string {
-  const quality = (raw as { narration?: { quality?: { soundAlike?: unknown } } }).narration?.quality
-  const groups = Array.isArray(quality?.soundAlike) ? (quality.soundAlike as string[][]) : []
-  const mark = (i: number) => `\u0000group ${i}`
-  const original = quality?.soundAlike
-  if (quality && groups.length) quality.soundAlike = groups.map((_, i) => mark(i))
+  const quality = (
+    raw as {
+      narration?: {
+        quality?: { soundAlike?: unknown; soundAlikeByLanguage?: Record<string, unknown> }
+      }
+    }
+  ).narration?.quality
+  // Every list of groups in the file, the source language's and each language's, by where it is.
+  const lists: { get: () => unknown; set: (value: unknown) => void }[] = []
+  if (quality && Array.isArray(quality.soundAlike)) {
+    lists.push({ get: () => quality.soundAlike, set: (v) => (quality.soundAlike = v) })
+  }
+  const byLanguage = quality?.soundAlikeByLanguage
+  for (const language of byLanguage && typeof byLanguage === 'object'
+    ? Object.keys(byLanguage)
+    : []) {
+    if (Array.isArray(byLanguage![language])) {
+      lists.push({ get: () => byLanguage![language], set: (v) => (byLanguage![language] = v) })
+    }
+  }
+  const mark = (list: number, i: number) => `\u0000group ${list}.${i}`
+  const originals = lists.map((list) => list.get() as string[][])
+  lists.forEach((list, n) => list.set(originals[n]!.map((_, i) => mark(n, i))))
   const oneLine = (group: string[]) => `[${group.map((w) => JSON.stringify(w)).join(', ')}]`
   const json = JSON.stringify(raw, null, indent)
-  if (quality && groups.length) quality.soundAlike = original
+  lists.forEach((list, n) => list.set(originals[n]))
   // A function, not a string, as the replacement: a "$" in a word is not a pattern.
-  return groups.reduce(
-    (text, group, i) => text.replace(JSON.stringify(mark(i)), () => oneLine(group)),
+  return originals.reduce(
+    (text, groups, n) =>
+      groups.reduce(
+        (t, group, i) => t.replace(JSON.stringify(mark(n, i)), () => oneLine(group)),
+        text,
+      ),
     json,
   )
 }

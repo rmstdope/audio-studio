@@ -13,7 +13,8 @@ export type CueChange = { ok: true } | { ok: false; problems: Problem[] } | Proj
 const INTEGER_LIKE = /^(0|[1-9]\d*)$/
 
 /**
- * Saves a line's own delivery cue in the part's cues file; an empty cue removes it, so the line
+ * Saves a line's own delivery cue in the part's cues file (the language's own: a language besides
+ * the source follows the source's cue for a line until it has one); an empty cue removes it, so the line
  * goes back to its character's style. Nothing is written when the cue does not change.
  */
 export async function setCue(
@@ -21,9 +22,10 @@ export async function setCue(
   partId: string,
   key: string,
   cue: string,
+  language?: string,
 ): Promise<CueChange> {
   const own = cue.trim()
-  return changeCues(projectFile, partId, [key], (entries) => {
+  return changeCues(projectFile, partId, [key], language, (entries) => {
     const current = entries.find(([k]) => k === key)?.[1] ?? ''
     if (current === own) return { entries }
     if (!own) return { entries: entries.filter(([k]) => k !== key) }
@@ -46,19 +48,26 @@ export async function moveCue(
   partId: string,
   from: string,
   to: string | null,
+  language?: string,
 ): Promise<CueChange> {
-  return changeCues(projectFile, partId, to === null ? [] : [to], (entries, path, inDialog) => {
-    const problem = (key: string, message: string) => ({
-      problems: [{ file: path, path: key, message }],
-    })
-    if (!entries.some(([k]) => k === from)) return null
-    if (inDialog.has(from)) return problem(from, 'this cue’s line is still in the dialog')
-    if (to === null) return { entries: entries.filter(([k]) => k !== from) }
-    if (entries.some(([k]) => k === to)) {
-      return problem(to, 'this line has its own cue already; clear it first')
-    }
-    return { entries: entries.map(([k, v]): Cue => [k === from ? to : k, v]) }
-  })
+  return changeCues(
+    projectFile,
+    partId,
+    to === null ? [] : [to],
+    language,
+    (entries, path, inDialog) => {
+      const problem = (key: string, message: string) => ({
+        problems: [{ file: path, path: key, message }],
+      })
+      if (!entries.some(([k]) => k === from)) return null
+      if (inDialog.has(from)) return problem(from, 'this cue’s line is still in the dialog')
+      if (to === null) return { entries: entries.filter(([k]) => k !== from) }
+      if (entries.some(([k]) => k === to)) {
+        return problem(to, 'this line has its own cue already; clear it first')
+      }
+      return { entries: entries.map(([k, v]): Cue => [k === from ? to : k, v]) }
+    },
+  )
 }
 
 /** One cue: a line key and the cue it is delivered with. */
@@ -78,13 +87,14 @@ async function changeCues(
   projectFile: string,
   partId: string,
   lines: string[],
+  language: string | undefined,
   change: (
     entries: Cue[],
     path: string,
     inDialog: Set<string>,
   ) => { entries: Cue[] } | { problems: Problem[] } | null,
 ): Promise<CueChange> {
-  const read = await readPart(projectFile, partId)
+  const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return read
   const inDialog = new Set(read.input.lines.map((line) => line.key))
   if (!lines.every((key) => inDialog.has(key))) return null

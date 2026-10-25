@@ -473,6 +473,25 @@ describe('setStyle', () => {
   })
 })
 
+/** The test project declaring English and Swedish, each with its own files. */
+function languageProject() {
+  const base = projectJson()
+  return {
+    ...base,
+    narration: {
+      ...(base.narration as object),
+      languages: ['en', 'sv'],
+      paths: {
+        dialog: 'tts/{part}/{language}/script.json',
+        cues: 'tts/{part}/{language}/cues.json',
+        lock: 'tts/{part}/{language}/narration.lock.json',
+        clips: 'audio/{part}/{language}',
+        manifest: 'audio/{part}/{language}/manifest.json',
+      },
+    },
+  }
+}
+
 describe('setPronunciations', () => {
   const withTable = {
     ...files,
@@ -503,6 +522,26 @@ describe('setPronunciations', () => {
       ['Willowbrook', 'Willow brook'],
     ])
     expect(JSON.parse(text).speakers.grandmother).toEqual({ voice: 'cur', style: '[warm]' })
+  })
+
+  it('saves a language’s table apart from the source language’s', async () => {
+    const root = tempRepo({
+      ...withTable,
+      'audio-studio.json': languageProject(),
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setPronunciations(projectFile, [['Eldoria', 'Eld-or-ia']], [], 'sv')).toEqual({
+      ok: true,
+    })
+    const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
+    expect(cast.languages).toEqual({ sv: { pronounce: { Eldoria: 'Eld-or-ia' } } })
+    expect(cast.pronounce).toEqual({ 'Act I:': 'Act One:', Eldoria: 'El-door-ia' })
+    // `was` is that language's table.
+    expect(await setPronunciations(projectFile, [], [], 'sv')).toMatchObject({ ok: false })
+    expect(await setPronunciations(projectFile, [], [['Eldoria', 'Eld-or-ia']], 'sv')).toEqual({
+      ok: true,
+    })
+    expect(JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).languages).toBeUndefined()
   })
 
   it('refuses when the table changed since the page showed it', async () => {
@@ -552,6 +591,40 @@ describe('setPronunciations', () => {
     ]
     expect(await setPronunciations(projectFile, fixed, shown)).toEqual({ ok: true })
     expect(await setStyle(projectFile, 'grandmother', '[x]')).toEqual({ ok: true })
+  })
+
+  it('refuses a character change that would reorder a language’s number key, too', async () => {
+    const root = tempRepo({
+      ...withTable,
+      'audio-studio.json': languageProject(),
+      'tts/cast.json': {
+        speakers: { grandmother: { voice: 'cur' } },
+        languages: { sv: { pronounce: { Eldoria: 'x', '10': 'tio' } } },
+      },
+    })
+    const result = await setStyle(join(root, 'audio-studio.json'), 'grandmother', '[x]')
+    expect(result).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/cast.json', path: 'languages.sv.pronounce' }],
+    })
+  })
+
+  it('does not reorder another language’s number key by saving a table', async () => {
+    const root = tempRepo({
+      ...withTable,
+      'audio-studio.json': languageProject(),
+      'tts/cast.json': {
+        speakers: { grandmother: { voice: 'cur' } },
+        pronounce: { Eldoria: 'x', '10': 'ten' },
+      },
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    const before = readFileSync(join(root, 'tts/cast.json'), 'utf8')
+    expect(await setPronunciations(projectFile, [['Kom', 'Komm']], [], 'sv')).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/cast.json', path: 'pronounce' }],
+    })
+    expect(readFileSync(join(root, 'tts/cast.json'), 'utf8')).toBe(before)
   })
 
   it('keeps a character change made at the same time', async () => {

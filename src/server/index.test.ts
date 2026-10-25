@@ -301,11 +301,12 @@ describe('server', () => {
     const part = await (await fetch(url('/api/parts/act1'))).json()
     expect(part.part.lines.find((l: { key: string }) => l.key === 'a')).toMatchObject({
       cue: '[hushed]',
-      ownCue: true,
+      cueFrom: 'own',
+      sourceCue: null,
     })
     expect((await patch('a', { cue: '' })).status).toBe(200)
     const after = await (await fetch(url('/api/parts/act1'))).json()
-    expect(after.part.lines.find((l: { key: string }) => l.key === 'a').ownCue).toBe(false)
+    expect(after.part.lines.find((l: { key: string }) => l.key === 'a').cueFrom).toBe('style')
   })
 
   it('tries a cue on a line, from the studio’s own page only, and serves the take', async () => {
@@ -2601,5 +2602,136 @@ describe('designing a voice', () => {
     expect(saved).toEqual(['Narrator (designed)'])
     const file = JSON.parse(readFileSync(join(repo, 'tts/cast.json'), 'utf8'))
     expect(file.speakers.narrator.voice).toBe('f'.repeat(32))
+  })
+})
+
+describe('server, generating per language', () => {
+  const base = projectJson()
+  const languageRoot = tempRepo({
+    'audio-studio.json': {
+      ...base,
+      narration: {
+        ...(base.narration as object),
+        languages: ['en', 'sv'],
+        quality: { transcriber: 'none' },
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+      },
+    },
+    'tts/cast.json': {
+      speakers: {
+        narrator: { voice: 'v-en', languages: { sv: { voice: 'v-sv' } } },
+        gran: { voice: 'v-gran' },
+      },
+    },
+    'tts/act1/en/script.json': [
+      { key: 'a', speaker: 'narrator', text: 'Once.' },
+      { key: 'b', speaker: 'gran', text: 'Come in.' },
+      { key: 'c', speaker: 'narrator', text: 'Later.' },
+    ],
+    'tts/act1/sv/script.json': [
+      { key: 'a', speaker: 'narrator', text: 'En gång.' },
+      { key: 'b', speaker: 'gran', text: 'Kom in.' },
+    ],
+  })
+  const spoken: string[] = []
+  const server = startServer({
+    projectFile: join(languageRoot, 'audio-studio.json'),
+    port: 0,
+    fish: {
+      ...fish,
+      async tts(request) {
+        spoken.push(`${request.voice}: ${request.text}`)
+        return fish.tts(request)
+      },
+    },
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const own = { origin: server.url.origin, 'content-type': 'application/json' }
+  const get = async (path: string) => (await fetch(at(path))).json()
+  const send = async (method: string, path: string, body: unknown) =>
+    (await fetch(at(path), { method, headers: own, body: JSON.stringify(body) })).json()
+
+  it('plans only the language asked for: its lines, who is uncast, what is not translated', async () => {
+    const sv = (await get('/api/parts/act1/plan?language=sv')).plan
+    expect(sv).toMatchObject({ keys: ['a'], uncast: ['gran'], untranslated: 1 })
+    const en = (await get('/api/parts/act1/plan')).plan
+    expect(en).toMatchObject({ keys: ['a', 'b', 'c'], uncast: [], untranslated: 0 })
+    // Unknown language: the source language's.
+    expect((await get('/api/parts/act1/plan?language=xx')).plan.keys).toEqual(['a', 'b', 'c'])
+  })
+
+  it('records a language into its own files, with its voice, and finds its job apart', async () => {
+    const job = await send('POST', '/api/parts/act1/jobs?language=sv', {
+      speaker: null,
+      keys: ['a'],
+      orphans: [],
+    })
+    expect(job).toMatchObject({ status: 'running', total: 1, language: 'sv' })
+    let state = job
+    while (state.status === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      state = await get(`/api/jobs/${job.id}`)
+    }
+    expect(state).toMatchObject({ status: 'done', done: 1, failed: [] })
+    expect(spoken).toEqual(['v-sv: En gång.'])
+    expect(existsSync(join(languageRoot, 'audio/act1/sv/a.mp3'))).toBe(true)
+    expect(existsSync(join(languageRoot, 'audio/act1/en/a.mp3'))).toBe(false)
+    expect((await get('/api/parts/act1/jobs/latest?language=sv')).id).toBe(job.id)
+    expect(await get('/api/parts/act1/jobs/latest')).toBeNull()
+    const sv = await get('/api/parts/act1?language=sv')
+    expect(sv.part.counts.ok).toBe(1)
+    expect((await get('/api/parts/act1')).part.counts.ok).toBe(0)
+  })
+
+  it('records one line of a language from its row', async () => {
+    const result = await send('POST', '/api/parts/act1/lines/b/record?language=sv', {})
+    expect(result).toMatchObject({ ok: false, reason: 'uncast' })
+  })
+
+  it('saves a cue, pronunciations and words that sound the same for the language asked for', async () => {
+    expect(await send('PATCH', '/api/parts/act1/cues/a?language=sv', { cue: '[mjukt]' })).toEqual({
+      ok: true,
+    })
+    expect(JSON.parse(readFileSync(join(languageRoot, 'tts/act1/sv/cues.json'), 'utf8'))).toEqual({
+      a: '[mjukt]',
+    })
+    expect(existsSync(join(languageRoot, 'tts/act1/en/cues.json'))).toBe(false)
+    expect(
+      await send('PATCH', '/api/pronounce?language=sv', { table: [['Kom', 'Komm']], was: [] }),
+    ).toEqual({ ok: true })
+    expect(JSON.parse(readFileSync(join(languageRoot, 'tts/cast.json'), 'utf8')).languages).toEqual(
+      {
+        sv: { pronounce: { Kom: 'Komm' } },
+      },
+    )
+    expect(
+      await send('PATCH', '/api/sound-alike?language=sv', {
+        groups: [['Lyria', 'Liria']],
+        was: [],
+      }),
+    ).toEqual({ ok: true })
+    const project = JSON.parse(readFileSync(join(languageRoot, 'audio-studio.json'), 'utf8'))
+    expect(project.narration.quality.soundAlikeByLanguage).toEqual({ sv: [['Lyria', 'Liria']] })
+    const summary = (await get('/api/project')).summary
+    expect(summary.perLanguage.sv).toEqual({
+      pronounce: [['Kom', 'Komm']],
+      soundAlike: [['Lyria', 'Liria']],
+    })
+    expect(summary.perLanguage.en).toEqual({ pronounce: [], soundAlike: [] })
+  })
+
+  it('keeps a language’s notes apart', async () => {
+    await send('PATCH', '/api/parts/act1/lines/a/note?language=sv', { note: 'för snabb' })
+    expect((await get('/api/parts/act1?language=sv')).part.notes).toEqual({ a: 'för snabb' })
+    expect((await get('/api/parts/act1')).part.notes).toEqual({})
   })
 })

@@ -1,5 +1,6 @@
 import type { StaleReason } from '../core/fingerprint'
 import type { LineState, LineStatus } from '../core/planner'
+import { displayName } from '../core/summary'
 
 /** How each status looks: its name, and the colour tokens of its dot, pill and bar segment. */
 export const STATUS: Record<LineStatus, { label: string; color: string; bg: string }> = {
@@ -40,7 +41,7 @@ export function reasonCounts(lines: LineState[]): [StaleReason, number][] {
 }
 
 /** One line of explanation for a line's status. */
-export function statusDetail(line: LineState, minHeard: number): string {
+export function statusDetail(line: LineState, minHeard: number, language?: string): string {
   switch (line.status) {
     case 'stale':
       return line.reasons.map((r) => REASON[r]).join(', ')
@@ -51,7 +52,9 @@ export function statusDetail(line: LineState, minHeard: number): string {
     case 'untracked':
       return 'recorded before Audio Studio; adopt to track it'
     case 'uncast':
-      return `${line.speaker} has no voice yet`
+      return language
+        ? `${displayName(line.speaker)} has no ${language} voice yet`
+        : `${line.speaker} has no voice yet`
     case 'untranslated':
       return ''
     case 'ok':

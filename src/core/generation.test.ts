@@ -18,7 +18,8 @@ function line(
     text,
     english: null,
     cue: '',
-    ownCue: false,
+    cueFrom: 'style',
+    sourceCue: null,
     final: false,
     status,
     reasons,
@@ -54,6 +55,21 @@ describe('planGeneration', () => {
       new TextEncoder().encode('Once upon a time.Hello there.Hello there.').length,
     )
     expect(plan.cost).toBe(0)
+  })
+
+  it('counts the lines not translated in scope, which are never recorded', () => {
+    const lines = [
+      ...state.lines,
+      line('t1', 'tilda', 'untranslated'),
+      line('t2', 'mira', 'untranslated'),
+    ]
+    const plan = planGeneration({ ...state, lines }, { at: AT, model: 's2.1-pro-free' })
+    expect(plan.untranslated).toBe(2)
+    expect(plan.keys).toEqual(['m1', 's1', 's2'])
+    expect(
+      planGeneration({ ...state, lines }, { at: AT, model: 's2.1-pro-free', speaker: 'tilda' })
+        .untranslated,
+    ).toBe(1)
   })
 
   it('narrows to one character, and its orphans', () => {

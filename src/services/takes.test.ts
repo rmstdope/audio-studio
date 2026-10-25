@@ -373,6 +373,49 @@ describe('tryLine', () => {
   })
 })
 
+describe('tryLine in a language besides the source', () => {
+  const several = projectJson()
+  const narration = several.narration as Record<string, unknown>
+  narration.languages = ['en', 'sv']
+  narration.paths = {
+    dialog: 'tts/{part}/{language}/script.json',
+    cues: 'tts/{part}/{language}/cues.json',
+    lock: 'tts/{part}/{language}/narration.lock.json',
+    clips: 'audio/{part}/{language}',
+    manifest: 'audio/{part}/{language}/manifest.json',
+  }
+  const swedish = {
+    'audio-studio.json': several,
+    'tts/cast.json': {
+      speakers: {
+        narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-sv' } } },
+      },
+    },
+    'tts/act1/en/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Hello.' }],
+    'tts/act1/sv/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Hej.' }],
+    'tts/act1/en/cues.json': { k1: '[worried]' },
+  }
+  const tryIt = async (cue: string) => {
+    const root = tempRepo(swedish)
+    const { fish, requests } = fakeFish()
+    await tryLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'k1',
+      cue,
+      async () => fish,
+      createLimiter(),
+      'sv',
+    )
+    return requests.map((r) => [r.text, r.voice])
+  }
+
+  it('says the language’s text in its voice; an empty cue follows the source cue', async () => {
+    expect(await tryIt('')).toEqual([['[worried] Hej.', 'v-sv']])
+    expect(await tryIt('[mjukt]')).toEqual([['[mjukt] Hej.', 'v-sv']])
+  })
+})
+
 describe('takes on a paid audition model', () => {
   const paid = {
     ...files,

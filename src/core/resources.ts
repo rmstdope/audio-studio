@@ -87,6 +87,13 @@ const PronounceSchema = z
 export const CastSchema = z.looseObject({
   speakers: z.record(z.string(), CharacterSchema).default({}),
   pronounce: PronounceSchema.default({}),
+  /**
+   * What is kept per language besides the source: its own pronunciations (the source language's
+   * are `pronounce`), by language code.
+   */
+  languages: z
+    .record(z.string(), z.looseObject({ pronounce: PronounceSchema.optional() }))
+    .optional(),
 })
 
 /** A character's casting in one language: nulls where it has none. */
@@ -123,9 +130,15 @@ export function voiceOf(
   }
 }
 
+/** How words are said in `language`: the source language's table is `pronounce`, another's is its own. */
+export function pronounceOf(cast: Cast, language: string, source: string): Record<string, string> {
+  return language === source ? cast.pronounce : (cast.languages?.[language]?.pronounce ?? {})
+}
+
 /**
- * The cast as `language` sees it: every character with that language's voice, speed and phrase in
- * the fields the planner and the takes read. The source language sees the cast as it is.
+ * The cast as `language` sees it: every character with that language's voice, speed and phrase,
+ * and the language's own pronunciations, in the fields the planner and the takes read. The source
+ * language sees the cast as it is.
  */
 export function projectCast(cast: Cast, language: string, source: string): Cast {
   if (language === source) return cast
@@ -142,7 +155,7 @@ export function projectCast(cast: Cast, language: string, source: string): Cast 
       return [id, projected]
     }),
   )
-  return { ...cast, speakers }
+  return { ...cast, speakers, pronounce: pronounceOf(cast, language, source) }
 }
 
 /**

@@ -5,8 +5,17 @@ import { markMissed } from '../../heard'
  * What Whisper heard of a line's take beside the text it was checked against (the line's, unless
  * changed since), the words it missed marked, so an imperfect score can be judged by eye.
  */
-export function HeardComparison({ partId, lineKey }: { partId: string; lineKey: string }) {
-  const query = useHeard(partId, lineKey)
+export function HeardComparison({
+  partId,
+  lineKey,
+  language,
+}: {
+  partId: string
+  lineKey: string
+  /** The language of the take, in a project with several. */
+  language?: string
+}) {
+  const query = useHeard(partId, lineKey, language)
   if (query.isPending) return <p className="muted heard-compare">Loading what Whisper heard…</p>
   if (query.isError) {
     return (

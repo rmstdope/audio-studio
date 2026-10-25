@@ -59,13 +59,17 @@ export type SoundAlike = ReadonlyMap<string, string>
  * project's `quality.soundAlike`), groups that share a word joined into one. Each word maps to
  * one word of its group, the same for all, as `norm` writes them ("two" is "2").
  */
-export function soundAlikes(extra: readonly (readonly string[])[] = []): SoundAlike {
+export function soundAlikes(
+  extra: readonly (readonly string[])[] = [],
+  /** Whether the built-in groups apply: they are English words, so only to English. */
+  builtIn = true,
+): SoundAlike {
   const parent = new Map<string, string>()
   const root = (word: string): string => {
     const up = parent.get(word) ?? word
     return up === word ? word : root(up)
   }
-  for (const group of [...SOUND_ALIKE, ...extra]) {
+  for (const group of [...(builtIn ? SOUND_ALIKE : []), ...extra]) {
     const [first, ...rest] = group.map(norm).filter(Boolean).map(american)
     if (!first) continue
     for (const word of rest) {

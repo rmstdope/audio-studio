@@ -1107,3 +1107,148 @@ describe('acceptLine', () => {
     expect(await acceptLine(projectFile, 'act1', 'nope')).toBeNull()
   })
 })
+
+describe('recording in a language besides the source', () => {
+  const several = projectJson()
+  const narration = several.narration as Record<string, unknown>
+  narration.languages = ['en', 'sv']
+  narration.quality = { chunkLimit: 100 }
+  narration.paths = {
+    dialog: 'tts/{part}/{language}/script.json',
+    cues: 'tts/{part}/{language}/cues.json',
+    lock: 'tts/{part}/{language}/narration.lock.json',
+    clips: 'audio/{part}/{language}',
+    manifest: 'audio/{part}/{language}/manifest.json',
+  }
+  const swedish = {
+    'audio-studio.json': several,
+    'tts/cast.json': {
+      speakers: {
+        narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-n-sv' } } },
+        mira: { voice: 'v-m' },
+      },
+      pronounce: { Elior: 'El-ee-or' },
+    },
+    'tts/act1/en/script.json': [
+      { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
+      { key: 'k2', speaker: 'mira', text: 'Welcome.' },
+      { key: 'k3', speaker: 'narrator', text: 'Not translated.' },
+    ],
+    'tts/act1/sv/script.json': [
+      { key: 'k1', speaker: 'narrator', text: 'Elior vaknar.' },
+      { key: 'k2', speaker: 'mira', text: 'Välkommen.' },
+    ],
+    'tts/act1/en/cues.json': { k1: '[worried]' },
+  }
+  const projectFile = (root: string) => join(root, 'audio-studio.json')
+  const recordSv = (root: string, key: string, fish: FishClient) =>
+    recordLine(projectFile(root), 'act1', key, async () => fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+      language: 'sv',
+    })
+
+  it('records into the language’s own clips, manifest and lock, with its voice, the source cue and no English pronunciation', async () => {
+    const root = tempRepo(swedish)
+    const { fish, requests } = fakeFish()
+    const result = await recordSv(root, 'k1', fish)
+    expect(result).toMatchObject({ ok: true, key: 'k1' })
+    expect(requests.map((r) => [r.text, r.voice])).toEqual([['[worried] Elior vaknar.', 'v-n-sv']])
+    expect(existsSync(join(root, 'audio/act1/sv/k1.mp3'))).toBe(true)
+    expect(existsSync(join(root, 'audio/act1/en/k1.mp3'))).toBe(false)
+    const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/sv/manifest.json'), 'utf8'))
+    expect(Object.keys(manifest)).toEqual(['k1'])
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/sv/narration.lock.json'), 'utf8'))
+    expect(lock.k1.voice).toBe('v-n-sv')
+    expect(existsSync(join(root, 'tts/act1/en/narration.lock.json'))).toBe(false)
+    const part = await loadPart(projectFile(root), 'act1', 'sv')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.status).toBe('ok')
+  })
+
+  it('does not record a character with no voice in the language, nor a line not translated', async () => {
+    const root = tempRepo(swedish)
+    const { fish, requests } = fakeFish()
+    expect(await recordSv(root, 'k2', fish)).toMatchObject({ ok: false, reason: 'uncast' })
+    expect(await recordSv(root, 'k3', fish)).toMatchObject({ ok: false, reason: 'untranslated' })
+    expect(requests).toEqual([])
+  })
+
+  it('leaves the source language as it was', async () => {
+    const root = tempRepo(swedish)
+    const { fish } = fakeFish()
+    await recordSv(root, 'k1', fish)
+    const part = await loadPart(projectFile(root), 'act1', 'en')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.status).toBe('missing')
+  })
+
+  it('accepts, measures and removes orphans in the language', async () => {
+    const root = tempRepo(swedish)
+    const { fish } = fakeFish()
+    await recordSv(root, 'k1', fish)
+    // A clip whose line left the Swedish dialog.
+    const lockFile = join(root, 'tts/act1/sv/narration.lock.json')
+    const manifestFile = join(root, 'audio/act1/sv/manifest.json')
+    const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'))
+    const lock = JSON.parse(readFileSync(lockFile, 'utf8'))
+    writeFileSync(
+      manifestFile,
+      JSON.stringify({ ...manifest, old: { file: 'old.mp3', speaker: 'mira' } }),
+    )
+    writeFileSync(lockFile, JSON.stringify({ ...lock, old: lock.k1 }))
+    writeFileSync(join(root, 'audio/act1/sv/old.mp3'), 'x')
+    expect(await removeOrphans(projectFile(root), 'act1', ['old'], 'sv')).toBe(1)
+    expect(existsSync(join(root, 'audio/act1/sv/old.mp3'))).toBe(false)
+    expect(existsSync(join(root, 'audio/act1/sv/k1.mp3'))).toBe(true)
+    expect(await acceptLine(projectFile(root), 'act1', 'k1', 'sv')).toMatchObject({
+      ok: false,
+      reason: 'not-weak',
+    })
+  })
+
+  it('has Whisper listen in the line’s own language, and keeps what it heard per language', async () => {
+    const root = tempRepo(swedish)
+    const { fish } = fakeFish()
+    const asked: (string | undefined)[] = []
+    const transcriber: Transcriber = {
+      async transcribe(_model, _path, language) {
+        asked.push(language)
+        return []
+      },
+      close() {},
+    }
+    await recordLine(projectFile(root), 'act1', 'k1', async () => fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+      transcriber,
+      language: 'sv',
+    })
+    expect(new Set(asked)).toEqual(new Set(['sv']))
+    // Heard below full, so it is kept: under the language's own name, never the source's.
+    const kept = await heardFor(projectFile(root), 'act1', 'k1', 'sv')
+    expect(kept).toMatchObject({ ok: true, heard: { text: 'Elior vaknar.' } })
+    expect(await heardFor(projectFile(root), 'act1', 'k1')).toMatchObject({
+      ok: true,
+      heard: null,
+    })
+  })
+
+  it('tells Whisper no language in a project with one language', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const asked: (string | undefined)[] = []
+    const transcriber: Transcriber = {
+      async transcribe(_model, _path, language) {
+        asked.push(language)
+        return []
+      },
+      close() {},
+    }
+    await recordLine(join(root, 'audio-studio.json'), 'act1', 'k1', async () => fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+      transcriber,
+    })
+    expect(asked.length).toBeGreaterThan(0)
+    expect(asked.every((language) => language === undefined)).toBe(true)
+  })
+})

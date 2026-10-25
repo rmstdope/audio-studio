@@ -89,7 +89,7 @@ export function App() {
         ) : route.view === 'setup' ? (
           <SetupView />
         ) : route.view === 'characters' ? (
-          <CharactersView summary={summary} />
+          <CharactersView summary={summary} asked={route.language} />
         ) : route.view === 'character' ? (
           <CharacterView
             key={route.character}

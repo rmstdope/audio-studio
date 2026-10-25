@@ -136,6 +136,36 @@ describe('ProjectSchema', () => {
     ])
   })
 
+  it('takes the words that sound the same of the languages besides the source, and no others', () => {
+    const base = projectJson()
+    const narration = base.narration as Record<string, unknown>
+    const languages = {
+      languages: ['en', 'sv'],
+      paths: {
+        dialog: 'tts/{part}/{language}/script.json',
+        cues: 'tts/{part}/{language}/cues.json',
+        lock: 'tts/{part}/{language}/lock.json',
+        clips: 'audio/{part}/{language}',
+        manifest: 'audio/{part}/{language}/manifest.json',
+      },
+    }
+    const by = (soundAlikeByLanguage: unknown) => ({
+      ...base,
+      narration: { ...narration, ...languages, quality: { soundAlikeByLanguage } },
+    })
+    expect(parse(by({ sv: [['Lyria', 'Liria']] })).success).toBe(true)
+    expect(problems(by({ sv: [['alone']] })).map((p) => p.path)).toEqual([
+      'narration.quality.soundAlikeByLanguage.sv[0]',
+    ])
+    expect(problems(by({ de: [['a', 'b']] })).map((p) => p.path)).toEqual([
+      'narration.quality.soundAlikeByLanguage.de',
+    ])
+    // The source language's own groups are `soundAlike`.
+    expect(problems(by({ en: [['a', 'b']] })).map((p) => p.path)).toEqual([
+      'narration.quality.soundAlikeByLanguage.en',
+    ])
+  })
+
   it('takes the Fish tier the user chose, or none', () => {
     const base = projectJson()
     const narration = base.narration as Record<string, unknown>

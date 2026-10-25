@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { clipInputs, fingerprint } from '../core/fingerprint'
+import { ProjectSchema } from '../core/project'
 import {
   adoptPart,
   clipFile,
@@ -9,6 +11,7 @@ import {
   loadPart,
   loadProject,
   projectFileProblem,
+  readPart,
 } from './workspace'
 
 const script = [
@@ -386,6 +389,79 @@ describe('a part in several languages', () => {
     const act2 = await open('en', 'act2')
     expect(act2.part.languages.find((l) => l.id === 'en')!.dialog).toBe('invalid')
     expect(act2.part.dialog).toBe('invalid')
+  })
+
+  it('has a line follow the source language’s cue until it has its own', async () => {
+    const { part } = await open('sv', 'act1', {
+      'tts/cast.json': {
+        speakers: {
+          narrator: { voice: 'v1', style: '[warm]', languages: { sv: { voice: 'v1-sv' } } },
+        },
+      },
+      'tts/act1/en/cues.json': { a: '[worried]', b: '[soft]' },
+      'tts/act1/sv/cues.json': { b: '[mjukt]', gone: '[x]' },
+    })
+    const by = Object.fromEntries(part.lines.map((l) => [l.key, [l.cue, l.cueFrom]]))
+    expect(by.a).toEqual(['[worried]', 'source'])
+    expect(by.b).toEqual(['', 'style'])
+    expect(by.z).toEqual(['', 'style'])
+    expect(part.orphanCues).toEqual([{ key: 'gone', cue: '[x]' }])
+  })
+
+  it('makes a language’s clips stale, for the cue, when the source cue changes', async () => {
+    const cast = { speakers: { narrator: { voice: 'v1-sv' } } }
+    const narration = ProjectSchema.parse(project(['en', 'sv', 'de'])).narration
+    const inputs = clipInputs(
+      { key: 'a', text: 'En gång.' },
+      cast.speakers.narrator,
+      {},
+      {},
+      narration,
+    )!
+    const { fp, parts } = fingerprint(inputs)
+    const made = { a: { fp, voice: 'v1-sv', model: inputs.model, parts, at: 'then' } }
+    const { part } = await open('sv', 'act1', {
+      'tts/cast.json': {
+        speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } } },
+      },
+      'tts/act1/sv/narration.lock.json': made,
+      'tts/act1/en/cues.json': { a: '[worried]' },
+    })
+    expect(part.lines.find((l) => l.key === 'a')).toMatchObject({
+      status: 'stale',
+      reasons: ['cue'],
+    })
+  })
+
+  it('hears a language with its own words that sound the same, the built-in English ones for English only', async () => {
+    const narration = project(['en', 'sv', 'de']).narration as Record<string, unknown>
+    const withGroups = {
+      ...project(['en', 'sv', 'de']),
+      narration: {
+        ...narration,
+        quality: {
+          soundAlike: [['Lyra', 'Lira']],
+          soundAlikeByLanguage: { sv: [['Lyria', 'Liria']] },
+        },
+      },
+    }
+    const root = tempRepo({ ...files, 'audio-studio.json': withGroups })
+    const projectFile = join(root, 'audio-studio.json')
+    const alike = async (language: string) => {
+      const read = await readPart(projectFile, 'act1', language)
+      if (!read?.ok) throw new Error('no part')
+      return read.ears.alike
+    }
+    const same = (map: Awaited<ReturnType<typeof alike>>, a: string, b: string) =>
+      (map.get(a) ?? a) === (map.get(b) ?? b)
+    const en = await alike('en')
+    expect(same(en, 'inn', 'in')).toBe(true)
+    expect(same(en, 'lira', 'lyra')).toBe(true)
+    expect(same(en, 'liria', 'lyria')).toBe(false)
+    const sv = await alike('sv')
+    expect(same(sv, 'liria', 'lyria')).toBe(true)
+    expect(same(sv, 'inn', 'in')).toBe(false)
+    expect(same(sv, 'lira', 'lyra')).toBe(false)
   })
 
   it('says so when the source dialog is missing, since lines cannot be matched', async () => {

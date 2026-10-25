@@ -27,6 +27,8 @@ export interface GenerationPlan {
   stale: Partial<Record<StaleReason, number>>
   /** Speakers in scope with lines but no voice: their lines cannot be recorded. */
   uncast: string[]
+  /** Lines in scope with no text in this language: never recorded. */
+  untranslated: number
   /** Orphaned clips in scope (their line left the dialog), removed if the user agrees. */
   orphans: string[]
   /** UTF-8 bytes of text sent to Fish (cues included), which paid models charge for. */
@@ -123,6 +125,7 @@ export function planGeneration(
     untracked: toRecord.filter((line) => line.status === 'untracked').length,
     stale,
     uncast: [...new Set(lines.filter((l) => l.status === 'uncast').map((l) => l.speaker))],
+    untranslated: lines.filter((l) => l.status === 'untranslated').length,
     orphans: state.orphans.filter((o) => inScope(o.speaker)).map((o) => o.key),
     bytes,
     model,

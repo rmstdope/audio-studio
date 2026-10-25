@@ -16,7 +16,7 @@ import {
   sameTable,
   type Pronunciation,
 } from '../core/pronounce'
-import { CastSchema, type Cast, type Character } from '../core/resources'
+import { CastSchema, pronounceOf, type Cast, type Character } from '../core/resources'
 import type { CharacterSummary } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
@@ -467,22 +467,42 @@ async function writeCharacter(
   return writeCast(projectFile, (cast, parsed, path) => {
     // A number-like pronunciation among others: parsing has already lost the file's order, so
     // writing would change the order they apply in. The table itself can be fixed on its own.
-    const keys = Object.keys(parsed.pronounce)
-    const reordered = keys.filter((k) => INTEGER_LIKE.test(k))
-    if (reordered.length && keys.length > 1) {
-      const message =
-        `the pronunciation of ${reordered.map((k) => `"${k}"`).join(', ')} would move to the ` +
-        'top if the studio wrote this file, changing the order pronunciations apply in. Make ' +
-        'the key longer under Pronunciations on All characters, e.g. "Act 10" or "10 " (any key ' +
-        'that is not a plain number keeps its place).'
-      return [{ file: path, path: 'pronounce', message }]
-    }
+    const reordered = reorderedTable(parsed, path)
+    if (reordered) return reordered
     const speakers = { ...cast.speakers }
     const { narration } = loaded.project
     const which = { language: declaredLanguage(narration, asked), source: narration.languages[0]! }
     speakers[characterId] = change(speakers[characterId] ?? {}, which)
     return { ...cast, speakers }
   })
+}
+
+/**
+ * The problem with a pronunciation table that writing the cast would reorder (a number-like key
+ * among others: parsing has already lost the file's order), in any table but `except`'s (the one
+ * being saved, which is checked on its own); null when none would be.
+ */
+function reorderedTable(parsed: Cast, path: string, except?: string): Problem[] | null {
+  const tables: [string, string[]][] = [
+    ['pronounce', Object.keys(parsed.pronounce)],
+    ...Object.entries(parsed.languages ?? {}).map(([language, own]): [string, string[]] => [
+      `languages.${language}.pronounce`,
+      Object.keys(own.pronounce ?? {}),
+    ]),
+  ]
+  for (const [where, keys] of tables) {
+    if (where === except) continue
+    const numbers = keys.filter((k) => INTEGER_LIKE.test(k))
+    if (numbers.length && keys.length > 1) {
+      const message =
+        `the pronunciation of ${numbers.map((k) => `"${k}"`).join(', ')} would move to the ` +
+        'top if the studio wrote this file, changing the order pronunciations apply in. Make ' +
+        'the key longer under Pronunciations on All characters, e.g. "Act 10" or "10 " (any key ' +
+        'that is not a plain number keeps its place).'
+      return [{ file: path, path: where, message }]
+    }
+  }
+  return null
 }
 
 /** The cast as it is in the file: only `speakers` and `pronounce` are known, the rest is kept. */
@@ -525,19 +545,38 @@ export function setPronunciations(
   projectFile: string,
   table: Pronunciation[],
   was: Pronunciation[],
+  language?: string,
 ): Promise<CharacterChange> {
   const clean = cleanPronunciations(table)
-  return castWrites.run(projectFile, () =>
-    writeCast(projectFile, (raw, parsed, path) => {
-      const problem = (message: string): Problem[] => [{ file: path, path: 'pronounce', message }]
-      if (!sameTable(Object.entries(parsed.pronounce), was)) {
+  return castWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const { narration } = opened.project
+    const which = declaredLanguage(narration, language)
+    // The source language's table is `pronounce`; another's is `languages.<code>.pronounce`.
+    const own = which !== narration.languages[0]
+    const where = own ? `languages.${which}.pronounce` : 'pronounce'
+    return writeCast(projectFile, (raw, parsed, path) => {
+      const problem = (message: string): Problem[] => [{ file: path, path: where, message }]
+      if (!sameTable(Object.entries(pronounceOf(parsed, which, narration.languages[0]!)), was)) {
         return problem(
           'the pronunciations in the file changed since editing began; discard your changes to see them',
         )
       }
       const why = pronounceProblem(clean)
       if (why) return problem(why)
-      return { ...raw, pronounce: Object.fromEntries(clean) }
-    }),
-  )
+      // The other tables are written back as parsed: none may be reordered by it.
+      const reordered = reorderedTable(parsed, path, where)
+      if (reordered) return reordered
+      if (!own) return { ...raw, pronounce: Object.fromEntries(clean) }
+      const { languages: had = {} } = raw as { languages?: Record<string, Record<string, unknown>> }
+      const { pronounce: _was, ...rest } = had[which] ?? {}
+      const entry = clean.length ? { ...rest, pronounce: Object.fromEntries(clean) } : rest
+      // A language left with nothing goes, and so does the key when no language is left.
+      const { [which]: _gone, ...others } = had
+      const kept = Object.keys(entry).length ? { ...others, [which]: entry } : others
+      const { languages: _languages, ...withoutLanguages } = raw
+      return Object.keys(kept).length ? { ...withoutLanguages, languages: kept } : withoutLanguages
+    })
+  })
 }

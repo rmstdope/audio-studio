@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import type { CharacterLanguage, CharacterSummary } from '../core/summary'
 import {
+  cardVoice,
   castInLanguage,
   castSaved,
   castTab,
@@ -81,6 +82,23 @@ describe('castTab', () => {
       title: 'No Deutsch voice yet',
       dimmed: true,
     })
+  })
+})
+
+describe('cardVoice', () => {
+  it('is her own voice in the source language, as a card always showed it', () => {
+    const own = { ...gran, voice: 'e', voiceName: 'Gentle Granny' }
+    expect(cardVoice(own, languages, 'en')).toEqual({ cast: true, label: 'Gentle Granny' })
+  })
+  it('is her voice in the language shown', () => {
+    expect(cardVoice(gran, languages, 'sv')).toEqual({ cast: true, label: 'Varm Mormor' })
+  })
+  it('says there is none in the language yet', () => {
+    expect(cardVoice(gran, languages, 'de')).toEqual({ cast: false, label: 'No Deutsch voice yet' })
+  })
+  it('keeps the source language’s wording for a character with none at all', () => {
+    const none = { ...gran, voice: null, voiceName: null }
+    expect(cardVoice(none, languages, 'en')).toEqual({ cast: false, label: 'No voice yet' })
   })
 })
 

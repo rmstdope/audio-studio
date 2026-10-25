@@ -118,7 +118,11 @@ export function CharacterView({
     return (
       <div className="empty-state">
         <strong>No character called “{characterId}”</strong>
-        <a className="btn" href={routeHref({ view: 'characters' })} style={{ alignSelf: 'center' }}>
+        <a
+          className="btn"
+          href={routeHref({ view: 'characters', ...(queried ? { language: queried } : {}) })}
+          style={{ alignSelf: 'center' }}
+        >
           All characters
         </a>
       </div>
@@ -156,7 +160,12 @@ export function CharacterView({
           </div>
           <div>
             <span className="crumbs">
-              <a href={routeHref({ view: 'characters' })}>Characters</a> / {character.name}
+              <a
+                href={routeHref({ view: 'characters', ...(queried ? { language: queried } : {}) })}
+              >
+                Characters
+              </a>{' '}
+              / {character.name}
             </span>
             <h1>{character.name}</h1>
             <span className="muted">

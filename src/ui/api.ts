@@ -118,12 +118,15 @@ export function usePart(partId: string, enabled = true, language?: string) {
  * What Whisper heard of a line's kept take, for comparing with its text. Asked again whenever it is
  * shown, and after the part's lines are recorded, since a retake replaces it.
  */
-export function useHeard(partId: string, key: string) {
+export function useHeard(partId: string, key: string, language?: string) {
   return useQuery({
-    queryKey: ['heard', partId, key],
+    queryKey: ['heard', partId, key, language],
     queryFn: () =>
       getJson<NonNullable<HeardResult>>(
-        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/heard`,
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/heard`,
+          language,
+        ),
       ),
   })
 }
@@ -147,12 +150,12 @@ export function useParts(partIds: string[], language?: string) {
 }
 
 /** Saves the project's own words that sound the same, then reloads the project. */
-export function useSetSoundAlike() {
+export function useSetSoundAlike(language?: string) {
   const client = useQueryClient()
   return useMutation({
     scope: { id: 'sound-alike' },
     mutationFn: async (change: { groups: string[][]; was: string[][] }) => {
-      const response = await fetch('/api/sound-alike', {
+      const response = await fetch(inLanguage('/api/sound-alike', language), {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(change),
@@ -192,12 +195,15 @@ export function useSwitchModels() {
  * Has Whisper check a line's clip again with today's rules (no new audio), then reloads the part,
  * its plan and what was heard.
  */
-export function useCheckAgain(partId: string) {
+export function useCheckAgain(partId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (key: string) =>
       postJson<MeasureResult>(
-        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/check`,
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/check`,
+          language,
+        ),
       ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['plan', partId] })
@@ -208,12 +214,15 @@ export function useCheckAgain(partId: string) {
 }
 
 /** Accepts a weak line's clip as it is, then reloads the part (the line is no longer weak). */
-export function useAccept(partId: string) {
+export function useAccept(partId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (key: string) =>
       postJson<AcceptResult>(
-        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/accept`,
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/accept`,
+          language,
+        ),
       ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['plan', partId] })
@@ -223,11 +232,13 @@ export function useAccept(partId: string) {
 }
 
 /** Adopts a part's untracked clips, then reloads the part. */
-export function useAdopt(partId: string) {
+export function useAdopt(partId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: () =>
-      postJson<NonNullable<AdoptResult>>(`/api/parts/${encodeURIComponent(partId)}/adopt`),
+      postJson<NonNullable<AdoptResult>>(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/adopt`, language),
+      ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['plan', partId] })
       return client.invalidateQueries({ queryKey: ['part', partId] })
@@ -237,7 +248,8 @@ export function useAdopt(partId: string) {
 
 /** `path` asking for `language` (the source language when none is named). */
 function inLanguage(path: string, language: string | undefined): string {
-  return language === undefined ? path : `${path}?language=${encodeURIComponent(language)}`
+  if (!language) return path
+  return `${path}${path.includes('?') ? '&' : '?'}language=${encodeURIComponent(language)}`
 }
 
 /**
@@ -394,12 +406,12 @@ export function useSetSpeed(characterId: string, language?: string) {
  * Saves the whole pronunciation table; `was` is the table shown, so a page that is out of date is
  * refused instead of overwriting someone's change. Every part's lines follow it.
  */
-export function useSetPronunciations() {
+export function useSetPronunciations(language?: string) {
   const client = useQueryClient()
   return useMutation({
     scope: { id: 'pronounce' },
     mutationFn: async (change: { table: Pronunciation[]; was: Pronunciation[] }) => {
-      const response = await fetch('/api/pronounce', {
+      const response = await fetch(inLanguage('/api/pronounce', language), {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(change),
@@ -475,12 +487,15 @@ export function useRefreshDialog(partId: string) {
 }
 
 /** Gives an orphaned cue to a line (`to`), or removes it (null), then reloads the part. */
-export function useMoveCue(partId: string) {
+export function useMoveCue(partId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async ({ key, to }: { key: string; to: string | null }) => {
       const response = await fetch(
-        `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}/move`,
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}/move`,
+          language,
+        ),
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -507,12 +522,15 @@ export function useMoveCue(partId: string) {
 }
 
 /** Saves the user's note on a line (empty to remove it), then reloads the part. */
-export function useSetNote(partId: string) {
+export function useSetNote(partId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async ({ key, note }: { key: string; note: string }) => {
       const response = await fetch(
-        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/note`,
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/note`,
+          language,
+        ),
         {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
@@ -531,12 +549,15 @@ export function useSetNote(partId: string) {
 }
 
 /** Saves a line's own cue (empty to go back to the character's style), then reloads the part. */
-export function useSetCue(partId: string) {
+export function useSetCue(partId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async ({ key, cue }: { key: string; cue: string }) => {
       const response = await fetch(
-        `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}`,
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}`,
+          language,
+        ),
         {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
@@ -994,11 +1015,14 @@ export function useAllowVoices(characterId: string, language?: string) {
  * Hears a line with a cue before saving it: the server records the line as a take with the cue
  * (empty: the character's style) and answers with the take to play, or why there is none.
  */
-export function useTryCue(partId: string) {
+export function useTryCue(partId: string, language?: string) {
   return useMutation({
     mutationFn: async ({ key, cue }: { key: string; cue: string }) => {
       const response = await fetch(
-        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/try`,
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/try`,
+          language,
+        ),
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -1055,19 +1079,25 @@ export function useSetFishTier() {
 }
 
 /** A line's extra takes, newest first, each marked current or stale. */
-export function useLineTakes(partId: string, key: string) {
+export function useLineTakes(partId: string, key: string, language?: string) {
   return useQuery({
-    queryKey: ['line-takes', partId, key],
+    queryKey: ['line-takes', partId, key, language],
     queryFn: () =>
       getJson<NonNullable<LineTakesResult>>(
-        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`,
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`,
+          language,
+        ),
       ),
   })
 }
 
 /** The URL of one of a line's extra takes (a WAV). */
-export function lineTakeUrl(partId: string, key: string, id: string): string {
-  return `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes/${id}.wav`
+export function lineTakeUrl(partId: string, key: string, id: string, language?: string): string {
+  return inLanguage(
+    `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes/${id}.wav`,
+    language,
+  )
 }
 
 /**
@@ -1076,7 +1106,7 @@ export function lineTakeUrl(partId: string, key: string, id: string): string {
  * `take` first answers with the most it can cost: `toConfirm` holds it until the user pays (`take`
  * again with that amount) or `cancel`s; nothing about the ask outlives the list.
  */
-export function useLineTakeActions(partId: string, key: string) {
+export function useLineTakeActions(partId: string, key: string, language?: string) {
   const client = useQueryClient()
   const base = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/takes`
   const reloadTakes = () => client.invalidateQueries({ queryKey: ['line-takes', partId, key] })
@@ -1089,7 +1119,7 @@ export function useLineTakeActions(partId: string, key: string) {
   const [refusal, setRefusal] = useState<string | null>(null)
   const take = useMutation({
     mutationFn: async (confirmedCost?: number) => {
-      const response = await fetch(base, {
+      const response = await fetch(inLanguage(base, language), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(confirmedCost === undefined ? {} : { confirmedCost }),
@@ -1117,7 +1147,8 @@ export function useLineTakeActions(partId: string, key: string) {
     },
   })
   const use = useMutation({
-    mutationFn: (id: string) => postJson<NonNullable<UseTakeResult>>(`${base}/${id}/use`),
+    mutationFn: (id: string) =>
+      postJson<NonNullable<UseTakeResult>>(inLanguage(`${base}/${id}/use`, language)),
     onMutate: () => setRefused(null),
     onSuccess: async (result) => {
       if (!result.ok) setRefused({ what: 'The take could not be used', answer: result })
@@ -1131,7 +1162,7 @@ export function useLineTakeActions(partId: string, key: string) {
   })
   const drop = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`${base}/${id}`, { method: 'DELETE' })
+      const response = await fetch(inLanguage(`${base}/${id}`, language), { method: 'DELETE' })
       if (!response.ok && response.status !== 409) {
         throw new Error(`dropping the take answered ${response.status}`)
       }
@@ -1212,7 +1243,7 @@ export function takeUrl(key: string): string {
  * with that amount) or `cancel`s. `recording` holds the lines in progress, `errors` what went
  * wrong per line.
  */
-export function useRecordLines(partId: string) {
+export function useRecordLines(partId: string, language?: string) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -1225,7 +1256,10 @@ export function useRecordLines(partId: string) {
       setErrors(({ [key]: _gone, ...rest }) => rest)
       forget(key)
       try {
-        const path = `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/record`
+        const path = inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/record`,
+          language,
+        )
         const response = await fetch(path, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -1263,7 +1297,7 @@ export function useRecordLines(partId: string) {
         })
       }
     },
-    [partId, client],
+    [partId, language, client],
   )
 
   return { record, recording, errors, toConfirm, cancel: forget }
@@ -1289,21 +1323,25 @@ export function usePlan(
   speaker: string | null,
   weak = false,
   stage: 'draft' | 'final' = 'draft',
+  language?: string,
 ) {
   return useQuery({
-    queryKey: ['plan', partId, speaker, weak, stage],
+    queryKey: ['plan', partId, speaker, weak, stage, language],
     queryFn: () => {
       const params = new URLSearchParams()
       if (speaker) params.set('speaker', speaker)
       if (weak) params.set('weak', '1')
       if (stage === 'final') params.set('stage', 'final')
+      if (language) params.set('language', language)
       const query = params.size ? `?${params}` : ''
       return getJson<PlanAnswer>(`/api/parts/${encodeURIComponent(partId)}/plan${query}`)
     },
     // Ticking the retake box asks for another plan: keep showing the last one for the same scope
     // meanwhile (its buttons wait), but never another speaker's or stage's.
     placeholderData: (previous, query) =>
-      query?.queryKey[2] === speaker && query?.queryKey[4] === stage
+      query?.queryKey[2] === speaker &&
+      query?.queryKey[4] === stage &&
+      query?.queryKey[5] === language
         ? keepPreviousData(previous)
         : undefined,
   })
@@ -1313,15 +1351,15 @@ export function usePlan(
  * The part's latest generation job, polled every second while it runs. When it finishes, the
  * part and its plans are loaded again.
  */
-export function useJob(partId: string) {
+export function useJob(partId: string, language?: string) {
   const client = useQueryClient()
   return useQuery({
-    queryKey: ['job', partId],
+    queryKey: ['job', partId, language],
     queryFn: async () => {
       const job = await getJson<JobState | null>(
-        `/api/parts/${encodeURIComponent(partId)}/jobs/latest`,
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/jobs/latest`, language),
       )
-      const before = client.getQueryData<JobState | null>(['job', partId])
+      const before = client.getQueryData<JobState | null>(['job', partId, language])
       // Keep the lines' statuses current while the job runs, and once more when it ends.
       const running = job && (job.status === 'running' || job.status === 'cancelling')
       if (job && (running || before?.status !== job.status)) {
@@ -1345,7 +1383,7 @@ export function useJob(partId: string) {
 }
 
 /** Starts generating a part, or cancels the running job. */
-export function useJobActions(partId: string) {
+export function useJobActions(partId: string, language?: string) {
   const client = useQueryClient()
   const start = useMutation({
     mutationFn: async (options: {
@@ -1358,18 +1396,21 @@ export function useJobActions(partId: string) {
       keys: string[]
       orphans: string[]
     }) => {
-      const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/jobs`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(options),
-      })
+      const response = await fetch(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/jobs`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(options),
+        },
+      )
       const body = (await response.json()) as JobState | { error: string }
       if ('error' in body) throw new Error(body.error)
       if (!response.ok) throw new Error(`generating answered ${response.status}`)
       return body
     },
     onSuccess: (job) => {
-      client.setQueryData(['job', partId], job)
+      client.setQueryData(['job', partId, language], job)
       // A paid job is on the Spending page from its first moment.
       void client.invalidateQueries({ queryKey: ['spending'] })
     },
@@ -1382,7 +1423,7 @@ export function useJobActions(partId: string) {
       if (!response.ok) throw new Error(`cancelling answered ${response.status}`)
       return (await response.json()) as JobState
     },
-    onSuccess: (job) => client.setQueryData(['job', partId], job),
+    onSuccess: (job) => client.setQueryData(['job', partId, language], job),
   })
   return { start, cancel }
 }

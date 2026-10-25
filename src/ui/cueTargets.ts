@@ -21,7 +21,9 @@ export function cueTargets(lines: LineState[]): {
   recorded: CueTarget[]
   suggested: string | null
 } {
-  const free = lines.map((line, i) => ({ line, place: i + 1 })).filter(({ line }) => !line.ownCue)
+  const free = lines
+    .map((line, i) => ({ line, place: i + 1 }))
+    .filter(({ line }) => line.cueFrom !== 'own')
   const target = ({ line, place }: { line: LineState; place: number }): CueTarget => {
     const words = line.text.length > WORDS ? `${line.text.slice(0, WORDS)}…` : line.text
     return { key: line.key, label: `${place}. ${displayName(line.speaker)}: ${words}` }

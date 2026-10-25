@@ -13,6 +13,7 @@ import {
   type TimedWord,
 } from '../core/align'
 import { clipInputs, fingerprint, type ClipInputs } from '../core/fingerprint'
+import { languageName } from '../core/languages'
 import { planPart } from '../core/planner'
 import { resolveInRoot } from '../core/paths'
 import type { Problem, Project } from '../core/project'
@@ -37,7 +38,7 @@ import type { Limiter } from './limit'
 import type { Transcriber } from './transcriber'
 import { keepHeard } from './heard'
 import { inPartTurn } from './partFiles'
-import { readPart, type ProjectFailure } from './workspace'
+import { readPart, type Ears, type ProjectFailure } from './workspace'
 import { NO_KEY, type FishClient } from './fish'
 
 /** Seconds of silence between the pieces of a long line (as in RetroQuest's narrate.py). */
@@ -51,7 +52,16 @@ export type RecordResult =
   | { ok: true; key: string; skipped: true }
   | {
       ok: false
-      reason: 'uncast' | 'no-key' | 'spend' | 'fish' | 'audio' | 'transcribe' | 'encode' | 'write'
+      reason:
+        | 'uncast'
+        | 'untranslated'
+        | 'no-key'
+        | 'spend'
+        | 'fish'
+        | 'audio'
+        | 'transcribe'
+        | 'encode'
+        | 'write'
       message: string
     }
   | { ok: false; problems: Problem[] }
@@ -94,6 +104,8 @@ export interface RecordOptions {
   budget?: Budget
   /** Checks each take (unless the project's `quality.transcriber` is "none"); none: unchecked. */
   transcriber?: Transcriber | null
+  /** The language to record (the source language when absent or not declared). */
+  language?: string
 }
 
 /**
@@ -133,13 +145,22 @@ export async function recordLine(
     transcriber = null,
     budget = FREE_ONLY,
     stage = 'draft',
+    language,
   }: RecordOptions,
 ): Promise<RecordResult> {
-  const read = await readPart(projectFile, partId)
+  const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return read
   if (read.problems.length) return { ok: false, problems: read.problems }
   const line = read.input.lines.find((l) => l.key === key)
-  if (!line) return null
+  if (!line || line.text.trim() === '') {
+    return planPart(read.input).lines.some((l) => l.key === key && l.status === 'untranslated')
+      ? {
+          ok: false,
+          reason: 'untranslated',
+          message: `${key} has no ${languageName(read.language)} text yet; translate it first.`,
+        }
+      : null
+  }
   const { cast, cues } = read.input
   const { narration } = read.project
   // With one model for both, there is no final step: a "final" recording is a draft one.
@@ -175,7 +196,7 @@ export async function recordLine(
 
   // The same line asked for again while it is being recorded shares that recording.
   // Per model too: a final recording never takes a draft one's result as its own.
-  const id = `${projectFile}\n${partId}\n${key}\n${model}`
+  const id = `${projectFile}\n${partId}\n${read.language}\n${key}\n${model}`
   const running = recordings.get(id)
   if (running) return running
   const recording = record()
@@ -206,7 +227,7 @@ export async function recordLine(
     if (onlyIfNeeded) {
       // Checked only now that this recording is registered: a recording of the same line that
       // finished meanwhile has written its files before leaving, so it is seen here.
-      const fresh = await readPart(projectFile, partId)
+      const fresh = await readPart(projectFile, partId, language)
       if (!fresh || !fresh.ok) return fresh
       const now = planPart(fresh.input).lines.find((l) => l.key === key)
       const status = now?.status
@@ -239,7 +260,7 @@ export async function recordLine(
       }
       let attempt: Take
       try {
-        attempt = await checkTake(checker, made.clip, line, cast, narration)
+        attempt = await checkTake(checker, made.clip, line, cast, narration, read.ears)
       } catch (error) {
         if (best) break
         return { ok: false, reason: 'transcribe', message: messageOf(error) }
@@ -255,6 +276,7 @@ export async function recordLine(
       line,
       inputs,
       paths: read.paths,
+      cacheName: read.cacheName,
       narration,
       encode,
       take: best,
@@ -365,23 +387,22 @@ export async function checkTake(
   line: Line,
   cast: Cast,
   narration: Project['narration'],
+  ears: Ears = { language: undefined, alike: soundAlikes(narration.quality.soundAlike) },
 ): Promise<Take> {
   const tokens = line.text.split(' ')
   if (!checker) {
     const timed = alignWords(tokens, [], clip.seconds).timed
     return { clip, timed, heard: null, words: [], missed: [] }
   }
-  const segments = await transcribeWav(checker, narration.quality.whisperModel, clip.wav)
+  const segments = await transcribeWav(
+    checker,
+    narration.quality.whisperModel,
+    clip.wav,
+    ears.language,
+  )
   const words = heardWords(segments, clip.seconds)
   const said = saidWords(line.text, cast.pronounce)
-  const aligned = alignWords(
-    tokens,
-    words,
-    clip.seconds,
-    said,
-    knownNames(cast),
-    soundAlikes(narration.quality.soundAlike),
-  )
+  const aligned = alignWords(tokens, words, clip.seconds, said, knownNames(cast), ears.alike)
   return {
     clip,
     timed: aligned.timed,
@@ -405,6 +426,7 @@ export async function commitClip({
   line,
   inputs,
   paths,
+  cacheName = partId,
   narration,
   encode,
   take,
@@ -416,6 +438,8 @@ export async function commitClip({
   line: Line
   inputs: ClipInputs
   paths: { clipsPath: string; manifestPath: string; lockPath: string }
+  /** What names the part's own files in the tool cache: the part's id, with the language besides the source. */
+  cacheName?: string
   narration: Project['narration']
   encode: Encoder
   take: Take
@@ -468,7 +492,7 @@ export async function commitClip({
         await rename(temporary, target)
         await writeAtomic(root, paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
         await writeAtomic(root, paths.lockPath, formatEntriesPerLine(lock))
-        await keepWhatWasHeard(projectFile, partId, key, { ...take, at, text: line.text })
+        await keepWhatWasHeard(projectFile, cacheName, key, { ...take, at, text: line.text })
         return []
       },
     )
@@ -516,14 +540,14 @@ function sorted<T>(record: Record<string, T>): Record<string, T> {
  */
 async function keepWhatWasHeard(
   projectFile: string,
-  partId: string,
+  name: string,
   key: string,
   take: { heard: number | null; at: string; text: string; words: string[]; missed: number[] },
 ): Promise<void> {
   const { heard, at, text, words, missed } = take
   if (heard === null) return
   const line = heard < 1 ? { at, text, words, missed } : null
-  await keepHeard(projectFile, partId, key, line).catch(() => {})
+  await keepHeard(projectFile, name, key, line).catch(() => {})
 }
 
 /** What Whisper heard in a WAV: written to a temporary file outside the game, then removed. */
@@ -531,11 +555,12 @@ async function transcribeWav(
   transcriber: Transcriber,
   model: string,
   wav: Uint8Array,
+  language?: string,
 ): Promise<HeardSegment[]> {
   const file = join(tmpdir(), `audio-studio-heard-${randomUUID()}.wav`)
   await writeFile(file, wav)
   try {
-    return await transcriber.transcribe(model, file)
+    return await transcriber.transcribe(model, file, language)
   } finally {
     await rm(file, { force: true }).catch(() => {})
   }
@@ -558,9 +583,10 @@ export async function removeOrphans(
   projectFile: string,
   partId: string,
   keys: string[],
+  language?: string,
 ): Promise<number> {
   return inPartTurn(projectFile, partId, async () => {
-    const read = await readPart(projectFile, partId)
+    const read = await readPart(projectFile, partId, language)
     if (!read || !read.ok) return 0
     if (read.problems.length) {
       throw new Error(read.problems.map((p) => `${p.file}: ${p.message}`).join('; '))
@@ -609,9 +635,10 @@ export async function acceptLine(
   projectFile: string,
   partId: string,
   key: string,
+  language?: string,
 ): Promise<AcceptResult> {
   return inPartTurn(projectFile, partId, async (): Promise<AcceptResult> => {
-    const read = await readPart(projectFile, partId)
+    const read = await readPart(projectFile, partId, language)
     if (!read || !read.ok) return read
     if (read.problems.length) return { ok: false, problems: read.problems }
     const state = planPart(read.input).lines.find((l) => l.key === key)
@@ -642,6 +669,8 @@ export interface MeasureOptions {
   again?: boolean
   /** In a job: a line that no longer needs it when its turn comes is skipped, not refused. */
   onlyIfNeeded?: boolean
+  /** The language of the clip (the source language when absent or not declared). */
+  language?: string
   decode?: (file: string) => Promise<{ wav: Uint8Array; seconds: number }>
 }
 
@@ -656,9 +685,15 @@ export async function measureLine(
   projectFile: string,
   partId: string,
   key: string,
-  { transcriber, decode = decodeClip, again = false, onlyIfNeeded = false }: MeasureOptions,
+  {
+    transcriber,
+    decode = decodeClip,
+    again = false,
+    onlyIfNeeded = false,
+    language,
+  }: MeasureOptions,
 ): Promise<MeasureResult> {
-  const read = await readPart(projectFile, partId)
+  const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return read
   if (read.problems.length) return { ok: false, problems: read.problems }
   const line = read.input.lines.find((l) => l.key === key)
@@ -703,11 +738,16 @@ export async function measureLine(
   let words: string[]
   try {
     // The decoded WAV, as narrate.py --retime transcribes it, so the timings come out the same.
-    const segments = await transcribeWav(transcriber, narration.quality.whisperModel, decoded.wav)
+    const segments = await transcribeWav(
+      transcriber,
+      narration.quality.whisperModel,
+      decoded.wav,
+      read.ears.language,
+    )
     const said = saidWords(line.text, read.input.cast.pronounce)
     const heardNow = heardWords(segments, seconds)
     const names = knownNames(read.input.cast)
-    const alike = soundAlikes(narration.quality.soundAlike)
+    const alike = read.ears.alike
     aligned = alignWords(line.text.split(' '), heardNow, seconds, said, names, alike)
     words = heardNow.map((w) => w.word.trim())
   } catch (error) {
@@ -731,7 +771,7 @@ export async function measureLine(
     lock[key] = { ...locked, heard }
     await writeAtomic(root, read.paths.manifestPath, `${pythonJson(sorted(manifest))}\n`)
     await writeAtomic(root, read.paths.lockPath, formatEntriesPerLine(lock))
-    await keepWhatWasHeard(projectFile, partId, key, {
+    await keepWhatWasHeard(projectFile, read.cacheName, key, {
       heard,
       at: locked.at,
       text: line.text,

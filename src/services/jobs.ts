@@ -12,6 +12,8 @@ export interface JobState {
   id: string
   kind: JobKind
   part: string
+  /** The language it records, measures or checks. */
+  language: string | null
   /** The one speaker generated, or null for the whole part. */
   speaker: string | null
   status: 'running' | 'cancelling' | 'done' | 'cancelled'
@@ -40,6 +42,8 @@ export interface JobState {
 export interface JobOptions {
   kind?: JobKind
   part: string
+  /** The language whose lines these are; absent: the source language's (or the only one's). */
+  language?: string
   speaker: string | null
   keys: string[]
   /** Orphans to remove once every line is done; empty unless the user agreed. */
@@ -56,8 +60,10 @@ export interface JobOptions {
 export interface Jobs {
   start(options: JobOptions): JobState | { error: string }
   get(id: string): JobState | null
-  /** The most recent job of a part, running or not. */
-  latest(part: string): JobState | null
+  /** The most recent job of a part in a language, running or not. */
+  latest(part: string, language?: string): JobState | null
+  /** Whether a job of the part is running in any language. */
+  running(part: string): boolean
   cancel(id: string): JobState | null
 }
 
@@ -71,10 +77,11 @@ interface Running {
  * Generation jobs: each records its lines `parallel` at a time, goes on past a failed line, and
  * removes the agreed orphans once every line is done. Cancelling stops lines not started yet;
  * lines under way finish, and no orphans are removed. Only the orphan removal itself cannot be
- * cancelled. One job per part runs at a time, and only each part's latest is kept.
+ * cancelled. One job per part and language runs at a time, and only the latest of each is kept.
  */
 export function createJobs(): Jobs {
   const byPart = new Map<string, Running>()
+  const keyOf = (part: string, language?: string) => `${part}\0${language ?? ''}`
   const find = (id: string) => [...byPart.values()].find((job) => job.state.id === id)
 
   const snapshot = ({ state }: Running): JobState => ({
@@ -85,12 +92,14 @@ export function createJobs(): Jobs {
 
   return {
     start(options) {
-      const current = byPart.get(options.part)
+      const current = byPart.get(keyOf(options.part, options.language))
       if (
         current &&
         (current.state.status === 'running' || current.state.status === 'cancelling')
       ) {
-        return { error: `A generation is already running for ${options.part}.` }
+        return {
+          error: `A generation is already running for ${options.part}${options.language ? ` in ${options.language}` : ''}.`,
+        }
       }
       const job: Running = {
         queue: [...options.keys],
@@ -98,6 +107,7 @@ export function createJobs(): Jobs {
           id: randomUUID(),
           kind: options.kind ?? 'record',
           part: options.part,
+          language: options.language ?? null,
           speaker: options.speaker,
           status: 'running',
           total: options.keys.length,
@@ -112,7 +122,7 @@ export function createJobs(): Jobs {
           finishedAt: null,
         },
       }
-      byPart.set(options.part, job)
+      byPart.set(keyOf(options.part, options.language), job)
       void run(job, options)
       return snapshot(job)
     },
@@ -120,9 +130,15 @@ export function createJobs(): Jobs {
       const job = find(id)
       return job ? snapshot(job) : null
     },
-    latest(part) {
-      const job = byPart.get(part)
+    latest(part, language) {
+      const job = byPart.get(keyOf(part, language))
       return job ? snapshot(job) : null
+    },
+    running(part) {
+      return [...byPart.values()].some(
+        ({ state }) =>
+          state.part === part && (state.status === 'running' || state.status === 'cancelling'),
+      )
     },
     cancel(id) {
       const job = find(id)

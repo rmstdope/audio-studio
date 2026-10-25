@@ -9,7 +9,8 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     text: 'Hello.',
     english: null,
     cue: '',
-    ownCue: false,
+    cueFrom: 'style',
+    sourceCue: null,
     final: false,
     status: 'missing',
     reasons: [],
@@ -25,7 +26,7 @@ describe('cueTargets', () => {
   it('offers lines without their own cue, those without a clip first, numbered as in the dialog', () => {
     const targets = cueTargets([
       line('a', { file: 'a.mp3', status: 'ok' }),
-      line('b', { ownCue: true }),
+      line('b', { cueFrom: 'own' }),
       line('c'),
       line('d', { text: 'x'.repeat(100) }),
     ])

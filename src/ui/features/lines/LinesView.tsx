@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineState, LineStatus } from '../../../core/planner'
-import type { LanguageProgress } from '../../../services/workspace'
 import type { PartSummary, ProjectSummary } from '../../../core/summary'
 import {
   clipUrl,
@@ -19,14 +18,14 @@ import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { RefreshOutcome } from '../overview/PartOverview'
 import { GeneratePanel } from './GeneratePanel'
-import { LanguageSwitch } from './LanguageSwitch'
+import { PartLanguageSwitch } from './PartLanguageSwitch'
 import { HeardComparison } from './HeardComparison'
 import { LineTakes } from './LineTakes'
 import { canCompare } from '../../heard'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
-import { languageTab, noDialogPanel, recordingNote } from '../../languages'
+import { cueButtonTitle, cueHint, cueNote, noDialogPanel } from '../../languages'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
@@ -59,16 +58,16 @@ export function LinesView({
   const active = declared.find((l) => l.id === language) ?? declared[0]!
   // Another language than the first: its lines are listed with the first's text beneath, and none is recorded yet.
   const foreign = active.id !== declared[0]!.id
+  // What the hooks and links ask with: the language, in a project with several.
+  const asked = several ? active.id : undefined
   const source = declared[0]!
   const detail = usePart(part.id, several || part.dialog === 'ok', several ? active.id : undefined)
   const refresh = useRefreshDialog(part.id)
   const clip = (file: string) => clipUrl(part.id, file, several ? active.id : undefined)
-  // The last counts seen, so the switch keeps them while another language loads.
-  const seen = useRef<LanguageProgress[] | null>(null)
   const { playing, inTurn, toggle, playInTurn, stop } = useClipPlayer()
-  const recorder = useRecordLines(part.id)
-  const accept = useAccept(part.id)
-  const check = useCheckAgain(part.id)
+  const recorder = useRecordLines(part.id, asked)
+  const accept = useAccept(part.id, asked)
+  const check = useCheckAgain(part.id, asked)
   // The lines Whisper is checking again, and why a line's last Accept or Check again failed.
   const [checking, setChecking] = useState<ReadonlySet<string>>(new Set())
   const [refused, setRefused] = useState<Record<string, string>>({})
@@ -113,7 +112,6 @@ export function LinesView({
   const [takesOf, setTakesOf] = useState<string | null>(null)
 
   const loaded = detail.data?.ok ? detail.data.part : null
-  if (loaded) seen.current = loaded.languages
   const lines = useMemo(() => {
     const words = search.trim().toLowerCase()
     return (loaded?.lines ?? []).filter(
@@ -212,19 +210,11 @@ export function LinesView({
         </span>
       </div>
       {several && (
-        <LanguageSwitch
-          tabs={declared.map((language) => {
-            const known = seen.current?.find((p) => p.id === language.id)
-            const tab = known ? languageTab(known, shortTitle(part.title)) : null
-            return {
-              id: language.id,
-              name: language.name,
-              count: tab?.count ?? null,
-              title: tab?.title,
-              dimmed: tab?.dimmed ?? false,
-            }
-          })}
+        <PartLanguageSwitch
+          summary={summary}
+          part={part}
           active={active.id}
+          progress={loaded?.languages ?? null}
           onChoose={(id) => {
             window.location.hash = routeHref({ view: 'lines', part: part.id, language: id })
           }}
@@ -362,15 +352,12 @@ export function LinesView({
         </div>
       </div>
 
-      {foreign ? (
-        <p className="muted language-note">{recordingNote(active.name)}</p>
-      ) : (
-        <GeneratePanel
-          partId={loaded.id}
-          speaker={speaker || null}
-          models={{ draft: loaded.draftModel, final: loaded.finalModel }}
-        />
-      )}
+      <GeneratePanel
+        partId={loaded.id}
+        language={several ? active : null}
+        speaker={speaker || null}
+        models={{ draft: loaded.draftModel, final: loaded.finalModel }}
+      />
 
       {filter === 'orphans' ? (
         <OrphanTable
@@ -387,7 +374,7 @@ export function LinesView({
               <tr>
                 <th style={{ width: 130 }}>Status</th>
                 <th>Line</th>
-                {!foreign && <th style={{ width: 220 }}>Delivery</th>}
+                <th style={{ width: 220 }}>Delivery{foreign ? ` (${active.name})` : ''}</th>
                 <th style={{ width: 70 }}>Length</th>
                 <th style={{ width: 70 }}>Heard</th>
                 <th style={{ width: 140 }}>
@@ -432,33 +419,38 @@ export function LinesView({
                           ) : (
                             <span className="line-gap line-english">No {source.name} line.</span>
                           ))}
-                        {line.status !== 'ok' && statusDetail(line, loaded.minHeard) && (
-                          <span
-                            className="line-detail"
-                            style={{ color: STATUS[line.status].color }}
-                          >
-                            {statusDetail(line, loaded.minHeard)}
-                          </span>
-                        )}
-                        {!foreign && (
-                          <NoteCell
-                            partId={loaded.id}
-                            lineKey={line.key}
-                            note={
-                              Object.hasOwn(loaded.notes, line.key) ? loaded.notes[line.key]! : ''
-                            }
-                          />
-                        )}
+                        {line.status !== 'ok' &&
+                          statusDetail(line, loaded.minHeard, asked && active.name) && (
+                            <span
+                              className="line-detail"
+                              style={{ color: STATUS[line.status].color }}
+                            >
+                              {statusDetail(line, loaded.minHeard, asked && active.name)}
+                            </span>
+                          )}
+                        <NoteCell
+                          partId={loaded.id}
+                          lineKey={line.key}
+                          language={asked}
+                          note={
+                            Object.hasOwn(loaded.notes, line.key) ? loaded.notes[line.key]! : ''
+                          }
+                        />
                       </div>
                     </td>
-                    {!foreign && (
-                      <td>
-                        <CueCell partId={loaded.id} line={line} playing={playing} toggle={toggle} />
-                      </td>
-                    )}
+                    <td>
+                      <CueCell
+                        partId={loaded.id}
+                        line={line}
+                        language={asked}
+                        names={foreign ? { language: active.name, source: source.name } : null}
+                        playing={playing}
+                        toggle={toggle}
+                      />
+                    </td>
                     <td className="mono num">{seconds(line.duration)}</td>
                     <td className="mono num">
-                      {!foreign && canCompare(line.heard) ? (
+                      {canCompare(line.heard) ? (
                         <button
                           type="button"
                           className="heard-btn"
@@ -474,7 +466,7 @@ export function LinesView({
                     </td>
                     <td>
                       <div className="row-actions">
-                        {!foreign && (RECORDABLE.has(line.status) || line.status === 'ok') ? (
+                        {RECORDABLE.has(line.status) || line.status === 'ok' ? (
                           <button
                             type="button"
                             className="btn row-takes"
@@ -506,8 +498,7 @@ export function LinesView({
                             <ListIcon />
                           </button>
                         )}
-                        {!foreign &&
-                          RECORDABLE.has(line.status) &&
+                        {RECORDABLE.has(line.status) &&
                           (recorder.toConfirm[line.key] !== undefined ? (
                             <>
                               <button
@@ -553,8 +544,7 @@ export function LinesView({
                                   : 'Record'}
                             </button>
                           ))}
-                        {!foreign &&
-                          line.status === 'weak' &&
+                        {line.status === 'weak' &&
                           recorder.toConfirm[line.key] === undefined &&
                           !recorder.recording.has(line.key) && (
                             <>
@@ -587,21 +577,22 @@ export function LinesView({
                       )}
                     </td>
                   </tr>
-                  {!foreign && comparing === line.key && canCompare(line.heard) && (
+                  {comparing === line.key && canCompare(line.heard) && (
                     <tr className="heard-row">
                       <td />
                       <td colSpan={5}>
-                        <HeardComparison partId={loaded.id} lineKey={line.key} />
+                        <HeardComparison partId={loaded.id} lineKey={line.key} language={asked} />
                       </td>
                     </tr>
                   )}
-                  {!foreign && takesOf === line.key && (
+                  {takesOf === line.key && (
                     <tr className="heard-row takes-row">
                       <td />
                       <td colSpan={5}>
                         <LineTakes
                           partId={loaded.id}
                           lineKey={line.key}
+                          language={asked}
                           draftModel={loaded.draftModel}
                           playing={playing}
                           toggle={toggle}
@@ -698,16 +689,22 @@ function OrphanTable({
 function CueCell({
   partId,
   line,
+  language,
+  names,
   playing,
   toggle,
 }: {
   partId: string
   line: LineState
+  /** The language of the line, in a project with several. */
+  language?: string
+  /** In a language besides the source: its name and the source's, for what the cue says it follows. */
+  names: { language: string; source: string } | null
   playing: string | null
   toggle: (id: string, url: string) => void
 }) {
-  const save = useSetCue(partId)
-  const hear = useTryCue(partId)
+  const save = useSetCue(partId, language)
+  const hear = useTryCue(partId, language)
   const [draft, setDraft] = useState<string | null>(null)
   // The take playing from this cell, so Hear it reads Stop while it plays.
   const tryId = `try/${line.key}`
@@ -723,7 +720,10 @@ function CueCell({
   const cell = useRef<HTMLButtonElement>(null)
   const refocus = useRef(false)
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
-  const own = line.ownCue ? line.cue : ''
+  const own = line.cueFrom === 'own' ? line.cue : ''
+  const note =
+    names && line.cue ? cueNote(line.cueFrom, displayName(line.speaker), names.source) : null
+  const hint = names ? cueHint(line.cueFrom, line.sourceCue, names.source) : null
 
   // Back on the cue after editing, so the keyboard keeps its place in the table.
   useEffect(() => {
@@ -753,22 +753,27 @@ function CueCell({
 
   if (draft === null) {
     return (
-      <button
-        ref={cell}
-        type="button"
-        className={`cue-button mono${line.ownCue ? '' : ' from-style'}`}
-        title={
-          line.ownCue
-            ? 'This line’s own cue: edit'
-            : 'The character’s style: give this line its own cue'
-        }
-        onClick={() => {
-          save.reset()
-          setDraft(own)
-        }}
-      >
-        {line.cue || '—'}
-      </button>
+      <>
+        <button
+          ref={cell}
+          type="button"
+          className={`cue-button mono${line.cueFrom === 'own' ? '' : ' from-style'}`}
+          title={
+            names
+              ? cueButtonTitle(line.cueFrom, names.language, names.source)
+              : line.cueFrom === 'own'
+                ? 'This line’s own cue: edit'
+                : 'The character’s style: give this line its own cue'
+          }
+          onClick={() => {
+            save.reset()
+            setDraft(own)
+          }}
+        >
+          {line.cue || '—'}
+        </button>
+        {note && <span className="cue-from muted">{note}</span>}
+      </>
     )
   }
   return (
@@ -783,23 +788,24 @@ function CueCell({
         className="mono"
         autoFocus
         aria-label={`Cue for ${line.key}`}
-        placeholder={line.ownCue ? '' : line.cue || '[a cue for this line]'}
+        placeholder={line.cueFrom === 'own' ? '' : line.cue || '[a cue for this line]'}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => e.key === 'Escape' && close()}
       />
+      {hint && <span className="cue-hint muted">{hint}</span>}
       <div className="cue-actions">
         <button className="btn" type="submit" disabled={save.isPending || draft.trim() === own}>
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
-        {line.ownCue && (
+        {line.cueFrom === 'own' && (
           <button
             className="btn"
             type="button"
             disabled={save.isPending}
             onClick={() => save.mutate({ key: line.key, cue: '' }, { onSuccess: done })}
           >
-            Use style
+            {names && line.sourceCue ? `Follow ${names.source}` : 'Use style'}
           </button>
         )}
         <button className="btn" type="button" onClick={close}>
@@ -831,8 +837,18 @@ function CueCell({
  * The user's note on a line ("too fast", "retake after the rewrite"), under its text: shown when
  * there is one, else an Add note link; edited in place. The studio's own, kept in the tool cache.
  */
-function NoteCell({ partId, lineKey, note }: { partId: string; lineKey: string; note: string }) {
-  const save = useSetNote(partId)
+function NoteCell({
+  partId,
+  lineKey,
+  language,
+  note,
+}: {
+  partId: string
+  lineKey: string
+  language?: string
+  note: string
+}) {
+  const save = useSetNote(partId, language)
   const [draft, setDraft] = useState<string | null>(null)
   const button = useRef<HTMLButtonElement>(null)
   const refocus = useRef(false)

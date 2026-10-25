@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+import { soundAlikes, type SoundAlike } from '../core/align'
 import { languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
@@ -8,8 +9,10 @@ import {
   PROJECT_FILE,
   ProjectSchema,
   declaredLanguage,
+  partCacheName,
   partPathFor,
   problemsFrom,
+  soundAlikeOf,
   type Part,
   type Problem,
   type Project,
@@ -22,6 +25,7 @@ import {
   ManifestSchema,
   projectCast,
   type Cast,
+  type Cues,
 } from '../core/resources'
 import { summarize, type DialogState, type ProjectSummary } from '../core/summary'
 import {
@@ -161,15 +165,16 @@ export const NOTES_DIR = '.audio-studio/notes'
  */
 export async function readNotes(
   root: string,
-  partId: string,
+  /** What names the notes in the cache: the part's id, with the language besides the source. */
+  name: string,
 ): Promise<{ notes: Notes; problem: Problem | null }> {
   const { value, broken, path } = await readCached(
     root,
     NOTES_DIR,
-    partId,
+    name,
     NotesSchema,
-    emptyNotes(partId),
-    (notes) => notes.part === partId,
+    emptyNotes(name),
+    (notes) => notes.part === name,
   )
   const problem = broken
     ? {
@@ -242,7 +247,7 @@ export async function loadPart(
       total,
     })
   }
-  const notes = await readNotes(dirname(projectFile), part.id)
+  const notes = await readNotes(dirname(projectFile), read.cacheName)
   return {
     ok: true,
     part: {
@@ -278,10 +283,11 @@ export async function adoptPart(
   projectFile: string,
   partId: string,
   now: Date = new Date(),
+  language?: string,
 ): Promise<AdoptResult> {
   // In the part's turn, reading the part afresh: a line recorded meanwhile keeps its lock entry.
   return inPartTurn(projectFile, partId, async () => {
-    const read = await readPart(projectFile, partId)
+    const read = await readPart(projectFile, partId, language)
     if (!read || !read.ok) return read
     if (read.problems.length) return { ok: false, problems: read.problems }
     const { lock, adopted } = adoptUntracked(read.input, now.toISOString())
@@ -313,11 +319,24 @@ export async function clipFile(
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
 
+/** How a take is checked: the language Whisper is told, and the words counted as heard for each other. */
+export interface Ears {
+  /** The code of the language spoken; absent in a project with one language, where Whisper recognises it. */
+  language: string | undefined
+  alike: SoundAlike
+}
+
 /** Everything read about a part, for planning it or acting on it. */
 export interface PartRead {
   ok: true
   /** The language read: the one asked for if the project declares it, else the source language. */
   language: string
+  /** What names the part's own files in the tool cache in this language (notes, what was heard). */
+  cacheName: string
+  /** The source language's cues a line follows until it has its own (none in the source language). */
+  sourceCues: Cues
+  /** How a take is checked in this language: what Whisper is told, and the words that sound the same. */
+  ears: Ears
   project: Project
   part: Part
   dialog: DialogState
@@ -365,7 +384,20 @@ export async function readPart(
     })
   }
   const cast = await readCast(root, project, problems)
-  const cues = usable(await readResource(root, at(templates.cues), CuesSchema, problems))
+  const ownCues = usable(await readResource(root, at(templates.cues), CuesSchema, problems)) ?? {}
+  // Another language follows the source language's cue for a line until it has one of its own.
+  const sourceCues =
+    language === sourceLanguage
+      ? {}
+      : (usable(
+          await readResource(
+            root,
+            partPathFor(templates.cues, part.id, sourceLanguage),
+            CuesSchema,
+            problems,
+          ),
+        ) ?? {})
+  const cues = { ...sourceCues, ...ownCues }
   const lock = usable(await readResource(root, at(templates.lock), LockSchema, problems))
   const manifest = usable(
     await readResource(root, at(templates.manifest), ManifestSchema, problems),
@@ -375,6 +407,14 @@ export async function readPart(
   return {
     ok: true,
     language,
+    cacheName: partCacheName(project.narration, part.id, language),
+    sourceCues,
+    ears: {
+      // Told the language only in a project with several, so a single-language project is as it was.
+      language: project.narration.languages.length > 1 ? language : undefined,
+      // The built-in groups are English words: they apply to English only.
+      alike: soundAlikes(soundAlikeOf(project.narration, language), language === 'en'),
+    },
     project,
     part,
     dialog,
@@ -386,7 +426,9 @@ export async function readPart(
         language,
         project.narration.languages[0]!,
       ),
-      cues: cues ?? {},
+      cues,
+      ownCues,
+      sourceCues,
       lock: lock ?? {},
       manifest: manifest ?? {},
       files,

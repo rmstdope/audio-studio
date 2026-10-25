@@ -551,6 +551,12 @@ describe('alignWords, words that sound the same', () => {
   const align = (shown: string, heard: string, alike = soundAlikes()) =>
     alignWords(shown.split(' '), heardAs(heard), 9, undefined, new Set(), alike)
 
+  it('leaves the built-in English groups out of another language', () => {
+    const swedish = soundAlikes([['Lyria', 'Liria']], false)
+    expect(align('Rest at the inn.', 'Rest at the in.', swedish).ratio).toBeLessThan(1)
+    expect(align('Lyria waits.', 'Liria waits.', swedish).ratio).toBe(1)
+  })
+
   it('counts a word heard as another that sounds the same (inn as in, weakly as weekly)', () => {
     expect(align('Rest at the inn.', 'Rest at the in.').ratio).toBe(1)
     expect(align('He comes weekly.', 'He comes weakly.').ratio).toBe(1)

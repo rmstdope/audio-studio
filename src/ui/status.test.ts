@@ -9,7 +9,8 @@ function line(overrides: Partial<LineState>): LineState {
     text: 'Hello.',
     english: null,
     cue: '',
-    ownCue: false,
+    cueFrom: 'style',
+    sourceCue: null,
     final: false,
     status: 'ok',
     reasons: [],
@@ -57,6 +58,12 @@ describe('statusDetail', () => {
 
   it('names the speaker of an uncast line', () => {
     expect(statusDetail(line({ status: 'uncast' }), 0.9)).toBe('mira has no voice yet')
+  })
+
+  it('names the language an uncast line lacks a voice in, in a project with several', () => {
+    expect(statusDetail(line({ status: 'uncast', speaker: 'grandmother' }), 0.9, 'Svenska')).toBe(
+      'Grandmother has no Svenska voice yet',
+    )
   })
 })
 
