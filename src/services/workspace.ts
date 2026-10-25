@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
+import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
 import { adoptUntracked, planPart, type PartState, type PlanInput } from '../core/planner'
 import {
   PROJECT_FILE,
@@ -20,7 +21,14 @@ import {
   type Cast,
 } from '../core/resources'
 import { summarize, type DialogState, type ProjectSummary } from '../core/summary'
-import { formatEntriesPerLine, listFiles, readJson, readResource, writeAtomic } from './files'
+import {
+  formatEntriesPerLine,
+  listFiles,
+  readCached,
+  readJson,
+  readResource,
+  writeAtomic,
+} from './files'
 import { inPartTurn } from './partFiles'
 
 /** The project file in `start` or the nearest directory above it that has one; null if none. */
@@ -111,6 +119,36 @@ export async function loadWorkspace(projectFile: string): Promise<
   }
 }
 
+/** Where the user's notes on each part's lines are kept, in the project's tool cache. */
+export const NOTES_DIR = '.audio-studio/notes'
+
+/**
+ * The notes on a part's lines: none if there is no file. A file that cannot be read or does not
+ * fit (a hand edit) gives none and a problem naming it, and nothing writes over it: the notes are
+ * the user's own words, not something the studio can make again.
+ */
+export async function readNotes(
+  root: string,
+  partId: string,
+): Promise<{ notes: Notes; problem: Problem | null }> {
+  const { value, broken, path } = await readCached(
+    root,
+    NOTES_DIR,
+    partId,
+    NotesSchema,
+    emptyNotes(partId),
+    (notes) => notes.part === partId,
+  )
+  const problem = broken
+    ? {
+        file: path,
+        path: '',
+        message: 'the notes file cannot be read; fix or remove it, and until then no note is saved',
+      }
+    : null
+  return { notes: value, problem }
+}
+
 /** One part with the state of every clip in it. */
 export interface PartDetail extends PartState {
   id: string
@@ -126,6 +164,8 @@ export interface PartDetail extends PartState {
   draftModel: string
   /** The model of the final recording; the same as the draft one when there is no final step. */
   finalModel: string
+  /** The user's notes on lines, by key (the studio's own, from the tool cache). */
+  notes: Record<string, string>
   problems: Problem[]
 }
 
@@ -137,6 +177,7 @@ export async function loadPart(projectFile: string, partId: string): Promise<Par
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
   const { project, part, input, dialog, problems } = read
+  const notes = await readNotes(dirname(projectFile), part.id)
   return {
     ok: true,
     part: {
@@ -147,7 +188,8 @@ export async function loadPart(projectFile: string, partId: string): Promise<Par
       minHeard: project.narration.quality.minHeard,
       draftModel: project.narration.models.draft,
       finalModel: project.narration.models.final,
-      problems,
+      notes: onLines(notes.notes.lines, input.lines),
+      problems: notes.problem ? [...problems, notes.problem] : problems,
       ...planPart(input),
     },
   }
@@ -339,4 +381,10 @@ function isFile(path: string): boolean {
   } catch {
     return false
   }
+}
+
+/** The notes on lines still in the dialog: one on a line that left it is kept, but not shown. */
+function onLines(notes: Record<string, string>, lines: { key: string }[]): Record<string, string> {
+  const keys = new Set(lines.map((l) => l.key))
+  return Object.fromEntries(Object.entries(notes).filter(([key]) => keys.has(key)))
 }

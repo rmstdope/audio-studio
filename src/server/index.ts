@@ -25,6 +25,7 @@ import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/
 import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile, tryLine } from '../services/takes'
 import { checkSetup } from '../services/setup'
+import { setNote } from '../services/notes'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -101,6 +102,9 @@ const MoveCueBody = z.object({ to: z.string().min(1).max(200).nullable() }).stri
 
 /** A line's own cue; empty to go back to the character's style. */
 const CueBody = z.object({ cue: z.string().max(1_000) }).strict()
+
+/** The user's note on a line; empty to remove it. */
+const NoteBody = z.object({ note: z.string().max(2_000) }).strict()
 
 /**
  * A generation to start: the scope, and the lines and orphans the page showed. Only those, and
@@ -375,6 +379,16 @@ export function startServer({
       '/api/parts/:part/lines/:key/heard': {
         GET: guard(async (request) => {
           const result = await heardFor(projectFile, request.params.part, request.params.key)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/lines/:key/note': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = NoteBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { note }' }, { status: 400 })
+          const { part, key } = request.params
+          const result = await setNote(projectFile, part, key, body.data.note)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

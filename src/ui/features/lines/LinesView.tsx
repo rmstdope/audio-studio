@@ -9,6 +9,7 @@ import {
   usePart,
   useRecordLines,
   useSetCue,
+  useSetNote,
   useTryCue,
 } from '../../api'
 import { ListIcon, PauseIcon, PlayIcon } from '../../components/icons'
@@ -24,7 +25,7 @@ import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
 
-type Filter = 'all' | 'attention' | LineStatus | 'orphans'
+type Filter = 'all' | 'attention' | LineStatus | 'orphans' | 'notes'
 
 /**
  * Lines a Record button is offered for: no clip, a clip made from other inputs, or a weak one
@@ -83,7 +84,11 @@ export function LinesView({ part }: { part: PartSummary }) {
     return (loaded?.lines ?? []).filter(
       (line) =>
         (filter === 'all' ||
-          (filter === 'attention' ? needsAttention(line) : line.status === filter)) &&
+          (filter === 'attention'
+            ? needsAttention(line)
+            : filter === 'notes'
+              ? Object.hasOwn(loaded?.notes ?? {}, line.key)
+              : line.status === filter)) &&
         (!speaker || line.speaker === speaker) &&
         (!words || line.text.toLowerCase().includes(words) || line.key.includes(words)),
     )
@@ -145,6 +150,9 @@ export function LinesView({ part }: { part: PartSummary }) {
       .map((s) => ({ id: s, label: STATUS[s].label, count: loaded.counts[s], status: s })),
     ...(loaded.orphans.length
       ? [{ id: 'orphans' as const, label: 'Orphaned', count: loaded.orphans.length }]
+      : []),
+    ...(Object.keys(loaded.notes).length
+      ? [{ id: 'notes' as const, label: 'With a note', count: Object.keys(loaded.notes).length }]
       : []),
     { id: 'all', label: 'All', count: loaded.lines.length },
   ]
@@ -263,6 +271,13 @@ export function LinesView({ part }: { part: PartSummary }) {
                             {statusDetail(line, loaded.minHeard)}
                           </span>
                         )}
+                        <NoteCell
+                          partId={loaded.id}
+                          lineKey={line.key}
+                          note={
+                            Object.hasOwn(loaded.notes, line.key) ? loaded.notes[line.key]! : ''
+                          }
+                        />
                       </div>
                     </td>
                     <td>
@@ -595,6 +610,98 @@ function CueCell({
       )}
       {refused && 'message' in refused && <span className="adopt-error">{refused.message}</span>}
       {hear.isError && <span className="adopt-error">{hear.error.message}</span>}
+    </form>
+  )
+}
+
+/**
+ * The user's note on a line ("too fast", "retake after the rewrite"), under its text: shown when
+ * there is one, else an Add note link; edited in place. The studio's own, kept in the tool cache.
+ */
+function NoteCell({ partId, lineKey, note }: { partId: string; lineKey: string; note: string }) {
+  const save = useSetNote(partId)
+  const [draft, setDraft] = useState<string | null>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const refocus = useRef(false)
+  // Back on the note after editing, so the keyboard keeps its place in the table.
+  useEffect(() => {
+    if (draft === null && refocus.current) {
+      refocus.current = false
+      button.current?.focus()
+    }
+  }, [draft])
+  const open = (text: string) => {
+    save.reset()
+    setDraft(text)
+  }
+  const close = () => {
+    refocus.current = true
+    setDraft(null)
+  }
+  const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
+  const refused = save.data && !save.data.ok && !('problems' in save.data)
+  if (draft === null) {
+    return note ? (
+      <button
+        ref={button}
+        type="button"
+        className="note-button"
+        title="Your note on this line: edit"
+        onClick={() => open(note)}
+      >
+        {note}
+      </button>
+    ) : (
+      <button
+        ref={button}
+        type="button"
+        className="note-add"
+        title="A note to yourself about this line, kept on this machine only"
+        onClick={() => open('')}
+      >
+        Add note
+      </button>
+    )
+  }
+  return (
+    <form
+      className="note-edit"
+      onSubmit={(event) => {
+        event.preventDefault()
+        save.mutate({ key: lineKey, note: draft }, { onSuccess: (r) => r.ok && close() })
+      }}
+    >
+      <input
+        autoFocus
+        aria-label={`Note on ${lineKey}`}
+        placeholder="e.g. too fast; retake after the rewrite"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && close()}
+      />
+      <div className="cue-actions">
+        <button className="btn" type="submit" disabled={save.isPending || draft.trim() === note}>
+          {save.isPending ? 'Saving…' : 'Save'}
+        </button>
+        {note && (
+          <button
+            className="btn"
+            type="button"
+            disabled={save.isPending}
+            onClick={() =>
+              save.mutate({ key: lineKey, note: '' }, { onSuccess: (r) => r.ok && close() })
+            }
+          >
+            Remove
+          </button>
+        )}
+        <button className="btn" type="button" onClick={close}>
+          Cancel
+        </button>
+      </div>
+      {problems.length > 0 && <Problems title="The note could not be saved" problems={problems} />}
+      {refused && <span className="adopt-error">The project file cannot be read.</span>}
+      {save.isError && <span className="adopt-error">{save.error.message}</span>}
     </form>
   )
 }

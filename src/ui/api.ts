@@ -24,6 +24,7 @@ import type { AcceptResult, MeasureResult, RecordResult } from '../services/narr
 import type { RuledOutResult } from '../services/ruledOut'
 import type { SoundAlikeChange } from '../services/soundAlike'
 import type { SetupResult } from '../services/setup'
+import type { NoteChange } from '../services/notes'
 import type { CastResult, SessionView } from '../services/sessions'
 import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
@@ -435,6 +436,30 @@ export function useMoveCue(partId: string) {
       void client.invalidateQueries({ queryKey: ['plan', partId] })
       void client.invalidateQueries({ queryKey: ['changes'] })
       await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** Saves the user's note on a line (empty to remove it), then reloads the part. */
+export function useSetNote(partId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ key, note }: { key: string; note: string }) => {
+      const response = await fetch(
+        `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/note`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ note }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the note answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<NoteChange>
+    },
+    onSuccess: async (saved) => {
+      if (saved.ok) await client.invalidateQueries({ queryKey: ['part', partId] })
     },
   })
 }
