@@ -27,6 +27,8 @@ import type { RuledOutResult } from '../services/ruledOut'
 import type { Take } from '../core/retirement'
 import type { FishTier } from '../core/setup'
 import type { ModelsChange } from '../services/models'
+import type { ModelsView } from '../services/modelsView'
+import type { Busy, Stage } from '../core/models'
 import type { SoundAlikeChange } from '../services/soundAlike'
 import type { FishTierChange } from '../services/fishTier'
 import type { SetupResult } from '../services/setup'
@@ -188,6 +190,47 @@ export function useSwitchModels() {
     },
     // Refused or not, the page shows the file's models again; the parts and plans carry them too.
     onSuccess: () => client.invalidateQueries(),
+  })
+}
+
+/** What the Models panel shows, and what is going on that stops the menus (null if nothing). */
+export type ModelsAnswer =
+  (Extract<ModelsView, { ok: true }> & { busy: Busy | null }) | ProjectFailure
+
+/**
+ * The models, the whole dialog and what the clips were made with, read afresh whenever the Setup
+ * page opens (a hand edit shows then), and every few seconds while something is recording.
+ */
+export function useModelsView() {
+  return useQuery({
+    queryKey: ['models'],
+    queryFn: () => getJson<ModelsAnswer>('/api/models'),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: (query) => (query.state.data?.ok && query.state.data.busy ? 3000 : false),
+  })
+}
+
+/**
+ * Saves the model of a stage in the project file (`was` is the one the page showed), then reloads
+ * everything that shows models: the plans, the setup checks and the retirement banner.
+ */
+export function useSetStageModel() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'models' },
+    mutationFn: async ({ stage, model, was }: { stage: Stage; model: string; was: string }) => {
+      const response = await fetch(`/api/models/${stage}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model, was }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the model answered ${response.status}`)
+      }
+      return (await response.json()) as ModelsChange
+    },
+    onSettled: () => client.invalidateQueries(),
   })
 }
 
