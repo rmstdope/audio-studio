@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { switchRetiredModels } from './models'
+import { setStageModel, switchRetiredModels } from './models'
 import { setSoundAlike } from './soundAlike'
 
 function projectWith(models: Record<string, string>) {
@@ -96,5 +96,63 @@ describe('switchRetiredModels', () => {
     const narration = JSON.parse(read()).narration
     expect(narration.models).toEqual({ draft: 's2.1-pro', final: 's2.1-pro' })
     expect(narration.quality.soundAlike).toEqual([['inn', 'Inne']])
+  })
+})
+
+describe('setStageModel', () => {
+  const models = { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 's2.1-pro-free' }
+
+  it('changes one stage’s model and nothing else, in the file’s own indentation', async () => {
+    const { projectFile, read } = repo(projectWith(models), 4)
+    expect(await setStageModel(projectFile, 'draft', 's2.1-pro', 's2.1-pro-free')).toEqual({
+      ok: true,
+    })
+    const saved = projectWith({ ...models, draft: 's2.1-pro' })
+    expect(read()).toBe(`${JSON.stringify(saved, null, 4)}\n`)
+  })
+
+  it('keeps the line endings and a missing last newline', async () => {
+    const root = tempRepo({})
+    const projectFile = join(root, 'audio-studio.json')
+    writeFileSync(projectFile, JSON.stringify(projectWith(models), null, 2).replace(/\n/g, '\r\n'))
+    await setStageModel(projectFile, 'final', 'drama-3', 's2.1-pro-free')
+    const text = readFileSync(projectFile, 'utf8')
+    expect(text.split('\n').every((l, i, all) => i === all.length - 1 || l.endsWith('\r'))).toBe(
+      true,
+    )
+    expect(text.endsWith('}')).toBe(true)
+    expect(JSON.parse(text).narration.models.final).toBe('drama-3')
+  })
+
+  it('writes all three models when the file named none', async () => {
+    const { projectFile, read } = repo(projectJson())
+    await setStageModel(projectFile, 'audition', 's2.1-pro', 's2.1-pro-free')
+    expect(JSON.parse(read()).narration.models).toEqual({ ...models, audition: 's2.1-pro' })
+  })
+
+  it('refuses, writing nothing, when the file changed since the page read it', async () => {
+    const { projectFile, read } = repo(projectWith({ ...models, draft: 's2-pro' }))
+    const before = read()
+    const result = await setStageModel(projectFile, 'draft', 's2.1-pro', 's2.1-pro-free')
+    expect(result).toMatchObject({ ok: false, problems: [{ path: 'narration.models.draft' }] })
+    expect(read()).toBe(before)
+  })
+
+  it('refuses a model with no price, and s1', async () => {
+    const { projectFile, read } = repo(projectWith(models))
+    const before = read()
+    expect(await setStageModel(projectFile, 'draft', 'mystery', 's2.1-pro-free')).toMatchObject({
+      ok: false,
+    })
+    expect(await setStageModel(projectFile, 'draft', 's1', 's2.1-pro-free')).toMatchObject({
+      ok: false,
+    })
+    expect(read()).toBe(before)
+  })
+
+  it('lets a stage on s1 move to s2.1-pro', async () => {
+    const { projectFile, read } = repo(projectWith({ ...models, final: 's1' }))
+    expect(await setStageModel(projectFile, 'final', 's2.1-pro', 's1')).toEqual({ ok: true })
+    expect(JSON.parse(read()).narration.models.final).toBe('s2.1-pro')
   })
 })

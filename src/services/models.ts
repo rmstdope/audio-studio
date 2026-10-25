@@ -1,6 +1,8 @@
 import { basename } from 'node:path'
 import { ProjectSchema, problemsFrom, type Problem } from '../core/project'
-import { REPLACEMENT_MODEL, retiringTakes, type Take } from '../core/retirement'
+import type { Stage } from '../core/models'
+import { isPriced } from '../core/prices'
+import { REPLACEMENT_MODEL, RETIRED_MODEL, retiringTakes, type Take } from '../core/retirement'
 import { openProject, projectJson, projectWrites, saveProject } from './projectFile'
 import type { ProjectFailure } from './workspace'
 
@@ -37,6 +39,43 @@ export function switchRetiredModels(projectFile: string, takes: Take[]): Promise
     const models = (opened.raw as { narration: { models: Record<string, unknown> } }).narration
       .models
     for (const take of now) models[take] = REPLACEMENT_MODEL
+    const parsed = ProjectSchema.safeParse(opened.raw)
+    if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
+    await saveProject(projectFile, opened, (indent) => projectJson(opened.raw, indent))
+    return { ok: true }
+  })
+}
+
+/**
+ * Saves the model one stage uses (`narration.models.<stage>` in the project file). `was` is the
+ * model the page showed: if the file names another, someone changed it meanwhile and nothing is
+ * written. Only a model the studio has a price for is accepted, and not `s1`, which is going
+ * away. A file that named no models gets all three written, as they were. The rest of the file
+ * stays as it was, in its own indentation and line endings.
+ */
+export function setStageModel(
+  projectFile: string,
+  stage: Stage,
+  model: string,
+  was: string,
+): Promise<ModelsChange> {
+  return projectWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const file = basename(projectFile)
+    const path = `${PATH}.${stage}`
+    const refuse = (message: string): ModelsChange => ({
+      ok: false,
+      problems: [{ file, path, message }],
+    })
+    if (opened.project.narration.models[stage] !== was) {
+      return refuse('the model in the file changed since the page was read; reload the studio')
+    }
+    if (!isPriced(model) || model === RETIRED_MODEL) {
+      return refuse(`${model} is not a model the studio can switch to`)
+    }
+    const narration = (opened.raw as { narration: { models?: Record<string, unknown> } }).narration
+    narration.models = { ...opened.project.narration.models, ...narration.models, [stage]: model }
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
     await saveProject(projectFile, opened, (indent) => projectJson(opened.raw, indent))
