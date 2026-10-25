@@ -2517,7 +2517,7 @@ a.btn {
 .models-busy {
   margin-top: 8px;
   font-size: 13px;
-  color: var(--soft);
+  color: var(--text-soft);
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2549,6 +2549,8 @@ a.btn {
   gap: 10px;
 }
 .mmenu select {
+  min-width: 260px;
+  max-width: 100%;
   font: inherit;
   font-size: 13px;
   color: var(--text);
@@ -2562,7 +2564,7 @@ a.btn {
   opacity: 0.55;
 }
 .mmenu .price {
-  color: var(--soft);
+  color: var(--text-soft);
 }
 .mmenu .free {
   color: var(--ok);
