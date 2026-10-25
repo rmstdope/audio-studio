@@ -1,0 +1,620 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Recording in each language</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --chip: #1a1d26;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --stale: #ffc24b;
+        --stale-bg: #2d2412;
+        --missing: #8fb5ff;
+        --missing-bg: #142033;
+        --weak: #ff94a8;
+        --grey: #9aa1ad;
+        --grey-bg: #1d2027;
+        --uncast: #c9a0ff;
+        --uncast-bg: #231a33;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .note {
+        background: #1d1a10;
+        border-bottom: 1px solid #3a3420;
+        color: #e8d9a8;
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+      .content {
+        max-width: 1100px;
+        padding: 28px 36px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .hdr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .crumbs {
+        font-size: 12.5px;
+        color: var(--faint);
+      }
+      h1 {
+        font-size: 30px;
+        font-weight: 600;
+        margin: 6px 0;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .tab {
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        color: var(--muted);
+      }
+      .tab.on {
+        background: var(--chip);
+        border-color: var(--line-strong);
+        color: var(--text);
+      }
+      .cnt {
+        font:
+          11.5px ui-monospace,
+          monospace;
+        color: var(--faint);
+      }
+      .seg {
+        display: inline-flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 10px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        font-size: 13px;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        display: inline-block;
+      }
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0d05;
+        font-weight: 600;
+      }
+      .pill {
+        font-size: 11.5px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        display: inline-block;
+      }
+      .ok {
+        color: var(--ok);
+        background: var(--ok-bg);
+      }
+      .stale {
+        color: var(--stale);
+        background: var(--stale-bg);
+      }
+      .missing {
+        color: var(--missing);
+        background: var(--missing-bg);
+      }
+      .grey {
+        color: var(--grey);
+        background: var(--grey-bg);
+      }
+      .uncast {
+        color: var(--uncast);
+        background: var(--uncast-bg);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      td,
+      th {
+        text-align: left;
+        padding: 10px 8px;
+        border-top: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        font-weight: 500;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .en {
+        font-size: 12px;
+        color: var(--faint);
+        margin-top: 4px;
+      }
+      .en b {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 500;
+        margin-right: 6px;
+      }
+      .cue {
+        font:
+          12px ui-monospace,
+          monospace;
+        padding: 3px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--line-strong);
+        display: inline-block;
+      }
+      .cue.dim {
+        color: var(--faint);
+        border-style: dashed;
+      }
+      .from {
+        font-size: 10.5px;
+        color: var(--faint);
+        display: block;
+        margin-top: 3px;
+      }
+      .plan {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+      .castnote {
+        color: var(--uncast);
+        font-size: 13px;
+      }
+      .check {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .stage {
+        display: flex;
+        gap: 6px;
+      }
+      .stats {
+        display: flex;
+        gap: 28px;
+        flex-wrap: wrap;
+      }
+      .stat span {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .stat strong {
+        display: block;
+        font-size: 22px;
+      }
+      .bar {
+        display: flex;
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        background: var(--line);
+      }
+      .ex {
+        border: 1px dashed #3a3420;
+        border-radius: 10px;
+        padding: 10px 12px;
+        color: #e8d9a8;
+        font-size: 12.5px;
+      }
+      input.f {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font:
+          13px ui-monospace,
+          monospace;
+        width: 160px;
+      }
+      .prow {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .sect {
+        margin-top: 32px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .chip {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--uncast-bg);
+        color: var(--uncast);
+        align-self: flex-start;
+      }
+      .editor {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 340px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      as-170.3 — recording a part’s lines in each language. The agreed drawing: 1 the Lines page in
+      Svenska with the Generate panel (untranslated lines named); 2 delivery cues following English;
+      3 editing a cue in Svenska; 4 All characters in Svenska; 5 the act’s overview in Svenska.
+    </div>
+    <div class="note sect">
+      Option A — the Lines page in Svenska records Svenska only. The “not available yet” line is
+      gone; row buttons and the Generate panel are back, naming the language.
+    </div>
+    <div class="content">
+      <div class="hdr">
+        <div>
+          <div class="crumbs">Act II / Lines</div>
+          <h1>Lines</h1>
+          <div class="muted">Act II · 481 lines</div>
+        </div>
+        <div class="seg" role="group" aria-label="Language">
+          <span class="tab">English <span class="cnt">470/480</span></span
+          ><span class="tab on">Svenska <span class="cnt">40/481</span></span
+          ><span class="tab" style="opacity: 0.6">Deutsch <span class="cnt">No dialog</span></span>
+        </div>
+      </div>
+      <div class="tabs">
+        <span class="tab on">All <span class="cnt">481</span></span
+        ><span class="tab">Needs attention <span class="cnt">441</span></span
+        ><span class="tab">Up to date <span class="cnt">40</span></span
+        ><span class="tab">Missing <span class="cnt">392</span></span
+        ><span class="tab">Uncast <span class="cnt">46</span></span
+        ><span class="tab">Not translated <span class="cnt">3</span></span>
+      </div>
+      <section class="panel">
+        <div class="row">
+          <div>
+            <span class="label">Generate · Svenska · every character</span><br /><strong
+              >Record 392 lines</strong
+            >
+          </div>
+          <span class="btn btn-primary">Generate</span>
+        </div>
+        <ul class="plan">
+          <li>392 missing lines</li>
+          <li>9 lines: wording changed</li>
+        </ul>
+        <span class="castnote">Not recorded until cast in Svenska: Grandmother.</span>
+        <span class="muted">Not recorded until translated: 3 lines.</span
+        ><span class="muted" style="font-size: 12.5px"
+          >s1 · 18.4 KB of text · free · each take checked with Whisper in Svenska, up to 3 takes a
+          line · files are written in place; commit them when you are happy</span
+        >
+      </section>
+      <div class="panel" style="padding: 0 8px">
+        <table>
+          <tr>
+            <th>Line</th>
+            <th>Character</th>
+            <th>Delivery</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+          <tr>
+            <td>
+              Välkommen till värdshuset, främling.
+              <div class="en"><b>English</b>Welcome to the inn, stranger.</div>
+            </td>
+            <td>Innkeeper</td>
+            <td><span class="cue dim">[warm]</span></td>
+            <td>
+              <span class="pill ok">Up to date</span> <span class="faint mono">heard 96%</span>
+            </td>
+            <td>
+              <span class="btn">▶</span> <span class="btn">Record</span>
+              <span class="btn">Takes</span>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              Har du sett min katt?
+              <div class="en"><b>English</b>Have you seen my cat?</div>
+            </td>
+            <td>Mira</td>
+            <td><span class="cue">[worried]</span></td>
+            <td>
+              <span class="pill missing">Missing</span> <span class="faint">not recorded yet</span>
+            </td>
+            <td><span class="btn">Record</span> <span class="btn">Note</span></td>
+          </tr>
+          <tr>
+            <td>
+              Sätt dig, barn, och lyssna.
+              <div class="en"><b>English</b>Sit down, child, and listen.</div>
+            </td>
+            <td>Grandmother</td>
+            <td><span class="cue dim">[slow, gentle]</span></td>
+            <td>
+              <span class="pill uncast">Uncast</span>
+              <span class="faint">Grandmother has no Svenska voice yet</span>
+            </td>
+            <td><span class="faint">—</span></td>
+          </tr>
+          <tr>
+            <td>
+              <i class="faint">No Svenska text for this line yet.</i>
+              <div class="en"><b>English</b>The bridge is out past the mill.</div>
+            </td>
+            <td>Innkeeper</td>
+            <td></td>
+            <td><span class="pill grey">Not translated</span></td>
+            <td><span class="faint">—</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <div class="note sect">
+      Option A — a Svenska line without its own cue uses the English line’s cue (dimmed, “from
+      English”), then the character’s style. Giving it its own Svenska cue overrides that.
+    </div>
+    <div class="content">
+      <h2>Lines · Svenska</h2>
+      <div class="panel" style="padding: 0 8px">
+        <table>
+          <tr>
+            <th>Line</th>
+            <th>Character</th>
+            <th>Delivery (Svenska)</th>
+          </tr>
+          <tr>
+            <td>
+              Har du sett min katt?
+              <div class="en"><b>English</b>Have you seen my cat?</div>
+            </td>
+            <td>Mira</td>
+            <td><span class="cue dim">[worried]</span><span class="from">from English</span></td>
+          </tr>
+          <tr>
+            <td>
+              Spring! De kommer!
+              <div class="en"><b>English</b>Run! They're coming!</div>
+            </td>
+            <td>Mira</td>
+            <td>
+              <span class="cue">[shouting, out of breath]</span
+              ><span class="from">this line’s own Svenska cue</span>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              Välkommen till värdshuset, främling.
+              <div class="en"><b>English</b>Welcome to the inn, stranger.</div>
+            </td>
+            <td>Innkeeper</td>
+            <td>
+              <span class="cue dim">[warm]</span><span class="from">the Innkeeper’s style</span>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div class="ex">
+        English line “Have you seen my cat?” has its own cue [worried]; the Svenska line follows it
+        until it gets its own. Changing the English cue makes the Svenska clip stale too (“delivery
+        cue changed”).
+      </div>
+    </div>
+    <div class="note sect">
+      Option A — editing a cue on the Svenska page only ever changes the Svenska line. The English
+      cue shows as a hint; a Svenska line with its own cue can go back to following English.
+    </div>
+    <div class="content">
+      <h2>Lines · Svenska — editing the delivery of one line</h2>
+      <div>
+        <div>Har du sett min katt?</div>
+        <div class="en"><b>English</b>Have you seen my cat?</div>
+      </div>
+      <div class="row" style="justify-content: flex-start; align-items: flex-start; gap: 24px">
+        <div>
+          <span class="label">Following English</span>
+          <div class="editor">
+            <input class="f" style="width: 100%" placeholder="[worried]" /><span
+              class="faint"
+              style="font-size: 12px"
+              >Empty: this line follows the English cue [worried].</span
+            >
+            <div class="row">
+              <span><span class="btn btn-primary">Save</span> <span class="btn">Cancel</span></span
+              ><span class="btn">Hear it</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <span class="label">With its own Svenska cue</span>
+          <div class="editor">
+            <input class="f" style="width: 100%" value="[whispering, worried]" /><span
+              class="faint"
+              style="font-size: 12px"
+              >English cue: [worried]</span
+            >
+            <div class="row">
+              <span
+                ><span class="btn btn-primary">Save</span> <span class="btn">Cancel</span>
+                <span class="btn">Follow English</span></span
+              ><span class="btn">Hear it</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note sect">
+      Option A — one switch in the page header; the cards follow it too: each card shows its Svenska
+      voice. (This changes what we agreed for the cards before: they showed the English voice
+      whatever the language.)
+    </div>
+    <div class="content">
+      <div class="hdr">
+        <div>
+          <div class="crumbs">Characters</div>
+          <h1>All characters</h1>
+        </div>
+        <div class="seg" role="group" aria-label="Language">
+          <span class="tab">English</span><span class="tab on">Svenska</span
+          ><span class="tab">Deutsch</span>
+        </div>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <strong>Innkeeper</strong><span class="muted">Svenska: Gruff Barkeep</span>
+        </div>
+        <div class="card">
+          <strong>Mira</strong><span class="muted">Svenska: Bright Girl</span
+          ><span class="chip">No Deutsch voice</span>
+        </div>
+        <div class="card">
+          <strong>Grandmother</strong><span class="muted">No Svenska voice yet</span
+          ><span class="chip">No Svenska voice</span><span class="chip">No Deutsch voice</span>
+        </div>
+      </div>
+      <section class="panel">
+        <span class="label">Pronunciations · Svenska</span><strong>2 entries</strong
+        ><span class="muted" style="font-size: 12.5px"
+          >Applied to every Svenska line, in the order the studio applies them, before it is sent;
+          spaces count, so “Al ” is not in “Alice”. Saved in
+          <span class="mono">characters.json</span>.</span
+        >
+        <div class="prow">
+          <input class="f" value="Kael" /><span>→</span><input class="f" value="Kejl" />
+        </div>
+      </section>
+      <section class="panel">
+        <span class="label">Words that sound the same · Svenska</span
+        ><strong>None of your own</strong
+        ><span class="muted" style="font-size: 12.5px"
+          >When Whisper writes one word of a group for another (“Liria” for “Lyria”), it still
+          counts as heard in Svenska lines. Words or phrases are separated by commas. Counts from
+          the next take on. Saved in <span class="mono">audio-studio.json</span>.</span
+        >
+      </section>
+    </div>
+    <div class="note sect">
+      Option A — the act’s overview has the same language switch; its clip status follows the chosen
+      language.
+    </div>
+    <div class="content">
+      <div class="hdr">
+        <div>
+          <div class="crumbs">Act II</div>
+          <h1>Act II · The Flooded Mill</h1>
+        </div>
+        <div class="seg">
+          <span class="tab">English <span class="cnt">470/480</span></span
+          ><span class="tab on">Svenska <span class="cnt">40/481</span></span
+          ><span class="tab" style="opacity: 0.6">Deutsch <span class="cnt">No dialog</span></span>
+        </div>
+      </div>
+      <section class="panel">
+        <div class="stats">
+          <div class="stat">
+            <span>Lines up to date</span
+            ><strong>40<span class="faint" style="font-size: 14px"> / 481</span></strong>
+          </div>
+          <div class="stat"><span>Missing</span><strong>392</strong></div>
+          <div class="stat"><span>Uncast</span><strong>46</strong></div>
+          <div class="stat"><span>Not translated</span><strong>3</strong></div>
+        </div>
+        <div class="bar">
+          <span style="width: 8%; background: var(--ok)"></span
+          ><span style="width: 81%; background: var(--missing)"></span
+          ><span style="width: 10%; background: var(--uncast)"></span>
+        </div>
+        <div><span class="btn">Open Svenska lines</span></div>
+      </section>
+    </div>
+  </body>
+</html>
