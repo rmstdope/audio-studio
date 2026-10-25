@@ -72,7 +72,10 @@ export async function tryLine(
 ): Promise<TryResult> {
   const read = await readPart(projectFile, partId)
   if (!read || !read.ok) return read
-  if (read.problems.length) return { ok: false, problems: read.problems }
+  // Only the cast is needed besides the dialog (a line of a broken dialog is not found): a broken
+  // manifest or lock, which the lines page lists lines under, does not stop a try.
+  const problems = castProblems(read.project, read.problems)
+  if (problems.length) return { ok: false, problems }
   const line = read.input.lines.find((l) => l.key === key)
   if (!line) return null
   const { cast } = read.input
@@ -84,7 +87,7 @@ export async function tryLine(
       message: `${line.speaker} has no voice yet; cast one first.`,
     }
   }
-  const tried = cue.trim() || character.style || ''
+  const tried = cue.trim() || (character.style ?? '')
   const spoken = spokenText(line.text, tried, cast.pronounce)
   return speak(dirname(projectFile), read.project, character.voice, spoken, fishFor, limiter)
 }

@@ -273,6 +273,42 @@ describe('tryLine', () => {
     expect(await takeFile(projectFileOf(root), result.key)).toBe(
       join(root, '.audio-studio/takes', `${result.key}.mp3`),
     )
+    // Nothing of the game's: no cue saved, no manifest or lock made.
+    for (const file of [
+      'tts/act1/cues.json',
+      'audio/act1/manifest.json',
+      'tts/act1/narration.lock.json',
+    ]) {
+      expect(existsSync(join(root, file))).toBe(false)
+    }
+  })
+
+  it('needs only the dialog and the cast: a broken manifest or lock does not stop it', async () => {
+    const root = tempRepo({
+      ...files,
+      'audio/act1/manifest.json': { a: { file: 3 } },
+      'tts/act1/narration.lock.json': 'not json',
+    })
+    const { fish } = fakeFish()
+    const result = await tryLine(
+      projectFileOf(root),
+      'act1',
+      'a',
+      '',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(result).toMatchObject({ ok: true })
+    const broken = tempRepo({ ...files, 'tts/cast.json': { speakers: 'no' } })
+    const refused = await tryLine(
+      projectFileOf(broken),
+      'act1',
+      'a',
+      '',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(refused).toMatchObject({ ok: false, problems: [{ file: 'tts/cast.json' }] })
   })
 
   it('tries the character’s style for an empty cue, and records a cue once', async () => {

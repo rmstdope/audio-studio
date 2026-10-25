@@ -461,6 +461,16 @@ function CueCell({
     }
   }, [draft])
 
+  // A try still playing stops when the row leaves the table (a filter or search changed).
+  const playingNow = useRef(playing)
+  playingNow.current = playing
+  useEffect(
+    () => () => {
+      if (playingNow.current === tryId) toggle(tryId, '')
+    },
+    [tryId, toggle],
+  )
+
   const close = () => {
     refocus.current = true
     if (playing === tryId) toggle(tryId, '')

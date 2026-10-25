@@ -656,9 +656,9 @@ Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's stat
 `POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
 `GET /api/characters/:id/voice` (its cast voice as Fish knows it, its take and the audition
 phrase; one lookup, no search), `PATCH /api/characters/:id`
-(keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`
-`POST /api/parts/:part/lines/:key/try` (`{ cue }`: a take of the line said with that cue, nothing saved),
-`POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
+(keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`,
+`POST /api/parts/:part/lines/:key/try` (`{ cue }`: a take of the line said with that cue, nothing saved)
+and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
 `{ confirmedCost }` on a paid model, else 409 with the ceiling to confirm),
 `GET /api/parts/:part/plan?speaker=&weak=1` (what generating would do, weak lines included if
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
