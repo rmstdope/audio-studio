@@ -79,8 +79,9 @@ bundle breaks.
 - The project file itself is read, and changed in three places only: `narration.quality.soundAlike`,
   saved from the Words that sound the same panel, `narration.models.draft` / `final`, moved
   from `s1` to `s2.1-pro` when the user confirms the retirement banner, and
-  `narration.quality.fishTier`, saved from the menu on Setup's Requests at once row. Each save writes the whole
-  file again in its own indentation and line endings (a hand-compacted object is written out).
+  `narration.quality.fishTier`, saved from the menu on Setup's Requests at once row. Each save
+  writes the whole file again in its own indentation and line endings (a hand-compacted object is
+  written out).
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
 - The game reads `manifest.json`: keep its format exactly. The studio's own state goes in the lock

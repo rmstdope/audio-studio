@@ -849,7 +849,8 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   the Fish key in the environment or the env file, whether Fish answers (the server's credit
   lookup, only with a key), Requests at once (`quality.parallel` against the Fish account's limit
   from `quality.fishTier`: ready up to 5 with no tier, a problem above it until the tier is
-  chosen, and above the chosen tier's limit; off without a key) and the optional `refreshDialog`, each with what to do about it.
+  chosen, and above the chosen tier's limit; off without a key; saving the tier checks again,
+  which asks Fish once more) and the optional `refreshDialog`, each with what to do about it.
   Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
   the problems from a check at most five minutes old and never on a window focus, so the studio
   does not ask Fish more than it did. The CLI still warns about ffmpeg, and recording says so.
@@ -975,10 +976,9 @@ Small, independently useful increments:
    3. **Final recording** (built, §8.4): a Draft/Final choice in the Generate panel when the two
       models differ; final clips marked in the line table and left alone by draft plans.
 
-   Paid auditions are built (§8.1: a budget per sitting). What a paid account could still have (the `s1` retirement,
-   cloning and design, the rate tier, a spend log) is in `docs/paid-account.md`, not planned yet.
    What a paid account could still have (paid auditions, the `s1` retirement, your own voices,
-   voice design, a spend log; cloning is built, as-5gk.5, and so is the rate tier on Setup, as-5gk.7) is in `docs/paid-account.md`, not planned yet.
+   voice design, a spend log; cloning is built, as-5gk.5, and so is the rate tier on Setup,
+   as-5gk.7) is in `docs/paid-account.md`, not planned yet.
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in

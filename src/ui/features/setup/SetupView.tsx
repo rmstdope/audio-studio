@@ -74,7 +74,7 @@ export function SetupView() {
 
 /**
  * The menu on the Requests at once row: what the user has paid Fish in total. A choice is saved
- * at once in the project file; the menu always shows what the last check found saved, so a failed
+ * at once in the project file; the menu always shows what the last check found saved, so the choice shows while it saves (the check after it asks Fish again), and a failed
  * save leaves it where it was, with a line saying so.
  */
 function TierMenu({ chosen }: { chosen: FishTier | null }) {
@@ -84,7 +84,7 @@ function TierMenu({ chosen }: { chosen: FishTier | null }) {
       <label className="setup-tier muted">
         What you have paid Fish in total
         <select
-          value={chosen ?? ''}
+          value={save.isPending ? (save.variables ?? '') : (chosen ?? '')}
           onChange={(e) => save.mutate((e.target.value || null) as FishTier | null)}
         >
           <option value="">Choose…</option>

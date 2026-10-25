@@ -1,3 +1,6 @@
+import type { z } from 'zod'
+import type { FishTierSchema } from './project'
+
 /** The name of the variable that holds the Fish Audio API key (`services/env.ts` reads it). */
 const FISH_KEY = 'FISH_AUDIO_API_KEY'
 
@@ -7,7 +10,7 @@ export type FishAnswer =
   | { ok: false; reason: 'no-key' | 'fish' | 'project'; message: string }
 
 /** What the user has paid Fish in total, which sets its requests-at-once limit. */
-export type FishTier = 'under-100' | '100' | '1000'
+export type FishTier = z.infer<typeof FishTierSchema>
 
 /** Fish's published tiers: the menu's words and how many requests each allows at once. */
 export const FISH_TIERS: readonly { value: FishTier; label: string; limit: number }[] = [

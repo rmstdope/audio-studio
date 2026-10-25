@@ -6,6 +6,9 @@ import { SOUND_ALIKE_WORD } from './soundAlikeEdit'
 /** Fish Audio's free model: the only one for auditions, for now. */
 export const FREE_MODELS = ['s2.1-pro-free'] as const
 
+/** What the user has paid Fish in total, as the project file names it (sets its limit at once). */
+export const FishTierSchema = z.enum(['under-100', '100', '1000'])
+
 /** The smallest `quality.chunkLimit` allowed. */
 const MIN_CHUNK = 100
 
@@ -112,7 +115,7 @@ const NarrationSchema = z
          * What the user has paid Fish in total, which sets how many requests it takes at once
          * (Setup compares it with `parallel`). Absent: not told.
          */
-        fishTier: z.enum(['under-100', '100', '1000']).optional(),
+        fishTier: FishTierSchema.optional(),
         /**
          * How takes are checked: mlx-whisper (Apple silicon, through uv), or none (one take each,
          * word timings spread evenly).

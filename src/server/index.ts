@@ -13,6 +13,7 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
+import { FishTierSchema } from '../core/project'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
@@ -114,7 +115,7 @@ const Groups = z.array(z.array(z.string().max(200)).max(50)).max(1000)
 const SoundAlikeBody = z.object({ groups: Groups, was: Groups }).strict()
 
 /** The Fish tier the user chose, or null to clear it. */
-const FishTierBody = z.object({ tier: z.enum(['under-100', '100', '1000']).nullable() }).strict()
+const FishTierBody = z.object({ tier: FishTierSchema.nullable() }).strict()
 
 /** The takes whose model the page offered to switch from s1. */
 const ModelsBody = z
