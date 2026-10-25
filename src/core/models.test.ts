@@ -124,7 +124,6 @@ describe('changeOf', () => {
     expect(change).toMatchObject({ kind: 'ask', lines: 1412, cost: { later: null } })
     expect(change.kind === 'ask' && change.cost.now).toBeCloseTo(1.071, 6)
   })
-  })
 
   it('does not ask when the old model is still in use by the other stage', () => {
     const alike = { ...models, final: 's2.1-pro-free' }
