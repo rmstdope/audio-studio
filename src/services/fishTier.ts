@@ -7,6 +7,8 @@ import type { ProjectFailure } from './workspace'
 /** A saved Fish tier, or why it was not saved. */
 export type FishTierChange = { ok: true } | { ok: false; problems: Problem[] } | ProjectFailure
 
+const PATH = 'narration.quality.fishTier'
+
 /**
  * Saves what the user has paid Fish in total (`narration.quality.fishTier` in the project file),
  * or clears it with `null`. The file is read once and the rest of it kept as it was, in its own
@@ -27,9 +29,7 @@ export function setFishTier(projectFile: string, tier: FishTier | null): Promise
     const file = basename(projectFile)
     const parsed = ProjectSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
-    return saveProject(projectFile, opened, 'narration.quality.fishTier', (indent) =>
-      projectJson(raw, indent),
-    )
+    return saveProject(projectFile, opened, PATH, (indent) => projectJson(raw, indent))
   })
 }
 
