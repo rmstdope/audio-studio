@@ -880,7 +880,7 @@ padding to drop. Chrome decoded such an MP3 to its exact length (80.000 s, no si
 end, against the WAV), so the game loops it without a gap through Web Audio; a looping `<audio>`
 element is not relied on. Safari and Firefox are checked with the game (12.8). As for narration,
 the encoder writes a hidden temporary file in the clips folder, renamed into place together with
-the manifest and lock update (built, 12.6): the temporary file is renamed over the clip, the manifest written, the lock last, all in one turn per project, so a failure before the lock leaves the track as it was, never up to date with a file it does not have. On the board the chosen take is a green card, "chosen · in the game", without Drop (a drop of it is refused, 409); every other card has **Choose**. A chosen track whose clip is gone shows "music file missing" on its card and keeps Choose, so the file can be written again. Clips are served only as plain files in the music clips folder (`GET /api/music/clips/<track>.mp3`: no folders, links, hidden files or the manifest).
+the manifest and lock update (built, 12.6): the temporary file is renamed over the clip, the manifest written, the lock last, all in one turn per project. A failure of the encode, or of reading the manifest or lock, leaves everything as it was; a write that fails after the rename (a full disk) leaves the new clip beside the old lock, and choosing again repairs it. A take is chosen and dropped in the track's board turn, so neither slips between the other's check and write, and a drop is refused while the lock cannot be read. On the board the chosen take is a green card, "chosen · in the game", without Drop (a drop of it is refused, 409); every other card has **Choose**. A chosen track whose clip is gone shows "music file missing" on its card and keeps Choose, so the file can be written again. Clips are served only as plain files in the music clips folder (`GET /api/music/clips/<track>.mp3`: no folders, links, hidden files or the manifest).
 
 **Status** of a track, from the lock and its takes: "chosen" (`ok`), "not chosen" (no take chosen),
 "changed since chosen" (`changed`; the track's page says what changed: the brief, length, tempo, key
@@ -900,9 +900,10 @@ seed, the number of the take on the board, a hash of what went into it (model, b
 as narration leaves the loudness out; the chosen take's own inputs, so a take from an earlier brief
 leaves the track "changed since chosen"), which list it came from (an act or the stingers), and when
 it was chosen. Changing the model in the code marks every track `changed`, as a new model makes new
-music. A track is `missing` (nothing chosen, or its clip is gone from disk), `ok`, or `changed` (its
-brief, kind, length, tempo or key changed since its take was chosen: the old one keeps playing in
-the game until another is chosen). A manifest entry without a lock entry is reported as a problem (with the orphans, 12.7).
+music. A track is `not-chosen` (no lock entry), `chosen`, `changed` (its brief, length, tempo or key,
+or the music model, differs from the chosen take's own: the old one keeps playing in the game until
+another is chosen; the page says which) or `missing` (a take was chosen but its clip is gone from
+disk, which is said ahead of `changed`). A manifest entry without a lock entry is reported as a problem (with the orphans, 12.7).
 Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
 while its list is there, is an orphan, shown on the page of the list its lock entry names under
 "Music the game no longer asks for"; removing it, after confirmation, deletes its clip, its manifest

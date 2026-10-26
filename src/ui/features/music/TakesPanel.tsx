@@ -206,7 +206,7 @@ function TakeCard({
           <button
             type="button"
             className="btn btn-ghost btn-small"
-            disabled={drop.isPending}
+            disabled={drop.isPending || choose.isPending}
             onClick={() => {
               if (playing || seamPlaying) player.stop()
               drop.mutate(take.file)

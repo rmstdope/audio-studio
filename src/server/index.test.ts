@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { readWav, writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
@@ -3256,5 +3256,9 @@ describe('server, choosing a take', () => {
     writeFileSync(join(musicRoot, 'audio/music/.hidden.mp3'), 'x')
     expect((await fetch(at('/api/music/clips/.hidden.mp3'))).status).toBe(404)
     expect((await fetch(at('/api/music/clips/..%2Fhall.mp3'))).status).toBe(404)
+    mkdirSync(join(musicRoot, 'audio/music/folder.mp3'))
+    expect((await fetch(at('/api/music/clips/folder.mp3'))).status).toBe(404)
+    symlinkSync(join(musicRoot, 'audio/music/hall.mp3'), join(musicRoot, 'audio/music/link.mp3'))
+    expect((await fetch(at('/api/music/clips/link.mp3'))).status).toBe(404)
   })
 })

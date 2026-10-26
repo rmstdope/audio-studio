@@ -186,6 +186,13 @@ describe('the music files in the changes', () => {
     expect(groups.music?.clips).toMatchObject({ new: 1, modified: 1, deleted: 0 })
   })
 
+  it('does not count the hidden file an encode is writing as a clip', () => {
+    const groups = groupChanges(withMusic, 'audio-studio.json', [
+      { path: 'web/audio/music/.hall.1234.mp3', change: 'new' },
+    ])
+    expect(groups.music).toBeNull()
+  })
+
   it('has no music group without changes or without a music section', () => {
     expect(groupChanges(withMusic, 'audio-studio.json', []).music).toBeNull()
     expect(groupChanges(project, 'audio-studio.json', []).music).toBeNull()

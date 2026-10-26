@@ -199,13 +199,13 @@ export function createMusicTakes({
   function changeBoard<T>(
     projectFile: string,
     found: Found,
-    change: (board: MusicBoard) => T,
+    change: (board: MusicBoard) => T | Promise<T>,
   ): Promise<T | ProjectFailure> {
     return boards.run(`${projectFile}\0${found.id}`, async () => {
       const board = await readBoard(found.root, found.board)
       if ('ok' in board) return board
       const before = JSON.stringify(board, null, 2)
-      const answer = change(board)
+      const answer = await change(board)
       const after = JSON.stringify(board, null, 2)
       // Nothing changed (a drop of a take that is not there): nothing is written.
       if (after !== before) await writeAtomic(found.root, found.board, `${after}\n`)
@@ -369,44 +369,57 @@ export function createMusicTakes({
     async drop(projectFile, id, name) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      const chosen = (await readChosen(found.root, found.music, []))[id]?.lock
-      const dropped = await changeBoard(projectFile, found, (board) => {
-        const take = board.takes.find((t) => fileOf(t) === name)
-        if (take && chosen?.take === take.n && chosen.fp === take.hash) return 'chosen' as const
-        if (take) board.takes = board.takes.filter((t) => t !== take)
-        return take
+      // The lock is read in the board's turn, so a choice under way is either done or not begun.
+      const outcome = await changeBoard(
+        projectFile,
+        found,
+        async (board): Promise<DropResult | { dropped: BoardTake }> => {
+          const problems: Problem[] = []
+          const chosenTracks = await readChosen(found.root, found.music, problems)
+          // Which take the game plays is not known: nothing is dropped.
+          if (problems.length) return { ok: false, file: found.music.paths.lock, problems }
+          const chosen = chosenTracks[id]?.lock
+          const take = board.takes.find((t) => fileOf(t) === name)
+          if (!take) return { ok: false, message: 'That take is not on the board.' }
+          if (chosen?.take === take.n && chosen.fp === take.hash) {
+            return { ok: false, message: 'That take is the one in the game; choose another first.' }
+          }
+          board.takes = board.takes.filter((t) => t !== take)
+          return { dropped: take }
+        },
+      )
+      if (!outcome || !('dropped' in outcome)) return outcome
+      await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(outcome.dropped)}`), {
+        force: true,
       })
-      if (dropped === 'chosen') {
-        return { ok: false, message: 'That take is the one in the game: choose another first.' }
-      }
-      if (dropped && 'ok' in dropped) return dropped
-      if (!dropped) return { ok: false, message: 'That take is not on the board.' }
-      await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(dropped)}`), { force: true })
       return { ok: true }
     },
 
     async choose(projectFile, id, name) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      const board = await readBoard(found.root, found.board)
-      if ('ok' in board) return board
-      const take = board.takes.find((t) => fileOf(t) === name)
-      if (!take) return { ok: false, message: 'That take is not on the board.' }
-      let wav: Uint8Array
-      try {
-        wav = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
-      } catch {
-        return { ok: false, message: 'That take’s sound is gone, so it cannot be chosen.' }
-      }
-      return commitChoice({
-        root: found.root,
-        projectFile,
-        music: found.music,
-        id,
-        listId: found.listId,
-        take,
-        wav,
-        encode,
+      // In the board's turn, so the take cannot be dropped between the check and the lock.
+      return boards.run(`${projectFile}\0${id}`, async (): Promise<CommitResult> => {
+        const board = await readBoard(found.root, found.board)
+        if ('ok' in board) return board
+        const take = board.takes.find((t) => fileOf(t) === name)
+        if (!take) return { ok: false, message: 'That take is not on the board.' }
+        let wav: Uint8Array
+        try {
+          wav = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
+        } catch {
+          return { ok: false, message: 'That take’s sound is gone, so it cannot be chosen.' }
+        }
+        return commitChoice({
+          root: found.root,
+          projectFile,
+          music: found.music,
+          id,
+          listId: found.listId,
+          take,
+          wav,
+          encode,
+        })
       })
     },
 

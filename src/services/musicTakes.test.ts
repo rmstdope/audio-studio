@@ -479,4 +479,33 @@ describe('choosing a take', () => {
     expect(row).toMatchObject({ status: 'changed', changed: ['brief'] })
     expect(lockOf(root).hall.inputs.brief).toBe('warm lute')
   })
+
+  it('never lets a drop of the take being chosen slip between the choice and the board', async () => {
+    const { root, file, takes, settled } = await twoTakes()
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    const name = view.takes[0]!.file
+    const [chosen, dropped] = await Promise.all([
+      takes.choose(file, 'hall', name),
+      takes.drop(file, 'hall', name),
+    ])
+    const after = await takes.view(file, 'hall')
+    if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
+    const lock = existsSync(join(root, 'music/music.lock.json')) ? lockOf(root).hall : undefined
+    // Either the take was chosen and stays, or it was dropped and nothing names it.
+    if (lock) expect(after.takes.some((t) => t.chosen)).toBe(true)
+    else expect(after.takes.some((t) => t.n === 1)).toBe(false)
+    const succeeded = (answer: unknown) =>
+      Boolean(answer && typeof answer === 'object' && 'ok' in answer && answer.ok === true)
+    // Exactly one of the two wins.
+    expect([succeeded(chosen), succeeded(dropped)].filter(Boolean)).toHaveLength(1)
+  })
+
+  it('refuses to drop anything while the lock cannot be read', async () => {
+    const { file, takes, settled } = await twoTakes({ 'music/music.lock.json': '{ nope' })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    const answer = await takes.drop(file, 'hall', view.takes[0]!.file)
+    expect(answer).toMatchObject({ ok: false, file: 'music/music.lock.json' })
+  })
 })

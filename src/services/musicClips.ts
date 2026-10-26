@@ -35,6 +35,16 @@ async function lockNow(
   return read === 'invalid' ? null : read === 'missing' ? {} : read
 }
 
+/** The music manifest as it is now: empty if there is none; null (with the problems added) if broken. */
+async function manifestNow(
+  root: string,
+  music: MusicConfig,
+  problems: Problem[],
+): Promise<MusicManifest | null> {
+  const read = await readResource(root, music.paths.manifest, MusicManifestSchema, problems)
+  return read === 'invalid' ? null : read === 'missing' ? {} : read
+}
+
 /**
  * Every track the lock says is chosen, with whether its music file is a plain file in the clips
  * folder. A lock that cannot be read adds its problems and gives no track.
@@ -103,9 +113,7 @@ export async function commitChoice({
   try {
     return await choices().run(`music-choice\0${projectFile}`, async (): Promise<CommitResult> => {
       const found: Problem[] = []
-      const read = await readResource(root, music.paths.manifest, MusicManifestSchema, found)
-      const manifest: MusicManifest | null =
-        read === 'invalid' ? null : read === 'missing' ? {} : read
+      const manifest = await manifestNow(root, music, found)
       const lock = await lockNow(root, music, found)
       if (!manifest || !lock) return { ok: false, file: found[0]!.file, problems: found }
       manifest[id] = { file, duration: pyRound(take.seconds) }

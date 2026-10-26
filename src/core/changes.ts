@@ -178,7 +178,12 @@ export function groupChanges(
         ? paths.music.files[change.path]
         : undefined
       if (role) files.push({ ...change, role })
-      else if (change.path.startsWith(paths.music.clips) && change.path.endsWith('.mp3')) {
+      else if (
+        change.path.startsWith(paths.music.clips) &&
+        change.path.endsWith('.mp3') &&
+        // A hidden name is a clip being encoded, not a clip.
+        !posix.basename(change.path).startsWith('.')
+      ) {
         clips[change.change]++
       }
     }
