@@ -128,6 +128,24 @@ describe('dialogGonePanel', () => {
     })
   })
 
+  it('names the cues file, not clips and a manifest, when only cues were recorded', () => {
+    expect(dialogGonePanel({ ...several, recorded: { clips: 0, cues: 3 } })).toMatchObject({
+      advice:
+        'Refresh dialog writes it again from the game. If the game no longer has Svenska lines for this act, delete the cues file yourself.',
+    })
+    expect(
+      dialogGonePanel({
+        ...several,
+        language: null,
+        canRefresh: false,
+        recorded: { clips: 0, cues: 1 },
+      }),
+    ).toMatchObject({
+      advice:
+        'Once the game writes it again, the studio reads it in. If the game no longer has this act, delete the cues file yourself.',
+    })
+  })
+
   it('has other advice without a refresh command', () => {
     expect(dialogGonePanel({ ...several, canRefresh: false })).toMatchObject({
       advice:
