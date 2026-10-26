@@ -886,22 +886,19 @@ a.btn {
 .cue-gap {
   display: inline-block;
   position: relative;
+  vertical-align: middle;
   width: 0;
   height: 1em;
-  vertical-align: middle;
 }
+/* Painted over the space before the next word only, so nothing moves or hides a letter. */
 .cue-gap::after {
   content: '';
   position: absolute;
-  left: -5px;
-  width: 10px;
+  right: 0;
+  width: 0.22em;
   top: 0;
   bottom: 0;
   border-radius: 3px;
-  pointer-events: none;
-}
-.line-text:hover .cue-gap::after {
-  pointer-events: auto;
 }
 .line-text:hover .cue-gap::after,
 .cue-gap:focus-visible::after,
@@ -923,12 +920,11 @@ button.cue-chip[aria-expanded='true'] {
   outline: 2px solid var(--accent);
 }
 .cue-box {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   gap: 6px;
-  vertical-align: top;
-  width: 300px;
-  margin: 0 8px;
+  max-width: 300px;
+  margin: 8px 0 0;
   padding: 10px;
   background: var(--panel, var(--inset));
   border: 1px solid var(--line-strong);
@@ -945,11 +941,10 @@ button.cue-chip[aria-expanded='true'] {
   padding: 7px 10px;
 }
 .cue-pieces {
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
 }
 .cue-piece {
   display: flex;
@@ -975,9 +970,7 @@ button.cue-chip[aria-expanded='true'] {
 }
 @media (max-width: 700px) {
   .cue-box {
-    display: flex;
-    width: auto;
-    margin: 8px 0 0;
+    max-width: none;
   }
 }
 
