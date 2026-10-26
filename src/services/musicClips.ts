@@ -116,7 +116,11 @@ export async function commitChoice({
       const found: Problem[] = []
       const manifest = await manifestNow(root, music, found)
       const lock = await lockNow(root, music, found)
-      if (!manifest || !lock) return { ok: false, file: found[0]!.file, problems: found }
+      if (!manifest) return { ok: false, file: found[0]!.file, problems: found }
+      if (!lock) {
+        const message = `Take ${take.n} could not be chosen: the music lock could not be read.`
+        return { ok: false, message: `${message} Nothing was changed.` }
+      }
       manifest[id] = { file, duration: pyRound(take.seconds) }
       const entry: LockEntry = {
         fp: take.hash,

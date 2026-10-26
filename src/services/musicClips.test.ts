@@ -139,8 +139,29 @@ describe('commitChoice', () => {
     expect(readdirSync(join(root, 'audio/music'), { withFileTypes: true }).length).toBe(0)
   })
 
-  it('refuses a broken lock or manifest, writing nothing and leaving no temporary file', async () => {
+  it('refuses a broken lock, saying so, writing nothing and leaving no temporary file', async () => {
     const root = tempRepo({ 'music/music.lock.json': '{ nope' })
+    const { encode } = fakeEncoder()
+    const result = await commitChoice({
+      root,
+      music: config,
+      id: 'hall',
+      listId: 'act1',
+      take: take(3),
+      wav: new Uint8Array(4),
+      encode,
+      now: () => at,
+    })
+    expect(result).toEqual({
+      ok: false,
+      message: 'Take 3 could not be chosen: the music lock could not be read. Nothing was changed.',
+    })
+    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
+    expect(readdirSync(join(root, 'audio/music'))).toEqual([])
+  })
+
+  it('refuses a broken manifest, naming it, writing nothing and leaving no temporary file', async () => {
+    const root = tempRepo({ 'audio/music/manifest.json': '{ nope' })
     const { encode } = fakeEncoder()
     const result = await commitChoice({
       root,
@@ -152,9 +173,10 @@ describe('commitChoice', () => {
       encode,
       now: () => at,
     })
-    expect(result).toMatchObject({ ok: false, file: 'music/music.lock.json' })
-    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
-    expect(readdirSync(join(root, 'audio/music'))).toEqual([])
+    expect(result).toMatchObject({ ok: false, file: 'audio/music/manifest.json' })
+    expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
+    expect(existsSync(join(root, 'music/music.lock.json'))).toBe(false)
+    expect(readdirSync(join(root, 'audio/music'))).toEqual(['manifest.json'])
   })
 })
 
