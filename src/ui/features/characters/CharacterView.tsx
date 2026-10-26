@@ -255,7 +255,8 @@ export function CharacterView({
           auditioning={inProgress !== null}
           onClose={() => {
             setDesigning(false)
-            designButton.current?.focus()
+            // The button is disabled while the box is open: focus it once the box is gone.
+            setTimeout(() => designButton.current?.focus(), 0)
           }}
           onDone={() => {
             setDesigning(false)

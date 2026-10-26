@@ -484,11 +484,12 @@ export function ShortlistBoard({
           auditioning
           onClose={() => {
             setDesigning(false)
-            designButton.current?.focus()
+            // The button is disabled while the box is open: focus it once the box is gone.
+            setTimeout(() => designButton.current?.focus(), 0)
           }}
           onDone={() => {
             setDesigning(false)
-            designButton.current?.focus()
+            setTimeout(() => designButton.current?.focus(), 0)
             // The designs join the board when it is read again; bring the section into view then.
             setTimeout(() => document.getElementById('designed')?.scrollIntoView(), 300)
           }}

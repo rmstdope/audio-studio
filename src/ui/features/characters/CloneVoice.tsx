@@ -124,6 +124,8 @@ export function CloneVoice({
   const [confirming, setConfirming] = useState(false)
   const nameField = useRef<HTMLInputElement>(null)
   const picker = useRef<HTMLInputElement>(null)
+  const chooseButton = useRef<HTMLButtonElement>(null)
+  const fileList = useRef<HTMLUListElement>(null)
   const castButton = useRef<HTMLButtonElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
   useLeaveWarning(mode === 'cloning')
@@ -158,6 +160,18 @@ export function CloneVoice({
       files.map(async (file) => ({ file, name: file.name, seconds: await audioSeconds(file) })),
     )
     setChosen((now) => [...now, ...read])
+  }
+
+  /**
+   * Removes the `index`th recording, and keeps focus in the form: on the next recording's ✕, or on
+   * Choose files… when none follows (its ✕ is gone with it, which would leave focus on the page).
+   */
+  function remove(index: number) {
+    setChosen((now) => now.filter((_, j) => j !== index))
+    setTimeout(() => {
+      const next = fileList.current?.querySelectorAll<HTMLButtonElement>('.clone-remove')[index]
+      ;(next ?? chooseButton.current)?.focus()
+    }, 0)
   }
 
   function drop(event: DragEvent) {
@@ -341,6 +355,7 @@ export function CloneVoice({
               }}
             />
             <button
+              ref={chooseButton}
               className="btn btn-small"
               type="button"
               disabled={cloning}
@@ -355,7 +370,7 @@ export function CloneVoice({
           </span>
         </div>
         {chosen.length > 0 && (
-          <ul className="clone-files">
+          <ul ref={fileList} className="clone-files">
             {chosen.map((c, i) => (
               <li key={`${i}-${c.name}`} className={state.marks[i] === 'sent' ? '' : 'left-out'}>
                 <span className="clone-file-name" title={c.name}>
@@ -368,11 +383,11 @@ export function CloneVoice({
                 </span>
                 <button
                   type="button"
-                  className="icon-btn"
+                  className="icon-btn clone-remove"
                   title={`Remove ${c.name}`}
                   aria-label={`Remove ${c.name}`}
                   disabled={cloning}
-                  onClick={() => setChosen((now) => now.filter((_, j) => j !== i))}
+                  onClick={() => remove(i)}
                 >
                   ✕
                 </button>
