@@ -468,13 +468,16 @@
       takes as cards, the brief always editable. Every word here is what would ship.
     </div>
     <div class="intro decided">
-      <b>Decided by me — say if any is wrong:</b> More takes makes 2 (about 6 minutes). Choosing
-      another take switches the game's music at once, without asking: the take that was chosen stays
-      on the board, so you can switch back. Takes from an earlier brief stay, marked "earlier
-      brief". The chosen take has no Drop. Takes keep being made when you leave the page; the act's
-      list shows "making 2 takes". Each act's page has Refresh from the game, the same as Refresh
-      dialog on Narration, which brings both the lines and the loops. The kind (loop or stinger) is
-      the game's alone. "Plays in" under a track's name is a line the game gives with the track.
+      <b>Agreed:</b> More takes makes 2 (about 6 minutes). Choosing another take switches the game's
+      music at once, without asking: the take that was chosen stays on the board, so you can switch
+      back. Takes from an earlier brief stay, marked "earlier brief". The chosen take has no Drop.
+      Takes keep being made when you leave the page; the act's list shows "making 2 takes". Each
+      act's page has Refresh from the game, the same as Refresh dialog on Narration, which brings
+      both the lines and the loops; the Stingers page's runs the game's command for what belongs to
+      no act. Stop cancels the waiting takes and lets the one under way finish. Statuses: chosen,
+      not chosen, changed since chosen (what changed is said on the track's page), music file
+      missing, making 2 takes. The kind (loop or stinger) is the game's alone. "Plays in" under a
+      track's name is a line the game gives with the track.
     </div>
     <p class="note">
       <b
@@ -493,7 +496,7 @@
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">2</span></span>
@@ -509,7 +512,7 @@
           <div class="grow">
             <span class="crumbs">Music</span>
             <h1>Act II</h1>
-            <span class="muted">The loops the game asks for in Act II. 2 of 3 chosen.</span>
+            <span class="muted">The loops the game asks for in Act II. 2 of 4 chosen.</span>
           </div>
           <button class="btn">Refresh from the game</button>
         </div>
@@ -544,7 +547,7 @@
                 <div class="brief">cozy tavern at night, celtic jig, tin whistle and accordion</div>
               </td>
               <td>1:20</td>
-              <td><span class="chip c-st">brief changed</span></td>
+              <td><span class="chip c-st">changed since chosen</span></td>
             </tr>
             <tr>
               <td style="width: 36px"><span class="play" style="opacity: 0.3">▶</span></td>
@@ -555,6 +558,20 @@
               <td><div class="brief">enchanted forest, celtic harp, breathy flute</div></td>
               <td>1:20</td>
               <td><span class="chip c-k">making 2 takes · about 4 min</span></td>
+            </tr>
+            <tr>
+              <td style="width: 36px"><span class="play" style="opacity: 0.3">▶</span></td>
+              <td>
+                <b>Market well</b>
+                <div class="mono faint">market-well</div>
+              </td>
+              <td>
+                <div class="brief">
+                  village square with a stone well, gentle bustle, hammered dulcimer
+                </div>
+              </td>
+              <td>1:20</td>
+              <td><span class="chip c-mi">not chosen</span></td>
             </tr>
           </table>
         </section>
@@ -577,7 +594,13 @@
         </section>
       </main>
     </div>
-    <p class="note"><b>2 — The stingers, for the whole game.</b></p>
+    <p class="note">
+      <b
+        >2 — The stingers, for the whole game. Refresh from the game here runs the game's own
+        command for what belongs to no act. A chosen track whose music file is gone from disk says
+        so.</b
+      >
+    </p>
     <div class="frame">
       <aside class="side">
         <div class="brand">〰 Audio Studio</div>
@@ -589,7 +612,7 @@
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni on" style="padding-left: 20px"
@@ -608,7 +631,8 @@
             <span class="crumbs">Music</span>
             <h1>Stingers</h1>
             <span class="muted"
-              >Played once, for a moment, anywhere in the game. 1 of 2 chosen.</span
+              >Played once, for a moment, anywhere in the game. 1 of 3 chosen; one's music file is
+              missing.</span
             >
           </div>
           <button class="btn">Refresh from the game</button>
@@ -642,11 +666,26 @@
               <td>0:05</td>
               <td><span class="chip c-mi">not chosen</span></td>
             </tr>
+            <tr>
+              <td style="width: 36px"><span class="play">▶</span></td>
+              <td>
+                <b>Level up</b>
+                <div class="mono faint">level-up</div>
+              </td>
+              <td><div class="brief">bright rising harp glissando with chimes</div></td>
+              <td>0:04</td>
+              <td><span class="chip c-st">music file missing</span></td>
+            </tr>
           </table>
         </section>
       </main>
     </div>
-    <p class="note"><b>3 — An act the game asks no loops for.</b></p>
+    <p class="note">
+      <b
+        >3 — An act the game asks no loops for (its list is there and empty; with no list at all the
+        page says: The game has not listed the loops for Act IV yet. Refresh from the game.).</b
+      >
+    </p>
     <div class="frame">
       <aside class="side">
         <div class="brand">〰 Audio Studio</div>
@@ -658,7 +697,7 @@
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni on" style="padding-left: 20px">Act IV</span
           ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">2</span></span>
@@ -741,7 +780,7 @@
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">2</span></span>
@@ -810,7 +849,12 @@
         </section>
       </main>
     </div>
-    <p class="note"><b>6 — Takes being made, after More takes.</b></p>
+    <p class="note">
+      <b
+        >6 — Takes being made, after More takes. Stop cancels the takes still waiting; the one being
+        made finishes and is kept.</b
+      >
+    </p>
     <div class="frame">
       <aside class="side">
         <div class="brand">〰 Audio Studio</div>
@@ -822,7 +866,7 @@
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">2</span></span>
@@ -954,7 +998,7 @@ enchanted ancient forest, mystical and serene, celtic harp arpeggios, breathy wo
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">2</span></span>
@@ -1017,7 +1061,7 @@ cozy medieval tavern at night, crackling hearth, jaunty celtic jig, tin whistle 
         </section>
         <div class="warnbox">
           <div class="grow">
-            <strong>The brief changed since this track's take was chosen.</strong>
+            <strong>Changed since its take was chosen: the brief.</strong>
             <div class="muted small">
               The game plays the chosen take until you choose another. Make takes from the new brief
               with More takes.
@@ -1074,7 +1118,7 @@ cozy medieval tavern at night, crackling hearth, jaunty celtic jig, tin whistle 
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni on" style="padding-left: 20px"
@@ -1176,7 +1220,7 @@ cozy medieval tavern at night, crackling hearth, jaunty celtic jig, tin whistle 
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">2</span></span>
@@ -1299,7 +1343,7 @@ enchanted ancient forest, celtic harp arpeggios, breathy wooden flute</textarea>
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">2</span></span>
@@ -1382,7 +1426,7 @@ enchanted ancient forest, celtic harp arpeggios, breathy wooden flute</textarea>
           <span class="lbl">Workspace</span><span class="ni">Narration</span
           ><span class="ni">Music</span
           ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
-          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">3</span></span
+          ><span class="ni on" style="padding-left: 20px">Act II<span class="muted">4</span></span
           ><span class="ni" style="padding-left: 20px">Act III<span class="muted">1</span></span
           ><span class="ni" style="padding-left: 20px">Act IV</span
           ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">2</span></span>
