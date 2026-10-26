@@ -2970,9 +2970,47 @@ button.cue-chip[aria-expanded='true'] {
   gap: 8px;
   min-width: 0;
 }
-.take-chosen {
+/* Music: what the game plays, above the takes */
+.in-game {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
   background: var(--kept-bg);
-  border-color: var(--kept-line);
+  border: 1px solid var(--kept-line);
+  min-width: 0;
+}
+.in-game-warn {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+}
+.in-game-warn .in-game-label {
+  color: var(--warn);
+}
+.in-game-none {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--muted);
+}
+.in-game-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ok-ink);
+}
+.in-game-none .in-game-label {
+  color: var(--muted);
+}
+.in-game .take-row {
+  flex-wrap: wrap;
+}
+.in-game-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .warnbox {
   display: flex;

@@ -54,7 +54,7 @@ const view = (over: Partial<MusicTakesView> = {}): MusicTakesView => ({
       seed: 1,
       peaks: [0.5],
       earlier: false,
-      chosen: true,
+      chosen: false,
       model: 'Balanced · XL turbo · 4B',
     },
   ],
