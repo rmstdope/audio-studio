@@ -929,7 +929,10 @@ nothing is dropped.
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
 kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Python worker
 (`worker/music.py`, ACE-Step through uv, the models loaded on the first take and stopped with the
-studio), the same JSON-lines protocol as the Whisper worker. It uses ACE-Step's XL turbo model with
+studio), the same JSON-lines protocol as the Whisper worker. Both workers run in the studio's own
+`worker/` folder, not in the game's repository the studio runs from, so what they write beside
+themselves (ACE-Step's `.cache/acestep/progress_estimates.json`) stays with the studio, ignored by
+its git. It uses ACE-Step's XL turbo model with
 its 4B language model, which plans the piece (decision 5). ACE-Step and Whisper share the one GPU
 and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`, a process-wide
 `createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a Whisper check at a
