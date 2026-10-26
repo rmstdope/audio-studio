@@ -109,6 +109,25 @@ describe('dialogGonePanel', () => {
     })
   })
 
+  it('says was and it when one clip or one cue was recorded', () => {
+    expect(dialogGonePanel({ ...several, recorded: { clips: 1, cues: 0 } })).toMatchObject({
+      before:
+        ' is not there, but 1 clip was recorded for Act 1 in Svenska. The studio keeps it as it is and offers to remove none of it until the dialog is back.',
+      lines:
+        '1 clip was recorded for these lines. Nothing can be generated or removed until the dialog is back.',
+    })
+    expect(dialogGonePanel({ ...several, recorded: { clips: 0, cues: 1 } })).toMatchObject({
+      before:
+        ' is not there, but 1 cue was recorded for Act 1 in Svenska. The studio keeps it as it is and offers to remove none of it until the dialog is back.',
+      lines:
+        '1 cue was recorded for these lines. Nothing can be generated or removed until the dialog is back.',
+    })
+    expect(dialogGonePanel({ ...several, recorded: { clips: 1, cues: 1 } })).toMatchObject({
+      before:
+        ' is not there, but 1 clip and 1 cue were recorded for Act 1 in Svenska. The studio keeps them as they are and offers to remove none of them until the dialog is back.',
+    })
+  })
+
   it('has other advice without a refresh command', () => {
     expect(dialogGonePanel({ ...several, canRefresh: false })).toMatchObject({
       advice:
