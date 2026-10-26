@@ -91,11 +91,14 @@ describe('SpeedEditor', () => {
     const style = document.createElement('style')
     style.textContent = await Bun.file(new URL('../../styles.css', import.meta.url)).text()
     document.head.append(style)
-    page = speedPage()
-    await page.show('de', 'Speed · Deutsch', 2)
-    const row = page.field().parentElement!
-    expect(row.textContent).toContain('Use the project’s')
-    expect(getComputedStyle(row).flexWrap).toBe('wrap')
-    style.remove()
+    try {
+      page = speedPage()
+      await page.show('de', 'Speed · Deutsch', 2)
+      const row = page.field().parentElement!
+      expect(row.textContent).toContain('Use the project’s')
+      expect(getComputedStyle(row).flexWrap).toBe('wrap')
+    } finally {
+      style.remove()
+    }
   })
 })
