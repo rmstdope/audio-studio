@@ -138,7 +138,11 @@ export function SceneBand({
     )
   }
 
-  const warning = warningText(scene.recordedFollowing)
+  // Saving marks lines only when the cue they are said with changes: not for an unchanged draft,
+  // nor for a draft that only makes the cue the scene already follows its own.
+  const changed = draft.trim() !== own
+  const marks = changed && draft.trim() !== (scene.cue ?? '')
+  const warning = marks ? warningText(scene.recordedFollowing) : null
   return (
     <tr className="scene-band">
       <td colSpan={columns}>
@@ -165,11 +169,7 @@ export function SceneBand({
           />
           {warning && <span className="scene-warning">{warning}</span>}
           <div className="cue-actions">
-            <button
-              className="btn btn-primary"
-              type="submit"
-              disabled={save.isPending || draft.trim() === own}
-            >
+            <button className="btn btn-primary" type="submit" disabled={save.isPending || !changed}>
               {save.isPending ? 'Saving…' : 'Save'}
             </button>
             {scene.cueFrom === 'own' && (
