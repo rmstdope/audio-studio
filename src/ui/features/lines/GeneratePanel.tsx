@@ -4,7 +4,7 @@ import { displayName } from '../../../core/summary'
 import type { JobKind } from '../../../services/jobs'
 import { useJob, useJobActions, usePlan } from '../../api'
 import { Problems } from '../../components/Problems'
-import { centsUp, dollars, plural } from '../../format'
+import { aboutDollars, centsUp, dollars, plural } from '../../format'
 import { castNote, generateLabel, planHeadline, translatedNote } from '../../languages'
 import { REASON } from '../../status'
 
@@ -322,10 +322,10 @@ export function GeneratePanel({
       )}
       <span className="muted plan-facts">
         {p.model} · {formatBytes(p.bytes)} of text ·{' '}
-        {p.cost === null ? 'price unknown' : p.cost ? `about ${dollars(p.cost)}` : 'free'} ·{' '}
+        {p.cost === null ? 'price unknown' : p.cost ? aboutDollars(p.cost) : 'free'} ·{' '}
         {p.checked
           ? `each take checked with Whisper${language ? ` in ${language.name}` : ''}, up to ${plural(p.takes, 'take')} a line${
-              p.cost ? ` (at most about ${dollars(p.cost * p.takes)})` : ''
+              p.cost ? ` (at most ${aboutDollars(p.cost * p.takes)})` : ''
             } · `
           : 'takes not checked · '}
         files are written in place; commit them when you are happy

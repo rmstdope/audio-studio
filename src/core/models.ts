@@ -62,6 +62,11 @@ function money(amount: number): string {
   return amount > 0 && amount < 0.005 ? 'under $0.01' : usd(amount)
 }
 
+/** An amount after "about": a fraction of a cent reads "under $0.01", not "about under $0.01". */
+function about(amount: number): string {
+  return amount > 0 && amount < 0.005 ? money(amount) : `about ${money(amount)}`
+}
+
 /** A rate in dollars per million characters: whole dollars without cents. */
 function rate(price: number): string {
   return Number.isInteger(price) ? `$${price}` : usd(price)
@@ -121,12 +126,13 @@ export function priceWords(model: string, at: Date, dialog: Dialog): string {
   )
   if (model === RETIRED_MODEL) parts.push('retires 31 December')
   if (dialog.lines > 0) {
-    const total = (price: number) => money((dialog.bytes / 1_000_000) * price)
+    const cost = (price: number) => (dialog.bytes / 1_000_000) * price
+    const total = (price: number) => about(cost(price))
     const count = `${dialog.lines.toLocaleString('en-US')} line${dialog.lines === 1 ? '' : 's'}`
     parts.push(
       promotion
-        ? `about ${total(promotion.price)} for all ${count} (${total(detail.price)} from ${day(promotion.until)})`
-        : `about ${total(detail.price)} for all ${count}`,
+        ? `${total(promotion.price)} for all ${count} (${money(cost(detail.price))} from ${day(promotion.until)})`
+        : `${total(detail.price)} for all ${count}`,
     )
   }
   return parts.join(' · ')
@@ -209,8 +215,8 @@ export function questionWords(
     cost.now === 0
       ? 'free'
       : cost.later !== null && until
-        ? `about ${money(cost.now)} (about ${money(cost.later)} from ${day(until)})`
-        : `about ${money(cost.now)}`
+        ? `${about(cost.now)} (${about(cost.later)} from ${day(until)})`
+        : about(cost.now)
   const one = lines === 1
   const count = `${lines.toLocaleString('en-US')} line${one ? '' : 's'}`
   const become = one ? 'becomes' : 'become'

@@ -64,6 +64,10 @@ describe('modelOptions', () => {
 
 describe('priceWords', () => {
   const dialog = { lines: 2340, bytes: 118_000 }
+  it('never writes "about under" for a tiny project total', () => {
+    const words = priceWords('s2.1-pro', before, { lines: 1, bytes: 40 })
+    expect(words).toBe('$15 per million characters · under $0.01 for all 1 line')
+  })
   it('says Free for a free model, with no total', () => {
     expect(priceWords('s2.1-pro-free', before, dialog)).toBe('Free')
   })
@@ -181,6 +185,21 @@ describe('questionWords', () => {
       keep: 'Keep s2.1-pro-free',
       confirm: 'Switch to s2.1-pro',
     })
+  })
+
+  it('never writes "about under" for a cost below a cent', () => {
+    const words = questionWords(
+      'final',
+      's2.1-pro',
+      'drama-3',
+      { lines: 1, cost: { now: 0.0004, later: 0.002 } },
+      'audio-studio.json',
+      before,
+    )
+    expect(words.items[1]).toBe(
+      '1 line recorded for the final with s2.1-pro becomes out of date: the next final recording records it again, under $0.01 (under $0.01 from 12 November).',
+    )
+    expect(words.items[1]).not.toContain('about under')
   })
 
   it('words a final change with a promotion', () => {

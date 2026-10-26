@@ -58,6 +58,11 @@ export function dollars(amount: number): string {
   return `$${amount.toFixed(2)}`
 }
 
+/** An amount after "about": a fraction of a cent reads "under $0.01", not "about under $0.01". */
+export function aboutDollars(amount: number): string {
+  return amount > 0 && amount < 0.005 ? dollars(amount) : `about ${dollars(amount)}`
+}
+
 /**
  * An amount rounded up to the next cent: what a "Pay up to" button shows and sends, so the amount
  * agreed is never less than the amount shown, and never less than the cost.
