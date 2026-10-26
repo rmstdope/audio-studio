@@ -308,3 +308,47 @@ describe('partPathFor with a language', () => {
     expect(partPathFor('tts/{part}/{language}.json', 'act2')).toBe('tts/act2/{language}.json')
   })
 })
+
+describe('the music section', () => {
+  const music = (paths: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
+    projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'web/audio/music',
+          manifest: 'web/audio/music/manifest.json',
+          ...paths,
+        },
+        ...extra,
+      },
+    })
+
+  it('is optional', () => {
+    expect(parse(projectJson()).data!.music).toBeUndefined()
+  })
+
+  it('accepts the paths and the shared refresh command', () => {
+    const result = parse(music({}, { refreshShared: 'node extract-shared.js' }))
+    expect(result.success).toBe(true)
+    expect(result.data!.music!.refreshShared).toBe('node extract-shared.js')
+  })
+
+  it('needs {part} in the loops path', () => {
+    expect(problems(music({ loops: 'tts/music.json' }))).toEqual([
+      {
+        file: 'audio-studio.json',
+        path: 'music.paths.loops',
+        message: 'must contain {part}, or every part would share one file',
+      },
+    ])
+  })
+
+  it('refuses {language} in any music path, music being the same in every language', () => {
+    const found = problems(music({ clips: 'web/{language}/music', lock: '{language}/lock.json' }))
+    expect(found.map((p) => p.path).sort()).toEqual(['music.paths.clips', 'music.paths.lock'])
+    expect(found[0]!.message).toContain('{language}')
+  })
+})

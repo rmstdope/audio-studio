@@ -2598,3 +2598,36 @@ a.btn {
     gap: 4px;
   }
 }
+
+/* Music */
+
+.music-table {
+  min-width: 640px;
+}
+.music-play {
+  width: 44px;
+}
+.music-brief-cell {
+  max-width: 0;
+  width: 45%;
+}
+.music-brief {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+}
+.music-notice {
+  margin: 0;
+  padding: 6px 0;
+}
+.music-example {
+  text-align: left;
+  align-self: stretch;
+}
+.music-subnav {
+  padding-left: 20px;
+}
+.music-id {
+  font-size: 12px;
+}

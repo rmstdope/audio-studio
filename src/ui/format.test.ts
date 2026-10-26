@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   centsUp,
+  clock,
   compact,
   aboutDollars,
   dollars,
@@ -99,5 +100,13 @@ describe('centsUp', () => {
     for (const amount of [0.0097, 0.123456, 1.9003949999999998, 0.07, 3.3]) {
       expect(centsUp(amount)).toBeGreaterThanOrEqual(amount)
     }
+  })
+})
+
+describe('clock', () => {
+  it('writes seconds as m:ss', () => {
+    expect(clock(80)).toBe('1:20')
+    expect(clock(5)).toBe('0:05')
+    expect(clock(600)).toBe('10:00')
   })
 })

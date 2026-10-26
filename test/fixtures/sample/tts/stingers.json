@@ -1,0 +1,20 @@
+[
+  {
+    "id": "victory",
+    "title": "Victory",
+    "brief": "short triumphant brass fanfare",
+    "seconds": 6
+  },
+  {
+    "id": "game-over",
+    "title": "Game over",
+    "brief": "short sad descending melody, strings and harp",
+    "seconds": 5
+  },
+  {
+    "id": "level-up",
+    "title": "Level up",
+    "brief": "bright rising harp glissando with chimes",
+    "seconds": 4
+  }
+]

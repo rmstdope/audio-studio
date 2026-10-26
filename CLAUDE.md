@@ -74,7 +74,9 @@ bundle breaks.
   only together with the manifest and lock update.
 - Another exception, to reading and writing only the named files: the project's own
   `refreshDialog` command (the game's code, named in its project file) runs in the project root
-  only when the user clicks Refresh dialog on the studio's page, and writes what the game writes.
+  only when the user clicks Refresh dialog on a part's page or Refresh from the game on an act's
+  Music page, and so does `music.refreshShared` when the user clicks Refresh from the game on the
+  Stingers page; each writes what the game writes.
   The studio runs nothing else of the consumer's.
 - The project file itself is read, and changed in four kinds of places only: the words that sound
   the same (`narration.quality.soundAlike`, and `narration.quality.soundAlikeByLanguage` for the
