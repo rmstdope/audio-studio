@@ -265,8 +265,8 @@ describe('the requests-at-once check', () => {
       expect(steps?.list[2]).toEqual({
         parts: ['Download both into ~/.cache/stable-audio, where the studio looks for them:'],
         commands: [
-          'HF_TOKEN=… huggingface-cli download stabilityai/stable-audio-open-1.0 --local-dir ~/.cache/stable-audio/stable-audio-open-1.0',
-          'HF_TOKEN=… huggingface-cli download stabilityai/stable-audio-open-small --local-dir ~/.cache/stable-audio/stable-audio-open-small',
+          'HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/stable-audio-open-1.0 --local-dir ~/.cache/stable-audio/stable-audio-open-1.0',
+          'HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/stable-audio-open-small --local-dir ~/.cache/stable-audio/stable-audio-open-small',
         ],
       })
       expect(steps?.note).toBe('The studio never asks for or keeps your token.')
