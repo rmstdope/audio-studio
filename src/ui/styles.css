@@ -2892,6 +2892,8 @@ button.cue-chip[aria-expanded='true'] {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  container-type: inline-size;
+  container-name: takes;
 }
 .takes-empty {
   display: flex;
@@ -2903,7 +2905,7 @@ button.cue-chip[aria-expanded='true'] {
 }
 .takes-head {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
 }
@@ -2936,14 +2938,6 @@ button.cue-chip[aria-expanded='true'] {
 .takes-model:disabled {
   opacity: 0.55;
 }
-@media (max-width: 640px) {
-  .takes-controls {
-    flex-wrap: nowrap;
-  }
-  .takes-model {
-    max-width: none;
-  }
-}
 .takes-make {
   display: flex;
   flex-wrap: wrap;
@@ -2951,6 +2945,23 @@ button.cue-chip[aria-expanded='true'] {
   justify-content: center;
   gap: 8px;
   align-self: stretch;
+}
+/* A narrow panel (the window's width less the sidebar, when shown): the menu and its button take a
+   line of their own under the heading, or fill the empty state's, the menu taking what is left. */
+@container takes (max-width: 599px) {
+  .takes-head {
+    flex-wrap: wrap;
+  }
+  .takes-controls {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+  .takes-make {
+    flex-wrap: nowrap;
+  }
+  .takes-model {
+    max-width: none;
+  }
 }
 .takes-missing {
   color: var(--warn);
