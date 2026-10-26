@@ -62,6 +62,14 @@ const view = (over: Partial<MusicTakesView> = {}): MusicTakesView => ({
   ...over,
 })
 
+/** Clicks, and lets the request and the page's reaction to it settle inside `act`. */
+async function click(button: HTMLButtonElement) {
+  await act(async () => {
+    button.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+}
+
 const posted: unknown[] = []
 beforeEach(() => {
   posted.length = 0
@@ -113,7 +121,7 @@ describe('the model menu on a track’s Takes panel', () => {
       page.menu().dispatchEvent(new Event('change', { bubbles: true }))
     })
     expect(posted).toEqual([])
-    await act(async () => page.button('More takes').click())
+    await click(page.button('More takes'))
     expect(posted).toEqual([{ count: 2, model: 'quick' }])
   })
 
@@ -128,7 +136,7 @@ describe('the model menu on a track’s Takes panel', () => {
       page.menu().dispatchEvent(new Event('change', { bubbles: true }))
     })
     expect(page.container.textContent).toContain('about 7 minutes each.')
-    await act(async () => page.button('Make 2 takes').click())
+    await click(page.button('Make 2 takes'))
     expect(posted).toEqual([{ count: 2, model: 'careful' }])
   })
 
@@ -179,13 +187,25 @@ describe('the model menu on a track’s Takes panel', () => {
     const page = render(view({ generator: { ok: false, message: 'none' } }))
     expect(page.menu()).not.toBeNull()
     expect(page.button('More takes').disabled).toBe(true)
+    expect(page.container.textContent).not.toContain("isn't on this computer. Pick another")
+  })
+
+  it('says a missing default beneath the menu in the empty state too', () => {
+    const page = render(
+      view({ takes: [], defaultModel: 'careful', models: everyModel(['careful']) }),
+    )
+    const line = page.container.querySelector('.takes-missing')!
+    expect(
+      page.menu().compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(page.button('Make 2 takes').disabled).toBe(true)
   })
 
   it('tries a failed take again without a model, so it keeps its own', async () => {
     const page = render(
       view({ failed: [{ n: 2, message: 'out of memory', model: 'Careful · XL sft · 4B' }] }),
     )
-    await act(async () => page.button('Try again').click())
+    await click(page.button('Try again'))
     expect(posted).toEqual([{ retry: 2 }])
   })
 })

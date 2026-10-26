@@ -82,9 +82,10 @@ retroquest/                      ← user runs `audio-studio` here
    page (`music.refreshShared`), run in the project root, only when the user clicks one on the
    studio's page; what a command writes is the game's business, and the studio does not check it
    beyond reading the dialog, the loops or the stingers again.
-   Besides those paths, the studio writes the project file itself in one place only: the project's
-   own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3), and
-   the models: `narration.models` and `music.model`, from Setup's Models panel.
+   Besides those paths, the studio writes the project file itself in a few places only: the project's
+   own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3),
+   the models (`narration.models`, and `music.model`) from Setup's Models panel, the retirement
+   switch of `s1`, and `narration.quality.fishTier`.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 

@@ -162,10 +162,7 @@ const ModelsBody = z
 /** The stages whose model can be chosen. */
 const StageParam = z.enum(['audition', 'draft', 'final'])
 
-/** The music model the page chose, and the one it showed. */
-const MusicModelBody = z.object({ model: z.string().min(1), was: z.string().min(1) }).strict()
-
-/** The model the page chose for a stage, and the one it showed. */
+/** The model the page chose for a stage or for the music, and the one it showed. */
 const StageModelBody = z.object({ model: z.string().min(1), was: z.string().min(1) }).strict()
 
 /** Where an orphaned cue goes: a line key, or null to remove it. */
@@ -1108,7 +1105,7 @@ export function startServer({
       },
       '/api/music/model': {
         PUT: fromOwnPage(async (request) => {
-          const body = MusicModelBody.safeParse(await request.json().catch(() => null))
+          const body = StageModelBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
             return Response.json({ error: 'expected { model, was }' }, { status: 400 })
           }

@@ -126,6 +126,9 @@ export function musicTakeHash(inputs: Inputs): string {
     .slice(0, 16)
 }
 
+/** A model as a take's line says it: "Balanced · XL turbo · 4B". */
+const lineOf = (model: MusicModelId) => modelLine(musicModel(model).recipe)
+
 /** A failure as a sentence for the page. */
 function describeFailure(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
@@ -339,7 +342,7 @@ export function createMusicTakes({
           n: entry.n,
           state: entry.state as 'waiting' | 'making',
           elapsed: entry.state === 'making' ? Math.max(0, (now() - entry.startedAt) / 1000) : 0,
-          model: modelLine(musicModel(entry.model).recipe),
+          model: lineOf(entry.model),
           expected: musicModel(entry.model).seconds,
         }))
       const failed: FailedView[] = entries
@@ -347,7 +350,7 @@ export function createMusicTakes({
         .map((entry) => ({
           n: entry.n,
           message: entry.message,
-          model: modelLine(musicModel(entry.model).recipe),
+          model: lineOf(entry.model),
         }))
       const models = MUSIC_MODELS.map(({ id }) => ({ id, installed: generator.installed(id) }))
       // Not installed at all when no model is here: the first one that is says the rest (the

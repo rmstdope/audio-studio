@@ -38,6 +38,13 @@ export function TakesPanel({ track }: { track: TrackRow }) {
   const model = picked ?? view.defaultModel
   const here = view.models.find((m) => m.id === model)?.installed ?? false
   const canMake = generator.ok && here
+  // Only when some other model could be picked: with none installed, Setup is the answer above.
+  const missing =
+    !here && generator.ok ? (
+      <span className="takes-missing small" role="status">
+        {missingOnTrack(model)}
+      </span>
+    ) : null
   const menu: ReactNode = (
     <select
       className="takes-model"
@@ -123,11 +130,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
             </>
           )}
         </div>
-        {!here && (
-          <span className="takes-missing small" role="status">
-            {missingOnTrack(model)}
-          </span>
-        )}
+        {!none && missing}
         {none ? (
           <div className="takes-empty">
             <strong>No takes yet</strong>
@@ -147,6 +150,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
                 Make 2 takes
               </button>
             </div>
+            {missing}
           </div>
         ) : (
           <div className="takes">

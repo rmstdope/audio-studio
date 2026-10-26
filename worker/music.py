@@ -27,6 +27,7 @@ sys.stdout = sys.stderr
 CHECKPOINTS = os.environ["ACESTEP_CHECKPOINTS"]
 handlers = None
 loaded = None
+root = None
 
 
 def answer(payload: dict) -> None:
@@ -36,9 +37,10 @@ def answer(payload: dict) -> None:
 
 def load(dit_model: str, lm_model: str):
     """The two handlers for these models, made on first use and again when another pair is asked for."""
-    global handlers, loaded
+    global handlers, loaded, root
     if loaded != (dit_model, lm_model):
         handlers = None  # let go of the old pair before the new one is read
+        loaded = None  # so a failed load is tried again, never answered with nothing
         import gc
 
         gc.collect()
@@ -53,8 +55,9 @@ def load(dit_model: str, lm_model: str):
 
         # ACE-Step looks for its models in <project_root>/checkpoints: a folder that has one,
         # linking to wherever the models really are.
-        root = tempfile.mkdtemp(prefix="audio-studio-ace-")
-        os.symlink(CHECKPOINTS, os.path.join(root, "checkpoints"))
+        if root is None:
+            root = tempfile.mkdtemp(prefix="audio-studio-ace-")
+            os.symlink(CHECKPOINTS, os.path.join(root, "checkpoints"))
         dit = AceStepHandler()
         dit.initialize_service(project_root=root, config_path=dit_model, device="mps")
         lm = LLMHandler()

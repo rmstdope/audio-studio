@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { wavSeconds } from '../core/musicTake'
 import { readWav } from '../core/wav'
@@ -117,6 +117,13 @@ describe('aceStepReady', () => {
     })
     expect(aceStepReady(mac, dir, 'quick')).toMatchObject({
       message: expect.stringContaining('acestep-5Hz-lm-1.7B'),
+    })
+  })
+
+  it('writes the home folder as ~ in what is missing', () => {
+    const checkpoints = join(homedir(), '.audio-studio-no-such-checkpoints')
+    expect(aceStepReady(mac, checkpoints)).toMatchObject({
+      message: expect.stringContaining('missing from ~/.audio-studio-no-such-checkpoints.'),
     })
   })
 
