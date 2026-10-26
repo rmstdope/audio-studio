@@ -11,7 +11,12 @@ const { LineWords } = await import('./CueGaps')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-afterAll(() => GlobalRegistrator.unregister())
+const roots: { unmount: () => void }[] = []
+
+afterAll(() => {
+  act(() => roots.forEach((r) => r.unmount()))
+  GlobalRegistrator.unregister()
+})
 
 /** Renders a line with one cue placed at word 2, and opens the box on the slot at `at`. */
 function openBox(at: number): HTMLElement {
@@ -26,6 +31,7 @@ function openBox(at: number): HTMLElement {
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
+  roots.push(root)
   act(() =>
     root.render(
       createElement(
