@@ -94,3 +94,19 @@ export function menuEntry(id: MusicModelId, installed: boolean): string {
   const base = `${model.name} · ${model.generator} — about ${model.minutes} a take`
   return installed ? base : `${base} — not on this computer`
 }
+
+/** What an empty track says a take takes with this model: "about 3 minutes each". */
+export function eachWords(id: MusicModelId): string {
+  const { minutes } = musicModel(id)
+  return `about ${minutes === '1 min' ? '1 minute' : minutes.replace(' min', ' minutes')} each`
+}
+
+/** The line under a track's menu when it starts on a model this computer does not have. */
+export function missingOnTrack(id: MusicModelId): string {
+  return `${musicModel(id).name} isn't on this computer. Pick another model for these takes, or see Setup for how to download it.`
+}
+
+/** The heading of the box shown when saving the project's music model failed. */
+export function saveFailureHeading(id: MusicModelId): string {
+  return `${musicModel(id).name} could not be saved as the music model.`
+}

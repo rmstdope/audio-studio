@@ -2,7 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import {
   DEFAULT_MUSIC_MODEL,
   MUSIC_MODELS,
+  eachWords,
   menuEntry,
+  missingOnTrack,
+  saveFailureHeading,
   modelLine,
   modelOfRecipe,
   musicModel,
@@ -42,6 +45,22 @@ describe('the music models', () => {
     expect(menuEntry('careful', false)).toBe(
       'Careful · XL sft · 4B — about 7 min a take — not on this computer',
     )
+  })
+})
+
+describe('the words around the menus', () => {
+  test('how long each take takes, for the empty state', () => {
+    expect(eachWords('balanced')).toBe('about 3 minutes each')
+    expect(eachWords('quick')).toBe('about 1¼ minutes each')
+    expect(eachWords('quickest')).toBe('about 1 minute each')
+  })
+  test('a model missing here, under a track’s menu', () => {
+    expect(missingOnTrack('careful')).toBe(
+      "Careful isn't on this computer. Pick another model for these takes, or see Setup for how to download it.",
+    )
+  })
+  test('a failed save names the model picked', () => {
+    expect(saveFailureHeading('quick')).toBe('Quick could not be saved as the music model.')
   })
 })
 

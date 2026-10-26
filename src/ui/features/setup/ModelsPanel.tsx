@@ -11,7 +11,14 @@ import {
   type Stage,
 } from '../../../core/models'
 import { failureBody, RETIRED_MODEL } from '../../../core/retirement'
-import { useModelsView, useSetStageModel, type ModelsAnswer } from '../../api'
+import {
+  MUSIC_MODELS,
+  menuEntry,
+  musicModel,
+  saveFailureHeading,
+  type MusicModelId,
+} from '../../../core/musicModels'
+import { useModelsView, useSetMusicModel, useSetStageModel, type ModelsAnswer } from '../../api'
 import { Confirm } from '../../components/Confirm'
 import { markSwitched } from '../../retirementSwitched'
 import { focusAfter, rowReducer, startRow } from '../../modelsRow'
@@ -56,8 +63,10 @@ export function ModelsPanel() {
         Models
       </h2>
       <span className="muted">
-        Which Fish model records each stage. Saved in <span className="mono">{view.data.file}</span>{' '}
-        for everyone on the project.
+        {view.data.music
+          ? 'Which model records each stage of the voices, and which makes the music.'
+          : 'Which Fish model records each stage.'}{' '}
+        Saved in <span className="mono">{view.data.file}</span> for everyone on the project.
       </span>
       {busy && (
         <span className="models-busy" role="status">
@@ -75,7 +84,107 @@ export function ModelsPanel() {
           save={(model, was) => save.mutateAsync({ stage, model, was })}
         />
       ))}
+      {view.data.music && <MusicRow file={view.data.file} music={view.data.music} />}
     </section>
+  )
+}
+
+/**
+ * The Music row: the one model loops and stingers are made with unless a track asks for another,
+ * a menu of whole recipes saved in the project file as soon as one is picked (nothing has to be
+ * made again, so nothing is asked first). Failing is the voice rows' box.
+ */
+function MusicRow({ file, music }: { file: string; music: NonNullable<View['music']> }) {
+  const save = useSetMusicModel()
+  const [state, dispatch] = useReducer(rowReducer, startRow)
+  const retry = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLSelectElement>(null)
+  const previous = useRef(state)
+  const lastRun = useRef('')
+  const current = music.model
+  const pending = state.phase === 'saving'
+
+  useEffect(() => {
+    const target = focusAfter(previous.current, state)
+    previous.current = state
+    if (target === 'menu') requestAnimationFrame(() => menu.current?.focus())
+    else if (target === 'retry') retry.current?.focus()
+  }, [state])
+
+  // The save runs from the state's own transition, so Try again and a first pick share one path.
+  useEffect(() => {
+    const key = state.phase === 'saving' ? state.to : ''
+    if (key && key !== lastRun.current) {
+      save.mutateAsync({ model: key, was: current }).then(
+        (result) =>
+          result.ok
+            ? dispatch({ type: 'saved' })
+            : dispatch({ type: 'failed', reason: result.problems?.[0]?.message ?? 'refused' }),
+        (error: Error) => dispatch({ type: 'failed', reason: error.message }),
+      )
+    }
+    lastRun.current = key
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
+
+  const shown = (state.phase === 'saving' ? state.to : current) as MusicModelId
+  const here = music.installed[shown]
+  return (
+    <div className="mrow">
+      <div className="mname">Music</div>
+      <div className="mtx">
+        <span className="muted">
+          Loops and stingers, made on this computer. A track's takes can use another.
+        </span>
+        <div className="mmenu">
+          <select
+            ref={menu}
+            aria-label="Music model"
+            value={shown}
+            disabled={pending}
+            onChange={(event) =>
+              dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
+            }
+          >
+            {MUSIC_MODELS.map(({ id }) => (
+              <option key={id} value={id}>
+                {menuEntry(id, music.installed[id])}
+              </option>
+            ))}
+          </select>
+          <span className="free">Free</span>
+          {!here && <span className="warnline">not on this computer</span>}
+          {pending && <span className="muted">Saving…</span>}
+        </div>
+        {state.phase === 'failed' && (
+          <section className="notice notice-err" role="alert">
+            <div className="notice-text">
+              <strong>{saveFailureHeading(state.to as MusicModelId)}</strong>
+              <span className="muted">
+                <Mono text={failureBody(file, state.reason)} words={[file]} />
+              </span>
+            </div>
+            <div className="notice-actions">
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => dispatch({ type: 'keep' })}
+              >
+                Keep {musicModel(current).name}
+              </button>
+              <button
+                ref={retry}
+                className="btn btn-primary"
+                type="button"
+                onClick={() => dispatch({ type: 'retry' })}
+              >
+                Try again
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
   )
 }
 
