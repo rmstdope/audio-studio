@@ -1176,11 +1176,11 @@ Small, independently useful increments:
    with 48 GB, MLX). A 96-second take takes 2 to 4 minutes with it, about a minute more for the
    first after a start, while the models load; the length matters little (with the 1.7B language
    model a 10-second take took 33 to 55 seconds, a 96-second one 52 to 67). The 1.7B language model
-   takes about 1¼ minutes a take, and the XL sft model at 50 steps (where the turbo model allows
-   no more than 8) about 6½, up to three times turbo's wait. In a blind test of one brief, two
-   takes from each (indicative only), the two judged worst were the 1.7B's, and sft was not clearly better than
-   turbo. The quality is fair rather than good, so a board of several takes is how a good one is
-   found. The chosen models take about 28 GB on disk, downloaded once, outside the studio for now.
-   Not measured: whether the music follows the tempo and key asked for (ACE-Step takes them as
-   given), whether a crossfaded seam is heard (judged on the board), and stingers beyond a
-   fanfare and a game-over phrase.
+   takes about 1¼ minutes a take, and the XL sft model at 50 steps (where the turbo model allows no
+   more than 8) about 6½, up to three times turbo's wait. In a blind test of one brief, two takes
+   from each (indicative only), the two judged worst were the 1.7B's, and sft was not clearly better
+   than turbo. The quality is fair rather than good, so a board of several takes is how a good one
+   is found. The chosen models take about 28 GB on disk, downloaded once, outside the studio for
+   now. Not measured: whether the music follows the tempo and key asked for (ACE-Step takes them as
+   given), whether a crossfaded seam is heard (judged on the board), and stingers beyond a fanfare
+   and a game-over phrase.
