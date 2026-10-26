@@ -789,58 +789,63 @@ files) stay where they are, untouched. The music files join the Changes panel (�
 ```
 
 A track's id names its file, so it is a slug (`^[a-z0-9]+(-[a-z0-9]+)*$`); `kind` is `loop` or
-`stinger`. Tracks are always instrumental (no lyrics). Optional `bpm` and `key` ("D major") are passed to
-ACE-Step as its own fields, which it takes as given.
-The file is validated like every resource (problems with file and JSON path) and written through
-`writeAtomic` in stable key order.
+`stinger`. Tracks are always instrumental (no lyrics). Optional `bpm` and `key` ("D major") are
+passed to ACE-Step as its own fields; their allowed values are settled in 12.2. A stinger is at
+most 10 seconds. The file is validated like every resource (problems with file and JSON path) and
+written through `writeAtomic` in stable key order.
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
 
-- a **loop** is generated 16 seconds longer than `seconds`, since every take closes as a song does,
-  fading out over its last 2 to 10 seconds. It is cut where its loudness first drops 10 LU below
-  its whole, or at `seconds` + 4 if that comes first, and the 4 seconds after the cut are
-  crossfaded over its start, so the end runs into the beginning without a seam. The board plays
-  a loop take around its seam (its last seconds, then its first) as well as from the start;
-- a **stinger** is generated at ACE-Step's shortest, 10 seconds, and cut to `seconds` with a short
-  fade-out (a fanfare asked for at 10 seconds already ends after about 6).
+- a **loop** is generated 20 seconds longer than `seconds`, since every take closes as a song does
+  (in the spike, fading from 5 to 14 seconds before its end). It is cut at `seconds`, and the
+  4 seconds after the cut are crossfaded over its start, so the end runs into the beginning
+  without a seam and the loop is `seconds` long. The board plays a loop take around its seam (its
+  last seconds, then its first) as well as from the start;
+- a **stinger** is generated at ACE-Step's shortest, 10 seconds, and cut at its own end (its
+  trailing silence trimmed) or at `seconds`, whichever comes first, with a short fade-out (a
+  fanfare asked for at 10 seconds ends after about 6).
 
-A take is cached in `.audio-studio/music-takes/` by a hash of the model, brief, kind, seconds, bpm, key and
-seed. The same seed does not make the same take again on the Mac, so the cache keeps the take
-itself, and the seed only says where it came from. The board for a track lists its takes: **More takes** generates
-four more, **Drop** removes one, **Choose** writes one. The board is kept in
-`.audio-studio/music/<track>.json` (a track id is a safe file name). A dropped take is just gone: seeds don't come back, so
-nothing is ruled out.
+The numbers are where 12.4 starts; its tests fix them. A take is cached in
+`.audio-studio/music-takes/` by a hash of its inputs (model, brief, kind, seconds, bpm, key) and a
+take id. The same seed does not make the same take again on the Mac, so the cache keeps the take
+itself; the seed is kept with it, in the board and the lock, to say where it came from. The board
+for a track lists its takes: **More takes** generates more, **Drop** removes one, **Choose** writes
+one. The board is kept in `.audio-studio/music/<track>.json` (a track id is a safe file name). A
+dropped take is just gone: seeds don't come back, so nothing is ruled out.
 
 **Choose** levels the take to −20 LUFS as narration is levelled (`level.py`'s commands; RetroQuest
 levels its music to −20 today) and encodes it into the clips folder as `<track>.mp3`, stereo,
-160 kbps. Chrome decodes such an MP3 to its exact length, with no silence added, so the game loops
-it without a gap through Web Audio; a looping `<audio>` element is not relied on. Safari and
-Firefox are checked with the game (12.8). As for narration, the encoder
-writes a hidden temporary file in the clips folder, renamed into place together with the manifest
-and lock update. Clips are served only as plain files in the music clips folder.
+160 kbps, with ffmpeg's LAME encoder, which writes the header that tells a decoder how much
+padding to drop. Chrome decoded such an MP3 to its exact length (80.000 s, no silence at either
+end, against the WAV), so the game loops it without a gap through Web Audio; a looping `<audio>`
+element is not relied on. Safari and Firefox are checked with the game (12.8). As for narration,
+the encoder writes a hidden temporary file in the clips folder, renamed into place together with
+the manifest and lock update. Clips are served only as plain files in the music clips folder.
 
 **Manifest** (`manifest.json` in the clips folder, what the game reads): `{ track: { file,
 duration } }`, its layout fixed once written. The game decides where a track plays, so the kind is
 not in it.
 
 **Lock** (`music.lock.json`, committed, one entry per line): per track, the chosen take's model,
-seed, a hash of what went into it (model, brief, kind, seconds, bpm, key; not the output settings, as
-narration leaves the loudness out), and when it was chosen. Changing the model in the code marks
-every track `changed`, as a new model makes new music. A track is `missing` (nothing chosen,
-or its clip is gone from disk), `ok`, or `changed` (its brief, kind or length changed since its
+seed, a hash of what went into it (model, brief, kind, seconds, bpm, key; not the output settings,
+as narration leaves the loudness out), and when it was chosen. Changing the model in the code marks
+every track `changed`, as a new model makes new music. A track is `missing` (nothing chosen, or its
+clip is gone from disk), `ok`, or `changed` (its brief, kind, length, tempo or key changed since its
 take was chosen: the old one keeps playing in the game until another is chosen). A manifest entry
 without a lock entry is reported as a problem. Nothing is generated again by itself: a new brief
 means new takes. A track removed from the list leaves its clip as an orphan, removed after
 confirmation as narration's are.
 
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
-seconds and seed, so tests run with a fake. The real one is a Python worker (`worker/music.py`,
-ACE-Step through uv, the model loaded on the first take and stopped with the studio), the same
-JSON-lines protocol as the Whisper worker. It uses ACE-Step's XL turbo model with its 4B language
-model, which plans the piece (decision 5). Generation and Whisper share the one GPU and never run
-at once: side by side they fit, but Whisper runs 2.5 times slower and memory runs short. The setup checklist (§10) names ACE-Step's environment and its model
-download.
+kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Python worker
+(`worker/music.py`, ACE-Step through uv, the models loaded on the first take and stopped with the
+studio), the same JSON-lines protocol as the Whisper worker. It uses ACE-Step's XL turbo model with
+its 4B language model, which plans the piece (decision 5). ACE-Step and Whisper share the one GPU
+and never run at once: both workers stay loaded, and one queue runs a take or a Whisper check at a
+time. In the spike, with both loaded and running together, 42 of the 48 GB were in use (20 GB of it
+compressed), and Whisper ran 2.5 times slower. The setup checklist (§10) names ACE-Step's
+environment and its model download.
 
 ---
 
@@ -1115,7 +1120,7 @@ Small, independently useful increments:
     2. **Listen again**: a line checked before that has Whisper hear its clip again, from the
        comparison, keeping what it heard.
 12. **Music** (§8.5), in small pull requests:
-    1. **Spike** (built: §13, decision 5): ACE-Step 1.5
+    1. **Spike** (done: §13, decision 5): ACE-Step 1.5
        on the M5 Pro, run from Python through uv. Its models, sizes and licence of the weights;
        time and memory for a 90-second take with the larger and smaller model, also with Whisper
        loaded; quality of instrumental loops and stingers in RetroQuest's style; whether tempo
@@ -1135,7 +1140,9 @@ Small, independently useful increments:
        track's status on the Music page; the music files in the Changes panel.
     7. **Orphans**: a removed track's clip removed after confirmation.
     8. **RetroQuest** (in the game's repository, not the studio's): the game reads the music
-       manifest and plays a track per room or region, and the stingers.
+       manifest and plays a track per room or region, and the stingers, looping through Web Audio;
+       checked in Chrome, Safari and Firefox. If a browser pads an MP3, the manifest gains loop
+       points.
 13. **Languages** (epic as-170), in small pull requests:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's
@@ -1166,13 +1173,14 @@ Small, independently useful increments:
    code and weights are MIT-licensed, it makes full instrumental tracks, and it runs on Apple
    Silicon. Tracks are chosen from takes, since every generation differs.
 5. **ACE-Step's XL turbo model with the 4B language model** (the spike, 12.1, on a MacBook M5 Pro
-   with 48 GB, MLX). A 96-second take takes 2 to 4 minutes (the first after a start about a
-   minute more, loading the models); the 1.7B language model takes about 1¼ minutes, and the XL
-   sft model at 50 steps (the turbo model allows at most 8) about 6½. In a blind test of one brief,
-   two takes from each, the two judged worst were the 1.7B's, and sft was not clearly better than
-   turbo for nearly three times the wait. The quality is fair, "ok, not better": a board of
-   several takes is how a good one is found. Every take closes as a song does, the same seed does
-   not make the same take again, whether a crossfaded seam is heard is judged on the board, and
-   Chrome decodes MP3 to its
-   exact length (§8.5). The models are about 30 GB on disk; they are downloaded once, outside the
-   studio for now (Claude Code's sandbox cannot reach Hugging Face's download host).
+   with 48 GB, MLX). A 96-second take takes 2 to 4 minutes with it, about a minute more for the
+   first after a start, while the models load; the length matters little (with the 1.7B language
+   model a 10-second take took 33 to 55 seconds, a 96-second one 52 to 67). The 1.7B language model
+   takes about 1¼ minutes a take, and the XL sft model at 50 steps (where the turbo model allows
+   no more than 8) about 6½, up to three times turbo's wait. In a blind test of one brief, two takes from each
+   (indicative only), the two judged worst were the 1.7B's, and sft was not clearly better than
+   turbo. The quality is fair rather than good, so a board of several takes is how a good one is
+   found. The chosen models take about 28 GB on disk, downloaded once, outside the studio for now.
+   Not measured: whether the music follows the tempo and key asked for (ACE-Step takes them as
+   given), whether a crossfaded seam is heard (judged on the board), and stingers beyond a
+   fanfare and a game-over phrase.
