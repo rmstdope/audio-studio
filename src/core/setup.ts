@@ -45,7 +45,10 @@ export interface SetupFacts {
   /** The tier the user told the studio (`quality.fishTier`), or none. */
   fishTier: FishTier | null
   /** The music generator, or null when the project has no `music` section. */
-  music: { ready: { ok: true } | { ok: false; message: string }; checkpoints: string } | null
+  music: {
+    ready: { ok: true } | { ok: false; message: string; fix: string }
+    checkpoints: string
+  } | null
 }
 
 /**
@@ -246,6 +249,6 @@ function music(facts: SetupFacts): SetupCheck {
     title,
     state: 'problem',
     detail: facts.music.ready.message,
-    fix: `Put the models acestep-v15-xl-turbo and acestep-5Hz-lm-4B (about 28 GB) in ${facts.music.checkpoints}, or set ACESTEP_CHECKPOINTS to the folder that holds them.`,
+    fix: facts.music.ready.fix,
   }
 }

@@ -38,6 +38,7 @@ export async function checkSetup(
   const { project } = opened
   const root = dirname(projectFile)
   const { narration } = project
+  const checkpoints = aceStepCheckpoints(environment)
   const key = (await fishApiKey(root, project.env, environment)) !== null
   const facts: SetupFacts = {
     ffmpeg: machine.which('ffmpeg'),
@@ -51,12 +52,7 @@ export async function checkSetup(
     refreshDialog: Boolean(narration.refreshDialog),
     parallel: narration.quality.parallel,
     fishTier: narration.quality.fishTier ?? null,
-    music: project.music
-      ? {
-          ready: aceStepReady(machine, aceStepCheckpoints(environment)),
-          checkpoints: aceStepCheckpoints(environment),
-        }
-      : null,
+    music: project.music ? { ready: aceStepReady(machine, checkpoints), checkpoints } : null,
   }
   return { ok: true, checks: setupChecks(facts) }
 }

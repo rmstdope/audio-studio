@@ -21,13 +21,14 @@ const music = {
 }
 
 /** A generator that makes a tone as long as asked (at 1000 Hz), and fails for a brief saying "fail". */
-function fakeGenerator(ready: MusicReady = { ok: true }) {
+function fakeGenerator(ready: MusicReady = { ok: true }, failOn: number[] = []) {
   const requests: MusicRequest[] = []
   const generator: MusicGenerator = {
     ready: () => ready,
     async generate(request) {
       requests.push(request)
-      if (request.brief.includes('fail')) throw new Error('The music generator: out of memory')
+      if (failOn.includes(requests.length - 1) || request.brief.includes('fail'))
+        throw new Error('The music generator: out of memory')
       const samples = new Int16Array(request.seconds * 1000)
       samples.forEach((_, i) => (samples[i] = Math.round(8000 * Math.sin(i / 20))))
       const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
@@ -38,7 +39,7 @@ function fakeGenerator(ready: MusicReady = { ok: true }) {
   return { generator, requests }
 }
 
-function setup(ready?: MusicReady, extra: Record<string, unknown> = {}) {
+function setup(ready?: MusicReady, extra: Record<string, unknown> = {}, failOn: number[] = []) {
   const root = tempRepo({
     'audio-studio.json': projectJson({ music }),
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
@@ -46,7 +47,7 @@ function setup(ready?: MusicReady, extra: Record<string, unknown> = {}) {
     ...extra,
   })
   const file = join(root, 'audio-studio.json')
-  const { generator, requests } = fakeGenerator(ready)
+  const { generator, requests } = fakeGenerator(ready, failOn)
   let seed = 100
   const takes = createMusicTakes({
     generator,
@@ -134,23 +135,46 @@ describe('createMusicTakes', () => {
   })
 
   it('keeps the other takes when one fails, saying why', async () => {
-    const { root, file, takes, settled } = setup()
-    await setTrackBrief(file, 'hall', { brief: 'fail it' })
-    await takes.make(file, 'hall', { count: 1 })
-    const failed = await settled('hall')
-    if (!failed || !('ok' in failed) || !failed.ok) throw new Error('expected a view')
-    expect(failed.takes).toEqual([])
-    expect(failed.failed).toEqual([
-      { n: 1, message: 'The music generator stopped: out of memory.' },
-    ])
-    expect(existsSync(join(root, '.audio-studio'))).toBe(false)
+    const { file, takes, settled } = setup(undefined, {}, [1])
+    await takes.make(file, 'hall', { count: 2 })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(view.takes.map((t) => t.n)).toEqual([1])
+    expect(view.failed).toEqual([{ n: 2, message: 'The music generator stopped: out of memory.' }])
   })
 
-  it('retries the number that failed', async () => {
-    const { file, takes, settled } = setup()
+  it('says a crashed worker stopped, in the same words', async () => {
+    const crashing: MusicGenerator = {
+      ready: () => ({ ok: true }),
+      generate: () => Promise.reject(new Error('The music generator stopped (exit code 3): boom')),
+      close() {},
+    }
+    const { file } = setup()
+    const takes = createMusicTakes({ generator: crashing, queue: createSerial(), newSeed: () => 1 })
     await takes.make(file, 'hall', { count: 1 })
-    await settled('hall')
-    await setTrackBrief(file, 'hall', { brief: 'fail' })
+    let view = await takes.view(file, 'hall')
+    for (let i = 0; i < 100 && view && 'making' in view && view.making.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      view = await takes.view(file, 'hall')
+    }
+    expect(view).toMatchObject({
+      failed: [{ n: 1, message: 'The music generator stopped (exit code 3): boom.' }],
+    })
+  })
+
+  it('remembers what is being made across a reload of the module that made it', async () => {
+    const { file, takes } = setup()
+    await takes.make(file, 'hall', { count: 1 })
+    const again = createMusicTakes({
+      generator: fakeGenerator().generator,
+      queue: createSerial(),
+      newSeed: () => 1,
+    })
+    expect(await again.view(file, 'hall')).toMatchObject({ making: [{ n: 1 }] })
+  })
+
+  it('retries the number that failed, and the take then exists', async () => {
+    const { file, takes, requests, settled } = setup(undefined, {}, [0])
     await takes.make(file, 'hall', { count: 1 })
     const first = await settled('hall')
     if (!first || !('ok' in first) || !first.ok) throw new Error('expected a view')
@@ -158,11 +182,25 @@ describe('createMusicTakes', () => {
     expect(await takes.make(file, 'hall', { retry: 1 })).toEqual({ ok: true })
     const again = await settled('hall')
     if (!again || !('ok' in again) || !again.ok) throw new Error('expected a view')
-    expect(again.failed.map((f) => f.n)).toEqual([1])
+    expect(again.failed).toEqual([])
+    expect(again.takes.map((t) => t.n)).toEqual([1])
+    expect(requests).toHaveLength(2)
+  })
+
+  it('refuses a retry of a take that did not fail', async () => {
+    const { file, takes } = setup()
+    expect(await takes.make(file, 'hall', { retry: 9 })).toEqual({
+      ok: false,
+      message: 'Take 9 did not fail, so it is not made again.',
+    })
   })
 
   it('refuses to make takes when the generator is not ready, and says why', async () => {
-    const { file, takes } = setup({ ok: false, message: 'uv is not on the PATH.' })
+    const { file, takes } = setup({
+      ok: false,
+      message: 'uv is not on the PATH.',
+      fix: 'brew install uv',
+    })
     expect(await takes.make(file, 'hall', { count: 2 })).toEqual({
       ok: false,
       message: 'uv is not on the PATH.',
@@ -170,7 +208,7 @@ describe('createMusicTakes', () => {
     const view = await takes.view(file, 'hall')
     expect(view).toMatchObject({
       ok: true,
-      generator: { ok: false, message: 'uv is not on the PATH.' },
+      generator: { ok: false, message: 'uv is not on the PATH.', fix: 'brew install uv' },
     })
   })
 

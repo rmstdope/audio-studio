@@ -27,7 +27,7 @@ interface Running {
 
 /** How a line worker is run. */
 export interface LineWorkerOptions {
-  /** What the worker is called in messages ("Whisper", "The music generator"). */
+  /** What the worker is called, starting a sentence ("Whisper", "The music generator"). */
   name: string
   command: string[]
   /** How long one request may take before the worker is stopped. */
@@ -92,8 +92,7 @@ export function createLineWorker({
       if (worker === current) worker = null
       const why = stderr.trim().split('\n').slice(-3).join(' ')
       const reason =
-        current.stoppedBecause ??
-        `the ${name} worker stopped (exit code ${code})${why ? `: ${why}` : ''}`
+        current.stoppedBecause ?? `${name} stopped (exit code ${code})${why ? `: ${why}` : ''}`
       for (const waiting of current.pending.values()) waiting.reject(new Error(reason))
       current.pending.clear()
     })

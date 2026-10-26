@@ -138,7 +138,11 @@ describe('the requests-at-once check', () => {
 
     it('says what is missing and where the models go', () => {
       const music = {
-        ready: { ok: false as const, message: 'The models are not in /models: acestep-5Hz-lm-4B.' },
+        ready: {
+          ok: false as const,
+          message: 'The models are not in /models: acestep-5Hz-lm-4B.',
+          fix: 'Put the models acestep-v15-xl-turbo and acestep-5Hz-lm-4B in /models.',
+        },
         checkpoints: '/models',
       }
       expect(byId({ ...ready, music }).music).toMatchObject({
@@ -148,6 +152,14 @@ describe('the requests-at-once check', () => {
         fix: expect.stringContaining('acestep-v15-xl-turbo'),
       })
       expect(byId({ ...ready, music }).music!.fix).toContain('/models')
+    })
+
+    it('gives the fix the generator found, whatever the problem is', () => {
+      const music = {
+        ready: { ok: false as const, message: 'uv is not on the PATH.', fix: 'brew install uv' },
+        checkpoints: '/models',
+      }
+      expect(byId({ ...ready, music }).music).toMatchObject({ fix: 'brew install uv' })
     })
   })
 })

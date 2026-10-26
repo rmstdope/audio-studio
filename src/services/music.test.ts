@@ -27,7 +27,9 @@ describe('createAceStepWorker', () => {
   })
 
   it('reports a worker that dies, and starts a new one next time', async () => {
-    await expect(worker.generate({ ...request, brief: 'crash' })).rejects.toThrow('stopped')
+    await expect(worker.generate({ ...request, brief: 'crash' })).rejects.toThrow(
+      'The music generator stopped (exit code 3)',
+    )
     expect((await worker.generate({ ...request, brief: 'again' })).seed).toBe(42)
   })
 
@@ -54,9 +56,21 @@ describe('aceStepReady', () => {
 
   it('says what is missing, in the order it can be fixed', () => {
     const none = { ...mac, platform: 'linux' }
-    expect(aceStepReady(none, dir)).toMatchObject({ ok: false })
-    expect(aceStepReady({ ...mac, which: () => false }, dir)).toMatchObject({ ok: false })
-    expect(aceStepReady(mac, dir)).toMatchObject({ ok: false })
+    expect(aceStepReady(none, dir)).toMatchObject({
+      ok: false,
+      message: 'ACE-Step runs on macOS with Apple silicon only.',
+      fix: expect.stringContaining('Apple silicon'),
+    })
+    expect(aceStepReady({ ...mac, which: () => false }, dir)).toMatchObject({
+      ok: false,
+      message: 'uv is not on the PATH; it runs the music worker.',
+      fix: expect.stringContaining('brew install uv'),
+    })
+    expect(aceStepReady(mac, dir)).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('acestep-v15-xl-turbo'),
+      fix: expect.stringContaining('acestep-5Hz-lm-4B'),
+    })
   })
 
   it('is ready with both model folders in place', () => {

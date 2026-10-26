@@ -94,7 +94,8 @@ export interface MusicTakes {
  * The takes of the game's music: made by `generator` on the GPU `queue` (shared with Whisper),
  * shaped to what the game would play, and cached in `.audio-studio/music-takes/<track>/` as
  * `<hash>.<n>.wav` with its seed and waveform in `<hash>.<n>.json`. Takes waiting, being made and
- * failed are kept in memory, per track, for the page to poll; a take made is a file.
+ * failed are kept in memory, per track, for the page to poll (they survive a `--dev` reload, not a
+ * restart); a take made is a file.
  */
 export function createMusicTakes({
   generator,
@@ -107,7 +108,9 @@ export function createMusicTakes({
   now?: () => number
   newSeed?: () => number
 }): MusicTakes {
-  const active = new Map<string, Map<number, Entry>>()
+  // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
+  const shared = globalThis as { audioStudioMakingTakes?: Map<string, Map<number, Entry>> }
+  const active = (shared.audioStudioMakingTakes ??= new Map())
 
   async function resolve(projectFile: string, id: string) {
     const opened = await openProject(projectFile)

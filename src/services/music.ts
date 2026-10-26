@@ -23,7 +23,7 @@ export interface GeneratedTake {
 }
 
 /** Whether takes can be made on this computer, and what is missing if not. */
-export type MusicReady = { ok: true } | { ok: false; message: string }
+export type MusicReady = { ok: true } | { ok: false; message: string; fix: string }
 
 /** Makes music from a brief. Behind an interface, so tests use a fake. */
 export interface MusicGenerator {
@@ -54,32 +54,47 @@ export function aceStepCheckpoints(
  */
 export function aceStepReady(machine: Machine, checkpoints: string): MusicReady {
   if (!(machine.platform === 'darwin' && machine.arch === 'arm64')) {
-    return { ok: false, message: 'ACE-Step runs on macOS with Apple silicon only.' }
+    return {
+      ok: false,
+      message: 'ACE-Step runs on macOS with Apple silicon only.',
+      fix: 'Music is made on a Mac with Apple silicon; there is nothing to install on this computer.',
+    }
   }
   if (!machine.which('uv')) {
-    return { ok: false, message: 'uv is not on the PATH; it runs the music worker.' }
+    return {
+      ok: false,
+      message: 'uv is not on the PATH; it runs the music worker.',
+      fix: 'brew install uv (then start the studio again if it is still not found)',
+    }
   }
   const missing = ACE_STEP_MODELS.filter((model) => !existsSync(join(checkpoints, model)))
   return missing.length
-    ? { ok: false, message: `The models are not in ${checkpoints}: ${missing.join(', ')}.` }
+    ? {
+        ok: false,
+        message: `The models are not in ${checkpoints}: ${missing.join(', ')}.`,
+        fix: `Put the models ${ACE_STEP_MODELS.join(' and ')} (about 28 GB) in ${checkpoints}, or set ACESTEP_CHECKPOINTS to the folder that holds them.`,
+      }
     : { ok: true }
 }
 
 /**
  * The ACE-Step worker (worker/music.py: XL turbo with the 4B language model), started on the
  * first take so the models load once and stopped with the studio. It writes each take to a
- * temporary file the request names. `command` replaces the worker (tests).
+ * temporary file the request names. `command` replaces the worker (tests), and `ready` the check
+ * that it can run here.
  */
 export function createAceStepWorker({
   command = ['uv', 'run', '--quiet', '--script', MUSIC_WORKER],
   timeoutMs = 30 * 60_000,
   environment = process.env,
   machine = { which: (c) => Bun.which(c) !== null, platform: process.platform, arch: process.arch },
+  ready = () => aceStepReady(machine, aceStepCheckpoints(environment)),
 }: {
   command?: string[]
   timeoutMs?: number
   environment?: Record<string, string | undefined>
   machine?: Machine
+  ready?: () => MusicReady
 } = {}): MusicGenerator {
   const checkpoints = aceStepCheckpoints(environment)
   const worker = createLineWorker({
@@ -91,7 +106,7 @@ export function createAceStepWorker({
       `The music generator could not start (${why}). It needs uv and Apple silicon.`,
   })
   return {
-    ready: () => (command[0] === 'uv' ? aceStepReady(machine, checkpoints) : { ok: true }),
+    ready,
     async generate(request) {
       const out = join(tmpdir(), `audio-studio-music-${randomUUID()}.wav`)
       try {

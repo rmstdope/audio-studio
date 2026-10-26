@@ -3045,7 +3045,7 @@ describe('server, a track’s takes', () => {
     'tts/cast.json': { speakers: {} },
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
   })
-  let ready: { ok: true } | { ok: false; message: string } = { ok: true }
+  let ready: { ok: true } | { ok: false; message: string; fix: string } = { ok: true }
   const made: string[] = []
   const studio = startServer({
     projectFile: join(musicRoot, 'audio-studio.json'),
@@ -3094,12 +3094,21 @@ describe('server, a track’s takes', () => {
   })
 
   it('refuses with the reason when the generator is not ready', async () => {
-    ready = { ok: false, message: 'uv is not on the PATH.' }
+    ready = { ok: false, message: 'uv is not on the PATH.', fix: 'brew install uv' }
     const answer = await make({ count: 2 })
     expect(answer.status).toBe(409)
     expect(await answer.json()).toEqual({ ok: false, message: 'uv is not on the PATH.' })
     expect(made).toEqual([])
     ready = { ok: true }
+  })
+
+  it('refuses to make again a take that did not fail', async () => {
+    const answer = await make({ retry: 7 })
+    expect(answer.status).toBe(409)
+    expect(await answer.json()).toEqual({
+      ok: false,
+      message: 'Take 7 did not fail, so it is not made again.',
+    })
   })
 
   it('makes two takes, lists them, and serves each as a WAV', async () => {

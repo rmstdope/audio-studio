@@ -42,8 +42,12 @@ def load():
         from acestep.handler import AceStepHandler  # noqa: E402  (after the redirect)
         from acestep.llm_inference import LLMHandler  # noqa: E402
 
+        # ACE-Step looks for its models in <project_root>/checkpoints: a folder that has one,
+        # linking to wherever the models really are.
+        root = tempfile.mkdtemp(prefix="audio-studio-ace-")
+        os.symlink(CHECKPOINTS, os.path.join(root, "checkpoints"))
         dit = AceStepHandler()
-        dit.initialize_service(project_root=CHECKPOINTS, config_path=DIT_MODEL, device="mps")
+        dit.initialize_service(project_root=root, config_path=DIT_MODEL, device="mps")
         lm = LLMHandler()
         lm.initialize(checkpoint_dir=CHECKPOINTS, lm_model_path=LM_MODEL, backend="mlx", device="mps")
         handlers = (dit, lm)
@@ -75,7 +79,7 @@ def make(request: dict) -> int:
         # ACE-Step writes 48 kHz stereo; the studio reads 16-bit PCM.
         import soundfile
 
-        soundfile.write(request["out"], take["tensor"].T.numpy(), take["sample_rate"], subtype="PCM_16")
+        soundfile.write(request["out"], take["tensor"].cpu().T.numpy(), take["sample_rate"], subtype="PCM_16")
         return int(take["params"].get("seed", request["seed"]))
 
 
@@ -86,4 +90,4 @@ for line in sys.stdin:
     try:
         answer({"id": request["id"], "seed": make(request)})
     except Exception as error:  # report it to the studio, keep serving
-        answer({"id": request["id"], "error": f"{type(error).__name__}: {error}"})
+        answer({"id": request["id"], "error": str(error) or type(error).__name__})

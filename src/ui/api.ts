@@ -16,6 +16,7 @@ import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
 import type { MusicTakesView } from '../core/musicTake'
+import { takesAreBeingMade } from './musicTakesText'
 import type { MakeRequest, MakeResult } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
 import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
@@ -619,7 +620,7 @@ export function useMusicTakes(trackId: string) {
       ),
     refetchInterval: (query) => {
       const view = query.state.data
-      return view && 'making' in view && view.making.length ? 3000 : false
+      return view && 'making' in view && takesAreBeingMade(view.making) ? 3000 : false
     },
   })
 }
