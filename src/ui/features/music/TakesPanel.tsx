@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { changedLine, type TrackStatus } from '../../../core/musicChoose'
+import { changedLine } from '../../../core/musicChoose'
 import type { TrackRow } from '../../../core/music'
 import type { MakingView, MusicTakesView, TakeView } from '../../../core/musicTake'
 import {
@@ -18,6 +18,7 @@ import { useClipPlayer } from '../../components/useClipPlayer'
 import { clock } from '../../format'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
+import { InTheGame, Wave } from './InTheGame'
 
 /**
  * A track's Takes panel: the takes made, played from the start and, for a loop, around their
@@ -42,7 +43,10 @@ export function TakesPanel({ track }: { track: TrackRow }) {
   if (!('making' in view))
     return <Problems title="The takes could not be listed" problems={view.problems} />
   const { generator } = view
-  const none = !view.takes.length && !view.making.length
+  // The chosen take is shown above, in the game's block; the cards are the others.
+  const others = view.takes.filter((take) => !take.chosen)
+  const hasChosen = others.length < view.takes.length
+  const none = !others.length && !view.making.length
   const model = picked ?? view.defaultModel
   const here = view.models.find((m) => m.id === model)?.installed ?? false
   const length = { kind: view.kind, seconds: track.seconds }
@@ -125,6 +129,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
           </span>
         </div>
       )}
+      <InTheGame track={track} view={view} player={player} />
       <section className="panel takes-panel">
         <div className="takes-head">
           <h2>Takes</h2>
@@ -155,11 +160,13 @@ export function TakesPanel({ track }: { track: TrackRow }) {
         {!none && missing}
         {none ? (
           <div className="takes-empty">
-            <strong>No takes yet</strong>
+            <strong>{hasChosen ? 'No other takes yet' : 'No takes yet'}</strong>
             <span className="muted">
               Each take is new music made from the brief, {eachWords(model)}.
               <br />
-              Make a few, listen, and choose the one the game plays.
+              {hasChosen
+                ? 'Make a few more to compare with the chosen one.'
+                : 'Make a few, listen, and choose the one the game plays.'}
             </span>
             <div className="takes-make">
               {menu}
@@ -176,13 +183,12 @@ export function TakesPanel({ track }: { track: TrackRow }) {
           </div>
         ) : (
           <div className="takes">
-            {view.takes.map((take) => (
+            {others.map((take) => (
               <TakeCard
                 key={take.n}
                 trackId={trackId}
                 kind={view.kind}
                 take={take}
-                status={track.status}
                 player={player}
               />
             ))}
@@ -204,13 +210,11 @@ function TakeCard({
   trackId,
   kind,
   take,
-  status,
   player,
 }: {
   trackId: string
   kind: MusicTakesView['kind']
   take: TakeView
-  status: TrackStatus
   player: ReturnType<typeof useClipPlayer>
 }) {
   const id = `music-take-${trackId}-${take.n}`
@@ -220,15 +224,10 @@ function TakeCard({
   const seamPlaying = player.playing === seamId
   const drop = useDropTake(trackId)
   const choose = useChooseTake(trackId)
-  // The take the game plays; if its music file is gone it can be chosen again to write it.
-  const inGame = take.chosen && status !== 'missing'
-  const lost = take.chosen && status === 'missing'
   return (
-    <div className={inGame || lost ? 'take take-chosen' : 'take'}>
+    <div className="take">
       <div className="take-row">
         <b className="grow">Take {take.n}</b>
-        {inGame && <span className="chip chip-ok">chosen · in the game</span>}
-        {lost && <span className="chip chip-warn">music file missing</span>}
         {take.earlier && <span className="faint small">earlier brief</span>}
       </div>
       <span className="faint small">{take.model}</span>
@@ -241,12 +240,7 @@ function TakeCard({
         >
           {playing ? '■' : '▶'}
         </button>
-        <div className="wave" aria-hidden>
-          {take.peaks.map((peak, i) => (
-            <i key={i} style={{ height: `${Math.max(4, peak * 100)}%` }} />
-          ))}
-          {kind === 'loop' && <span className="seam" />}
-        </div>
+        <Wave peaks={take.peaks} loop={kind === 'loop'} />
         <span className="faint small">{clock(take.seconds)}</span>
       </div>
       <div className="take-row">
@@ -260,29 +254,25 @@ function TakeCard({
           </button>
         )}
         <span className="grow" />
-        {!take.chosen && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-small"
-            disabled={drop.isPending || choose.isPending}
-            onClick={() => {
-              if (playing || seamPlaying) player.stop()
-              drop.mutate(take.file)
-            }}
-          >
-            Drop
-          </button>
-        )}
-        {!inGame && (
-          <button
-            type="button"
-            className="btn btn-small"
-            disabled={choose.isPending}
-            onClick={() => choose.mutate(take.file)}
-          >
-            {choose.isPending ? 'Choosing…' : 'Choose'}
-          </button>
-        )}
+        <button
+          type="button"
+          className="btn btn-ghost btn-small"
+          disabled={drop.isPending || choose.isPending}
+          onClick={() => {
+            if (playing || seamPlaying) player.stop()
+            drop.mutate(take.file)
+          }}
+        >
+          Drop
+        </button>
+        <button
+          type="button"
+          className="btn btn-small"
+          disabled={choose.isPending}
+          onClick={() => choose.mutate(take.file)}
+        >
+          {choose.isPending ? 'Choosing…' : 'Choose'}
+        </button>
       </div>
       {(choose.isError || (choose.data && !choose.data.ok)) && (
         <span className="adopt-error">

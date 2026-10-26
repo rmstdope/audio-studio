@@ -687,6 +687,31 @@ describe('choosing a take', () => {
     expect(await takes.drop(file, 'hall', two!.file)).toEqual({ ok: true })
   })
 
+  it('takes the choice back: the files go, the take stays on the board to be chosen or dropped', async () => {
+    const { root, file, takes, settled } = await twoTakes()
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    const [one, two] = view.takes
+    await takes.choose(file, 'hall', one!.file)
+    expect(await takes.unchoose(file, 'hall')).toEqual({ ok: true })
+    expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(false)
+    expect(lockOf(root).hall).toBeUndefined()
+    const after = await takes.view(file, 'hall')
+    if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
+    expect(after.takes.map((t) => [t.n, t.chosen])).toEqual([
+      [1, false],
+      [2, false],
+    ])
+    expect(await takes.drop(file, 'hall', one!.file)).toEqual({ ok: true })
+    expect(await takes.choose(file, 'hall', two!.file)).toEqual({ ok: true })
+  })
+
+  it('refuses to un-choose a track with no chosen take, and an unknown track', async () => {
+    const { file, takes } = await twoTakes()
+    expect(await takes.unchoose(file, 'hall')).toMatchObject({ ok: false })
+    expect(await takes.unchoose(file, 'nope')).toBeNull()
+  })
+
   it('leaves the track changed when a take from an earlier brief is chosen', async () => {
     const { root, file, takes, settled } = await twoTakes()
     await setTrackBrief(file, 'hall', { brief: 'a new brief' })

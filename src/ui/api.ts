@@ -677,6 +677,31 @@ export function useMakeTakes(trackId: string) {
   })
 }
 
+/**
+ * Takes a track's chosen take back (its music file is deleted from the game), then reloads its
+ * takes and the project, whose Music pages show the track's status.
+ */
+export function useUnchooseTake(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/unchoose`, {
+        method: 'POST',
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`un-choosing the take answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<ChooseResult>
+    },
+    // Both reloaded before the question closes, so the block never shows the old choice.
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
+      ]),
+  })
+}
+
 /** Takes a take off a track's board, then reloads its takes. */
 export function useDropTake(trackId: string) {
   const client = useQueryClient()

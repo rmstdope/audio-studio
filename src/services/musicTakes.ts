@@ -32,7 +32,7 @@ import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
 import { gpuQueue, GPU } from './gpu'
 import type { MusicGenerator } from './music'
-import { commitChoice, readChosen, type CommitResult } from './musicClips'
+import { commitChoice, readChosen, uncommitChoice, type CommitResult } from './musicClips'
 import { readMusic } from './musicLists'
 import { createSerial, type Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
@@ -150,6 +150,8 @@ export interface MusicTakes {
   stop(projectFile: string, id: string): Promise<StopResult>
   /** Makes a take on the board the track's music: levelled, encoded, with the manifest and lock. */
   choose(projectFile: string, id: string, name: string): Promise<ChooseResult>
+  /** Takes the track's chosen take back: its music file, manifest entry and lock entry go; the take stays on the board. */
+  unchoose(projectFile: string, id: string): Promise<ChooseResult>
   /** Takes a take off the board and deletes its file; the chosen take stays. */
   drop(projectFile: string, id: string, name: string): Promise<DropResult>
   /** What is being made in the project, by track, for the lists' status. */
@@ -497,6 +499,15 @@ export function createMusicTakes({
           encode,
         })
       })
+    },
+
+    async unchoose(projectFile, id) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      // In the board's turn, like Choose and Drop, so none slips between another's check and write.
+      return boards.run(`${projectFile}\0${id}`, () =>
+        uncommitChoice({ root: found.root, projectFile, music: found.music, id }),
+      )
     },
 
     async making(projectFile) {

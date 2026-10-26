@@ -3332,6 +3332,22 @@ describe('server, choosing a take', () => {
     expect(drop.status).toBe(409)
   })
 
+  it('takes a choice back from the studio’s own page only, and the track is not chosen again', async () => {
+    const path = '/api/music/tracks/hall/unchoose'
+    expect((await post(path, {}, 'https://evil.example')).status).toBe(403)
+    expect((await post('/api/music/tracks/nobody/unchoose', {})).status).toBe(404)
+    expect(await post(path, {}).then((r) => r.json())).toEqual({ ok: true })
+    expect(existsSync(join(musicRoot, 'audio/music/hall.mp3'))).toBe(false)
+    expect((await post(path, {})).status).toBe(409)
+    const summary = await (await fetch(at('/api/project'))).json()
+    expect(summary.summary.music.lists[0].tracks[0].status).toBe('not-chosen')
+    const file = (await (await fetch(at('/api/music/tracks/hall/takes'))).json()).takes[0].file
+    // Put the choice back for the tests that follow.
+    expect(await post('/api/music/tracks/hall/choose', { file }).then((r) => r.json())).toEqual({
+      ok: true,
+    })
+  })
+
   it('serves the music clip as a plain file and nothing else of the folder', async () => {
     expect((await fetch(at('/api/music/clips/hall.mp3'))).status).toBe(200)
     expect((await fetch(at('/api/music/clips/manifest.json'))).status).toBe(404)

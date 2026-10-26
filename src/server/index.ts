@@ -990,6 +990,13 @@ export function startServer({
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
+      '/api/music/tracks/:id/unchoose': {
+        POST: fromOwnPage(async (request) => {
+          const result = await musicTakes.unchoose(projectFile, request.params.id)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
       '/api/music/tracks/:id/remove': {
         POST: fromOwnPage(async (request) => {
           const result = await removeOrphan(projectFile, request.params.id)

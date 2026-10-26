@@ -31,6 +31,7 @@ const track: TrackRow = {
   changed: [],
   chosenAt: '2026-10-01T10:00:00.000Z',
   current: { kind: 'take', take: 1, exists: true },
+  gameFile: null,
 }
 
 const everyModel = (missing: string[] = []) =>
@@ -53,7 +54,7 @@ const view = (over: Partial<MusicTakesView> = {}): MusicTakesView => ({
       seed: 1,
       peaks: [0.5],
       earlier: false,
-      chosen: true,
+      chosen: false,
       model: 'Balanced · XL turbo · 4B',
     },
   ],

@@ -123,6 +123,8 @@ export interface TrackRow {
   chosenAt: string | null
   /** What the play button plays now. */
   current: CurrentMusic
+  /** The music file the game itself plays for the track, whatever is chosen; null when it names none. */
+  gameFile: { file: string; exists: boolean } | null
 }
 
 /** What the lock says of a track and whether its music file is on disk. */
@@ -322,6 +324,7 @@ function rowOf(
       : track.file
         ? { kind: 'game', file: track.file, exists: gameFileExists }
         : { kind: 'none' },
+    gameFile: track.file ? { file: track.file, exists: gameFileExists } : null,
   }
 }
 
