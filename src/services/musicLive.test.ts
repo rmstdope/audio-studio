@@ -27,6 +27,7 @@ describe.skipIf(!live)('createAceStepWorker, with real ACE-Step (macOS)', () => 
           bpm: null,
           key: null,
           seed: 7,
+          model: 'balanced',
         })
         expect(take.seed).toBe(7)
         expect(wavSeconds(readWav(take.wav))).toBeGreaterThan(9)

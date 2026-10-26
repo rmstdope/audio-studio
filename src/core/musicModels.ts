@@ -77,7 +77,9 @@ export function musicModel(id: MusicModelId): MusicModel {
 
 /** The model a take's stored recipe names: none stored is Balanced's; one not known is null. */
 export function modelOfRecipe(recipe: string | undefined): MusicModel | null {
-  return MUSIC_MODELS.find((model) => model.recipe === (recipe ?? musicModel('balanced').recipe)) ?? null
+  return (
+    MUSIC_MODELS.find((model) => model.recipe === (recipe ?? musicModel('balanced').recipe)) ?? null
+  )
 }
 
 /** What a take says it was made with: "Balanced · XL turbo · 4B", or the recipe as stored if not known. */

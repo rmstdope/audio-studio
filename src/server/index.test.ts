@@ -3135,6 +3135,7 @@ describe('server, a track’s takes', () => {
     transcriber: null,
     music: {
       ready: () => ready,
+      installed: () => true,
       async generate(request) {
         made.push(request.brief)
         const samples = new Int16Array(request.seconds * 1000).fill(4000)
@@ -3278,6 +3279,7 @@ describe('server, choosing a take', () => {
     transcriber: null,
     music: {
       ready: () => ({ ok: true }),
+      installed: () => true,
       async generate(request) {
         const samples = new Int16Array(request.seconds * 1000).fill(4000)
         const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }

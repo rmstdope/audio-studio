@@ -30,12 +30,7 @@ describe('changedFields', () => {
 
   it('names what differs, in the order brief, length, tempo, key', () => {
     const now = { ...inputs, key: 'A minor', brief: 'bold', seconds: 90, bpm: null }
-    expect(changedFields(entry({ model: 'old' }), now)).toEqual([
-      'brief',
-      'length',
-      'tempo',
-      'key',
-    ])
+    expect(changedFields(entry({ model: 'old' }), now)).toEqual(['brief', 'length', 'tempo', 'key'])
   })
 })
 

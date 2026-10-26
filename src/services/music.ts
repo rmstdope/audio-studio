@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DEFAULT_MUSIC_MODEL, musicModel, type MusicModelId } from '../core/musicModels'
 import { createLineWorker } from './lineWorker'
 import type { Machine } from './setup'
 
@@ -14,6 +15,8 @@ export interface MusicRequest {
   bpm: number | null
   key: string | null
   seed: number
+  /** The music model to make it with. */
+  model: MusicModelId
 }
 
 /** One take as generated: a WAV, and the seed it was made from. */
@@ -27,8 +30,10 @@ export type MusicReady = { ok: true } | { ok: false; message: string; fix: strin
 
 /** Makes music from a brief. Behind an interface, so tests use a fake. */
 export interface MusicGenerator {
-  /** Whether a take can be made now: the machine, uv and the models are there. */
-  ready(): MusicReady
+  /** Whether a take can be made now with this model: the machine, uv and its folders are there. */
+  ready(model: MusicModelId): MusicReady
+  /** Whether this model's folders are on this computer. */
+  installed(model: MusicModelId): boolean
   /**
    * One take of the brief; slow (minutes), and the first one loads the models. Aborting `signal`
    * ends it at once (Stop), and it rejects.
@@ -41,8 +46,16 @@ export interface MusicGenerator {
 /** The worker script, run with uv (which installs ACE-Step the first time). */
 export const MUSIC_WORKER = join(import.meta.dir, '../../worker/music.py')
 
-/** The two model folders ACE-Step needs in its checkpoints folder. */
-export const ACE_STEP_MODELS = ['acestep-v15-xl-turbo', 'acestep-5Hz-lm-4B'] as const
+/** The folders of a model's that are not in `checkpoints`. */
+export function missingFolders(checkpoints: string, model: MusicModelId): string[] {
+  return musicModel(model).folders.filter((folder) => !existsSync(join(checkpoints, folder)))
+}
+
+/** A path with the home folder written as `~`, as a person would name it. */
+function withHome(path: string): string {
+  const home = homedir()
+  return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path
+}
 
 /** Where ACE-Step's models are looked for: `ACESTEP_CHECKPOINTS`, else a folder in the user's cache. */
 export function aceStepCheckpoints(
@@ -53,9 +66,13 @@ export function aceStepCheckpoints(
 
 /**
  * Whether ACE-Step can run here, and the first thing that stops it if not: Apple silicon, uv,
- * the models in `checkpoints`.
+ * the folders of `model` (the project's, by default Balanced) in `checkpoints`.
  */
-export function aceStepReady(machine: Machine, checkpoints: string): MusicReady {
+export function aceStepReady(
+  machine: Machine,
+  checkpoints: string,
+  model: MusicModelId = DEFAULT_MUSIC_MODEL,
+): MusicReady {
   if (!(machine.platform === 'darwin' && machine.arch === 'arm64')) {
     return {
       ok: false,
@@ -70,18 +87,18 @@ export function aceStepReady(machine: Machine, checkpoints: string): MusicReady 
       fix: 'brew install uv (then start the studio again if it is still not found)',
     }
   }
-  const missing = ACE_STEP_MODELS.filter((model) => !existsSync(join(checkpoints, model)))
-  return missing.length
-    ? {
-        ok: false,
-        message: `The models are not in ${checkpoints}: ${missing.join(', ')}.`,
-        fix: `Put the models ${ACE_STEP_MODELS.join(' and ')} (about 28 GB) in ${checkpoints}, or set ACESTEP_CHECKPOINTS to the folder that holds them.`,
-      }
-    : { ok: true }
+  const missing = missingFolders(checkpoints, model)
+  if (!missing.length) return { ok: true }
+  const { name, folders, download } = musicModel(model)
+  return {
+    ok: false,
+    message: `The project's music model, ${name}, is not on this computer: ${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} missing from ${withHome(checkpoints)}.`,
+    fix: `Put the models ${folders.join(' and ')}${download ? ` (${download})` : ''} in ${checkpoints}, or set ACESTEP_CHECKPOINTS to the folder that holds them.`,
+  }
 }
 
 /**
- * The ACE-Step worker (worker/music.py: XL turbo with the 4B language model), started on the
+ * The ACE-Step worker (worker/music.py: the model each request names), started on the
  * first take so the models load once and stopped with the studio. It writes each take to a
  * temporary file the request names. `command` replaces the worker (tests), and `ready` the check
  * that it can run here.
@@ -91,13 +108,13 @@ export function createAceStepWorker({
   timeoutMs = 30 * 60_000,
   environment = process.env,
   machine = { which: (c) => Bun.which(c) !== null, platform: process.platform, arch: process.arch },
-  ready = () => aceStepReady(machine, aceStepCheckpoints(environment)),
+  ready = (model) => aceStepReady(machine, aceStepCheckpoints(environment), model),
 }: {
   command?: string[]
   timeoutMs?: number
   environment?: Record<string, string | undefined>
   machine?: Machine
-  ready?: () => MusicReady
+  ready?: (model: MusicModelId) => MusicReady
 } = {}): MusicGenerator {
   const checkpoints = aceStepCheckpoints(environment)
   const worker = createLineWorker({
@@ -112,7 +129,8 @@ export function createAceStepWorker({
   })
   return {
     ready,
-    async generate(request, signal) {
+    installed: (model) => missingFolders(checkpoints, model).length === 0,
+    async generate({ model, ...request }, signal) {
       const out = join(tmpdir(), `audio-studio-music-${randomUUID()}.wav`)
       // The worker makes one take at a time, so ending this one means stopping the worker; the
       // next take starts it again.
@@ -120,7 +138,12 @@ export function createAceStepWorker({
       signal?.addEventListener('abort', stop, { once: true })
       try {
         if (signal?.aborted) throw new Error('The music generator was stopped.')
-        const answer = await worker.request({ ...request, out })
+        const answer = await worker.request({
+          ...request,
+          dit: musicModel(model).folders[0],
+          lm: musicModel(model).folders[1],
+          out,
+        })
         return { wav: new Uint8Array(await readFile(out)), seed: Number(answer.seed) }
       } finally {
         signal?.removeEventListener('abort', stop)

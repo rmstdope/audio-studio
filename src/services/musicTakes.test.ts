@@ -9,8 +9,9 @@ import { createSerial } from './serial'
 import type { MusicGenerator, MusicReady, MusicRequest } from './music'
 import type { Encoder } from './audio'
 import { loadProject } from './workspace'
-import { boardQueue, createMusicTakes } from './musicTakes'
+import { boardQueue, createMusicTakes, musicTakeHash } from './musicTakes'
 import { GPU } from './gpu'
+import { createHash } from 'node:crypto'
 
 const music = {
   paths: {
@@ -28,10 +29,12 @@ function fakeGenerator(
   ready: MusicReady = { ok: true },
   failOn: number[] = [],
   gate?: Promise<void>,
+  missing: string[] = [],
 ) {
   const requests: MusicRequest[] = []
   const generator: MusicGenerator = {
     ready: () => ready,
+    installed: (model) => !missing.includes(model),
     async generate(request) {
       requests.push(request)
       await gate
@@ -52,6 +55,7 @@ function setup(
   extra: Record<string, unknown> = {},
   failOn: number[] = [],
   gate?: Promise<void>,
+  missing: string[] = [],
 ) {
   const root = tempRepo({
     'audio-studio.json': projectJson({ music }),
@@ -60,7 +64,7 @@ function setup(
     ...extra,
   })
   const file = join(root, 'audio-studio.json')
-  const { generator, requests } = fakeGenerator(ready, failOn, gate)
+  const { generator, requests } = fakeGenerator(ready, failOn, gate, missing)
   let seed = 100
   const encode: Encoder = async (_wav, out) => {
     mkdirSync(dirname(out), { recursive: true })
@@ -349,12 +353,19 @@ describe('createMusicTakes', () => {
     const view = await settled('hall')
     if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
     expect(view.takes.map((t) => t.n)).toEqual([1])
-    expect(view.failed).toEqual([{ n: 2, message: 'The music generator stopped: out of memory.' }])
+    expect(view.failed).toEqual([
+      {
+        n: 2,
+        message: 'The music generator stopped: out of memory.',
+        model: 'Balanced · XL turbo · 4B',
+      },
+    ])
   })
 
   it('says a crashed worker stopped, in the same words', async () => {
     const crashing: MusicGenerator = {
       ready: () => ({ ok: true }),
+      installed: () => true,
       generate: () => Promise.reject(new Error('The music generator stopped (exit code 3): boom')),
       close() {},
     }
@@ -402,6 +413,115 @@ describe('createMusicTakes', () => {
     expect(again.failed).toEqual([])
     expect(again.takes.map((t) => t.n)).toEqual([1])
     expect(requests).toHaveLength(2)
+  })
+
+  it('keeps every take hash as it was before models were chosen', () => {
+    const inputs = { brief: 'warm lute', kind: 'loop', seconds: 30, bpm: null, key: null } as const
+    const before = createHash('sha256')
+      .update(JSON.stringify(['acestep-v15-xl-turbo+lm-4B', 'warm lute', 'loop', 30, null, null]))
+      .digest('hex')
+      .slice(0, 16)
+    expect(musicTakeHash(inputs)).toBe(before)
+  })
+
+  it('makes takes with the model asked for, and records it on each take', async () => {
+    const { file, takes, requests, settled } = setup()
+    expect(await takes.make(file, 'hall', { count: 1, model: 'quick' })).toEqual({ ok: true })
+    await takes.make(file, 'hall', { count: 1 })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(requests.map((r) => r.model)).toEqual(['quick', 'balanced'])
+    expect(view.takes.map((t) => t.model)).toEqual([
+      'Quick · XL turbo · 1.7B',
+      'Balanced · XL turbo · 4B',
+    ])
+    // A take of another model is not "earlier": only a changed brief, length, tempo or key is.
+    expect(view.takes.map((t) => t.earlier)).toEqual([false, false])
+  })
+
+  it('uses the project’s model when none is asked for', async () => {
+    const { file, takes, requests, settled } = setup(undefined, {
+      'audio-studio.json': projectJson({ music: { ...music, model: 'quickest' } }),
+    })
+    await takes.make(file, 'hall', { count: 1 })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(requests[0]!.model).toBe('quickest')
+    expect(view.defaultModel).toBe('quickest')
+  })
+
+  it('shows a take made before models were chosen as Balanced', async () => {
+    const { root, file, takes, settled } = setup()
+    await takes.make(file, 'hall', { count: 1 })
+    await settled('hall')
+    const board = join(root, '.audio-studio/music/hall.json')
+    const saved = JSON.parse(readFileSync(board, 'utf8'))
+    delete saved.takes[0].model
+    writeFileSync(board, JSON.stringify(saved))
+    const view = await takes.view(file, 'hall')
+    expect(view).toMatchObject({ takes: [{ model: 'Balanced · XL turbo · 4B' }] })
+  })
+
+  it('refuses a model that is not on this computer, and says which models are', async () => {
+    const { file, takes } = setup(undefined, {}, [], undefined, ['careful'])
+    expect(await takes.make(file, 'hall', { count: 1, model: 'careful' })).toEqual({
+      ok: false,
+      message: 'Careful is not on this computer.',
+    })
+    const view = await takes.view(file, 'hall')
+    expect(view).toMatchObject({
+      ok: true,
+      generator: { ok: true },
+      defaultModel: 'balanced',
+      models: [
+        { id: 'balanced', installed: true },
+        { id: 'quick', installed: true },
+        { id: 'quickest', installed: true },
+        { id: 'careful', installed: false },
+      ],
+    })
+  })
+
+  it('says the generator is not installed only when no model is here', async () => {
+    const all = ['balanced', 'quick', 'quickest', 'careful']
+    const { file, takes } = setup(
+      { ok: false, message: 'none here', fix: 'download' },
+      {},
+      [],
+      undefined,
+      all,
+    )
+    expect(await takes.view(file, 'hall')).toMatchObject({
+      generator: { ok: false, message: 'none here' },
+    })
+  })
+
+  it('remakes a failed take with the model it was asked with, and times each by its model', async () => {
+    const { file, takes, requests, settled } = setup(undefined, {}, [0])
+    await takes.make(file, 'hall', { count: 1, model: 'careful' })
+    await settled('hall')
+    const failed = await takes.view(file, 'hall')
+    expect(failed).toMatchObject({ failed: [{ n: 1, model: 'Careful · XL sft · 4B' }] })
+    await takes.make(file, 'hall', { retry: 1 })
+    await settled('hall')
+    expect(requests.map((r) => r.model)).toEqual(['careful', 'careful'])
+  })
+
+  it('counts the time left of each take by its own model', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes } = setup(undefined, {}, [], gate)
+    await takes.make(file, 'hall', { count: 1, model: 'careful' })
+    await takes.make(file, 'hall', { count: 1, model: 'quickest' })
+    const view = await takes.view(file, 'hall')
+    expect(view).toMatchObject({
+      making: [
+        { n: 1, model: 'Careful · XL sft · 4B', expected: 420 },
+        { n: 2, model: 'Quickest · Turbo · 1.7B', expected: 60 },
+      ],
+    })
+    expect(await takes.making(file)).toEqual({ hall: { takes: 2, left: 480 } })
+    release()
   })
 
   it('refuses a retry of a take that did not fail', async () => {

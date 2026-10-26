@@ -5,11 +5,12 @@
 """Audio Studio's music worker: makes one take of a track with ACE-Step 1.5, the models loaded once.
 
 Reads one JSON request per line on stdin: {"id": "...", "brief": "...", "kind": "loop|stinger",
-"seconds": 100, "bpm": 84 | null, "key": "D major" | null, "seed": 123, "out": "take.wav"}.
+"seconds": 100, "bpm": 84 | null, "key": "D major" | null, "seed": 123, "dit": "acestep-v15-xl-turbo", "lm": "acestep-5Hz-lm-4B", "out": "take.wav"}.
 Writes one JSON answer per line on stdout: {"id": "...", "seed": 123} after writing the take to
 `out` as a 16-bit WAV, or {"id": "...", "error": "..."}. Anything the libraries print goes to
-stderr, so stdout carries only answers. The models (XL turbo and the 4B language model) are read
-from $ACESTEP_CHECKPOINTS and loaded on the first request. Always instrumental.
+stderr, so stdout carries only answers. The two models a request names (`dit` and `lm`, folders in
+$ACESTEP_CHECKPOINTS) are loaded on the first request that needs them, and swapped for another pair
+when a request names one. Always instrumental.
 """
 
 import json
@@ -24,10 +25,8 @@ os.dup2(2, 1)
 sys.stdout = sys.stderr
 
 CHECKPOINTS = os.environ["ACESTEP_CHECKPOINTS"]
-DIT_MODEL = "acestep-v15-xl-turbo"
-LM_MODEL = "acestep-5Hz-lm-4B"
-
 handlers = None
+loaded = None
 
 
 def answer(payload: dict) -> None:
@@ -35,10 +34,20 @@ def answer(payload: dict) -> None:
     answers.flush()
 
 
-def load():
-    """The two handlers, made on first use."""
-    global handlers
-    if handlers is None:
+def load(dit_model: str, lm_model: str):
+    """The two handlers for these models, made on first use and again when another pair is asked for."""
+    global handlers, loaded
+    if loaded != (dit_model, lm_model):
+        handlers = None  # let go of the old pair before the new one is read
+        import gc
+
+        gc.collect()
+        try:
+            import torch
+
+            torch.mps.empty_cache()
+        except Exception:
+            pass
         from acestep.handler import AceStepHandler  # noqa: E402  (after the redirect)
         from acestep.llm_inference import LLMHandler  # noqa: E402
 
@@ -47,10 +56,11 @@ def load():
         root = tempfile.mkdtemp(prefix="audio-studio-ace-")
         os.symlink(CHECKPOINTS, os.path.join(root, "checkpoints"))
         dit = AceStepHandler()
-        dit.initialize_service(project_root=root, config_path=DIT_MODEL, device="mps")
+        dit.initialize_service(project_root=root, config_path=dit_model, device="mps")
         lm = LLMHandler()
-        lm.initialize(checkpoint_dir=CHECKPOINTS, lm_model_path=LM_MODEL, backend="mlx", device="mps")
+        lm.initialize(checkpoint_dir=CHECKPOINTS, lm_model_path=lm_model, backend="mlx", device="mps")
         handlers = (dit, lm)
+        loaded = (dit_model, lm_model)
     return handlers
 
 
@@ -58,7 +68,7 @@ def make(request: dict) -> int:
     """Generates one take into request["out"]; returns the seed it was made from."""
     from acestep.inference import GenerationConfig, GenerationParams, generate_music
 
-    dit, lm = load()
+    dit, lm = load(request["dit"], request["lm"])
     params = GenerationParams(
         caption=request["brief"],
         lyrics="[Instrumental]",

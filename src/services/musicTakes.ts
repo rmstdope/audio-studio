@@ -16,6 +16,13 @@ import {
   type MusicTakesView,
   type TakeView,
 } from '../core/musicTake'
+import {
+  DEFAULT_MUSIC_MODEL,
+  MUSIC_MODELS,
+  modelLine,
+  musicModel,
+  type MusicModelId,
+} from '../core/musicModels'
 import { trackFor, type TrackRow } from '../core/music'
 import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
@@ -32,9 +39,6 @@ import { openProject, type ProjectFailure } from './workspace'
 /** Where a project's music takes are cached, one folder per track. */
 export const MUSIC_TAKES_DIR = '.audio-studio/music-takes'
 
-/** About how long a take takes, in seconds (§13 decision 5: 2 to 4 minutes), for the progress shown. */
-export const EXPECTED_TAKE_SECONDS = 180
-
 /** Where a track's board is saved: one file per track (a track id is a safe file name). */
 export const MUSIC_BOARD_DIR = '.audio-studio/music'
 
@@ -48,7 +52,7 @@ const WAVEFORM_BARS = 120
 const TAKE_FILE = /^([0-9a-f]{16})\.(\d+)\.wav$/
 
 /** What to make: this many new takes, or the failed take with this number again. */
-export type MakeRequest = { count: number } | { retry: number }
+export type MakeRequest = { count: number; model?: MusicModelId } | { retry: number }
 
 /** What asking for takes answered; null for a track the project does not list. */
 export type MakeResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
@@ -105,9 +109,15 @@ interface Entry {
   hash: string
   /** Ends the take while it is being made (Stop). */
   stop?: AbortController
+  /** The music model it is made with; a retry makes it again with the same. */
+  model: MusicModelId
 }
 
-/** A hash of what went into a take: the model and the track's inputs. */
+/**
+ * A hash of what went into a take: the track's inputs. It begins with Balanced's recipe whatever
+ * model makes the take, as it did when there was one model, so no fingerprint already kept
+ * changes and choosing another model never makes a take "earlier".
+ */
 export function musicTakeHash(inputs: Inputs): string {
   const { brief, kind, seconds, bpm, key } = inputs
   return createHash('sha256')
@@ -197,6 +207,7 @@ export function createMusicTakes({
       root,
       id,
       music: project.music,
+      model: project.music.model ?? DEFAULT_MUSIC_MODEL,
       listId: found.list.id,
       inputs,
       hash: musicTakeHash(inputs),
@@ -256,6 +267,7 @@ export function createMusicTakes({
           bpm: inputs.bpm,
           key: inputs.key,
           seed,
+          model: entry.model,
         },
         stop.signal,
       )
@@ -267,7 +279,7 @@ export function createMusicTakes({
         n: entry.n,
         hash: entry.hash,
         seed: take.seed,
-        model: MUSIC_MODEL,
+        model: musicModel(entry.model).recipe,
         seconds: wavSeconds(wav),
         peaks: peaks(wav, WAVEFORM_BARS),
         inputs,
@@ -318,6 +330,7 @@ export function createMusicTakes({
           peaks: take.peaks,
           earlier: take.hash !== hash,
           chosen: chosen?.take === take.n && chosen.fp === take.hash,
+          model: modelLine(take.model),
         })
       }
       const making: MakingView[] = entries
@@ -326,15 +339,26 @@ export function createMusicTakes({
           n: entry.n,
           state: entry.state as 'waiting' | 'making',
           elapsed: entry.state === 'making' ? Math.max(0, (now() - entry.startedAt) / 1000) : 0,
+          model: modelLine(musicModel(entry.model).recipe),
+          expected: musicModel(entry.model).seconds,
         }))
       const failed: FailedView[] = entries
         .filter((entry) => entry.state === 'failed' && entry.hash === hash)
-        .map((entry) => ({ n: entry.n, message: entry.message }))
+        .map((entry) => ({
+          n: entry.n,
+          message: entry.message,
+          model: modelLine(musicModel(entry.model).recipe),
+        }))
+      const models = MUSIC_MODELS.map(({ id }) => ({ id, installed: generator.installed(id) }))
+      // Not installed at all when no model is here: the first one that is says the rest (the
+      // machine and uv); with none, the project's model says what to download.
+      const here = models.find((m) => m.installed)
       return {
         ok: true,
         kind: inputs.kind,
-        generator: generator.ready(),
-        expected: EXPECTED_TAKE_SECONDS,
+        generator: generator.ready(here?.id ?? found.model),
+        defaultModel: found.model,
+        models,
         takes,
         making,
         failed,
@@ -344,9 +368,17 @@ export function createMusicTakes({
     async make(projectFile, id, request) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      const ready = generator.ready()
-      if (!ready.ok) return { ok: false, message: ready.message }
       const { inputs, hash } = found
+      // A retry is made with the model the take was first asked with.
+      const retried =
+        'retry' in request ? active.get(`${projectFile}\0${id}`)?.get(request.retry) : undefined
+      const model =
+        retried?.model ?? ('retry' in request ? found.model : (request.model ?? found.model))
+      if (!generator.installed(model)) {
+        return { ok: false, message: `${musicModel(model).name} is not on this computer.` }
+      }
+      const ready = generator.ready(model)
+      if (!ready.ok) return { ok: false, message: ready.message }
       const key = `${projectFile}\0${id}`
       const entries = active.get(key) ?? new Map<number, Entry>()
       active.set(key, entries)
@@ -377,6 +409,7 @@ export function createMusicTakes({
             startedAt: 0,
             message: '',
             hash,
+            model,
           }
           entries.set(entry.n, entry)
           queued.push(entry)
@@ -470,10 +503,11 @@ export function createMusicTakes({
         for (const entry of entries.values()) {
           if (entry.state === 'failed') continue
           takes++
+          const expected = musicModel(entry.model).seconds
           left +=
             entry.state === 'waiting'
-              ? EXPECTED_TAKE_SECONDS
-              : Math.max(0, EXPECTED_TAKE_SECONDS - (now() - entry.startedAt) / 1000)
+              ? expected
+              : Math.max(0, expected - (now() - entry.startedAt) / 1000)
         }
         if (takes) summary[key.slice(prefix.length)] = { takes, left }
       }

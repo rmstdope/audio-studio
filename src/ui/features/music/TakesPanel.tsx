@@ -130,7 +130,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
               />
             ))}
             {view.making.map((making, index) => (
-              <MakingCard key={making.n} making={making} view={view} first={index === 0} />
+              <MakingCard key={making.n} making={making} first={index === 0} />
             ))}
           </div>
         )}
@@ -249,23 +249,15 @@ function TakeCard({
 }
 
 /** A take waiting or being made: a dashed card with a progress bar and the time left. */
-function MakingCard({
-  making,
-  view,
-  first,
-}: {
-  making: MakingView
-  view: MusicTakesView
-  first: boolean
-}) {
+function MakingCard({ making, first }: { making: MakingView; first: boolean }) {
   return (
     <div className="take take-making">
       <div className="take-row">
         <b>Take {making.n}</b>
-        <span className="small">{timeLeftText(making, view.expected)}</span>
+        <span className="small">{timeLeftText(making)}</span>
       </div>
       <div className="bar" role="progressbar" aria-label={`Take ${making.n}`}>
-        <i style={{ width: `${Math.round(progressOf(making, view.expected) * 100)}%` }} />
+        <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
       </div>
       {first && (
         <span className="small faint">

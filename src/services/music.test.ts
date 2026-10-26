@@ -1,16 +1,25 @@
 import { afterAll, describe, expect, it } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { wavSeconds } from '../core/musicTake'
 import { readWav } from '../core/wav'
-import { aceStepCheckpoints, aceStepReady, createAceStepWorker } from './music'
+import { aceStepCheckpoints, aceStepReady, createAceStepWorker, missingFolders } from './music'
 
+const dir0 = mkdtempSync(join(tmpdir(), 'audio-studio-ace-log-'))
+afterAll(() => rmSync(dir0, { recursive: true, force: true }))
 const fake = join(import.meta.dir, '../../test/fixtures/fake-acestep.ts')
 const worker = createAceStepWorker({ command: [process.execPath, fake] })
 afterAll(() => worker.close())
 
-const request = { kind: 'loop', seconds: 3, bpm: null, key: null, seed: 42 } as const
+const request = {
+  kind: 'loop',
+  seconds: 3,
+  bpm: null,
+  key: null,
+  seed: 42,
+  model: 'balanced',
+} as const
 
 describe('createAceStepWorker', () => {
   it('gives the WAV the worker made and the seed it was made from', async () => {
@@ -97,5 +106,40 @@ describe('aceStepReady', () => {
     mkdirSync(join(dir, 'acestep-v15-xl-turbo'))
     mkdirSync(join(dir, 'acestep-5Hz-lm-4B'))
     expect(aceStepReady(mac, dir)).toEqual({ ok: true })
+  })
+
+  it('asks for the folders of the model it is asked about, and names it', () => {
+    const careful = aceStepReady(mac, dir, 'careful')
+    expect(careful).toMatchObject({
+      ok: false,
+      message: `The project's music model, Careful, is not on this computer: acestep-v15-xl-sft is missing from ${dir}.`,
+      fix: expect.stringContaining('acestep-v15-xl-sft and acestep-5Hz-lm-4B'),
+    })
+    expect(aceStepReady(mac, dir, 'quick')).toMatchObject({
+      message: expect.stringContaining('acestep-5Hz-lm-1.7B'),
+    })
+  })
+
+  it('lists the folders of a model that are missing', () => {
+    expect(missingFolders(dir, 'balanced')).toEqual([])
+    expect(missingFolders(dir, 'quickest')).toEqual(['acestep-v15-turbo', 'acestep-5Hz-lm-1.7B'])
+  })
+})
+
+describe('the worker’s request', () => {
+  it('names the model’s two folders', async () => {
+    const seen = join(dir0, 'request.json')
+    process.env.FAKE_ACESTEP_LOG = seen
+    const spy = createAceStepWorker({ command: [process.execPath, fake] })
+    try {
+      await spy.generate({ ...request, brief: 'a', model: 'careful' })
+    } finally {
+      spy.close()
+      delete process.env.FAKE_ACESTEP_LOG
+    }
+    expect(JSON.parse(readFileSync(seen, 'utf8'))).toMatchObject({
+      dit: 'acestep-v15-xl-sft',
+      lm: 'acestep-5Hz-lm-4B',
+    })
   })
 })
