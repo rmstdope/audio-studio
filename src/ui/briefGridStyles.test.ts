@@ -27,3 +27,11 @@ describe('the brief grid keeps labels level', () => {
     expect(rule(css, '.music-kind')).toContain('justify-self: start')
   })
 })
+
+describe("Setup's short-model line is a quiet note", () => {
+  it('uses the faint colour and a small size, as the mockup shows', () => {
+    const declarations = rule(css, '.mshort')
+    expect(declarations).toContain('color: var(--faint)')
+    expect(declarations).toMatch(/font-size: 1[0-3]px/)
+  })
+})
