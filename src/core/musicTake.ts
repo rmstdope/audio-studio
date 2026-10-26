@@ -49,7 +49,7 @@ export function wavSeconds(wav: Wav): number {
 /**
  * A loop from a take generated `LOOP_EXTRA_SECONDS` longer: cut at `seconds`, with the
  * `SEAM_SECONDS` after the cut crossfaded (equal power) over its start, so the end runs into
- * the beginning without a seam.
+ * the beginning without a seam. Where the two sum past full scale the blend is held at it.
  */
 export function shapeLoop(wav: Wav, seconds: number): Wav {
   const { channels, sampleRate } = wav.format
@@ -65,7 +65,10 @@ export function shapeLoop(wav: Wav, seconds: number): Wav {
     for (let channel = 0; channel < channels; channel++) {
       const at = frame * channels + channel
       const tail = samples[(cut + frame) * channels + channel]!
-      out[at] = Math.round(tail * Math.cos(angle) + samples[at]! * Math.sin(angle))
+      // Equal power sums to up to 1.4 times either side: held at full scale, since a 16-bit
+      // sample past it wraps round to the other sign, a loud crackle.
+      const blended = Math.round(tail * Math.cos(angle) + samples[at]! * Math.sin(angle))
+      out[at] = Math.max(-32768, Math.min(32767, blended))
     }
   }
   return wavOf(wav.format, out)

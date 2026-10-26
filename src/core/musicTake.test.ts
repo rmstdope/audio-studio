@@ -60,6 +60,23 @@ describe('shapeLoop', () => {
     expect(middle).toBeLessThan(9000)
   })
 
+  test('keeps a loud blend in range instead of wrapping it round to the other sign', () => {
+    // ACE-Step peaks its takes at -1 dBFS (about 29200). Where head and tail are both that loud,
+    // the equal-power sum reaches about 1.4 times full scale, which a 16-bit sample cannot hold.
+    const source = make(30, () => 29000)
+    const out = samplesOf(shapeLoop(source, 20))
+    expect(Math.min(...out)).toBeGreaterThanOrEqual(29000)
+    expect(out[(SEAM_SECONDS * RATE) / 2]).toBe(32767)
+    const below = samplesOf(
+      shapeLoop(
+        make(30, () => -29000),
+        20,
+      ),
+    )
+    expect(Math.max(...below)).toBeLessThanOrEqual(-29000)
+    expect(below[(SEAM_SECONDS * RATE) / 2]).toBe(-32768)
+  })
+
   test('refuses a take too short to close its loop', () => {
     expect(() =>
       shapeLoop(

@@ -854,7 +854,9 @@ the board is what the game will play:
 - a **loop** is generated 20 seconds longer than `seconds`, since every take closes as a song does
   (in the spike, fading from 5 to 14 seconds before its end). It is cut at `seconds`, and the
   4 seconds after the cut are crossfaded over its start, so the end runs into the beginning
-  without a seam and the loop is `seconds` long. The board plays a loop take around its seam (its
+  without a seam and the loop is `seconds` long. The crossfade is equal power, so where both sides
+  are loud it sums past full scale (ACE-Step peaks a take at −1 dBFS): the blend is held at full
+  scale there, never wrapped round to the other sign. The board plays a loop take around its seam (its
   last seconds, then its first) as well as from the start;
 - a **stinger** is generated at ACE-Step's shortest, 10 seconds, and cut at its own end (its
   trailing silence trimmed) or at `seconds`, whichever comes first, with a short fade-out (a
