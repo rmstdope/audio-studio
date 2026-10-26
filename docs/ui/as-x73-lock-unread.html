@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Music lock unread</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft: #2a1b12;
+        --accent-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger: #ff94a8;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 26px;
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 22px 26px;
+      }
+      .frame.narrow {
+        max-width: 420px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        font-weight: 500;
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .play {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .play.on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0a02;
+      }
+      .play[disabled] {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--soft);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .brief {
+        max-width: 280px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .err {
+        color: var(--danger);
+        font-size: 12.5px;
+      }
+      .tag {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .callout {
+        border-left: 3px solid var(--accent);
+        padding: 2px 10px;
+        color: var(--soft);
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      .ncard {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        margin-top: 10px;
+        padding: 12px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .banner {
+        max-width: 1100px;
+        margin: 0 auto 12px;
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-radius: 10px;
+        padding: 9px 14px;
+        font-size: 13px;
+      }
+      .banner .mono {
+        color: var(--soft);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-top: 14px;
+      }
+      .panel h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .grow {
+        flex: 1;
+      }
+      .btn {
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 5px 12px;
+        font: inherit;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0a02;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn[disabled] {
+        opacity: 0.4;
+      }
+      .warnbox {
+        border: 1px solid #5a4719;
+        background: var(--warn-bg);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-top: 14px;
+      }
+      .warnbox strong {
+        color: var(--warn);
+      }
+      .takes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .take {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .wave {
+        flex: 1;
+        height: 26px;
+        background: repeating-linear-gradient(90deg, #3a3f4c 0 2px, transparent 2px 4px);
+        border-radius: 4px;
+      }
+      .hint {
+        color: var(--warn);
+        font-size: 12.5px;
+        margin-top: 10px;
+      }
+      .empty {
+        border: 1px dashed var(--line-strong);
+        border-radius: 10px;
+        padding: 18px;
+        margin-top: 12px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .opt {
+        display: inline-block;
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      section.case {
+        margin-top: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>When the music lock can't be read (agreed)</h1>
+      While music/music.lock.json can't be read, the studio does not know which take is chosen for
+      any track. The Music pages say so instead of claiming nothing is chosen, and the Takes panel
+      holds Choose and Drop.
+    </div>
+    <section class="case">
+      <div class="intro"><h1>1. An act's Music list</h1></div>
+      <div class="intro">
+        <h1>Option A — say "not known", and why, on the list</h1>
+        The music lock (the file that records which take is chosen for each track) is broken. Today
+        the list says every track is <em>not chosen</em> and counts <em>0 of 4 chosen</em>, which
+        may be false. The Plays column already says <em>Not known</em>.
+      </div>
+      <div class="banner">
+        <strong>Some files could not be read.</strong>
+        <span class="mono">music/music.lock.json</span>: not valid JSON.
+      </div>
+      <div class="frame">
+        <span class="crumbs">Music</span>
+        <h2>Act 1</h2>
+        <span class="muted"
+          >The loops the game asks for in Act 1. Which tracks are chosen is not known: the music
+          lock could not be read.</span
+        >
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Track</th>
+              <th>Brief</th>
+              <th>Length</th>
+              <th>Plays</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><button class="play" disabled>▶</button></td>
+              <td>
+                <strong>Tavern at dusk</strong>
+                <div class="mono faint">act1-tavern</div>
+              </td>
+              <td><div class="brief">Warm lute and low fiddle</div></td>
+              <td>1:20</td>
+              <td><span class="faint">Not known</span></td>
+              <td><span class="chip warn">not known</span></td>
+            </tr>
+            <tr>
+              <td><button class="play" disabled>▶</button></td>
+              <td>
+                <strong>Forest path</strong>
+                <div class="mono faint">act1-forest</div>
+              </td>
+              <td><div class="brief">Airy flute over soft strings</div></td>
+              <td>1:40</td>
+              <td><span class="faint">Not known</span></td>
+              <td><span class="chip warn">not known</span></td>
+            </tr>
+            <tr>
+              <td><button class="play" disabled>▶</button></td>
+              <td>
+                <strong>Cave drip</strong>
+                <div class="mono faint">act1-cave</div>
+              </td>
+              <td><div class="brief">Sparse, cold, a single low drone</div></td>
+              <td>1:00</td>
+              <td><span class="faint">Not known</span></td>
+              <td><span class="chip">making 2</span></td>
+            </tr>
+            <tr>
+              <td><button class="play" disabled>▶</button></td>
+              <td>
+                <strong>Castle gate</strong>
+                <div class="mono faint">act1-gate</div>
+              </td>
+              <td><div class="brief">Brass fanfare, held back</div></td>
+              <td>0:50</td>
+              <td><span class="faint">Not known</span></td>
+              <td><span class="chip warn">not known</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        Each track's Status says <strong>not known</strong> (amber, like other "needs a look"
+        chips). The count under the heading is replaced by the reason. A track being made still
+        shows "making 2", since that is known.
+      </div>
+      <div class="note">
+        Narrow window: Brief is hidden first, as today; the Status cell keeps its place.
+      </div>
+      <div class="frame narrow">
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Track</th>
+              <th>Plays</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><button class="play" disabled>▶</button></td>
+              <td><strong>Tavern at dusk</strong></td>
+              <td><span class="faint">Not known</span></td>
+              <td><span class="chip warn">not known</span></td>
+            </tr>
+            <tr>
+              <td><button class="play" disabled>▶</button></td>
+              <td><strong>Cave drip</strong></td>
+              <td><span class="faint">Not known</span></td>
+              <td><span class="chip">making 2</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        Once the lock is mended and the page reloaded, everything is back to normal: "chosen", "not
+        chosen", "2 of 4 chosen."
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro"><h1>2. The Stingers page</h1></div>
+      <div class="intro">
+        <h1>Option B — the Stingers page</h1>
+        Same as the act's list you chose (not known + the reason), only the line under the heading
+        differs.
+      </div>
+      <div class="banner">
+        <strong>Some files could not be read.</strong>
+        <span class="mono">music/music.lock.json</span>: not valid JSON.
+      </div>
+      <div class="frame">
+        <span class="crumbs">Music</span>
+        <h2>Stingers</h2>
+        <span class="muted"
+          >Played once, for a moment, anywhere in the game. Which stingers are chosen is not known:
+          the music lock could not be read.</span
+        >
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Track</th>
+              <th>Brief</th>
+              <th>Length</th>
+              <th>Plays</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><button class="play" disabled>▶</button></td>
+              <td>
+                <strong>Victory</strong>
+                <div class="mono faint">victory</div>
+              </td>
+              <td><div class="brief">Short bright brass rise</div></td>
+              <td>0:04</td>
+              <td><span class="faint">Not known</span></td>
+              <td><span class="chip warn">not known</span></td>
+            </tr>
+            <tr>
+              <td><button class="play" disabled>▶</button></td>
+              <td>
+                <strong>Item found</strong>
+                <div class="mono faint">item</div>
+              </td>
+              <td><div class="brief">Two plucked notes, up</div></td>
+              <td>0:02</td>
+              <td><span class="faint">Not known</span></td>
+              <td><span class="chip warn">not known</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro"><h1>3. A track's page: Takes with takes</h1></div>
+      <div class="intro">
+        <h1>Option A — show every take, with Choose and Drop held</h1>
+        Today the chosen take (say Take 3) drops back into Takes as an ordinary card with Choose,
+        because the studio cannot tell which one it is: that is written only in the broken lock.
+      </div>
+      <div class="banner">
+        <strong>Some files could not be read.</strong>
+        <span class="mono">music/music.lock.json</span>: not valid JSON.
+      </div>
+      <div class="frame">
+        <span class="crumbs">Music › Act 1</span>
+        <h2>Tavern at dusk</h2>
+        <div class="warnbox">
+          <strong>The music lock could not be read</strong>
+          <div class="muted small">
+            Which take the game plays is not known until the lock can be read; fix it, then reload.
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head">
+            <h3 class="grow">Takes</h3>
+            <select class="btn">
+              <option>Stable Audio</option></select
+            ><button class="btn primary">More takes</button>
+          </div>
+          <div class="hint">
+            Choosing and dropping wait until the music lock can be read. You can still listen and
+            make more takes.
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 1</b></div>
+              <span class="faint small">Stable Audio</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:20</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn ghost" disabled>Drop</button
+                ><button class="btn" disabled>Choose</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 2</b></div>
+              <span class="faint small">Stable Audio</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:20</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn ghost" disabled>Drop</button
+                ><button class="btn" disabled>Choose</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 3</b></div>
+              <span class="faint small">Stable Audio</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:20</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn ghost" disabled>Drop</button
+                ><button class="btn" disabled>Choose</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        All takes are shown, the chosen one among them (the studio can't single it out). Play and
+        Hear the seam work. Choose and Drop are greyed out, with one amber line saying why. Making
+        more takes still works.
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro"><h1>4. A track's page: no takes yet</h1></div>
+      <div class="intro">
+        <h1>Option A — a track with no takes yet: no amber line</h1>
+        The line about choosing and dropping only appears once there is a take to choose or drop.
+      </div>
+      <div class="banner">
+        <strong>Some files could not be read.</strong>
+        <span class="mono">music/music.lock.json</span>: not valid JSON.
+      </div>
+      <div class="frame">
+        <span class="crumbs">Music › Act 1</span>
+        <h2>Tavern at dusk</h2>
+        <div class="warnbox">
+          <strong>The music lock could not be read</strong>
+          <div class="muted small">
+            Which take the game plays is not known until the lock can be read; fix it, then reload.
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head"><h3 class="grow">Takes</h3></div>
+          <div class="empty">
+            <strong>No takes yet</strong><br />Each take is new music made from the brief.<br />Make
+            a few, listen, and choose the one the game plays.<br /><br /><select class="btn">
+              <option>Stable Audio</option>
+            </select>
+            <button class="btn primary">Make 2 takes</button>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        As soon as the first take arrives, the amber line appears above the cards and its Choose and
+        Drop are greyed out.
+      </div>
+    </section>
+  </body>
+</html>
