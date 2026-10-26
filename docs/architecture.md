@@ -298,6 +298,9 @@ language is her own in it, else the project's standard one in it, else her longe
 none (and no audition can start). Her audition and ruled-out voices are kept per language in the
 cache, the source language's under the names they always had; an audition's shortlist starts
 with her voices in the other languages, so they can be heard saying this language's phrase.
+On a language with no voice, the page's explanation names each distinct Fish voice once (as-2tb),
+by its name on Fish with the languages it is cast in; until Fish has named it, by those languages
+("Its English voice").
 
 **Pronunciations per language** (as-170.3): the source language's table is `pronounce`; another
 language's is `languages: { "sv": { "pronounce": {…} } }` at the top of the cast. `projectCast`

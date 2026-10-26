@@ -10,6 +10,8 @@ import {
   missingVoiceChips,
   noPhraseText,
   noVoiceText,
+  otherVoices,
+  voiceTitleOf,
   phraseNote,
   shortlistNote,
   speedInLanguage,
@@ -122,17 +124,118 @@ describe('shortlistNote', () => {
   })
 })
 
+describe('otherVoices', () => {
+  const four = [...languages, { id: 'fi', name: 'Suomi' }]
+  const keeper = {
+    languages: {
+      en: casting({ voice: 'a', voiceName: 'Old man bible storytelling' }),
+      sv: casting({ voice: 'a', voiceName: 'old man bible storytelling' }),
+      de: casting({ voice: 'd' }),
+      fi: casting(),
+    },
+  } as unknown as CharacterSummary
+  it('lists each Fish voice once, with every language it is cast in, in project order', () => {
+    expect(otherVoices(keeper, four, 'fi')).toEqual([
+      { id: 'a', first: 'en', languages: ['English', 'Svenska'] },
+      { id: 'd', first: 'de', languages: ['Deutsch'] },
+    ])
+  })
+  it('leaves out the language shown', () => {
+    expect(otherVoices(keeper, four, 'sv')).toEqual([
+      { id: 'a', first: 'en', languages: ['English'] },
+      { id: 'd', first: 'de', languages: ['Deutsch'] },
+    ])
+  })
+})
+
+describe('voiceTitleOf', () => {
+  const about = (id: string, title: string | null) => ({
+    ok: true,
+    id,
+    voice: title === null ? null : { title },
+  })
+  it('is the title Fish gave, and nothing when it did not say or the title is blank', () => {
+    expect(voiceTitleOf(about('a', ' Gentle Granny '), 'a')).toBe('Gentle Granny')
+    expect(voiceTitleOf(about('a', '  '), 'a')).toBeUndefined()
+    expect(voiceTitleOf(about('a', null), 'a')).toBeUndefined()
+    expect(voiceTitleOf({ ok: false }, 'a')).toBeUndefined()
+    expect(voiceTitleOf(undefined, 'a')).toBeUndefined()
+  })
+  it('is nothing when the answer is about another voice than the one asked for', () => {
+    expect(voiceTitleOf(about('b', 'Someone Else'), 'a')).toBeUndefined()
+  })
+})
+
 describe('noVoiceText', () => {
-  it('says her other voices start the shortlist', () => {
-    expect(noVoiceText(gran, languages, 'de')).toBe(
-      'Start an audition to find one. Gentle Granny (English) and Varm Mormor (Svenska) start on its shortlist, so you can hear them speak Deutsch too. Until then Grandmother’s Deutsch lines cannot be recorded.',
+  const tail = ' Until then Grandmother’s Deutsch lines cannot be recorded.'
+  it('says her other voices start the shortlist, by their names on Fish', () => {
+    expect(noVoiceText(gran, languages, 'de', { e: 'Gentle Granny', s: 'Varm Mormor' })).toBe(
+      'Start an audition to find one. Gentle Granny (English) and Varm Mormor (Svenska) start on its shortlist, so you can hear them speak Deutsch too.' +
+        tail,
+    )
+  })
+  it('names a voice cast in two languages once, with both, and a singular verb', () => {
+    const shared = {
+      ...gran,
+      languages: { ...gran.languages, sv: casting({ voice: 'e', voiceName: 'gentle granny' }) },
+    }
+    expect(noVoiceText(shared, languages, 'de', { e: 'Gentle Granny' })).toBe(
+      'Start an audition to find one. Gentle Granny (English and Svenska) starts on its shortlist, so you can hear it speak Deutsch too.' +
+        tail,
+    )
+  })
+  it('does not use the name stored with the cast', () => {
+    expect(noVoiceText(gran, languages, 'de', { e: 'Real Name', s: 'Other' })).toContain(
+      'Real Name (English) and Other (Svenska)',
+    )
+  })
+  it('calls a voice by its languages while its name is not known', () => {
+    const one = { ...gran, languages: { ...gran.languages, sv: casting() } }
+    expect(noVoiceText(one, languages, 'de', {})).toBe(
+      'Start an audition to find one. Its English voice starts on its shortlist, so you can hear it speak Deutsch too.' +
+        tail,
+    )
+  })
+  it('does the same for a shared voice, and for two unnamed voices', () => {
+    const shared = {
+      ...gran,
+      languages: { ...gran.languages, sv: casting({ voice: 'e' }) },
+    }
+    expect(noVoiceText(shared, languages, 'de', {})).toContain(
+      'Its English and Svenska voice starts on its shortlist, so you can hear it speak',
+    )
+    expect(noVoiceText(gran, languages, 'de', {})).toContain(
+      'Its English voice and its Svenska voice start on its shortlist, so you can hear them speak',
+    )
+  })
+  it('mixes named and unnamed voices, capitalising Its only at the start', () => {
+    expect(noVoiceText(gran, languages, 'de', { e: 'Gentle Granny' })).toContain(
+      'Gentle Granny (English) and its Svenska voice start on its shortlist, so you can hear them speak',
+    )
+    expect(noVoiceText(gran, languages, 'de', { s: 'Varm Mormor' })).toContain(
+      'Its English voice and Varm Mormor (Svenska) start on its shortlist',
+    )
+  })
+  it('names a shared voice and an own one, with the plural verb', () => {
+    const four = [...languages, { id: 'fi', name: 'Suomi' }]
+    const keeper = {
+      name: 'Keeper',
+      languages: {
+        en: casting({ voice: 'a' }),
+        sv: casting({ voice: 'a' }),
+        de: casting({ voice: 'd' }),
+        fi: casting(),
+      },
+    } as unknown as CharacterSummary
+    expect(
+      noVoiceText(keeper, four, 'fi', { a: 'Old Man Bible Storytelling', d: 'Vanha Kertoja' }),
+    ).toBe(
+      'Start an audition to find one. Old Man Bible Storytelling (English and Svenska) and Vanha Kertoja (Deutsch) start on its shortlist, so you can hear them speak Suomi too. Until then Keeper’s Suomi lines cannot be recorded.',
     )
   })
   it('leaves the middle sentence out with no voice in any language', () => {
     const none = { ...gran, languages: { en: casting(), sv: casting(), de: casting() } }
-    expect(noVoiceText(none, languages, 'de')).toBe(
-      'Start an audition to find one. Until then Grandmother’s Deutsch lines cannot be recorded.',
-    )
+    expect(noVoiceText(none, languages, 'de', {})).toBe('Start an audition to find one.' + tail)
   })
 })
 

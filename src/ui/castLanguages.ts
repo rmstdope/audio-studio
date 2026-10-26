@@ -91,21 +91,66 @@ export function shortlistNote(
   return other ? `Her ${other.name} voice` : undefined
 }
 
-/** The explanation under "No Deutsch voice yet": her other voices start the audition's shortlist. */
+/** A Fish voice cast for a character in other languages than the one shown, and those languages. */
+export interface OtherVoice {
+  id: string
+  /** The code of the first language it is cast in. */
+  first: string
+  /** The names of the languages it is cast in, in the project's order. */
+  languages: string[]
+}
+
+/**
+ * The distinct voices a character is cast with in the languages but `language`, in the order of
+ * the first language each is cast in. A voice is the same when its Fish id is, whatever name was
+ * stored with it.
+ */
+export function otherVoices(
+  character: CharacterSummary,
+  languages: Language[],
+  language: string,
+): OtherVoice[] {
+  const voices: OtherVoice[] = []
+  for (const l of languages) {
+    const id = l.id === language ? undefined : character.languages[l.id]?.voice
+    if (!id) continue
+    const known = voices.find((v) => v.id === id)
+    if (known) known.languages.push(l.name)
+    else voices.push({ id, first: l.id, languages: [l.name] })
+  }
+  return voices
+}
+
+/**
+ * The voice's own name on Fish from a character-voice answer; undefined when Fish gave none, or
+ * when the answer is about another voice than `id` (the cast changed since the page read it).
+ */
+export function voiceTitleOf(
+  answer: { ok: boolean; id?: string | null; voice?: { title: string } | null } | null | undefined,
+  id: string,
+): string | undefined {
+  return answer?.ok && answer.id === id ? answer.voice?.title.trim() || undefined : undefined
+}
+
+/**
+ * The explanation under "No Deutsch voice yet": her other voices start the audition's shortlist,
+ * each named once by its name on Fish (`titles`, by voice id) with the languages it is cast in, or
+ * by those languages while its name is not known.
+ */
 export function noVoiceText(
   character: CharacterSummary,
   languages: Language[],
   language: string,
+  titles: Record<string, string | undefined>,
 ): string {
   const name = nameOf(languages, language)
-  const others = languages
-    .filter((l) => l.id !== language)
-    .flatMap((l) => {
-      const voice = character.languages[l.id]
-      return voice?.voice ? [`${voice.voiceName || voice.voice} (${l.name})`] : []
-    })
-  const middle = others.length
-    ? ` ${joinNames(others)} start${others.length === 1 ? 's' : ''} on its shortlist, so you can hear ${others.length === 1 ? 'it' : 'them'} speak ${name} too.`
+  const voices = otherVoices(character, languages, language).map((v, i) => {
+    const title = titles[v.id]
+    if (title) return `${title} (${joinNames(v.languages)})`
+    return `${i === 0 ? 'Its' : 'its'} ${joinNames(v.languages)} voice`
+  })
+  const middle = voices.length
+    ? ` ${joinNames(voices)} start${voices.length === 1 ? 's' : ''} on its shortlist, so you can hear ${voices.length === 1 ? 'it' : 'them'} speak ${name} too.`
     : ''
   return `Start an audition to find one.${middle} Until then ${character.name}’s ${name} lines cannot be recorded.`
 }

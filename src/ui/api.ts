@@ -41,6 +41,7 @@ import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import type { SittingView } from '../core/sitting'
 import { takeCaches, waitingAfter } from './sitting'
+import { voiceTitleOf } from './castLanguages'
 import { centsUp } from './format'
 import { isAbout, takeAnswerState, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
@@ -319,6 +320,32 @@ export function useCharacterVoice(
       return data?.ok && !isAbout(data, voiceId) ? 0 : 10 * 60 * 1000
     },
     refetchOnWindowFocus: false,
+  })
+}
+
+/**
+ * The names on Fish of the voices a character is cast with in other languages, by voice id. Each
+ * voice is asked for once, in the first language it is cast in, through the same cached answer
+ * as that language's own page; a voice Fish has not named yet is missing.
+ */
+export function useOtherVoiceTitles(
+  characterId: string,
+  voices: { id: string; language: string }[],
+  enabled = true,
+): Record<string, string | undefined> {
+  return useQueries({
+    queries: voices.map(({ id, language }) => ({
+      enabled,
+      queryKey: ['voice', characterId, language, id],
+      queryFn: () =>
+        getJson<NonNullable<CharacterVoiceResult>>(
+          inLanguage(`/api/characters/${encodeURIComponent(characterId)}/voice`, language),
+        ),
+      staleTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    })),
+    combine: (results) =>
+      Object.fromEntries(voices.map((v, i) => [v.id, voiceTitleOf(results[i]?.data, v.id)])),
   })
 }
 
