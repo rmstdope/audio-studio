@@ -47,15 +47,16 @@ export async function manifestNow(
 
 /**
  * Every track the lock says is chosen, with whether its music file is a plain file in the clips
- * folder. A lock that cannot be read adds its problems and gives no track.
+ * folder. A lock that cannot be read adds its problems and gives null: which take is chosen is
+ * then not known.
  */
 export async function readChosen(
   root: string,
   music: MusicConfig,
   problems: Problem[],
-): Promise<Record<string, ChosenState>> {
+): Promise<Record<string, ChosenState> | null> {
   const lock = await lockNow(root, music, problems)
-  if (!lock) return {}
+  if (!lock) return null
   const files = await listFiles(resolveInRoot(root, music.paths.clips))
   return Object.fromEntries(
     Object.entries(lock).map(([id, entry]) => [

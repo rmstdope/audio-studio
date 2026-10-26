@@ -114,14 +114,21 @@ export type InTheGameState =
   | { kind: 'take'; take: number; missing: boolean; hint: string }
   | { kind: 'game'; file: string; exists: boolean; hint: string }
   | { kind: 'nothing'; hint: string }
+  | { kind: 'unknown'; hint: string }
 
 /**
  * What the game plays for a track, singled out on its page: the chosen take (its music file gone
  * or not), else the game's own file (there or not), else nothing; each with the faint line saying
- * what comes next.
+ * what comes next. Not known while the music lock cannot be read: the lock says what is chosen.
  */
 export function inTheGame(track: Pick<TrackRow, 'current' | 'gameFile'>): InTheGameState {
   const { current, gameFile } = track
+  if (current.kind === 'unknown') {
+    return {
+      kind: 'unknown',
+      hint: 'Which take the game plays is not known until the lock can be read; fix it, then reload.',
+    }
+  }
   if (current.kind === 'take') {
     return {
       kind: 'take',

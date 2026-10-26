@@ -38,15 +38,18 @@ export function playsText(current: CurrentMusic, failed?: PlayFailure): PlaysTex
       ? { lead: `Take ${current.take}` }
       : current.kind === 'game'
         ? { lead: "The game's file", file: fileName(current.file), path: current.file }
-        : { lead: 'Nothing to play yet', faint: true }
-  if (current.kind !== 'none' && !current.exists) text.missing = NOT_THERE
+        : current.kind === 'unknown'
+          ? { lead: 'Not known', faint: true }
+          : { lead: 'Nothing to play yet', faint: true }
+  if ((current.kind === 'take' || current.kind === 'game') && !current.exists)
+    text.missing = NOT_THERE
   if (failed) text.failure = FAILURE[failed]
   return text
 }
 
 /** Whether there is music to play: it is named and it is on disk. */
 export function canPlay(current: CurrentMusic): boolean {
-  return current.kind !== 'none' && current.exists
+  return (current.kind === 'take' || current.kind === 'game') && current.exists
 }
 
 /**

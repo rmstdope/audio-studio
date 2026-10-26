@@ -362,7 +362,8 @@ export async function musicClipFile(projectFile: string, file: string): Promise<
 
 /**
  * The absolute path of the music a track plays now: its chosen take's clip, else the game's own
- * file for it. Null when there is none, it is not on disk, or the track is unknown. The game's
+ * file for it. Null when there is none, it is not on disk, the track is unknown, or the music
+ * lock cannot be read (so which it is is not known). The game's
  * file is only read.
  */
 export async function musicCurrentFile(projectFile: string, id: string): Promise<string | null> {
@@ -371,7 +372,8 @@ export async function musicCurrentFile(projectFile: string, id: string): Promise
   const root = dirname(projectFile)
   const music = await readMusic(root, opened.project, [])
   const row = music?.lists.flatMap((list) => list.tracks).find((track) => track.id === id)
-  if (!row || row.current.kind === 'none' || !row.current.exists) return null
+  if (!row || row.current.kind === 'none' || row.current.kind === 'unknown') return null
+  if (!row.current.exists) return null
   return row.current.kind === 'take'
     ? musicClipFile(projectFile, `${id}.mp3`)
     : gameFilePath(root, row.current.file)

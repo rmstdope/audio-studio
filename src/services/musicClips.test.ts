@@ -186,17 +186,17 @@ describe('readChosen', () => {
     writeFileSync(join(root, 'audio/music/hall.mp3'), 'x')
     const problems: never[] = []
     const chosen = await readChosen(root, config, problems)
-    expect(chosen.hall?.fileExists).toBe(true)
-    expect(chosen.cave?.fileExists).toBe(false)
+    expect(chosen?.hall?.fileExists).toBe(true)
+    expect(chosen?.cave?.fileExists).toBe(false)
     expect(problems).toEqual([])
   })
 
-  it('is empty without a lock, and reports a broken one as a problem with its file', async () => {
+  it('is empty without a lock, and null for a broken one, reported as a problem with its file', async () => {
     const root = tempRepo({})
     expect(await readChosen(root, config, [])).toEqual({})
     const broken = tempRepo({ 'music/music.lock.json': { hall: { fp: 1 } } })
     const problems: { file: string }[] = []
-    expect(await readChosen(broken, config, problems as never)).toEqual({})
+    expect(await readChosen(broken, config, problems as never)).toBeNull()
     expect(problems[0]?.file).toBe('music/music.lock.json')
   })
 })

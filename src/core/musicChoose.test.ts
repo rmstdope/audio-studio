@@ -127,6 +127,13 @@ describe('inTheGame', () => {
     )
   })
 
+  it('is not known while the music lock cannot be read, whatever the game’s own file', () => {
+    expect(inTheGame({ current: { kind: 'unknown' }, gameFile: file })).toEqual({
+      kind: 'unknown',
+      hint: 'Which take the game plays is not known until the lock can be read; fix it, then reload.',
+    })
+  })
+
   it('is the chosen take with its music file missing', () => {
     expect(
       inTheGame({ current: { kind: 'take', take: 3, exists: false }, gameFile: null }),
