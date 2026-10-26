@@ -20,10 +20,11 @@ export function NoMusic() {
     <>
       <header className="page-header">
         <div>
+          <span className="crumbs">Music</span>
           <h1>Music</h1>
         </div>
       </header>
-      <div className="empty-state">
+      <section className="panel no-music">
         <strong>This project has no music yet</strong>
         <span>
           Add a <span className="mono">music</span> section to{' '}
@@ -34,7 +35,7 @@ export function NoMusic() {
           How to set it up
         </button>
         {open && <pre className="refresh-output mono music-example">{EXAMPLE}</pre>}
-      </div>
+      </section>
     </>
   )
 }

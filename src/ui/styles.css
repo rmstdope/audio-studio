@@ -456,6 +456,18 @@ a {
   font-size: 16px;
 }
 
+.no-music {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.no-music strong {
+  color: var(--text);
+}
+
 .problems {
   padding: 16px 18px;
   border-radius: var(--radius);
