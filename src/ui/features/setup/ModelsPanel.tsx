@@ -12,8 +12,9 @@ import {
 } from '../../../core/models'
 import { failureBody, RETIRED_MODEL } from '../../../core/retirement'
 import {
-  MUSIC_MODELS,
+  MUSIC_GROUPS,
   menuEntry,
+  setupShortLine,
   musicModel,
   saveFailureHeading,
   type MusicModelId,
@@ -129,6 +130,7 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
 
   const shown = (state.phase === 'saving' ? state.to : current) as MusicModelId
   const here = music.installed[shown]
+  const shortLine = setupShortLine(shown, music.loops)
   return (
     <div className="mrow">
       <div className="mname">Music</div>
@@ -146,16 +148,21 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
               dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
             }
           >
-            {MUSIC_MODELS.map(({ id }) => (
-              <option key={id} value={id}>
-                {menuEntry(id, music.installed[id])}
-              </option>
+            {MUSIC_GROUPS.map((group) => (
+              <optgroup key={group.heading} label={group.heading}>
+                {group.ids.map((id) => (
+                  <option key={id} value={id}>
+                    {menuEntry(id, music.installed[id])}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <span className="free">Free</span>
           {!here && <span className="warnline">not on this computer</span>}
           {pending && <span className="muted">Saving…</span>}
         </div>
+        {shortLine && <span className="mshort faint small">{shortLine}</span>}
         {state.phase === 'failed' && (
           <section className="notice notice-err" role="alert">
             <div className="notice-text">

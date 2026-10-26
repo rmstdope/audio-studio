@@ -50,30 +50,60 @@ export function SetupView() {
           <ModelsPanel />
           <ul className="setup-list">
             {setup.data.checks.map((check) => (
-              <li key={check.id} className="panel setup-check">
-                <span className={`setup-state ${check.state}`}>
-                  {check.state === 'ok' ? (
-                    <CheckIcon />
-                  ) : check.state === 'problem' ? (
-                    <AlertIcon />
-                  ) : null}
-                  {STATE[check.state]}
-                </span>
-                <div className="setup-text">
-                  <strong>{check.title}</strong>
-                  <span className="muted">
-                    {check.detail}
-                    {check.credit !== undefined && ` ${dollars(check.credit)}`}
-                  </span>
-                  {check.tier && <TierMenu chosen={check.tier.chosen} />}
-                  {check.fix && <code className="setup-fix mono">{check.fix}</code>}
-                </div>
-              </li>
+              <SetupCheckRow key={check.id} check={check} />
             ))}
           </ul>
         </>
       )}
     </>
+  )
+}
+
+/** One row of the checklist: its state, what was found, a menu or a command, and numbered steps. */
+export function SetupCheckRow({ check }: { check: SetupCheck }) {
+  return (
+    <li className="panel setup-check">
+      <span className={`setup-state ${check.state}`}>
+        {check.state === 'ok' ? <CheckIcon /> : check.state === 'problem' ? <AlertIcon /> : null}
+        {check.label ?? STATE[check.state]}
+      </span>
+      <div className="setup-text">
+        <strong>{check.title}</strong>
+        <span className="muted">
+          {check.detail}
+          {check.credit !== undefined && ` ${dollars(check.credit)}`}
+        </span>
+        {check.tier && <TierMenu chosen={check.tier.chosen} />}
+        {check.fix && <code className="setup-fix mono">{check.fix}</code>}
+        {check.steps && (
+          <>
+            <ol className="setup-steps small">
+              {check.steps.list.map((step, i) => (
+                <li key={i}>
+                  <span>
+                    {step.parts.map((part, j) =>
+                      typeof part === 'string' ? (
+                        part
+                      ) : (
+                        <a key={j} href={part.href} target="_blank" rel="noreferrer noopener">
+                          {part.link}
+                        </a>
+                      ),
+                    )}
+                  </span>
+                  {step.commands?.map((command) => (
+                    <code key={command} className="setup-fix mono">
+                      {command}
+                    </code>
+                  ))}
+                </li>
+              ))}
+            </ol>
+            <span className="faint small">{check.steps.note}</span>
+          </>
+        )}
+      </div>
+    </li>
   )
 }
 

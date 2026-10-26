@@ -2105,6 +2105,22 @@ button.cue-chip[aria-expanded='true'] {
   border: 1px solid var(--line);
   width: fit-content;
 }
+.setup-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.setup-steps code {
+  display: block;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mshort {
+  display: block;
+}
 .setup-tier {
   display: flex;
   flex-wrap: wrap;

@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
@@ -33,6 +34,7 @@ describe('checkSetup', () => {
       requests: 'ok',
       refresh: 'off',
       music: 'off',
+      stableAudio: 'off',
     })
   })
 
@@ -58,6 +60,7 @@ describe('checkSetup', () => {
       requests: 'off',
       refresh: 'off',
       music: 'off',
+      stableAudio: 'off',
     })
     expect(asked).toBe(0)
   })
@@ -145,5 +148,38 @@ describe('checkSetup, requests at once', () => {
       detail: `The project's music model, Careful, is not on this computer: acestep-v15-xl-sft is missing from ${join(root, 'models')}.`,
       fix: expect.stringContaining('acestep-v15-xl-sft and acestep-5Hz-lm-4B'),
     })
+  })
+
+  it('checks the Stable Audio models in their own folder, whatever else is set', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson({ music: musicSection }),
+      'stable/stable-audio-open-1.0/.keep': '',
+    })
+    const run = async (model?: string) => {
+      if (model) {
+        await Bun.write(
+          join(root, 'audio-studio.json'),
+          JSON.stringify(projectJson({ music: { ...musicSection, model } })),
+        )
+      }
+      const result = await checkSetup(
+        join(root, 'audio-studio.json'),
+        credit,
+        mac,
+        { ACESTEP_CHECKPOINTS: join(root, 'models') },
+        join(root, 'stable'),
+      )
+      if (!result.ok) throw new Error('expected checks')
+      return result.checks.find((c) => c.id === 'stableAudio')
+    }
+    expect(await run()).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+      detail: 'Short is in place; Shortest is missing from ~/.cache/stable-audio.',
+    })
+    await Bun.write(join(root, 'stable/stable-audio-open-small/.keep'), '')
+    expect(await run()).toMatchObject({ state: 'ok' })
+    await rm(join(root, 'stable/stable-audio-open-1.0'), { recursive: true })
+    expect(await run('short')).toMatchObject({ state: 'problem' })
   })
 })

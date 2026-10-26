@@ -1,8 +1,9 @@
-import { basename } from 'node:path'
+import { basename, dirname } from 'node:path'
 import type { Dialog, Recorded, StageModels } from '../core/models'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS, type MusicModelId } from '../core/musicModels'
 import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
+import { readMusic } from './musicLists'
 import { openProject, readPart, type ProjectFailure } from './workspace'
 
 /** What the Models panel needs: the models, the whole dialog, and what recorded clips were made with. */
@@ -21,6 +22,8 @@ export type ModelsView =
 export interface MusicModels {
   model: MusicModelId
   installed: Record<MusicModelId, boolean>
+  /** The length in seconds of every loop track, as it is in force (the studio's changes included). */
+  loops: number[]
 }
 
 const encoder = new TextEncoder()
@@ -74,6 +77,9 @@ export async function modelsView(
     recorded,
     music: project.music
       ? {
+          loops: (await readMusic(dirname(projectFile), project, []))!.lists
+            .filter((list) => list.kind === 'act')
+            .flatMap((list) => list.tracks.map((track) => track.seconds)),
           model: project.music.model ?? DEFAULT_MUSIC_MODEL,
           installed: Object.fromEntries(
             MUSIC_MODELS.map(({ id }) => [id, installed(id)]),

@@ -13,7 +13,7 @@ const ready: SetupFacts = {
   refreshDialog: true,
   parallel: 4,
   fishTier: null,
-  music: { ready: { ok: true }, checkpoints: '/models' },
+  music: { ready: { ok: true }, checkpoints: '/models', model: 'balanced', stableAudioMissing: [] },
 }
 
 const byId = (facts: SetupFacts) => Object.fromEntries(setupChecks(facts).map((c) => [c.id, c]))
@@ -29,6 +29,7 @@ describe('setupChecks', () => {
       'requests',
       'refresh',
       'music',
+      'stableAudio',
     ])
     expect(checks.every((c) => c.state === 'ok')).toBe(true)
     expect(byId(ready).fish!.credit).toBe(12.5)
@@ -144,6 +145,8 @@ describe('the requests-at-once check', () => {
           fix: 'Put the models acestep-v15-xl-turbo and acestep-5Hz-lm-4B in /models.',
         },
         checkpoints: '/models',
+        model: 'balanced' as const,
+        stableAudioMissing: [],
       }
       expect(byId({ ...ready, music }).music).toMatchObject({
         title: 'Music generator (ACE-Step)',
@@ -158,8 +161,106 @@ describe('the requests-at-once check', () => {
       const music = {
         ready: { ok: false as const, message: 'uv is not on the PATH.', fix: 'brew install uv' },
         checkpoints: '/models',
+        model: 'balanced' as const,
+        stableAudioMissing: [],
       }
       expect(byId({ ...ready, music }).music).toMatchObject({ fix: 'brew install uv' })
+    })
+  })
+
+  describe('the Stable Audio row', () => {
+    const music = (
+      stableAudioMissing: ('short' | 'shortest')[],
+      model: 'balanced' | 'short' = 'balanced',
+    ) => ({
+      ...ready,
+      music: { ready: { ok: true as const }, checkpoints: '/models', model, stableAudioMissing },
+    })
+    const row = (facts: SetupFacts) => byId(facts).stableAudio!
+
+    it('is not used without a music section', () => {
+      expect(row({ ...ready, music: null })).toMatchObject({
+        title: 'Music generator (Stable Audio Open)',
+        state: 'off',
+        detail: 'The project has no music section.',
+      })
+      expect(row({ ...ready, music: null }).steps).toBeUndefined()
+      expect(row({ ...ready, music: null }).label).toBeUndefined()
+    })
+
+    it('is ready when both models are in place', () => {
+      expect(row(music([]))).toMatchObject({
+        state: 'ok',
+        detail: 'Short and Shortest are in place; they load on the first take.',
+      })
+      expect(row(music([])).steps).toBeUndefined()
+    })
+
+    it('is optional, so "Not set up" and not a problem, when neither is here', () => {
+      expect(row(music(['short', 'shortest']))).toMatchObject({
+        state: 'off',
+        label: 'Not set up',
+        detail: 'Optional: for stingers and short loops. Its models are not on this computer.',
+      })
+    })
+
+    it('names the one missing, and where', () => {
+      expect(row(music(['shortest']))).toMatchObject({
+        state: 'off',
+        label: 'Not set up',
+        detail: 'Short is in place; Shortest is missing from ~/.cache/stable-audio.',
+      })
+      expect(row(music(['short'])).detail).toBe(
+        'Shortest is in place; Short is missing from ~/.cache/stable-audio.',
+      )
+    })
+
+    it('needs attention when the project’s own music model is the one missing', () => {
+      expect(row(music(['short', 'shortest'], 'short'))).toMatchObject({
+        state: 'problem',
+        detail:
+          "The project's music model, Short, is not on this computer: stable-audio-open-1.0 is missing from ~/.cache/stable-audio.",
+      })
+      // The other being missing is not a problem for a project that does not use it.
+      expect(row(music(['shortest'], 'short')).state).toBe('off')
+    })
+
+    it('gives three numbered steps, the licence pages, the token page and the download', () => {
+      const { steps } = row(music(['short', 'shortest']))
+      expect(steps?.list).toHaveLength(3)
+      expect(steps?.list[0]).toEqual({
+        parts: [
+          "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+          {
+            link: 'stabilityai/stable-audio-open-1.0',
+            href: 'https://huggingface.co/stabilityai/stable-audio-open-1.0',
+          },
+          ' and ',
+          {
+            link: 'stabilityai/stable-audio-open-small',
+            href: 'https://huggingface.co/stabilityai/stable-audio-open-small',
+          },
+          '.',
+        ],
+      })
+      expect(steps?.list[1]).toEqual({
+        parts: [
+          'Make a read token at ',
+          {
+            link: 'huggingface.co/settings/tokens',
+            href: 'https://huggingface.co/settings/tokens',
+          },
+          '.',
+        ],
+      })
+      expect(steps?.list[2]).toEqual({
+        parts: ['Download both into ~/.cache/stable-audio, where the studio looks for them:'],
+        commands: [
+          'HF_TOKEN=… huggingface-cli download stabilityai/stable-audio-open-1.0 --local-dir ~/.cache/stable-audio/stable-audio-open-1.0',
+          'HF_TOKEN=… huggingface-cli download stabilityai/stable-audio-open-small --local-dir ~/.cache/stable-audio/stable-audio-open-small',
+        ],
+      })
+      expect(steps?.note).toBe('The studio never asks for or keeps your token.')
     })
   })
 })

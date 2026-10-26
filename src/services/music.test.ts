@@ -4,7 +4,15 @@ import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { wavSeconds } from '../core/musicTake'
 import { readWav } from '../core/wav'
-import { aceStepCheckpoints, aceStepReady, createAceStepWorker, missingFolders } from './music'
+import {
+  aceStepCheckpoints,
+  aceStepReady,
+  createAceStepWorker,
+  createMusicRouter,
+  missingFolders,
+  type MusicGenerator,
+  type MusicReady,
+} from './music'
 
 const dir0 = mkdtempSync(join(tmpdir(), 'audio-studio-ace-log-'))
 afterAll(() => rmSync(dir0, { recursive: true, force: true }))
@@ -127,6 +135,10 @@ describe('aceStepReady', () => {
     })
   })
 
+  it('does not ask for ACE-Step’s folders when the project’s model is a Stable Audio one', () => {
+    expect(aceStepReady(mac, join(dir, 'nothing-here'), 'short')).toEqual({ ok: true })
+  })
+
   it('lists the folders of a model that are missing', () => {
     expect(missingFolders(dir, 'balanced')).toEqual([])
     expect(missingFolders(dir, 'quickest')).toEqual(['acestep-v15-turbo', 'acestep-5Hz-lm-1.7B'])
@@ -148,5 +160,51 @@ describe('the worker’s request', () => {
       dit: 'acestep-v15-xl-sft',
       lm: 'acestep-5Hz-lm-4B',
     })
+  })
+})
+
+describe('createMusicRouter', () => {
+  const make = (name: string, log: string[]): MusicGenerator => ({
+    ready: (model) => ({ ok: model !== 'careful', message: name, fix: '' }) as MusicReady,
+    installed: (model) => model !== 'quick',
+    generate: async (r) => {
+      log.push(`${name}:generate:${r.model}`)
+      return { wav: new Uint8Array(), seed: 1 }
+    },
+    close: () => void log.push(`${name}:close`),
+  })
+
+  it('sends each model to its own generator, and closes the other when the family changes', async () => {
+    const log: string[] = []
+    const router = createMusicRouter({ acestep: make('ace', log), stableAudio: make('sa', log) })
+    const base = { brief: 'a', kind: 'loop', seconds: 3, bpm: null, key: null, seed: 1 } as const
+    await router.generate({ ...base, model: 'balanced' })
+    await router.generate({ ...base, model: 'quick' })
+    await router.generate({ ...base, model: 'short' })
+    await router.generate({ ...base, model: 'shortest' })
+    await router.generate({ ...base, model: 'balanced' })
+    expect(log).toEqual([
+      'ace:generate:balanced',
+      'ace:generate:quick',
+      'ace:close',
+      'sa:generate:short',
+      'sa:generate:shortest',
+      'sa:close',
+      'ace:generate:balanced',
+    ])
+  })
+
+  it('asks the generator of the model’s family whether it is ready and installed', () => {
+    const router = createMusicRouter({ acestep: make('ace', []), stableAudio: make('sa', []) })
+    expect(router.installed('quick')).toBe(false)
+    expect(router.installed('short')).toBe(true)
+    expect(router.ready('careful').ok).toBe(false)
+    expect(router.ready('short')).toMatchObject({ ok: true })
+  })
+
+  it('stops both', () => {
+    const log: string[] = []
+    createMusicRouter({ acestep: make('ace', log), stableAudio: make('sa', log) }).close()
+    expect(log.sort()).toEqual(['ace:close', 'sa:close'])
   })
 })

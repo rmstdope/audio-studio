@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import { musicModel, type MusicModelId } from './musicModels'
 import type { FishTierSchema } from './project'
 
 /** The name of the variable that holds the Fish Audio API key (`services/env.ts` reads it). */
@@ -48,7 +49,17 @@ export interface SetupFacts {
   music: {
     ready: { ok: true } | { ok: false; message: string; fix: string }
     checkpoints: string
+    /** The project's music model. */
+    model: MusicModelId
+    /** The Stable Audio models that are not in `~/.cache/stable-audio`. */
+    stableAudioMissing: MusicModelId[]
   } | null
+}
+
+/** One numbered step: text with links in it, and commands to copy after it. */
+export interface SetupStep {
+  parts: (string | { link: string; href: string })[]
+  commands?: string[]
 }
 
 /**
@@ -56,13 +67,17 @@ export interface SetupFacts {
  * optional and not set).
  */
 export interface SetupCheck {
-  id: 'ffmpeg' | 'whisper' | 'key' | 'fish' | 'requests' | 'refresh' | 'music'
+  id: 'ffmpeg' | 'whisper' | 'key' | 'fish' | 'requests' | 'refresh' | 'music' | 'stableAudio'
   title: string
   state: 'ok' | 'problem' | 'off'
   /** What was found, in a sentence. */
   detail: string
   /** What to do about a problem: a command or a setting. */
   fix?: string
+  /** Replaces the state's own word ("Not used") on the row, when another says it better. */
+  label?: string
+  /** Numbered steps to put it right, with the note under them. */
+  steps?: { list: SetupStep[]; note: string }
   /** The account's credit in dollars, when Fish answered. */
   credit?: number
   /** Set when the row offers the tier menu: the tier chosen so far. */
@@ -82,6 +97,7 @@ export function setupChecks(facts: SetupFacts): SetupCheck[] {
     requests(facts),
     refresh(facts),
     music(facts),
+    stableAudio(facts),
   ]
 }
 
@@ -251,4 +267,73 @@ function music(facts: SetupFacts): SetupCheck {
     detail: facts.music.ready.message,
     fix: facts.music.ready.fix,
   }
+}
+
+/** Where Stable Audio Open's models are looked for, as a person writes it. */
+const STABLE_AUDIO_HOME = '~/.cache/stable-audio'
+
+/** The Hugging Face repositories of the Stable Audio models, which the folders are named after. */
+const STABLE_AUDIO_REPOS = ['stable-audio-open-1.0', 'stable-audio-open-small']
+
+function stableAudio(facts: SetupFacts): SetupCheck {
+  const title = 'Music generator (Stable Audio Open)'
+  if (!facts.music) {
+    return { id: 'stableAudio', title, state: 'off', detail: 'The project has no music section.' }
+  }
+  const { stableAudioMissing: missing, model } = facts.music
+  if (!missing.length) {
+    return {
+      id: 'stableAudio',
+      title,
+      state: 'ok',
+      detail: 'Short and Shortest are in place; they load on the first take.',
+    }
+  }
+  const steps = {
+    list: [
+      {
+        parts: [
+          "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+          ...STABLE_AUDIO_REPOS.flatMap((repo, i) => [
+            ...(i ? [' and '] : []),
+            { link: `stabilityai/${repo}`, href: `https://huggingface.co/stabilityai/${repo}` },
+          ]),
+          '.',
+        ],
+      },
+      {
+        parts: [
+          'Make a read token at ',
+          {
+            link: 'huggingface.co/settings/tokens',
+            href: 'https://huggingface.co/settings/tokens',
+          },
+          '.',
+        ],
+      },
+      {
+        parts: [`Download both into ${STABLE_AUDIO_HOME}, where the studio looks for them:`],
+        commands: STABLE_AUDIO_REPOS.map(
+          (repo) =>
+            `HF_TOKEN=… huggingface-cli download stabilityai/${repo} --local-dir ${STABLE_AUDIO_HOME}/${repo}`,
+        ),
+      },
+    ],
+    note: 'The studio never asks for or keeps your token.',
+  }
+  if (missing.includes(model)) {
+    const { name, folders } = musicModel(model)
+    return {
+      id: 'stableAudio',
+      title,
+      state: 'problem',
+      detail: `The project's music model, ${name}, is not on this computer: ${folders.join(', ')} is missing from ${STABLE_AUDIO_HOME}.`,
+      steps,
+    }
+  }
+  const detail =
+    missing.length === 2
+      ? 'Optional: for stingers and short loops. Its models are not on this computer.'
+      : `${musicModel(missing[0] === 'short' ? 'shortest' : 'short').name} is in place; ${musicModel(missing[0]!).name} is missing from ${STABLE_AUDIO_HOME}.`
+  return { id: 'stableAudio', title, state: 'off', label: 'Not set up', detail, steps }
 }

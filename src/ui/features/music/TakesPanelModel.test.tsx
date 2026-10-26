@@ -34,7 +34,7 @@ const track: TrackRow = {
 }
 
 const everyModel = (missing: string[] = []) =>
-  (['balanced', 'quick', 'quickest', 'careful'] as const).map((id) => ({
+  (['balanced', 'quick', 'quickest', 'careful', 'short', 'shortest'] as const).map((id) => ({
     id,
     installed: !missing.includes(id),
   }))
@@ -79,7 +79,7 @@ beforeEach(() => {
   }) as typeof fetch
 })
 
-function render(data: MusicTakesView) {
+function render(data: MusicTakesView, row: TrackRow = track) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   client.setQueryData(['music-takes', 'hall'], data)
   const container = document.createElement('div')
@@ -88,7 +88,7 @@ function render(data: MusicTakesView) {
   cleanups.push(() => act(() => root.unmount()))
   act(() =>
     root.render(
-      createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track })),
+      createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track: row })),
     ),
   )
   const menu = () =>
@@ -111,6 +111,8 @@ describe('the model menu on a track’s Takes panel', () => {
       'Quick · XL turbo · 1.7B — about 1¼ min a take',
       'Quickest · Turbo · 1.7B — about 1 min a take',
       'Careful · XL sft · 4B — about 7 min a take',
+      'Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 0:30',
+      'Shortest · Stable Audio Open Small — makes no loops · this one is 0:30',
     ])
   })
 
@@ -207,5 +209,90 @@ describe('the model menu on a track’s Takes panel', () => {
     )
     await click(page.button('Try again'))
     expect(posted).toEqual([{ retry: 2 }])
+  })
+})
+
+describe('the Stable Audio models in a track’s menu', () => {
+  const stinger = { ...track, seconds: 6 }
+  const shortLoop = { ...track, seconds: 20 }
+  const stingerView = (over: Partial<MusicTakesView> = {}) => view({ kind: 'stinger', ...over })
+
+  it('is two groups under headings', () => {
+    const page = render(view())
+    expect([...page.menu().querySelectorAll('optgroup')].map((g) => g.label)).toEqual([
+      'ACE-Step · any length',
+      'Stable Audio · short music only',
+    ])
+  })
+
+  it('greys a model that cannot make a long loop, saying why, and can pick the rest', () => {
+    const page = render(view())
+    const options = [...page.menu().options]
+    expect(options.map((o) => o.disabled)).toEqual([false, false, false, false, true, true])
+  })
+
+  it('lets a short loop be made by Short, but not Shortest', () => {
+    const page = render(view(), shortLoop)
+    const options = [...page.menu().options]
+    expect(options.find((o) => o.value === 'short')!.disabled).toBe(false)
+    expect(options.find((o) => o.value === 'short')!.textContent).toBe(
+      'Short · Stable Audio Open 1.0 — about 40 s a take',
+    )
+    expect(options.find((o) => o.value === 'shortest')!.disabled).toBe(true)
+  })
+
+  it('lets every model make a stinger, and times them', () => {
+    const page = render(stingerView(), stinger)
+    const options = [...page.menu().options]
+    expect(options.every((o) => !o.disabled)).toBe(true)
+    expect(options[5]!.textContent).toBe('Shortest · Stable Audio Open Small — about 10 s a take')
+  })
+
+  it('shows the length reason, not “not on this computer”, for a missing model too short', () => {
+    const page = render(view({ models: everyModel(['short']) }))
+    const short = [...page.menu().options].find((o) => o.value === 'short')!
+    expect(short.textContent).toBe(
+      'Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 0:30',
+    )
+  })
+
+  it('starts on Setup’s model when it cannot make the track, warns, and disables making', () => {
+    const page = render(view({ defaultModel: 'short' }))
+    expect(page.menu().value).toBe('short')
+    expect(page.container.querySelector('.takes-missing')!.textContent).toBe(
+      'Short makes loops up to 27 s, and this one is 0:30. Pick another model for these takes.',
+    )
+    expect(page.button('More takes').disabled).toBe(true)
+    act(() => {
+      page.menu().value = 'quick'
+      page.menu().dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(page.container.querySelector('.takes-missing')).toBeNull()
+    expect(page.button('More takes').disabled).toBe(false)
+  })
+
+  it('disables Make 2 takes the same way when there are no takes', () => {
+    const page = render(view({ takes: [], defaultModel: 'shortest' }))
+    expect(page.button('Make 2 takes').disabled).toBe(true)
+    expect(page.container.querySelector('.takes-missing')!.textContent).toContain(
+      'Shortest makes no loops, and this one is 0:30.',
+    )
+  })
+
+  it('follows a length changed on the page: the pick stays and the line appears', () => {
+    const page = render(view({ defaultModel: 'short' }), shortLoop)
+    expect(page.button('More takes').disabled).toBe(false)
+    expect(page.container.querySelector('.takes-missing')).toBeNull()
+  })
+
+  it('says a Stable Audio model is not on this computer, in the agreed words, and does not allow it', () => {
+    const page = render(
+      stingerView({ defaultModel: 'short', models: everyModel(['short']) }),
+      stinger,
+    )
+    expect(page.container.querySelector('.takes-missing')!.textContent).toBe(
+      "Short isn't on this computer. Pick another model for these takes, or see Setup for how to download it.",
+    )
+    expect(page.button('More takes').disabled).toBe(true)
   })
 })

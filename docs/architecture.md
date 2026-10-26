@@ -798,8 +798,8 @@ drawn in `docs/ui/music-workspace.html`.
 
 **Project file.** An optional `music` section beside `narration`, its acts the narration's parts.
 Only the paths and the model are settled; the number of takes and the output settings are fixed in
-the code until a project needs another value. `model` (optional; `balanced`, `quick`, `quickest` or
-`careful`, Balanced when absent) is the music model new takes are made with, saved from Setup's
+the code until a project needs another value. `model` (optional; `balanced`, `quick`, `quickest`,
+`careful`, `short` or `shortest`, Balanced when absent) is the music model new takes are made with, saved from Setup's
 Models panel (the fifth place the studio writes the project file, with the same rules as the
 stages' models):
 
@@ -981,12 +981,30 @@ The project's model is `music.model`; a track's Takes panel has a menu "Model fo
 on it, holds while the page is open, and applies only to the takes being asked for; each take card
 names its model; Try again remakes a take with its own. A model whose folders are not on the
 computer is marked "not on this computer", can still be the project's default (a teammate may have
-it) and cannot make takes here. ACE-Step and Whisper share the one GPU
+it) and cannot make takes here.
+
+**Stable Audio Open** (as-ui4) adds two models of another generator: **Short** (Stable Audio Open
+1.0, about 47 s of music at most) and **Shortest** (Stable Audio Open Small, about 11 s). Each
+`MusicModel` has a `family` and a `longest` piece in seconds; a loop is generated
+`LOOP_EXTRA_SECONDS` (20) longer than it plays, so Short makes loops up to 27 s and Shortest none, and
+every stinger (at most 10 s, generated at 10) fits both. `canMake`/`lengthReason` (`core/musicModels.ts`)
+decide it: a track's menu greys a model that cannot make its length with the reason ("makes loops up
+to 27 s · this one is 1:30", which wins over "not on this computer"), the track's line says why when the
+picked model, Setup's included, cannot make it and More takes is disabled until another is picked, and
+`make` refuses it too. Setup's menu greys nothing and, while a Stable Audio model is the default,
+says how many of the project's loops (`modelsView`'s `loops`) are longer. The menus are two groups,
+"ACE-Step · any length" and "Stable Audio · short music only". A second worker
+(`worker/stable_audio.py`, `services/stableAudio.ts`, stable-audio-tools through uv, offline: no
+token is read) loads a model from its own folder in `~/.cache/stable-audio` (fixed, one named folder
+per model, downloaded by the user after accepting Stability AI's Community Licence); `createMusicRouter`
+sends each model to its family's worker and stops the other worker when the family changes, so only
+one holds memory. Takes are shaped as ACE-Step's are and record the recipe `stable-audio-open-1.0` or
+`-small`. The times per take (40 s and 10 s) are estimates until measured on real takes. ACE-Step and Whisper share the one GPU
 and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`, a process-wide
 `createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a Whisper check at a
 time. In the spike, with both loaded and running together, 42 of the 48 GB were in use (20 GB of it
 compressed), and Whisper ran 2.5 times slower. The setup checklist (§10) names ACE-Step's
-environment and its model download.
+environment and its model download, and, in its own optional row, Stable Audio's.
 
 ---
 
@@ -1109,7 +1127,11 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   which asks Fish once more), the optional `refreshDialog` and, with a `music` section, the music
   generator (Apple silicon, uv, and the two model folders of the project's music model, Balanced's
   `acestep-v15-xl-turbo` and `acestep-5Hz-lm-4B` by default, in `$ACESTEP_CHECKPOINTS` or
-  `~/.cache/ace-step/checkpoints`; downloaded outside the studio, about 28 GB for Balanced), each with what to do about it.
+  `~/.cache/ace-step/checkpoints`; downloaded outside the studio, about 28 GB for Balanced; when
+  the project's model is a Stable Audio one, only the machine and uv) and, in a row of its own, the
+  optional Stable Audio Open models in `~/.cache/stable-audio` ("Not set up" until they are there,
+  "Needs attention" only when the project's music model is one that is missing, with three numbered
+  steps: accept the licence, make a read token, download), each with what to do about it.
   Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
   the problems from a check at most five minutes old and never on a window focus, so the studio
   does not ask Fish more than it did. The CLI still warns about ffmpeg, and recording says so.
@@ -1321,6 +1343,8 @@ Small, independently useful increments:
         Models panel; four models (Balanced, Quick, Quickest, Careful); a menu "Model for new
         takes" on a track's Takes panel; every take names its model; the model is no longer a cause of
         "changed since chosen".
+    11. **Stable Audio Open** (built): Short and Shortest in every music menu, grouped under
+        headings, greyed on a track too long for them; their own worker and optional Setup row.
 13. **Languages** (epic as-170), in small pull requests:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's

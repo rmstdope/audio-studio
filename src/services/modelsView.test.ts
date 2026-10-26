@@ -98,4 +98,37 @@ describe('modelsView', () => {
       recorded: { 'drama-3': { lines: 1 } },
     })
   })
+
+  it('lists the length of every loop in the project, for Setup’s line about a short model', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson({
+        music: {
+          paths: {
+            loops: 'tts/{part}/music.json',
+            stingers: 'tts/stingers.json',
+            briefs: 'music/briefs.json',
+            lock: 'music/music.lock.json',
+            clips: 'audio/music',
+            manifest: 'audio/music/manifest.json',
+          },
+        },
+      }),
+      'tts/act1/music.json': [
+        { id: 'hall', title: 'Hall', brief: 'lute', seconds: 90 },
+        { id: 'cave', title: 'Cave', brief: 'drone', seconds: 20 },
+      ],
+      'tts/stingers.json': [{ id: 'win', title: 'Win', brief: 'fanfare', seconds: 6 }],
+      'music/briefs.json': { cave: { seconds: 25 } },
+    })
+    const view = await modelsView(join(root, 'audio-studio.json'))
+    if (!view.ok) throw new Error('expected a view')
+    expect(view.music).toMatchObject({ model: 'balanced', loops: [90, 25] })
+  })
+
+  it('has no music for a project without a music section', async () => {
+    const view = await modelsView(
+      join(tempRepo({ 'audio-studio.json': projectJson() }), 'audio-studio.json'),
+    )
+    expect(view).toMatchObject({ ok: true, music: null })
+  })
 })

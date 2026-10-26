@@ -439,6 +439,39 @@ describe('createMusicTakes', () => {
     expect(view.takes.map((t) => t.earlier)).toEqual([false, false])
   })
 
+  it('makes a stinger with a Stable Audio model, and the take names it', async () => {
+    const { file, takes, requests, settled } = setup()
+    expect(await takes.make(file, 'victory', { count: 1, model: 'shortest' })).toEqual({ ok: true })
+    const view = await settled('victory')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(requests.map((r) => r.model)).toEqual(['shortest'])
+    expect(view.takes.map((t) => t.model)).toEqual(['Shortest · Stable Audio Open Small'])
+  })
+
+  it('refuses a model that cannot make the track’s length, before anything is queued', async () => {
+    const { file, takes, requests } = setup()
+    expect(await takes.make(file, 'hall', { count: 2, model: 'short' })).toEqual({
+      ok: false,
+      message:
+        'Short makes loops up to 27 s, and this one is 0:30. Pick another model for these takes.',
+    })
+    expect(await takes.make(file, 'hall', { count: 1, model: 'shortest' })).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('Shortest makes no loops'),
+    })
+    expect(requests).toEqual([])
+    const view = await takes.view(file, 'hall')
+    expect(view).toMatchObject({ making: [], takes: [] })
+  })
+
+  it('refuses the project’s own model too when it cannot make the track', async () => {
+    const { file, takes } = setup(undefined, {
+      'audio-studio.json': projectJson({ music: { ...music, model: 'short' } }),
+    })
+    expect(await takes.make(file, 'hall', { count: 1 })).toMatchObject({ ok: false })
+    expect(await takes.make(file, 'victory', { count: 1 })).toEqual({ ok: true })
+  })
+
   it('uses the project’s model when none is asked for', async () => {
     const { file, takes, requests, settled } = setup(undefined, {
       'audio-studio.json': projectJson({ music: { ...music, model: 'quickest' } }),
@@ -478,6 +511,8 @@ describe('createMusicTakes', () => {
         { id: 'quick', installed: true },
         { id: 'quickest', installed: true },
         { id: 'careful', installed: false },
+        { id: 'short', installed: true },
+        { id: 'shortest', installed: true },
       ],
     })
   })

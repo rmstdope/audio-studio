@@ -2,7 +2,15 @@ import { useState, type ReactNode } from 'react'
 import { changedLine, type TrackStatus } from '../../../core/musicChoose'
 import type { TrackRow } from '../../../core/music'
 import type { MakingView, MusicTakesView, TakeView } from '../../../core/musicTake'
-import { eachWords, menuEntry, missingOnTrack, type MusicModelId } from '../../../core/musicModels'
+import {
+  MUSIC_GROUPS,
+  canMake as canMakeTrack,
+  eachWords,
+  menuEntry,
+  missingOnTrack,
+  tooLongOnTrack,
+  type MusicModelId,
+} from '../../../core/musicModels'
 import { useChooseTake, useDropTake, useMakeTakes, useMusicTakes, useStopTakes } from '../../api'
 import { Failure } from '../../components/Failure'
 import { Problems } from '../../components/Problems'
@@ -37,12 +45,15 @@ export function TakesPanel({ track }: { track: TrackRow }) {
   const none = !view.takes.length && !view.making.length
   const model = picked ?? view.defaultModel
   const here = view.models.find((m) => m.id === model)?.installed ?? false
-  const canMake = generator.ok && here
+  const length = { kind: view.kind, seconds: track.seconds }
+  const tooLong = tooLongOnTrack(model, length.kind, length.seconds)
+  const canMake = generator.ok && here && !tooLong
   // Only when some other model could be picked: with none installed, Setup is the answer above.
+  // A model too short for the track says so first: downloading it would not help.
   const missing =
-    !here && generator.ok ? (
+    (tooLong || !here) && generator.ok ? (
       <span className="takes-missing small" role="status">
-        {missingOnTrack(model)}
+        {tooLong ?? missingOnTrack(model)}
       </span>
     ) : null
   const menu: ReactNode = (
@@ -53,10 +64,21 @@ export function TakesPanel({ track }: { track: TrackRow }) {
       disabled={view.making.length > 0}
       onChange={(event) => setPicked(event.target.value as MusicModelId)}
     >
-      {view.models.map((m) => (
-        <option key={m.id} value={m.id} disabled={!m.installed}>
-          {menuEntry(m.id, m.installed)}
-        </option>
+      {MUSIC_GROUPS.map((group) => (
+        <optgroup key={group.heading} label={group.heading}>
+          {group.ids.map((id) => {
+            const installed = view.models.find((m) => m.id === id)?.installed ?? false
+            return (
+              <option
+                key={id}
+                value={id}
+                disabled={!installed || !canMakeTrack(id, length.kind, length.seconds)}
+              >
+                {menuEntry(id, installed, length)}
+              </option>
+            )
+          })}
+        </optgroup>
       ))}
     </select>
   )
