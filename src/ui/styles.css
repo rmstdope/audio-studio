@@ -2634,6 +2634,9 @@ a.btn {
 .music-subnav {
   padding-left: 20px;
 }
+.nav-workspace:not([aria-current='page']) {
+  color: var(--text);
+}
 .music-id {
   font-size: 12px;
 }

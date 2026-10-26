@@ -12,7 +12,8 @@ import {
   SpendingIcon,
   CheckIcon,
 } from './icons'
-import { dollars, longTitle, plural, shortTitle } from '../format'
+import { dollars, plural, shortTitle } from '../format'
+import { actCount, openWorkspace } from '../sidebarActs'
 
 /** The studio's navigation: project, workspaces, the parts, and the project-wide characters. */
 export function Sidebar({
@@ -31,6 +32,7 @@ export function Sidebar({
   const problems = setup.data?.ok
     ? setup.data.checks.filter((c) => c.state === 'problem').length
     : 0
+  const open = openWorkspace(route)
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -59,77 +61,63 @@ export function Sidebar({
 
       <nav className="nav" aria-label="Workspaces">
         <span className="label">Workspace</span>
-        <a
-          className="nav-item"
-          href={routeHref({ view: 'part', part: activePart })}
-          aria-current={route.view === 'music' ? undefined : 'page'}
-        >
+        <a className="nav-item nav-workspace" href={routeHref({ view: 'part', part: activePart })}>
           <MicIcon /> Narration
         </a>
+        {open === 'narration' &&
+          summary.parts.map((part) => {
+            const count = actCount(part)
+            return (
+              <a
+                key={part.id}
+                className="nav-item music-subnav"
+                title={part.title}
+                href={routeHref({
+                  view: 'part',
+                  part: part.id,
+                  language:
+                    route.view === 'part' || route.view === 'lines' ? route.language : undefined,
+                })}
+                aria-current={activePart === part.id ? 'page' : undefined}
+              >
+                <span className="grow">{shortTitle(part.title)}</span>
+                <span className={count.warn ? 'meta meta-warn' : 'meta'}>{count.text}</span>
+              </a>
+            )
+          })}
         <a
-          className="nav-item"
+          className="nav-item nav-workspace"
           href={routeHref({ view: 'music', page: null })}
           aria-current={route.view === 'music' && !summary.music ? 'page' : undefined}
         >
           <MusicIcon /> <span className="grow">Music</span>
         </a>
-        {summary.music?.lists.map((list) => {
-          const current = route.view === 'music' && listFor(summary.music!.lists, route) === list
-          return (
-            <a
-              key={`${list.kind}:${list.id}`}
-              className="nav-item music-subnav"
-              href={routeHref(
-                list.kind === 'stingers'
-                  ? { view: 'music', page: 'stingers' }
-                  : { view: 'music', page: 'act', part: list.id },
-              )}
-              aria-current={current ? 'page' : undefined}
-            >
-              <span className="grow">
-                {list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)}
-              </span>
-              {list.state === 'ok' && <span className="meta">{list.tracks.length}</span>}
-            </a>
-          )
-        })}
+        {open === 'music' &&
+          summary.music?.lists.map((list) => {
+            const current = route.view === 'music' && listFor(summary.music!.lists, route) === list
+            return (
+              <a
+                key={`${list.kind}:${list.id}`}
+                className="nav-item music-subnav"
+                title={list.title}
+                href={routeHref(
+                  list.kind === 'stingers'
+                    ? { view: 'music', page: 'stingers' }
+                    : { view: 'music', page: 'act', part: list.id },
+                )}
+                aria-current={current ? 'page' : undefined}
+              >
+                <span className="grow">
+                  {list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)}
+                </span>
+                {list.state === 'ok' && <span className="meta">{list.tracks.length}</span>}
+              </a>
+            )
+          })}
         <span className="nav-item" aria-disabled="true">
           <SpeakerIcon /> <span className="grow">Sound effects</span>{' '}
           <span className="meta">Soon</span>
         </span>
-      </nav>
-
-      <nav className="nav" aria-label={`${summary.partLabel}s`}>
-        <span className="label">{summary.partLabel}s</span>
-        {summary.parts.map((part, index) => (
-          <a
-            key={part.id}
-            className="nav-item"
-            href={routeHref({
-              view: 'part',
-              part: part.id,
-              language:
-                route.view === 'part' || route.view === 'lines' ? route.language : undefined,
-            })}
-            aria-current={
-              (route.view === 'part' || route.view === 'lines') && activePart === part.id
-                ? 'page'
-                : undefined
-            }
-          >
-            <span className="num">{index + 1}</span>
-            <span className="grow">{longTitle(part.title)}</span>
-            <span className={part.dialog === 'gone' ? 'meta meta-warn' : 'meta'}>
-              {part.dialog === 'ok'
-                ? plural(part.lineCount, 'line')
-                : part.dialog === 'missing'
-                  ? 'no script'
-                  : part.dialog === 'gone'
-                    ? 'dialog gone'
-                    : 'invalid'}
-            </span>
-          </a>
-        ))}
       </nav>
 
       <nav className="nav sidebar-foot" aria-label="Project">
