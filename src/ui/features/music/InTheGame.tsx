@@ -106,13 +106,13 @@ export function InTheGame({
         )
       : null
   const cls =
-    state.kind === 'unknown'
-      ? 'track-in-game track-in-game-warn'
-      : state.kind === 'nothing'
-        ? 'track-in-game track-in-game-none'
-        : (state.kind === 'take' && state.missing) || (state.kind === 'game' && !state.exists)
-          ? 'track-in-game track-in-game-warn'
-          : 'track-in-game'
+    state.kind === 'nothing'
+      ? 'track-in-game track-in-game-none'
+      : state.kind === 'unknown' ||
+          (state.kind === 'take' && state.missing) ||
+          (state.kind === 'game' && !state.exists)
+        ? 'track-in-game track-in-game-warn'
+        : 'track-in-game'
   const label = <span className="track-in-game-label">In the game</span>
   const hint = <span className="faint small">{state.hint}</span>
 
