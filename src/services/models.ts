@@ -3,7 +3,14 @@ import { ProjectSchema, problemsFrom, type Problem } from '../core/project'
 import type { Stage } from '../core/models'
 import { isPriced } from '../core/prices'
 import { REPLACEMENT_MODEL, RETIRED_MODEL, retiringTakes, type Take } from '../core/retirement'
-import { openProject, projectJson, projectWrites, saveProject } from './projectFile'
+import { writeFailure } from './files'
+import {
+  openProject,
+  projectJson,
+  projectWrites,
+  saveProject,
+  type OpenedProject,
+} from './projectFile'
 import type { ProjectFailure } from './workspace'
 
 /** A switch of the retired model, or why nothing was written. */
@@ -41,8 +48,7 @@ export function switchRetiredModels(projectFile: string, takes: Take[]): Promise
     for (const take of now) models[take] = REPLACEMENT_MODEL
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
-    await saveProject(projectFile, opened, (indent) => projectJson(opened.raw, indent))
-    return { ok: true }
+    return save(projectFile, opened, PATH)
   })
 }
 
@@ -78,7 +84,23 @@ export function setStageModel(
     narration.models = { ...opened.project.narration.models, ...narration.models, [stage]: model }
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
+    return save(projectFile, opened, path)
+  })
+}
+
+/** Writes the changed project file, or says why the disk refused it (`path` is what changed). */
+async function save(
+  projectFile: string,
+  opened: OpenedProject,
+  path: string,
+): Promise<ModelsChange> {
+  try {
     await saveProject(projectFile, opened, (indent) => projectJson(opened.raw, indent))
     return { ok: true }
-  })
+  } catch (error) {
+    return {
+      ok: false,
+      problems: [{ file: basename(projectFile), path, message: writeFailure(error) }],
+    }
+  }
 }

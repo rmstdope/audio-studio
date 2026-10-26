@@ -62,6 +62,25 @@ export async function listFiles(folder: string): Promise<Set<string>> {
   }
 }
 
+/** What a failed write's error code means, in words a user can act on. */
+const WRITE_FAILURES: Record<string, string> = {
+  EACCES: 'permission denied',
+  EPERM: 'permission denied',
+  EROFS: 'the disk is read-only',
+  ENOSPC: 'the disk is full',
+  EDQUOT: 'the disk quota is used up',
+}
+
+/**
+ * Why a write failed, as a reason a user can act on ("permission denied"), not the system call
+ * and temporary file that met it; an error without a known code gives its own message.
+ */
+export function writeFailure(error: unknown): string {
+  const code = (error as NodeJS.ErrnoException | null)?.code
+  if (code && Object.hasOwn(WRITE_FAILURES, code)) return WRITE_FAILURES[code]!
+  return error instanceof Error ? error.message : String(error)
+}
+
 /**
  * Writes `text` (or bytes) to `path` (relative to `root`) through a temporary file and a rename, so a crash
  * never leaves a half-written file. Each write has its own temporary file, so two writes at once
