@@ -42,6 +42,9 @@ export function InTheGame({
   const unchoose = useUnchooseTake(track.id)
   const choose = useChooseTake(track.id)
   const [asking, setAsking] = useState(false)
+  // The take the question was about: a refusal is still named after the page re-reads and the
+  // block no longer knows it (a music lock that cannot be read).
+  const [asked, setAsked] = useState<number | null>(null)
   const opener = useRef<HTMLButtonElement | null>(null)
   const block = useRef<HTMLElement | null>(null)
   const refocus = useFocusWhenClosed(asking, opener)
@@ -95,9 +98,11 @@ export function InTheGame({
 
   const failed = unchoose.data && !unchoose.data.ok ? unchoose.data : null
   const failedLine =
-    state.kind === 'take' && (failed || unchoose.isError)
+    asked !== null &&
+    (state.kind === 'take' || state.kind === 'unknown') &&
+    (failed || unchoose.isError)
       ? unchooseFailure(
-          state.take,
+          asked,
           failed && 'message' in failed
             ? failed.message.replace(/\.$/, '')
             : unchoose.isError && !failed
@@ -131,6 +136,7 @@ export function InTheGame({
         {label}
         <b>The music lock could not be read</b>
         {hint}
+        {failedLine && <span className="adopt-error">{failedLine}</span>}
       </section>
     )
 
@@ -186,6 +192,7 @@ export function InTheGame({
           disabled={unchoose.isPending}
           onClick={() => {
             unchoose.reset()
+            setAsked(state.take)
             setAsking(true)
           }}
         >

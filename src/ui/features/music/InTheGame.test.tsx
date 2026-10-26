@@ -82,15 +82,17 @@ function render(track: TrackRow, takes: TakeView[]) {
     act(() => root.unmount())
     container.remove()
   })
-  act(() =>
-    root.render(
-      createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track })),
-    ),
-  )
+  const show = (track: TrackRow) =>
+    act(() =>
+      root.render(
+        createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track })),
+      ),
+    )
+  show(track)
   const button = (name: string) =>
     [...container.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === name)
   const block = () => container.querySelector('[aria-label="In the game"]')
-  return { container, button, block }
+  return { container, button, block, rerender: show }
 }
 
 async function click(button: HTMLButtonElement | undefined) {
@@ -267,6 +269,24 @@ describe('Un-choose', () => {
     const block = page.block()!
     expect(block.textContent).toContain(
       'Take 3 could not be un-chosen: the disk is full. Nothing was changed.',
+    )
+  })
+
+  it('says why when it was refused for a lock that cannot be read, after the page re-reads', async () => {
+    answer = {
+      ok: false,
+      file: 'music/music.lock.json',
+      problems: [{ file: 'music/music.lock.json', path: '', message: 'not valid JSON' }],
+    }
+    const page = chosen()
+    await click(page.button('Un-choose'))
+    await click(page.button('Un-choose'))
+    // The page re-reads the project: with the lock unreadable, what plays is not known.
+    page.rerender(row({ status: 'not-chosen', chosenAt: null, current: { kind: 'unknown' } }))
+    const block = page.block()!
+    expect(block.textContent).toContain('The music lock could not be read')
+    expect(block.textContent).toContain(
+      'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',
     )
   })
 })
