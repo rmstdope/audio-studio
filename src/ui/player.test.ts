@@ -120,3 +120,35 @@ describe('createPlayer', () => {
     expect(plays).toHaveLength(1)
   })
 })
+
+describe('createPlayer, telling a failure', () => {
+  it('names the clip that failed once, though the failure is told twice', async () => {
+    const { element, plays } = fakeAudio()
+    const failed: string[] = []
+    const player = createPlayer(
+      element,
+      () => {},
+      (id) => failed.push(id),
+    )
+    player.toggle('a', '/a.mp3')
+    player.failed()
+    plays[0]!.reject(new Error('no'))
+    await flush()
+    expect(failed).toEqual(['a'])
+  })
+
+  it('does not name a clip that was stopped or replaced before it failed', async () => {
+    const { element, plays } = fakeAudio()
+    const failed: string[] = []
+    const player = createPlayer(
+      element,
+      () => {},
+      (id) => failed.push(id),
+    )
+    player.toggle('a', '/a.mp3')
+    player.toggle('b', '/b.mp3')
+    plays[0]!.reject(new Error('no'))
+    await flush()
+    expect(failed).toEqual([])
+  })
+})

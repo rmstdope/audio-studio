@@ -2606,6 +2606,19 @@ a.btn {
 .music-play {
   width: 44px;
 }
+.music-plays {
+  min-width: 140px;
+}
+.music-plays-err {
+  color: var(--danger-ink);
+  font-size: 12px;
+}
+.music-plays-none {
+  color: var(--faint);
+}
+.music-stop {
+  color: var(--accent);
+}
 .music-brief-cell {
   max-width: 0;
   width: 45%;
@@ -2866,4 +2879,14 @@ a.btn {
   flex-direction: column;
   gap: 2px;
   color: var(--danger-ink);
+}
+
+/* Narrow window: the Brief column goes first. */
+@media (max-width: 800px) {
+  .music-table .music-brief-cell {
+    display: none;
+  }
+  .music-table {
+    min-width: 0;
+  }
 }

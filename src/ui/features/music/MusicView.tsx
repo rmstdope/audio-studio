@@ -3,8 +3,11 @@ import type { ProjectSummary } from '../../../core/summary'
 import type { RefreshResult, RefreshSharedResult } from '../../../services/refresh'
 import { useMusicMaking, useRefreshDialog, useRefreshShared } from '../../api'
 import { STATUS_LABEL, type TrackStatus } from '../../../core/musicChoose'
+import { useState } from 'react'
 import { Problems } from '../../components/Problems'
-import { PlayIcon } from '../../components/icons'
+import { PlayIcon, StopIcon } from '../../components/icons'
+import { useClipPlayer } from '../../components/useClipPlayer'
+import { canPlay, playLabel, playsText, type PlayFailure } from '../../musicPlays'
 import { clock, shortTitle } from '../../format'
 import { makingStatusText } from '../../musicTakesText'
 import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
@@ -102,6 +105,15 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
   const name = list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)
   const notice = listNotice(list, name)
   const making = useMusicMaking().data ?? {}
+  // Why the last press of play failed, by track; cleared when the row is pressed again.
+  const [failed, setFailed] = useState<Record<string, PlayFailure>>({})
+  const player = useClipPlayer((id) => {
+    void whyFailed(currentUrl(id)).then((why) => setFailed((was) => ({ ...was, [id]: why })))
+  })
+  const press = (id: string) => {
+    setFailed(({ [id]: _, ...rest }) => rest)
+    player.toggle(id, currentUrl(id))
+  }
   return (
     <>
       <header className="page-header">
@@ -135,51 +147,56 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
               <tr>
                 <th aria-label="Play" />
                 <th>Track</th>
-                <th>Brief</th>
+                <th className="music-brief-cell">Brief</th>
                 <th>Length</th>
+                <th>Plays</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {list.tracks.map((track) => (
-                <tr key={track.id}>
-                  <td className="music-play">
-                    <button
-                      className="icon-btn"
-                      type="button"
-                      disabled
-                      title="No take chosen"
-                      aria-label={`Play ${track.title}: no take chosen`}
-                    >
-                      <PlayIcon />
-                    </button>
-                  </td>
-                  <td>
-                    <a
-                      className="music-track-link"
-                      href={routeHref({ view: 'music', page: 'track', track: track.id })}
-                    >
-                      <strong>{track.title}</strong>
-                    </a>
-                    <div className="mono muted music-id">{track.id}</div>
-                  </td>
-                  <td className="music-brief-cell">
-                    <div className="music-brief" title={track.brief}>
-                      {track.brief}
-                    </div>
-                  </td>
-                  <td>{clock(track.seconds)}</td>
-                  <td>
-                    {making[track.id] ? (
-                      <span className="chip">{makingStatusText(making[track.id]!)}</span>
-                    ) : (
-                      <span className={STATUS_CHIP[track.status]}>
-                        {STATUS_LABEL[track.status]}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {list.tracks.map((track) => {
+                const playing = player.playing
+                return (
+                  <tr key={track.id}>
+                    <td className="music-play">
+                      <button
+                        className={playing === track.id ? 'icon-btn music-stop' : 'icon-btn'}
+                        type="button"
+                        disabled={!canPlay(track.current)}
+                        aria-label={playLabel(track.title, track.current, playing === track.id)}
+                        onClick={() => press(track.id)}
+                      >
+                        {playing === track.id ? <StopIcon /> : <PlayIcon />}
+                      </button>
+                    </td>
+                    <td>
+                      <a
+                        className="music-track-link"
+                        href={routeHref({ view: 'music', page: 'track', track: track.id })}
+                      >
+                        <strong>{track.title}</strong>
+                      </a>
+                      <div className="mono muted music-id">{track.id}</div>
+                    </td>
+                    <td className="music-brief-cell">
+                      <div className="music-brief" title={track.brief}>
+                        {track.brief}
+                      </div>
+                    </td>
+                    <td>{clock(track.seconds)}</td>
+                    <PlaysCell text={playsText(track.current, failed[track.id])} />
+                    <td>
+                      {making[track.id] ? (
+                        <span className="chip">{makingStatusText(making[track.id]!)}</span>
+                      ) : (
+                        <span className={STATUS_CHIP[track.status]}>
+                          {STATUS_LABEL[track.status]}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -252,5 +269,37 @@ function FailedPanel({
         <pre className="refresh-output mono">{result.output}</pre>
       )}
     </section>
+  )
+}
+
+/** The API path of the music a track plays now. */
+function currentUrl(id: string): string {
+  return `/api/music/tracks/${encodeURIComponent(id)}/current`
+}
+
+/** Why a play failed: the file is gone since the page loaded, or it is there but will not open. */
+async function whyFailed(url: string): Promise<PlayFailure> {
+  try {
+    const response = await fetch(url)
+    void response.body?.cancel()
+    return response.status === 404 ? 'gone' : 'open'
+  } catch {
+    return 'open'
+  }
+}
+
+/** What a row plays, beside its button: take or the game's file, its name, and any red line. */
+function PlaysCell({ text }: { text: ReturnType<typeof playsText> }) {
+  return (
+    <td className="music-plays">
+      <span className={text.faint ? 'music-plays-none' : undefined}>{text.lead}</span>
+      {text.file && <div className="mono muted music-id">{text.file}</div>}
+      {text.missing && <div className="music-plays-err">{text.missing}</div>}
+      {text.failure && (
+        <div className="music-plays-err" role="status">
+          {text.failure}
+        </div>
+      )}
+    </td>
   )
 }
