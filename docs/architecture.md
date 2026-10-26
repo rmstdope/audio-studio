@@ -352,9 +352,10 @@ fingerprint, so changing a scene's cue makes the lines that follow it stale for 
 and putting it back makes them up to date again. In a language besides the source the scene is the
 source dialog's name for the line, and its cue follows the source's until the language has its own
 (`cueFrom` adds `scene` and `sceneSource`). `PartState.scenes` lists the scenes with their cue,
-line counts, recorded followers (what saving marks stale) and the first line that follows (what
-Hear it says); the lines page puts a band per run of a scene's lines above them, carrying the cue
-and its editor, and a scene cue whose scene left the dialog is an orphaned cue.
+line counts, up-to-date recorded followers (what saving newly marks stale; a follower already stale
+is not counted) and the first line that follows (what Hear it says); the lines page puts a band per
+run of a scene's lines above them, carrying the cue and its editor, and a scene cue whose scene left
+the dialog is an orphaned cue.
 
 **Cues inside a line** (as-vhm): a line's entry is its opening cue alone (as always), or the _cued
 text_: the opening cue, then the line's own words with a bracketed cue between some of them

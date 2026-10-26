@@ -109,7 +109,7 @@ export interface SceneState {
   lines: number
   /** Lines that follow the scene's cue (when it has one): recordable ones of the named speakers. */
   following: number
-  /** Of those, the lines with a clip made from today's or older inputs: what a change marks stale. */
+  /** Of those, the lines with a clip made from today's inputs: what a change newly marks stale. */
   recordedFollowing: number
   /** The first line that follows the scene's cue, which Hear it says; null when none does. */
   firstFollowing: string | null
@@ -315,7 +315,7 @@ function sceneStates(
     scene.lines++
     if (line.followsScene && line.status !== 'untranslated') {
       scene.following++
-      if (line.status === 'ok' || line.status === 'weak' || line.status === 'stale') {
+      if (line.status === 'ok' || line.status === 'weak') {
         scene.recordedFollowing++
       }
       scene.firstFollowing ??= line.key

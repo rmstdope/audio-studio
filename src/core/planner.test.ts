@@ -483,7 +483,16 @@ describe('planPart, scene cues', () => {
   })
 
   it('describes each scene: its cue, followers, recorded followers and first follower', () => {
-    const lock = { n2: entryFor(scened[2]!) }
+    const n2 = scened[2]!
+    const inputs = clipInputs(
+      n2,
+      cast.speakers.narrator,
+      { 'scene:Cave': '[dark]' },
+      {},
+      narration,
+    )!
+    const { fp, parts } = fingerprint(inputs)
+    const lock = { n2: { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then' } }
     const manifest = { n2: { file: 'n2.mp3', speaker: 'narrator' } }
     const state = plan({
       lock,
@@ -504,6 +513,21 @@ describe('planPart, scene cues', () => {
       },
     ])
     expect(plan().scenes[0]).toMatchObject({ cue: null, cueFrom: null })
+  })
+
+  it('counts only up-to-date clips as recorded followers, since a stale one is marked already', () => {
+    const lock = {
+      n1: entryFor(scened[0]!),
+      n2: entryFor(scened[2]!, cast, { fp: 'older', voice: 'an older voice' }),
+    }
+    const manifest = {
+      n1: { file: 'n1.mp3', speaker: 'narrator' },
+      n2: { file: 'n2.mp3', speaker: 'narrator' },
+    }
+    const state = plan({ lock, manifest, files: new Set(['n1.mp3', 'n2.mp3']) })
+    expect(by(state).n1?.status).toBe('ok')
+    expect(by(state).n2?.status).toBe('stale')
+    expect(state.scenes[0]).toMatchObject({ following: 3, recordedFollowing: 1 })
   })
 
   it('has no scenes when the dialog names none', () => {
