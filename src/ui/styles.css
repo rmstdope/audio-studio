@@ -775,6 +775,7 @@ a.btn {
 
 .table-box {
   overflow-x: auto;
+  container-type: inline-size;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--sidebar);
@@ -3019,6 +3020,13 @@ button.cue-chip[aria-expanded='true'] {
 .scene-band td {
   background: var(--raised);
   padding: 9px 12px;
+}
+/* The band spans the whole table, which can be wider than its box: hold its text to the visible
+   width, and keep it there while the table scrolls sideways. */
+.scene-band td > * {
+  position: sticky;
+  left: 12px;
+  max-width: calc(100cqi - 24px);
 }
 .scene-band-head {
   display: flex;
