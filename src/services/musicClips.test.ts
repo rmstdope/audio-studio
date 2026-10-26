@@ -173,9 +173,41 @@ describe('commitChoice', () => {
       encode,
       now: () => at,
     })
-    expect(result).toMatchObject({ ok: false, file: 'audio/music/manifest.json' })
+    expect(result).toEqual({
+      ok: false,
+      message:
+        'Take 1 could not be chosen: the music manifest could not be read. Nothing was changed.',
+    })
     expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
     expect(existsSync(join(root, 'music/music.lock.json'))).toBe(false)
+    expect(readdirSync(join(root, 'audio/music'))).toEqual(['manifest.json'])
+  })
+})
+
+describe('commitChoice with both files broken', () => {
+  it('names the manifest, writing nothing', async () => {
+    const root = tempRepo({
+      'audio/music/manifest.json': '{ nope',
+      'music/music.lock.json': '{ nope',
+    })
+    const { encode } = fakeEncoder()
+    const result = await commitChoice({
+      root,
+      music: config,
+      id: 'hall',
+      listId: 'act1',
+      take: take(2),
+      wav: new Uint8Array(4),
+      encode,
+      now: () => at,
+    })
+    expect(result).toEqual({
+      ok: false,
+      message:
+        'Take 2 could not be chosen: the music manifest could not be read. Nothing was changed.',
+    })
+    expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
+    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
     expect(readdirSync(join(root, 'audio/music'))).toEqual(['manifest.json'])
   })
 })
@@ -272,17 +304,28 @@ describe('uncommitChoice', () => {
     const root = await chosen()
     writeFileSync(join(root, 'music/music.lock.json'), '{ nope')
     const result = await uncommitChoice({ root, music: config, id: 'hall' })
-    expect(result.ok).toBe(false)
-    expect('problems' in result).toBe(true)
+    expect(result).toEqual({ ok: false, message: 'The music lock could not be read.' })
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
+    expect(Object.keys(readJson(root, 'audio/music/manifest.json'))).toEqual(['cave', 'hall'])
   })
 
   it('deletes nothing when the manifest cannot be read', async () => {
     const root = await chosen()
     writeFileSync(join(root, 'audio/music/manifest.json'), '{ nope')
     const result = await uncommitChoice({ root, music: config, id: 'hall' })
-    expect('problems' in result).toBe(true)
+    expect(result).toEqual({ ok: false, message: 'The music manifest could not be read.' })
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
     expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave', 'hall'])
+  })
+
+  it('names the manifest when both the manifest and the lock cannot be read', async () => {
+    const root = await chosen()
+    writeFileSync(join(root, 'audio/music/manifest.json'), '{ nope')
+    writeFileSync(join(root, 'music/music.lock.json'), '{ nope')
+    const result = await uncommitChoice({ root, music: config, id: 'hall' })
+    expect(result).toEqual({ ok: false, message: 'The music manifest could not be read.' })
+    expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
+    expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
+    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
   })
 })

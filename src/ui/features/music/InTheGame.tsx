@@ -112,11 +112,11 @@ export function InTheGame({
     (failed || unchoose.isError)
       ? unchooseFailure(
           asked,
-          failed && 'message' in failed
-            ? failed.message.replace(/\.$/, '')
-            : unchoose.isError && !failed
-              ? unchoose.error.message
-              : 'the music lock could not be read',
+          !failed
+            ? (unchoose.error?.message ?? '')
+            : 'message' in failed
+              ? failed.message
+              : `${failed.file} could not be read`,
         )
       : null
   const cls =
