@@ -341,6 +341,19 @@ language's clips stale for the cue, and `LineState.cueFrom` (`own`, `source`, `s
 `sourceCue` tell the page where a cue comes from. Editing a cue in a language writes that
 language's file only.
 
+**Scene cues** (as-2qh): a dialog line may name its `scene`, and the cues file holds a cue per scene
+under the key `scene:<name>` (a line key never holds a colon, so it cannot collide with one, and the
+game, which looks up its own keys, ignores it). A line is cued by its own cue, else its scene's, else
+its character's style; only the speakers in `narration.sceneCueSpeakers` (cast ids, default
+`["narrator"]`, edited by hand in the project file) follow scene cues. The cue that results feeds the
+fingerprint, so changing a scene's cue makes the lines that follow it stale for "The cue changed"
+and putting it back makes them up to date again. In a language besides the source the scene is the
+source dialog's name for the line, and its cue follows the source's until the language has its own
+(`cueFrom` adds `scene` and `sceneSource`). `PartState.scenes` lists the scenes with their cue,
+line counts, recorded followers (what saving marks stale) and the first line that follows (what
+Hear it says); the lines page puts a band per run of a scene's lines above them, carrying the cue
+and its editor, and a scene cue whose scene left the dialog is an orphaned cue.
+
 **Manifest** (`manifest.json`, written): unchanged, `{ key: { file, speaker, duration, words[] } }`.
 This is what the game reads.
 
@@ -1003,6 +1016,8 @@ POST   /api/music/stingers/refresh               run music.refreshShared; the st
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
 POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
+PATCH  /api/parts/:part/scene-cues               a scene's cue ({ scene, cue }; empty: remove)
+POST   /api/parts/:part/scene-cues/move          an orphaned scene cue to a scene ({ from, to }; null: remove)
 GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
 PATCH  /api/characters/:id                       style, speed, keywords, phrase
@@ -1160,7 +1175,8 @@ Small, independently useful increments:
          with their text; each is given to a line (in its place in the cues file; lines without a
          clip offered first, since a reworded line has none yet, and suggested when it is the only
          one; numbered as in the dialog) or removed. Listed in the cues file's order. A line with its own
-         cue is not offered over.
+         cue is not offered over. Scene cues whose scene left the dialog are listed there too, given
+         to a scene without a cue of its own, or removed.
 7. **RetroQuest switch-over**. RetroQuest's narration moved on meanwhile (Acts II–IV recorded with
    `narrate.py`, clips levelled to −16 LUFS by `level.py`, a cast per act, `extract-act.ts`), so:
    1. **Parity** (built): measured clips are transcribed from their decoded WAV, as
@@ -1213,6 +1229,8 @@ Small, independently useful increments:
     1. **Hear it** (built): a line's cue heard before it is saved, as a free take (§8.3).
     2. **Playthrough** (built): the lines shown played in turn, from the first or from a row, the
        row playing marked and kept in view (§8.3).
+       2a. **Scene cues** (built, as-2qh): a cue per scene that its narrator lines follow, edited in a
+       band above the scene's lines (§ Cues).
     3. **A character's speed** (built): `speed` in the cast, edited on the character page; its
        lines, takes and tries spoken at it, and its lines stale when it changes (§6, §7).
     4. **Setup page** (built): what the machine and the project lack, with the fix for each (§10).

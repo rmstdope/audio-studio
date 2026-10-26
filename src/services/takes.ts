@@ -10,6 +10,7 @@ import {
 } from '../core/project'
 import type { Budget } from '../core/spend'
 import { isPaid } from '../core/sitting'
+import { sceneCueFor } from '../core/fingerprint'
 import { cueFor, projectCast, ttsFor, type Cast } from '../core/resources'
 import type { ProjectSummary } from '../core/summary'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
@@ -134,8 +135,14 @@ export async function tryLine(
       message: `${line.speaker} has no voice yet; cast one first.`,
     }
   }
-  // Nothing typed: the cue the line would follow, the source language's, else the character's style.
-  const tried = cue.trim() || cueFor(read.sourceCues, key) || (character.style ?? '')
+  // Nothing typed: the cue the line would follow without its own: the source language's, else its
+  // scene's, else the character's style.
+  const withoutOwn = Object.fromEntries(Object.entries(read.input.cues).filter(([k]) => k !== key))
+  const tried =
+    cue.trim() ||
+    cueFor(read.sourceCues, key) ||
+    sceneCueFor(line, withoutOwn, read.project.narration) ||
+    (character.style ?? '')
   const spoken = spokenText(line.text, tried, cast.pronounce)
   const tts = ttsFor(read.project.narration.tts, character)
   return speak(

@@ -412,3 +412,138 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['cue'] })
   })
 })
+
+describe('planPart, scene cues', () => {
+  const scened: Line[] = [
+    { key: 'n1', speaker: 'narrator', text: 'Elior wakes.', scene: 'Cave' },
+    { key: 'm1', speaker: 'mira', text: 'Welcome, child.', scene: 'Cave' },
+    { key: 'n2', speaker: 'narrator', text: 'Light fades.', scene: 'Cave' },
+    { key: 'n3', speaker: 'narrator', text: 'Morning.' },
+    { key: 'n4', speaker: 'narrator', text: 'Back again.', scene: 'Cave' },
+  ]
+  const plan = (overrides: Partial<PlanInput> = {}) =>
+    planPart(input({ lines: scened, ...overrides }))
+  const by = (state: ReturnType<typeof planPart>) =>
+    Object.fromEntries(state.lines.map((l) => [l.key, l]))
+
+  it('gives a scene’s cue to the narrator’s lines, before the style', () => {
+    const lines = by(plan({ cues: { 'scene:Cave': '[dark]' } }))
+    expect(lines.n1).toMatchObject({
+      cue: '[dark]',
+      cueFrom: 'scene',
+      followsScene: true,
+      scene: 'Cave',
+    })
+    expect(lines.n3).toMatchObject({
+      cue: '[warm]',
+      cueFrom: 'style',
+      followsScene: false,
+      scene: null,
+    })
+  })
+
+  it('leaves speakers the project does not name on their own cue or style', () => {
+    const lines = by(plan({ cues: { 'scene:Cave': '[dark]' } }))
+    expect(lines.m1).toMatchObject({ cue: '[low, calm]', cueFrom: 'style', followsScene: false })
+  })
+
+  it('lets a line’s own cue win, and follows other named speakers', () => {
+    const state = plan({
+      cues: { 'scene:Cave': '[dark]', n2: '[hushed]', m1: '[sad]' },
+      narration: { ...narration, sceneCueSpeakers: ['narrator', 'mira'] },
+    })
+    const lines = by(state)
+    expect(lines.n2).toMatchObject({ cue: '[hushed]', cueFrom: 'own', followsScene: false })
+    expect(lines.m1).toMatchObject({ cue: '[sad]', cueFrom: 'own' })
+    expect(
+      by(
+        plan({
+          cues: { 'scene:Cave': '[dark]' },
+          narration: { ...narration, sceneCueSpeakers: ['mira'] },
+        }),
+      ).m1?.cue,
+    ).toBe('[dark]')
+  })
+
+  it('marks recorded lines stale for the cue when the scene cue changes, and ok when it goes back', () => {
+    const lock = Object.fromEntries(
+      scened.filter((l) => l.speaker === 'narrator').map((l) => [l.key, entryFor(l)]),
+    )
+    const manifest = Object.fromEntries(
+      scened
+        .filter((l) => l.speaker === 'narrator')
+        .map((l) => [l.key, { file: `${l.key}.mp3`, speaker: 'narrator' }]),
+    )
+    const files = new Set(Object.values(manifest).map((c) => c.file))
+    const changed = plan({ lock, manifest, files, cues: { 'scene:Cave': '[dark]' } })
+    expect(by(changed).n1).toMatchObject({ status: 'stale', reasons: ['cue'] })
+    expect(by(changed).n3?.status).toBe('ok')
+    expect(plan({ lock, manifest, files }).counts.ok).toBe(4)
+  })
+
+  it('describes each scene: its cue, followers, recorded followers and first follower', () => {
+    const lock = { n2: entryFor(scened[2]!) }
+    const manifest = { n2: { file: 'n2.mp3', speaker: 'narrator' } }
+    const state = plan({
+      lock,
+      manifest,
+      files: new Set(['n2.mp3']),
+      cues: { 'scene:Cave': '[dark]' },
+    })
+    expect(state.scenes).toEqual([
+      {
+        name: 'Cave',
+        cue: '[dark]',
+        cueFrom: 'own',
+        sourceCue: null,
+        lines: 4,
+        following: 3,
+        recordedFollowing: 1,
+        firstFollowing: 'n1',
+      },
+    ])
+    expect(plan().scenes[0]).toMatchObject({ cue: null, cueFrom: null })
+  })
+
+  it('has no scenes when the dialog names none', () => {
+    expect(planPart(input()).scenes).toEqual([])
+    expect(planPart(input()).lines.every((l) => l.scene === null)).toBe(true)
+  })
+
+  it('follows the source language’s scene cue until the language has its own', () => {
+    const source: Line[] = scened
+    const svenska: Line[] = scened.map((l) => ({ ...l, text: `sv ${l.text}`, scene: undefined }))
+    const followed = by(
+      planPart(
+        input({
+          lines: svenska,
+          source,
+          cues: { 'scene:Cave': '[mörkt]' },
+          ownCues: {},
+          sourceCues: { 'scene:Cave': '[mörkt]' },
+        }),
+      ),
+    )
+    expect(followed.n1).toMatchObject({ scene: 'Cave', cue: '[mörkt]', cueFrom: 'sceneSource' })
+    const own = planPart(
+      input({
+        lines: svenska,
+        source,
+        cues: { 'scene:Cave': '[eget]' },
+        ownCues: { 'scene:Cave': '[eget]' },
+        sourceCues: { 'scene:Cave': '[mörkt]' },
+      }),
+    )
+    expect(by(own).n1).toMatchObject({ cue: '[eget]', cueFrom: 'scene' })
+    expect(own.scenes[0]).toMatchObject({ cueFrom: 'own', cue: '[eget]', sourceCue: '[mörkt]' })
+  })
+
+  it('lists a scene cue whose scene left the dialog as an orphan, never while held', () => {
+    const cues = { 'scene:Cave': '[dark]', 'scene:Gone': '[old]', gone: '[soft]' }
+    expect(plan({ cues }).orphanCues).toEqual([
+      { key: 'scene:Gone', cue: '[old]' },
+      { key: 'gone', cue: '[soft]' },
+    ])
+    expect(plan({ cues, held: true }).orphanCues).toEqual([])
+  })
+})

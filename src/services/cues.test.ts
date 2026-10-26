@@ -2,8 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { loadPart } from './workspace'
-import { moveCue, setCue } from './cues'
+import { clipInputs } from '../core/fingerprint'
+import { loadPart, readPart } from './workspace'
+import { moveCue, moveSceneCue, setCue, setSceneCue } from './cues'
 
 const files = {
   'audio-studio.json': projectJson(),
@@ -228,5 +229,111 @@ describe('cues in a language besides the source', () => {
     const projectFile = join(root, 'audio-studio.json')
     expect(await moveCue(projectFile, 'act1', 'old', 'a', 'sv')).toEqual({ ok: true })
     expect(await cueOf(projectFile, 'sv')).toMatchObject({ cue: '[x]', cueFrom: 'own' })
+  })
+})
+
+describe('scene cues', () => {
+  const scened = {
+    ...files,
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'narrator', text: 'Hello.', scene: 'Cave' },
+      { key: 'b', speaker: 'narrator', text: 'Goodbye.', scene: 'Meadow' },
+    ],
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } }, pronounce: {} },
+  }
+  const cuesOf = (root: string) => readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')
+
+  it('saves a scene’s cue under scene:<name>, after the others, and the narrator follows it', async () => {
+    const root = tempRepo({ ...scened, 'tts/act1/cues.json': '{\n  "b": "[sad]"\n}\n' })
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setSceneCue(projectFile, 'act1', 'Cave', ' [dark] ')).toEqual({ ok: true })
+    expect(cuesOf(root)).toBe('{\n  "b": "[sad]",\n  "scene:Cave": "[dark]"\n}\n')
+    const part = await loadPart(projectFile, 'act1')
+    expect(part?.ok && part.part.lines.find((l) => l.key === 'a')).toMatchObject({
+      cue: '[dark]',
+      cueFrom: 'scene',
+    })
+  })
+
+  it('removes the cue when it is cleared, and writes nothing when it does not change', async () => {
+    const root = tempRepo(scened)
+    const projectFile = join(root, 'audio-studio.json')
+    await setSceneCue(projectFile, 'act1', 'Cave', '[dark]')
+    const before = cuesOf(root)
+    await setSceneCue(projectFile, 'act1', 'Cave', '[dark]')
+    expect(cuesOf(root)).toBe(before)
+    await setSceneCue(projectFile, 'act1', 'Cave', '')
+    expect(cuesOf(root)).toBe('{}\n')
+  })
+
+  it('knows no unknown scene or part', async () => {
+    const root = tempRepo(scened)
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await setSceneCue(projectFile, 'act1', 'Nowhere', '[x]')).toBeNull()
+    expect(await setSceneCue(projectFile, 'nope', 'Cave', '[x]')).toBeNull()
+  })
+
+  it('gives an orphaned scene cue to another scene, or removes it; never one still in the dialog', async () => {
+    const root = tempRepo({
+      ...scened,
+      'tts/act1/cues.json': '{\n  "scene:Gone": "[old]",\n  "scene:Cave": "[dark]"\n}\n',
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    expect(await moveSceneCue(projectFile, 'act1', 'Cave', 'Meadow')).toMatchObject({ ok: false })
+    expect(await moveSceneCue(projectFile, 'act1', 'Gone', 'Cave')).toMatchObject({ ok: false })
+    expect(await moveSceneCue(projectFile, 'act1', 'Gone', 'Meadow')).toEqual({ ok: true })
+    expect(cuesOf(root)).toBe('{\n  "scene:Meadow": "[old]",\n  "scene:Cave": "[dark]"\n}\n')
+    const other = tempRepo({ ...scened, 'tts/act1/cues.json': { 'scene:Gone': '[old]' } })
+    expect(await moveSceneCue(join(other, 'audio-studio.json'), 'act1', 'Gone', null)).toEqual({
+      ok: true,
+    })
+    expect(cuesOf(other)).toBe('{}\n')
+    expect(await moveSceneCue(join(other, 'audio-studio.json'), 'act1', 'Gone', null)).toBeNull()
+  })
+
+  it('follows the source language’s scene name, and writes the language’s own cue only', async () => {
+    const several = projectJson()
+    const narration = several.narration as Record<string, unknown>
+    narration.languages = ['en', 'sv']
+    narration.paths = {
+      dialog: 'tts/{part}/{language}/script.json',
+      cues: 'tts/{part}/{language}/cues.json',
+      lock: 'tts/{part}/{language}/narration.lock.json',
+      clips: 'audio/{part}/{language}',
+      manifest: 'audio/{part}/{language}/manifest.json',
+    }
+    const root = tempRepo({
+      'audio-studio.json': several,
+      'tts/cast.json': {
+        speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v2' } } } },
+      },
+      'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Hi.', scene: 'Cave' }],
+      'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'Hej.' }],
+      'tts/act1/en/cues.json': { 'scene:Cave': '[dark]' },
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    const line = async () => {
+      const part = await loadPart(projectFile, 'act1', 'sv')
+      return part?.ok ? part.part.lines[0] : undefined
+    }
+    expect(await line()).toMatchObject({ cue: '[dark]', cueFrom: 'sceneSource' })
+    // What is recorded, adopted and tried reads the same lines as the page: with the source's scene.
+    const read = await readPart(projectFile, 'act1', 'sv')
+    if (!read?.ok) throw new Error('part unreadable')
+    const sv = read.input.lines[0]!
+    expect(sv.scene).toBe('Cave')
+    const inputs = clipInputs(
+      sv,
+      read.input.cast.speakers.narrator,
+      read.input.cues,
+      {},
+      read.project.narration,
+    )
+    expect(inputs?.cue).toBe('[dark]')
+    expect(await setSceneCue(projectFile, 'act1', 'Cave', '[mörkt]', 'sv')).toEqual({ ok: true })
+    expect(await line()).toMatchObject({ cue: '[mörkt]', cueFrom: 'scene' })
+    expect(readFileSync(join(root, 'tts/act1/en/cues.json'), 'utf8')).toBe(
+      '{\n  "scene:Cave": "[dark]"\n}',
+    )
   })
 })

@@ -1,7 +1,7 @@
 import { dirname } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import { problemsFrom, type Problem } from '../core/project'
-import { CuesSchema } from '../core/resources'
+import { CuesSchema, sceneKey } from '../core/resources'
 import { readJson, writeAtomic } from './files'
 import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
@@ -70,6 +70,35 @@ export async function moveCue(
   )
 }
 
+/**
+ * Saves a scene's cue in the part's cues file, under `scene:<name>`, as `setCue` saves a line's:
+ * the language's own, and an empty cue removes it. Null for a scene the dialog does not name.
+ */
+export async function setSceneCue(
+  projectFile: string,
+  partId: string,
+  scene: string,
+  cue: string,
+  language?: string,
+): Promise<CueChange> {
+  return setCue(projectFile, partId, sceneKey(scene), cue, language)
+}
+
+/**
+ * Gives an orphaned scene cue (its scene left the dialog, usually renamed) to the scene `to`, in
+ * its place in the file, or removes it when `to` is null; refused, as for lines, for a scene still
+ * in the dialog or one that has a cue of its own already.
+ */
+export async function moveSceneCue(
+  projectFile: string,
+  partId: string,
+  from: string,
+  to: string | null,
+  language?: string,
+): Promise<CueChange> {
+  return moveCue(projectFile, partId, sceneKey(from), to === null ? null : sceneKey(to), language)
+}
+
 /** One cue: a line key and the cue it is delivered with. */
 type Cue = [key: string, cue: string]
 
@@ -96,7 +125,16 @@ async function changeCues(
 ): Promise<CueChange> {
   const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return read
-  const inDialog = new Set(read.input.lines.map((line) => line.key))
+  // The dialog's line keys, and the `scene:` keys of its scenes: the source language's name for a
+  // line's scene, else the line's own.
+  const inSource = new Set((read.input.source ?? []).map((line) => line.key))
+  const inDialog = new Set([
+    ...read.input.lines.map((line) => line.key),
+    ...[
+      ...(read.input.source ?? []),
+      ...read.input.lines.filter((l) => !inSource.has(l.key)),
+    ].flatMap((line) => (line.scene ? [sceneKey(line.scene)] : [])),
+  ])
   if (!lines.every((key) => inDialog.has(key))) return null
   if (read.input.held) {
     // Nothing is orphaned while the dialog is unreadable or gone, so no cue moves or goes.

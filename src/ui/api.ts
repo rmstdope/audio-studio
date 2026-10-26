@@ -784,6 +784,66 @@ export function useMoveCue(partId: string, language?: string) {
   })
 }
 
+/** Gives an orphaned scene cue to the scene `to`, or removes it (null), then reloads the part. */
+export function useMoveSceneCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ from, to }: { from: string; to: string | null }) => {
+      const response = await fetch(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/scene-cues/move`, language),
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ from, to }),
+        },
+      )
+      if (response.status === 404) {
+        throw new Error(
+          'That cue or scene is no longer in this part; the page shows it as it is now.',
+        )
+      }
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`moving the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    // Moved or not (a 404 means the part changed), the page shows the part as it is now.
+    onSettled: async () => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['changes'] })
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/** Saves a scene's cue (empty to remove it), then reloads the part. */
+export function useSetSceneCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ scene, cue }: { scene: string; cue: string }) => {
+      const response = await fetch(
+        inLanguage(`/api/parts/${encodeURIComponent(partId)}/scene-cues`, language),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ scene, cue }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the scene cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['project'] })
+      // The editor closes once the cue shown is the new one.
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
 /** Saves the user's note on a line (empty to remove it), then reloads the part. */
 export function useSetNote(partId: string, language?: string) {
   const client = useQueryClient()

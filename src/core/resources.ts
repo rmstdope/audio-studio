@@ -6,6 +6,8 @@ export const LineSchema = z.object({
   key: z.string().regex(/^[A-Za-z0-9_-]+$/, 'a line key may only hold letters, digits, - and _'),
   speaker: z.string().min(1),
   text: z.string(),
+  /** The scene the line belongs to, as the game's dialog names it; lines without one are in none. */
+  scene: z.string().min(1).optional(),
 })
 
 /** A part's dialog resource (RetroQuest: `tts/<act>/script.json`). Read only. Keys are unique. */
@@ -176,6 +178,22 @@ export const CuesSchema = z.record(z.string(), z.string())
 /** A line's own cue, if it has one (only the file's own keys: never `toString` and the like). */
 export function cueFor(cues: Record<string, string>, key: string): string | undefined {
   return Object.hasOwn(cues, key) ? cues[key] : undefined
+}
+
+/**
+ * What a scene's cue is kept under in the cues file: a line key never holds a colon, so it cannot
+ * be one, and the game, which looks up its lines' keys, never reads it.
+ */
+const SCENE_PREFIX = 'scene:'
+
+/** The cues file's key for a scene's cue. */
+export function sceneKey(scene: string): string {
+  return `${SCENE_PREFIX}${scene}`
+}
+
+/** The scene a cues file key names, or null for a line's key. */
+export function sceneOfKey(key: string): string | null {
+  return key.startsWith(SCENE_PREFIX) ? key.slice(SCENE_PREFIX.length) : null
 }
 
 /** One clip in the game's manifest. Only what the studio needs is checked; the rest is kept. */
