@@ -90,7 +90,7 @@ function render(kind: MusicListSummary['kind']) {
     [...container.querySelectorAll<HTMLButtonElement>('td.music-play button')].find((b) =>
       b.getAttribute('aria-label')!.includes(title),
     )!
-  return { button }
+  return { button, container }
 }
 
 describe.each(['act', 'stingers'] as const)('the play button on a %s page', (kind) => {
@@ -100,7 +100,6 @@ describe.each(['act', 'stingers'] as const)('the play button on a %s page', (kin
   it('plays the chosen take’s music file', () => {
     const page = render(kind)
     const play = page.button('Lantern hall')
-    expect(play.disabled).toBe(false)
     expect(play.getAttribute('aria-label')).toBe('Play Lantern hall: take 3')
     played.length = 0
     act(() => play.click())
@@ -110,22 +109,28 @@ describe.each(['act', 'stingers'] as const)('the play button on a %s page', (kin
 
   it('still plays a chosen take whose track changed since', () => {
     const play = button('Cellar')
-    expect(play.disabled).toBe(false)
     expect(play.getAttribute('aria-label')).toBe('Play Cellar: take 3')
     played.length = 0
     act(() => play.click())
     expect(played).toEqual(['/api/music/tracks/cellar/current'])
   })
 
-  it('is dim and says so when the music file is missing', () => {
-    const play = button('Tower')
-    expect(play.disabled).toBe(true)
-    expect(play.getAttribute('aria-label')).toBe('Play Tower: take 3, the file is not there')
+  const playCell = (container: HTMLElement, title: string) =>
+    [...container.querySelectorAll<HTMLTableRowElement>('tbody tr')]
+      .find((r) => r.textContent!.includes(title))!
+      .querySelector('td.music-play')!
+
+  it('leaves the button out, and the Plays column says why, when the music file is missing', () => {
+    const { container } = render(kind)
+    expect(playCell(container, 'Tower').querySelector('button')).toBeNull()
+    expect(playCell(container, 'Tower').parentElement!.textContent).toContain(
+      'The file is not there.',
+    )
   })
 
-  it('is dim and says so when no take is chosen', () => {
-    const play = button('Roof')
-    expect(play.disabled).toBe(true)
-    expect(play.getAttribute('aria-label')).toBe('Play Roof: nothing to play yet')
+  it('leaves the button out, and the Plays column says why, when no take is chosen', () => {
+    const { container } = render(kind)
+    expect(playCell(container, 'Roof').querySelector('button')).toBeNull()
+    expect(playCell(container, 'Roof').parentElement!.textContent).toContain('Nothing to play yet')
   })
 })

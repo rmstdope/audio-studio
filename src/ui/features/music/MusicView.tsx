@@ -159,15 +159,16 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
                 return (
                   <tr key={track.id}>
                     <td className="music-play">
-                      <button
-                        className={playing === track.id ? 'icon-btn music-stop' : 'icon-btn'}
-                        type="button"
-                        disabled={!canPlay(track.current) && playing !== track.id}
-                        aria-label={playLabel(track.title, track.current, playing === track.id)}
-                        onClick={() => press(track.id)}
-                      >
-                        {playing === track.id ? <StopIcon /> : <PlayIcon />}
-                      </button>
+                      {(canPlay(track.current) || playing === track.id) && (
+                        <button
+                          className={playing === track.id ? 'icon-btn music-stop' : 'icon-btn'}
+                          type="button"
+                          aria-label={playLabel(track.title, track.current, playing === track.id)}
+                          onClick={() => press(track.id)}
+                        >
+                          {playing === track.id ? <StopIcon /> : <PlayIcon />}
+                        </button>
+                      )}
                     </td>
                     <td>
                       <a

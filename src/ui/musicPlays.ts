@@ -49,15 +49,11 @@ export function canPlay(current: CurrentMusic): boolean {
   return current.kind !== 'none' && current.exists
 }
 
-/** The play button's accessible name: the track and what it plays, or Stop while it plays. */
+/**
+ * The play button's accessible name: the track and what it plays, or Stop while it plays. Only for
+ * a track that can play, since a row with nothing to play has no button.
+ */
 export function playLabel(title: string, current: CurrentMusic, playing: boolean): string {
   if (playing) return `Stop ${title}`
-  const what =
-    current.kind === 'take'
-      ? `take ${current.take}`
-      : current.kind === 'game'
-        ? "the game's file"
-        : 'nothing to play yet'
-  const gone = current.kind !== 'none' && !current.exists ? ', the file is not there' : ''
-  return `Play ${title}: ${what}${gone}`
+  return `Play ${title}: ${current.kind === 'take' ? `take ${current.take}` : "the game's file"}`
 }

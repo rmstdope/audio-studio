@@ -59,16 +59,6 @@ describe('playLabel', () => {
   it('says the track and what it plays', () => {
     expect(playLabel('Forest path', take(), false)).toBe('Play Forest path: take 3')
     expect(playLabel('Forest path', game(), false)).toBe("Play Forest path: the game's file")
-    expect(playLabel('Cave drip', none, false)).toBe('Play Cave drip: nothing to play yet')
-  })
-
-  it('says the file is not there on a greyed-out button', () => {
-    expect(playLabel('Forest path', game(false), false)).toBe(
-      "Play Forest path: the game's file, the file is not there",
-    )
-    expect(playLabel('Forest path', take(false), false)).toBe(
-      'Play Forest path: take 3, the file is not there',
-    )
   })
 
   it('says stop while it plays', () => {
