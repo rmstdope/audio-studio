@@ -277,7 +277,7 @@ export function CastSection({
   // In a language besides the source, who speaks in the part in that language (when it has
   // dialog there), with the lines they have in it.
   const spoken =
-    detail?.dialog === 'ok' && language && language !== summary.languages[0]?.id
+    readable && language && language !== summary.languages[0]?.id
       ? summary.characters.flatMap((character) => {
           const lines = character.languages[language]?.appearances.find((a) => a.part === part.id)
           return lines ? [{ id: character.id, lines: lines.lines }] : []
