@@ -99,6 +99,11 @@ const NarrationSchema = z
       manifest: partPath,
     }),
     refreshDialog: z.string().optional(),
+    /**
+     * The speakers (cast ids) whose lines follow their scene's cue unless they have a cue of
+     * their own; the others keep their own cue or their style. Edited by hand in this file.
+     */
+    sceneCueSpeakers: z.array(z.string().min(1)).default(['narrator']),
     models: z
       .object({ audition: recordingModel, draft: recordingModel, final: recordingModel })
       .prefault({}),

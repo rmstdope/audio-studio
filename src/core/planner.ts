@@ -1,5 +1,6 @@
 import {
   clipInputs,
+  sceneCueFor,
   fingerprint,
   fingerprintMatches,
   staleReasons,
@@ -7,7 +8,16 @@ import {
 } from './fingerprint'
 import { sameModel } from './retirement'
 import type { Project } from './project'
-import { cueFor, type Cast, type Cues, type Line, type Lock, type Manifest } from './resources'
+import {
+  cueFor,
+  sceneKey,
+  sceneOfKey,
+  type Cast,
+  type Cues,
+  type Line,
+  type Lock,
+  type Manifest,
+} from './resources'
 
 /**
  * Where a line's clip stands:
@@ -48,9 +58,17 @@ export interface LineState {
   cue: string
   /**
    * Where that cue comes from: the line's own cue in this language, the source language's cue for
-   * the line (another language follows it), or its character's style.
+   * the line (another language follows it), its scene's cue (written in this language, or the
+   * source language's), or its character's style.
    */
-  cueFrom: 'own' | 'source' | 'style'
+  cueFrom: 'own' | 'source' | 'scene' | 'sceneSource' | 'style'
+  /** The scene the line is in (the source language's name for it when it has one), or null. */
+  scene: string | null
+  /**
+   * Whether the line takes its scene's cue when the scene has one: its speaker is one the project
+   * names and it has no cue of its own.
+   */
+  followsScene: boolean
   /** The source language's own cue for the line, when this is another language and it has one. */
   sourceCue: string | null
   /** Whether the clip was made with the final model (when it differs from the draft one). */
@@ -71,11 +89,35 @@ export interface Orphan {
   file: string
 }
 
+/** A scene of a part's dialog and its cue. */
+export interface SceneState {
+  name: string
+  /** The cue the scene's following lines are spoken with, or null when it has none. */
+  cue: string | null
+  /** Where it comes from: written in this language, or the source language's; null without one. */
+  cueFrom: 'own' | 'source' | null
+  /** The source language's own cue for the scene, when this is another language and it has one. */
+  sourceCue: string | null
+  /** Lines in the scene, in all its runs. */
+  lines: number
+  /** Lines that follow the scene's cue (when it has one): recordable ones of the named speakers. */
+  following: number
+  /** Of those, the lines with a clip made from today's or older inputs: what a change marks stale. */
+  recordedFollowing: number
+  /** The first line that follows the scene's cue, which Hear it says; null when none does. */
+  firstFollowing: string | null
+}
+
 /** The state of every clip in a part. */
 export interface PartState {
   lines: LineState[]
+  /** The scenes the dialog names, in the order they first appear. */
+  scenes: SceneState[]
   orphans: Orphan[]
-  /** Cue keys whose line is no longer in the dialog (its wording changed, so its key did). */
+  /**
+   * Cue keys whose line is no longer in the dialog (its wording changed, so its key did), and the
+   * `scene:` keys of scenes that are no longer in it.
+   */
   orphanCues: { key: string; cue: string }[]
   counts: Record<LineStatus, number>
 }
@@ -118,6 +160,11 @@ export function planPart(input: PlanInput): PartState {
   const counts = Object.fromEntries(LINE_STATUSES.map((s) => [s, 0])) as Record<LineStatus, number>
 
   const states = lines.map(({ line, english }): LineState => {
+    const scene = line.scene ?? null
+    const followsScene =
+      scene !== null &&
+      narration.sceneCueSpeakers.includes(line.speaker) &&
+      cueFor(cues, line.key) === undefined
     if (line.text.trim() === '' && english !== null) {
       counts.untranslated++
       return {
@@ -127,6 +174,8 @@ export function planPart(input: PlanInput): PartState {
         english,
         cue: '',
         cueFrom: 'style',
+        scene,
+        followsScene,
         sourceCue: null,
         final: false,
         status: 'untranslated',
@@ -174,14 +223,16 @@ export function planPart(input: PlanInput): PartState {
       speaker: line.speaker,
       text: line.text,
       english,
-      cue: inputs?.cue ?? cueFor(cues, line.key) ?? character?.style ?? '',
+      cue:
+        inputs?.cue ??
+        cueFor(cues, line.key) ??
+        sceneCueFor(line, cues, narration) ??
+        character?.style ??
+        '',
+      scene,
+      followsScene,
       sourceCue: (input.sourceCues && cueFor(input.sourceCues, line.key)) ?? null,
-      cueFrom:
-        cueFor(own, line.key) !== undefined
-          ? 'own'
-          : cueFor(cues, line.key) !== undefined
-            ? 'source'
-            : 'style',
+      cueFrom: cueFrom(line, cues, own, narration),
       final,
       status,
       reasons,
@@ -193,15 +244,68 @@ export function planPart(input: PlanInput): PartState {
   })
 
   const keys = new Set(lines.map(({ line }) => line.key))
+  const scenes = sceneStates(states, cues, own, input.sourceCues)
+  const sceneNames = new Set(scenes.map((scene) => scene.name))
   const orphans = Object.entries(manifest)
     .filter(([key]) => !input.held && !keys.has(key))
     .map(([key, clip]) => ({ key, speaker: clip.speaker ?? null, file: clip.file }))
     .sort((a, b) => a.key.localeCompare(b.key))
   const orphanCues = Object.entries(own)
-    .filter(([key]) => !input.held && !keys.has(key))
+    .filter(([key]) => {
+      const scene = sceneOfKey(key)
+      return !input.held && !(scene === null ? keys.has(key) : sceneNames.has(scene))
+    })
     .map(([key, cue]) => ({ key, cue }))
 
-  return { lines: states, orphans, orphanCues, counts }
+  return { lines: states, scenes, orphans, orphanCues, counts }
+}
+
+/** Where a line's cue comes from: its own, its scene's (own or the source language's), or its style. */
+function cueFrom(
+  line: Line,
+  cues: Cues,
+  own: Cues,
+  narration: Project['narration'],
+): LineState['cueFrom'] {
+  if (cueFor(own, line.key) !== undefined) return 'own'
+  if (cueFor(cues, line.key) !== undefined) return 'source'
+  if (sceneCueFor(line, cues, narration) === undefined) return 'style'
+  return cueFor(own, sceneKey(line.scene!)) !== undefined ? 'scene' : 'sceneSource'
+}
+
+/** The part's scenes, in the order they first appear, with their cue and who follows it. */
+function sceneStates(
+  states: LineState[],
+  cues: Cues,
+  own: Cues,
+  sourceCues: Cues | undefined,
+): SceneState[] {
+  const scenes = new Map<string, SceneState>()
+  for (const line of states) {
+    if (line.scene === null) continue
+    const key = sceneKey(line.scene)
+    const cue = cueFor(cues, key) ?? null
+    const scene = scenes.get(line.scene) ?? {
+      name: line.scene,
+      cue,
+      cueFrom: cue === null ? null : cueFor(own, key) !== undefined ? 'own' : 'source',
+      sourceCue: (sourceCues && cueFor(sourceCues, key)) ?? null,
+      lines: 0,
+      following: 0,
+      recordedFollowing: 0,
+      firstFollowing: null,
+    }
+    scene.lines++
+    if (line.followsScene && line.status !== 'untranslated') {
+      scene.following++
+      if (line.status === 'ok' || line.status === 'weak' || line.status === 'stale') {
+        scene.recordedFollowing++
+      }
+      scene.firstFollowing ??= line.key
+    }
+    scenes.set(line.scene, scene)
+  }
+  return [...scenes.values()]
 }
 
 /**
@@ -220,8 +324,12 @@ function withSource(
       .filter((line) => line.text.trim() !== '' || own.has(line.key))
       .map((line) => {
         const translated = own.get(line.key)
+        // The source's scene names the scene, so both languages share its cue's identity.
+        const scene = line.scene ?? translated?.scene
+        const shown =
+          translated && translated.text.trim() !== '' ? translated : { ...line, text: '' }
         return {
-          line: translated && translated.text.trim() !== '' ? translated : { ...line, text: '' },
+          line: scene === undefined ? shown : { ...shown, scene },
           english: line.text,
         }
       }),

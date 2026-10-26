@@ -352,3 +352,12 @@ describe('the music section', () => {
     expect(found[0]!.message).toContain('{language}')
   })
 })
+
+describe('narration.sceneCueSpeakers', () => {
+  it('is the narrator alone unless the project names speakers', () => {
+    expect(parse(projectJson()).data!.narration.sceneCueSpeakers).toEqual(['narrator'])
+    const base = projectJson().narration as Record<string, unknown>
+    const named = projectJson({ narration: { ...base, sceneCueSpeakers: ['narrator', 'mira'] } })
+    expect(parse(named).data!.narration.sceneCueSpeakers).toEqual(['narrator', 'mira'])
+  })
+})
