@@ -121,11 +121,15 @@ export function otherVoices(
   return voices
 }
 
-/** The voice's own name on Fish from a character-voice answer; undefined when Fish gave none. */
+/**
+ * The voice's own name on Fish from a character-voice answer; undefined when Fish gave none, or
+ * when the answer is about another voice than `id` (the cast changed since the page read it).
+ */
 export function voiceTitleOf(
-  answer: { ok: boolean; voice?: { title: string } | null } | null | undefined,
+  answer: { ok: boolean; id?: string | null; voice?: { title: string } | null } | null | undefined,
+  id: string,
 ): string | undefined {
-  return answer?.ok ? answer.voice?.title.trim() || undefined : undefined
+  return answer?.ok && answer.id === id ? answer.voice?.title.trim() || undefined : undefined
 }
 
 /**

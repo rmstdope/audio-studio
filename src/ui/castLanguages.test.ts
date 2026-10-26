@@ -149,12 +149,20 @@ describe('otherVoices', () => {
 })
 
 describe('voiceTitleOf', () => {
+  const about = (id: string, title: string | null) => ({
+    ok: true,
+    id,
+    voice: title === null ? null : { title },
+  })
   it('is the title Fish gave, and nothing when it did not say or the title is blank', () => {
-    expect(voiceTitleOf({ ok: true, voice: { title: ' Gentle Granny ' } })).toBe('Gentle Granny')
-    expect(voiceTitleOf({ ok: true, voice: { title: '  ' } })).toBeUndefined()
-    expect(voiceTitleOf({ ok: true, voice: null })).toBeUndefined()
-    expect(voiceTitleOf({ ok: false })).toBeUndefined()
-    expect(voiceTitleOf(undefined)).toBeUndefined()
+    expect(voiceTitleOf(about('a', ' Gentle Granny '), 'a')).toBe('Gentle Granny')
+    expect(voiceTitleOf(about('a', '  '), 'a')).toBeUndefined()
+    expect(voiceTitleOf(about('a', null), 'a')).toBeUndefined()
+    expect(voiceTitleOf({ ok: false }, 'a')).toBeUndefined()
+    expect(voiceTitleOf(undefined, 'a')).toBeUndefined()
+  })
+  it('is nothing when the answer is about another voice than the one asked for', () => {
+    expect(voiceTitleOf(about('b', 'Someone Else'), 'a')).toBeUndefined()
   })
 })
 

@@ -345,7 +345,7 @@ export function useOtherVoiceTitles(
       refetchOnWindowFocus: false,
     })),
     combine: (results) =>
-      Object.fromEntries(voices.map((v, i) => [v.id, voiceTitleOf(results[i]?.data)])),
+      Object.fromEntries(voices.map((v, i) => [v.id, voiceTitleOf(results[i]?.data, v.id)])),
   })
 }
 
