@@ -1,0 +1,617 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Cues inside a line</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --miss: #8fb5ff;
+        --miss-bg: #142033;
+        --cue: #b9a9ff;
+        --cue-bg: #211c35;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #050608;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 0 16px;
+      }
+      .note {
+        max-width: 1180px;
+        margin: 18px auto 8px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .note b {
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1180px;
+        margin: 0 auto 28px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 20px 24px;
+        overflow: hidden;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+        margin-bottom: 14px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .pill {
+        display: inline-block;
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 12px;
+      }
+      .ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .stale {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .who {
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .who .mono {
+        color: var(--faint);
+      }
+      .text {
+        display: block;
+        margin-top: 2px;
+        max-width: 560px;
+      }
+      .cuebtn {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+        background: none;
+        border: 1px dashed transparent;
+        color: var(--soft);
+        padding: 2px 4px;
+        border-radius: 6px;
+      }
+      .cuebtn.style {
+        color: var(--faint);
+      }
+      .chip {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 11.5px;
+        background: var(--cue-bg);
+        color: var(--cue);
+        border-radius: 5px;
+        padding: 0 5px;
+        margin: 0 2px;
+        white-space: nowrap;
+      }
+      .badge {
+        font-size: 11.5px;
+        background: var(--cue-bg);
+        color: var(--cue);
+        border-radius: 99px;
+        padding: 0 7px;
+        margin-left: 4px;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 5px 11px;
+        font: inherit;
+        font-size: 13px;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+      }
+      .edit {
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      textarea,
+      input {
+        width: 100%;
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        color: var(--text);
+        padding: 8px 10px;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 13px;
+        line-height: 1.55;
+        resize: vertical;
+      }
+      textarea:focus,
+      input:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: -1px;
+      }
+      .actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .err {
+        background: var(--danger-bg);
+        color: var(--danger-ink);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+      .err b {
+        color: #ffc2cd;
+      }
+      .pieces {
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .pieces .p {
+        display: flex;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .pieces .n {
+        color: var(--faint);
+        width: 52px;
+        flex: none;
+        font-size: 12px;
+      }
+      .state {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--accent);
+        margin: 22px 0 6px;
+      }
+      .gap {
+        display: inline-block;
+        width: 9px;
+        height: 16px;
+        vertical-align: middle;
+        border-radius: 3px;
+      }
+      .gap:hover,
+      .gap.on {
+        background: var(--cue-bg);
+        outline: 1px dashed var(--cue);
+      }
+      .pop {
+        display: inline-block;
+        vertical-align: top;
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 10px;
+        width: 300px;
+        margin-left: 8px;
+        box-shadow: 0 8px 24px #0008;
+      }
+      @media (max-width: 700px) {
+        .frame {
+          padding: 14px;
+        }
+        td {
+          padding: 8px 4px;
+        }
+        .text {
+          max-width: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <style>
+      .gap.show {
+        background: #ffffff14;
+      }
+      .chip {
+        cursor: pointer;
+      }
+      .narrow {
+        max-width: 390px;
+      }
+      .narrow .pop {
+        display: block;
+        width: auto;
+        margin: 8px 0 0;
+      }
+      kbd {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 11.5px;
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        padding: 0 4px;
+      }
+      .warnline {
+        display: block;
+        color: var(--warn);
+        font-size: 12.5px;
+        margin-top: 4px;
+      }
+    </style>
+    <div class="note">
+      <b>Cues inside a line — the whole design, state by state.</b> Hovering a line's text shows the
+      gaps between its words; clicking a gap opens a small box to type a cue that takes effect from
+      the next word. Cues inside a line show as chips in the text; click one to change or remove it.
+      The opening cue stays in the Cue column as today.
+    </div>
+
+    <div class="frame">
+      <h1>Lines</h1>
+      <div class="crumbs">Narration / Act II · 14 lines</div>
+      <div class="state">1 · At rest: cues inside show as chips</div>
+      <table>
+        <tr>
+          <th style="width: 80px">Status</th>
+          <th>Line</th>
+          <th style="width: 200px">Cue</th>
+          <th style="width: 60px">Length</th>
+        </tr>
+        <tr>
+          <td><span class="pill ok">ok</span></td>
+          <td>
+            <span class="who">Rowena <span class="mono">ferry.rowena.4</span></span
+            ><span class="text"
+              >I should have told you sooner. I was afraid of what you'd think.
+              <span class="chip" title="A cue inside the line: click to change or remove it"
+                >[resolute]</span
+              >
+              But I'm done hiding — we leave at dawn.</span
+            >
+          </td>
+          <td><button class="cuebtn">[ashamed]</button></td>
+          <td class="mono">6.4s</td>
+        </tr>
+        <tr>
+          <td><span class="pill ok">ok</span></td>
+          <td>
+            <span class="who">Rowena <span class="mono">ferry.rowena.3</span></span
+            ><span class="text">Stay close to the rail. The water is calm tonight.</span>
+          </td>
+          <td><button class="cuebtn style">[calm, low]</button></td>
+          <td class="mono">3.1s</td>
+        </tr>
+      </table>
+      <p class="hint">
+        On a row: <kbd>j ↓</kbd> next line · <kbd>k ↑</kbd> previous line · <kbd>space</kbd> play ·
+        … · <kbd>c</kbd> cue · <kbd>p</kbd> place a cue inside · <kbd>n</kbd> note ·
+        <kbd>t</kbd> takes
+      </p>
+
+      <div class="state">
+        2 · Hovering the text: the gaps show (none before the first word, none after the last)
+      </div>
+      <table>
+        <tr>
+          <th style="width: 80px">Status</th>
+          <th>Line</th>
+          <th style="width: 200px">Cue</th>
+          <th style="width: 60px">Length</th>
+        </tr>
+        <tr>
+          <td><span class="pill ok">ok</span></td>
+          <td>
+            <span class="who">Rowena <span class="mono">ferry.rowena.4</span></span
+            ><span class="text"
+              >I<span class="gap" title="Place a cue here"></span>should<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >have<span class="gap" title="Place a cue here"></span>told<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >you<span class="gap" title="Place a cue here"></span>sooner.<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >I<span class="gap" title="Place a cue here"></span>was<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >afraid<span class="gap" title="Place a cue here"></span>of<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >what<span class="gap" title="Place a cue here"></span>you'd<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >think.<span class="chip">[resolute]</span>But<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >I'm<span class="gap" title="Place a cue here"></span>done<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >hiding<span class="gap" title="Place a cue here"></span>—<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >we<span class="gap" title="Place a cue here"></span>leave<span
+                class="gap"
+                title="Place a cue here"
+              ></span
+              >at<span class="gap" title="Place a cue here"></span>dawn.</span
+            >
+          </td>
+          <td><button class="cuebtn">[ashamed]</button></td>
+          <td class="mono">6.4s</td>
+        </tr>
+      </table>
+
+      <div class="state">
+        3 · A gap clicked: the box opens beside it (a long line lists its pieces)
+      </div>
+      <table>
+        <tr>
+          <th style="width: 80px">Status</th>
+          <th>Line</th>
+          <th style="width: 200px">Cue</th>
+          <th style="width: 60px">Length</th>
+        </tr>
+        <tr>
+          <td><span class="pill ok">ok</span></td>
+          <td colspan="3">
+            <span class="who">Narrator <span class="mono">ferry.narr.2</span></span>
+            <span class="text" style="max-width: none"
+              >The ferry slid out past the last lamp of the harbour, its engine a low patient hum.
+              Nobody spoke. Somewhere below, a child was singing, a thin song with no words to it
+              that rose and fell with the swell. <span class="chip">[whispering]</span> And then,
+              all at once,<span class="gap on"></span>the singing stopped. Nobody moved.</span
+            >
+            <div class="pop" style="display: block; margin: 8px 0; width: 340px">
+              <input placeholder="[break]" value="break" aria-label="Cue before “the”" />
+              <div class="hint" style="margin: 6px 0">
+                From “the” on, until the next cue. Brackets are added for you.
+              </div>
+              <div class="actions">
+                <button class="btn primary">Add</button><button class="btn">Cancel</button
+                ><button class="btn">Hear it</button>
+              </div>
+            </div>
+            <div class="pieces">
+              <span class="hint">Recorded in 3 pieces:</span>
+              <div class="p">
+                <span class="n">Piece 1</span
+                ><span
+                  ><span class="chip">[calm, warm]</span> The ferry slid out past the last lamp of
+                  the harbour, its engine a low patient hum. Nobody spoke.</span
+                >
+              </div>
+              <div class="p">
+                <span class="n">Piece 2</span
+                ><span
+                  ><span class="chip">[calm, warm]</span> Somewhere below, a child was singing, a
+                  thin song with no words to it that rose and fell with the swell.</span
+                >
+              </div>
+              <div class="p">
+                <span class="n">Piece 3</span
+                ><span
+                  ><span class="chip">[whispering]</span> And then, all at once,
+                  <span class="chip">[break]</span> the singing stopped. Nobody moved.</span
+                >
+              </div>
+            </div>
+            <p class="hint">
+              Add saves at once and the line turns stale. Escape or Cancel closes the box without
+              saving. A short line (one piece) lists nothing.
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <div class="state">4 · A chip clicked: change or remove it</div>
+      <div class="pop" style="margin: 0">
+        <input value="[resolute]" aria-label="Cue before “But”" />
+        <div class="hint" style="margin: 6px 0">From “But” on, until the next cue.</div>
+        <div class="actions">
+          <button class="btn primary" disabled>Save</button><button class="btn">Remove</button
+          ><button class="btn">Cancel</button><button class="btn">Hear it</button>
+        </div>
+      </div>
+
+      <div class="state">
+        5 · Saving refused (the line's words changed in the game while the box was open)
+      </div>
+      <div class="pop" style="margin: 0; width: 380px">
+        <input value="break" />
+        <div class="err" style="margin-top: 8px">
+          <b>The cue could not be saved.</b> This line's words changed in the game; close this and
+          place the cue again.
+        </div>
+        <div class="actions" style="margin-top: 8px">
+          <button class="btn primary" disabled>Add</button><button class="btn">Cancel</button
+          ><button class="btn">Hear it</button>
+        </div>
+      </div>
+
+      <div class="state">
+        6 · The game changed the words after cues were placed (or the cues file has cues whose words
+        don't match)
+      </div>
+      <table>
+        <tr>
+          <th style="width: 80px">Status</th>
+          <th>Line</th>
+          <th style="width: 200px">Cue</th>
+          <th style="width: 60px">Length</th>
+        </tr>
+        <tr>
+          <td><span class="pill stale">stale</span></td>
+          <td>
+            <span class="who">Rowena <span class="mono">ferry.rowena.4</span></span
+            ><span class="text"
+              >I should have told you before. I was scared of what you'd say. But I'm done hiding —
+              we sail at dawn.</span
+            >
+            <div class="err" style="margin-top: 6px">
+              <b>The cues inside this line no longer fit its words</b>, so it records with [ashamed]
+              only. Place them again in the text above. Before:
+              <span class="mono"
+                >… think. [resolute] But I'm done hiding — [whispering] we leave at dawn.</span
+              >
+            </div>
+          </td>
+          <td><button class="cuebtn">[ashamed]</button></td>
+          <td class="mono">6.4s</td>
+        </tr>
+      </table>
+
+      <div class="state">7 · Another language: follows only the English opening cue</div>
+      <table>
+        <tr>
+          <th style="width: 80px">Status</th>
+          <th>Line</th>
+          <th style="width: 200px">Cue</th>
+          <th style="width: 60px">Length</th>
+        </tr>
+        <tr>
+          <td><span class="pill ok">ok</span></td>
+          <td>
+            <span class="who">Rowena <span class="mono">ferry.rowena.4</span></span
+            ><span class="text"
+              >Jag borde ha sagt det tidigare. Jag var rädd för vad du skulle tycka. Men jag är klar
+              med att gömma mig — vi ger oss av i gryningen.</span
+            ><span style="display: block; font-size: 12.5px; color: var(--muted); margin-top: 4px"
+              ><b>English</b> I should have told you sooner. I was afraid of what you'd think.
+              <span class="chip">[resolute]</span> But I'm done hiding — we leave at dawn.</span
+            >
+          </td>
+          <td>
+            <button class="cuebtn style">[ashamed]</button
+            ><span class="muted" style="display: block; font-size: 12px"
+              >from English · cues inside stay with English</span
+            >
+          </td>
+          <td class="mono">6.9s</td>
+        </tr>
+      </table>
+
+      <div class="state">8 · A line with no text in this language: no gaps</div>
+      <table>
+        <tr>
+          <th style="width: 80px">Status</th>
+          <th>Line</th>
+          <th style="width: 200px">Cue</th>
+          <th style="width: 60px">Length</th>
+        </tr>
+        <tr>
+          <td>
+            <span class="pill" style="background: #1d2029; color: #b8bfcc">untranslated</span>
+          </td>
+          <td>
+            <span class="who">Rowena <span class="mono">ferry.rowena.4</span></span
+            ><span class="muted" style="display: block">No Svenska text for this line yet.</span>
+          </td>
+          <td><button class="cuebtn style">[ashamed]</button></td>
+          <td class="mono">—</td>
+        </tr>
+      </table>
+
+      <div class="state">9 · A narrow window: the box drops under the text, full width</div>
+      <div class="narrow">
+        <div class="edit" style="padding: 10px">
+          <span class="who">Rowena <span class="mono">ferry.rowena.4</span></span
+          ><span class="text"
+            >I should have told you sooner. I was afraid of what you'd think.
+            <span class="chip">[resolute]</span> But I'm done hiding —<span class="gap on"></span>we
+            leave at dawn.</span
+          >
+          <div class="pop">
+            <input value="whispering" />
+            <div class="hint" style="margin: 6px 0">
+              From “we” on, until the next cue. Brackets are added for you.
+            </div>
+            <div class="actions">
+              <button class="btn primary">Add</button><button class="btn">Cancel</button
+              ><button class="btn">Hear it</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
