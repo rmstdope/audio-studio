@@ -116,6 +116,16 @@ describe('the model menu on a track’s Takes panel', () => {
     ])
   })
 
+  it('keeps the menu and More takes in one group apart from the heading, so they wrap together', () => {
+    const page = render(view())
+    const group = page.menu().parentElement!
+    expect(group.className).toBe('takes-controls')
+    expect(group).toBe(page.button('More takes').parentElement!)
+    const heading = page.container.querySelector('h2')!
+    expect(group.contains(heading)).toBe(false)
+    expect(group.parentElement).toBe(heading.parentElement)
+  })
+
   it('asks for takes with the model picked, and starts nothing by picking', async () => {
     const page = render(view())
     act(() => {

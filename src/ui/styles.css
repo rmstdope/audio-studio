@@ -2903,6 +2903,15 @@ button.cue-chip[aria-expanded='true'] {
   flex: 1 0 auto;
   margin: 0;
 }
+.takes-controls {
+  display: flex;
+  flex: 1 1 520px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
 .takes-model {
   flex: 1 1 200px;
   min-width: 0;
@@ -2918,6 +2927,14 @@ button.cue-chip[aria-expanded='true'] {
 }
 .takes-model:disabled {
   opacity: 0.55;
+}
+@media (max-width: 640px) {
+  .takes-controls {
+    flex-wrap: nowrap;
+  }
+  .takes-model {
+    max-width: none;
+  }
 }
 .takes-make {
   display: flex;
