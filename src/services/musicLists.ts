@@ -10,6 +10,7 @@ import {
 } from '../core/music'
 import { partPathFor, type Problem, type Project } from '../core/project'
 import { readResource } from './files'
+import { readChosen } from './musicClips'
 
 /** The path of an act's loops list. */
 export function loopsPath(project: Project, partId: string): string | null {
@@ -51,7 +52,7 @@ export async function readMusic(
   })
   const briefs = await readResource(root, music.paths.briefs, BriefsSchema, problems)
   const shown: Briefs = briefs === 'missing' || briefs === 'invalid' ? {} : briefs
-  const summary = summarizeMusic(lists, shown)
+  const summary = summarizeMusic(lists, shown, await readChosen(root, music, problems))
   problems.push(...summary.problems)
   return summary.music
 }

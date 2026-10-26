@@ -1,4 +1,11 @@
-import type { Change, ChangeKind, FileRole, PartChanges } from '../../../core/changes'
+import type {
+  Change,
+  ChangeKind,
+  FileRole,
+  MusicChanges,
+  MusicFileRole,
+  PartChanges,
+} from '../../../core/changes'
 import type { ProjectSummary } from '../../../core/summary'
 import { useChanges } from '../../api'
 import { plural } from '../../format'
@@ -11,11 +18,13 @@ const KIND: Record<ChangeKind, { label: string; color: string }> = {
   conflict: { label: 'Conflict', color: 'var(--accent)' },
 }
 
-const ROLE: Record<FileRole, string> = {
+const ROLE: Record<FileRole | MusicFileRole, string> = {
   dialog: 'Dialog',
   cues: 'Cues',
   lock: 'Lock',
   manifest: 'Manifest',
+  list: 'Tracks from the game',
+  briefs: 'Briefs',
 }
 
 /**
@@ -66,6 +75,10 @@ function ChangesBody({ summary }: { summary: ProjectSummary }) {
   }
   const conflicts =
     groups.project.filter((c) => c.change === 'conflict').length +
+    (groups.music
+      ? groups.music.clips.conflict +
+        groups.music.files.filter((f) => f.change === 'conflict').length
+      : 0) +
     groups.parts.reduce(
       (sum, part) =>
         sum + part.clips.conflict + part.files.filter((f) => f.change === 'conflict').length,
@@ -88,18 +101,39 @@ function ChangesBody({ summary }: { summary: ProjectSummary }) {
       {groups.parts.map((part) => (
         <PartSection key={part.id} part={part} label={summary.partLabel} />
       ))}
+      {groups.music && <MusicSection music={groups.music} />}
     </div>
   )
 }
 
 function PartSection({ part, label }: { part: PartChanges; label: string }) {
-  const clips = (Object.entries(part.clips) as [ChangeKind, number][]).filter(([, n]) => n > 0)
   return (
     <section className="panel" aria-label={part.title}>
       <span className="label">
         {label} · {part.title}
       </span>
       {part.files.length > 0 && <FileList files={part.files} />}
+      <ClipCounts clips={part.clips} />
+    </section>
+  )
+}
+
+/** The music's files and clips together: they are committed together. */
+function MusicSection({ music }: { music: MusicChanges }) {
+  return (
+    <section className="panel" aria-label="Music">
+      <span className="label">Music</span>
+      {music.files.length > 0 && <FileList files={music.files} />}
+      <ClipCounts clips={music.clips} />
+    </section>
+  )
+}
+
+/** The clips that changed, counted by kind. */
+function ClipCounts({ clips: counts }: { clips: Record<ChangeKind, number> }) {
+  const clips = (Object.entries(counts) as [ChangeKind, number][]).filter(([, n]) => n > 0)
+  return (
+    <>
       {clips.length > 0 && (
         <div className="change-clips">
           <span>
@@ -115,11 +149,11 @@ function PartSection({ part, label }: { part: PartChanges; label: string }) {
           ))}
         </div>
       )}
-    </section>
+    </>
   )
 }
 
-function FileList({ files }: { files: (Change & { role?: FileRole })[] }) {
+function FileList({ files }: { files: (Change & { role?: FileRole | MusicFileRole })[] }) {
   return (
     <ul className="change-files">
       {files.map((file) => (

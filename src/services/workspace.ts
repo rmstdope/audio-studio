@@ -334,6 +334,19 @@ export async function clipFile(
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
 }
 
+/**
+ * The absolute path of a clip in the music clips folder, or null if the project has no music or
+ * the name is not a plain `.mp3` file there. Folders, links, hidden files and the manifest are
+ * never served.
+ */
+export async function musicClipFile(projectFile: string, file: string): Promise<string | null> {
+  const opened = await openProject(projectFile)
+  if (!opened.ok || !opened.project.music) return null
+  if (file.startsWith('.') || !file.endsWith('.mp3')) return null
+  const folder = resolveInRoot(dirname(projectFile), opened.project.music.paths.clips)
+  return (await listFiles(folder)).has(file) ? join(folder, file) : null
+}
+
 /** How a take is checked: the language Whisper is told, and the words counted as heard for each other. */
 export interface Ears {
   /** The code of the language spoken; absent in a project with one language, where Whisper recognises it. */

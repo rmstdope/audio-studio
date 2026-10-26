@@ -1,5 +1,7 @@
+import { changedLine, type TrackStatus } from '../../../core/musicChoose'
+import type { TrackRow } from '../../../core/music'
 import type { MakingView, MusicTakesView, TakeView } from '../../../core/musicTake'
-import { useDropTake, useMakeTakes, useMusicTakes, useStopTakes } from '../../api'
+import { useChooseTake, useDropTake, useMakeTakes, useMusicTakes, useStopTakes } from '../../api'
 import { Failure } from '../../components/Failure'
 import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
@@ -12,7 +14,8 @@ import { routeHref } from '../../route'
  * seam; the ones being made; and "Make 2 takes" when there are none yet. A take that failed says
  * why, with Try again; without the music generator on this computer, it says so and links Setup.
  */
-export function TakesPanel({ trackId }: { trackId: string }) {
+export function TakesPanel({ track }: { track: TrackRow }) {
+  const trackId = track.id
   const takes = useMusicTakes(trackId)
   const make = useMakeTakes(trackId)
   const stop = useStopTakes(trackId)
@@ -62,6 +65,15 @@ export function TakesPanel({ trackId }: { trackId: string }) {
           </button>
         </div>
       ))}
+      {track.status === 'changed' && (
+        <div className="warnbox" role="status">
+          <strong>{changedLine(track.changed)}</strong>
+          <span className="muted small">
+            The game plays the chosen take until you choose another. Make takes from the new brief
+            with More takes.
+          </span>
+        </div>
+      )}
       <section className="panel takes-panel">
         <div className="takes-head">
           <h2>Takes</h2>
@@ -113,6 +125,7 @@ export function TakesPanel({ trackId }: { trackId: string }) {
                 trackId={trackId}
                 kind={view.kind}
                 take={take}
+                status={track.status}
                 player={player}
               />
             ))}
@@ -134,11 +147,13 @@ function TakeCard({
   trackId,
   kind,
   take,
+  status,
   player,
 }: {
   trackId: string
   kind: MusicTakesView['kind']
   take: TakeView
+  status: TrackStatus
   player: ReturnType<typeof useClipPlayer>
 }) {
   const id = `music-take-${trackId}-${take.n}`
@@ -147,10 +162,16 @@ function TakeCard({
   const seamId = `${id}-seam`
   const seamPlaying = player.playing === seamId
   const drop = useDropTake(trackId)
+  const choose = useChooseTake(trackId)
+  // The take the game plays; if its music file is gone it can be chosen again to write it.
+  const inGame = take.chosen && status !== 'missing'
+  const lost = take.chosen && status === 'missing'
   return (
-    <div className="take">
+    <div className={inGame || lost ? 'take take-chosen' : 'take'}>
       <div className="take-row">
         <b className="grow">Take {take.n}</b>
+        {inGame && <span className="chip chip-ok">chosen · in the game</span>}
+        {lost && <span className="chip chip-warn">music file missing</span>}
         {take.earlier && <span className="faint small">earlier brief</span>}
       </div>
       <div className="take-row">
@@ -181,18 +202,39 @@ function TakeCard({
           </button>
         )}
         <span className="grow" />
-        <button
-          type="button"
-          className="btn btn-ghost btn-small"
-          disabled={drop.isPending}
-          onClick={() => {
-            if (playing || seamPlaying) player.stop()
-            drop.mutate(take.file)
-          }}
-        >
-          Drop
-        </button>
+        {!take.chosen && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-small"
+            disabled={drop.isPending}
+            onClick={() => {
+              if (playing || seamPlaying) player.stop()
+              drop.mutate(take.file)
+            }}
+          >
+            Drop
+          </button>
+        )}
+        {!inGame && (
+          <button
+            type="button"
+            className="btn btn-small"
+            disabled={choose.isPending}
+            onClick={() => choose.mutate(take.file)}
+          >
+            {choose.isPending ? 'Choosing…' : 'Choose'}
+          </button>
+        )}
       </div>
+      {(choose.isError || (choose.data && !choose.data.ok)) && (
+        <span className="adopt-error">
+          {choose.isError
+            ? choose.error.message
+            : choose.data && 'message' in choose.data
+              ? choose.data.message
+              : 'The take could not be chosen.'}
+        </span>
+      )}
       {(drop.isError || (drop.data && !drop.data.ok)) && (
         <span className="adopt-error">
           {drop.isError

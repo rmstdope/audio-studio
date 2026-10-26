@@ -17,7 +17,13 @@ import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
 import type { MakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
-import type { DropResult, MakeRequest, MakeResult, StopResult } from '../services/musicTakes'
+import type {
+  ChooseResult,
+  DropResult,
+  MakeRequest,
+  MakeResult,
+  StopResult,
+} from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
 import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
@@ -662,6 +668,31 @@ export function useDropTake(trackId: string) {
       return (await response.json()) as NonNullable<DropResult>
     },
     onSettled: () => client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
+  })
+}
+
+/**
+ * Makes a take the track's music, then reloads its takes and the project, whose Music pages show
+ * the track's status.
+ */
+export function useChooseTake(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (file: string) => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/choose`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ file }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`choosing the take answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<ChooseResult>
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['project'] })
+      return client.invalidateQueries({ queryKey: ['music-takes', trackId] })
+    },
   })
 }
 

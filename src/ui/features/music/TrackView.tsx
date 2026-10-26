@@ -23,7 +23,7 @@ export function TrackView({ list, track }: { list: MusicListSummary; track: Trac
         </div>
       </header>
       <BriefPanel key={track.id} track={track} kind={list.kind} />
-      <TakesPanel key={`takes-${track.id}`} trackId={track.id} />
+      <TakesPanel key={`takes-${track.id}`} track={track} />
     </>
   )
 }

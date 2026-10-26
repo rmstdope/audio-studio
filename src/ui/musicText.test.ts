@@ -14,17 +14,34 @@ const list = (over = {}) => ({
   kind: 'act' as const,
   title: 'Act II: The Road',
   state: 'ok' as const,
-  tracks: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
+  tracks: ['a', 'b', 'c', 'd'].map((id) => ({ id, status: 'not-chosen' as const })),
   canRefresh: true,
   dropped: 0,
   ...over,
 })
 
 describe('listLine', () => {
-  it('counts the tracks chosen, none until choosing exists', () => {
+  const tracks = (...statuses: ('chosen' | 'changed' | 'missing' | 'not-chosen')[]) =>
+    statuses.map((status, i) => ({ id: `t${i}`, status }))
+
+  it('counts the tracks chosen, a track changed since its take was chosen among them', () => {
     expect(listLine(list(), 'Act II')).toBe('The loops the game asks for in Act II. 0 of 4 chosen.')
-    expect(listLine(list({ kind: 'stingers', tracks: [{ id: 'v' }] }), 'Stingers')).toBe(
-      'Played once, for a moment, anywhere in the game. 0 of 1 chosen.',
+    expect(
+      listLine(list({ tracks: tracks('chosen', 'changed', 'not-chosen', 'not-chosen') }), 'Act II'),
+    ).toBe('The loops the game asks for in Act II. 2 of 4 chosen.')
+  })
+
+  it('says how many music files are missing, which are not counted as chosen', () => {
+    expect(
+      listLine(
+        list({ kind: 'stingers', tracks: tracks('chosen', 'not-chosen', 'missing') }),
+        'Stingers',
+      ),
+    ).toBe(
+      "Played once, for a moment, anywhere in the game. 1 of 3 chosen; one's music file is missing.",
+    )
+    expect(listLine(list({ tracks: tracks('missing', 'missing') }), 'Act II')).toBe(
+      'The loops the game asks for in Act II. 0 of 2 chosen; 2 music files are missing.',
     )
   })
 

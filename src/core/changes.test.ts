@@ -147,3 +147,54 @@ describe('projectPaths with several languages', () => {
     expect(Object.keys(part.files)).toHaveLength(8)
   })
 })
+
+describe('the music files in the changes', () => {
+  const withMusic = ProjectSchema.parse(
+    projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'web/audio/music',
+          manifest: 'web/audio/music/manifest.json',
+        },
+      },
+    }),
+  )
+
+  it('lists the music files by role and counts the music clips', () => {
+    const groups = groupChanges(withMusic, 'audio-studio.json', [
+      { path: 'tts/act1/music.json', change: 'modified' },
+      { path: 'tts/stingers.json', change: 'new' },
+      { path: 'music/briefs.json', change: 'modified' },
+      { path: 'music/music.lock.json', change: 'modified' },
+      { path: 'web/audio/music/manifest.json', change: 'modified' },
+      { path: 'web/audio/music/a.mp3', change: 'new' },
+      { path: 'web/audio/music/b.mp3', change: 'modified' },
+      { path: 'web/audio/music/notes.txt', change: 'new' },
+    ])
+    expect(groups.total).toBe(7)
+    expect(groups.music?.files.map((f) => [f.path, f.role])).toEqual([
+      ['tts/act1/music.json', 'list'],
+      ['tts/stingers.json', 'list'],
+      ['music/briefs.json', 'briefs'],
+      ['music/music.lock.json', 'lock'],
+      ['web/audio/music/manifest.json', 'manifest'],
+    ])
+    expect(groups.music?.clips).toMatchObject({ new: 1, modified: 1, deleted: 0 })
+  })
+
+  it('has no music group without changes or without a music section', () => {
+    expect(groupChanges(withMusic, 'audio-studio.json', []).music).toBeNull()
+    expect(groupChanges(project, 'audio-studio.json', []).music).toBeNull()
+  })
+
+  it('names the music paths for git to ask about', () => {
+    const paths = projectPaths(withMusic, 'audio-studio.json')
+    expect(paths.music?.clips).toBe('web/audio/music/')
+    expect(Object.keys(paths.music!.files)).toContain('music/music.lock.json')
+    expect(projectPaths(project, 'audio-studio.json').music).toBeNull()
+  })
+})

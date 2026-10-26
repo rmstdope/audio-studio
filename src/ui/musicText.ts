@@ -7,26 +7,33 @@ import {
   type TrackRef,
   type TrackRow,
 } from '../core/music'
+import { chosenLine, type TrackStatus } from '../core/musicChoose'
 import { clock, plural } from './format'
 import type { MusicRoute } from './route'
 
 /** What a list page needs of a list to word its sentences. */
 type ListWords = Pick<MusicListSummary, 'kind' | 'state' | 'canRefresh' | 'dropped'> & {
-  tracks: readonly unknown[]
+  tracks: readonly { status: TrackStatus }[]
 }
 
 /**
  * The line under a list page's heading: what the game asks for there and how many tracks are
- * chosen. Nothing can be chosen yet, so none is. Without tracks to count, the line says what the
- * list is and no more.
+ * chosen (one changed since its take was chosen still counts), with the music files that are
+ * missing. Without tracks to count, the line says what the list is and no more.
  */
 export function listLine(list: ListWords, name: string): string {
-  if (list.kind === 'stingers') {
-    const what = 'Played once, for a moment, anywhere in the game.'
-    return list.tracks.length ? `${what} 0 of ${list.tracks.length} chosen.` : what
-  }
-  const what = `The loops the game asks for in ${name}.`
-  return list.tracks.length ? `${what} 0 of ${list.tracks.length} chosen.` : what
+  const what =
+    list.kind === 'stingers'
+      ? 'Played once, for a moment, anywhere in the game.'
+      : `The loops the game asks for in ${name}.`
+  if (!list.tracks.length) return what
+  const count = (...statuses: TrackStatus[]) =>
+    list.tracks.filter((track) => statuses.includes(track.status)).length
+  return `${what} ${chosenLine({
+    chosen: count('chosen', 'changed'),
+    total: list.tracks.length,
+    missing: count('missing'),
+  })}`
 }
 
 /**

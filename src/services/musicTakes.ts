@@ -20,9 +20,11 @@ import { trackFor, type TrackRow } from '../core/music'
 import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
 import { readWav } from '../core/wav'
+import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
 import { gpuQueue, GPU } from './gpu'
 import type { MusicGenerator } from './music'
+import { commitChoice, readChosen, type CommitResult } from './musicClips'
 import { readMusic } from './musicLists'
 import { createSerial, type Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
@@ -56,6 +58,9 @@ export type DropResult = { ok: true } | { ok: false; message: string } | Project
 
 /** What stopping answered: how many waiting takes were cancelled; null for an unknown track. */
 export type StopResult = { ok: true; stopped: number } | ProjectFailure | null
+
+/** What choosing a take answered; null for a track the project does not list. */
+export type ChooseResult = CommitResult | null
 
 /** A track's takes as the page shows them, a project failure, or null for an unknown track. */
 export type TakesResult = MusicTakesView | ProjectFailure | null
@@ -106,7 +111,9 @@ export interface MusicTakes {
   make(projectFile: string, id: string, request: MakeRequest): Promise<MakeResult>
   /** Cancels the takes still waiting; the one being made finishes and is kept. */
   stop(projectFile: string, id: string): Promise<StopResult>
-  /** Takes a take off the board and deletes its file. */
+  /** Makes a take on the board the track's music: levelled, encoded, with the manifest and lock. */
+  choose(projectFile: string, id: string, name: string): Promise<ChooseResult>
+  /** Takes a take off the board and deletes its file; the chosen take stays. */
   drop(projectFile: string, id: string, name: string): Promise<DropResult>
   /** What is being made in the project, by track, for the lists' status. */
   making(projectFile: string): Promise<Record<string, MakingSummary>>
@@ -130,11 +137,14 @@ export function createMusicTakes({
   queue = gpuQueue(),
   now = Date.now,
   newSeed = () => Math.floor(Math.random() * 2 ** 31),
+  encode = ffmpegEncoder,
 }: {
   generator: MusicGenerator
   queue?: Serial
   now?: () => number
   newSeed?: () => number
+  /** Encodes the chosen take (tests); ffmpeg by default. */
+  encode?: Encoder
 }): MusicTakes {
   // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
   const shared = globalThis as {
@@ -166,6 +176,8 @@ export function createMusicTakes({
     return {
       root,
       id,
+      music: project.music,
+      listId: found.list.id,
       inputs,
       hash: musicTakeHash(inputs),
       folder: `${MUSIC_TAKES_DIR}/${id}`,
@@ -228,6 +240,7 @@ export function createMusicTakes({
         n: entry.n,
         hash: entry.hash,
         seed: take.seed,
+        model: MUSIC_MODEL,
         seconds: wavSeconds(wav),
         peaks: peaks(wav, WAVEFORM_BARS),
         inputs,
@@ -259,6 +272,7 @@ export function createMusicTakes({
       const entries = entriesOf(projectFile, id)
       const board = await readBoard(root, found.board)
       if ('ok' in board) return board
+      const chosen = (await readChosen(root, found.music, []))[id]?.lock
       const takes: TakeView[] = []
       for (const take of board.takes) {
         if (!(await Bun.file(join(root, folder, fileOf(take))).exists())) continue
@@ -269,6 +283,7 @@ export function createMusicTakes({
           seed: take.seed,
           peaks: take.peaks,
           earlier: take.hash !== hash,
+          chosen: chosen?.take === take.n && chosen.fp === take.hash,
         })
       }
       const making: MakingView[] = entries
@@ -354,15 +369,45 @@ export function createMusicTakes({
     async drop(projectFile, id, name) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
+      const chosen = (await readChosen(found.root, found.music, []))[id]?.lock
       const dropped = await changeBoard(projectFile, found, (board) => {
         const take = board.takes.find((t) => fileOf(t) === name)
+        if (take && chosen?.take === take.n && chosen.fp === take.hash) return 'chosen' as const
         if (take) board.takes = board.takes.filter((t) => t !== take)
         return take
       })
+      if (dropped === 'chosen') {
+        return { ok: false, message: 'That take is the one in the game: choose another first.' }
+      }
       if (dropped && 'ok' in dropped) return dropped
       if (!dropped) return { ok: false, message: 'That take is not on the board.' }
       await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(dropped)}`), { force: true })
       return { ok: true }
+    },
+
+    async choose(projectFile, id, name) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      const board = await readBoard(found.root, found.board)
+      if ('ok' in board) return board
+      const take = board.takes.find((t) => fileOf(t) === name)
+      if (!take) return { ok: false, message: 'That take is not on the board.' }
+      let wav: Uint8Array
+      try {
+        wav = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
+      } catch {
+        return { ok: false, message: 'That take’s sound is gone, so it cannot be chosen.' }
+      }
+      return commitChoice({
+        root: found.root,
+        projectFile,
+        music: found.music,
+        id,
+        listId: found.listId,
+        take,
+        wav,
+        encode,
+      })
     },
 
     async making(projectFile) {

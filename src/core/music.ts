@@ -1,4 +1,12 @@
 import { z } from 'zod'
+import { MUSIC_MODEL } from './musicTake'
+import {
+  changedFields,
+  trackStatus,
+  type ChangedField,
+  type LockEntry,
+  type TrackStatus,
+} from './musicChoose'
 import type { Problem } from './project'
 
 /** The longest stinger the game may ask for, in seconds. */
@@ -87,8 +95,18 @@ export interface TrackRow {
   key: string | null
   /** What the game's list says, for "from the game" and "use the game's". */
   game: GameBrief
-  /** Only "not chosen" is known until choosing exists. */
-  status: 'not-chosen'
+  /** Chosen, not chosen, changed since chosen, or its music file missing. */
+  status: TrackStatus
+  /** What changed since the take was chosen; empty unless the status is `changed`. */
+  changed: ChangedField[]
+  /** When the take was chosen (ISO time); null when none is. */
+  chosenAt: string | null
+}
+
+/** What the lock says of a track and whether its music file is on disk. */
+export interface ChosenState {
+  lock: LockEntry
+  fileExists: boolean
 }
 
 /** One page of Music: an act's loops or the stingers. */
@@ -116,6 +134,7 @@ export interface MusicSummary {
 export function summarizeMusic(
   lists: MusicListInput[],
   briefs: Briefs,
+  chosen: Record<string, ChosenState> = {},
 ): { music: MusicSummary; problems: Problem[] } {
   const uses = new Map<string, { file: string; path: string }[]>()
   for (const list of lists) {
@@ -149,7 +168,9 @@ export function summarizeMusic(
         kind: list.kind,
         title: list.title,
         state: list.state.status,
-        tracks: shown(list, uses).map((track) => rowOf(track, briefs[track.id])),
+        tracks: shown(list, uses).map((track) =>
+          rowOf(track, briefs[track.id], list.kind, chosen[track.id]),
+        ),
         dropped: listed(list).length - shown(list, uses).length,
         canRefresh: list.canRefresh,
       })),
@@ -167,8 +188,13 @@ function shown(list: MusicListInput, uses: Map<string, unknown[]>): Track[] {
   return listed(list).filter((track) => uses.get(track.id)!.length === 1)
 }
 
-function rowOf(track: Track, change: Briefs[string] | undefined): TrackRow {
-  return {
+function rowOf(
+  track: Track,
+  change: Briefs[string] | undefined,
+  kind: MusicListInput['kind'],
+  chosen: ChosenState | undefined,
+): TrackRow {
+  const row = {
     id: track.id,
     title: track.title,
     plays: track.plays ?? null,
@@ -183,7 +209,24 @@ function rowOf(track: Track, change: Briefs[string] | undefined): TrackRow {
       bpm: track.bpm ?? null,
       key: track.key ?? null,
     },
-    status: 'not-chosen',
+  }
+  const current = {
+    brief: row.brief,
+    kind: kind === 'stingers' ? ('stinger' as const) : ('loop' as const),
+    seconds: row.seconds,
+    bpm: row.bpm,
+    key: row.key,
+  }
+  const status = trackStatus({
+    lock: chosen?.lock,
+    current,
+    fileExists: chosen?.fileExists ?? false,
+  })
+  return {
+    ...row,
+    status,
+    changed: status === 'changed' ? changedFields(chosen!.lock, MUSIC_MODEL, current) : [],
+    chosenAt: chosen?.lock.at ?? null,
   }
 }
 
