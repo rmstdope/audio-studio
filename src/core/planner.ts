@@ -56,6 +56,8 @@ export interface LineState {
   inside: InsideCue[]
   /** The line's previous cued text when its words changed and its cues inside were set aside. */
   insideStale: string | null
+  /** The cues inside the source language's line, shown with it; not recorded in this language. */
+  sourceInside: InsideCue[]
   /** The source language's own cue for the line, when this is another language and it has one. */
   sourceCue: string | null
   /** Whether the clip was made with the final model (when it differs from the draft one). */
@@ -103,6 +105,8 @@ export interface PlanInput {
   ownCues?: Cues
   /** The source language's cues, in a language besides the source; absent: none. */
   sourceCues?: Cues
+  /** The cues inside the source language's lines, by key; absent: none. */
+  sourceInside?: Record<string, InsideCue[]>
   lock: Lock
   manifest: Manifest
   /** File names present in the part's clips folder. */
@@ -135,6 +139,7 @@ export function planPart(input: PlanInput): PartState {
         sourceCue: null,
         inside: [],
         insideStale: null,
+        sourceInside: [],
         final: false,
         status: 'untranslated',
         reasons: [],
@@ -183,6 +188,12 @@ export function planPart(input: PlanInput): PartState {
       english,
       cue: inputs?.cue ?? ownOpening(cues, line) ?? character?.style ?? '',
       inside: inputs?.inside ?? parseCued(cueFor(cues, line.key) ?? '', line.text).inside,
+      sourceInside:
+        (input.sourceInside &&
+          (Object.hasOwn(input.sourceInside, line.key)
+            ? input.sourceInside[line.key]
+            : undefined)) ??
+        [],
       insideStale: parseCued(cueFor(own, line.key) ?? '', line.text).stale,
       sourceCue: (input.sourceCues && cueFor(input.sourceCues, line.key)) ?? null,
       cueFrom:

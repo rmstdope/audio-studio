@@ -446,7 +446,7 @@ export async function readPart(
             problems,
           ),
         ) ?? {})
-  const { cues, sourceCues } = mergeCues(
+  const { cues, sourceCues, sourceInside } = mergeCues(
     dialog.status === 'ok' ? dialog.lines : [],
     ownCues,
     sourceEntries,
@@ -484,6 +484,7 @@ export async function readPart(
       cues,
       ownCues,
       sourceCues,
+      sourceInside,
       lock: lock ?? {},
       manifest: manifest ?? {},
       files,

@@ -13,6 +13,7 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     sourceCue: null,
     inside: [],
     insideStale: null,
+    sourceInside: [],
     final: false,
     status: 'missing',
     reasons: [],

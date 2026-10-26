@@ -128,6 +128,8 @@ export interface MergedCues {
   cues: Record<string, string>
   /** The source's opening cues; its cues inside are never carried over. */
   sourceCues: Record<string, string>
+  /** The cues inside the source's lines, for showing them; they are not recorded in this language. */
+  sourceInside: Record<string, InsideCue[]>
 }
 
 /**
@@ -144,10 +146,12 @@ export function mergeCues(
   const textOf = (all: { key: string; text: string }[], key: string) =>
     all.find((l) => l.key === key)?.text ?? ''
   const sourceCues: Record<string, string> = {}
+  const sourceInside: Record<string, InsideCue[]> = {}
   for (const [key, entry] of Object.entries(source)) {
     const line = sourceLines.find((l) => l.key === key)
-    const opening = line ? parseCued(entry, line.text).opening : entry
-    if (opening) sourceCues[key] = opening
+    const parsed = line ? parseCued(entry, line.text) : { opening: entry, inside: [] }
+    if (parsed.opening) sourceCues[key] = parsed.opening
+    if (parsed.inside.length) sourceInside[key] = parsed.inside
   }
   const cues: Record<string, string> = { ...sourceCues }
   for (const [key, entry] of Object.entries(own)) {
@@ -155,5 +159,5 @@ export function mergeCues(
     const opening = parseCued(entry, textOf(lines, key)).opening
     cues[key] = lead && !opening ? `${lead} ${entry}` : entry
   }
-  return { cues, sourceCues }
+  return { cues, sourceCues, sourceInside }
 }

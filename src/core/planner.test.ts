@@ -453,6 +453,22 @@ describe('planPart, cues inside a line', () => {
     })
   })
 
+  it('shows the source line’s cues inside beside it, and records none of them', () => {
+    const swedish: Line[] = [{ key: 'n1', speaker: 'narrator', text: 'Elior vaknar.' }]
+    const state = planPart(
+      input({
+        lines: swedish,
+        source: lines,
+        cues: { n1: '[worried]' },
+        ownCues: {},
+        sourceCues: { n1: '[worried]' },
+        sourceInside: { n1: [{ at: 1, cue: '[low]' }] },
+      }),
+    )
+    expect(state.lines[0]).toMatchObject({ inside: [], sourceInside: [{ at: 1, cue: '[low]' }] })
+    expect(planPart(input()).lines[0]!.sourceInside).toEqual([])
+  })
+
   it('takes a line with cues inside but no opening cue as the style’s', () => {
     const state = planPart(input({ cues: { n1: 'Elior [low] wakes.' } }))
     expect(state.lines[0]).toMatchObject({

@@ -22,6 +22,7 @@ function line(
     sourceCue: null,
     inside: [],
     insideStale: null,
+    sourceInside: [],
     final: false,
     status,
     reasons,
