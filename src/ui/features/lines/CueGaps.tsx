@@ -87,24 +87,7 @@ export function LineWords({
                     onClick={() => setOpen(open === i ? null : i)}
                   >
                     {placed ? placed.cue : ''}
-                  </button>
-                  {open === i && (
-                    <CueBox
-                      partId={partId}
-                      line={line}
-                      at={i}
-                      placed={line.inside.find((c) => c.at === i)?.cue ?? null}
-                      word={word}
-                      language={language}
-                      chunkLimit={chunkLimit}
-                      playing={playing}
-                      toggle={toggle}
-                      close={() => {
-                        back.current = i
-                        setOpen(null)
-                      }}
-                    />
-                  )}{' '}
+                  </button>{' '}
                 </>
               )}
               {word}
@@ -112,6 +95,24 @@ export function LineWords({
           )
         })}
       </span>
+      {open !== null && (
+        <CueBox
+          key={open}
+          partId={partId}
+          line={line}
+          at={open}
+          placed={line.inside.find((c) => c.at === open)?.cue ?? null}
+          word={words[open] ?? ''}
+          language={language}
+          chunkLimit={chunkLimit}
+          playing={playing}
+          toggle={toggle}
+          close={() => {
+            back.current = open
+            setOpen(null)
+          }}
+        />
+      )}
       {line.insideStale !== null && (
         <span className="line-stale-cues" role="status">
           <b>The cues inside this line no longer fit its words</b>, so it records with{' '}
@@ -218,59 +219,81 @@ function CueBox({
   }
 
   return (
-    <form
-      className="cue-box"
-      onSubmit={(event) => {
-        event.preventDefault()
-        if (cue && !save.isPending && !changed && cue !== placed) write(cue)
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
+    <>
+      <form
+        className="cue-box"
+        onSubmit={(event) => {
           event.preventDefault()
-          event.stopPropagation()
-          cancel()
-        }
-      }}
-    >
-      <input
-        className="mono"
-        autoFocus
-        aria-label={`Cue before “${word}”`}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-      />
-      <span className="cue-hint muted">
-        {placed === null
-          ? `From “${word}” on, until the next cue. Brackets are added for you.`
-          : `From “${word}” on, until the next cue.`}
-      </span>
-      <div className="cue-actions">
-        <button
-          className="btn"
-          type="submit"
-          disabled={save.isPending || changed || !cue || cue === placed}
-        >
-          {placed === null ? 'Add' : 'Save'}
-        </button>
-        {placed !== null && (
-          <button className="btn" type="button" disabled={save.isPending} onClick={() => write('')}>
-            Remove
-          </button>
+          if (cue && !save.isPending && !changed && cue !== placed) write(cue)
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            event.stopPropagation()
+            cancel()
+          }
+        }}
+      >
+        <input
+          className="mono"
+          autoFocus
+          aria-label={`Cue before “${word}”`}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <span className="cue-hint muted">
+          {placed === null
+            ? `From “${word}” on, until the next cue. Brackets are added for you.`
+            : `From “${word}” on, until the next cue.`}
+        </span>
+        {changed && (
+          <section className="cue-refused" role="alert">
+            <b>The cue could not be saved.</b> This line’s words changed in the game; close this and
+            place the cue again.
+          </section>
         )}
-        <button className="btn" type="button" onClick={cancel}>
-          Cancel
-        </button>
-        <button
-          className="btn"
-          type="button"
-          title="Hear the whole line said with this cue, without saving anything (a free take)"
-          disabled={hear.isPending || (placed === null && !cue)}
-          onClick={tryIt}
-        >
-          {hear.isPending ? 'Recording…' : playing === tryId ? 'Stop' : 'Hear it'}
-        </button>
-      </div>
-      {heard && playing === tryId && <span className="muted cue-tried mono">{heard.spoken}</span>}
+        <div className="cue-actions">
+          <button
+            className="btn"
+            type="submit"
+            disabled={save.isPending || changed || !cue || cue === placed}
+          >
+            {placed === null ? 'Add' : 'Save'}
+          </button>
+          {placed !== null && (
+            <button
+              className="btn"
+              type="button"
+              disabled={save.isPending}
+              onClick={() => write('')}
+            >
+              Remove
+            </button>
+          )}
+          <button className="btn" type="button" onClick={cancel}>
+            Cancel
+          </button>
+          <button
+            className="btn"
+            type="button"
+            title="Hear the whole line said with this cue, without saving anything (a free take)"
+            disabled={hear.isPending || (placed === null && !cue)}
+            onClick={tryIt}
+          >
+            {hear.isPending ? 'Recording…' : playing === tryId ? 'Stop' : 'Hear it'}
+          </button>
+        </div>
+        {heard && playing === tryId && <span className="muted cue-tried mono">{heard.spoken}</span>}
+        {!changed && problems.length > 0 && (
+          <Problems title="The cue could not be saved" problems={problems} />
+        )}
+        {save.isError && <span className="adopt-error">{save.error.message}</span>}
+        {refused && 'problems' in refused && (
+          <Problems title="The cue could not be tried" problems={refused.problems} />
+        )}
+        {refused && 'message' in refused && <span className="adopt-error">{refused.message}</span>}
+        {hear.isError && <span className="adopt-error">{hear.error.message}</span>}
+      </form>
       {pieces.length > 0 && (
         <div className="cue-pieces">
           <span className="muted">Recorded in {pieces.length} pieces:</span>
@@ -289,21 +312,6 @@ function CueBox({
           ))}
         </div>
       )}
-      {changed && (
-        <section className="cue-refused" role="alert">
-          <b>The cue could not be saved.</b> This line’s words changed in the game; close this and
-          place the cue again.
-        </section>
-      )}
-      {!changed && problems.length > 0 && (
-        <Problems title="The cue could not be saved" problems={problems} />
-      )}
-      {save.isError && <span className="adopt-error">{save.error.message}</span>}
-      {refused && 'problems' in refused && (
-        <Problems title="The cue could not be tried" problems={refused.problems} />
-      )}
-      {refused && 'message' in refused && <span className="adopt-error">{refused.message}</span>}
-      {hear.isError && <span className="adopt-error">{hear.error.message}</span>}
-    </form>
+    </>
   )
 }
