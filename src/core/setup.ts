@@ -326,7 +326,7 @@ function stableAudio(facts: SetupFacts): SetupCheck {
         parts: [`Download both into ${STABLE_AUDIO_HOME}, where the studio looks for them:`],
         commands: STABLE_AUDIO_REPOS.map(
           (repo) =>
-            `HF_TOKEN=… huggingface-cli download stabilityai/${repo} --local-dir ${STABLE_AUDIO_HOME}/${repo}`,
+            `HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/${repo} --local-dir ${STABLE_AUDIO_HOME}/${repo}`,
         ),
       },
     ],
