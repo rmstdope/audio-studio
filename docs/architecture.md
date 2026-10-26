@@ -829,7 +829,9 @@ on the track's page is saved as the field is left and marked "changed here"; "us
 value typed back to the game's, removes it again. The game's lists are never written.
 Validated like every resource and written through `writeAtomic` in stable key order.
 
-**Pages.** Music in the sidebar opens into the acts and Stingers, a page each (listed only while a Music page is open; Narration lists its acts the same way, and on Setup and the project pages both are folded), listing its tracks
+**Pages.** The sidebar lists a workspace's acts only while one of its pages is open (Narration's
+acts the same way); on Setup and the project pages both are folded. Music opens into the acts and
+Stingers, a page each, listing its tracks
 with their status (see Status below). An act's page has **Refresh from the game** when the project
 has `refreshDialog`: the same command as Refresh dialog, which brings the act's lines and loops
 together, and its summary names the loops added and removed besides the lines. A refresh of an act

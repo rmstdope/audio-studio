@@ -15,7 +15,7 @@ import {
 import { dollars, plural, shortTitle } from '../format'
 import { actCount, openWorkspace } from '../sidebarActs'
 
-/** The studio's navigation: project, workspaces, the parts, and the project-wide characters. */
+/** The studio's navigation: project, the workspaces with the open one's acts, and the project-wide pages. */
 export function Sidebar({
   summary,
   route,
@@ -99,7 +99,6 @@ export function Sidebar({
               <a
                 key={`${list.kind}:${list.id}`}
                 className="nav-item music-subnav"
-                title={list.title}
                 href={routeHref(
                   list.kind === 'stingers'
                     ? { view: 'music', page: 'stingers' }

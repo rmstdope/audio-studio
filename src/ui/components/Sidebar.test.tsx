@@ -12,7 +12,11 @@ const { Sidebar } = await import('./Sidebar')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-afterAll(() => GlobalRegistrator.unregister())
+const cleanups: (() => void)[] = []
+afterAll(() => {
+  cleanups.forEach((c) => c())
+  GlobalRegistrator.unregister()
+})
 
 const part = (id: string, title: string, dialog: string, lineCount: number) => ({
   id,
@@ -47,11 +51,17 @@ const summary = {
 function render(route: Route) {
   const container = document.createElement('div')
   document.body.append(container)
+  const root = createRoot(container)
+  cleanups.push(() => act(() => root.unmount()))
   act(() =>
-    createRoot(container).render(
+    root.render(
       createElement(
         QueryClientProvider,
-        { client: new QueryClient() },
+        {
+          client: new QueryClient({
+            defaultOptions: { queries: { retry: false, enabled: false } },
+          }),
+        },
         createElement(Sidebar, { summary, route, activePart: 'act1' }),
       ),
     ),
@@ -94,14 +104,18 @@ describe('the sidebar on a Narration page', () => {
     expect(links[2]!.title).toBe('Act II: The Long Name That Goes On')
     expect(container.textContent).not.toContain('lines')
     expect(container.querySelector('nav[aria-label="Acts"]')).toBeNull()
+    const gone = [...container.querySelectorAll('.meta-warn')].map((m) => m.textContent)
+    expect(gone).toEqual(['dialog gone'])
   })
 })
 
 describe('the sidebar elsewhere', () => {
   it('lists Music, its acts and Stingers on a Music page, and folds Narration', () => {
-    const texts = render({ view: 'music', page: 'stingers' }).links.map((l) => l.text)
+    const { links } = render({ view: 'music', page: 'stingers' })
+    const texts = links.map((l) => l.text)
     expect(texts.slice(0, 4)).toEqual(['Narration', 'Music', 'Act I 3', 'Stingers 1'])
     expect(texts).not.toContain('Act II no script')
+    expect(links.filter((l) => l.current).map((l) => l.text)).toEqual(['Stingers 1'])
   })
   it('folds both on Setup', () => {
     const { links } = render({ view: 'setup' })
