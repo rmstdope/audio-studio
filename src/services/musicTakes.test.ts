@@ -163,14 +163,22 @@ describe('createMusicTakes', () => {
   })
 
   it('remembers what is being made across a reload of the module that made it', async () => {
-    const { file, takes } = setup()
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const inner = fakeGenerator().generator
+    const slow: MusicGenerator = {
+      ...inner,
+      generate: async (request) => {
+        await gate
+        return inner.generate(request)
+      },
+    }
+    const { file } = setup()
+    const takes = createMusicTakes({ generator: slow, queue: createSerial(), newSeed: () => 1 })
     await takes.make(file, 'hall', { count: 1 })
-    const again = createMusicTakes({
-      generator: fakeGenerator().generator,
-      queue: createSerial(),
-      newSeed: () => 1,
-    })
+    const again = createMusicTakes({ generator: inner, queue: createSerial(), newSeed: () => 1 })
     expect(await again.view(file, 'hall')).toMatchObject({ making: [{ n: 1 }] })
+    release()
   })
 
   it('retries the number that failed, and the take then exists', async () => {

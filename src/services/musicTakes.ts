@@ -182,6 +182,11 @@ export function createMusicTakes({
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       const { root, inputs, hash, folder } = found
+      // The entries first: one is dropped only after its files are written, so a take is then
+      // in the list read after, never in neither.
+      const entries = [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])]
+        .filter((entry) => entry.hash === hash)
+        .sort((a, b) => a.n - b.n)
       const takes: TakeView[] = []
       for (const n of (await made(root, folder, hash)).sort((a, b) => a - b)) {
         const base = `${hash}.${n}`
@@ -198,11 +203,8 @@ export function createMusicTakes({
           // A take without readable details is not shown; the files stay for a person to see.
         }
       }
-      const entries = [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])]
-        .filter((entry) => entry.hash === hash)
-        .sort((a, b) => a.n - b.n)
       const making: MakingView[] = entries
-        .filter((entry) => entry.state !== 'failed')
+        .filter((entry) => entry.state !== 'failed' && !takes.some((take) => take.n === entry.n))
         .map((entry) => ({
           n: entry.n,
           state: entry.state as 'waiting' | 'making',
