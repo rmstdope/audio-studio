@@ -57,6 +57,7 @@ import { voiceUrl } from '../../voiceId'
 import { DesignVoice } from '../audition/DesignVoice'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
+import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { CloneVoice } from './CloneVoice'
 import { KeywordsEditor, PhraseEditor, SpeedEditor, StyleEditor } from './BriefEditors'
 
@@ -96,6 +97,7 @@ export function CharacterView({
   const [asking, setAsking] = useState<'start' | 'resume' | null>(null)
   const [designing, setDesigning] = useState(false)
   const designButton = useRef<HTMLButtonElement>(null)
+  const refocusDesign = useFocusWhenClosed(designing, designButton)
   const player = useClipPlayer()
   const { playing, toggle } = player
   const appearances = casting?.appearances ?? []
@@ -255,8 +257,7 @@ export function CharacterView({
           auditioning={inProgress !== null}
           onClose={() => {
             setDesigning(false)
-            // The button is disabled while the box is open: focus it once the box is gone.
-            setTimeout(() => designButton.current?.focus(), 0)
+            refocusDesign()
           }}
           onDone={() => {
             setDesigning(false)

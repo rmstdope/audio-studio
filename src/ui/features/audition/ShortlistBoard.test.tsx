@@ -45,7 +45,7 @@ function Board() {
     language: null,
     name: 'Keeper',
     lines: 0,
-    designStart: '',
+    designStart: 'A calm, slow old voice, worn by the sea wind.',
     view: { ok: true, session, audition: null, takes: {} },
     playing: null,
     toggle: () => {},
@@ -97,6 +97,43 @@ describe('ShortlistBoard', () => {
     )
     // Focus comes back once the box is gone and the button is enabled again.
     await until(() => box() === null && document.activeElement === design())
+
+    await act(() => page.unmount())
+  })
+
+  it('gives focus back to Design a voice… when a design is made', async () => {
+    globalThis.fetch = (async (path: string) =>
+      path === '/api/credit'
+        ? Response.json({ ok: true, credit: 25 })
+        : path.endsWith('/design')
+          ? Response.json({ ok: true, voices: [] })
+          : new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board),
+        ),
+      ),
+    )
+    const button = (label: string) =>
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.includes(label))
+    const design = () => button('Design a voice…')!
+
+    await act(() => design().click())
+    await act(() => button('Design voices…')!.click())
+    await until(() => button('Pay up to')?.disabled === false)
+    await act(() => button('Pay up to')!.click())
+    // Focus comes back once the box is gone and the button is enabled again.
+    await until(
+      () =>
+        !container.querySelector('[aria-label="Description of the voice"]') &&
+        document.activeElement === design(),
+    )
 
     await act(() => page.unmount())
   })
