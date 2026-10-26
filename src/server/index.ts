@@ -13,6 +13,7 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
+import { BriefChangeBody } from '../core/music'
 import { FishTierSchema } from '../core/project'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
@@ -24,7 +25,8 @@ import { createSpendLog, readSpending } from '../services/spending'
 import { outcomeOf, summariseSpending } from '../core/spending'
 import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
-import { isRefreshing, refreshDialog } from '../services/refresh'
+import { setTrackBrief } from '../services/briefs'
+import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import { setStageModel, switchRetiredModels } from '../services/models'
 import { modelsView } from '../services/modelsView'
@@ -860,6 +862,26 @@ export function startServer({
             return Response.json({ ok: false, reason: 'busy', message }, { status: 409 })
           }
           const result = await refreshDialog(projectFile, request.params.part)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/stingers/refresh': {
+        POST: fromOwnPage(async () => {
+          const result = await refreshShared(projectFile)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = BriefChangeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json(
+              { error: 'expected one of { brief }, { seconds }, { bpm } or { key }' },
+              { status: 400 },
+            )
+          }
+          const result = await setTrackBrief(projectFile, request.params.id, body.data)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

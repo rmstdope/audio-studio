@@ -215,6 +215,33 @@ const NarrationSchema = z
     }
   })
 
+/** A music path: the same in every language, so it may not contain `{language}`. */
+const musicPath = z
+  .string()
+  .min(1)
+  .refine((path) => !path.includes('{language}'), {
+    error: 'must not contain {language}: music is the same in every language',
+  })
+
+/** The optional `music` section: where the game lists its tracks and where their files go. */
+const MusicSchema = z.object({
+  /** The game's command for what belongs to no act (the stingers); run in the project root. */
+  refreshShared: z.string().min(1).optional(),
+  paths: z.object({
+    /** An act's loops, written by the game. */
+    loops: musicPath.refine((path) => path.includes('{part}'), {
+      error: 'must contain {part}, or every part would share one file',
+    }),
+    /** The stingers of the whole game, written by the game. */
+    stingers: musicPath,
+    /** The studio's changes to the game's briefs. */
+    briefs: musicPath,
+    lock: musicPath,
+    clips: musicPath,
+    manifest: musicPath,
+  }),
+})
+
 /** The project file, `audio-studio.json`, in the consumer repository's root. */
 export const ProjectSchema = z.object({
   $schema: z.string().optional(),
@@ -222,10 +249,14 @@ export const ProjectSchema = z.object({
   description: z.string().default(''),
   env: z.string().default('.env'),
   narration: NarrationSchema,
+  music: MusicSchema.optional(),
 })
 
 /** A validated project file, with defaults filled in. */
 export type Project = z.infer<typeof ProjectSchema>
+
+/** The validated `music` section of a project file. */
+export type MusicConfig = z.infer<typeof MusicSchema>
 
 /** One part of the game (RetroQuest: an act). */
 export type Part = z.infer<typeof PartSchema>

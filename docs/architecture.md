@@ -54,10 +54,19 @@ retroquest/                      ← user runs `audio-studio` here
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
 │   ├── cues.json                ← per-line delivery cues (read + written)
-│   └── narration.lock.json      ← per-clip fingerprints (written, committed)
-└── web/public/audio/narration/act1/
-    ├── *.mp3                    ← clips (written)
-    └── manifest.json            ← key → file, speaker, duration, word timings (written)
+│   ├── narration.lock.json      ← per-clip fingerprints (written, committed)
+│   └── music.json               ← the act's loops, from the game (read; built, §8.5)
+├── tts/stingers.json            ← the game's stingers (read; built)
+├── music/
+│   ├── briefs.json              ← the studio's changes to the game's briefs (read + written)
+│   └── music.lock.json          ← the chosen take of each track (written, committed)
+└── web/public/audio/
+    ├── narration/act1/
+    │   ├── *.mp3                ← clips (written)
+    │   └── manifest.json        ← key → file, speaker, duration, word timings (written)
+    └── music/generated/
+        ├── *.mp3                ← tracks (written; planned)
+        └── manifest.json        ← track → file, duration (written; planned)
 ```
 
 1. `audio-studio` walks up from the current directory to find `audio-studio.json`. That directory
@@ -68,10 +77,11 @@ retroquest/                      ← user runs `audio-studio` here
 4. The studio writes only to paths the project file names, and every path goes through
    `resolveInRoot`, which refuses anything outside the project root. Clips are served only when
    they are plain files in the part's clips folder (no folders, no symbolic links). The one
-   exception is **Refresh dialog**: it runs the project's own `refreshDialog` command (the game's
-   code, named in its project file) in the project root, only when the user clicks it on the
-   studio's page; what that command writes is the game's business, and the studio does not check
-   it beyond reading the dialog again.
+   exception is the game's own commands: **Refresh dialog**, on a part's overview, and **Refresh
+   from the game**, on an act's Music page (the same `refreshDialog` command) and on the Stingers
+   page (`music.refreshShared`), run in the project root, only when the user clicks one on the
+   studio's page; what a command writes is the game's business, and the studio does not check it
+   beyond reading the dialog, the loops or the stingers again.
    Besides those paths, the studio writes the project file itself in one place only: the project's
    own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3).
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
@@ -749,20 +759,24 @@ generation while the script and cast still change) and `final` (the recording th
 
 ### 8.5 Music (planned)
 
-The music workspace makes the game's **tracks**: looping background music, one per room or region
-as the game chooses, and short **stingers** (victory, game over). A track is made like a voice is
-cast: a brief, several generated takes to listen to, and one take chosen. The steps are in §12,
-step 12. What the spike (12.1) has not confirmed yet is marked _to confirm_: the model's name and
-sizes, its shortest take, its licence for the weights, and how it runs on Apple Silicon.
+The music workspace makes the game's **tracks**: looping background music, each act's own, one per
+room or region as the game chooses, and short **stingers** (victory, game over) for the whole game.
+As with characters and lines, the game says which tracks it needs; the studio makes them. A track
+is made like a voice is cast: a brief, several generated takes to listen to, and one take chosen.
+The steps are in §12, step 12; the spike's findings (12.1) are in §13, decision 5. The screens are
+drawn in `docs/ui/music-workspace.html`.
 
-**Project file.** An optional `music` section beside `narration`. Only the paths are settled; the
-model, the number of takes and the output settings are fixed in the code until a project needs
-another value:
+**Project file.** An optional `music` section beside `narration`, its acts the narration's parts.
+Only the paths are settled; the model, the number of takes and the output settings are fixed in the
+code until a project needs another value:
 
 ```json
 "music": {
-  "tracks": "music/tracks.json",
+  "refreshShared": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-shared.ts",
   "paths": {
+    "loops": "tts/{part}/music.json",
+    "stingers": "tts/stingers.json",
+    "briefs": "music/briefs.json",
     "lock": "music/music.lock.json",
     "clips": "web/public/audio/music/generated",
     "manifest": "web/public/audio/music/generated/manifest.json"
@@ -771,79 +785,128 @@ another value:
 ```
 
 The clips folder is the studio's own: tracks that are not the studio's (RetroQuest's freetouse.com
-files) stay where they are, untouched. The music files join the Changes panel (§8.3).
+files) stay where they are, untouched. The music files (the game's lists, the studio's briefs, the
+lock, the clips and the manifest) join the Changes panel (§8.3); `briefs.json` is committed, the
+studio's own changes to the game's music. No music path may hold `{language}`: music is the same in
+every language. `refreshShared` is optional: the game's command for what belongs to no act (the
+stingers), run in the project root by Refresh from the game on the Stingers page, as `refreshDialog`
+is for an act; without it the page has no such button.
 
-**Track list** (`music/tracks.json`, read and written by the studio, edited on the Music page):
+**Track lists** (read only, written by the game): an act's loops in `loops`, written by the game's
+own `refreshDialog` command for that part alongside its dialog, and the stingers for the whole game
+in `stingers`, written by `refreshShared`. Both are lists in the game's order. A list that is there
+and empty means the game asks for none; a list that is not there yet means the game has not listed
+them ("The game has not listed the loops for Act IV yet."), and no track is taken for an orphan
+because of it.
 
 ```json
-{
-  "tracks": {
-    "willowbrook-village": {
-      "title": "Willowbrook village",
-      "kind": "loop",
-      "brief": "gentle medieval village, lute and recorder, warm, unhurried, 84 bpm, D major",
-      "seconds": 90
-    },
-    "victory": {
-      "title": "Victory",
-      "kind": "stinger",
-      "brief": "short triumphant brass fanfare",
-      "seconds": 5
-    }
+[
+  {
+    "id": "willowbrook-village",
+    "title": "Willowbrook village",
+    "plays": "Willowbrook, the village square",
+    "brief": "gentle medieval village, lute and recorder, warm, unhurried",
+    "seconds": 90,
+    "bpm": 84,
+    "key": "D major"
   }
-}
+]
 ```
 
-A track's id names its file, so it is a slug (`^[a-z0-9]+(-[a-z0-9]+)*$`); `kind` is `loop` or
-`stinger`. Tracks are always instrumental (no lyrics). Tempo and key are written in the brief for
-now; they become fields of their own if the spike shows ACE-Step follows them better that way.
-The file is validated like every resource (problems with file and JSON path) and written through
-`writeAtomic` in stable key order.
+The file says the kind: a track in `loops` is a loop, one in `stingers` a stinger. A track's id
+names its file in the one clips folder, so it is a slug (`^[a-z0-9]+(-[a-z0-9]+)*$`) and unique
+across the game (a second use is a problem with both files and paths, and neither track is shown or
+made until it is resolved). `plays` (where the game plays
+it, shown under its name) and `bpm` and `key` are optional; `brief` and `seconds` are the game's
+starting point. Tracks are always instrumental (no lyrics). `bpm` and `key` ("D major") are passed
+to ACE-Step as its own fields; their allowed values are settled in 12.2. A stinger is at most 10
+seconds.
+
+**Briefs** (`music/briefs.json`, read and written by the studio): what the studio changed of a
+track's brief, length, tempo and key, `{ id: { brief?, seconds?, bpm?, key? } }`, like a line's
+cue over a character's style; `null` for `bpm` or `key` means none, over the game's. A field changed
+on the track's page is saved as the field is left and marked "changed here"; "use the game's", or a
+value typed back to the game's, removes it again. The game's lists are never written.
+Validated like every resource and written through `writeAtomic` in stable key order.
+
+**Pages.** Music in the sidebar opens into the acts and Stingers, a page each, listing its tracks
+with their status (see Status below). An act's page has **Refresh from the game** when the project
+has `refreshDialog`: the same command as Refresh dialog, which brings the act's lines and loops
+together, and its summary names the loops added and removed besides the lines. A refresh of an act
+and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
+refresh of the stingers and takes being made for a stinger. A project without a `music` section
+shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel; the board of its takes comes with takes).
+Choosing an act the same way in Narration is a change of its own.
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
 
-- a **loop** is generated a few seconds longer than `seconds`, and that tail is crossfaded over its
-  start, so the end runs into the beginning without a seam. The board plays a loop take around its
-  seam (its last seconds, then its first) as well as from the start;
-- a **stinger** is cut to `seconds` with a short fade-out (ACE-Step makes at least 10 seconds, _to
-  confirm_).
+- a **loop** is generated 20 seconds longer than `seconds`, since every take closes as a song does
+  (in the spike, fading from 5 to 14 seconds before its end). It is cut at `seconds`, and the
+  4 seconds after the cut are crossfaded over its start, so the end runs into the beginning
+  without a seam and the loop is `seconds` long. The board plays a loop take around its seam (its
+  last seconds, then its first) as well as from the start;
+- a **stinger** is generated at ACE-Step's shortest, 10 seconds, and cut at its own end (its
+  trailing silence trimmed) or at `seconds`, whichever comes first, with a short fade-out (a
+  fanfare asked for at 10 seconds ends after about 6).
 
-A take is cached in `.audio-studio/music-takes/` by a hash of the model, brief, kind, seconds and
-seed. The seed is kept to say where a take came from; whether the same seed makes the same take
-again on the Mac is for the spike. The board for a track lists its takes: **More takes** generates
-four more, **Drop** removes one, **Choose** writes one. The board is kept in
-`.audio-studio/music/<track>.json` (a track id is a safe file name). A dropped take is just gone: seeds don't come back, so
-nothing is ruled out.
+The numbers are where 12.4 starts; its tests fix them. A take is cached in
+`.audio-studio/music-takes/` by a hash of its inputs (model, brief, kind, seconds, bpm, key) and a
+take id. The same seed does not make the same take again on the Mac, so the cache keeps the take
+itself; the seed is kept with it, in the board and the lock, to say where it came from. The brief a
+take is made from is the game's with the studio's changes over it. The board for a track shows its
+takes as cards: **More takes** generates two more (about six minutes), made in the background, so
+the page can be left meanwhile; **Drop** removes one (not the chosen one); **Choose** writes one at
+once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
+from an earlier brief stay, marked "earlier brief". The board is kept in
+`.audio-studio/music/<track>.json` (a track id is a safe file name). A dropped take is just gone:
+seeds don't come back, so nothing is ruled out.
 
 **Choose** levels the take to −20 LUFS as narration is levelled (`level.py`'s commands; RetroQuest
-levels its music to −20 today) and encodes it into the clips folder as `<track>.<ext>`, the codec
-settled by the spike (MP3 adds a little silence at both ends, so a looping `<audio>` element can
-click at the seam; the spike checks whether the game must loop through Web Audio, or whether
-another codec loops cleanly in the browsers the game supports). As for narration, the encoder
-writes a hidden temporary file in the clips folder, renamed into place together with the manifest
-and lock update. Clips are served only as plain files in the music clips folder.
+levels its music to −20 today) and encodes it into the clips folder as `<track>.mp3`, stereo,
+160 kbps, with ffmpeg's LAME encoder, which writes the header that tells a decoder how much
+padding to drop. Chrome decoded such an MP3 to its exact length (80.000 s, no silence at either
+end, against the WAV), so the game loops it without a gap through Web Audio; a looping `<audio>`
+element is not relied on. Safari and Firefox are checked with the game (12.8). As for narration,
+the encoder writes a hidden temporary file in the clips folder, renamed into place together with
+the manifest and lock update. Clips are served only as plain files in the music clips folder.
+
+**Status** of a track, from the lock and its takes: "chosen" (`ok`), "not chosen" (no take chosen),
+"changed since chosen" (`changed`; the track's page says what changed: the brief, length, tempo, key
+or model), "music file missing" (a take was chosen but its clip is gone from disk), and "making 2
+takes" while its takes are being made. **Stop** cancels the takes still waiting; the one being made
+finishes and is kept. A take that fails says why, and **Try again** makes it again; the other takes
+are kept. Without ACE-Step or its models on the computer, a track's page says so, with **Open
+Setup**, and takes cannot be made.
 
 **Manifest** (`manifest.json` in the clips folder, what the game reads): `{ track: { file,
 duration } }`, its layout fixed once written. The game decides where a track plays, so the kind is
 not in it.
 
 **Lock** (`music.lock.json`, committed, one entry per line): per track, the chosen take's model,
-seed, a hash of what went into it (model, brief, kind, seconds; not the output settings, as
-narration leaves the loudness out), and when it was chosen. Changing the model in the code marks
-every track `changed`, as a new model makes new music. A track is `missing` (nothing chosen,
-or its clip is gone from disk), `ok`, or `changed` (its brief, kind or length changed since its
-take was chosen: the old one keeps playing in the game until another is chosen). A manifest entry
-without a lock entry is reported as a problem. Nothing is generated again by itself: a new brief
-means new takes. A track removed from the list leaves its clip as an orphan, removed after
-confirmation as narration's are.
+seed, a hash of what went into it (model, brief, kind, seconds, bpm, key; not the output settings,
+as narration leaves the loudness out; the chosen take's own inputs, so a take from an earlier brief
+leaves the track "changed since chosen"), which list it came from (an act or the stingers), and when
+it was chosen. Changing the model in the code marks every track `changed`, as a new model makes new
+music. A track is `missing` (nothing chosen, or its clip is gone from disk), `ok`, or `changed` (its
+brief, kind, length, tempo or key changed since its take was chosen: the old one keeps playing in
+the game until another is chosen). A manifest entry without a lock entry is reported as a problem.
+Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
+while its list is there, is an orphan, shown on the page of the list its lock entry names under
+"Music the game no longer asks for"; removing it, after confirmation, deletes its clip, its manifest
+and lock entries, its board, its takes and its briefs entry. The brief changes and board of a track
+never chosen are dropped when the list that named it is there and no longer names it, at the next
+save of the briefs or of that board; while a list is missing, nothing of its tracks is dropped.
 
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
-seconds and seed, so tests run with a fake. The real one is a Python worker (`worker/music.py`,
-ACE-Step through uv, the model loaded on the first take and stopped with the studio), the same
-JSON-lines protocol as the Whisper worker. Generation and Whisper share the one GPU: ACE-Step and Whisper never run at
-once, unless the spike shows both fit and run well side by side. The setup checklist (§10) names ACE-Step's environment and its model
-download.
+kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Python worker
+(`worker/music.py`, ACE-Step through uv, the models loaded on the first take and stopped with the
+studio), the same JSON-lines protocol as the Whisper worker. It uses ACE-Step's XL turbo model with
+its 4B language model, which plans the piece (decision 5). ACE-Step and Whisper share the one GPU
+and never run at once: both workers stay loaded, and one queue runs a take or a Whisper check at a
+time. In the spike, with both loaded and running together, 42 of the 48 GB were in use (20 GB of it
+compressed), and Whisper ran 2.5 times slower. The setup checklist (§10) names ACE-Step's
+environment and its model download.
 
 ---
 
@@ -892,7 +955,8 @@ POST   /api/parts/:part/lines/:key/takes/:id/use make the take the line's clip (
 DELETE /api/parts/:part/lines/:key/takes/:id     drop the take
 POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
-POST   /api/parts/:part/refresh                  run refreshDialog
+POST   /api/parts/:part/refresh                  run refreshDialog (its result names the act's loops added and removed)
+POST   /api/music/stingers/refresh               run music.refreshShared; the stingers added and removed
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
 POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
@@ -1118,7 +1182,7 @@ Small, independently useful increments:
     2. **Listen again**: a line checked before that has Whisper hear its clip again, from the
        comparison, keeping what it heard.
 12. **Music** (§8.5), in small pull requests:
-    1. **Spike** (outside the studio's code; the findings written into §8.5 and §13): ACE-Step 1.5
+    1. **Spike** (done: §13, decision 5): ACE-Step 1.5
        on the M5 Pro, run from Python through uv. Its models, sizes and licence of the weights;
        time and memory for a 90-second take with the larger and smaller model, also with Whisper
        loaded; quality of instrumental loops and stingers in RetroQuest's style; whether tempo
@@ -1126,19 +1190,28 @@ Small, independently useful increments:
        does (which the loop's crossfade needs to know); whether the same seed makes the same
        take; whether the crossfaded seam is heard; and how a loop plays without a click in the
        game's browsers (MP3 in `<audio>`, another codec, or Web Audio).
-    2. **Track list**: the project file's `music` section and `tracks.json` (schemas, problems with
-       file and path), and a Music page listing the tracks, read only.
-    3. **Editing tracks**: a track's brief, kind and length edited and saved; tracks added and
-       removed.
+    2. **Track lists** (built): the project file's `music` section, the game's loop and stinger lists and
+       the studio's briefs (schemas, problems with file and path), and the Music pages, a page per
+       act and one for the stingers, listing the tracks, read only; Refresh from the game on an
+       act's page, and on the Stingers page running `refreshShared` (CLAUDE.md's consumer rules
+       updated in that step to name both buttons and the new command); the sample project in
+       `test/fixtures/sample` gains loop and stinger lists.
+    3. **Briefs** (built): a track's page (a track opens from its row), its brief, length, tempo
+       and key changed and saved in the studio's briefs as each field is left, marked "changed
+       here", and the game's taken back; `PATCH /api/music/tracks/:id`, one field at a time.
     4. **Takes**: the ACE-Step worker behind `MusicGenerator` (and in the setup checklist), a take
        generated, shaped and cached per click on a track's page, and played, loops around their
        seam too.
-    5. **Board**: a track's takes listed, More takes, Drop; the board saved.
+    5. **Board**: a track's takes as cards, More takes (two, in the background), Drop; takes from an
+       earlier brief marked; Stop and Try again; the board saved.
     6. **Choose**: the chosen take levelled, encoded and written with the manifest and lock; each
-       track's status on the Music page; the music files in the Changes panel.
-    7. **Orphans**: a removed track's clip removed after confirmation.
-    8. **RetroQuest** (in the game's repository, not the studio's): the game reads the music
-       manifest and plays a track per room or region, and the stingers.
+       track's status on the Music pages; the music files in the Changes panel.
+    7. **Orphans**: the clip of a track the game no longer lists removed after confirmation.
+    8. **RetroQuest** (in the game's repository, not the studio's): the game's extractor writes
+       each act's loops and the stingers with their first briefs, and the game reads the music
+       manifest and plays a track per room or region, and the stingers, looping through Web Audio;
+       checked in Chrome, Safari and Firefox. If a browser pads an MP3, the manifest gains loop
+       points.
 13. **Languages** (epic as-170), in small pull requests:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's
@@ -1166,5 +1239,21 @@ Small, independently useful increments:
    with rights to use the result (ElevenLabs Music's free plan is non-commercial; others give
    signup credits only). Of the open models, MusicGen's weights are non-commercial (CC-BY-NC) and
    Stable Audio Open is limited to 47 seconds and stronger at effects than at melody; ACE-Step's
-   code is MIT-licensed (its weights' licence _to confirm_), makes full instrumental tracks, and
-   runs on Apple Silicon. Tracks are chosen from takes, since every generation differs.
+   code and weights are MIT-licensed, it makes full instrumental tracks, and it runs on Apple
+   Silicon. Tracks are chosen from takes, since every generation differs.
+5. **ACE-Step's XL turbo model with the 4B language model** (the spike, 12.1, on a MacBook M5 Pro
+   with 48 GB, MLX). A 96-second take takes 2 to 4 minutes with it, about a minute more for the
+   first after a start, while the models load; the length matters little (with the 1.7B language
+   model a 10-second take took 33 to 55 seconds, a 96-second one 52 to 67). The 1.7B language model
+   takes about 1¼ minutes a take, and the XL sft model at 50 steps (where the turbo model allows no
+   more than 8) about 6½, up to three times turbo's wait. In a blind test of one brief, two takes
+   from each (indicative only), the two judged worst were the 1.7B's, and sft was not clearly better
+   than turbo. The quality is fair rather than good, so a board of several takes is how a good one
+   is found. The chosen models take about 28 GB on disk, downloaded once, outside the studio for
+   now. Not measured: whether the music follows the tempo and key asked for (ACE-Step takes them as
+   given), whether a crossfaded seam is heard (judged on the board), and stingers beyond a fanfare
+   and a game-over phrase.
+6. **The game lists the music it needs.** As with characters and lines, the game says which loops
+   each act has and which stingers the whole game has, with a first brief for each; the studio only
+   makes them, and keeps its own changes to a brief beside the game's. Hence no adding or removing
+   of tracks in the studio, and a track the game drops becomes an orphan.

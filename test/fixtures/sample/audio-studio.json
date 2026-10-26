@@ -11,6 +11,10 @@
       {
         "id": "act2",
         "title": "Act II: The Road"
+      },
+      {
+        "id": "act3",
+        "title": "Act III: The Crown"
       }
     ],
     "characters": "tts/cast.json",
@@ -25,6 +29,18 @@
       "en",
       "sv",
       "de"
-    ]
+    ],
+    "refreshDialog": "sh tools/refresh.sh {part}"
+  },
+  "music": {
+    "refreshShared": "sh tools/refresh-stingers.sh",
+    "paths": {
+      "loops": "tts/{part}/music.json",
+      "stingers": "tts/stingers.json",
+      "briefs": "music/briefs.json",
+      "lock": "music/music.lock.json",
+      "clips": "audio/music",
+      "manifest": "audio/music/manifest.json"
+    }
   }
 }

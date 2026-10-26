@@ -24,6 +24,12 @@ export function separatorBefore(i: number, n: number): string {
   return i === 0 ? '' : i === n - 1 ? ' and ' : ', '
 }
 
+/** A length in seconds as m:ss (`80` → `1:20`). */
+export function clock(seconds: number): string {
+  const whole = Math.round(seconds)
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
+}
+
 /** `1 line`, `2 lines`. */
 export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`

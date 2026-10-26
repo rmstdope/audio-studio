@@ -1128,6 +1128,12 @@ a.btn {
   gap: 8px;
 }
 
+/* The speed field and its two buttons are wider than the side column together: they wrap rather
+   than widen it, which would drop the character page to one column. */
+.speed-row {
+  flex-wrap: wrap;
+}
+
 .keyword-add .search {
   flex: 1;
   width: auto;
@@ -2597,4 +2603,121 @@ a.btn {
     grid-template-columns: 1fr;
     gap: 4px;
   }
+}
+
+/* Music */
+
+.music-table {
+  min-width: 640px;
+}
+.music-play {
+  width: 44px;
+}
+.music-brief-cell {
+  max-width: 0;
+  width: 45%;
+}
+.music-brief {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+}
+.music-notice {
+  margin: 0;
+  padding: 6px 0;
+}
+.music-example {
+  text-align: left;
+  align-self: stretch;
+}
+.music-subnav {
+  padding-left: 20px;
+}
+.music-id {
+  font-size: 12px;
+}
+
+.music-track-link {
+  color: var(--text);
+  text-decoration: none;
+}
+.music-track-link:hover {
+  text-decoration: underline;
+}
+
+/* A track's Brief panel */
+
+.brief-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.brief-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.brief-panel-head h2 {
+  margin: 0;
+}
+.saved {
+  font-size: 12px;
+  color: var(--ok-ink);
+}
+.music-brief-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+@media (max-width: 700px) {
+  .music-brief-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.brief-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.brief-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.brief-field-head .label {
+  margin-right: auto;
+}
+.field-tag {
+  font-size: 12px;
+  color: var(--faint);
+}
+.field-tag.changed {
+  color: var(--warn);
+}
+.link-button {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+  color: var(--warn);
+}
+.brief-input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 8px 10px;
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+.music-kind {
+  align-self: flex-start;
+  margin-top: 6px;
 }

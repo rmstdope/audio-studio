@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
 
+/** The Music pages: none chosen (the first list), an act's loops, the stingers, or one track. */
+export type MusicRoute =
+  | { view: 'music'; page: null }
+  | { view: 'music'; page: 'act'; part: string }
+  | { view: 'music'; page: 'stingers' }
+  | { view: 'music'; page: 'track'; track: string }
+
 /**
  * Where the UI is: a part's overview or its lines, every character, one character's page or its
  * audition, or the project's uncommitted changes.
@@ -11,12 +18,13 @@ export type Route =
   | { view: 'changes' }
   | { view: 'spending' }
   | { view: 'setup' }
+  | MusicRoute
   | { view: 'character'; character: string; language?: string }
   | { view: 'audition'; character: string; language?: string }
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`; anything else is the
+ * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers`, `#/music/tracks/victory`; anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
@@ -26,6 +34,17 @@ export function parseRoute(hash: string): Route {
   if (first === 'changes') return { view: 'changes' }
   if (first === 'spending') return { view: 'spending' }
   if (first === 'setup') return { view: 'setup' }
+  if (first === 'music') {
+    if (second === 'parts' && third) {
+      return { view: 'music', page: 'act', part: decodeURIComponent(third) }
+    }
+    if (second === 'tracks' && third) {
+      return { view: 'music', page: 'track', track: decodeURIComponent(third) }
+    }
+    return second === 'stingers'
+      ? { view: 'music', page: 'stingers' }
+      : { view: 'music', page: null }
+  }
   if (first === 'characters') {
     if (!second) return language ? { view: 'characters', language } : { view: 'characters' }
     const character = decodeURIComponent(second)
@@ -45,6 +64,14 @@ export function routeHref(route: Route): string {
   if (route.view === 'changes') return '#/changes'
   if (route.view === 'spending') return '#/spending'
   if (route.view === 'setup') return '#/setup'
+  if (route.view === 'music') {
+    if (route.page === 'track') return `#/music/tracks/${encodeURIComponent(route.track)}`
+    return route.page === 'act'
+      ? `#/music/parts/${encodeURIComponent(route.part)}`
+      : route.page === 'stingers'
+        ? '#/music/stingers'
+        : '#/music'
+  }
   const query = route.language ? `?language=${encodeURIComponent(route.language)}` : ''
   if (route.view === 'characters') return `#/characters${query}`
   if (route.view === 'character')

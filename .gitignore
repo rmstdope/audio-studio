@@ -15,3 +15,6 @@ node_modules/
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+
+# The studio's briefs, written while working on the sample project.
+test/fixtures/sample/music/

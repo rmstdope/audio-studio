@@ -84,4 +84,21 @@ describe('SpeedEditor', () => {
     await page.show('de', 'Speed · Deutsch')
     expect(page.container.textContent).not.toContain('The speed could not be saved')
   })
+
+  it('lets a saved speed’s three controls wrap rather than widen the side column', async () => {
+    // The field, Save speed and Use the project’s are wider than the side column together: a row
+    // that cannot wrap widens the column until the character page falls to one column (as-86w).
+    const style = document.createElement('style')
+    style.textContent = await Bun.file(new URL('../../styles.css', import.meta.url)).text()
+    document.head.append(style)
+    try {
+      page = speedPage()
+      await page.show('de', 'Speed · Deutsch', 2)
+      const row = page.field().parentElement!
+      expect(row.textContent).toContain('Use the project’s')
+      expect(getComputedStyle(row).flexWrap).toBe('wrap')
+    } finally {
+      style.remove()
+    }
+  })
 })

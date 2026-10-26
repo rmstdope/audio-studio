@@ -74,8 +74,7 @@ export function setSoundAlike(
     const parsed = ProjectSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
 
-    await saveProject(projectFile, opened, (indent) => projectJson(raw, indent))
-    return { ok: true }
+    return saveProject(projectFile, opened, PATH, (indent) => projectJson(raw, indent))
   })
 }
 

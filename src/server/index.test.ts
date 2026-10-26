@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { writeWav } from '../core/wav'
@@ -2901,5 +2901,121 @@ describe('server, generating per language', () => {
     await send('PATCH', '/api/parts/act1/lines/a/note?language=sv', { note: 'för snabb' })
     expect((await get('/api/parts/act1?language=sv')).part.notes).toEqual({ a: 'för snabb' })
     expect((await get('/api/parts/act1')).part.notes).toEqual({})
+  })
+})
+
+describe('server, the music pages', () => {
+  const list = JSON.stringify([{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5 }])
+  const musicRoot = tempRepo({
+    'audio-studio.json': projectJson({
+      music: {
+        refreshShared: `printf '%s' '${list}' > tts/stingers.json`,
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+  })
+  const studio = startServer({
+    projectFile: join(musicRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => studio.stop(true))
+  const refresh = (origin: string) =>
+    fetch(new URL('/api/music/stingers/refresh', studio.url), {
+      method: 'POST',
+      headers: { origin },
+    })
+
+  it('shows the lists in the project summary', async () => {
+    const body = await (await fetch(new URL('/api/project', studio.url))).json()
+    expect(body.summary.music.lists.map((l: { id: string }) => l.id)).toEqual([
+      'act1',
+      'act2',
+      'stingers',
+    ])
+  })
+
+  it('refreshes the stingers from the studio’s own page only', async () => {
+    expect((await refresh('https://evil.example')).status).toBe(403)
+    const answer = await refresh(studio.url.origin)
+    expect(answer.status).toBe(200)
+    expect(await answer.json()).toMatchObject({
+      ok: true,
+      stingers: 1,
+      change: { added: [{ id: 'victory' }], removed: [] },
+    })
+    expect(existsSync(join(musicRoot, 'tts/stingers.json'))).toBe(true)
+  })
+
+  describe('saving a track’s brief', () => {
+    const patch = (id: string, body: unknown, origin = studio.url.origin) =>
+      fetch(new URL(`/api/music/tracks/${id}`, studio.url), {
+        method: 'PATCH',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+    beforeAll(() => writeFileSync(join(musicRoot, 'tts/stingers.json'), list))
+
+    it('takes a change from the studio’s own page only', async () => {
+      expect((await patch('victory', { brief: 'x' }, 'https://evil.example')).status).toBe(403)
+    })
+
+    it('refuses a body that is not one field', async () => {
+      expect((await patch('victory', { brief: 'x', key: 'C' })).status).toBe(400)
+      expect((await patch('victory', { bpm: 1000 })).status).toBe(400)
+    })
+
+    it('answers 404 for a track nobody lists', async () => {
+      expect((await patch('nobody', { brief: 'x' })).status).toBe(404)
+    })
+
+    it('answers 409 with the reason for a stinger that is too long', async () => {
+      const answer = await patch('victory', { seconds: 11 })
+      expect(answer.status).toBe(409)
+      expect(await answer.json()).toMatchObject({
+        ok: false,
+        problems: [{ path: 'victory.seconds' }],
+      })
+    })
+
+    it('saves, and the summary then shows the change', async () => {
+      const answer = await patch('victory', { brief: 'ours' })
+      expect(answer.status).toBe(200)
+      expect(await answer.json()).toEqual({ ok: true })
+      const body = await (await fetch(new URL('/api/project', studio.url))).json()
+      const stingers = body.summary.music.lists.find((l: { id: string }) => l.id === 'stingers')
+      expect(stingers.tracks[0]).toMatchObject({ brief: 'ours', game: { brief: 'fanfare' } })
+    })
+  })
+
+  it('refuses with a reason when the project has no shared command', async () => {
+    const plain = startServer({
+      projectFile: join(root, 'audio-studio.json'),
+      port: 0,
+      fish,
+      encode,
+      transcriber: null,
+    })
+    try {
+      const answer = await fetch(new URL('/api/music/stingers/refresh', plain.url), {
+        method: 'POST',
+        headers: { origin: plain.url.origin },
+      })
+      expect(answer.status).toBe(409)
+      expect(await answer.json()).toMatchObject({ ok: false, reason: 'none' })
+    } finally {
+      plain.stop(true)
+    }
   })
 })

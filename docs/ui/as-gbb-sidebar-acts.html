@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Acts in the sidebar</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --chip: #1a1d26;
+        --warn: #ffc24b;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        max-width: 1100px;
+        margin: 26px auto 8px;
+        color: var(--soft);
+      }
+      .frames {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      .frame {
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        min-height: 520px;
+        background: var(--bg);
+        flex: 1 1 520px;
+      }
+      .side {
+        width: 260px;
+        flex: none;
+        background: var(--sidebar);
+        border-right: 1px solid #1e212a;
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .brand {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        font-weight: 600;
+      }
+      .mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .pbox {
+        padding: 12px;
+        border-radius: 12px;
+        background: #151821;
+        border: 1px solid #222632;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 13px;
+      }
+      .lbl {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        padding: 0 10px 6px;
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .ni {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 36px;
+        padding: 0 10px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 13.5px;
+      }
+      .ni.sub {
+        padding-left: 34px;
+        min-height: 32px;
+      }
+      .ni.on {
+        background: var(--chip);
+        color: var(--text);
+      }
+      .ni.ws {
+        color: var(--text);
+      }
+      .ni.dis {
+        opacity: 0.6;
+      }
+      .ni .num {
+        width: 22px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .ni .g {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ni .m {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .ni .m.w {
+        color: var(--warn);
+      }
+      .ic {
+        width: 16px;
+        text-align: center;
+        color: var(--faint);
+      }
+      .foot {
+        margin-top: auto;
+      }
+      .main {
+        flex: 1;
+        padding: 24px 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-width: 0;
+      }
+      .crumbs {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .ph {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        height: 90px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .call {
+        border-left: 3px solid var(--accent);
+        padding: 6px 10px;
+        color: var(--soft);
+        font-size: 12.5px;
+        background: #14110e;
+        border-radius: 0 8px 8px 0;
+      }
+      .frame.narrow {
+        flex: 0 0 380px;
+        flex-direction: column;
+      }
+      .frame.narrow .side {
+        width: auto;
+        border-right: 0;
+        border-bottom: 1px solid #1e212a;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Acts in the sidebar</h1>
+      <p>
+        Narration and Music are chosen alike: the open workspace lists its acts beneath it, the
+        other is folded. Agreed in the design session for this change.
+      </p>
+    </div>
+    <p class="note">
+      <b>1 — On an act in Narration.</b> Narration’s acts are listed, indented under it: “Act I” and
+      the number of lines. Music’s acts are folded away. Only the open act is highlighted. The
+      “Acts” list and its heading are gone.
+    </p>
+    <div class="frames">
+      <div class="frame">
+        <aside class="side">
+          <div class="brand"><span class="mark">〰</span>Audio Studio</div>
+          <div class="pbox">
+            <span class="lbl" style="padding: 0">Project</span><strong>Sample Quest</strong
+            ><span style="font-family: var(--mono); font-size: 11px; color: var(--muted)"
+              >sample</span
+            >
+          </div>
+          <div class="nav">
+            <span class="lbl">Workspace</span
+            ><span class="ni ws"><span class="ic">🎙</span><span class="g">Narration</span></span
+            ><span class="ni sub on"><span class="g">Act I</span><span class="m">12</span></span
+            ><span class="ni sub"><span class="g">Act II</span><span class="m">9</span></span
+            ><span class="ni ws"><span class="ic">♪</span><span class="g">Music</span></span
+            ><span class="ni dis"
+              ><span class="ic">🔊</span><span class="g">Sound effects</span
+              ><span class="m">Soon</span></span
+            >
+          </div>
+          <div class="nav foot">
+            <span class="ni"
+              ><span class="ic">👥</span><span class="g">All characters</span
+              ><span class="m">4</span></span
+            ><span class="ni"
+              ><span class="ic">±</span><span class="g">Changes</span><span class="m">3</span></span
+            ><span class="ni"
+              ><span class="ic">$</span><span class="g">Spending</span
+              ><span class="m">$0.42</span></span
+            ><span class="ni"><span class="ic">✓</span><span class="g">Setup</span></span>
+          </div>
+        </aside>
+        <main class="main">
+          <div>
+            <div class="crumbs">Narration / Act I</div>
+            <h2>The Lantern</h2>
+            <span style="color: var(--muted)">Act I · 12 lines</span>
+          </div>
+          <div class="ph">The act's page, unchanged</div>
+          <div class="ph">…</div>
+        </main>
+      </div>
+    </div>
+    <p class="note">
+      <b>2 — On a page in Music.</b> Music’s acts and Stingers are listed under it, Narration’s are
+      folded away. Pressing “Narration” opens its first act with a script and lists its acts again.
+    </p>
+    <div class="frames">
+      <div class="frame">
+        <aside class="side">
+          <div class="brand"><span class="mark">〰</span>Audio Studio</div>
+          <div class="pbox">
+            <span class="lbl" style="padding: 0">Project</span><strong>Sample Quest</strong
+            ><span style="font-family: var(--mono); font-size: 11px; color: var(--muted)"
+              >sample</span
+            >
+          </div>
+          <div class="nav">
+            <span class="lbl">Workspace</span
+            ><span class="ni ws"><span class="ic">🎙</span><span class="g">Narration</span></span
+            ><span class="ni ws"><span class="ic">♪</span><span class="g">Music</span></span
+            ><span class="ni sub"><span class="g">Act I</span><span class="m">2</span></span
+            ><span class="ni sub on"><span class="g">Act II</span><span class="m">4</span></span
+            ><span class="ni sub"><span class="g">Stingers</span><span class="m">3</span></span
+            ><span class="ni dis"
+              ><span class="ic">🔊</span><span class="g">Sound effects</span
+              ><span class="m">Soon</span></span
+            >
+          </div>
+          <div class="nav foot">
+            <span class="ni"
+              ><span class="ic">👥</span><span class="g">All characters</span
+              ><span class="m">4</span></span
+            ><span class="ni"
+              ><span class="ic">±</span><span class="g">Changes</span><span class="m">3</span></span
+            ><span class="ni"
+              ><span class="ic">$</span><span class="g">Spending</span
+              ><span class="m">$0.42</span></span
+            ><span class="ni"><span class="ic">✓</span><span class="g">Setup</span></span>
+          </div>
+        </aside>
+        <main class="main">
+          <div>
+            <div class="crumbs">Music</div>
+            <h2>Act II</h2>
+            <span style="color: var(--muted)">The loops the game asks for in Act II.</span>
+          </div>
+          <div class="ph">The act's page, unchanged</div>
+          <div class="ph">…</div>
+        </main>
+      </div>
+    </div>
+    <p class="note">
+      <b>3 — On Setup, All characters, Changes or Spending.</b> No workspace is open, so both are
+      folded.
+    </p>
+    <div class="frames">
+      <div class="frame">
+        <aside class="side">
+          <div class="brand"><span class="mark">〰</span>Audio Studio</div>
+          <div class="pbox">
+            <span class="lbl" style="padding: 0">Project</span><strong>Sample Quest</strong
+            ><span style="font-family: var(--mono); font-size: 11px; color: var(--muted)"
+              >sample</span
+            >
+          </div>
+          <div class="nav">
+            <span class="lbl">Workspace</span
+            ><span class="ni ws"><span class="ic">🎙</span><span class="g">Narration</span></span
+            ><span class="ni ws"><span class="ic">♪</span><span class="g">Music</span></span
+            ><span class="ni dis"
+              ><span class="ic">🔊</span><span class="g">Sound effects</span
+              ><span class="m">Soon</span></span
+            >
+          </div>
+          <div class="nav foot">
+            <span class="ni"
+              ><span class="ic">👥</span><span class="g">All characters</span
+              ><span class="m">4</span></span
+            ><span class="ni"
+              ><span class="ic">±</span><span class="g">Changes</span><span class="m">3</span></span
+            ><span class="ni"
+              ><span class="ic">$</span><span class="g">Spending</span
+              ><span class="m">$0.42</span></span
+            ><span class="ni on"><span class="ic">✓</span><span class="g">Setup</span></span>
+          </div>
+        </aside>
+        <main class="main">
+          <div>
+            <div class="crumbs">&nbsp;</div>
+            <h2>Setup</h2>
+          </div>
+          <div class="ph">Setup, unchanged</div>
+        </main>
+      </div>
+    </div>
+    <p class="note">
+      <b>4 — Acts with a problem.</b> The problem replaces the count, in words, as today: “no
+      script”, “dialog gone” in amber, “invalid”.
+    </p>
+    <div class="frames">
+      <div class="frame">
+        <aside class="side">
+          <div class="brand"><span class="mark">〰</span>Audio Studio</div>
+          <div class="pbox">
+            <span class="lbl" style="padding: 0">Project</span><strong>Sample Quest</strong
+            ><span style="font-family: var(--mono); font-size: 11px; color: var(--muted)"
+              >sample</span
+            >
+          </div>
+          <div class="nav">
+            <span class="lbl">Workspace</span
+            ><span class="ni ws"><span class="ic">🎙</span><span class="g">Narration</span></span
+            ><span class="ni sub on"><span class="g">Act I</span><span class="m">12</span></span
+            ><span class="ni sub"
+              ><span class="g">Act II</span><span class="m">no script</span></span
+            ><span class="ni sub"
+              ><span class="g">Act III</span><span class="m w">dialog gone</span></span
+            ><span class="ni sub"><span class="g">Act IV</span><span class="m">invalid</span></span
+            ><span class="ni ws"><span class="ic">♪</span><span class="g">Music</span></span
+            ><span class="ni dis"
+              ><span class="ic">🔊</span><span class="g">Sound effects</span
+              ><span class="m">Soon</span></span
+            >
+          </div>
+          <div class="nav foot">
+            <span class="ni"
+              ><span class="ic">👥</span><span class="g">All characters</span
+              ><span class="m">4</span></span
+            ><span class="ni"
+              ><span class="ic">±</span><span class="g">Changes</span><span class="m">3</span></span
+            ><span class="ni"
+              ><span class="ic">$</span><span class="g">Spending</span
+              ><span class="m">$0.42</span></span
+            ><span class="ni"><span class="ic">✓</span><span class="g">Setup</span></span>
+          </div>
+        </aside>
+        <main class="main">
+          <div>
+            <div class="crumbs">Narration / Act I</div>
+            <h2>The Lantern</h2>
+            <span style="color: var(--muted)">Act I · 12 lines</span>
+          </div>
+          <div class="ph">The act's page, unchanged</div>
+          <div class="ph">…</div>
+        </main>
+      </div>
+    </div>
+    <p class="note">
+      <b>5 — Many acts, one with a long name and none with a subtitle.</b> A name too long for the
+      sidebar is cut short with “…”; pointing at it shows the whole name. The sidebar scrolls on its
+      own, the page stays put.
+    </p>
+    <div class="frames">
+      <div class="frame">
+        <aside class="side">
+          <div class="brand"><span class="mark">〰</span>Audio Studio</div>
+          <div class="pbox">
+            <span class="lbl" style="padding: 0">Project</span><strong>Sample Quest</strong
+            ><span style="font-family: var(--mono); font-size: 11px; color: var(--muted)"
+              >sample</span
+            >
+          </div>
+          <div class="nav">
+            <span class="lbl">Workspace</span
+            ><span class="ni ws"><span class="ic">🎙</span><span class="g">Narration</span></span
+            ><span class="ni sub"><span class="g">Prologue</span><span class="m">4</span></span
+            ><span class="ni sub"><span class="g">Act I</span><span class="m">12</span></span
+            ><span class="ni sub"><span class="g">Act II</span><span class="m">9</span></span
+            ><span class="ni sub on"><span class="g">Act III</span><span class="m">14</span></span
+            ><span class="ni sub"><span class="g">Act IV</span><span class="m">7</span></span
+            ><span class="ni sub"><span class="g">Act V</span><span class="m">22</span></span
+            ><span class="ni sub"
+              ><span class="g" title="Interlude at the Silver Stag Inn, before the storm"
+                >Interlude at the Silver Stag Inn, before the storm</span
+              ><span class="m">6</span></span
+            ><span class="ni sub"><span class="g">Act VI</span><span class="m">5</span></span
+            ><span class="ni sub"><span class="g">Act VII</span><span class="m">18</span></span
+            ><span class="ni sub"><span class="g">Act VIII</span><span class="m">11</span></span
+            ><span class="ni sub"><span class="g">Act IX</span><span class="m">3</span></span
+            ><span class="ni sub"><span class="g">Act X</span><span class="m">16</span></span
+            ><span class="ni sub"><span class="g">Act XI</span><span class="m">8</span></span
+            ><span class="ni ws"><span class="ic">♪</span><span class="g">Music</span></span
+            ><span class="ni dis"
+              ><span class="ic">🔊</span><span class="g">Sound effects</span
+              ><span class="m">Soon</span></span
+            >
+          </div>
+          <div class="nav foot">
+            <span class="ni"
+              ><span class="ic">👥</span><span class="g">All characters</span
+              ><span class="m">4</span></span
+            ><span class="ni"
+              ><span class="ic">±</span><span class="g">Changes</span><span class="m">3</span></span
+            ><span class="ni"
+              ><span class="ic">$</span><span class="g">Spending</span
+              ><span class="m">$0.42</span></span
+            ><span class="ni"><span class="ic">✓</span><span class="g">Setup</span></span>
+          </div>
+        </aside>
+        <main class="main">
+          <div>
+            <div class="crumbs">Narration / Act III</div>
+            <h2>Act III</h2>
+            <span style="color: var(--muted)">12 lines</span>
+          </div>
+          <div class="ph">The act's page, unchanged</div>
+          <div class="ph">…</div>
+        </main>
+      </div>
+    </div>
+    <p class="note">
+      <b>6 — A narrow window.</b> The sidebar stacks above the page, full width, as today, with the
+      open workspace’s acts in it.
+    </p>
+    <div class="frames">
+      <div class="frame narrow">
+        <aside class="side">
+          <div class="brand"><span class="mark">〰</span>Audio Studio</div>
+          <div class="pbox">
+            <span class="lbl" style="padding: 0">Project</span><strong>Sample Quest</strong
+            ><span style="font-family: var(--mono); font-size: 11px; color: var(--muted)"
+              >sample</span
+            >
+          </div>
+          <div class="nav">
+            <span class="lbl">Workspace</span
+            ><span class="ni ws"><span class="ic">🎙</span><span class="g">Narration</span></span
+            ><span class="ni sub on"><span class="g">Act I</span><span class="m">12</span></span
+            ><span class="ni sub"><span class="g">Act II</span><span class="m">9</span></span
+            ><span class="ni ws"><span class="ic">♪</span><span class="g">Music</span></span
+            ><span class="ni dis"
+              ><span class="ic">🔊</span><span class="g">Sound effects</span
+              ><span class="m">Soon</span></span
+            >
+          </div>
+          <div class="nav foot">
+            <span class="ni"
+              ><span class="ic">👥</span><span class="g">All characters</span
+              ><span class="m">4</span></span
+            ><span class="ni"
+              ><span class="ic">±</span><span class="g">Changes</span><span class="m">3</span></span
+            ><span class="ni"
+              ><span class="ic">$</span><span class="g">Spending</span
+              ><span class="m">$0.42</span></span
+            ><span class="ni"><span class="ic">✓</span><span class="g">Setup</span></span>
+          </div>
+        </aside>
+        <main class="main">
+          <div>
+            <div class="crumbs">Narration / Act I</div>
+            <h2>The Lantern</h2>
+            <span style="color: var(--muted)">Act I · 12 lines</span>
+          </div>
+          <div class="ph">The act's page, unchanged</div>
+          <div class="ph">…</div>
+        </main>
+      </div>
+    </div>
+    <p class="note">
+      <b>For comparison — before this change.</b> The acts are their own list under an “Acts”
+      heading, numbered, with their subtitle and “12 lines”.
+    </p>
+    <div class="frames">
+      <div class="frame">
+        <aside class="side">
+          <div class="brand"><span class="mark">〰</span>Audio Studio</div>
+          <div class="pbox">
+            <span class="lbl" style="padding: 0">Project</span><strong>Sample Quest</strong
+            ><span style="font-family: var(--mono); font-size: 11px; color: var(--muted)"
+              >sample</span
+            >
+          </div>
+          <div class="nav">
+            <span class="lbl">Workspace</span
+            ><span class="ni on"><span class="ic">🎙</span><span class="g">Narration</span></span
+            ><span class="ni"><span class="ic">♪</span><span class="g">Music</span></span
+            ><span class="ni sub"><span class="g">Act I</span><span class="m">2</span></span
+            ><span class="ni sub"><span class="g">Act II</span><span class="m">4</span></span
+            ><span class="ni sub"><span class="g">Stingers</span><span class="m">3</span></span
+            ><span class="ni dis"
+              ><span class="ic">🔊</span><span class="g">Sound effects</span
+              ><span class="m">Soon</span></span
+            >
+          </div>
+          <div class="nav">
+            <span class="lbl">Acts</span
+            ><span class="ni on"
+              ><span class="num">1</span><span class="g">The Lantern</span
+              ><span class="m">12 lines</span></span
+            ><span class="ni"
+              ><span class="num">2</span><span class="g">The Road</span
+              ><span class="m">9 lines</span></span
+            >
+          </div>
+          <div class="nav foot">
+            <span class="ni"
+              ><span class="ic">👥</span><span class="g">All characters</span
+              ><span class="m">4</span></span
+            ><span class="ni"
+              ><span class="ic">±</span><span class="g">Changes</span><span class="m">3</span></span
+            ><span class="ni"
+              ><span class="ic">$</span><span class="g">Spending</span
+              ><span class="m">$0.42</span></span
+            ><span class="ni"><span class="ic">✓</span><span class="g">Setup</span></span>
+          </div>
+        </aside>
+        <main class="main">
+          <div>
+            <div class="crumbs">Narration / Act I</div>
+            <h2>The Lantern</h2>
+            <span style="color: var(--muted)">Act I · 12 lines</span>
+          </div>
+          <div class="ph">The act's page, unchanged</div>
+          <div class="ph">…</div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
