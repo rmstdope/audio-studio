@@ -760,6 +760,7 @@ describe('choosing a take', () => {
     const unread = await bad.settled('hall')
     if (!unread || !('ok' in unread) || !unread.ok) throw new Error('expected a view')
     expect(unread.lockUnread).toBe(true)
+    expect(unread.takes.map((t) => t.chosen)).toEqual([false, false])
     const good = await twoTakes()
     const read = await good.settled('hall')
     if (!read || !('ok' in read) || !read.ok) throw new Error('expected a view')

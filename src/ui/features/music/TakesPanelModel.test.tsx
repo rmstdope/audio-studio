@@ -114,6 +114,20 @@ describe('the Takes panel while the music lock cannot be read', () => {
     expect(page.button('More takes').disabled).toBe(false)
   })
 
+  it('says why as soon as the first take is being made', () => {
+    const making = [
+      {
+        n: 1,
+        state: 'making' as const,
+        elapsed: 5,
+        model: 'Quick · XL turbo · 1.7B',
+        expected: 75,
+      },
+    ]
+    const page = render(view({ lockUnread: true, takes: [], making }))
+    expect(page.container.textContent).toContain(why)
+  })
+
   it('says nothing on an empty panel, nor when the lock is readable', () => {
     expect(render(view({ lockUnread: true, takes: [] })).container.textContent).not.toContain(why)
     const ok = render(view({ lockUnread: false }))
