@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Stable Audio Open — agreed</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --text-soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --info: #7aa7ff;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --miss: #8fb5ff;
+        --miss-bg: #142033;
+        --kept-bg: #0f1a16;
+        --kept-line: #1f5a40;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        max-width: 1100px;
+        margin: 26px auto 8px;
+        color: var(--text-soft);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        min-height: 300px;
+        background: var(--bg);
+      }
+      .side {
+        width: 200px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: none;
+      }
+      .brand {
+        font-weight: 600;
+      }
+      .lbl {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .ni {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 8px;
+        border-radius: 8px;
+        color: var(--text-soft);
+        font-size: 13px;
+      }
+      .ni.on {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .main {
+        flex: 1;
+        padding: 22px 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn.p {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.g {
+        background: transparent;
+        border-color: transparent;
+        color: var(--muted);
+      }
+      .btn.s {
+        padding: 4px 9px;
+        font-size: 12.5px;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .wrap {
+        flex-wrap: wrap;
+      }
+      .grow {
+        flex: 1;
+        min-width: 0;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .chip {
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .c-ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .c-k {
+        background: var(--chip);
+        color: var(--text-soft);
+      }
+      .c-st {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 99px;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        flex: none;
+      }
+      .wave {
+        height: 34px;
+        flex: 1;
+        min-width: 120px;
+        background: repeating-linear-gradient(90deg, #3a4150 0 2px, transparent 2px 4px);
+        mask: linear-gradient(180deg, transparent 0, #000 20%, #000 80%, transparent 100%);
+        border-radius: 4px;
+        position: relative;
+      }
+      .seam {
+        position: absolute;
+        top: -4px;
+        bottom: -4px;
+        width: 2px;
+        background: var(--accent);
+        right: 6%;
+      }
+      select {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 7px 9px;
+        font: inherit;
+      }
+      .takes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .take {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .take.chosen {
+        background: var(--kept-bg);
+        border-color: var(--kept-line);
+      }
+      .take.gen {
+        border-style: dashed;
+        color: var(--muted);
+      }
+      .bar {
+        height: 6px;
+        border-radius: 99px;
+        background: var(--line-strong);
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        width: 40%;
+        background: var(--accent);
+      }
+      .mrow {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 16px;
+        padding: 12px 0;
+        border-top: 1px solid var(--line);
+        align-items: start;
+      }
+      .mrow.first {
+        border-top: 0;
+      }
+      .mname {
+        font-weight: 600;
+      }
+      .mtx {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .free {
+        color: var(--ok);
+      }
+      .price {
+        color: var(--text-soft);
+      }
+      .sub {
+        margin: 14px 0 0;
+        padding-top: 12px;
+        border-top: 1px solid var(--line-strong);
+        font-size: 13px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .pop {
+        position: absolute;
+        right: 0;
+        top: 38px;
+        z-index: 2;
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        box-shadow: 0 12px 32px rgb(0 0 0/45%);
+        padding: 6px;
+        min-width: 300px;
+        display: flex;
+        flex-direction: column;
+      }
+      .pop .it {
+        padding: 7px 10px;
+        border-radius: 7px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .pop .it.on {
+        background: var(--raised);
+      }
+      .callout {
+        border-left: 3px solid var(--info);
+        padding-left: 10px;
+        color: var(--text-soft);
+        max-width: 1100px;
+        margin: 10px auto 0;
+        font-size: 13px;
+      }
+      .errbox {
+        background: var(--danger-bg);
+        border: 1px solid #6a2a3a;
+        border-radius: 12px;
+        padding: 10px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .errbox strong {
+        color: var(--danger-ink);
+      }
+      .warnline {
+        color: var(--warn);
+        font-size: 12.5px;
+      }
+      .check {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .st {
+        font-size: 12.5px;
+        white-space: nowrap;
+        width: 120px;
+        flex: none;
+      }
+      .st.ok {
+        color: var(--ok);
+      }
+      .st.pr {
+        color: var(--warn);
+      }
+      .opt {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 6px 10px;
+        border-radius: 7px;
+      }
+      .opt.dis {
+        color: var(--faint);
+      }
+      .opt.on {
+        background: var(--raised);
+      }
+      .narrow {
+        max-width: 400px;
+      }
+      .narrow .side {
+        display: none;
+      }
+      .narrow .takes {
+        grid-template-columns: 1fr;
+      }
+      .narrow .mrow {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .opt .why {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .grp {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        padding: 8px 10px 2px;
+      }
+      .tag {
+        display: inline-block;
+        background: #3a2a10;
+        color: #ffc24b;
+        border-radius: 6px;
+        padding: 1px 7px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .st.off {
+        color: var(--faint);
+      }
+      ol.steps {
+        margin: 6px 0 0;
+        padding-left: 20px;
+        color: var(--text-soft);
+      }
+      ol.steps li {
+        margin: 3px 0;
+      }
+      a {
+        color: var(--info);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Stable Audio Open — agreed</h1>
+      Stable Audio Open 1.0 and Small join the music models as <b>Short</b> and <b>Shortest</b>,
+      under their own heading in every music menu (Setup’s, and the one beside More takes). They
+      make short music only: a model that can’t make a track is greyed with what it can make and how
+      long the track is. If Setup’s model can’t make a track, the track’s menu starts on it, says
+      why, and waits for another pick. Setup’s checklist gets a Stable Audio row with three steps:
+      accept the licence, make a token, download into ~/.cache/stable-audio. Times per take and the
+      longest loop each model can make are examples, measured by whoever builds this.
+    </div>
+    <p class="note">
+      <b>1 — A stinger (Victory, 6 s): the menu beside More takes, open.</b> Two groups under faint
+      headings. Every model can make a stinger. The menu is still a plain native menu; the headings
+      are its groups.
+    </p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span
+          ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">4</span></span
+          ><span class="ni on" style="padding-left: 20px"
+            >Stingers<span class="muted">3</span></span
+          >
+        </div>
+        <div class="nav" style="margin-top: auto"><span class="ni">Setup</span></div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Music › Stingers</span>
+          <h1>Victory</h1>
+          <span class="muted">Plays in: winning a battle · Stinger · 6 s</span>
+        </div>
+        <section class="panel col">
+          <div class="row wrap">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select aria-label="Model for new takes">
+              <option>Shortest · Stable Audio Open Small</option></select
+            ><button class="btn p">More takes</button>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 1</b></div>
+              <span class="faint small">Balanced · XL turbo · 4B</span>
+              <div class="row">
+                <span class="play">▶</span>
+                <div class="wave"></div>
+                <span class="faint small">0:06</span>
+              </div>
+              <div class="row">
+                <span class="grow"></span><button class="btn g s">Drop</button
+                ><button class="btn s">Choose</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 2</b></div>
+              <span class="faint small">Shortest · Stable Audio Open Small</span>
+              <div class="row">
+                <span class="play">▶</span>
+                <div class="wave"></div>
+                <span class="faint small">0:06</span>
+              </div>
+              <div class="row">
+                <span class="grow"></span><button class="btn g s">Drop</button
+                ><button class="btn s">Choose</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <div class="panel" style="max-width: 620px; padding: 6px">
+          <div class="grp">ACE-Step · any length</div>
+          <div class="opt">
+            <span>Balanced · XL turbo · 4B</span><span class="faint small">about 3 min a take</span>
+          </div>
+          <div class="opt">
+            <span>Quick · XL turbo · 1.7B</span><span class="faint small">about 1¼ min a take</span>
+          </div>
+          <div class="opt">
+            <span>Quickest · Turbo · 1.7B</span><span class="faint small">about 1 min a take</span>
+          </div>
+          <div class="opt">
+            <span>Careful · XL sft · 4B</span><span class="faint small">about 7 min a take</span>
+          </div>
+          <div class="grp">Stable Audio · short music only</div>
+          <div class="opt">
+            <span>Short · Stable Audio Open 1.0</span
+            ><span class="faint small">about 40 s a take</span>
+          </div>
+          <div class="opt on">
+            <span>✓ Shortest · Stable Audio Open Small</span
+            ><span class="faint small">about 10 s a take</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >2 — A long loop (Castle gates, 1:30): the Stable Audio models are greyed, each saying what
+        it can make and how long this one is.</b
+      >
+      A loop is made longer than it plays so its seam can be blended, so a model’s longest loop is
+      shorter than its longest piece: the numbers are examples, measured by whoever builds this.
+    </p>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <div class="panel" style="max-width: 620px; padding: 6px">
+          <div class="grp">ACE-Step · any length</div>
+          <div class="opt on">
+            <span>✓ Balanced · XL turbo · 4B</span
+            ><span class="faint small">about 3 min a take</span>
+          </div>
+          <div class="opt">
+            <span>Quick · XL turbo · 1.7B</span><span class="faint small">about 1¼ min a take</span>
+          </div>
+          <div class="opt">
+            <span>Quickest · Turbo · 1.7B</span><span class="faint small">about 1 min a take</span>
+          </div>
+          <div class="opt">
+            <span>Careful · XL sft · 4B</span><span class="faint small">about 7 min a take</span>
+          </div>
+          <div class="grp">Stable Audio · short music only</div>
+          <div class="opt dis">
+            <span>Short · Stable Audio Open 1.0</span
+            ><span class="small">makes loops up to 27 s · this one is 1:30</span>
+          </div>
+          <div class="opt dis">
+            <span>Shortest · Stable Audio Open Small</span
+            ><span class="small">makes no loops · this one is 1:30</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      <b>3 — A short loop (Torch flicker, 0:20): Short can make it, Shortest can’t.</b> Takes from
+      Stable Audio are cut and blended at the seam like ACE-Step’s, so Hear the seam works the same.
+    </p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">2</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">3</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto"><span class="ni">Setup</span></div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Music › Act I</span>
+          <h1>Torch flicker</h1>
+          <span class="muted">Plays in: the dungeon corridor · Loop · 0:20</span>
+        </div>
+        <section class="panel col">
+          <div class="row wrap">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select aria-label="Model for new takes">
+              <option>Short · Stable Audio Open 1.0</option></select
+            ><button class="btn p">More takes</button>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 1</b></div>
+              <span class="faint small">Short · Stable Audio Open 1.0</span>
+              <div class="row">
+                <span class="play">▶</span>
+                <div class="wave"><span class="seam"></span></div>
+                <span class="faint small">0:20</span>
+              </div>
+              <div class="row">
+                <button class="btn s">Hear the seam</button><span class="grow"></span
+                ><button class="btn g s">Drop</button><button class="btn s">Choose</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <div class="panel" style="max-width: 620px; padding: 6px">
+          <div class="grp">ACE-Step · any length</div>
+          <div class="opt">
+            <span>Balanced · XL turbo · 4B</span><span class="faint small">about 3 min a take</span>
+          </div>
+          <div class="opt">
+            <span>Quick · XL turbo · 1.7B</span><span class="faint small">about 1¼ min a take</span>
+          </div>
+          <div class="opt">
+            <span>Quickest · Turbo · 1.7B</span><span class="faint small">about 1 min a take</span>
+          </div>
+          <div class="opt">
+            <span>Careful · XL sft · 4B</span><span class="faint small">about 7 min a take</span>
+          </div>
+          <div class="grp">Stable Audio · short music only</div>
+          <div class="opt on">
+            <span>✓ Short · Stable Audio Open 1.0</span
+            ><span class="faint small">about 40 s a take</span>
+          </div>
+          <div class="opt dis">
+            <span>Shortest · Stable Audio Open Small</span
+            ><span class="small">makes no loops · this one is 0:20</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      <b>4 — Setup, a short model chosen as the music model.</b> A line beneath says which tracks it
+      can’t make; it is shown only while a Stable Audio model is the default.
+    </p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes</span><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <section class="panel">
+          <h2>Models</h2>
+          <span class="muted"
+            >Which model records each stage of the voices, and which makes the music. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow first">
+            <div class="mname faint">Audition · Draft · Final</div>
+            <div class="mtx faint small">(the voice rows, unchanged)</div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Music</div>
+            <div class="mtx">
+              <span class="muted"
+                >Loops and stingers, made on this computer. A track's takes can use another.</span
+              >
+              <div class="row wrap">
+                <select>
+                  <option>Short · Stable Audio Open 1.0 — about 40 s a take</option></select
+                ><span class="free">Free</span>
+              </div>
+              <span class="faint small"
+                >Short makes stingers, and loops up to 27 s. 9 loops are longer: their takes will
+                need another model, picked on their page.</span
+              >
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes</span><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <section class="panel">
+          <h2>Models</h2>
+          <span class="muted"
+            >Which model records each stage of the voices, and which makes the music. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow first">
+            <div class="mname faint">Audition · Draft · Final</div>
+            <div class="mtx faint small">(the voice rows, unchanged)</div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Music</div>
+            <div class="mtx">
+              <span class="muted"
+                >Loops and stingers, made on this computer. A track's takes can use another.</span
+              >
+              <div class="row wrap">
+                <select>
+                  <option>Shortest · Stable Audio Open Small — about 10 s a take</option></select
+                ><span class="free">Free</span>
+              </div>
+              <span class="faint small"
+                >Shortest makes stingers, and no loops. 12 loops will need another model, picked on
+                their page.</span
+              >
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>5 — A long loop while Setup’s model is Short.</b> The menu starts on Setup’s model, as
+      always, and says it can’t make this one. More takes waits until another model is picked.
+      Nothing is swapped without saying. The same happens if the track’s length is changed on its
+      page to more than the picked model can make: the pick stays, the line appears, More takes
+      waits.
+    </p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">2</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Stingers<span class="muted">3</span></span>
+        </div>
+        <div class="nav" style="margin-top: auto"><span class="ni">Setup</span></div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Music › Act I</span>
+          <h1>Castle gates</h1>
+          <span class="muted">Plays in: the castle courtyard · Loop · 1:30</span>
+        </div>
+        <section class="panel col">
+          <div class="row wrap">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select aria-label="Model for new takes">
+              <option>Short · Stable Audio Open 1.0</option></select
+            ><button class="btn p" disabled>More takes</button>
+          </div>
+          <span class="warnline"
+            >Short makes loops up to 27 s, and this one is 1:30. Pick another model for these
+            takes.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>6 — Stable Audio isn’t set up on this computer.</b> On a stinger, both are marked “not on
+      this computer” and can’t be picked. (On a loop too long for them, the length reason shows
+      instead, since downloading wouldn’t help.) If Setup’s model is one of them, the track starts
+      on it and says so, as agreed for any missing model.
+    </p>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <div class="panel" style="max-width: 620px; padding: 6px">
+          <div class="grp">ACE-Step · any length</div>
+          <div class="opt on">
+            <span>✓ Balanced · XL turbo · 4B</span
+            ><span class="faint small">about 3 min a take</span>
+          </div>
+          <div class="opt">
+            <span>Quick · XL turbo · 1.7B</span><span class="faint small">about 1¼ min a take</span>
+          </div>
+          <div class="opt">
+            <span>Quickest · Turbo · 1.7B</span><span class="faint small">about 1 min a take</span>
+          </div>
+          <div class="opt">
+            <span>Careful · XL sft · 4B</span><span class="faint small">about 7 min a take</span>
+          </div>
+          <div class="grp">Stable Audio · short music only</div>
+          <div class="opt dis">
+            <span>Short · Stable Audio Open 1.0</span
+            ><span class="small">not on this computer</span>
+          </div>
+          <div class="opt dis">
+            <span>Shortest · Stable Audio Open Small</span
+            ><span class="small">not on this computer</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span
+          ><span class="ni" style="padding-left: 20px">Act I<span class="muted">2</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">4</span></span
+          ><span class="ni on" style="padding-left: 20px"
+            >Stingers<span class="muted">3</span></span
+          >
+        </div>
+        <div class="nav" style="margin-top: auto"><span class="ni">Setup</span></div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Music › Stingers</span>
+          <h1>Victory</h1>
+          <span class="muted">Plays in: winning a battle · Stinger · 6 s</span>
+        </div>
+        <section class="panel col">
+          <div class="row wrap">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select aria-label="Model for new takes">
+              <option>Short · Stable Audio Open 1.0</option></select
+            ><button class="btn p" disabled>More takes</button>
+          </div>
+          <span class="warnline"
+            >Short isn’t on this computer. Pick another model for these takes, or see Setup for how
+            to download it.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>7 — Setup’s checklist: Stable Audio’s own row, under ACE-Step’s.</b> It is optional, so
+      “Not set up” is faint, not a problem…
+    </p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes</span><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="panel check">
+          <span class="st ok">✓ Ready</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (ACE-Step)</strong
+            ><span class="muted"
+              >uv and the models are in place; the models load on the first take.</span
+            >
+          </div>
+        </div>
+        <div class="panel check">
+          <span class="st off">— Not set up</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (Stable Audio Open)</strong
+            ><span class="muted"
+              >Optional: for stingers and short loops. Its models are not on this computer.</span
+            >
+            <ol class="steps small">
+              <li>
+                Sign in to Hugging Face and accept Stability AI’s Community Licence on
+                <a>stabilityai/stable-audio-open-1.0</a> and
+                <a>stabilityai/stable-audio-open-small</a>.
+              </li>
+              <li>Make a read token at <a>huggingface.co/settings/tokens</a>.</li>
+              <li>
+                Download both into <span class="mono">~/.cache/stable-audio</span>, where the studio
+                looks for them:<br /><code class="mono faint"
+                  >HF_TOKEN=… huggingface-cli download stabilityai/stable-audio-open-1.0 --local-dir
+                  ~/.cache/stable-audio/stable-audio-open-1.0<br />HF_TOKEN=… huggingface-cli
+                  download stabilityai/stable-audio-open-small --local-dir
+                  ~/.cache/stable-audio/stable-audio-open-small</code
+                >
+              </li>
+            </ol>
+            <span class="faint small">The studio never asks for or keeps your token.</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">…set up:</p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes</span><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="panel check">
+          <span class="st ok">✓ Ready</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (ACE-Step)</strong
+            ><span class="muted"
+              >uv and the models are in place; the models load on the first take.</span
+            >
+          </div>
+        </div>
+        <div class="panel check">
+          <span class="st ok">✓ Ready</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (Stable Audio Open)</strong
+            ><span class="muted"
+              >Short and Shortest are in place; they load on the first take.</span
+            >
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">…one of the two downloaded:</p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes</span><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="panel check">
+          <span class="st ok">✓ Ready</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (ACE-Step)</strong
+            ><span class="muted"
+              >uv and the models are in place; the models load on the first take.</span
+            >
+          </div>
+        </div>
+        <div class="panel check">
+          <span class="st off">— Not set up</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (Stable Audio Open)</strong
+            ><span class="muted"
+              >Short is in place; Shortest is missing from ~/.cache/stable-audio.</span
+            >
+            <ol class="steps small">
+              <li>
+                Sign in to Hugging Face and accept Stability AI’s Community Licence on
+                <a>stabilityai/stable-audio-open-1.0</a> and
+                <a>stabilityai/stable-audio-open-small</a>.
+              </li>
+              <li>Make a read token at <a>huggingface.co/settings/tokens</a>.</li>
+              <li>
+                Download both into <span class="mono">~/.cache/stable-audio</span>, where the studio
+                looks for them:<br /><code class="mono faint"
+                  >HF_TOKEN=… huggingface-cli download stabilityai/stable-audio-open-1.0 --local-dir
+                  ~/.cache/stable-audio/stable-audio-open-1.0<br />HF_TOKEN=… huggingface-cli
+                  download stabilityai/stable-audio-open-small --local-dir
+                  ~/.cache/stable-audio/stable-audio-open-small</code
+                >
+              </li>
+            </ol>
+            <span class="faint small">The studio never asks for or keeps your token.</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      …and a problem only when the project’s music model is a Stable Audio one this computer doesn’t
+      have:
+    </p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes</span><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <section class="panel">
+          <h2>Models</h2>
+          <span class="muted"
+            >Which model records each stage of the voices, and which makes the music. Saved in
+            <span class="mono">audio-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow first">
+            <div class="mname faint">Audition · Draft · Final</div>
+            <div class="mtx faint small">(the voice rows, unchanged)</div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Music</div>
+            <div class="mtx">
+              <span class="muted"
+                >Loops and stingers, made on this computer. A track's takes can use another.</span
+              >
+              <div class="row wrap">
+                <select>
+                  <option>Short · Stable Audio Open 1.0 — about 40 s a take</option></select
+                ><span class="free">Free</span>
+              </div>
+              <span class="warnline">not on this computer</span>
+            </div>
+          </div>
+        </section>
+        <div class="panel check">
+          <span class="st ok">✓ Ready</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (ACE-Step)</strong
+            ><span class="muted"
+              >uv and the models are in place; the models load on the first take.</span
+            >
+          </div>
+        </div>
+        <div class="panel check">
+          <span class="st pr">⚠ Needs attention</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (Stable Audio Open)</strong
+            ><span class="muted"
+              >The project’s music model, Short, is not on this computer: stable-audio-open-1.0 is
+              missing from ~/.cache/stable-audio.</span
+            >
+            <ol class="steps small">
+              <li>
+                Sign in to Hugging Face and accept Stability AI’s Community Licence on
+                <a>stabilityai/stable-audio-open-1.0</a> and
+                <a>stabilityai/stable-audio-open-small</a>.
+              </li>
+              <li>Make a read token at <a>huggingface.co/settings/tokens</a>.</li>
+              <li>
+                Download both into <span class="mono">~/.cache/stable-audio</span>, where the studio
+                looks for them:<br /><code class="mono faint"
+                  >HF_TOKEN=… huggingface-cli download stabilityai/stable-audio-open-1.0 --local-dir
+                  ~/.cache/stable-audio/stable-audio-open-1.0<br />HF_TOKEN=… huggingface-cli
+                  download stabilityai/stable-audio-open-small --local-dir
+                  ~/.cache/stable-audio/stable-audio-open-small</code
+                >
+              </li>
+            </ol>
+            <span class="faint small">The studio never asks for or keeps your token.</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      <b>8 — A project with no music section:</b> both music rows say “Not used”, as ACE-Step’s does
+      today.
+    </p>
+    <div class="frame" style="min-height: 0">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes</span><span class="ni on">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="panel check">
+          <span class="st off">— Not used</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (ACE-Step)</strong
+            ><span class="muted">The project has no music section.</span>
+          </div>
+        </div>
+        <div class="panel check">
+          <span class="st off">— Not used</span>
+          <div class="col" style="gap: 2px">
+            <strong>Music generator (Stable Audio Open)</strong
+            ><span class="muted">The project has no music section.</span>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
