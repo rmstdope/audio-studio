@@ -14,7 +14,7 @@ const { SceneBand } = await import('./SceneBand')
 afterAll(() => GlobalRegistrator.unregister())
 
 /** A scene with a cue of its own, two of whose following lines are recorded. */
-const scene: SceneState = {
+const ownCue: SceneState = {
   name: 'Gate',
   cue: '[tense]',
   cueFrom: 'own',
@@ -26,7 +26,10 @@ const scene: SceneState = {
 }
 
 /** Renders the scene's band in a table, with its cue editor open. */
-function openEditor() {
+function openEditor(
+  scene: SceneState = ownCue,
+  names: { language: string; source: string } | null = null,
+) {
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
@@ -52,9 +55,10 @@ function openEditor() {
                 total: 3,
               },
               scene,
+              language: names?.language,
               filtered: false,
               speakers: ['narrator'],
-              names: null,
+              names,
               columns: 5,
               playing: null,
               toggle: () => {},
@@ -86,5 +90,16 @@ describe('SceneBand', () => {
     expect(page.warning()).toBe('Saving marks 2 recorded lines for re-recording.')
     page.type('[tense] ')
     expect(page.warning()).toBeNull()
+  })
+
+  it('does not warn when a scene following the source cue is given that same cue', () => {
+    page = openEditor(
+      { ...ownCue, cueFrom: 'source', sourceCue: '[tense]' },
+      { language: 'sv', source: 'English' },
+    )
+    page.type('[tense]')
+    expect(page.warning()).toBeNull()
+    page.type('[calm]')
+    expect(page.warning()).toBe('Saving marks 2 recorded lines for re-recording.')
   })
 })

@@ -138,9 +138,11 @@ export function SceneBand({
     )
   }
 
-  // Saving an unchanged cue marks nothing, so only an edited draft warns.
+  // Saving marks lines only when the cue they are said with changes: not for an unchanged draft,
+  // nor for a draft that only makes the cue the scene already follows its own.
   const changed = draft.trim() !== own
-  const warning = changed ? warningText(scene.recordedFollowing) : null
+  const marks = changed && draft.trim() !== (scene.cue ?? '')
+  const warning = marks ? warningText(scene.recordedFollowing) : null
   return (
     <tr className="scene-band">
       <td colSpan={columns}>
