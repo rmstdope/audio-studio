@@ -33,7 +33,7 @@ const encoder = new TextEncoder()
  */
 export async function modelsView(
   projectFile: string,
-  installed: (model: MusicModelId) => boolean,
+  installed: (model: MusicModelId) => boolean = () => true,
 ): Promise<ModelsView> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
