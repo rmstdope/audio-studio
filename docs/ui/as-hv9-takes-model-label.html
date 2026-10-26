@@ -1,0 +1,393 @@
+<!doctype html><meta charset="utf-8" /><title>Takes: model menu, short label</title
+><style>
+  :root {
+    --bg: #0b0c10;
+    --panel: #12141a;
+    --raised: #191c24;
+    --line: #1f232d;
+    --line-strong: #2a2e39;
+    --text: #eceef3;
+    --muted: #a9b0bd;
+    --faint: #8a91a0;
+    --accent: #ff6b2c;
+    --accent-ink: #1a0a02;
+    --warn: #ffc24b;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font:
+      14px/1.45 -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  .lead {
+    color: var(--muted);
+    max-width: 760px;
+    margin: 0 0 20px;
+  }
+  h3 {
+    font-size: 13px;
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 28px 0 10px;
+    font-weight: 600;
+  }
+  .row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .frame {
+    border: 1px dashed #333a48;
+    padding: 16px;
+    border-radius: 6px;
+  }
+  .frame .w {
+    font-size: 11px;
+    color: var(--faint);
+    margin-bottom: 8px;
+  }
+  .panel {
+    padding: 20px 22px;
+    border-radius: 16px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .head h2 {
+    margin: 0;
+    font-size: 17px;
+    flex: 1 0 auto;
+  }
+  .ctl {
+    display: flex;
+    flex: 1 1 100%;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+  }
+  .ctl.wrap {
+    flex-wrap: wrap;
+  }
+  .sel {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13px;
+    background: var(--raised);
+    border: 1px solid var(--line-strong);
+    border-radius: 9px;
+    min-height: 36px;
+    padding: 0 28px 0 10px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    position: relative;
+  }
+  .sel:after {
+    content: '▾';
+    position: absolute;
+    right: 10px;
+    color: var(--muted);
+  }
+  .sel.two {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    line-height: 1.25;
+  }
+  .sel .f {
+    color: var(--faint);
+    font-size: 12px;
+  }
+  .full {
+    flex-basis: 100%;
+  }
+  .btn {
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 9px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: 1px solid var(--accent);
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+  .btn.g {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--line-strong);
+    font-weight: 500;
+  }
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 22px 0;
+    text-align: center;
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .small {
+    font-size: 12px;
+  }
+  .miss {
+    color: var(--warn);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .list {
+    margin-top: 6px;
+    background: #1e222b;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    font-size: 13px;
+    padding: 4px 0;
+    box-shadow: 0 8px 24px #0008;
+  }
+  .list .g {
+    color: var(--faint);
+    font-size: 11px;
+    padding: 6px 12px 2px;
+    font-weight: 600;
+  }
+  .list .o {
+    padding: 4px 12px 4px 22px;
+    white-space: nowrap;
+  }
+  .list .o.on {
+    background: #2a3a6a;
+  }
+  .list .o.d {
+    color: #5e6575;
+  }
+  .card {
+    margin-top: 12px;
+    height: 58px;
+    border-radius: 12px;
+    background: var(--raised);
+    border: 1px solid var(--line-strong);
+    color: var(--faint);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+  }
+  .note {
+    color: var(--muted);
+    font-size: 12px;
+    max-width: 760px;
+    margin-top: 6px;
+  }
+</style>
+<h1>Takes: model menu, short label</h1>
+<p class="lead">
+  The closed menu shows only the plain name and the time. The generator's own names (XL turbo · 4B)
+  appear only in the opened list. Same at every width.
+</p>
+<h3>Closed menu, with takes</h3>
+<div class="row">
+  <div class="frame" style="width: 380px">
+    <div class="w">window 380 px · with takes</div>
+    <div class="panel">
+      <div class="head">
+        <h2>Takes</h2>
+        <div class="ctl">
+          <div class="sel">Balanced — about 3 min a take</div>
+          <button class="btn">More takes</button>
+        </div>
+      </div>
+      <div class="card">Take 1 ▶</div>
+    </div>
+  </div>
+  <div class="frame" style="width: 440px">
+    <div class="w">window 440 px · with takes</div>
+    <div class="panel">
+      <div class="head">
+        <h2>Takes</h2>
+        <div class="ctl">
+          <div class="sel">Balanced — about 3 min a take</div>
+          <button class="btn">More takes</button>
+        </div>
+      </div>
+      <div class="card">Take 1 ▶</div>
+    </div>
+  </div>
+  <div class="frame" style="width: 600px">
+    <div class="w">window 600 px · with takes</div>
+    <div class="panel">
+      <div class="head">
+        <h2>Takes</h2>
+        <div class="ctl">
+          <div class="sel">Balanced — about 3 min a take</div>
+          <button class="btn">More takes</button>
+        </div>
+      </div>
+      <div class="card">Take 1 ▶</div>
+    </div>
+  </div>
+</div>
+<h3>Closed menu, no takes yet</h3>
+<div class="row">
+  <div class="frame" style="width: 380px">
+    <div class="w">window 380 px · no takes yet</div>
+    <div class="panel">
+      <h2 style="font-size: 17px; margin: 0">Takes</h2>
+      <div class="empty">
+        <strong>No takes yet</strong
+        ><span class="muted"
+          >Each take is new music made from the brief, about 3 minutes each.<br />Make a few,
+          listen, and choose the one the game plays.</span
+        >
+        <div class="ctl" style="align-self: stretch">
+          <div class="sel">Balanced — about 3 min a take</div>
+          <button class="btn">Make 2 takes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="frame" style="width: 500px">
+    <div class="w">window 500 px · no takes yet</div>
+    <div class="panel">
+      <h2 style="font-size: 17px; margin: 0">Takes</h2>
+      <div class="empty">
+        <strong>No takes yet</strong
+        ><span class="muted"
+          >Each take is new music made from the brief, about 3 minutes each.<br />Make a few,
+          listen, and choose the one the game plays.</span
+        >
+        <div class="ctl" style="align-self: stretch">
+          <div class="sel">Balanced — about 3 min a take</div>
+          <button class="btn">Make 2 takes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row" style="display: none">
+  <div class="frame" style="width: 380px">
+    <div class="w">window 380 px · no takes yet · model missing</div>
+    <div class="panel">
+      <h2 style="font-size: 17px; margin: 0">Takes</h2>
+      <div class="empty">
+        <strong>No takes yet</strong
+        ><span class="muted"
+          >Each take is new music made from the brief, about 3 minutes each.<br />Make a few,
+          listen, and choose the one the game plays.</span
+        >
+        <div class="ctl" style="align-self: stretch">
+          <div class="sel">Careful — not on this computer</div>
+          <button class="btn">Make 2 takes</button>
+        </div>
+        <div class="miss">
+          Careful isn't on this computer. Pick another model for these takes, or see Setup for how
+          to download it.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<h3>Opened (unchanged in every option)</h3>
+<div class="row">
+  <div style="width: 440px">
+    <div class="list">
+      <div class="g">ACE-Step · any length</div>
+      <div class="o on">Balanced · XL turbo · 4B — about 3 min a take</div>
+      <div class="o">Quick · XL turbo · 1.7B — about 1¼ min a take</div>
+      <div class="o">Quickest · Turbo · 1.7B — about 1 min a take</div>
+      <div class="o d">Careful · XL sft · 4B — about 7 min a take — not on this computer</div>
+      <div class="g">Stable Audio · short music only</div>
+      <div class="o d">
+        Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 1:30
+      </div>
+      <div class="o d">Shortest · Stable Audio Open Small — makes no loops · this one is 1:30</div>
+    </div>
+  </div>
+</div>
+<p class="note">
+  Cost: the generator's names are no longer visible without opening the menu — at any width.
+</p>
+<h3
+  style="
+    margin-top: 36px;
+    color: var(--text);
+    font-size: 15px;
+    text-transform: none;
+    letter-spacing: 0;
+  "
+>
+  When the chosen model can't be used: the reason takes the time's place
+</h3>
+<h3>The project's model is missing on this computer</h3>
+<div class="row">
+  <div class="frame" style="width: 380px">
+    <div class="w">window 380 px</div>
+    <div class="panel">
+      <h2 style="font-size: 17px; margin: 0">Takes</h2>
+      <div class="empty">
+        <strong>No takes yet</strong
+        ><span class="muted"
+          >Each take is new music made from the brief, about 3 minutes each.<br />Make a few,
+          listen, and choose the one the game plays.</span
+        >
+        <div class="ctl" style="align-self: stretch">
+          <div class="sel">Careful — not on this computer</div>
+          <button class="btn" style="opacity: 0.55">Make 2 takes</button>
+        </div>
+        <div class="miss">
+          Careful isn't on this computer. Pick another model for these takes, or see Setup for how
+          to download it.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<h3>The project's model can't make a track this long</h3>
+<div class="row">
+  <div class="frame" style="width: 380px">
+    <div class="w">window 380 px · a 1:30 loop</div>
+    <div class="panel">
+      <h2 style="font-size: 17px; margin: 0">Takes</h2>
+      <div class="empty">
+        <strong>No takes yet</strong
+        ><span class="muted"
+          >Each take is new music made from the brief, about 3 minutes each.<br />Make a few,
+          listen, and choose the one the game plays.</span
+        >
+        <div class="ctl" style="align-self: stretch">
+          <div class="sel">Short — makes loops up to 27 s</div>
+          <button class="btn" style="opacity: 0.55">Make 2 takes</button>
+        </div>
+        <div class="miss">
+          Short makes loops up to 27 s, and this one is 1:30. Pick another model for these takes.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
