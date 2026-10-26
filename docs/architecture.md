@@ -906,10 +906,16 @@ another is chosen; the page says which) or `missing` (a take was chosen but its 
 disk, which is said ahead of `changed`). A manifest entry without a lock entry is reported as a problem (with the orphans, 12.7).
 Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
 while its list is there, is an orphan, shown on the page of the list its lock entry names under
-"Music the game no longer asks for"; removing it, after confirmation, deletes its clip, its manifest
-and lock entries, its board, its takes and its briefs entry. The brief changes and board of a track
-never chosen are dropped when the list that named it is there and no longer names it, at the next
-save of the briefs or of that board; while a list is missing, nothing of its tracks is dropped.
+"Music the game no longer asks for" (built, 12.7): a play button, its name (its id as words, since
+the lock keeps no title) with its file name under it, when it was chosen, and **Remove**. Remove
+asks first ("Remove the music for Castle gates?", saying what goes) and then deletes, in this
+order so a failure can be repeated, its manifest entry, its clip, its board and takes, its briefs
+entry and, last, its lock entry (`POST /api/music/tracks/:id/remove`, 404 for a track that is not
+an orphan; a manifest or lock that cannot be read deletes nothing). A list that is missing or
+unreadable has no orphans, and one another list names is not one. The briefs and board of a track
+never chosen that no list names are dropped at the next save of the briefs, and only when every
+list is there (which list named a track never chosen is not known); while a list is missing,
+nothing is dropped.
 
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
 kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Python worker
@@ -958,6 +964,7 @@ GET    /api/setup                                what the machine and project la
 GET    /api/music/tracks/:id/takes               a track's takes, those being made, failures, and whether takes can be made
 POST   /api/music/tracks/:id/takes               { count } or { retry } queue takes (409 and why if the generator is not ready)
 POST   /api/music/tracks/:id/choose              { file } make a take the track's music: levelled, encoded, manifest and lock written (409 and why if it cannot)
+POST   /api/music/tracks/:id/remove              remove an orphan's music: clip, manifest, lock, board, takes, brief changes (404 if it is not one)
 GET    /api/music/clips/:file                    a music clip (a plain .mp3 in the music clips folder)
 POST   /api/music/tracks/:id/stop                cancel the takes still waiting; the one being made finishes
 DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
@@ -1232,7 +1239,8 @@ Small, independently useful increments:
        `.audio-studio/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
     6. **Choose** (built): the chosen take levelled, encoded and written with the manifest and lock; each
        track's status on the Music pages; the music files in the Changes panel.
-    7. **Orphans**: the clip of a track the game no longer lists removed after confirmation.
+    7. **Orphans** (built): the music of a track the game no longer lists, shown on its list's page and
+       removed after confirmation; the briefs and boards of unlisted tracks never chosen dropped.
     8. **RetroQuest** (in the game's repository, not the studio's): the game's extractor writes
        each act's loops and the stingers with their first briefs, and the game reads the music
        manifest and plays a track per room or region, and the stingers, looping through Web Audio;

@@ -26,7 +26,7 @@ export const MUSIC_OUTPUT = { bitrate: '160k', channels: 2, lufs: -20 } as const
 export type CommitResult = { ok: true } | { ok: false; message: string } | ProjectFailure
 
 /** The music lock as it is now: empty if there is none; null (with the problems added) if broken. */
-async function lockNow(
+export async function lockNow(
   root: string,
   music: MusicConfig,
   problems: Problem[],
@@ -36,7 +36,7 @@ async function lockNow(
 }
 
 /** The music manifest as it is now: empty if there is none; null (with the problems added) if broken. */
-async function manifestNow(
+export async function manifestNow(
   root: string,
   music: MusicConfig,
   problems: Problem[],
@@ -66,7 +66,7 @@ export async function readChosen(
 }
 
 /** One choice at a time per project: each reads the manifest and lock the one before wrote. */
-function choices(): Serial {
+export function choices(): Serial {
   const shared = globalThis as { audioStudioMusicChoices?: Serial }
   return (shared.audioStudioMusicChoices ??= createSerial())
 }
@@ -140,7 +140,7 @@ export async function commitChoice({
   }
 }
 
-function sorted<T>(record: Record<string, T>): Record<string, T> {
+export function sorted<T>(record: Record<string, T>): Record<string, T> {
   return Object.fromEntries(
     Object.keys(record)
       .sort()

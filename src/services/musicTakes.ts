@@ -65,6 +65,27 @@ export type ChooseResult = CommitResult | null
 /** A track's takes as the page shows them, a project failure, or null for an unknown track. */
 export type TakesResult = MusicTakesView | ProjectFailure | null
 
+/** Changes to one track's board, one after another, keyed `<project file>\0<track id>`. */
+export function boardQueue(): Serial {
+  const shared = globalThis as { audioStudioBoardQueue?: Serial }
+  return (shared.audioStudioBoardQueue ??= createSerial())
+}
+
+/** Whether a track id is safe as the name of its board and takes folder. */
+export function isSafeId(id: string): boolean {
+  return SAFE_ID.test(id)
+}
+
+/**
+ * Deletes a track's board and its cached takes (the caller holds the track's turn on the board
+ * queue). Nothing for an id that is not safe as a file name.
+ */
+export async function deleteBoard(root: string, id: string): Promise<void> {
+  if (!isSafeId(id)) return
+  await rm(resolveInRoot(root, `${MUSIC_BOARD_DIR}/${id}.json`), { force: true })
+  await rm(resolveInRoot(root, `${MUSIC_TAKES_DIR}/${id}`), { recursive: true, force: true })
+}
+
 /** What a track's inputs are for the takes: the brief in force, with the kind. */
 interface Inputs {
   brief: string
@@ -147,13 +168,10 @@ export function createMusicTakes({
   encode?: Encoder
 }): MusicTakes {
   // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
-  const shared = globalThis as {
-    audioStudioMakingTakes?: Map<string, Map<number, Entry>>
-    audioStudioBoardQueue?: Serial
-  }
+  const shared = globalThis as { audioStudioMakingTakes?: Map<string, Map<number, Entry>> }
   const active = (shared.audioStudioMakingTakes ??= new Map())
   // Changes to one track's board, one after another: a take finishing and a drop lose neither.
-  const boards = (shared.audioStudioBoardQueue ??= createSerial())
+  const boards = boardQueue()
 
   async function resolve(projectFile: string, id: string) {
     if (!SAFE_ID.test(id)) return null

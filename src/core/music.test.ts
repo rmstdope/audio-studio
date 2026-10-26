@@ -8,6 +8,9 @@ import {
   parseClock,
   StingerListSchema,
   loopsDiff,
+  orphanOf,
+  orphanTitle,
+  staleIds,
   summarizeMusic,
   type MusicListInput,
   type Track,
@@ -313,5 +316,83 @@ describe('parseClock', () => {
     for (const bad of ['90', '1:75', '0:00', '', 'a:bc', '1:2', '-1:20', '1:20:00']) {
       expect(parseClock(bad)).toBeNull()
     }
+  })
+})
+
+describe('orphans', () => {
+  const lock = (listId: string, at = '2026-11-02T10:00:00.000Z'): LockEntry => ({
+    fp: '0123456789abcdef',
+    model: MUSIC_MODEL,
+    seed: 1,
+    list: listId,
+    take: 1,
+    inputs: { brief: 'x', kind: 'loop', seconds: 80, bpm: null, key: null },
+    at,
+  })
+  const chosen = (listId: string, fileExists = true) => ({ lock: lock(listId), fileExists })
+  const orphansOf = (
+    lists: MusicListInput[],
+    chosenTracks: Record<string, ReturnType<typeof chosen>>,
+  ) => summarizeMusic(lists, {}, chosenTracks).music.lists.map((l) => l.orphans)
+
+  it('shows a chosen track the list it came from no longer names, on that list', () => {
+    const lists = [list('act1', [track('a')]), list('act2', [track('b')])]
+    const [act1, act2] = orphansOf(lists, { 'castle-gates': chosen('act1'), a: chosen('act1') })
+    expect(act1).toEqual([
+      {
+        id: 'castle-gates',
+        title: 'Castle gates',
+        file: 'castle-gates.mp3',
+        chosenAt: '2026-11-02T10:00:00.000Z',
+        fileExists: true,
+      },
+    ])
+    expect(act2).toEqual([])
+  })
+
+  it('is no orphan while its list is missing or unreadable, or when another list names it', () => {
+    const gone = { 'castle-gates': chosen('act1') }
+    expect(orphansOf([list('act1', [], { state: { status: 'missing' } })], gone)).toEqual([[]])
+    expect(orphansOf([list('act1', [], { state: { status: 'invalid' } })], gone)).toEqual([[]])
+    expect(
+      orphansOf([list('act1', []), list('act2', [track('castle-gates')])], gone).flat(),
+    ).toEqual([])
+  })
+
+  it('counts a track hidden for a repeated id as still named', () => {
+    const lists = [list('act1', [track('a')]), list('act2', [track('a')])]
+    expect(orphansOf(lists, { a: chosen('act1') }).flat()).toEqual([])
+  })
+
+  it('keeps a missing music file in the row, and orders orphans by id', () => {
+    const [rows] = orphansOf([list('act1', [])], { b: chosen('act1', false), a: chosen('act1') })
+    expect(rows!.map((o) => [o.id, o.fileExists])).toEqual([
+      ['a', true],
+      ['b', false],
+    ])
+  })
+
+  it('names an orphan from its id, and finds it with its list', () => {
+    expect(orphanTitle('level-up-2')).toBe('Level up 2')
+    const { music } = summarizeMusic([list('act1', [])], {}, { gone: chosen('act1') })
+    expect(orphanOf(music.lists, 'gone')?.list.id).toBe('act1')
+    expect(orphanOf(music.lists, 'other')).toBeUndefined()
+  })
+
+  it('finds the briefs and boards to drop only when every list is there', () => {
+    const ok = summarizeMusic([list('act1', [track('a')]), list('stingers', [])], {}, {}).music
+    expect(staleIds(ok, ['a', 'old', 'kept'], ['kept'])).toEqual(['old'])
+    const missing = summarizeMusic(
+      [list('act1', [track('a')]), list('stingers', [], { state: { status: 'missing' } })],
+      {},
+      {},
+    ).music
+    expect(staleIds(missing, ['old'], [])).toEqual([])
+    const repeated = summarizeMusic(
+      [list('act1', [track('a')]), list('act2', [track('a')])],
+      {},
+      {},
+    ).music
+    expect(staleIds(repeated, ['old'], [])).toEqual([])
   })
 })

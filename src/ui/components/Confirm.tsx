@@ -35,11 +35,13 @@ export function Confirm({
   return (
     <section ref={panel} className="panel confirm" role="alertdialog" aria-label={title}>
       <h2 className="section-title">{title}</h2>
-      <ul className="confirm-effects">
-        {effects.map((effect, i) => (
-          <li key={i}>{effect}</li>
-        ))}
-      </ul>
+      {effects.length > 0 && (
+        <ul className="confirm-effects">
+          {effects.map((effect, i) => (
+            <li key={i}>{effect}</li>
+          ))}
+        </ul>
+      )}
       {note && <span className="muted">{note}</span>}
       <div className="confirm-actions">
         <button className="btn btn-ghost" type="button" onClick={onBack} disabled={backDisabled}>

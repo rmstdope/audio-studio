@@ -10,6 +10,7 @@ import { makingStatusText } from '../../musicTakesText'
 import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
 import { routeHref, type MusicRoute } from '../../route'
 import { NoMusic } from './NoMusic'
+import { OrphansPanel } from './OrphansPanel'
 import { TrackView } from './TrackView'
 
 /** The chip class of each status: green when chosen, amber when it needs a look. */
@@ -183,6 +184,7 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
           </table>
         </div>
       )}
+      <OrphansPanel orphans={list.orphans} />
     </>
   )
 }

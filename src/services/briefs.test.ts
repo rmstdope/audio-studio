@@ -112,3 +112,50 @@ describe('setTrackBrief', () => {
     expect(await setTrackBrief(join(root, 'audio-studio.json'), 'hall', { brief: 'x' })).toBeNull()
   })
 })
+
+describe('setTrackBrief and tracks the game dropped', () => {
+  const stale = {
+    'tts/act2/music.json': [],
+    'music/briefs.json': { gone: { bpm: 70 }, kept: { bpm: 80 } },
+    '.audio-studio/music/gone.json': { next: 2, takes: [] },
+    '.audio-studio/music-takes/gone/0123456789abcdef.1.wav': 'wav',
+    '.audio-studio/music/lonely.json': { next: 2, takes: [] },
+    'music/music.lock.json': {
+      kept: {
+        fp: 'f',
+        model: 'm',
+        seed: 1,
+        list: 'act1',
+        take: 1,
+        inputs: { brief: 'x', kind: 'loop', seconds: 80, bpm: null, key: null },
+        at: '2026-11-02T10:00:00.000Z',
+      },
+    },
+    'audio/music/kept.mp3': 'mp3',
+    '.audio-studio/music/kept.json': { next: 2, takes: [] },
+  }
+
+  it('drops the briefs and boards of unlisted tracks never chosen, at the next save', async () => {
+    const { root, file, briefs } = repo(stale)
+    expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
+    expect(JSON.parse(briefs())).toEqual({ hall: { bpm: 70 }, kept: { bpm: 80 } })
+    expect(existsSync(join(root, '.audio-studio/music/gone.json'))).toBe(false)
+    expect(existsSync(join(root, '.audio-studio/music-takes/gone'))).toBe(false)
+    expect(existsSync(join(root, '.audio-studio/music/lonely.json'))).toBe(false)
+    expect(existsSync(join(root, '.audio-studio/music/kept.json'))).toBe(true)
+  })
+
+  it('drops nothing while a list is missing', async () => {
+    const { root, file, briefs } = repo({ ...stale, 'tts/stingers.json': undefined })
+    expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
+    expect(JSON.parse(briefs())).toHaveProperty('gone')
+    expect(existsSync(join(root, '.audio-studio/music/gone.json'))).toBe(true)
+  })
+
+  it('drops nothing when the lock cannot be read', async () => {
+    const { root, file, briefs } = repo({ ...stale, 'music/music.lock.json': '{ nope' })
+    expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
+    expect(JSON.parse(briefs())).toHaveProperty('gone')
+    expect(existsSync(join(root, '.audio-studio/music/gone.json'))).toBe(true)
+  })
+})
