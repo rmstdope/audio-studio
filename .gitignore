@@ -18,3 +18,6 @@ node_modules/
 
 # The studio's briefs, written while working on the sample project.
 test/fixtures/sample/music/
+
+# What the workers write beside themselves (ACE-Step's progress estimates).
+worker/.cache/

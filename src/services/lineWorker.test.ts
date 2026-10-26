@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
-import { createLineWorker } from './lineWorker'
+import { WORKERS_DIR, createLineWorker } from './lineWorker'
 
 const fake = join(import.meta.dir, '../../test/fixtures/fake-whisper.ts')
 const make = (options: Partial<Parameters<typeof createLineWorker>[0]> = {}) =>
@@ -51,6 +51,16 @@ describe('createLineWorker', () => {
       env: { LINE_WORKER_TEST: 'hello' },
     })
     expect(await worker.request({})).toEqual({ said: 'hello' })
+    worker.close()
+  })
+
+  it("runs the worker in the studio's worker folder, not in the game's repository", async () => {
+    // ACE-Step writes ./.cache/acestep/progress_estimates.json; the studio runs from the game's repo.
+    const script = `for await (const line of console) { const { id } = JSON.parse(line); console.log(JSON.stringify({ id, cwd: process.cwd() })) }`
+    const worker = make({ command: [process.execPath, '-e', script] })
+    const { cwd } = await worker.request({})
+    expect(cwd).not.toBe(process.cwd())
+    expect(cwd).toBe(WORKERS_DIR)
     worker.close()
   })
 

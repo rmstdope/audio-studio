@@ -1,3 +1,11 @@
+import { join } from 'node:path'
+
+/**
+ * The studio's own worker folder, where every worker runs: what a worker writes beside itself
+ * (ACE-Step's ./.cache) stays with the studio, never in the game's repository the studio runs from.
+ */
+export const WORKERS_DIR = join(import.meta.dir, '../../worker')
+
 /** A request to a worker: anything, plus the `id` the worker answers it by (added here). */
 type Payload = Record<string, unknown>
 
@@ -57,6 +65,7 @@ export function createLineWorker({
 
   function start(): Running {
     const proc = Bun.spawn(command, {
+      cwd: WORKERS_DIR,
       stdin: 'pipe',
       stdout: 'pipe',
       stderr: 'pipe',
