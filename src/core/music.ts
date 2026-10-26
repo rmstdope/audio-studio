@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { MUSIC_MODEL } from './musicTake'
 import {
   changedFields,
   trackStatus,
@@ -316,7 +315,7 @@ function rowOf(
   return {
     ...row,
     status,
-    changed: status === 'changed' ? changedFields(chosen!.lock, MUSIC_MODEL, current) : [],
+    changed: status === 'changed' ? changedFields(chosen!.lock, current) : [],
     chosenAt: chosen?.lock.at ?? null,
     current: chosen
       ? { kind: 'take', take: chosen.lock.take, exists: chosen.fileExists }

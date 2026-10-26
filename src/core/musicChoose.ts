@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import { MUSIC_MODEL, TakeInputsSchema, type TakeInputs } from './musicTake'
+import { TakeInputsSchema, type TakeInputs } from './musicTake'
 
 /** One track in the music lock: the take the game plays, and what it was made from. */
 export const LockEntrySchema = z.object({
-  /** A hash of what went into the take (model, brief, kind, seconds, bpm, key). */
+  /** A hash of what went into the take (brief, kind, seconds, bpm, key). */
   fp: z.string(),
   model: z.string(),
   seed: z.number(),
@@ -39,17 +39,16 @@ export type MusicManifest = z.infer<typeof MusicManifestSchema>
 export type TrackStatus = 'not-chosen' | 'chosen' | 'changed' | 'missing'
 
 /** What can have changed since a take was chosen. */
-export type ChangedField = 'brief' | 'length' | 'tempo' | 'key' | 'model'
+export type ChangedField = 'brief' | 'length' | 'tempo' | 'key'
 
 /** What differs between the chosen take's own inputs and the track's now, in a fixed order. */
-export function changedFields(lock: LockEntry, model: string, now: TakeInputs): ChangedField[] {
+export function changedFields(lock: LockEntry, now: TakeInputs): ChangedField[] {
   const then = lock.inputs
   const changed: ChangedField[] = []
   if (then.brief !== now.brief) changed.push('brief')
   if (then.seconds !== now.seconds) changed.push('length')
   if (then.bpm !== now.bpm) changed.push('tempo')
   if (then.key !== now.key) changed.push('key')
-  if (lock.model !== model) changed.push('model')
   return changed
 }
 
@@ -57,18 +56,16 @@ export function changedFields(lock: LockEntry, model: string, now: TakeInputs): 
 export function trackStatus({
   lock,
   current,
-  model = MUSIC_MODEL,
   fileExists,
 }: {
   lock: LockEntry | undefined
   current: TakeInputs
-  model?: string
   fileExists: boolean
 }): TrackStatus {
   if (!lock) return 'not-chosen'
   // The file is the more urgent fact: the game has nothing to play.
   if (!fileExists) return 'missing'
-  return changedFields(lock, model, current).length ? 'changed' : 'chosen'
+  return changedFields(lock, current).length ? 'changed' : 'chosen'
 }
 
 const NAMES: Record<ChangedField, string> = {
@@ -76,7 +73,6 @@ const NAMES: Record<ChangedField, string> = {
   length: 'the length',
   tempo: 'the tempo',
   key: 'the key',
-  model: 'the music model',
 }
 
 /** The first line of the box saying what changed since the take was chosen. */

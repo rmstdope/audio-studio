@@ -25,17 +25,16 @@ const entry = (over: Partial<LockEntry> = {}): LockEntry => ({
 
 describe('changedFields', () => {
   it('names nothing when the track is as its take was made', () => {
-    expect(changedFields(entry(), MUSIC_MODEL, inputs)).toEqual([])
+    expect(changedFields(entry(), inputs)).toEqual([])
   })
 
-  it('names what differs, in the order brief, length, tempo, key, model', () => {
+  it('names what differs, in the order brief, length, tempo, key', () => {
     const now = { ...inputs, key: 'A minor', brief: 'bold', seconds: 90, bpm: null }
-    expect(changedFields(entry({ model: 'old' }), MUSIC_MODEL, now)).toEqual([
+    expect(changedFields(entry({ model: 'old' }), now)).toEqual([
       'brief',
       'length',
       'tempo',
       'key',
-      'model',
     ])
   })
 })
@@ -46,8 +45,8 @@ describe('changedLine', () => {
     expect(changedLine(['brief', 'length'])).toBe(
       'Changed since its take was chosen: the brief and the length.',
     )
-    expect(changedLine(['brief', 'length', 'model'])).toBe(
-      'Changed since its take was chosen: the brief, the length and the music model.',
+    expect(changedLine(['brief', 'length', 'tempo'])).toBe(
+      'Changed since its take was chosen: the brief, the length and the tempo.',
     )
   })
 })
@@ -67,9 +66,9 @@ describe('trackStatus', () => {
     )
   })
 
-  it('is changed when the model moved on', () => {
+  it('stays chosen whatever model made the take', () => {
     expect(trackStatus({ lock: entry({ model: 'old' }), current: inputs, fileExists: true })).toBe(
-      'changed',
+      'chosen',
     )
   })
 
