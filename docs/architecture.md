@@ -869,8 +869,9 @@ and takes being made for its tracks refuse each other, as a refresh and a genera
 refresh of the stingers and takes being made for a stinger. A project without a `music` section
 shows Music with a page saying how to add one. **Plays.** Each row of a list has a **Plays** column saying what its play button plays: the chosen
 take ("Take 3", even when the brief changed since), else the game's own `file` ("The game's file"
-with the name beneath), else nothing ("Nothing to play yet", the button greyed out). A file that is
-not on disk when the page loads is marked "The file is not there." and its button greyed out.
+with the name beneath), else nothing ("Nothing to play yet", no button). A file that is
+not on disk when the page loads is marked "The file is not there." and has no button either; the
+empty cell keeps the column aligned.
 Play runs once from the start (a loop too), one row at a time, and stops on leaving the page; a
 play that fails says so in its row. The audio is `GET /api/music/tracks/:id/current`, which the
 studio resolves itself from the row (the page sends no path). A track opens its own page (built: its Brief panel and its Takes panel; its board: More takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).

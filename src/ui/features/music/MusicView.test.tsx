@@ -117,15 +117,20 @@ describe.each(['act', 'stingers'] as const)('the play button on a %s page', (kin
     expect(played).toEqual(['/api/music/tracks/cellar/current'])
   })
 
-  it('is dim and says so when the music file is missing', () => {
-    const play = button('Tower')
-    expect(play.disabled).toBe(true)
-    expect(play.getAttribute('aria-label')).toBe('Play Tower: take 3, the file is not there')
+  const playCell = (title: string) =>
+    [...document.querySelectorAll<HTMLTableRowElement>('tbody tr')]
+      .find((r) => r.textContent!.includes(title))!
+      .querySelector('td.music-play')!
+
+  it('leaves the button out, and the Plays column says why, when the music file is missing', () => {
+    render(kind)
+    expect(playCell('Tower').querySelector('button')).toBeNull()
+    expect(playCell('Tower').parentElement!.textContent).toContain('The file is not there.')
   })
 
-  it('is dim and says so when no take is chosen', () => {
-    const play = button('Roof')
-    expect(play.disabled).toBe(true)
-    expect(play.getAttribute('aria-label')).toBe('Play Roof: nothing to play yet')
+  it('leaves the button out, and the Plays column says why, when no take is chosen', () => {
+    render(kind)
+    expect(playCell('Roof').querySelector('button')).toBeNull()
+    expect(playCell('Roof').parentElement!.textContent).toContain('Nothing to play yet')
   })
 })
