@@ -5,6 +5,9 @@ import {
   changedFields,
   changedLine,
   chosenLine,
+  inTheGame,
+  unchooseFailure,
+  unchooseQuestion,
   trackStatus,
   type LockEntry,
 } from './musicChoose'
@@ -99,5 +102,71 @@ describe('the lock and the manifest', () => {
   it('rejects a lock entry without its take', () => {
     const { take: _take, ...broken } = entry()
     expect(MusicLockSchema.safeParse({ a: broken }).success).toBe(false)
+  })
+})
+
+describe('inTheGame', () => {
+  const file = { file: 'assets/music/willowbrook.mp3', exists: true }
+
+  it('is the chosen take, with what Un-choose does', () => {
+    expect(inTheGame({ current: { kind: 'take', take: 3, exists: true }, gameFile: file })).toEqual(
+      {
+        kind: 'take',
+        take: 3,
+        missing: false,
+        hint: 'Un-choose and the game goes back to its own file.',
+      },
+    )
+    expect(inTheGame({ current: { kind: 'take', take: 2, exists: true }, gameFile: null })).toEqual(
+      {
+        kind: 'take',
+        take: 2,
+        missing: false,
+        hint: 'Un-choose and the game plays nothing here.',
+      },
+    )
+  })
+
+  it('is the chosen take with its music file missing', () => {
+    expect(
+      inTheGame({ current: { kind: 'take', take: 3, exists: false }, gameFile: null }),
+    ).toMatchObject({ kind: 'take', missing: true })
+  })
+
+  it('is the game’s own file when no take is chosen, there or not', () => {
+    const current = { kind: 'game', ...file } as const
+    expect(inTheGame({ current, gameFile: file })).toEqual({
+      kind: 'game',
+      file: file.file,
+      exists: true,
+      hint: 'Choose a take below and the game plays it instead.',
+    })
+    expect(
+      inTheGame({ current: { ...current, exists: false }, gameFile: { ...file, exists: false } }),
+    ).toMatchObject({ kind: 'game', exists: false })
+  })
+
+  it('is nothing without a take or a file', () => {
+    expect(inTheGame({ current: { kind: 'none' }, gameFile: null })).toEqual({
+      kind: 'nothing',
+      hint: 'Choose a take below and the game plays it.',
+    })
+  })
+})
+
+describe('the Un-choose question', () => {
+  it('says where the game goes, and what is deleted', () => {
+    expect(unchooseQuestion(3, 'assets/music/freetouse/willowbrook-village.mp3')).toBe(
+      "The game goes back to its own file (assets/music/freetouse/willowbrook-village.mp3). Take 3's music file is deleted from the game; Take 3 stays with the other takes, to be chosen again.",
+    )
+    expect(unchooseQuestion(2, null)).toBe(
+      "The game plays nothing here until another take is chosen. Take 2's music file is deleted from the game; Take 2 stays with the other takes, to be chosen again.",
+    )
+  })
+
+  it('says why it failed and that nothing changed', () => {
+    expect(unchooseFailure(3, 'the music lock could not be read')).toBe(
+      'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',
+    )
   })
 })

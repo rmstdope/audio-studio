@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { TakeInputsSchema, type TakeInputs } from './musicTake'
+import type { TrackRow } from './music'
 
 /** One track in the music lock: the take the game plays, and what it was made from. */
 export const LockEntrySchema = z.object({
@@ -106,4 +107,51 @@ export function chosenLine({
   return missing === 1
     ? `${base}; one's music file is missing.`
     : `${base}; ${missing} music files are missing.`
+}
+
+/** What a track's "In the game" block shows. */
+export type InTheGameState =
+  | { kind: 'take'; take: number; missing: boolean; hint: string }
+  | { kind: 'game'; file: string; exists: boolean; hint: string }
+  | { kind: 'nothing'; hint: string }
+
+/**
+ * What the game plays for a track, singled out on its page: the chosen take (its music file gone
+ * or not), else the game's own file (there or not), else nothing; each with the faint line saying
+ * what comes next.
+ */
+export function inTheGame(track: Pick<TrackRow, 'current' | 'gameFile'>): InTheGameState {
+  const { current, gameFile } = track
+  if (current.kind === 'take') {
+    return {
+      kind: 'take',
+      take: current.take,
+      missing: !current.exists,
+      hint: gameFile
+        ? 'Un-choose and the game goes back to its own file.'
+        : 'Un-choose and the game plays nothing here.',
+    }
+  }
+  if (current.kind === 'game') {
+    return {
+      kind: 'game',
+      file: current.file,
+      exists: current.exists,
+      hint: 'Choose a take below and the game plays it instead.',
+    }
+  }
+  return { kind: 'nothing', hint: 'Choose a take below and the game plays it.' }
+}
+
+/** The question before un-choosing take `take`: where the game goes, and what is deleted. */
+export function unchooseQuestion(take: number, gameFile: string | null): string {
+  const goes = gameFile
+    ? `The game goes back to its own file (${gameFile}).`
+    : 'The game plays nothing here until another take is chosen.'
+  return `${goes} Take ${take}'s music file is deleted from the game; Take ${take} stays with the other takes, to be chosen again.`
+}
+
+/** The red line when un-choosing failed. */
+export function unchooseFailure(take: number, reason: string): string {
+  return `Take ${take} could not be un-chosen: ${reason}. Nothing was changed.`
 }
