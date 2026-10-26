@@ -17,6 +17,7 @@ import {
   nameOf,
   queryLanguage,
   noVoiceText,
+  otherVoices,
   speedInLanguage,
   startBlocked,
   type Language,
@@ -27,6 +28,7 @@ import {
   takeUrl,
   useAuditionsGoingOn,
   useCharacterVoice,
+  useOtherVoiceTitles,
   usePart,
   useParts,
   useRuledOut,
@@ -485,6 +487,12 @@ function VoicePanel({
 }) {
   const recorder = useTakes(character.id, false, language?.id)
   const id = casting?.voice ?? null
+  // Without a voice here, her other voices are named as Fish names them.
+  const others = !id && language ? otherVoices(character, languages, language.id) : []
+  const titles = useOtherVoiceTitles(
+    character.id,
+    others.map((v) => ({ id: v.id, language: v.first })),
+  )
   // The take is asked for once per phrase, so one the page cannot show is not asked again.
   const asked = useRef(new Set<string>())
   const wanted = answer ? takeToRecord(answer, id) : null
@@ -521,7 +529,7 @@ function VoicePanel({
         <strong>{language ? `No ${language.name} voice yet` : 'No voice yet'}</strong>
         <span className="muted">
           {language
-            ? noVoiceText(character, languages, language.id)
+            ? noVoiceText(character, languages, language.id, titles)
             : `Start an audition to find one, or clone one from recordings you have. Until then ${character.name}’s lines cannot be recorded.`}
         </span>
         {clone}
