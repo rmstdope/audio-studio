@@ -2,8 +2,9 @@ import type { MusicListSummary, TrackRow } from '../../../core/music'
 import { shortTitle } from '../../format'
 import { routeHref } from '../../route'
 import { BriefPanel } from './BriefPanel'
+import { TakesPanel } from './TakesPanel'
 
-/** A track's own page: where it plays, and its Brief. */
+/** A track's own page: where it plays, its Brief and its Takes. */
 export function TrackView({ list, track }: { list: MusicListSummary; track: TrackRow }) {
   const name = list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)
   const listRoute =
@@ -22,6 +23,7 @@ export function TrackView({ list, track }: { list: MusicListSummary; track: Trac
         </div>
       </header>
       <BriefPanel key={track.id} track={track} kind={list.kind} />
+      <TakesPanel key={`takes-${track.id}`} trackId={track.id} />
     </>
   )
 }

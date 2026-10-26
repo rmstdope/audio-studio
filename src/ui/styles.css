@@ -2717,3 +2717,118 @@ a.btn {
   align-self: flex-start;
   margin-top: 6px;
 }
+
+/* Music: a track's takes */
+.takes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.takes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 0;
+  text-align: center;
+}
+.takes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 700px) {
+  .takes {
+    grid-template-columns: 1fr;
+  }
+}
+.take {
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.take-making {
+  border-style: dashed;
+  color: var(--muted);
+}
+.take-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.take-making .take-row {
+  justify-content: space-between;
+}
+.play {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex: none;
+  cursor: pointer;
+}
+.play:hover {
+  background: var(--raised-hover);
+}
+.wave {
+  position: relative;
+  flex: 1;
+  height: 34px;
+  min-width: 80px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+.wave i {
+  flex: 1;
+  min-width: 1px;
+  background: var(--faint);
+  border-radius: 1px;
+}
+.wave .seam {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  right: 6%;
+  width: 2px;
+  background: var(--accent);
+}
+.bar {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 1s linear;
+}
+.errbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-ink);
+}
+.errbox-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--danger-ink);
+}

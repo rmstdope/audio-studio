@@ -14,6 +14,8 @@ import { createLimiter } from '../services/limit'
 import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
 import { BriefChangeBody } from '../core/music'
+import { MakeTakesBody, seamWav } from '../core/musicTake'
+import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
@@ -65,6 +67,10 @@ import {
 } from '../services/sessions'
 import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
 import { heardFor } from '../services/heard'
+import { onGpu } from '../services/gpu'
+import { createAceStepWorker, type MusicGenerator } from '../services/music'
+import { createFakeMusic } from '../services/musicFake'
+import { createMusicTakes } from '../services/musicTakes'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
 import { declaredLanguage } from '../core/project'
 import {
@@ -91,6 +97,8 @@ export interface ServerOptions {
   encode?: Encoder
   /** The take checker to use (tests: null for none); by default a Whisper worker, started on use. */
   transcriber?: Transcriber | null
+  /** The music generator to use (tests); by default an ACE-Step worker, started on use. */
+  music?: MusicGenerator
 }
 
 /**
@@ -102,6 +110,18 @@ function sharedWhisper(): Transcriber {
   const state = globalThis as { audioStudioWhisper?: Transcriber }
   state.audioStudioWhisper ??= createWhisperWorker()
   return state.audioStudioWhisper
+}
+
+/**
+ * The process's one ACE-Step worker, kept across `--dev` reloads like Whisper's. It starts with
+ * the first take and exits when the studio does. `AUDIO_STUDIO_FAKE_MUSIC=1` swaps it for a
+ * stand-in that makes tones, for working on the pages.
+ */
+function sharedMusic(): MusicGenerator {
+  const state = globalThis as { audioStudioMusic?: MusicGenerator }
+  state.audioStudioMusic ??=
+    process.env.AUDIO_STUDIO_FAKE_MUSIC === '1' ? createFakeMusic() : createAceStepWorker()
+  return state.audioStudioMusic
 }
 
 /**
@@ -253,7 +273,9 @@ export function startServer({
   fish,
   encode,
   transcriber,
+  music,
 }: ServerOptions) {
+  const musicTakes = createMusicTakes({ generator: music ?? sharedMusic() })
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
   /** A character's ruled-out voices as an answer: 404 for an unknown character, 409 for a broken project. */
@@ -454,7 +476,7 @@ export function startServer({
 
   /** The take checker: the one given (tests), else the process's one Whisper worker. */
   async function transcriberFor(): Promise<Transcriber | null> {
-    return transcriber !== undefined ? transcriber : sharedWhisper()
+    return transcriber !== undefined ? transcriber : onGpu(sharedWhisper())
   }
 
   /** What generating a part (or one speaker in it) would do, or why it can't be planned. */
@@ -884,6 +906,39 @@ export function startServer({
           const result = await setTrackBrief(projectFile, request.params.id, body.data)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/takes': {
+        GET: guard(async (request) => {
+          const view = await musicTakes.view(projectFile, request.params.id)
+          return view ? Response.json(view) : notFound()
+        }),
+        POST: fromOwnPage(async (request) => {
+          const body = MakeTakesBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { count } or { retry }' }, { status: 400 })
+          }
+          const result = await musicTakes.make(projectFile, request.params.id, body.data)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/takes/:file': {
+        GET: guard(async (request) => {
+          const file = await musicTakes.takeFile(
+            projectFile,
+            request.params.id,
+            request.params.file,
+          )
+          if (!file) return notFound()
+          // `?seam=1`: the take's last seconds and then its first, to hear the loop come round.
+          if (new URL(request.url).searchParams.get('seam') !== '1') {
+            return new Response(Bun.file(file))
+          }
+          const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
+          return new Response(writeWav(seamWav(wav)) as Uint8Array<ArrayBuffer>, {
+            headers: { 'content-type': 'audio/wav' },
+          })
         }),
       },
       '/api/parts/:part/cues/:key/move': {

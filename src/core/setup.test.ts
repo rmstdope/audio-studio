@@ -13,6 +13,7 @@ const ready: SetupFacts = {
   refreshDialog: true,
   parallel: 4,
   fishTier: null,
+  music: { ready: { ok: true }, checkpoints: '/models' },
 }
 
 const byId = (facts: SetupFacts) => Object.fromEntries(setupChecks(facts).map((c) => [c.id, c]))
@@ -27,6 +28,7 @@ describe('setupChecks', () => {
       'fish',
       'requests',
       'refresh',
+      'music',
     ])
     expect(checks.every((c) => c.state === 'ok')).toBe(true)
     expect(byId(ready).fish!.credit).toBe(12.5)
@@ -127,5 +129,37 @@ describe('the requests-at-once check', () => {
     const check = requests({ key: false, parallel: 8, fishTier: '100' })
     expect(check).toMatchObject({ state: 'off', detail: 'Not checked: there is no key.' })
     expect(check.tier).toBeUndefined()
+  })
+
+  describe('the music generator', () => {
+    it('is off in a project without music', () => {
+      expect(byId({ ...ready, music: null }).music).toMatchObject({ state: 'off' })
+    })
+
+    it('says what is missing and where the models go', () => {
+      const music = {
+        ready: {
+          ok: false as const,
+          message: 'The models are not in /models: acestep-5Hz-lm-4B.',
+          fix: 'Put the models acestep-v15-xl-turbo and acestep-5Hz-lm-4B in /models.',
+        },
+        checkpoints: '/models',
+      }
+      expect(byId({ ...ready, music }).music).toMatchObject({
+        title: 'Music generator (ACE-Step)',
+        state: 'problem',
+        detail: 'The models are not in /models: acestep-5Hz-lm-4B.',
+        fix: expect.stringContaining('acestep-v15-xl-turbo'),
+      })
+      expect(byId({ ...ready, music }).music!.fix).toContain('/models')
+    })
+
+    it('gives the fix the generator found, whatever the problem is', () => {
+      const music = {
+        ready: { ok: false as const, message: 'uv is not on the PATH.', fix: 'brew install uv' },
+        checkpoints: '/models',
+      }
+      expect(byId({ ...ready, music }).music).toMatchObject({ fix: 'brew install uv' })
+    })
   })
 })

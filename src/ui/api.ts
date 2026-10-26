@@ -15,6 +15,9 @@ import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
+import type { MusicTakesView } from '../core/musicTake'
+import { takesAreBeingMade } from './musicTakesText'
+import type { MakeRequest, MakeResult } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
 import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
@@ -604,6 +607,40 @@ export function useSetTrackBrief(trackId: string) {
     },
     // Saved or not (a 404 means the list changed), the page shows the project as it is now.
     onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
+}
+
+/** A track's takes as its page shows them; polled while any is being made. */
+export function useMusicTakes(trackId: string) {
+  return useQuery({
+    queryKey: ['music-takes', trackId],
+    queryFn: () =>
+      getJson<MusicTakesView | ProjectFailure>(
+        `/api/music/tracks/${encodeURIComponent(trackId)}/takes`,
+      ),
+    refetchInterval: (query) => {
+      const view = query.state.data
+      return view && 'making' in view && takesAreBeingMade(view.making) ? 3000 : false
+    },
+  })
+}
+
+/** Asks for takes of a track (new ones, or a failed one again), then reloads its takes. */
+export function useMakeTakes(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (request: MakeRequest) => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/takes`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`asking for takes answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<MakeResult>
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
   })
 }
 

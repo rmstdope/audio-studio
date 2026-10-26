@@ -44,6 +44,11 @@ export interface SetupFacts {
   parallel: number
   /** The tier the user told the studio (`quality.fishTier`), or none. */
   fishTier: FishTier | null
+  /** The music generator, or null when the project has no `music` section. */
+  music: {
+    ready: { ok: true } | { ok: false; message: string; fix: string }
+    checkpoints: string
+  } | null
 }
 
 /**
@@ -51,7 +56,7 @@ export interface SetupFacts {
  * optional and not set).
  */
 export interface SetupCheck {
-  id: 'ffmpeg' | 'whisper' | 'key' | 'fish' | 'requests' | 'refresh'
+  id: 'ffmpeg' | 'whisper' | 'key' | 'fish' | 'requests' | 'refresh' | 'music'
   title: string
   state: 'ok' | 'problem' | 'off'
   /** What was found, in a sentence. */
@@ -69,7 +74,15 @@ export interface SetupCheck {
  * the first run says what to install or set instead of failing on the first recording.
  */
 export function setupChecks(facts: SetupFacts): SetupCheck[] {
-  return [ffmpeg(facts), whisper(facts), key(facts), fish(facts), requests(facts), refresh(facts)]
+  return [
+    ffmpeg(facts),
+    whisper(facts),
+    key(facts),
+    fish(facts),
+    requests(facts),
+    refresh(facts),
+    music(facts),
+  ]
 }
 
 function ffmpeg(facts: SetupFacts): SetupCheck {
@@ -216,4 +229,26 @@ function refresh(facts: SetupFacts): SetupCheck {
         detail:
           'No refreshDialog command in the project file (optional): extract the dialog outside the studio.',
       }
+}
+
+function music(facts: SetupFacts): SetupCheck {
+  const title = 'Music generator (ACE-Step)'
+  if (!facts.music) {
+    return { id: 'music', title, state: 'off', detail: 'The project has no music section.' }
+  }
+  if (facts.music.ready.ok) {
+    return {
+      id: 'music',
+      title,
+      state: 'ok',
+      detail: 'uv and the models are in place; the models load on the first take.',
+    }
+  }
+  return {
+    id: 'music',
+    title,
+    state: 'problem',
+    detail: facts.music.ready.message,
+    fix: facts.music.ready.fix,
+  }
 }

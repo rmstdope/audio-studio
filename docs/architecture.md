@@ -49,7 +49,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 retroquest/                      ← user runs `audio-studio` here
 ├── audio-studio.json            ← project file (committed)
 ├── .env                         ← FISH_AUDIO_API_KEY (gitignored, already exists)
-├── .audio-studio/               ← tool state: takes, auditions, ruled-out voices, what was heard
+├── .audio-studio/               ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard
 ├── tts/cast.json                ← character resource, shared by all parts (read + written)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
@@ -103,7 +103,7 @@ Installed once from this repo with `bun link` (later `bun add -g`), then run in 
 | TTS and voice library                       | **Fish Audio REST API** via a thin `fetch` client                | The calls in use are few (search, voice, TTS, credits); no SDK needed.                                                                                  |
 | Transcription (word timings, quality check) | **mlx-whisper** in a long-lived Python worker (`uv run`)         | Same model and quality bar as today; the model loads once, not once per clip. Behind an interface, so whisper.cpp can replace it on non-Apple machines. |
 | Encoding and joining                        | **ffmpeg** (subprocess)                                          | Already a dependency; MP3 64 kbps mono as today.                                                                                                        |
-| Music generation (planned, §8.5)            | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free and local; why, in §13 decision 4.                                                                                                                 |
+| Music generation (§8.5)                     | **ACE-Step 1.5** in a long-lived Python worker (`uv run`)        | Free and local; why, in §13 decision 4.                                                                                                                 |
 
 A native window (Electrobun) can wrap the same web UI later; nothing in the design depends on it.
 
@@ -757,7 +757,7 @@ generation while the script and cast still change) and `final` (the recording th
   model for both, there is no final step: a final plan or recording is a draft one. A paid
   `audition` model is still to come, with its cost per take.
 
-### 8.5 Music (planned)
+### 8.5 Music
 
 The music workspace makes the game's **tracks**: looping background music, each act's own, one per
 room or region as the game chooses, and short **stingers** (victory, game over) for the whole game.
@@ -837,7 +837,7 @@ has `refreshDialog`: the same command as Refresh dialog, which brings the act's 
 together, and its summary names the loops added and removed besides the lines. A refresh of an act
 and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
 refresh of the stingers and takes being made for a stinger. A project without a `music` section
-shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel; the board of its takes comes with takes).
+shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel and its Takes panel; the board proper, with Drop, More takes and Choose, is 12.5 and 12.6).
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
@@ -851,11 +851,18 @@ the board is what the game will play:
   trailing silence trimmed) or at `seconds`, whichever comes first, with a short fade-out (a
   fanfare asked for at 10 seconds ends after about 6).
 
-The numbers are where 12.4 starts; its tests fix them. A take is cached in
-`.audio-studio/music-takes/` by a hash of its inputs (model, brief, kind, seconds, bpm, key) and a
-take id. The same seed does not make the same take again on the Mac, so the cache keeps the take
+The numbers are fixed in `core/musicTake.ts` and its tests (built, 12.4). A take is cached in
+`.audio-studio/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (model, brief, kind,
+seconds, bpm, key) and a take number counted from 1 per hash, with `<hash>.<n>.json` beside it
+(seed, length, waveform bars). The same seed does not make the same take again on the Mac, so the cache keeps the take
 itself; the seed is kept with it, in the board and the lock, to say where it came from. The brief a
-take is made from is the game's with the studio's changes over it. The board for a track shows its
+take is made from is the game's with the studio's changes over it. What is built is the Takes panel on a track's page: "Make 2 takes" (when there are none) queues two,
+made one at a time on the GPU queue, each a dashed card with a progress bar (about 3 minutes
+expected, a guess) and its time left, then a card with play, its waveform (a loop's seam marked),
+its length and, for a loop, **Hear the seam** (`GET …/takes/<file>?seam=1` is the last 4 seconds
+followed by the first 4, one WAV). A take that fails is kept as "could not be made" with the
+generator's reason and **Try again** (remakes that number); the other takes stay. The making state is
+in memory (a restart forgets a failure, not a take). The board for a track shows its
 takes as cards: **More takes** generates two more (about six minutes), made in the background, so
 the page can be left meanwhile; **Drop** removes one (not the chosen one); **Choose** writes one at
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
@@ -904,7 +911,8 @@ kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Py
 (`worker/music.py`, ACE-Step through uv, the models loaded on the first take and stopped with the
 studio), the same JSON-lines protocol as the Whisper worker. It uses ACE-Step's XL turbo model with
 its 4B language model, which plans the piece (decision 5). ACE-Step and Whisper share the one GPU
-and never run at once: both workers stay loaded, and one queue runs a take or a Whisper check at a
+and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`, a process-wide
+`createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a Whisper check at a
 time. In the spike, with both loaded and running together, 42 of the 48 GB were in use (20 GB of it
 compressed), and Whisper ran 2.5 times slower. The setup checklist (§10) names ACE-Step's
 environment and its model download.
@@ -941,7 +949,10 @@ groups. The rest is the plan:
 ```
 GET    /api/project                              project, parts
 GET    /api/credit                               the Fish account's API credit (dollars)
-GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish)
+GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish, ACE-Step)
+GET    /api/music/tracks/:id/takes               a track's takes, those being made, failures, and whether takes can be made
+POST   /api/music/tracks/:id/takes               { count } or { retry } queue takes (409 and why if the generator is not ready)
+GET    /api/music/tracks/:id/takes/:file         a take's WAV (?seam=1: its seam)
 PATCH  /api/fish-tier                            { tier } the Fish tier (or null) in the project file
 GET    /api/parts/:part?language=                the part in a language (default: the first), every line
                                                  with its status and reason, and each language's progress
@@ -1014,7 +1025,10 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   lookup, only with a key), Requests at once (`quality.parallel` against the Fish account's limit
   from `quality.fishTier`: ready up to 5 with no tier, a problem above it until the tier is
   chosen, and above the chosen tier's limit; off without a key; saving the tier checks again,
-  which asks Fish once more) and the optional `refreshDialog`, each with what to do about it.
+  which asks Fish once more), the optional `refreshDialog` and, with a `music` section, the music
+  generator (Apple silicon, uv, and the two model folders `acestep-v15-xl-turbo` and
+  `acestep-5Hz-lm-4B` in `$ACESTEP_CHECKPOINTS` or `~/.cache/ace-step/checkpoints`; downloaded
+  outside the studio, about 28 GB), each with what to do about it.
   Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
   the problems from a check at most five minutes old and never on a window focus, so the studio
   does not ask Fish more than it did. The CLI still warns about ffmpeg, and recording says so.
@@ -1200,7 +1214,7 @@ Small, independently useful increments:
     3. **Briefs** (built): a track's page (a track opens from its row), its brief, length, tempo
        and key changed and saved in the studio's briefs as each field is left, marked "changed
        here", and the game's taken back; `PATCH /api/music/tracks/:id`, one field at a time.
-    4. **Takes**: the ACE-Step worker behind `MusicGenerator` (and in the setup checklist), a take
+    4. **Takes** (built): the ACE-Step worker behind `MusicGenerator` (and in the setup checklist), a take
        generated, shaped and cached per click on a track's page, and played, loops around their
        seam too.
     5. **Board**: a track's takes as cards, More takes (two, in the background), Drop; takes from an
