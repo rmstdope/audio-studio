@@ -1,0 +1,203 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Each voice named once, by its name</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --ok: #3ddc97;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .note {
+        background: #1d1a10;
+        border-bottom: 1px solid #3a3420;
+        color: #e8d9a8;
+        padding: 10px 16px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 24px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .variant {
+        font:
+          12px ui-monospace,
+          monospace;
+        color: var(--accent);
+        margin: 0 0 -14px;
+      }
+      .pnl {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .was {
+        font-size: 12px;
+        color: var(--faint);
+        border-top: 1px dashed var(--line-strong);
+        padding-top: 8px;
+      }
+      .was s {
+        color: #ff94a8;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      Agreed: A voice cast in several languages is named once, by its name on Fish, followed by all
+      its languages. When its name can’t be shown (being looked up, Fish unreachable, or the voice
+      gone from Fish) it is called by the languages it was cast in: “its English voice”. Two
+      different voices read as today.
+    </div>
+    <main>
+      <h1>Each voice named once, by its name</h1>
+      <p class="variant">1 · The Narrator in Deutsch: one voice cast in English and Svenska</p>
+      <section class="pnl">
+        <span class="label">Voice · Deutsch</span><strong>No Deutsch voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Old Man Bible Storytelling (English and Svenska) starts on
+          its shortlist, so you can hear it speak Deutsch too. Until then the Narrator’s Deutsch
+          lines cannot be recorded.</span
+        >
+        <div class="was">
+          Today:
+          <s
+            >Start an audition to find one. Old man bible storytelling (English) and old man bible
+            storytelling (Svenska) start on its shortlist, so you can hear them speak Deutsch too.
+            Until then the Narrator’s Deutsch lines cannot be recorded.</s
+          >
+        </div>
+      </section>
+      <p class="variant">2 · Grandmother in Deutsch: two different voices (unchanged)</p>
+      <section class="pnl">
+        <span class="label">Voice · Deutsch</span><strong>No Deutsch voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Gentle Granny (English) and Varm Mormor (Svenska) start on
+          its shortlist, so you can hear them speak Deutsch too. Until then Grandmother’s Deutsch
+          lines cannot be recorded.</span
+        >
+      </section>
+      <p class="variant">3 · Four languages, in Suomi: one voice shared by two, one of its own</p>
+      <section class="pnl">
+        <span class="label">Voice · Suomi</span><strong>No Suomi voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Old Man Bible Storytelling (English and Svenska) and Vanha
+          Kertoja (Deutsch) start on its shortlist, so you can hear them speak Suomi too. Until then
+          the Narrator’s Suomi lines cannot be recorded.</span
+        >
+      </section>
+      <p class="variant">
+        4 · The Keeper in Svenska: its English voice was cast before names were kept — name found on
+        Fish
+      </p>
+      <section class="pnl">
+        <span class="label">Voice · Svenska</span><strong>No Svenska voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Deep Lighthouse Keeper (English) starts on its shortlist,
+          so you can hear it speak Svenska too. Until then the Keeper’s Svenska lines cannot be
+          recorded.</span
+        >
+        <div class="was">
+          Today:
+          <s
+            >Start an audition to find one. e48a228e21a443d6a4302dc6238c8128 (English) starts on its
+            shortlist, so you can hear it speak Svenska too. Until then the Keeper’s Svenska lines
+            cannot be recorded.</s
+          >
+        </div>
+      </section>
+      <p class="variant">
+        5 · The same while the name is being looked up, or when it can’t be found
+      </p>
+      <section class="pnl">
+        <span class="label">Voice · Svenska</span><strong>No Svenska voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Its English voice starts on its shortlist, so you can hear
+          it speak Svenska too. Until then the Keeper’s Svenska lines cannot be recorded.</span
+        >
+      </section>
+      <p class="variant">6 · A shared voice whose name can’t be found</p>
+      <section class="pnl">
+        <span class="label">Voice · Deutsch</span><strong>No Deutsch voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Its English and Svenska voice starts on its shortlist, so
+          you can hear it speak Deutsch too. Until then the Narrator’s Deutsch lines cannot be
+          recorded.</span
+        >
+      </section>
+      <p class="variant">
+        7 · One named voice and one that can’t be found (lowercase “its” after the first)
+      </p>
+      <section class="pnl">
+        <span class="label">Voice · Deutsch</span><strong>No Deutsch voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Gentle Granny (English) and its Svenska voice start on its
+          shortlist, so you can hear them speak Deutsch too. Until then Grandmother’s Deutsch lines
+          cannot be recorded.</span
+        >
+      </section>
+      <p class="variant">8 · Two different voices, neither name found</p>
+      <section class="pnl">
+        <span class="label">Voice · Deutsch</span><strong>No Deutsch voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Its English voice and its Svenska voice start on its
+          shortlist, so you can hear them speak Deutsch too. Until then Grandmother’s Deutsch lines
+          cannot be recorded.</span
+        >
+      </section>
+      <p class="variant">9 · No voice in any other language (unchanged)</p>
+      <section class="pnl">
+        <span class="label">Voice · Deutsch</span><strong>No Deutsch voice yet</strong>
+        <span class="muted" style="font-size: 13px"
+          >Start an audition to find one. Until then Grandmother’s Deutsch lines cannot be
+          recorded.</span
+        >
+      </section>
+    </main>
+  </body>
+</html>
