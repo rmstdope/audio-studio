@@ -235,30 +235,51 @@ describe('createMusicTakes', () => {
     expect(existsSync(join(root, '.audio-studio/music/hall.json'))).toBe(false)
   })
 
-  it('stops the takes still waiting; the one under way finishes and is kept', async () => {
+  it('stops every take: the one being made ends and is discarded, the waiting ones never start', async () => {
+    const { root, file, takes: first, settled } = setup()
+    await first.make(file, 'hall', { count: 1 })
+    await settled('hall')
+    // A generator that makes nothing until released, and gives up when the take is stopped.
     let release: () => void = () => {}
     const gate = new Promise<void>((resolve) => (release = resolve))
     const inner = fakeGenerator()
+    const signals: (AbortSignal | undefined)[] = []
     const slow: MusicGenerator = {
       ...inner.generator,
-      generate: async (request) => {
-        await gate
+      generate: async (request, signal) => {
+        signals.push(signal)
+        await Promise.race([
+          gate,
+          new Promise((_, reject) =>
+            signal?.addEventListener('abort', () =>
+              reject(new Error('The music generator stopped')),
+            ),
+          ),
+        ])
         return inner.generator.generate(request)
       },
     }
-    const { file } = setup()
     const takes = createMusicTakes({ generator: slow, queue: createSerial(), newSeed: () => 1 })
     await takes.make(file, 'hall', { count: 3 })
-    expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 2 })
-    expect(await takes.view(file, 'hall')).toMatchObject({ making: [{ n: 1, state: 'making' }] })
+    for (let i = 0; i < 200 && !signals.length; i++) await new Promise((r) => setTimeout(r, 5))
+    expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 3 })
+    expect(signals[0]?.aborted).toBe(true)
+    expect(await takes.view(file, 'hall')).toMatchObject({
+      takes: [{ n: 1 }],
+      making: [],
+      failed: [],
+    })
     release()
-    let view = await takes.view(file, 'hall')
-    for (let i = 0; i < 200 && view && 'making' in view && view.making.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 5))
-      view = await takes.view(file, 'hall')
-    }
-    expect(view).toMatchObject({ takes: [{ n: 1 }], making: [] })
-    expect(inner.requests).toHaveLength(1)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    // Nothing more is made: no board entry, no file, no further request; the earlier take stays.
+    expect(await takes.view(file, 'hall')).toMatchObject({
+      takes: [{ n: 1 }],
+      making: [],
+      failed: [],
+    })
+    expect(readdirSync(join(root, '.audio-studio/music-takes/hall'))).toHaveLength(1)
+    expect(signals).toHaveLength(1)
+    expect(await takes.making(file)).toEqual({})
     expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 0 })
     expect(await takes.stop(file, 'nope')).toBeNull()
   })

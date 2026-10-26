@@ -722,7 +722,7 @@ export function useRemoveOrphan(trackId: string) {
   })
 }
 
-/** Cancels a track's waiting takes, then reloads its takes. */
+/** Stops a track's takes (the one being made and those waiting), then reloads its takes. */
 export function useStopTakes(trackId: string) {
   const client = useQueryClient()
   return useMutation({
