@@ -8,6 +8,7 @@ import {
   lengthReason,
   longestFor,
   menuEntry,
+  shortMenuLabel,
   missingOnTrack,
   setupShortLine,
   tooLongOnTrack,
@@ -182,5 +183,25 @@ describe('music.model in the project file', () => {
     const result = ProjectSchema.safeParse(projectJson({ music: { ...music, model: 'huge' } }))
     expect(result.success).toBe(false)
     expect(result.error?.issues[0]?.path).toEqual(['music', 'model'])
+  })
+})
+
+describe('the closed menu’s short label', () => {
+  const loop90 = { kind: 'loop', seconds: 90 } as const
+  test('the plain name and the time', () => {
+    expect(shortMenuLabel('balanced', true)).toBe('Balanced — about 3 min a take')
+    expect(shortMenuLabel('quick', true)).toBe('Quick — about 1¼ min a take')
+    expect(shortMenuLabel('short', true)).toBe('Short — about 40 s a take')
+  })
+  test('a missing model says so in place of the time', () => {
+    expect(shortMenuLabel('careful', false)).toBe('Careful — not on this computer')
+  })
+  test('a model too short for the track says what it makes, without the length, and wins', () => {
+    expect(shortMenuLabel('short', true, loop90)).toBe('Short — makes loops up to 27 s')
+    expect(shortMenuLabel('short', false, loop90)).toBe('Short — makes loops up to 27 s')
+    expect(shortMenuLabel('shortest', true, loop90)).toBe('Shortest — makes no loops')
+    expect(shortMenuLabel('short', true, { kind: 'stinger', seconds: 5 })).toBe(
+      'Short — about 40 s a take',
+    )
   })
 })

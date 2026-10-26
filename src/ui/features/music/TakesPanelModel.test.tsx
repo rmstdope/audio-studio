@@ -342,3 +342,56 @@ describe('the Stable Audio models in a track’s menu', () => {
     expect(page.button('More takes').disabled).toBe(true)
   })
 })
+
+describe('the closed model menu’s short label', () => {
+  const labels = (menu: HTMLSelectElement) => [...menu.options].map((o) => o.getAttribute('label'))
+  const fire = (menu: HTMLSelectElement, event: Event) => act(() => void menu.dispatchEvent(event))
+
+  it('labels only the chosen entry, and leaves every entry’s text whole', () => {
+    const menu = render(view()).menu()
+    expect(labels(menu)).toEqual(['Balanced — about 3 min a take', null, null, null, null, null])
+    expect(menu.options[0]!.textContent).toBe('Balanced · XL turbo · 4B — about 3 min a take')
+  })
+
+  it('follows the pick', () => {
+    const menu = render(view()).menu()
+    act(() => {
+      menu.value = 'quick'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(labels(menu)[0]).toBeNull()
+    expect(labels(menu)[1]).toBe('Quick — about 1¼ min a take')
+  })
+
+  it('says why in place of the time for a missing or too short model', () => {
+    const missing = render(view({ defaultModel: 'careful', models: everyModel(['careful']) }))
+    expect(labels(missing.menu())[3]).toBe('Careful — not on this computer')
+    const short = render(view({ defaultModel: 'short' })).menu()
+    expect(labels(short)[4]).toBe('Short — makes loops up to 27 s')
+  })
+
+  it('shows the whole list while the menu is open, and the short label again once it is not', () => {
+    const menu = render(view()).menu()
+    fire(menu, new MouseEvent('mousedown', { bubbles: true }))
+    expect(labels(menu).every((l) => l === null)).toBe(true)
+    fire(menu, new FocusEvent('focusout', { bubbles: true }))
+    expect(labels(menu)[0]).toBe('Balanced — about 3 min a take')
+    fire(menu, new KeyboardEvent('keydown', { key: ' ', bubbles: true }))
+    expect(labels(menu)[0]).toBeNull()
+    fire(menu, new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(labels(menu)[0]).toBe('Balanced — about 3 min a take')
+    fire(menu, new MouseEvent('mousedown', { bubbles: true }))
+    act(() => {
+      menu.value = 'quick'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(labels(menu)[1]).toBe('Quick — about 1¼ min a take')
+  })
+
+  it('keeps the short label while takes are being made', () => {
+    const making = [{ n: 1, state: 'making' as const, elapsed: 5, model: 'Balanced', expected: 75 }]
+    const menu = render(view({ making })).menu()
+    expect(menu.disabled).toBe(true)
+    expect(labels(menu)[0]).toBe('Balanced — about 3 min a take')
+  })
+})

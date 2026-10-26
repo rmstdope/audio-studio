@@ -200,6 +200,16 @@ export function menuEntry(id: MusicModelId, installed: boolean, track?: TrackLen
   return installed ? base : `${base} — not on this computer`
 }
 
+/**
+ * The closed menu's label: the plain name, then the time, or in its place why the model can't be
+ * used (too short for the track wins over missing); the generator's names stay in the opened list.
+ */
+export function shortMenuLabel(id: MusicModelId, installed: boolean, track?: TrackLength): string {
+  const { name, minutes } = musicModel(id)
+  if (track && !canMake(id, track.kind, track.seconds)) return `${name} — ${makes(id)}`
+  return installed ? `${name} — about ${minutes} a take` : `${name} — not on this computer`
+}
+
 /** What an empty track says a take takes with this model: "about 3 minutes each". */
 export function eachWords(id: MusicModelId): string {
   const { minutes } = musicModel(id)
