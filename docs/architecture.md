@@ -818,7 +818,9 @@ The file says the kind: a track in `loops` is a loop, one in `stingers` a stinge
 names its file in the one clips folder, so it is a slug (`^[a-z0-9]+(-[a-z0-9]+)*$`) and unique
 across the game (a second use is a problem with both files and paths, and neither track is shown or
 made until it is resolved). `plays` (where the game plays
-it, shown under its name) and `bpm` and `key` are optional; `brief` and `seconds` are the game's
+it, shown under its name), `file` (the music file the game plays for the track now, a path inside the
+project root to an `.mp3`, `.ogg`, `.wav`, `.m4a` or `.flac`; read only, never moved, levelled,
+re-encoded or written, and never taken as a chosen take) and `bpm` and `key` are optional; `brief` and `seconds` are the game's
 starting point. Tracks are always instrumental (no lyrics). `bpm` and `key` ("D major") are passed
 to ACE-Step as its own fields; their allowed values are settled in 12.2. A stinger is at most 10
 seconds.
@@ -838,7 +840,13 @@ has `refreshDialog`: the same command as Refresh dialog, which brings the act's 
 together, and its summary names the loops added and removed besides the lines. A refresh of an act
 and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
 refresh of the stingers and takes being made for a stinger. A project without a `music` section
-shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel and its Takes panel; its board: More takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).
+shows Music with a page saying how to add one. **Plays.** Each row of a list has a **Plays** column saying what its play button plays: the chosen
+take ("Take 3", even when the brief changed since), else the game's own `file` ("The game's file"
+with the name beneath), else nothing ("Nothing to play yet", the button greyed out). A file that is
+not on disk when the page loads is marked "The file is not there." and its button greyed out.
+Play runs once from the start (a loop too), one row at a time, and stops on leaving the page; a
+play that fails says so in its row. The audio is `GET /api/music/tracks/:id/current`, which the
+studio resolves itself from the row (the page sends no path). A track opens its own page (built: its Brief panel and its Takes panel; its board: More takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
@@ -1242,7 +1250,9 @@ Small, independently useful increments:
        track's status on the Music pages; the music files in the Changes panel.
     7. **Orphans** (built): the music of a track the game no longer lists, shown on its list's page and
        removed after confirmation; the briefs and boards of unlisted tracks never chosen dropped.
-    8. **RetroQuest** (in the game's repository, not the studio's): the game's extractor writes
+    8. **Hear a track from the list** (built): `file` in the track lists, the Plays column and
+       `GET /api/music/tracks/:id/current`.
+    9. **RetroQuest** (in the game's repository, not the studio's): the game's extractor writes
        each act's loops and the stingers with their first briefs, and the game reads the music
        manifest and plays a track per room or region, and the stingers, looping through Web Audio;
        checked in Chrome, Safari and Firefox. If a browser pads an MP3, the manifest gains loop

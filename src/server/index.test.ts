@@ -3263,6 +3263,81 @@ describe('server, choosing a take', () => {
   })
 })
 
+describe('server, playing what a track plays now', () => {
+  const lock = {
+    fp: '0123456789abcdef',
+    model: 'm',
+    seed: 1,
+    list: 'act1',
+    take: 3,
+    inputs: { brief: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
+    at: '2026-11-02T10:00:00.000Z',
+  }
+  const musicRoot = tempRepo({
+    'audio-studio.json': projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/music.json': [
+      { id: 'game', title: 'G', brief: 'x', seconds: 5, file: 'game/walk.mp3' },
+      { id: 'gone', title: 'H', brief: 'x', seconds: 5, file: 'game/nope.mp3' },
+      { id: 'bare', title: 'B', brief: 'x', seconds: 5 },
+      { id: 'taken', title: 'T', brief: 'x', seconds: 5, file: 'game/walk.mp3' },
+      { id: 'folder', title: 'F', brief: 'x', seconds: 5, file: 'game/dir.mp3' },
+    ],
+    'tts/act2/music.json': [],
+    'tts/stingers.json': [],
+    'music/music.lock.json': { taken: lock },
+    'audio/music/manifest.json': { taken: { file: 'taken.mp3', duration: 5 } },
+    'audio/music/taken.mp3': 'the take',
+    'game/walk.mp3': 'the game file',
+  })
+  mkdirSync(join(musicRoot, 'game/dir.mp3'))
+  const studio = startServer({
+    projectFile: join(musicRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => studio.stop(true))
+  const at = (path: string) => new URL(path, studio.url)
+  const current = (id: string) => fetch(at(`/api/music/tracks/${id}/current`))
+
+  it('says what each row plays, and whether it is there', async () => {
+    const summary = await (await fetch(at('/api/project'))).json()
+    const rows = summary.summary.music.lists[0].tracks as { id: string; current: unknown }[]
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.current]))).toEqual({
+      game: { kind: 'game', file: 'game/walk.mp3', exists: true },
+      gone: { kind: 'game', file: 'game/nope.mp3', exists: false },
+      bare: { kind: 'none' },
+      taken: { kind: 'take', take: 3, exists: true },
+      folder: { kind: 'game', file: 'game/dir.mp3', exists: false },
+    })
+  })
+
+  it('serves the chosen take, else the game’s file, and nothing else', async () => {
+    expect(await (await current('taken')).text()).toBe('the take')
+    expect(await (await current('game')).text()).toBe('the game file')
+    for (const id of ['gone', 'bare', 'folder', 'nobody'])
+      expect((await current(id)).status).toBe(404)
+  })
+
+  it('never writes the game’s file', async () => {
+    await current('game')
+    expect(readFileSync(join(musicRoot, 'game/walk.mp3'), 'utf8')).toBe('the game file')
+  })
+})
+
 describe('server, removing music the game no longer asks for', () => {
   const musicRoot = tempRepo({
     'audio-studio.json': projectJson({

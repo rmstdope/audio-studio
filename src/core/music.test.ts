@@ -181,6 +181,71 @@ describe('loopsDiff', () => {
   })
 })
 
+describe('a track naming its own game file', () => {
+  const base = { id: 'a', title: 'A', brief: 'x', seconds: 9 }
+
+  it('keeps a file inside the project', () => {
+    const parsed = LoopListSchema.parse([{ ...base, file: 'web/public/audio/forest-walk.mp3' }])
+    expect(parsed[0]!.file).toBe('web/public/audio/forest-walk.mp3')
+  })
+
+  it.each(['../x.mp3', '/abs/x.mp3', 'a/../../x.mp3', 'notes.txt', 'C:\\\\x.mp3'])(
+    'refuses %s, with its JSON path',
+    (file) => {
+      const parsed = LoopListSchema.safeParse([{ ...base, file }])
+      if (parsed.success) throw new Error('expected a problem')
+      expect(problemsFrom('f.json', parsed.error).map((p) => p.path)).toEqual(['[0].file'])
+    },
+  )
+})
+
+describe('what a track plays now', () => {
+  const entry = (take: number): LockEntry => ({
+    fp: '0123456789abcdef',
+    model: MUSIC_MODEL,
+    seed: 1,
+    list: 'act1',
+    take,
+    inputs: { brief: 'old', kind: 'loop', seconds: 80, bpm: null, key: null },
+    at: '2026-11-02T10:00:00.000Z',
+  })
+  const rows = (
+    tracks: Track[],
+    chosen: Parameters<typeof summarizeMusic>[2],
+    gameFiles: Record<string, boolean>,
+  ) => summarizeMusic([list('act1', tracks)], {}, chosen, gameFiles).music.lists[0]!.tracks
+
+  it('is the chosen take, even when the brief changed since', () => {
+    const [row] = rows(
+      [track('a', { file: 'g.mp3' })],
+      { a: { lock: entry(3), fileExists: true } },
+      { a: true },
+    )
+    expect(row!.status).toBe('changed')
+    expect(row!.current).toEqual({ kind: 'take', take: 3, exists: true })
+  })
+
+  it('is the chosen take with its clip gone', () => {
+    const [row] = rows([track('a')], { a: { lock: entry(2), fileExists: false } }, {})
+    expect(row!.current).toEqual({ kind: 'take', take: 2, exists: false })
+  })
+
+  it('is the game’s file when no take is chosen, there or not', () => {
+    const [a, b] = rows(
+      [track('a', { file: 'g/a.mp3' }), track('b', { file: 'g/b.mp3' })],
+      {},
+      { a: true },
+    )
+    expect(a!.current).toEqual({ kind: 'game', file: 'g/a.mp3', exists: true })
+    expect(b!.current).toEqual({ kind: 'game', file: 'g/b.mp3', exists: false })
+  })
+
+  it('is nothing without a take or a file', () => {
+    const [row] = rows([track('a')], {}, {})
+    expect(row!.current).toEqual({ kind: 'none' })
+  })
+})
+
 describe('summarizeMusic with chosen takes', () => {
   const lock = (inputs: LockEntry['inputs']): LockEntry => ({
     fp: '0123456789abcdef',

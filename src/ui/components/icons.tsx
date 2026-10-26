@@ -108,6 +108,15 @@ export function PauseIcon({ size = 14 }: { size?: number }) {
   )
 }
 
+/** Stop the clip playing (a square). */
+export function StopIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+    </svg>
+  )
+}
+
 /** A list of lines. */
 export function ListIcon() {
   return (

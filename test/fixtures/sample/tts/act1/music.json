@@ -4,7 +4,8 @@
     "title": "Lantern hall",
     "brief": "warm lute, slow, a hearth crackling",
     "seconds": 80,
-    "plays": "The hall where the lantern hangs"
+    "plays": "The hall where the lantern hangs",
+    "file": "audio/game-music/lantern-hall.wav"
   },
   {
     "id": "village-lane",
@@ -12,6 +13,7 @@
     "brief": "gentle recorder and fiddle, a walk in the morning, unhurried and bright with birdsong and a little hand drum",
     "seconds": 90,
     "bpm": 84,
-    "key": "D major"
+    "key": "D major",
+    "file": "audio/game-music/village-lane.wav"
   }
 ]

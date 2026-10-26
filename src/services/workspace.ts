@@ -42,7 +42,7 @@ import {
   readResource,
   writeAtomic,
 } from './files'
-import { readMusic } from './musicLists'
+import { gameFilePath, readMusic } from './musicLists'
 import { inPartTurn } from './partFiles'
 
 /** The project file in `start` or the nearest directory above it that has one; null if none. */
@@ -345,6 +345,23 @@ export async function musicClipFile(projectFile: string, file: string): Promise<
   if (file.startsWith('.') || !file.endsWith('.mp3')) return null
   const folder = resolveInRoot(dirname(projectFile), opened.project.music.paths.clips)
   return (await listFiles(folder)).has(file) ? join(folder, file) : null
+}
+
+/**
+ * The absolute path of the music a track plays now: its chosen take's clip, else the game's own
+ * file for it. Null when there is none, it is not on disk, or the track is unknown. The game's
+ * file is only read.
+ */
+export async function musicCurrentFile(projectFile: string, id: string): Promise<string | null> {
+  const opened = await openProject(projectFile)
+  if (!opened.ok || !opened.project.music) return null
+  const root = dirname(projectFile)
+  const music = await readMusic(root, opened.project, [])
+  const row = music?.lists.flatMap((list) => list.tracks).find((track) => track.id === id)
+  if (!row || row.current.kind === 'none' || !row.current.exists) return null
+  return row.current.kind === 'take'
+    ? musicClipFile(projectFile, `${id}.mp3`)
+    : gameFilePath(root, row.current.file)
 }
 
 /** How a take is checked: the language Whisper is told, and the words counted as heard for each other. */

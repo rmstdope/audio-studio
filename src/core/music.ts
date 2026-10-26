@@ -12,7 +12,21 @@ import type { Problem } from './project'
 /** The longest stinger the game may ask for, in seconds. */
 export const MAX_STINGER_SECONDS = 10
 
-/** A track as the game lists it. `plays` is where the game plays it, shown under its name. */
+/** Music files the studio can play, by extension. */
+const AUDIO_FILE = /\.(mp3|ogg|wav|m4a|flac)$/i
+
+/** The path of a music file the game plays: inside the project root, and an audio file. */
+const GameFile = z
+  .string()
+  .min(1)
+  .refine((file) => !/^([/\\]|[a-z]:)/i.test(file) && !file.split(/[/\\]/).includes('..'), {
+    error: 'use a path inside the project (no leading / and no ..)',
+  })
+  .refine((file) => AUDIO_FILE.test(file), {
+    error: 'use an audio file (.mp3, .ogg, .wav, .m4a or .flac)',
+  })
+
+/** A track as the game lists it. `plays` is where the game plays it, shown under its name; `file` is the music file it plays now. */
 const TrackShape = z.object({
   id: z
     .string()
@@ -22,6 +36,7 @@ const TrackShape = z.object({
     ),
   title: z.string().min(1),
   plays: z.string().min(1).optional(),
+  file: GameFile.optional(),
   brief: z.string().min(1),
   seconds: z.number().int().positive(),
   bpm: z.number().int().min(30).max(300).optional(),
@@ -84,6 +99,12 @@ export interface GameBrief {
   key: string | null
 }
 
+/** What a row's play button plays: the chosen take, else the game's own file, else nothing. */
+export type CurrentMusic =
+  | { kind: 'take'; take: number; exists: boolean }
+  | { kind: 'game'; file: string; exists: boolean }
+  | { kind: 'none' }
+
 /** A track as a list page shows it; its brief, length, tempo and key are the ones in force. */
 export interface TrackRow {
   id: string
@@ -101,6 +122,8 @@ export interface TrackRow {
   changed: ChangedField[]
   /** When the take was chosen (ISO time); null when none is. */
   chosenAt: string | null
+  /** What the play button plays now. */
+  current: CurrentMusic
 }
 
 /** What the lock says of a track and whether its music file is on disk. */
@@ -150,6 +173,7 @@ export function summarizeMusic(
   lists: MusicListInput[],
   briefs: Briefs,
   chosen: Record<string, ChosenState> = {},
+  gameFiles: Record<string, boolean> = {},
 ): { music: MusicSummary; problems: Problem[] } {
   const uses = new Map<string, { file: string; path: string }[]>()
   for (const list of lists) {
@@ -185,7 +209,7 @@ export function summarizeMusic(
         title: list.title,
         state: list.state.status,
         tracks: shown(list, uses).map((track) =>
-          rowOf(track, briefs[track.id], list.kind, chosen[track.id]),
+          rowOf(track, briefs[track.id], list.kind, chosen[track.id], gameFiles[track.id] ?? false),
         ),
         orphans: orphansOf(list, named, chosen),
         dropped: listed(list).length - shown(list, uses).length,
@@ -259,6 +283,7 @@ function rowOf(
   change: Briefs[string] | undefined,
   kind: MusicListInput['kind'],
   chosen: ChosenState | undefined,
+  gameFileExists: boolean,
 ): TrackRow {
   const row = {
     id: track.id,
@@ -293,6 +318,11 @@ function rowOf(
     status,
     changed: status === 'changed' ? changedFields(chosen!.lock, MUSIC_MODEL, current) : [],
     chosenAt: chosen?.lock.at ?? null,
+    current: chosen
+      ? { kind: 'take', take: chosen.lock.take, exists: chosen.fileExists }
+      : track.file
+        ? { kind: 'game', file: track.file, exists: gameFileExists }
+        : { kind: 'none' },
   }
 }
 
