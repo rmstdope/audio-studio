@@ -39,8 +39,19 @@ function input(overrides: Partial<PlanInput> = {}): PlanInput {
 }
 
 /** The lock entry a clip of `line` made with today's inputs would have. */
-function entryFor(line: Line, theCast: Cast = cast, extra: Partial<LockEntry> = {}): LockEntry {
-  const inputs = clipInputs(line, theCast.speakers[line.speaker], {}, theCast.pronounce, narration)!
+function entryFor(
+  line: Line,
+  theCast: Cast = cast,
+  extra: Partial<LockEntry> = {},
+  cues: Record<string, string> = {},
+): LockEntry {
+  const inputs = clipInputs(
+    line,
+    theCast.speakers[line.speaker],
+    cues,
+    theCast.pronounce,
+    narration,
+  )!
   const { fp, parts } = fingerprint(inputs)
   return { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then', ...extra }
 }
@@ -483,7 +494,7 @@ describe('planPart, scene cues', () => {
   })
 
   it('describes each scene: its cue, followers, recorded followers and first follower', () => {
-    const lock = { n2: entryFor(scened[2]!) }
+    const lock = { n2: entryFor(scened[2]!, cast, {}, { 'scene:Cave': '[dark]' }) }
     const manifest = { n2: { file: 'n2.mp3', speaker: 'narrator' } }
     const state = plan({
       lock,
@@ -504,6 +515,22 @@ describe('planPart, scene cues', () => {
       },
     ])
     expect(plan().scenes[0]).toMatchObject({ cue: null, cueFrom: null })
+  })
+
+  it('counts only up-to-date clips as recorded followers, since a stale one is marked already', () => {
+    const cues = { 'scene:Cave': '[dark]' }
+    const lock = {
+      n1: entryFor(scened[0]!, cast, {}, cues),
+      n2: entryFor(scened[2]!, cast, { fp: 'older', voice: 'an older voice' }, cues),
+    }
+    const manifest = {
+      n1: { file: 'n1.mp3', speaker: 'narrator' },
+      n2: { file: 'n2.mp3', speaker: 'narrator' },
+    }
+    const state = plan({ lock, manifest, files: new Set(['n1.mp3', 'n2.mp3']), cues })
+    expect(by(state).n1?.status).toBe('ok')
+    expect(by(state).n2?.status).toBe('stale')
+    expect(state.scenes[0]).toMatchObject({ following: 3, recordedFollowing: 1 })
   })
 
   it('has no scenes when the dialog names none', () => {
