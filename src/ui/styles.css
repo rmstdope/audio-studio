@@ -2929,6 +2929,9 @@ button.cue-chip[aria-expanded='true'] {
   opacity: 0.55;
 }
 @media (max-width: 640px) {
+  .takes-controls {
+    flex-wrap: nowrap;
+  }
   .takes-model {
     max-width: none;
   }
