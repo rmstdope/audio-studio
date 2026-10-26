@@ -26,6 +26,7 @@ import {
   takesToRecord,
   undoFor,
 } from '../../board'
+import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { DesignVoice } from './DesignVoice'
 import { CheckIcon, CrossIcon, SparkIcon } from '../../components/icons'
 import { Confirm } from '../../components/Confirm'
@@ -100,6 +101,7 @@ export function ShortlistBoard({
   const [idError, setIdError] = useState<string | null>(null)
   const [designing, setDesigning] = useState(false)
   const designButton = useRef<HTMLButtonElement>(null)
+  const refocusDesign = useFocusWhenClosed(designing, designButton)
 
   // Every take is asked for once per phrase, so a take the cache cannot show is not asked again.
   const asked = useRef(new Set<string>())
@@ -484,11 +486,11 @@ export function ShortlistBoard({
           auditioning
           onClose={() => {
             setDesigning(false)
-            designButton.current?.focus()
+            refocusDesign()
           }}
           onDone={() => {
             setDesigning(false)
-            designButton.current?.focus()
+            refocusDesign()
             // The designs join the board when it is read again; bring the section into view then.
             setTimeout(() => document.getElementById('designed')?.scrollIntoView(), 300)
           }}
