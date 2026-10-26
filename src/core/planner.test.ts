@@ -39,8 +39,19 @@ function input(overrides: Partial<PlanInput> = {}): PlanInput {
 }
 
 /** The lock entry a clip of `line` made with today's inputs would have. */
-function entryFor(line: Line, theCast: Cast = cast, extra: Partial<LockEntry> = {}): LockEntry {
-  const inputs = clipInputs(line, theCast.speakers[line.speaker], {}, theCast.pronounce, narration)!
+function entryFor(
+  line: Line,
+  theCast: Cast = cast,
+  extra: Partial<LockEntry> = {},
+  cues: Record<string, string> = {},
+): LockEntry {
+  const inputs = clipInputs(
+    line,
+    theCast.speakers[line.speaker],
+    cues,
+    theCast.pronounce,
+    narration,
+  )!
   const { fp, parts } = fingerprint(inputs)
   return { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then', ...extra }
 }
@@ -483,16 +494,7 @@ describe('planPart, scene cues', () => {
   })
 
   it('describes each scene: its cue, followers, recorded followers and first follower', () => {
-    const n2 = scened[2]!
-    const inputs = clipInputs(
-      n2,
-      cast.speakers.narrator,
-      { 'scene:Cave': '[dark]' },
-      {},
-      narration,
-    )!
-    const { fp, parts } = fingerprint(inputs)
-    const lock = { n2: { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then' } }
+    const lock = { n2: entryFor(scened[2]!, cast, {}, { 'scene:Cave': '[dark]' }) }
     const manifest = { n2: { file: 'n2.mp3', speaker: 'narrator' } }
     const state = plan({
       lock,
@@ -516,15 +518,16 @@ describe('planPart, scene cues', () => {
   })
 
   it('counts only up-to-date clips as recorded followers, since a stale one is marked already', () => {
+    const cues = { 'scene:Cave': '[dark]' }
     const lock = {
-      n1: entryFor(scened[0]!),
-      n2: entryFor(scened[2]!, cast, { fp: 'older', voice: 'an older voice' }),
+      n1: entryFor(scened[0]!, cast, {}, cues),
+      n2: entryFor(scened[2]!, cast, { fp: 'older', voice: 'an older voice' }, cues),
     }
     const manifest = {
       n1: { file: 'n1.mp3', speaker: 'narrator' },
       n2: { file: 'n2.mp3', speaker: 'narrator' },
     }
-    const state = plan({ lock, manifest, files: new Set(['n1.mp3', 'n2.mp3']) })
+    const state = plan({ lock, manifest, files: new Set(['n1.mp3', 'n2.mp3']), cues })
     expect(by(state).n1?.status).toBe('ok')
     expect(by(state).n2?.status).toBe('stale')
     expect(state.scenes[0]).toMatchObject({ following: 3, recordedFollowing: 1 })
