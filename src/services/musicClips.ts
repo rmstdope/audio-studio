@@ -116,9 +116,9 @@ export async function commitChoice({
       const found: Problem[] = []
       const manifest = await manifestNow(root, music, found)
       const lock = await lockNow(root, music, found)
-      if (!manifest) return { ok: false, file: found[0]!.file, problems: found }
-      if (!lock) {
-        const message = `Take ${take.n} could not be chosen: the music lock could not be read.`
+      if (!manifest || !lock) {
+        const unread = !manifest ? 'manifest' : 'lock'
+        const message = `Take ${take.n} could not be chosen: the music ${unread} could not be read.`
         return { ok: false, message: `${message} Nothing was changed.` }
       }
       manifest[id] = { file, duration: pyRound(take.seconds) }
@@ -168,7 +168,8 @@ export async function uncommitChoice({
       const found: Problem[] = []
       const manifest = await manifestNow(root, music, found)
       const lock = await lockNow(root, music, found)
-      if (!manifest || !lock) return { ok: false, file: found[0]!.file, problems: found }
+      if (!manifest) return { ok: false, message: 'The music manifest could not be read.' }
+      if (!lock) return { ok: false, message: 'The music lock could not be read.' }
       if (!(id in lock)) return { ok: false, message: 'No take is chosen for this track.' }
       if (id in manifest) {
         delete manifest[id]

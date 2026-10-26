@@ -300,4 +300,14 @@ describe('Un-choose', () => {
     )
     expect(document.activeElement).toBe(block)
   })
+
+  it('names the music manifest when it is the file that could not be read', async () => {
+    answer = { ok: false, message: 'The music manifest could not be read.' }
+    const page = chosen()
+    await click(page.button('Un-choose'))
+    await click(page.button('Un-choose'))
+    expect(page.block()!.textContent).toContain(
+      'Take 3 could not be un-chosen: the music manifest could not be read. Nothing was changed.',
+    )
+  })
 })
