@@ -69,7 +69,7 @@ export function LineWords({
             <Fragment key={i}>
               {i > 0 && (
                 <>
-                  {placed ? ' ' : null}
+                  {' '}
                   <button
                     type="button"
                     className={`cue-slot${placed ? ' cue-chip mono' : ' cue-gap'}`}
@@ -87,7 +87,8 @@ export function LineWords({
                     onClick={() => setOpen(open === i ? null : i)}
                   >
                     {placed ? placed.cue : ''}
-                  </button>{' '}
+                  </button>
+                  {placed ? ' ' : null}
                 </>
               )}
               {word}

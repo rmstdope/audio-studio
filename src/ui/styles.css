@@ -885,15 +885,24 @@ a.btn {
 }
 .cue-gap {
   display: inline-block;
+  position: relative;
   vertical-align: middle;
   width: 0;
   height: 1em;
+}
+/* Painted over the space before the next word only, so nothing moves or hides a letter. */
+.cue-gap::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  width: 0.22em;
+  top: 0;
+  bottom: 0;
   border-radius: 3px;
 }
-.line-text:hover .cue-gap,
-.cue-gap:focus-visible,
-.cue-gap[aria-expanded='true'] {
-  width: 9px;
+.line-text:hover .cue-gap::after,
+.cue-gap:focus-visible::after,
+.cue-gap[aria-expanded='true']::after {
   background: var(--tint-5-bg);
   outline: 1px dashed var(--tint-5);
 }
