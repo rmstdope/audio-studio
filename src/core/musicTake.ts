@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { readWav, writeWav, type Wav } from './wav'
 
-/** The music model the takes come from; a take made with another is another set of takes. */
+/** What a take made before models were chosen records, and what the take fingerprint begins with. */
 export const MUSIC_MODEL = 'acestep-v15-xl-turbo+lm-4B'
 
 /** How much longer than it plays a loop is generated, since every take closes as a song does. */
