@@ -43,6 +43,23 @@ describe('modelsView', () => {
     expect(view.recorded['s2.1-pro-free']!.lines).toBe(1)
   })
 
+  it('counts the cues inside a line in the bytes it sends', async () => {
+    const files = (cues: object) => ({
+      'audio-studio.json': project(models),
+      'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
+      'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
+      'tts/act1/cues.json': cues,
+    })
+    const bytes = async (cues: object) => {
+      const view = await modelsView(join(tempRepo(files(cues)), 'audio-studio.json'))
+      if (!view.ok) throw new Error(JSON.stringify(view.problems))
+      return view.dialog.bytes
+    }
+    expect((await bytes({ a: 'Once [hushed] upon a time.' })) - (await bytes({}))).toBe(
+      '[hushed] '.length,
+    )
+  })
+
   it('has no lines in a project without dialog', async () => {
     const root = tempRepo({ 'audio-studio.json': project(models) })
     const view = await modelsView(join(root, 'audio-studio.json'))

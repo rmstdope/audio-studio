@@ -335,4 +335,45 @@ describe('cues inside a line', () => {
     })
     expect(cuesAt(root)).toBe('{\n  "a": "[old] I did it. [a] I will fix it."\n}\n')
   })
+
+  it('refuses a cue with brackets inside it, and one on a line whose own words have brackets', async () => {
+    const root = tempRepo({
+      ...inside,
+      'tts/act1/script.json': [
+        { key: 'a', speaker: 'mira', text: 'I did it. I will fix it.' },
+        { key: 'b', speaker: 'mira', text: '[E] to open the door' },
+      ],
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    const text = 'I did it. I will fix it.'
+    await setInsideCue(projectFile, 'act1', 'a', { at: 2, cue: '[keep]', text })
+    for (const cue of ['very [sad] slowly', 'sad]']) {
+      expect(await setInsideCue(projectFile, 'act1', 'a', { at: 3, cue, text })).toMatchObject({
+        ok: false,
+      })
+    }
+    expect(cuesAt(root)).toBe('{\n  "a": "I did [keep] it. I will fix it."\n}\n')
+    expect(
+      await setInsideCue(projectFile, 'act1', 'b', {
+        at: 1,
+        cue: '[x]',
+        text: '[E] to open the door',
+      }),
+    ).toMatchObject({ ok: false })
+  })
+
+  it('keeps the free text of an opening cue when the words changed and a cue is placed again', async () => {
+    const root = tempRepo(inside)
+    const projectFile = join(root, 'audio-studio.json')
+    writeFileSync(
+      join(root, 'tts/act1/cues.json'),
+      '{\n  "a": "[sad] very slowly I did it. [x] I will mend it."\n}\n',
+    )
+    await setInsideCue(projectFile, 'act1', 'a', {
+      at: 3,
+      cue: '[a]',
+      text: 'I did it. I will fix it.',
+    })
+    expect(cuesAt(root)).toBe('{\n  "a": "[sad] very slowly I did it. [a] I will fix it."\n}\n')
+  })
 })

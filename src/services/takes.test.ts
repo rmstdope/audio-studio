@@ -282,6 +282,25 @@ describe('tryLine', () => {
     expect(requests).toHaveLength(1)
   })
 
+  it('keeps the saved cues inside when only the opening cue is tried', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+      'tts/act1/cues.json': { a: 'Come [low] here now.' },
+    })
+    const { fish } = fakeFish()
+    const result = await tryLine(
+      projectFileOf(root),
+      'act1',
+      'a',
+      '[soft]',
+      async () => fish,
+      createLimiter(),
+    )
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.spoken).toBe('[soft] Come [low] here now.')
+  })
+
   it('refuses a gap that is not between two words', async () => {
     const root = tempRepo(files)
     const { fish } = fakeFish()

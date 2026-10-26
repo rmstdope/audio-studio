@@ -52,6 +52,26 @@ describe('parseCued', () => {
   })
 })
 
+describe('parseCued, an entry that does not fit', () => {
+  it('keeps the free text of the opening cue', () => {
+    const entry = '[sad] very slowly I did it. [x] I will mend it.'
+    expect(parseCued(entry, TEXT)).toEqual({
+      opening: '[sad] very slowly',
+      inside: [],
+      stale: entry,
+    })
+  })
+
+  it('keeps a plain cue with a bracket after free text, whose words are not the line’s', () => {
+    expect(parseCued('[sad] very slowly [break]', TEXT)).toEqual({
+      opening: '[sad] very slowly [break]',
+      inside: [],
+      stale: null,
+    })
+    expect(parseCued('softly [pause]', TEXT).stale).toBeNull()
+  })
+})
+
 describe('composeCued', () => {
   it('gives the opening cue alone when nothing is inside', () => {
     expect(composeCued('[a]', [], TEXT)).toBe('[a]')

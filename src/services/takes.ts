@@ -15,7 +15,7 @@ import type { ProjectSummary } from '../core/summary'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
 import { normalizeCue, withInside, wordsOf } from '../core/cued'
 import { clipInputs } from '../core/fingerprint'
-import { spokenPieces, spokenText } from '../core/spoken'
+import { spokenPieces } from '../core/spoken'
 import type { FishFactory } from './auditions'
 import { writeAtomic } from './files'
 import type { Limiter } from './limit'
@@ -141,7 +141,15 @@ export async function tryLine(
   let spoken: string
   if (at === undefined) {
     const tried = cue.trim() || cueFor(read.sourceCues, key) || (character.style ?? '')
-    spoken = spokenText(line.text, tried, cast.pronounce)
+    // The line's saved cues inside stay: it is heard as it would be recorded with this opening.
+    const { inside } = clipInputs(
+      line,
+      character,
+      read.input.cues,
+      cast.pronounce,
+      read.project.narration,
+    )!
+    spoken = spokenPieces(line.text, tried, cast.pronounce, Infinity, inside)[0]!
   } else {
     // A cue tried inside the line: its opening and the cues saved inside stay, the typed cue is
     // added at the gap (replacing the one there; empty: without it), the whole line in one request.

@@ -1,6 +1,7 @@
 import { dirname } from 'node:path'
 import {
   WORDS_CHANGED,
+  composeChecked,
   composeCued,
   normalizeCue,
   parseCued,
@@ -77,7 +78,10 @@ export async function setInsideCue(
     }
     const current = entries.find(([k]) => k === key)?.[1]
     const parsed = parseCued(current ?? '', words)
-    const next = composeCued(parsed.opening, withInside(parsed.inside, change.at, cue), words)
+    const next = composeChecked(parsed.opening, withInside(parsed.inside, change.at, cue), words)
+    if (next === null) {
+      return refuse('this cue cannot go in this line: brackets inside a cue or in the line’s words')
+    }
     if (current === undefined ? !next : current === next) return { entries }
     return { entries: replaceEntry(entries, key, next) }
   })

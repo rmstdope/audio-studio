@@ -179,7 +179,7 @@ function CueBox({
   const save = useSetInsideCue(partId, language)
   const hear = useTryCue(partId, language)
   const [draft, setDraft] = useState(placed ?? '')
-  const tryId = `try/${line.key}`
+  const tryId = `try/${line.key}/${at}`
   const heard = hear.data?.ok ? hear.data : null
   const refused = hear.data && !hear.data.ok ? hear.data : null
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []

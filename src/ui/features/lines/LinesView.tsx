@@ -439,7 +439,8 @@ export function LinesView({
                           <span className="line-gap">No {active.name} text for this line yet.</span>
                         ) : (
                           <LineWords
-                            key={`${asked ?? ''}/${line.key}`}
+                            // A new filter or search closes an open box: nothing unsaved survives it.
+                            key={`${asked ?? ''}/${line.key}/${filter}/${speaker}/${search}`}
                             partId={loaded.id}
                             line={line}
                             language={asked}

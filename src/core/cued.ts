@@ -57,7 +57,19 @@ export function parseCued(entry: string, text: string): ParsedCue {
     const inside = insideOf(body)
     if (inside) return { opening: entry.slice(0, start).trim(), inside, stale: null }
   }
-  return { opening: leading.trim(), inside: [], stale: entry }
+  // Not the line's words. An entry that shares most of them is the line's earlier cued text; one
+  // that does not is a plain opening cue that happens to have a bracket after some words.
+  const own = new Set(wordsOf(text))
+  const shared = wordsOf(entry.replace(GROUP, ' ')).filter((w) => own.has(w))
+  if (shared.length * 2 < own.size) return { opening: entry.trim(), inside: [], stale: null }
+  const first = wordsOf(text)[0]
+  const at =
+    first === undefined ? -1 : entry.search(new RegExp(`(?<=^|\\s)${escaped(first)}(?=\\s|$)`))
+  return { opening: (at < 0 ? leading : entry.slice(0, at)).trim(), inside: [], stale: entry }
+}
+
+function escaped(word: string): string {
+  return word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /** The cues in cued words, or null for one after the last word. Cues of one gap are one cue. */
@@ -75,6 +87,24 @@ function insideOf(body: string): InsideCue[] | null {
     }
   }
   return pending ? null : inside
+}
+
+/** Whether `cue` can sit between words: one bracket group, with no brackets inside it. */
+export function isCue(cue: string): boolean {
+  return /^\[[^[\]]*\]$/.test(cue)
+}
+
+/**
+ * The entry to save for a line's opening cue and cues inside, or null when it would not read back
+ * as the same cues (a bracket in a cue, or in the line's own words).
+ */
+export function composeChecked(opening: string, inside: InsideCue[], text: string): string | null {
+  const entry = composeCued(opening, inside, text)
+  if (!inside.every((c) => isCue(c.cue))) return null
+  const back = parseCued(entry, text)
+  return back.stale === null && JSON.stringify(back.inside) === JSON.stringify(inside)
+    ? entry
+    : null
 }
 
 /** The entry to save: the opening cue, then the words with each inside cue before its word. */
