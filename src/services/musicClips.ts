@@ -140,6 +140,45 @@ export async function commitChoice({
   }
 }
 
+/**
+ * Takes the chosen take back: in the project's choice turn, once the manifest and lock could be
+ * read, the track's manifest entry, then its music file, then its lock entry last, so a failure
+ * part-way leaves the track chosen and the same click can be pressed again (as removing an
+ * orphan). A track with no lock entry is refused; the caller has asked the user.
+ */
+export async function uncommitChoice({
+  root,
+  projectFile = root,
+  music,
+  id,
+}: {
+  root: string
+  /** What names the project in the queue; the root by default. */
+  projectFile?: string
+  music: MusicConfig
+  id: string
+}): Promise<CommitResult> {
+  try {
+    return await choices().run(`music-choice\0${projectFile}`, async (): Promise<CommitResult> => {
+      const found: Problem[] = []
+      const manifest = await manifestNow(root, music, found)
+      const lock = await lockNow(root, music, found)
+      if (!manifest || !lock) return { ok: false, file: found[0]!.file, problems: found }
+      if (!(id in lock)) return { ok: false, message: 'No take is chosen for this track.' }
+      if (id in manifest) {
+        delete manifest[id]
+        await writeAtomic(root, music.paths.manifest, `${pythonJson(sorted(manifest))}\n`)
+      }
+      await rm(resolveInRoot(root, join(music.paths.clips, `${id}.mp3`)), { force: true })
+      delete lock[id]
+      await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
+      return { ok: true }
+    })
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 export function sorted<T>(record: Record<string, T>): Record<string, T> {
   return Object.fromEntries(
     Object.keys(record)

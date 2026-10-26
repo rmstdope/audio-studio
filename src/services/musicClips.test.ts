@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { MUSIC_MODEL, type BoardTake } from '../core/musicTake'
 import { ProjectSchema } from '../core/project'
 import type { Encoder, EncodeOptions } from './audio'
-import { commitChoice, readChosen } from './musicClips'
+import { commitChoice, readChosen, uncommitChoice } from './musicClips'
 
 const music = {
   paths: {
@@ -198,5 +198,69 @@ describe('readChosen', () => {
     const problems: { file: string }[] = []
     expect(await readChosen(broken, config, problems as never)).toEqual({})
     expect(problems[0]?.file).toBe('music/music.lock.json')
+  })
+})
+
+describe('uncommitChoice', () => {
+  /** A project with `hall` and `cave` chosen. */
+  async function chosen() {
+    const root = tempRepo({})
+    const { encode } = fakeEncoder()
+    for (const id of ['hall', 'cave']) {
+      await commitChoice({
+        root,
+        music: config,
+        id,
+        listId: 'act1',
+        take: take(1),
+        wav: new Uint8Array(4),
+        encode,
+        now: () => at,
+      })
+    }
+    return root
+  }
+  const readJson = (root: string, file: string) =>
+    JSON.parse(readFileSync(join(root, file), 'utf8')) as Record<string, unknown>
+
+  it('deletes the track’s clip, manifest entry and lock entry, and no other track’s', async () => {
+    const root = await chosen()
+    expect(await uncommitChoice({ root, music: config, id: 'hall' })).toEqual({ ok: true })
+    expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(false)
+    expect(Object.keys(readJson(root, 'audio/music/manifest.json'))).toEqual(['cave'])
+    expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave'])
+    expect(existsSync(join(root, 'audio/music/cave.mp3'))).toBe(true)
+  })
+
+  it('can be done again when the clip is already gone', async () => {
+    const root = await chosen()
+    rmSync(join(root, 'audio/music/hall.mp3'))
+    expect(await uncommitChoice({ root, music: config, id: 'hall' })).toEqual({ ok: true })
+    expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave'])
+  })
+
+  it('refuses a track with no chosen take, changing nothing', async () => {
+    const root = await chosen()
+    const result = await uncommitChoice({ root, music: config, id: 'nobody' })
+    expect(result).toEqual({ ok: false, message: 'No take is chosen for this track.' })
+    expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave', 'hall'])
+  })
+
+  it('deletes nothing when the lock cannot be read', async () => {
+    const root = await chosen()
+    writeFileSync(join(root, 'music/music.lock.json'), '{ nope')
+    const result = await uncommitChoice({ root, music: config, id: 'hall' })
+    expect(result.ok).toBe(false)
+    expect('problems' in result).toBe(true)
+    expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
+  })
+
+  it('deletes nothing when the manifest cannot be read', async () => {
+    const root = await chosen()
+    writeFileSync(join(root, 'audio/music/manifest.json'), '{ nope')
+    const result = await uncommitChoice({ root, music: config, id: 'hall' })
+    expect('problems' in result).toBe(true)
+    expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
+    expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave', 'hall'])
   })
 })
