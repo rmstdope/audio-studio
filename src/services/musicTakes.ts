@@ -18,6 +18,7 @@ import {
 } from '../core/musicTake'
 import { trackFor, type TrackRow } from '../core/music'
 import type { Problem } from '../core/project'
+import { resolveInRoot } from '../core/paths'
 import { readWav } from '../core/wav'
 import { readResource, writeAtomic } from './files'
 import { gpuQueue, GPU } from './gpu'
@@ -35,7 +36,7 @@ export const EXPECTED_TAKE_SECONDS = 180
 /** Where a track's board is saved: one file per track (a track id is a safe file name). */
 export const MUSIC_BOARD_DIR = '.audio-studio/music'
 
-/** A track id that is safe as a file and folder name. */
+/** A track id that is safe as a file and folder name (the game's list is validated too; this guards the board's path on its own). */
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
 /** How many bars a take's waveform has. */
@@ -191,8 +192,11 @@ export function createMusicTakes({
     return boards.run(`${projectFile}\0${found.id}`, async () => {
       const board = await readBoard(found.root, found.board)
       if ('ok' in board) return board
+      const before = JSON.stringify(board, null, 2)
       const answer = change(board)
-      await writeAtomic(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
+      const after = JSON.stringify(board, null, 2)
+      // Nothing changed (a drop of a take that is not there): nothing is written.
+      if (after !== before) await writeAtomic(found.root, found.board, `${after}\n`)
       return answer
     })
   }
@@ -241,7 +245,7 @@ export function createMusicTakes({
     }
   }
 
-  /** The tracks' entries of a project: waiting, being made, or failed. */
+  /** A track's entries: waiting, being made, or failed. */
   const entriesOf = (projectFile: string, id: string) =>
     [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])].sort((a, b) => a.n - b.n)
 
@@ -338,11 +342,10 @@ export function createMusicTakes({
     async stop(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
-      const entries = active.get(`${projectFile}\0${id}`)
       let stopped = 0
-      for (const entry of entriesOf(projectFile, id)) {
+      for (const [n, entry] of active.get(`${projectFile}\0${id}`) ?? []) {
         if (entry.state !== 'waiting') continue
-        entries?.delete(entry.n)
+        active.get(`${projectFile}\0${id}`)?.delete(n)
         stopped++
       }
       return { ok: true, stopped }
@@ -358,7 +361,7 @@ export function createMusicTakes({
       })
       if (dropped && 'ok' in dropped) return dropped
       if (!dropped) return { ok: false, message: 'That take is not on the board.' }
-      await rm(join(found.root, found.folder, fileOf(dropped)), { force: true })
+      await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(dropped)}`), { force: true })
       return { ok: true }
     },
 

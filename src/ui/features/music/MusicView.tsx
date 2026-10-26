@@ -160,11 +160,9 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
                   </td>
                   <td>{clock(track.seconds)}</td>
                   <td>
-                    {making[track.id] ? (
-                      <span className="chip">{makingStatusText(making[track.id]!)}</span>
-                    ) : (
-                      <span className="chip">not chosen</span>
-                    )}
+                    <span className="chip">
+                      {making[track.id] ? makingStatusText(making[track.id]!) : 'not chosen'}
+                    </span>
                   </td>
                 </tr>
               ))}

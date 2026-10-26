@@ -122,6 +122,7 @@ export function TakesPanel({ trackId }: { trackId: string }) {
           </div>
         )}
         <Failure title="The takes could not be made" result={result} />
+        {stop.isError && <span className="adopt-error">{stop.error.message}</span>}
         {make.isError && <span className="adopt-error">{make.error.message}</span>}
       </section>
     </>
@@ -192,6 +193,15 @@ function TakeCard({
           Drop
         </button>
       </div>
+      {(drop.isError || (drop.data && !drop.data.ok)) && (
+        <span className="adopt-error">
+          {drop.isError
+            ? drop.error.message
+            : drop.data && 'message' in drop.data
+              ? drop.data.message
+              : 'The take could not be dropped.'}
+        </span>
+      )}
     </div>
   )
 }

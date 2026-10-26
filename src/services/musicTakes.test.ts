@@ -195,8 +195,8 @@ describe('createMusicTakes', () => {
     expect(await takes.view(file, 'hall')).toMatchObject({ takes: [{ n: second!.n }] })
   })
 
-  it('refuses to drop what is not on the board, and an unknown track', async () => {
-    const { file, takes } = setup()
+  it('refuses to drop what is not on the board, and an unknown track, writing nothing', async () => {
+    const { root, file, takes } = setup()
     expect(await takes.drop(file, 'hall', 'aaaaaaaaaaaaaaaa.1.wav')).toEqual({
       ok: false,
       message: 'That take is not on the board.',
@@ -206,6 +206,7 @@ describe('createMusicTakes', () => {
       message: 'That take is not on the board.',
     })
     expect(await takes.drop(file, 'nope', 'aaaaaaaaaaaaaaaa.1.wav')).toBeNull()
+    expect(existsSync(join(root, '.audio-studio/music/hall.json'))).toBe(false)
   })
 
   it('stops the takes still waiting; the one under way finishes and is kept', async () => {
