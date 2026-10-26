@@ -23,12 +23,17 @@ const music = {
 }
 
 /** A generator that makes a tone as long as asked (at 1000 Hz), and fails for a brief saying "fail". */
-function fakeGenerator(ready: MusicReady = { ok: true }, failOn: number[] = []) {
+function fakeGenerator(
+  ready: MusicReady = { ok: true },
+  failOn: number[] = [],
+  gate?: Promise<void>,
+) {
   const requests: MusicRequest[] = []
   const generator: MusicGenerator = {
     ready: () => ready,
     async generate(request) {
       requests.push(request)
+      await gate
       if (failOn.includes(requests.length - 1) || request.brief.includes('fail'))
         throw new Error('The music generator: out of memory')
       const samples = new Int16Array(request.seconds * 1000)
@@ -41,7 +46,12 @@ function fakeGenerator(ready: MusicReady = { ok: true }, failOn: number[] = []) 
   return { generator, requests }
 }
 
-function setup(ready?: MusicReady, extra: Record<string, unknown> = {}, failOn: number[] = []) {
+function setup(
+  ready?: MusicReady,
+  extra: Record<string, unknown> = {},
+  failOn: number[] = [],
+  gate?: Promise<void>,
+) {
   const root = tempRepo({
     'audio-studio.json': projectJson({ music }),
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
@@ -49,7 +59,7 @@ function setup(ready?: MusicReady, extra: Record<string, unknown> = {}, failOn: 
     ...extra,
   })
   const file = join(root, 'audio-studio.json')
-  const { generator, requests } = fakeGenerator(ready, failOn)
+  const { generator, requests } = fakeGenerator(ready, failOn, gate)
   let seed = 100
   const encode: Encoder = async (_wav, out) => {
     mkdirSync(dirname(out), { recursive: true })
@@ -93,7 +103,14 @@ describe('createMusicTakes', () => {
   })
 
   it('shows a take being made and the next waiting, in turn', async () => {
-    const { file, takes } = setup()
+    // The generator waits for the test, so what is seen does not depend on how fast the queue runs.
+    let release = () => {}
+    const { file, takes, settled } = setup(
+      undefined,
+      {},
+      [],
+      new Promise<void>((resolve) => (release = resolve)),
+    )
     await takes.make(file, 'hall', { count: 2 })
     const view = await takes.view(file, 'hall')
     if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
@@ -101,6 +118,8 @@ describe('createMusicTakes', () => {
       [1, 'making'],
       [2, 'waiting'],
     ])
+    release()
+    await settled('hall')
   })
 
   it('cuts a stinger at its own length', async () => {
