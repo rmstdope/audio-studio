@@ -273,11 +273,7 @@ describe('Un-choose', () => {
   })
 
   it('says why, with focus on the block, when refused for a lock that cannot be read', async () => {
-    const refusal = {
-      ok: false,
-      file: 'music/music.lock.json',
-      problems: [{ file: 'music/music.lock.json', path: '', message: 'not valid JSON' }],
-    }
+    const refusal = { ok: false, message: 'The music lock could not be read.' }
     let answerNow = () => {}
     globalThis.fetch = (async (_url: unknown, _init?: RequestInit) => {
       await new Promise<void>((resolve) => (answerNow = resolve))
@@ -299,6 +295,16 @@ describe('Un-choose', () => {
       'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',
     )
     expect(document.activeElement).toBe(block)
+  })
+
+  it('names the file of a refusal that carries no message, never the lock', async () => {
+    answer = { ok: false, file: 'audio-studio.json', problems: [] }
+    const page = chosen()
+    await click(page.button('Un-choose'))
+    await click(page.button('Un-choose'))
+    expect(page.block()!.textContent).toContain(
+      'Take 3 could not be un-chosen: audio-studio.json could not be read. Nothing was changed.',
+    )
   })
 
   it('names the music manifest when it is the file that could not be read', async () => {
