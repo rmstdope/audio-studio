@@ -16,7 +16,11 @@ describe('playsText', () => {
   })
 
   it('names the game’s file and puts the file name beneath', () => {
-    expect(playsText(game())).toEqual({ lead: "The game's file", file: 'forest-walk.mp3' })
+    expect(playsText(game())).toEqual({
+      lead: "The game's file",
+      file: 'forest-walk.mp3',
+      path: 'web/public/audio/forest-walk.mp3',
+    })
   })
 
   it('says a missing file is not there, for a take and for the game’s file', () => {
@@ -24,6 +28,7 @@ describe('playsText', () => {
     expect(playsText(game(false))).toEqual({
       lead: "The game's file",
       file: 'forest-walk.mp3',
+      path: 'web/public/audio/forest-walk.mp3',
       missing: 'The file is not there.',
     })
   })

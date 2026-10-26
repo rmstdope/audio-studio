@@ -9,6 +9,8 @@ export interface PlaysText {
   lead: string
   /** The game's file name, in small grey monospace beneath. */
   file?: string
+  /** The file's full path as the game's list gives it, for a tooltip. */
+  path?: string
   /** Red, beneath the file name: the file was not there when the page loaded. */
   missing?: string
   /** Red, beneath the file name: the last press of play failed. */
@@ -35,7 +37,7 @@ export function playsText(current: CurrentMusic, failed?: PlayFailure): PlaysTex
     current.kind === 'take'
       ? { lead: `Take ${current.take}` }
       : current.kind === 'game'
-        ? { lead: "The game's file", file: fileName(current.file) }
+        ? { lead: "The game's file", file: fileName(current.file), path: current.file }
         : { lead: 'Nothing to play yet', faint: true }
   if (current.kind !== 'none' && !current.exists) text.missing = NOT_THERE
   if (failed) text.failure = FAILURE[failed]

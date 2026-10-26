@@ -110,6 +110,7 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
   const player = useClipPlayer((id) => {
     void whyFailed(currentUrl(id)).then((why) => setFailed((was) => ({ ...was, [id]: why })))
   })
+  const playing = player.playing
   const press = (id: string) => {
     setFailed(({ [id]: _, ...rest }) => rest)
     player.toggle(id, currentUrl(id))
@@ -155,14 +156,13 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
             </thead>
             <tbody>
               {list.tracks.map((track) => {
-                const playing = player.playing
                 return (
                   <tr key={track.id}>
                     <td className="music-play">
                       <button
                         className={playing === track.id ? 'icon-btn music-stop' : 'icon-btn'}
                         type="button"
-                        disabled={!canPlay(track.current)}
+                        disabled={!canPlay(track.current) && playing !== track.id}
                         aria-label={playLabel(track.title, track.current, playing === track.id)}
                         onClick={() => press(track.id)}
                       >
@@ -293,7 +293,11 @@ function PlaysCell({ text }: { text: ReturnType<typeof playsText> }) {
   return (
     <td className="music-plays">
       <span className={text.faint ? 'music-plays-none' : undefined}>{text.lead}</span>
-      {text.file && <div className="mono muted music-id">{text.file}</div>}
+      {text.file && (
+        <div className="mono muted music-id" title={text.path}>
+          {text.file}
+        </div>
+      )}
       {text.missing && <div className="music-plays-err">{text.missing}</div>}
       {text.failure && (
         <div className="music-plays-err" role="status">

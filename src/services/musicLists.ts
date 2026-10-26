@@ -8,7 +8,8 @@ import {
   type MusicListState,
   type MusicSummary,
 } from '../core/music'
-import { lstat } from 'node:fs/promises'
+import { lstat, realpath } from 'node:fs/promises'
+import { relative, isAbsolute } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 import { partPathFor, type Problem, type Project } from '../core/project'
 import { readResource } from './files'
@@ -81,7 +82,10 @@ export async function readList(
 export async function gameFilePath(root: string, file: string): Promise<string | null> {
   try {
     const full = resolveInRoot(root, file)
-    return (await lstat(full)).isFile() ? full : null
+    if (!(await lstat(full)).isFile()) return null
+    // A linked folder on the way must not lead out of the root.
+    const real = relative(await realpath(root), await realpath(full))
+    return real.startsWith('..') || isAbsolute(real) ? null : full
   } catch {
     return null
   }

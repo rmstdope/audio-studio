@@ -23,7 +23,8 @@ export interface PlayerState {
  * fails is skipped). The element's `ended` and `error` events are passed on as `ended()` and
  * `failed()`. A failure can be told twice (the error event, then the rejected `play()`); each
  * play has a token, and only the play still current is acted on, so a clip is skipped once and a
- * play replaced meanwhile is let be. `onChange` hears every change of state, `onFailed` the id of each clip that failed; `dispose` ends it.
+ * play replaced meanwhile is let be. `onChange` hears every change of state, `onFailed` the id of
+ * each clip that failed; `dispose` ends it.
  */
 export function createPlayer(
   element: AudioLike,
