@@ -42,9 +42,21 @@ export function InTheGame({
   const unchoose = useUnchooseTake(track.id)
   const choose = useChooseTake(track.id)
   const [asking, setAsking] = useState(false)
+  // The take the question was about: a refusal is still named after the page re-reads and the
+  // block no longer knows it (a music lock that cannot be read). The line is shown under a chosen
+  // take or that unknown block only: a re-read that finds the game's own file or nothing means the
+  // take is no longer chosen, so a refusal to un-choose it says nothing true.
+  const [asked, setAsked] = useState<number | null>(null)
   const opener = useRef<HTMLButtonElement | null>(null)
   const block = useRef<HTMLElement | null>(null)
-  const refocus = useFocusWhenClosed(asking, opener)
+  // Back to the block's Un-choose, or to the block when a re-read has taken that away (a refusal
+  // for a music lock that cannot be read leaves the block not knowing which take plays).
+  const back = useRef({
+    get current() {
+      return opener.current ?? block.current
+    },
+  }).current
+  const refocus = useFocusWhenClosed(asking, back)
   const focusBlock = useFocusWhenClosed(asking, block)
 
   if (asking && state.kind === 'take') {
@@ -95,9 +107,11 @@ export function InTheGame({
 
   const failed = unchoose.data && !unchoose.data.ok ? unchoose.data : null
   const failedLine =
-    state.kind === 'take' && (failed || unchoose.isError)
+    asked !== null &&
+    (state.kind === 'take' || state.kind === 'unknown') &&
+    (failed || unchoose.isError)
       ? unchooseFailure(
-          state.take,
+          asked,
           failed && 'message' in failed
             ? failed.message.replace(/\.$/, '')
             : unchoose.isError && !failed
@@ -131,6 +145,7 @@ export function InTheGame({
         {label}
         <b>The music lock could not be read</b>
         {hint}
+        {failedLine && <span className="adopt-error">{failedLine}</span>}
       </section>
     )
 
@@ -186,6 +201,7 @@ export function InTheGame({
           disabled={unchoose.isPending}
           onClick={() => {
             unchoose.reset()
+            setAsked(state.take)
             setAsking(true)
           }}
         >

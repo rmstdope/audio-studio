@@ -82,15 +82,17 @@ function render(track: TrackRow, takes: TakeView[]) {
     act(() => root.unmount())
     container.remove()
   })
-  act(() =>
-    root.render(
-      createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track })),
-    ),
-  )
+  const show = (track: TrackRow) =>
+    act(() =>
+      root.render(
+        createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track })),
+      ),
+    )
+  show(track)
   const button = (name: string) =>
     [...container.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === name)
   const block = () => container.querySelector('[aria-label="In the game"]')
-  return { container, button, block }
+  return { container, button, block, rerender: show }
 }
 
 async function click(button: HTMLButtonElement | undefined) {
@@ -268,5 +270,34 @@ describe('Un-choose', () => {
     expect(block.textContent).toContain(
       'Take 3 could not be un-chosen: the disk is full. Nothing was changed.',
     )
+  })
+
+  it('says why, with focus on the block, when refused for a lock that cannot be read', async () => {
+    const refusal = {
+      ok: false,
+      file: 'music/music.lock.json',
+      problems: [{ file: 'music/music.lock.json', path: '', message: 'not valid JSON' }],
+    }
+    let answerNow = () => {}
+    globalThis.fetch = (async (_url: unknown, _init?: RequestInit) => {
+      await new Promise<void>((resolve) => (answerNow = resolve))
+      return new Response(JSON.stringify(refusal), { status: 409 })
+    }) as typeof fetch
+    const page = chosen()
+    await click(page.button('Un-choose'))
+    await click(page.button('Un-choose'))
+    // The page re-reads the project before the question closes: with the lock unreadable, what
+    // plays is not known, and the block has no Un-choose to give focus back to.
+    page.rerender(row({ status: 'not-chosen', chosenAt: null, current: { kind: 'unknown' } }))
+    await act(async () => {
+      answerNow()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    const block = page.block()!
+    expect(block.textContent).toContain('The music lock could not be read')
+    expect(block.textContent).toContain(
+      'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',
+    )
+    expect(document.activeElement).toBe(block)
   })
 })
