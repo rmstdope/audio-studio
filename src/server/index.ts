@@ -30,7 +30,7 @@ import { gitChanges } from '../services/git'
 import { setTrackBrief } from '../services/briefs'
 import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
-import { setStageModel, switchRetiredModels } from '../services/models'
+import { setMusicModel, setStageModel, switchRetiredModels } from '../services/models'
 import { modelsView } from '../services/modelsView'
 import type { Busy } from '../core/models'
 import { setFishTier } from '../services/fishTier'
@@ -161,6 +161,9 @@ const ModelsBody = z
 
 /** The stages whose model can be chosen. */
 const StageParam = z.enum(['audition', 'draft', 'final'])
+
+/** The music model the page chose, and the one it showed. */
+const MusicModelBody = z.object({ model: z.string().min(1), was: z.string().min(1) }).strict()
 
 /** The model the page chose for a stage, and the one it showed. */
 const StageModelBody = z.object({ model: z.string().min(1), was: z.string().min(1) }).strict()
@@ -300,8 +303,9 @@ export function startServer({
   transcriber,
   music,
 }: ServerOptions) {
+  const musicGenerator = music ?? sharedMusic()
   const musicTakes = createMusicTakes({
-    generator: music ?? sharedMusic(),
+    generator: musicGenerator,
     ...(encode ? { encode } : {}),
   })
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
@@ -1090,7 +1094,7 @@ export function startServer({
       },
       '/api/models': {
         GET: guard(async () => {
-          const view = await modelsView(projectFile)
+          const view = await modelsView(projectFile, musicGenerator.installed)
           return Response.json(view.ok ? { ...view, busy: await busyNow() } : view)
         }),
         PATCH: fromOwnPage(async (request) => {
@@ -1099,6 +1103,16 @@ export function startServer({
             return Response.json({ error: 'expected { takes }' }, { status: 400 })
           }
           const result = await switchRetiredModels(projectFile, body.data.takes)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/model': {
+        PUT: fromOwnPage(async (request) => {
+          const body = MusicModelBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { model, was }' }, { status: 400 })
+          }
+          const result = await setMusicModel(projectFile, body.data.model, body.data.was)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

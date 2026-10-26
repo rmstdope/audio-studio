@@ -1,13 +1,27 @@
 import { basename } from 'node:path'
 import type { Dialog, Recorded, StageModels } from '../core/models'
+import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS, type MusicModelId } from '../core/musicModels'
 import { planPart } from '../core/planner'
 import { spokenPieces } from '../core/spoken'
 import { openProject, readPart, type ProjectFailure } from './workspace'
 
 /** What the Models panel needs: the models, the whole dialog, and what recorded clips were made with. */
 export type ModelsView =
-  | { ok: true; file: string; models: StageModels; dialog: Dialog; recorded: Recorded }
+  | {
+      ok: true
+      file: string
+      models: StageModels
+      dialog: Dialog
+      recorded: Recorded
+      music: MusicModels | null
+    }
   | ProjectFailure
+
+/** The project's music model, and which models this computer has; null for a project with no music. */
+export interface MusicModels {
+  model: MusicModelId
+  installed: Record<MusicModelId, boolean>
+}
 
 const encoder = new TextEncoder()
 
@@ -17,7 +31,10 @@ const encoder = new TextEncoder()
  * lines and bytes by the model they were made with. A part without a readable dialog counts for
  * nothing; a line not yet translated is not a line.
  */
-export async function modelsView(projectFile: string): Promise<ModelsView> {
+export async function modelsView(
+  projectFile: string,
+  installed: (model: MusicModelId) => boolean,
+): Promise<ModelsView> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
   const { project } = opened
@@ -55,5 +72,13 @@ export async function modelsView(projectFile: string): Promise<ModelsView> {
     models: project.narration.models,
     dialog,
     recorded,
+    music: project.music
+      ? {
+          model: project.music.model ?? DEFAULT_MUSIC_MODEL,
+          installed: Object.fromEntries(
+            MUSIC_MODELS.map(({ id }) => [id, installed(id)]),
+          ) as Record<MusicModelId, boolean>,
+        }
+      : null,
   }
 }
