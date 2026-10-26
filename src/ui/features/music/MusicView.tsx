@@ -1,10 +1,11 @@
 import { trackFor, type MusicListSummary } from '../../../core/music'
 import type { ProjectSummary } from '../../../core/summary'
 import type { RefreshResult, RefreshSharedResult } from '../../../services/refresh'
-import { useRefreshDialog, useRefreshShared } from '../../api'
+import { useMusicMaking, useRefreshDialog, useRefreshShared } from '../../api'
 import { Problems } from '../../components/Problems'
 import { PlayIcon } from '../../components/icons'
 import { clock, shortTitle } from '../../format'
+import { makingStatusText } from '../../musicTakesText'
 import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
 import { routeHref, type MusicRoute } from '../../route'
 import { NoMusic } from './NoMusic'
@@ -90,6 +91,7 @@ function StingersPage({ list }: { list: MusicListSummary }) {
 function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh }) {
   const name = list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)
   const notice = listNotice(list, name)
+  const making = useMusicMaking().data ?? {}
   return (
     <>
       <header className="page-header">
@@ -158,7 +160,9 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
                   </td>
                   <td>{clock(track.seconds)}</td>
                   <td>
-                    <span className="chip">not chosen</span>
+                    <span className="chip">
+                      {making[track.id] ? makingStatusText(making[track.id]!) : 'not chosen'}
+                    </span>
                   </td>
                 </tr>
               ))}

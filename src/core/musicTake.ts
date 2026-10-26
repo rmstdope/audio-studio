@@ -156,6 +156,8 @@ export interface TakeView {
   seed: number
   /** The waveform's bars, 0 to 1. */
   peaks: number[]
+  /** Made from a brief, length, tempo or key the track no longer has. */
+  earlier: boolean
 }
 
 /** A take being made or waiting its turn. */
@@ -183,6 +185,44 @@ export interface MusicTakesView {
   takes: TakeView[]
   making: MakingView[]
   failed: FailedView[]
+}
+
+/** What a take was made from: the track's inputs at the time. */
+export const TakeInputsSchema = z.object({
+  brief: z.string(),
+  kind: z.enum(['loop', 'stinger']),
+  seconds: z.number(),
+  bpm: z.number().nullable(),
+  key: z.string().nullable(),
+})
+
+/** A take on a track's board, saved in `.audio-studio/music/<track>.json`. */
+export const BoardTakeSchema = z.object({
+  n: z.number().int().positive(),
+  /** The hash of its inputs, which with `n` names its WAV. */
+  hash: z.string().regex(/^[0-9a-f]{16}$/),
+  seed: z.number(),
+  seconds: z.number(),
+  peaks: z.array(z.number()),
+  inputs: TakeInputsSchema,
+})
+
+/** A track's board: the takes kept, and the number the next take gets (numbers are never reused). */
+export const MusicBoardSchema = z.object({
+  next: z.number().int().positive(),
+  takes: z.array(BoardTakeSchema),
+})
+
+/** A track's saved board. */
+export type MusicBoard = z.infer<typeof MusicBoardSchema>
+
+/** A take on the board. */
+export type BoardTake = z.infer<typeof BoardTakeSchema>
+
+/** What is being made for a track: how many takes wait or are made, and about how many seconds are left. */
+export interface MakingSummary {
+  takes: number
+  left: number
 }
 
 /** The most takes one click asks for. */

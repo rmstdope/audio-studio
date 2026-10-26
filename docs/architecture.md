@@ -837,7 +837,7 @@ has `refreshDialog`: the same command as Refresh dialog, which brings the act's 
 together, and its summary names the loops added and removed besides the lines. A refresh of an act
 and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
 refresh of the stingers and takes being made for a stinger. A project without a `music` section
-shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel and its Takes panel; the board proper, with Drop, More takes and Choose, is 12.5 and 12.6).
+shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel and its Takes panel; its board: More takes, Stop, Drop, earlier-brief marks; Choose is 12.6).
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
@@ -867,7 +867,10 @@ takes as cards: **More takes** generates two more (about six minutes), made in t
 the page can be left meanwhile; **Drop** removes one (not the chosen one); **Choose** writes one at
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
-`.audio-studio/music/<track>.json` (a track id is a safe file name). A dropped take is just gone:
+`.audio-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed,
+seconds, peaks, inputs }] }`, the take's WAV beside the others in `music-takes/<track>/`. Take
+numbers are per track and never reused (`next` is reserved when takes are asked for), and a take
+is on the board only once its WAV is written. The cache no longer keeps a sidecar file per take. A dropped take is just gone:
 seeds don't come back, so nothing is ruled out.
 
 **Choose** levels the take to −20 LUFS as narration is levelled (`level.py`'s commands; RetroQuest
@@ -952,6 +955,9 @@ GET    /api/credit                               the Fish account's API credit (
 GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish, ACE-Step)
 GET    /api/music/tracks/:id/takes               a track's takes, those being made, failures, and whether takes can be made
 POST   /api/music/tracks/:id/takes               { count } or { retry } queue takes (409 and why if the generator is not ready)
+POST   /api/music/tracks/:id/stop                cancel the takes still waiting; the one being made finishes
+DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
+GET    /api/music/making                         what is being made, by track ({ takes, left seconds }), for the lists' status
 GET    /api/music/tracks/:id/takes/:file         a take's WAV (?seam=1: its seam)
 PATCH  /api/fish-tier                            { tier } the Fish tier (or null) in the project file
 GET    /api/parts/:part?language=                the part in a language (default: the first), every line
@@ -1217,8 +1223,9 @@ Small, independently useful increments:
     4. **Takes** (built): the ACE-Step worker behind `MusicGenerator` (and in the setup checklist), a take
        generated, shaped and cached per click on a track's page, and played, loops around their
        seam too.
-    5. **Board**: a track's takes as cards, More takes (two, in the background), Drop; takes from an
-       earlier brief marked; Stop and Try again; the board saved.
+    5. **Board** (built): a track's takes as cards, More takes (two, in the background), Drop;
+       takes from an earlier brief marked; Stop and Try again; the board saved in
+       `.audio-studio/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
     6. **Choose**: the chosen take levelled, encoded and written with the manifest and lock; each
        track's status on the Music pages; the music files in the Changes panel.
     7. **Orphans**: the clip of a track the game no longer lists removed after confirmation.

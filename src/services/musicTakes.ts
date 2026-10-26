@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readdir, readFile } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
   MUSIC_MODEL,
@@ -7,18 +7,24 @@ import {
   peaks,
   shapeTake,
   wavSeconds,
+  MusicBoardSchema,
+  type BoardTake,
   type FailedView,
+  type MakingSummary,
   type MakingView,
+  type MusicBoard,
   type MusicTakesView,
   type TakeView,
 } from '../core/musicTake'
 import { trackFor, type TrackRow } from '../core/music'
+import type { Problem } from '../core/project'
+import { resolveInRoot } from '../core/paths'
 import { readWav } from '../core/wav'
-import { writeAtomic } from './files'
+import { readResource, writeAtomic } from './files'
 import { gpuQueue, GPU } from './gpu'
 import type { MusicGenerator } from './music'
 import { readMusic } from './musicLists'
-import type { Serial } from './serial'
+import { createSerial, type Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
 /** Where a project's music takes are cached, one folder per track. */
@@ -26,6 +32,12 @@ export const MUSIC_TAKES_DIR = '.audio-studio/music-takes'
 
 /** About how long a take takes, in seconds (§13 decision 5: 2 to 4 minutes), for the progress shown. */
 export const EXPECTED_TAKE_SECONDS = 180
+
+/** Where a track's board is saved: one file per track (a track id is a safe file name). */
+export const MUSIC_BOARD_DIR = '.audio-studio/music'
+
+/** A track id that is safe as a file and folder name (the game's list is validated too; this guards the board's path on its own). */
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
 /** How many bars a take's waveform has. */
 const WAVEFORM_BARS = 120
@@ -38,6 +50,12 @@ export type MakeRequest = { count: number } | { retry: number }
 
 /** What asking for takes answered; null for a track the project does not list. */
 export type MakeResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
+
+/** What dropping a take answered; null for a track the project does not list. */
+export type DropResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
+
+/** What stopping answered: how many waiting takes were cancelled; null for an unknown track. */
+export type StopResult = { ok: true; stopped: number } | ProjectFailure | null
 
 /** A track's takes as the page shows them, a project failure, or null for an unknown track. */
 export type TakesResult = MusicTakesView | ProjectFailure | null
@@ -82,20 +100,30 @@ function describeFailure(error: unknown): string {
 
 /** What the takes of a track are made of. */
 export interface MusicTakes {
-  /** The track's takes of its current inputs, and those being made. */
+  /** The track's board, and those being made. */
   view(projectFile: string, id: string): Promise<TakesResult>
   /** Queues takes on the GPU queue and returns at once; they are made one at a time. */
   make(projectFile: string, id: string, request: MakeRequest): Promise<MakeResult>
+  /** Cancels the takes still waiting; the one being made finishes and is kept. */
+  stop(projectFile: string, id: string): Promise<StopResult>
+  /** Takes a take off the board and deletes its file. */
+  drop(projectFile: string, id: string, name: string): Promise<DropResult>
+  /** What is being made in the project, by track, for the lists' status. */
+  making(projectFile: string): Promise<Record<string, MakingSummary>>
   /** The path of a take's WAV, or null for a track not listed or a name that is not a take's. */
   takeFile(projectFile: string, id: string, name: string): Promise<string | null>
 }
 
+/** A take's file name on the board. */
+const fileOf = (take: Pick<BoardTake, 'hash' | 'n'>) => `${take.hash}.${take.n}.wav`
+
 /**
  * The takes of the game's music: made by `generator` on the GPU `queue` (shared with Whisper),
- * shaped to what the game would play, and cached in `.audio-studio/music-takes/<track>/` as
- * `<hash>.<n>.wav` with its seed and waveform in `<hash>.<n>.json`. Takes waiting, being made and
- * failed are kept in memory, per track, for the page to poll (they survive a `--dev` reload, not a
- * restart); a take made is a file.
+ * shaped to what the game would play, and kept on a board per track in
+ * `.audio-studio/music/<track>.json` (each take with its seed, waveform and the inputs it was made
+ * from), its WAV in `.audio-studio/music-takes/<track>/<hash>.<n>.wav`. Takes waiting, being made
+ * and failed are kept in memory, per track, for the page to poll (they survive a `--dev` reload,
+ * not a restart); a take made is a file and a board entry.
  */
 export function createMusicTakes({
   generator,
@@ -109,10 +137,16 @@ export function createMusicTakes({
   newSeed?: () => number
 }): MusicTakes {
   // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
-  const shared = globalThis as { audioStudioMakingTakes?: Map<string, Map<number, Entry>> }
+  const shared = globalThis as {
+    audioStudioMakingTakes?: Map<string, Map<number, Entry>>
+    audioStudioBoardQueue?: Serial
+  }
   const active = (shared.audioStudioMakingTakes ??= new Map())
+  // Changes to one track's board, one after another: a take finishing and a drop lose neither.
+  const boards = (shared.audioStudioBoardQueue ??= createSerial())
 
   async function resolve(projectFile: string, id: string) {
+    if (!SAFE_ID.test(id)) return null
     const opened = await openProject(projectFile)
     if (!opened.ok) return opened
     const { project } = opened
@@ -129,25 +163,53 @@ export function createMusicTakes({
       bpm: row.bpm,
       key: row.key,
     }
-    return { root, inputs, hash: musicTakeHash(inputs), folder: `${MUSIC_TAKES_DIR}/${id}` }
+    return {
+      root,
+      id,
+      inputs,
+      hash: musicTakeHash(inputs),
+      folder: `${MUSIC_TAKES_DIR}/${id}`,
+      board: `${MUSIC_BOARD_DIR}/${id}.json`,
+    }
+  }
+  type Found = Exclude<Awaited<ReturnType<typeof resolve>>, ProjectFailure | null>
+
+  /** A track's board; an empty one before its first take; the problems if its file is broken. */
+  async function readBoard(root: string, path: string): Promise<MusicBoard | ProjectFailure> {
+    const problems: Problem[] = []
+    const board = await readResource(root, path, MusicBoardSchema, problems)
+    if (board === 'missing') return { next: 1, takes: [] }
+    if (board === 'invalid') return { ok: false, file: path, problems }
+    return board
   }
 
-  /** The numbers of the takes cached for these inputs. */
-  async function made(root: string, folder: string, hash: string): Promise<number[]> {
-    const names = await readdir(join(root, folder)).catch(() => [] as string[])
-    return names.flatMap((name) => {
-      const match = TAKE_FILE.exec(name)
-      return match && match[1] === hash ? [Number(match[2])] : []
+  /** Changes a track's board and saves it; what `change` returns is the answer. */
+  function changeBoard<T>(
+    projectFile: string,
+    found: Found,
+    change: (board: MusicBoard) => T,
+  ): Promise<T | ProjectFailure> {
+    return boards.run(`${projectFile}\0${found.id}`, async () => {
+      const board = await readBoard(found.root, found.board)
+      if ('ok' in board) return board
+      const before = JSON.stringify(board, null, 2)
+      const answer = change(board)
+      const after = JSON.stringify(board, null, 2)
+      // Nothing changed (a drop of a take that is not there): nothing is written.
+      if (after !== before) await writeAtomic(found.root, found.board, `${after}\n`)
+      return answer
     })
   }
 
   async function run(
-    root: string,
-    folder: string,
+    projectFile: string,
+    found: Found,
     entry: Entry,
     inputs: Inputs,
     waiting: Map<number, Entry>,
   ): Promise<void> {
+    // Stopped while it waited: it is no longer in the map.
+    if (waiting.get(entry.n) !== entry || entry.state !== 'waiting') return
     entry.state = 'making'
     entry.startedAt = now()
     try {
@@ -162,14 +224,20 @@ export function createMusicTakes({
       })
       const shaped = shapeTake(take.wav, inputs.kind, inputs.seconds)
       const wav = readWav(shaped)
-      const base = `${folder}/${entry.hash}.${entry.n}`
-      // The details first: a take exists once its WAV does.
-      await writeAtomic(
-        root,
-        `${base}.json`,
-        `${JSON.stringify({ seed: take.seed, seconds: wavSeconds(wav), peaks: peaks(wav, WAVEFORM_BARS) })}\n`,
-      )
-      await writeAtomic(root, `${base}.wav`, shaped)
+      const made: BoardTake = {
+        n: entry.n,
+        hash: entry.hash,
+        seed: take.seed,
+        seconds: wavSeconds(wav),
+        peaks: peaks(wav, WAVEFORM_BARS),
+        inputs,
+      }
+      // The file first: a take is on the board only once its WAV is there.
+      await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, shaped)
+      const saved = await changeBoard(projectFile, found, (board) => {
+        board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort((a, b) => a.n - b.n)
+      })
+      if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       waiting.delete(entry.n)
     } catch (error) {
       entry.state = 'failed'
@@ -177,31 +245,31 @@ export function createMusicTakes({
     }
   }
 
+  /** A track's entries: waiting, being made, or failed. */
+  const entriesOf = (projectFile: string, id: string) =>
+    [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])].sort((a, b) => a.n - b.n)
+
   return {
     async view(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       const { root, inputs, hash, folder } = found
-      // The entries first: one is dropped only after its files are written, so a take is then
-      // in the list read after, never in neither.
-      const entries = [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])]
-        .filter((entry) => entry.hash === hash)
-        .sort((a, b) => a.n - b.n)
+      // The entries first: one is dropped only after the board has it, so a take is then in the
+      // board read after, never in neither.
+      const entries = entriesOf(projectFile, id)
+      const board = await readBoard(root, found.board)
+      if ('ok' in board) return board
       const takes: TakeView[] = []
-      for (const n of (await made(root, folder, hash)).sort((a, b) => a - b)) {
-        const base = `${hash}.${n}`
-        try {
-          const details = JSON.parse(await readFile(join(root, folder, `${base}.json`), 'utf8'))
-          takes.push({
-            n,
-            file: `${base}.wav`,
-            seconds: details.seconds,
-            seed: details.seed,
-            peaks: details.peaks,
-          })
-        } catch {
-          // A take without readable details is not shown; the files stay for a person to see.
-        }
+      for (const take of board.takes) {
+        if (!(await Bun.file(join(root, folder, fileOf(take))).exists())) continue
+        takes.push({
+          n: take.n,
+          file: fileOf(take),
+          seconds: take.seconds,
+          seed: take.seed,
+          peaks: take.peaks,
+          earlier: take.hash !== hash,
+        })
       }
       const making: MakingView[] = entries
         .filter((entry) => entry.state !== 'failed' && !takes.some((take) => take.n === entry.n))
@@ -211,7 +279,7 @@ export function createMusicTakes({
           elapsed: entry.state === 'making' ? Math.max(0, (now() - entry.startedAt) / 1000) : 0,
         }))
       const failed: FailedView[] = entries
-        .filter((entry) => entry.state === 'failed')
+        .filter((entry) => entry.state === 'failed' && entry.hash === hash)
         .map((entry) => ({ n: entry.n, message: entry.message }))
       return {
         ok: true,
@@ -229,7 +297,7 @@ export function createMusicTakes({
       if (!found || !('inputs' in found)) return found
       const ready = generator.ready()
       if (!ready.ok) return { ok: false, message: ready.message }
-      const { root, inputs, hash, folder } = found
+      const { inputs, hash } = found
       const key = `${projectFile}\0${id}`
       const entries = active.get(key) ?? new Map<number, Entry>()
       active.set(key, entries)
@@ -245,21 +313,76 @@ export function createMusicTakes({
         failed.state = 'waiting'
         queued.push(failed)
       } else {
-        let next = Math.max(
-          0,
-          ...(await made(root, folder, hash)),
-          ...[...entries.values()].filter((e) => e.hash === hash).map((e) => e.n),
-        )
+        // The numbers are reserved on the board at once, so none is used twice, even by a take
+        // that fails or is stopped.
+        const reserved = await changeBoard(projectFile, found, (board) => {
+          const first = Math.max(board.next, ...[...entries.values()].map((entry) => entry.n + 1))
+          board.next = first + request.count
+          return first
+        })
+        if (typeof reserved !== 'number') return reserved
         for (let i = 0; i < request.count; i++) {
-          const entry: Entry = { n: ++next, state: 'waiting', startedAt: 0, message: '', hash }
+          const entry: Entry = {
+            n: reserved + i,
+            state: 'waiting',
+            startedAt: 0,
+            message: '',
+            hash,
+          }
           entries.set(entry.n, entry)
           queued.push(entry)
         }
       }
       for (const entry of queued) {
-        void queue.run(GPU, () => run(root, folder, entry, inputs, entries))
+        void queue.run(GPU, () => run(projectFile, found, entry, inputs, entries))
       }
       return { ok: true }
+    },
+
+    async stop(projectFile, id) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      let stopped = 0
+      for (const [n, entry] of active.get(`${projectFile}\0${id}`) ?? []) {
+        if (entry.state !== 'waiting') continue
+        active.get(`${projectFile}\0${id}`)?.delete(n)
+        stopped++
+      }
+      return { ok: true, stopped }
+    },
+
+    async drop(projectFile, id, name) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      const dropped = await changeBoard(projectFile, found, (board) => {
+        const take = board.takes.find((t) => fileOf(t) === name)
+        if (take) board.takes = board.takes.filter((t) => t !== take)
+        return take
+      })
+      if (dropped && 'ok' in dropped) return dropped
+      if (!dropped) return { ok: false, message: 'That take is not on the board.' }
+      await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(dropped)}`), { force: true })
+      return { ok: true }
+    },
+
+    async making(projectFile) {
+      const summary: Record<string, MakingSummary> = {}
+      const prefix = `${projectFile}\0`
+      for (const [key, entries] of active) {
+        if (!key.startsWith(prefix)) continue
+        let takes = 0
+        let left = 0
+        for (const entry of entries.values()) {
+          if (entry.state === 'failed') continue
+          takes++
+          left +=
+            entry.state === 'waiting'
+              ? EXPECTED_TAKE_SECONDS
+              : Math.max(0, EXPECTED_TAKE_SECONDS - (now() - entry.startedAt) / 1000)
+        }
+        if (takes) summary[key.slice(prefix.length)] = { takes, left }
+      }
+      return summary
     },
 
     async takeFile(projectFile, id, name) {

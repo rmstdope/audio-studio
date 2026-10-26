@@ -119,19 +119,155 @@ describe('createMusicTakes', () => {
     expect(wavSeconds(readWav(new Uint8Array(readFileSync(path!))))).toBe(30)
   })
 
-  it('makes the takes of a changed brief apart, the earlier ones not listed', async () => {
+  it('keeps the takes of an earlier brief on the board, marked, and numbers on from them', async () => {
     const { file, takes, requests, settled } = setup()
     await takes.make(file, 'hall', { count: 1 })
     await settled('hall')
     await setTrackBrief(file, 'hall', { brief: 'a drum' })
     const changed = await settled('hall')
     if (!changed || !('ok' in changed) || !changed.ok) throw new Error('expected a view')
-    expect(changed.takes).toEqual([])
+    expect(changed.takes.map((t) => [t.n, t.earlier])).toEqual([[1, true]])
     await takes.make(file, 'hall', { count: 1 })
     const view = await settled('hall')
     if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
-    expect(view.takes.map((t) => t.n)).toEqual([1])
+    expect(view.takes.map((t) => [t.n, t.earlier])).toEqual([
+      [1, true],
+      [2, false],
+    ])
     expect(requests[1]!.brief).toBe('a drum')
+  })
+
+  it('marks a take made from a brief that changed while it was made', async () => {
+    const { file, takes, settled } = setup()
+    await takes.make(file, 'hall', { count: 1 })
+    await setTrackBrief(file, 'hall', { brief: 'a drum' })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(view.takes.map((t) => [t.n, t.earlier])).toEqual([[1, true]])
+  })
+
+  it('keeps its takes on a saved board that a new instance reads, and never reuses a number', async () => {
+    const { root, file, takes, settled } = setup()
+    await takes.make(file, 'hall', { count: 2 })
+    await settled('hall')
+    const board = JSON.parse(readFileSync(join(root, '.audio-studio/music/hall.json'), 'utf8'))
+    expect(board.next).toBe(3)
+    expect(board.takes.map((t: { n: number }) => t.n)).toEqual([1, 2])
+    expect(
+      readdirSync(join(root, '.audio-studio/music-takes/hall')).some((f) => f.endsWith('.json')),
+    ).toBe(false)
+    const again = createMusicTakes({
+      generator: fakeGenerator().generator,
+      queue: createSerial(),
+      newSeed: () => 7,
+    })
+    const view = await again.view(file, 'hall')
+    expect(view).toMatchObject({ takes: [{ n: 1 }, { n: 2 }] })
+    const dropped = (view as { takes: { file: string }[] }).takes[1]!.file
+    expect(await again.drop(file, 'hall', dropped)).toEqual({ ok: true })
+    await again.make(file, 'hall', { count: 1 })
+    for (let i = 0; i < 200; i++) {
+      const v = await again.view(file, 'hall')
+      if (v && 'making' in v && !v.making.length) break
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    const last = await again.view(file, 'hall')
+    expect(last).toMatchObject({ takes: [{ n: 1 }, { n: 3 }] })
+  })
+
+  it('reports a broken board file instead of overwriting it', async () => {
+    const { file, takes } = setup(undefined, { '.audio-studio/music/hall.json': '{ nope' })
+    const view = await takes.view(file, 'hall')
+    expect(view).toMatchObject({ ok: false })
+    expect(JSON.stringify(view)).toContain('.audio-studio/music/hall.json')
+    expect(await takes.make(file, 'hall', { count: 1 })).toMatchObject({ ok: false })
+  })
+
+  it('drops a take: its entry and its file go, the others stay', async () => {
+    const { root, file, takes, settled } = setup()
+    await takes.make(file, 'hall', { count: 2 })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    const [first, second] = view.takes
+    expect(await takes.drop(file, 'hall', first!.file)).toEqual({ ok: true })
+    expect(await takes.takeFile(file, 'hall', first!.file)).toBeNull()
+    expect(existsSync(join(root, '.audio-studio/music-takes/hall', first!.file))).toBe(false)
+    expect(await takes.view(file, 'hall')).toMatchObject({ takes: [{ n: second!.n }] })
+  })
+
+  it('refuses to drop what is not on the board, and an unknown track, writing nothing', async () => {
+    const { root, file, takes } = setup()
+    expect(await takes.drop(file, 'hall', 'aaaaaaaaaaaaaaaa.1.wav')).toEqual({
+      ok: false,
+      message: 'That take is not on the board.',
+    })
+    expect(await takes.drop(file, 'hall', '../../audio-studio.json')).toEqual({
+      ok: false,
+      message: 'That take is not on the board.',
+    })
+    expect(await takes.drop(file, 'nope', 'aaaaaaaaaaaaaaaa.1.wav')).toBeNull()
+    expect(existsSync(join(root, '.audio-studio/music/hall.json'))).toBe(false)
+  })
+
+  it('stops the takes still waiting; the one under way finishes and is kept', async () => {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const inner = fakeGenerator()
+    const slow: MusicGenerator = {
+      ...inner.generator,
+      generate: async (request) => {
+        await gate
+        return inner.generator.generate(request)
+      },
+    }
+    const { file } = setup()
+    const takes = createMusicTakes({ generator: slow, queue: createSerial(), newSeed: () => 1 })
+    await takes.make(file, 'hall', { count: 3 })
+    expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 2 })
+    expect(await takes.view(file, 'hall')).toMatchObject({ making: [{ n: 1, state: 'making' }] })
+    release()
+    let view = await takes.view(file, 'hall')
+    for (let i = 0; i < 200 && view && 'making' in view && view.making.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      view = await takes.view(file, 'hall')
+    }
+    expect(view).toMatchObject({ takes: [{ n: 1 }], making: [] })
+    expect(inner.requests).toHaveLength(1)
+    expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 0 })
+    expect(await takes.stop(file, 'nope')).toBeNull()
+  })
+
+  it('sums what is being made across the project: takes and about how long', async () => {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const inner = fakeGenerator().generator
+    const slow: MusicGenerator = {
+      ...inner,
+      generate: async (request) => {
+        await gate
+        return inner.generate(request)
+      },
+    }
+    const { file } = setup()
+    let clock = 0
+    const takes = createMusicTakes({
+      generator: slow,
+      queue: createSerial(),
+      now: () => clock,
+      newSeed: () => 1,
+    })
+    await takes.make(file, 'hall', { count: 2 })
+    await takes.make(file, 'victory', { count: 1 })
+    clock = 60_000
+    expect(await takes.making(file)).toEqual({
+      hall: { takes: 2, left: 120 + 180 },
+      victory: { takes: 1, left: 180 },
+    })
+    release()
+    for (let i = 0; i < 200 && Object.keys(await takes.making(file)).length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(await takes.making(file)).toEqual({})
   })
 
   it('keeps the other takes when one fails, saying why', async () => {

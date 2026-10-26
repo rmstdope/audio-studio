@@ -940,6 +940,20 @@ export function startServer({
             headers: { 'content-type': 'audio/wav' },
           })
         }),
+        DELETE: fromOwnPage(async (request) => {
+          const result = await musicTakes.drop(projectFile, request.params.id, request.params.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/stop': {
+        POST: fromOwnPage(async (request) => {
+          const result = await musicTakes.stop(projectFile, request.params.id)
+          return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/music/making': {
+        GET: guard(async () => Response.json(await musicTakes.making(projectFile))),
       },
       '/api/parts/:part/cues/:key/move': {
         POST: fromOwnPage(async (request) => {

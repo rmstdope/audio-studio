@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  MusicBoardSchema,
   LOOP_EXTRA_SECONDS,
   SEAM_SECONDS,
   generatedSeconds,
@@ -136,5 +137,29 @@ describe('seamWav', () => {
 
   test('takes the whole of a loop shorter than the seam, twice', () => {
     expect(wavSeconds(seamWav(make(3, () => 1)))).toBe(6)
+  })
+})
+
+describe('MusicBoardSchema', () => {
+  const take = {
+    n: 1,
+    hash: 'abcdef0123456789',
+    seed: 5,
+    seconds: 30,
+    peaks: [0.5],
+    inputs: { brief: 'b', kind: 'loop', seconds: 30, bpm: null, key: null },
+  }
+  test('accepts a board with takes', () => {
+    expect(MusicBoardSchema.safeParse({ next: 2, takes: [take] }).success).toBe(true)
+  })
+  test('refuses a take number of 0, a hash that is not 16 hex digits, and an unknown kind', () => {
+    for (const bad of [
+      { ...take, n: 0 },
+      { ...take, hash: 'xyz' },
+      { ...take, inputs: { ...take.inputs, kind: 'jingle' } },
+    ]) {
+      expect(MusicBoardSchema.safeParse({ next: 2, takes: [bad] }).success).toBe(false)
+    }
+    expect(MusicBoardSchema.safeParse({ next: 0, takes: [] }).success).toBe(false)
   })
 })
