@@ -2873,3 +2873,77 @@ describe('server, generating per language', () => {
     expect((await get('/api/parts/act1')).part.notes).toEqual({})
   })
 })
+
+describe('server, the music pages', () => {
+  const list = JSON.stringify([{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5 }])
+  const musicRoot = tempRepo({
+    'audio-studio.json': projectJson({
+      music: {
+        refreshShared: `printf '%s' '${list}' > tts/stingers.json`,
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+  })
+  const studio = startServer({
+    projectFile: join(musicRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => studio.stop(true))
+  const refresh = (origin: string) =>
+    fetch(new URL('/api/music/stingers/refresh', studio.url), {
+      method: 'POST',
+      headers: { origin },
+    })
+
+  it('shows the lists in the project summary', async () => {
+    const body = await (await fetch(new URL('/api/project', studio.url))).json()
+    expect(body.summary.music.lists.map((l: { id: string }) => l.id)).toEqual([
+      'act1',
+      'act2',
+      'stingers',
+    ])
+  })
+
+  it('refreshes the stingers from the studio’s own page only', async () => {
+    expect((await refresh('https://evil.example')).status).toBe(403)
+    const answer = await refresh(studio.url.origin)
+    expect(answer.status).toBe(200)
+    expect(await answer.json()).toMatchObject({
+      ok: true,
+      stingers: 1,
+      change: { added: [{ id: 'victory' }], removed: [] },
+    })
+    expect(existsSync(join(musicRoot, 'tts/stingers.json'))).toBe(true)
+  })
+
+  it('refuses with a reason when the project has no shared command', async () => {
+    const plain = startServer({
+      projectFile: join(root, 'audio-studio.json'),
+      port: 0,
+      fish,
+      encode,
+      transcriber: null,
+    })
+    try {
+      const answer = await fetch(new URL('/api/music/stingers/refresh', plain.url), {
+        method: 'POST',
+        headers: { origin: plain.url.origin },
+      })
+      expect(answer.status).toBe(409)
+      expect(await answer.json()).toMatchObject({ ok: false, reason: 'none' })
+    } finally {
+      plain.stop(true)
+    }
+  })
+})

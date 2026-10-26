@@ -14,7 +14,7 @@ import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
-import type { RefreshResult } from '../services/refresh'
+import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
@@ -480,39 +480,33 @@ export function useSetPronunciations(language?: string) {
 }
 
 /**
- * Refreshing a part's dialog: `start` runs the project's refreshDialog command, `pending` says
- * whether it runs, `outcome` is the last one's result until dismissed. The state lives in the
- * mutation cache under the part's key, so leaving the page and coming back during a refresh still
- * shows it running. Afterwards everything read from the dialog is loaded again.
+ * A refresh command run from the page: `start` posts to `url`, `pending` says whether it runs,
+ * `outcome` is the last one's result until dismissed. The state lives in the mutation cache under
+ * `mutationKey`, so leaving the page and coming back during a refresh still shows it running.
+ * `reload` loads again what the refresh may have changed.
  */
-export function useRefreshDialog(partId: string) {
+function useRefreshRun<R>(
+  mutationKey: string[],
+  url: string,
+  reload: (client: QueryClient) => Promise<unknown>,
+) {
   const client = useQueryClient()
-  const mutationKey = ['refresh', partId]
   const mutation = useMutation({
     mutationKey,
-    scope: { id: `refresh-${partId}` },
+    scope: { id: mutationKey.join('-') },
     mutationFn: async () => {
-      const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/refresh`, {
-        method: 'POST',
-      })
+      const response = await fetch(url, { method: 'POST' })
       if (!response.ok && response.status !== 409) {
         throw new Error(`refreshing answered ${response.status}`)
       }
-      return (await response.json()) as NonNullable<RefreshResult>
+      return (await response.json()) as R
     },
-    onSettled: async () => {
-      void client.invalidateQueries({ queryKey: ['plan', partId] })
-      void client.invalidateQueries({ queryKey: ['changes'] })
-      await Promise.all([
-        client.invalidateQueries({ queryKey: ['project'] }),
-        client.invalidateQueries({ queryKey: ['part', partId] }),
-      ])
-    },
+    onSettled: () => reload(client),
   })
   const pending = useIsMutating({ mutationKey }) > 0
   const last = useMutationState({
     filters: { mutationKey },
-    select: (m) => m.state as MutationState<NonNullable<RefreshResult>, Error>,
+    select: (m) => m.state as MutationState<R, Error>,
   }).at(-1)
   const settled = last && last.status !== 'pending' && last.status !== 'idle'
   return {
@@ -527,6 +521,34 @@ export function useRefreshDialog(partId: string) {
       }
     },
   }
+}
+
+/**
+ * Refreshing a part's dialog (and its loops): see `useRefreshRun`. Afterwards everything read from
+ * the dialog is loaded again.
+ */
+export function useRefreshDialog(partId: string) {
+  return useRefreshRun<NonNullable<RefreshResult>>(
+    ['refresh', partId],
+    `/api/parts/${encodeURIComponent(partId)}/refresh`,
+    async (client) => {
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['changes'] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['part', partId] }),
+      ])
+    },
+  )
+}
+
+/** Refreshing the stingers with the project's `music.refreshShared`: see `useRefreshRun`. */
+export function useRefreshShared() {
+  return useRefreshRun<RefreshSharedResult>(
+    ['refresh-shared'],
+    '/api/music/stingers/refresh',
+    (client) => client.invalidateQueries({ queryKey: ['project'] }),
+  )
 }
 
 /** Gives an orphaned cue to a line (`to`), or removes it (null), then reloads the part. */

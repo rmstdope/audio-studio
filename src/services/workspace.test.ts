@@ -510,3 +510,103 @@ describe('a part in several languages', () => {
     expect(await clipFile(projectFile, 'act1', 'a.mp3', 'fr')).toBeNull()
   })
 })
+
+describe('loadProject with a music section', () => {
+  const musicSection = {
+    refreshShared: 'true',
+    paths: {
+      loops: 'tts/{part}/music.json',
+      stingers: 'tts/stingers.json',
+      briefs: 'music/briefs.json',
+      lock: 'music/music.lock.json',
+      clips: 'audio/music',
+      manifest: 'audio/music/manifest.json',
+    },
+  }
+  const loop = (id: string, extra = {}) => ({
+    id,
+    title: id,
+    brief: `${id} brief`,
+    seconds: 80,
+    ...extra,
+  })
+
+  it('has no music pages without a section', async () => {
+    const root = tempRepo({ 'audio-studio.json': projectJson() })
+    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    if (!loaded.ok) throw new Error('expected the project to load')
+    expect(loaded.summary.music).toBeNull()
+  })
+
+  it('lists each act’s loops and the stingers, and tells a missing list from an empty one', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson({ music: musicSection }),
+      'tts/act1/music.json': [loop('a'), loop('b')],
+      'tts/act2/music.json': [],
+      'tts/stingers.json': [loop('victory', { seconds: 5 })],
+      'music/briefs.json': { a: { brief: 'ours' } },
+    })
+    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    if (!loaded.ok) throw new Error('expected the project to load')
+    const lists = loaded.summary.music!.lists
+    expect(lists.map((l) => [l.id, l.kind, l.state, l.tracks.length, l.canRefresh])).toEqual([
+      ['act1', 'act', 'ok', 2, false],
+      ['act2', 'act', 'ok', 0, false],
+      ['stingers', 'stingers', 'ok', 1, true],
+    ])
+    expect(lists[0]!.tracks[0]!.brief).toBe('ours')
+    expect(loaded.summary.problems).toEqual([])
+  })
+
+  it('shows an act without a list as missing', async () => {
+    const root = tempRepo({ 'audio-studio.json': projectJson({ music: musicSection }) })
+    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    if (!loaded.ok) throw new Error('expected the project to load')
+    expect(loaded.summary.music!.lists.map((l) => l.state)).toEqual([
+      'missing',
+      'missing',
+      'missing',
+    ])
+    expect(loaded.summary.problems).toEqual([])
+  })
+
+  it('reports a broken list with its file and JSON path, and the rest still loads', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson({ music: musicSection }),
+      'tts/act1/music.json': [loop('a'), { id: 'Bad Id', title: 'x', brief: 'x', seconds: 1 }],
+      'tts/stingers.json': [loop('long', { seconds: 30 })],
+      'music/briefs.json': '{ broken',
+    })
+    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    if (!loaded.ok) throw new Error('expected the project to load')
+    expect(loaded.summary.music!.lists.map((l) => l.state)).toEqual([
+      'invalid',
+      'missing',
+      'invalid',
+    ])
+    expect(loaded.summary.problems.map((p) => [p.file, p.path])).toEqual([
+      ['tts/act1/music.json', '[1].id'],
+      ['tts/stingers.json', '[0].seconds'],
+      ['music/briefs.json', ''],
+    ])
+  })
+
+  it('reports an id used in two lists at both places', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson({ music: musicSection }),
+      'tts/act1/music.json': [loop('x'), loop('a')],
+      'tts/stingers.json': [loop('x', { seconds: 5 })],
+    })
+    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    if (!loaded.ok) throw new Error('expected the project to load')
+    expect(loaded.summary.music!.lists.map((l) => l.tracks.map((t) => t.id))).toEqual([
+      ['a'],
+      [],
+      [],
+    ])
+    expect(loaded.summary.problems.map((p) => [p.file, p.path])).toEqual([
+      ['tts/act1/music.json', '[0].id'],
+      ['tts/stingers.json', '[0].id'],
+    ])
+  })
+})

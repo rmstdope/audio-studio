@@ -2,7 +2,13 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { isRefreshing, refreshDialog, stopRefreshes } from './refresh'
+import {
+  isRefreshing,
+  isRefreshingShared,
+  refreshDialog,
+  refreshShared,
+  stopRefreshes,
+} from './refresh'
 
 const before = [
   { key: 'a', speaker: 'mira', text: 'Hello.' },
@@ -142,5 +148,135 @@ describe('refreshDialog', () => {
   it('knows no unknown part', async () => {
     const root = tempRepo(project('true'))
     expect(await refreshDialog(join(root, 'audio-studio.json'), 'act9')).toBeNull()
+  })
+})
+
+describe('refreshing the music lists', () => {
+  const loop = (id: string, extra = {}) => ({
+    id,
+    title: id.toUpperCase(),
+    brief: 'b',
+    seconds: 80,
+    ...extra,
+  })
+  const music = (refreshShared?: string) => ({
+    refreshShared,
+    paths: {
+      loops: 'tts/{part}/music.json',
+      stingers: 'tts/stingers.json',
+      briefs: 'music/briefs.json',
+      lock: 'music/music.lock.json',
+      clips: 'audio/music',
+      manifest: 'audio/music/manifest.json',
+    },
+  })
+  const withMusic = (command: string, shared?: string, files: Record<string, unknown> = {}) => {
+    const json = projectJson({ music: music(shared) })
+    ;(json.narration as Record<string, unknown>).refreshDialog = command
+    return {
+      'audio-studio.json': json,
+      'tts/cast.json': { speakers: {}, pronounce: {} },
+      'tts/act1/script.json': before,
+      ...files,
+    }
+  }
+  const writeLoops = `printf '%s' '${JSON.stringify([loop('b'), loop('c')])}' > tts/{part}/music.json`
+
+  it('names the loops an act’s refresh added and removed', async () => {
+    const root = tempRepo(
+      withMusic(`${writeLoops} && printf '%s' '${after}' > tts/{part}/script.json`, undefined, {
+        'tts/act1/music.json': [loop('a'), loop('b')],
+      }),
+    )
+    const result = await refreshDialog(join(root, 'audio-studio.json'), 'act1')
+    expect(result).toMatchObject({
+      ok: true,
+      loops: { added: [{ id: 'c', title: 'C' }], removed: [{ id: 'a', title: 'A' }], total: 2 },
+    })
+  })
+
+  it('counts every loop as added when the act had no list before', async () => {
+    const root = tempRepo(
+      withMusic(`${writeLoops} && printf '%s' '${after}' > tts/{part}/script.json`),
+    )
+    expect(await refreshDialog(join(root, 'audio-studio.json'), 'act1')).toMatchObject({
+      ok: true,
+      loops: {
+        added: [
+          { id: 'b', title: 'B' },
+          { id: 'c', title: 'C' },
+        ],
+        removed: [],
+      },
+    })
+  })
+
+  it('says nothing of loops when the command wrote no list, or the project has no music', async () => {
+    const wrote = tempRepo(withMusic(`printf '%s' '${after}' > tts/{part}/script.json`))
+    expect(await refreshDialog(join(wrote, 'audio-studio.json'), 'act1')).toMatchObject({
+      ok: true,
+      loops: null,
+    })
+    const plain = tempRepo(project(`printf '%s' '${after}' > tts/{part}/script.json`))
+    expect(await refreshDialog(join(plain, 'audio-studio.json'), 'act1')).toMatchObject({
+      ok: true,
+      loops: null,
+    })
+  })
+
+  it('runs refreshShared in the project root and names the stingers added and removed', async () => {
+    const list = JSON.stringify([loop('victory', { seconds: 5 })])
+    const root = tempRepo(
+      withMusic('true', `printf '%s' '${list}' > tts/stingers.json && echo listed`, {
+        'tts/stingers.json': [loop('old', { seconds: 5 })],
+      }),
+    )
+    expect(await refreshShared(join(root, 'audio-studio.json'))).toEqual({
+      ok: true,
+      stingers: 1,
+      change: {
+        added: [{ id: 'victory', title: 'VICTORY' }],
+        removed: [{ id: 'old', title: 'OLD' }],
+      },
+      output: 'listed',
+    })
+  })
+
+  it('says when the project has no shared command', async () => {
+    const root = tempRepo(withMusic('true'))
+    expect(await refreshShared(join(root, 'audio-studio.json'))).toMatchObject({
+      ok: false,
+      reason: 'none',
+    })
+  })
+
+  it('reports a failing command, a missing list and a broken one', async () => {
+    const failing = tempRepo(withMusic('true', 'echo oops >&2; exit 2'))
+    expect(await refreshShared(join(failing, 'audio-studio.json'))).toMatchObject({
+      ok: false,
+      reason: 'failed',
+      output: expect.stringContaining('oops'),
+    })
+    const wrote = tempRepo(withMusic('true', 'true'))
+    expect(await refreshShared(join(wrote, 'audio-studio.json'))).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/stingers.json', path: '' }],
+    })
+    const long = JSON.stringify([loop('v', { seconds: 30 })])
+    const broken = tempRepo(withMusic('true', `printf '%s' '${long}' > tts/stingers.json`))
+    expect(await refreshShared(join(broken, 'audio-studio.json'))).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/stingers.json', path: '[0].seconds' }],
+    })
+  })
+
+  it('says while the stingers are refreshing, apart from any part', async () => {
+    const root = tempRepo(withMusic('true', 'sleep 0.3; echo "[]" > tts/stingers.json'))
+    const file = join(root, 'audio-studio.json')
+    const running = refreshShared(file)
+    expect(isRefreshingShared(file)).toBe(true)
+    expect(isRefreshing(file, 'act1')).toBe(false)
+    await running
+    expect(isRefreshingShared(file)).toBe(false)
   })
 })

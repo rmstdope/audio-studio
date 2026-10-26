@@ -1,6 +1,7 @@
+import type { MusicListSummary } from '../../core/music'
 import type { ProjectSummary } from '../../core/summary'
 import { useChanges, useCredit, useSetup, useSpending } from '../api'
-import { routeHref, type Route } from '../route'
+import { routeHref, type MusicRoute, type Route } from '../route'
 import {
   MicIcon,
   MusicIcon,
@@ -11,7 +12,14 @@ import {
   SpendingIcon,
   CheckIcon,
 } from './icons'
-import { dollars, longTitle, plural } from '../format'
+import { dollars, longTitle, plural, shortTitle } from '../format'
+
+/** Whether a Music list's entry is the page shown: the one the route names, else the first list. */
+function isCurrentList(list: MusicListSummary, route: MusicRoute, index: number): boolean {
+  if (route.page === 'stingers') return list.kind === 'stingers'
+  if (route.page === 'act') return list.kind === 'act' && list.id === route.part
+  return index === 0
+}
 
 /** The studio's navigation: project, workspaces, the parts, and the project-wide characters. */
 export function Sidebar({
@@ -61,13 +69,37 @@ export function Sidebar({
         <a
           className="nav-item"
           href={routeHref({ view: 'part', part: activePart })}
-          aria-current="page"
+          aria-current={route.view === 'music' ? undefined : 'page'}
         >
           <MicIcon /> Narration
         </a>
-        <span className="nav-item" aria-disabled="true">
-          <MusicIcon /> <span className="grow">Music</span> <span className="meta">Soon</span>
-        </span>
+        <a
+          className="nav-item"
+          href={routeHref({ view: 'music', page: null })}
+          aria-current={route.view === 'music' && !summary.music ? 'page' : undefined}
+        >
+          <MusicIcon /> <span className="grow">Music</span>
+        </a>
+        {summary.music?.lists.map((list, index) => {
+          const current = route.view === 'music' && isCurrentList(list, route, index)
+          return (
+            <a
+              key={`${list.kind}:${list.id}`}
+              className="nav-item music-subnav"
+              href={routeHref(
+                list.kind === 'stingers'
+                  ? { view: 'music', page: 'stingers' }
+                  : { view: 'music', page: 'act', part: list.id },
+              )}
+              aria-current={current ? 'page' : undefined}
+            >
+              <span className="grow">
+                {list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)}
+              </span>
+              {list.tracks.length > 0 && <span className="meta">{list.tracks.length}</span>}
+            </a>
+          )
+        })}
         <span className="nav-item" aria-disabled="true">
           <SpeakerIcon /> <span className="grow">Sound effects</span>{' '}
           <span className="meta">Soon</span>

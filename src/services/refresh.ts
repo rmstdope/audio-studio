@@ -1,20 +1,52 @@
 import { dirname } from 'node:path'
 import { dialogDiff, type DialogDiff } from '../core/dialogDiff'
+import {
+  loopsDiff,
+  LoopListSchema,
+  StingerListSchema,
+  type Track,
+  type TrackRef,
+} from '../core/music'
 import { partPathFor, type Problem } from '../core/project'
 import { DialogSchema, type Line } from '../core/resources'
 import { readResource } from './files'
+import { readList } from './musicLists'
 import { createSerial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
 /** What refreshing a part's dialog did, or why it did not. Null for an unknown part. */
 export type RefreshResult =
-  /** `diff` is null when the dialog could not be read before, so what changed is not known. */
-  | { ok: true; lines: number; diff: DialogDiff | null; output: string }
+  /**
+   * `diff` is null when the dialog could not be read before, so what changed is not known. `loops`
+   * is the act's loops added and removed when the project has a `music` section and the command
+   * left a loops list that can be read; else null.
+   */
+  | {
+      ok: true
+      lines: number
+      diff: DialogDiff | null
+      loops: (LoopsChange & { total: number }) | null
+      output: string
+    }
   | { ok: false; reason: 'none' | 'busy'; message: string }
   | { ok: false; reason: 'failed'; message: string; output: string }
   | { ok: false; problems: Problem[]; output: string }
   | ProjectFailure
   | null
+
+/** The tracks a refresh added to a list the game writes and removed from it. */
+export interface LoopsChange {
+  added: TrackRef[]
+  removed: TrackRef[]
+}
+
+/** What refreshing the stingers did, or why it did not. */
+export type RefreshSharedResult =
+  | { ok: true; stingers: number; change: LoopsChange | null; output: string }
+  | { ok: false; reason: 'none' | 'busy'; message: string }
+  | { ok: false; reason: 'failed'; message: string; output: string }
+  | { ok: false; problems: Problem[]; output: string }
+  | ProjectFailure
 
 /** How long a refresh may run before it is stopped. */
 const TIMEOUT_MS = 10 * 60_000
@@ -45,6 +77,36 @@ export function refreshDialog(
       if (left) active.set(key, left)
       else active.delete(key)
     })
+}
+
+/** The key of the stingers' refresh: no part id holds a NUL, so it cannot be a part's. */
+function sharedKey(projectFile: string): string {
+  return `${projectFile}\0shared`
+}
+
+/**
+ * Runs the project's `music.refreshShared` command in the project root, the way the game lists
+ * what belongs to no act (the stingers), then reads the list again and says what changed. Only
+ * from the studio's page, one at a time.
+ */
+export function refreshShared(
+  projectFile: string,
+  { timeoutMs = TIMEOUT_MS }: { timeoutMs?: number } = {},
+): Promise<RefreshSharedResult> {
+  const key = sharedKey(projectFile)
+  active.set(key, (active.get(key) ?? 0) + 1)
+  return refreshes
+    .run(key, () => refreshStingers(projectFile, timeoutMs))
+    .finally(() => {
+      const left = (active.get(key) ?? 1) - 1
+      if (left) active.set(key, left)
+      else active.delete(key)
+    })
+}
+
+/** Whether the stingers are being refreshed or a refresh of them waits to run. */
+export function isRefreshingShared(projectFile: string): boolean {
+  return active.has(sharedKey(projectFile))
 }
 
 /** Refreshes asked for and not finished, per part: a generation waits for none of them. */
@@ -122,6 +184,10 @@ async function refresh(
   const root = dirname(projectFile)
   const dialogPath = partPathFor(narration.paths.dialog, part.id, narration.languages[0])
   const before = await readLines(root, dialogPath)
+  const loopsFile = opened.project.music
+    ? partPathFor(opened.project.music.paths.loops, part.id)
+    : null
+  const loopsBefore = loopsFile ? await readTracks(root, loopsFile, LoopListSchema) : 'invalid'
 
   const command = partPathFor(narration.refreshDialog, part.id)
   const run = await shell(command, root, timeoutMs)
@@ -136,7 +202,62 @@ async function refresh(
   }
   if (read === 'missing' || read === 'invalid') return { ok: false, problems, output: run.output }
   const diff = before === 'invalid' ? null : dialogDiff(before, read)
-  return { ok: true, lines: read.length, diff, output: run.output }
+  const loopsAfter = loopsFile ? await readTracks(root, loopsFile, LoopListSchema) : 'invalid'
+  // What the loops were is unknown when the old list was broken, and there is none to compare when
+  // the command wrote none: say nothing then.
+  const loops =
+    loopsBefore === 'invalid' || loopsAfter === 'invalid' || !loopsAfter.found
+      ? null
+      : {
+          ...loopsDiff(loopsBefore.tracks, loopsAfter.tracks),
+          total: loopsAfter.tracks.length,
+        }
+  return { ok: true, lines: read.length, diff, loops, output: run.output }
+}
+
+async function refreshStingers(
+  projectFile: string,
+  timeoutMs: number,
+): Promise<RefreshSharedResult> {
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return opened
+  const { music } = opened.project
+  if (!music?.refreshShared) {
+    return {
+      ok: false,
+      reason: 'none',
+      message: 'The project file names no music.refreshShared command.',
+    }
+  }
+  const root = dirname(projectFile)
+  const before = await readTracks(root, music.paths.stingers, StingerListSchema)
+  const run = await shell(music.refreshShared, root, timeoutMs)
+  if (!run.ok) return { ok: false, reason: 'failed', message: run.message, output: run.output }
+
+  const problems: Problem[] = []
+  const read = await readResource(root, music.paths.stingers, StingerListSchema, problems)
+  if (read === 'missing') {
+    problems.push({
+      file: music.paths.stingers,
+      path: '',
+      message: 'the command wrote no stingers file',
+    })
+  }
+  if (read === 'missing' || read === 'invalid') return { ok: false, problems, output: run.output }
+  const change = before === 'invalid' ? null : loopsDiff(before.tracks, read)
+  return { ok: true, stingers: read.length, change, output: run.output }
+}
+
+/** A track list as it is now: none if there is no file yet (`found` false), 'invalid' if broken. */
+async function readTracks(
+  root: string,
+  path: string,
+  schema: typeof LoopListSchema | typeof StingerListSchema,
+): Promise<{ tracks: Track[]; found: boolean } | 'invalid'> {
+  const state = await readList(root, path, schema, [])
+  return state.status === 'invalid'
+    ? 'invalid'
+    : { tracks: state.status === 'ok' ? state.tracks : [], found: state.status === 'ok' }
 }
 
 /** The dialog's lines as they are now: none if there is no file yet, 'invalid' if it is broken. */

@@ -56,7 +56,7 @@ retroquest/                      ← user runs `audio-studio` here
 │   ├── cues.json                ← per-line delivery cues (read + written)
 │   ├── narration.lock.json      ← per-clip fingerprints (written, committed)
 │   └── music.json               ← the act's loops, from the game (read; planned, §8.5)
-├── tts/stingers.json            ← the game's stingers (read; planned)
+├── tts/stingers.json            ← the game's stingers (read; built)
 ├── music/
 │   ├── briefs.json              ← the studio's changes to the game's briefs (read + written)
 │   └── music.lock.json          ← the chosen take of each track (written, committed)
@@ -77,10 +77,11 @@ retroquest/                      ← user runs `audio-studio` here
 4. The studio writes only to paths the project file names, and every path goes through
    `resolveInRoot`, which refuses anything outside the project root. Clips are served only when
    they are plain files in the part's clips folder (no folders, no symbolic links). The one
-   exception is **Refresh dialog**: it runs the project's own `refreshDialog` command (the game's
-   code, named in its project file) in the project root, only when the user clicks it on the
-   studio's page; what that command writes is the game's business, and the studio does not check
-   it beyond reading the dialog again.
+   exception is the game's own commands: **Refresh dialog**, on a part's overview, and **Refresh
+   from the game**, on an act's Music page (the same `refreshDialog` command) and on the Stingers
+   page (`music.refreshShared`), run in the project root, only when the user clicks one on the
+   studio's page; what a command writes is the game's business, and the studio does not check it
+   beyond reading the dialog, the loops or the stingers again.
    Besides those paths, the studio writes the project file itself in one place only: the project's
    own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3).
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
@@ -947,7 +948,8 @@ POST   /api/parts/:part/lines/:key/takes/:id/use make the take the line's clip (
 DELETE /api/parts/:part/lines/:key/takes/:id     drop the take
 POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it is (lock `accepted`)
 POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
-POST   /api/parts/:part/refresh                  run refreshDialog
+POST   /api/parts/:part/refresh                  run refreshDialog (its result names the act's loops added and removed)
+POST   /api/music/stingers/refresh               run music.refreshShared; the stingers added and removed
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
 POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
@@ -1181,7 +1183,7 @@ Small, independently useful increments:
        does (which the loop's crossfade needs to know); whether the same seed makes the same
        take; whether the crossfaded seam is heard; and how a loop plays without a click in the
        game's browsers (MP3 in `<audio>`, another codec, or Web Audio).
-    2. **Track lists**: the project file's `music` section, the game's loop and stinger lists and
+    2. **Track lists** (built): the project file's `music` section, the game's loop and stinger lists and
        the studio's briefs (schemas, problems with file and path), and the Music pages, a page per
        act and one for the stingers, listing the tracks, read only; Refresh from the game on an
        act's page, and on the Stingers page running `refreshShared` (CLAUDE.md's consumer rules

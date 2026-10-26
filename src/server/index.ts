@@ -24,7 +24,7 @@ import { createSpendLog, readSpending } from '../services/spending'
 import { outcomeOf, summariseSpending } from '../core/spending'
 import { moveCue, setCue } from '../services/cues'
 import { gitChanges } from '../services/git'
-import { isRefreshing, refreshDialog } from '../services/refresh'
+import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import { setStageModel, switchRetiredModels } from '../services/models'
 import { modelsView } from '../services/modelsView'
@@ -861,6 +861,12 @@ export function startServer({
           }
           const result = await refreshDialog(projectFile, request.params.part)
           if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/stingers/refresh': {
+        POST: fromOwnPage(async () => {
+          const result = await refreshShared(projectFile)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

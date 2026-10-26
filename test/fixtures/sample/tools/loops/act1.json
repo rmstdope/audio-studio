@@ -1,0 +1,23 @@
+[
+  {
+    "id": "lantern-hall",
+    "title": "Lantern hall",
+    "brief": "warm lute, slow, a hearth crackling",
+    "seconds": 80,
+    "plays": "The hall where the lantern hangs"
+  },
+  {
+    "id": "village-lane",
+    "title": "Village lane",
+    "brief": "gentle recorder and fiddle, a walk in the morning, unhurried and bright with birdsong and a little hand drum",
+    "seconds": 90,
+    "bpm": 84,
+    "key": "D major"
+  },
+  {
+    "id": "river-road",
+    "title": "River road",
+    "brief": "steady drums and pipes, travelling music",
+    "seconds": 80
+  }
+]

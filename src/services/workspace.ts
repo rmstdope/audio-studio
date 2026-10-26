@@ -36,6 +36,7 @@ import {
   readResource,
   writeAtomic,
 } from './files'
+import { readMusic } from './musicLists'
 import { inPartTurn } from './partFiles'
 
 /** The project file in `start` or the nearest directory above it that has one; null if none. */
@@ -139,6 +140,7 @@ export async function loadWorkspace(projectFile: string): Promise<
       languageDialogs[language][part.id] = await readDialog(root, project, part, problems, language)
     }
   }
+  const music = await readMusic(root, project, problems)
   return {
     ok: true,
     project,
@@ -150,6 +152,7 @@ export async function loadWorkspace(projectFile: string): Promise<
       dialogs,
       languageDialogs,
       cast,
+      music,
       problems,
     }),
   }

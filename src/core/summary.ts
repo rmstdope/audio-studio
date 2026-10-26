@@ -1,4 +1,5 @@
 import { languageName } from './languages'
+import type { MusicSummary } from './music'
 import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
 import { pronounceOf, voiceOf, type Cast, type Line } from './resources'
@@ -104,6 +105,8 @@ export interface ProjectSummary {
   speed: number
   /** The project file's name, where `soundAlike` is saved. */
   projectFile: string
+  /** The Music pages; null when the project file has no `music` section. */
+  music: MusicSummary | null
   problems: Problem[]
 }
 
@@ -117,6 +120,8 @@ export interface SummaryInput {
   /** The other languages' dialogs by language code, then part; a language left out has none. */
   languageDialogs?: Record<string, Record<string, DialogState>>
   cast: Cast | null
+  /** The Music pages, from `summarizeMusic`; absent or null without a `music` section. */
+  music?: MusicSummary | null
   problems: Problem[]
 }
 
@@ -136,6 +141,7 @@ export function summarize({
   dialogs,
   languageDialogs = {},
   cast,
+  music = null,
   problems,
 }: SummaryInput): ProjectSummary {
   const { narration } = project
@@ -250,6 +256,7 @@ export function summarize({
     models: { draft: narration.models.draft, final: narration.models.final },
     speed: narration.tts.speed,
     projectFile,
+    music,
     problems,
   }
 }
