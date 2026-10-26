@@ -15,6 +15,15 @@ export interface Change {
 /** What a part's file is for. */
 export type FileRole = 'dialog' | 'cues' | 'lock' | 'manifest'
 
+/** What a music file is for: the game's list of tracks, the studio's briefs, the lock or the manifest. */
+export type MusicFileRole = 'list' | 'briefs' | 'lock' | 'manifest'
+
+/** The music files' changes: its files one by one, its clips counted. */
+export interface MusicChanges {
+  files: (Change & { role: MusicFileRole })[]
+  clips: Record<ChangeKind, number>
+}
+
 /** A part's changes: its own files one by one, its clips counted. */
 export interface PartChanges {
   id: string
@@ -29,6 +38,8 @@ export interface ChangeGroups {
   /** The project file and the cast. */
   project: Change[]
   parts: PartChanges[]
+  /** The music files and clips, when the project has music and any of them changed. */
+  music: MusicChanges | null
 }
 
 /** A part's files by path (with their role) and its clips folders, one per language (ending in `/`). */
@@ -44,6 +55,8 @@ export interface ProjectPaths {
   /** The project file and the cast. */
   own: string[]
   parts: PartPaths[]
+  /** The music files by path (with their role) and the clips folder (ending in `/`); null without music. */
+  music: { files: Record<string, MusicFileRole>; clips: string } | null
 }
 
 /** A path from the project file as git writes it: no `./`, no doubled or trailing slashes. */
@@ -53,8 +66,23 @@ function normal(path: string): string {
 
 /** The paths the studio reads and writes for a project: what git is asked about, and grouped by. */
 export function projectPaths(project: Project, projectPath: string): ProjectPaths {
-  const { narration } = project
+  const { narration, music } = project
   return {
+    music: music
+      ? {
+          files: Object.fromEntries([
+            ...narration.parts.map((part): [string, MusicFileRole] => [
+              normal(partPathFor(music.paths.loops, part.id)),
+              'list',
+            ]),
+            [normal(music.paths.stingers), 'list'],
+            [normal(music.paths.briefs), 'briefs'],
+            [normal(music.paths.lock), 'lock'],
+            [normal(music.paths.manifest), 'manifest'],
+          ]),
+          clips: `${normal(music.paths.clips)}/`,
+        }
+      : null,
     own: [normal(projectPath), normal(narration.characters)],
     parts: narration.parts.map((part) => {
       const at = (template: string, language: string) =>
@@ -125,13 +153,7 @@ export function groupChanges(
 
   const parts = paths.parts.flatMap((part): PartChanges[] => {
     const files: PartChanges['files'] = []
-    const clips: Record<ChangeKind, number> = {
-      new: 0,
-      modified: 0,
-      deleted: 0,
-      renamed: 0,
-      conflict: 0,
-    }
+    const clips = noClips()
     for (const change of changes) {
       const role = Object.hasOwn(part.files, change.path) ? part.files[change.path] : undefined
       if (role) files.push({ ...change, role })
@@ -146,5 +168,32 @@ export function groupChanges(
     total += count
     return count ? [{ id: part.id, title: part.title, files, clips }] : []
   })
-  return { total, project: projectChanges, parts }
+
+  let musicChanges: MusicChanges | null = null
+  if (paths.music) {
+    const files: MusicChanges['files'] = []
+    const clips = noClips()
+    for (const change of changes) {
+      const role = Object.hasOwn(paths.music.files, change.path)
+        ? paths.music.files[change.path]
+        : undefined
+      if (role) files.push({ ...change, role })
+      else if (
+        change.path.startsWith(paths.music.clips) &&
+        change.path.endsWith('.mp3') &&
+        // A hidden name is a clip being encoded, not a clip.
+        !posix.basename(change.path).startsWith('.')
+      ) {
+        clips[change.change]++
+      }
+    }
+    const count = files.length + Object.values(clips).reduce((a, b) => a + b, 0)
+    total += count
+    if (count) musicChanges = { files, clips }
+  }
+  return { total, project: projectChanges, parts, music: musicChanges }
+}
+
+function noClips(): Record<ChangeKind, number> {
+  return { new: 0, modified: 0, deleted: 0, renamed: 0, conflict: 0 }
 }

@@ -837,7 +837,7 @@ has `refreshDialog`: the same command as Refresh dialog, which brings the act's 
 together, and its summary names the loops added and removed besides the lines. A refresh of an act
 and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
 refresh of the stingers and takes being made for a stinger. A project without a `music` section
-shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel and its Takes panel; its board: More takes, Stop, Drop, earlier-brief marks; Choose is 12.6).
+shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel and its Takes panel; its board: More takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
@@ -868,7 +868,7 @@ the page can be left meanwhile; **Drop** removes one (not the chosen one); **Cho
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
 `.audio-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed,
-seconds, peaks, inputs }] }`, the take's WAV beside the others in `music-takes/<track>/`. Take
+seconds, peaks, inputs, model }] }` (`model` is the music model that made the take, which Choose records in the lock; a board without it is read as the current model), the take's WAV beside the others in `music-takes/<track>/`. Take
 numbers are per track and never reused (`next` is reserved when takes are asked for), and a take
 is on the board only once its WAV is written. The cache no longer keeps a sidecar file per take. A dropped take is just gone:
 seeds don't come back, so nothing is ruled out.
@@ -880,7 +880,7 @@ padding to drop. Chrome decoded such an MP3 to its exact length (80.000 s, no si
 end, against the WAV), so the game loops it without a gap through Web Audio; a looping `<audio>`
 element is not relied on. Safari and Firefox are checked with the game (12.8). As for narration,
 the encoder writes a hidden temporary file in the clips folder, renamed into place together with
-the manifest and lock update. Clips are served only as plain files in the music clips folder.
+the manifest and lock update (built, 12.6): the temporary file is renamed over the clip, the manifest written, the lock last, all in one turn per project. A failure of the encode, or of reading the manifest or lock, leaves everything as it was; a write that fails after the rename (a full disk) leaves the new clip beside the old lock, and choosing again repairs it. A take is chosen and dropped in the track's board turn, so neither slips between the other's check and write, and a drop is refused while the lock cannot be read. On the board the chosen take is a green card, "chosen · in the game", without Drop (a drop of it is refused, 409); every other card has **Choose**. A chosen track whose clip is gone shows "music file missing" on its card and keeps Choose, so the file can be written again. Clips are served only as plain files in the music clips folder (`GET /api/music/clips/<track>.mp3`: no folders, links, hidden files or the manifest).
 
 **Status** of a track, from the lock and its takes: "chosen" (`ok`), "not chosen" (no take chosen),
 "changed since chosen" (`changed`; the track's page says what changed: the brief, length, tempo, key
@@ -894,14 +894,16 @@ Setup**, and takes cannot be made.
 duration } }`, its layout fixed once written. The game decides where a track plays, so the kind is
 not in it.
 
-**Lock** (`music.lock.json`, committed, one entry per line): per track, the chosen take's model,
-seed, a hash of what went into it (model, brief, kind, seconds, bpm, key; not the output settings,
+**Lock** (`music.lock.json`, committed, one entry per line, `{ fp, model, seed, list, take, inputs,
+at }`): per track, the chosen take's model,
+seed, the number of the take on the board, a hash of what went into it (model, brief, kind, seconds, bpm, key; not the output settings,
 as narration leaves the loudness out; the chosen take's own inputs, so a take from an earlier brief
 leaves the track "changed since chosen"), which list it came from (an act or the stingers), and when
 it was chosen. Changing the model in the code marks every track `changed`, as a new model makes new
-music. A track is `missing` (nothing chosen, or its clip is gone from disk), `ok`, or `changed` (its
-brief, kind, length, tempo or key changed since its take was chosen: the old one keeps playing in
-the game until another is chosen). A manifest entry without a lock entry is reported as a problem.
+music. A track is `not-chosen` (no lock entry), `chosen`, `changed` (its brief, length, tempo or key,
+or the music model, differs from the chosen take's own: the old one keeps playing in the game until
+another is chosen; the page says which) or `missing` (a take was chosen but its clip is gone from
+disk, which is said ahead of `changed`). A manifest entry without a lock entry is reported as a problem (with the orphans, 12.7).
 Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
 while its list is there, is an orphan, shown on the page of the list its lock entry names under
 "Music the game no longer asks for"; removing it, after confirmation, deletes its clip, its manifest
@@ -955,6 +957,8 @@ GET    /api/credit                               the Fish account's API credit (
 GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish, ACE-Step)
 GET    /api/music/tracks/:id/takes               a track's takes, those being made, failures, and whether takes can be made
 POST   /api/music/tracks/:id/takes               { count } or { retry } queue takes (409 and why if the generator is not ready)
+POST   /api/music/tracks/:id/choose              { file } make a take the track's music: levelled, encoded, manifest and lock written (409 and why if it cannot)
+GET    /api/music/clips/:file                    a music clip (a plain .mp3 in the music clips folder)
 POST   /api/music/tracks/:id/stop                cancel the takes still waiting; the one being made finishes
 DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
 GET    /api/music/making                         what is being made, by track ({ takes, left seconds }), for the lists' status
@@ -1226,7 +1230,7 @@ Small, independently useful increments:
     5. **Board** (built): a track's takes as cards, More takes (two, in the background), Drop;
        takes from an earlier brief marked; Stop and Try again; the board saved in
        `.audio-studio/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
-    6. **Choose**: the chosen take levelled, encoded and written with the manifest and lock; each
+    6. **Choose** (built): the chosen take levelled, encoded and written with the manifest and lock; each
        track's status on the Music pages; the music files in the Changes panel.
     7. **Orphans**: the clip of a track the game no longer lists removed after confirmation.
     8. **RetroQuest** (in the game's repository, not the studio's): the game's extractor writes

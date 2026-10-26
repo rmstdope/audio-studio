@@ -14,7 +14,7 @@ import { createLimiter } from '../services/limit'
 import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
 import { BriefChangeBody } from '../core/music'
-import { MakeTakesBody, seamWav } from '../core/musicTake'
+import { ChooseTakeBody, MakeTakesBody, seamWav } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
@@ -77,6 +77,7 @@ import {
   adoptPart,
   cacheNameFor,
   clipFile,
+  musicClipFile,
   loadPart,
   loadProject,
   openProject,
@@ -275,7 +276,10 @@ export function startServer({
   transcriber,
   music,
 }: ServerOptions) {
-  const musicTakes = createMusicTakes({ generator: music ?? sharedMusic() })
+  const musicTakes = createMusicTakes({
+    generator: music ?? sharedMusic(),
+    ...(encode ? { encode } : {}),
+  })
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
   /** A character's ruled-out voices as an answer: 404 for an unknown character, 409 for a broken project. */
@@ -944,6 +948,21 @@ export function startServer({
           const result = await musicTakes.drop(projectFile, request.params.id, request.params.file)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/choose': {
+        POST: fromOwnPage(async (request) => {
+          const body = ChooseTakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { file }' }, { status: 400 })
+          const result = await musicTakes.choose(projectFile, request.params.id, body.data.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/clips/:file': {
+        GET: guard(async (request) => {
+          const file = await musicClipFile(projectFile, request.params.file)
+          return file ? new Response(Bun.file(file)) : notFound()
         }),
       },
       '/api/music/tracks/:id/stop': {

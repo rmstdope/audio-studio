@@ -12,6 +12,8 @@ import {
   type MusicListInput,
   type Track,
 } from './music'
+import { MUSIC_MODEL } from './musicTake'
+import type { LockEntry } from './musicChoose'
 import { problemsFrom } from './project'
 
 const track = (id: string, extra: Partial<Track> = {}): Track => ({
@@ -173,6 +175,60 @@ describe('loopsDiff', () => {
     expect(loopsDiff([track('a'), track('b')], [track('b'), track('c', { title: 'Sea' })])).toEqual(
       { added: [{ id: 'c', title: 'Sea' }], removed: [{ id: 'a', title: 'A' }] },
     )
+  })
+})
+
+describe('summarizeMusic with chosen takes', () => {
+  const lock = (inputs: LockEntry['inputs']): LockEntry => ({
+    fp: '0123456789abcdef',
+    model: MUSIC_MODEL,
+    seed: 1,
+    list: 'act1',
+    take: 1,
+    inputs,
+    at: '2026-11-02T10:00:00.000Z',
+  })
+  const made = { brief: 'a brief', kind: 'loop' as const, seconds: 80, bpm: null, key: null }
+  const rowsOf = (chosen: Parameters<typeof summarizeMusic>[2], briefs = {}) =>
+    summarizeMusic([list('act1', [track('a'), track('b'), track('c'), track('d')])], briefs, chosen)
+      .music.lists[0]!.tracks
+
+  it('gives each track its status, and what changed for a changed one', () => {
+    const rows = rowsOf(
+      {
+        a: { lock: lock(made), fileExists: true },
+        b: { lock: lock({ ...made, seconds: 60 }), fileExists: true },
+        c: { lock: lock({ ...made, brief: 'c brief' }), fileExists: false },
+      },
+      { b: { bpm: 90 } },
+    )
+    expect(rows.map((r) => r.status)).toEqual(['chosen', 'changed', 'missing', 'not-chosen'])
+    expect(rows[1]!.changed).toEqual(['brief', 'length', 'tempo'])
+    expect(rows[2]!.changed).toEqual([])
+    expect(rows[3]!.chosenAt).toBeNull()
+  })
+
+  it('says a track is chosen when its brief is what the take was made from', () => {
+    const rows = rowsOf({ a: { lock: lock({ ...made, brief: 'a brief' }), fileExists: true } })
+    expect(rows[0]!).toMatchObject({
+      status: 'chosen',
+      changed: [],
+      chosenAt: '2026-11-02T10:00:00.000Z',
+    })
+  })
+
+  it('takes a stinger’s kind from its list', () => {
+    const { music } = summarizeMusic(
+      [list('stingers', [track('v', { seconds: 5 })])],
+      {},
+      {
+        v: {
+          lock: lock({ ...made, kind: 'stinger', seconds: 5, brief: 'v brief' }),
+          fileExists: true,
+        },
+      },
+    )
+    expect(music.lists[0]!.tracks[0]!.status).toBe('chosen')
   })
 })
 

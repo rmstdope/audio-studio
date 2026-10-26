@@ -158,6 +158,8 @@ export interface TakeView {
   peaks: number[]
   /** Made from a brief, length, tempo or key the track no longer has. */
   earlier: boolean
+  /** The take the game plays. */
+  chosen: boolean
 }
 
 /** A take being made or waiting its turn. */
@@ -196,12 +198,17 @@ export const TakeInputsSchema = z.object({
   key: z.string().nullable(),
 })
 
+/** What a take was made from. */
+export type TakeInputs = z.infer<typeof TakeInputsSchema>
+
 /** A take on a track's board, saved in `.audio-studio/music/<track>.json`. */
 export const BoardTakeSchema = z.object({
   n: z.number().int().positive(),
   /** The hash of its inputs, which with `n` names its WAV. */
   hash: z.string().regex(/^[0-9a-f]{16}$/),
   seed: z.number(),
+  /** The music model that made it; absent on a take made before this was kept (the current one). */
+  model: z.string().optional(),
   seconds: z.number(),
   peaks: z.array(z.number()),
   inputs: TakeInputsSchema,
@@ -233,3 +240,6 @@ export const MakeTakesBody = z.union([
   z.object({ count: z.number().int().min(1).max(MAX_TAKES_AT_ONCE) }).strict(),
   z.object({ retry: z.number().int().positive() }).strict(),
 ])
+
+/** The body of a choice: the file name of the take on the track's board. */
+export const ChooseTakeBody = z.object({ file: z.string().min(1) }).strict()

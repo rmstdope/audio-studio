@@ -2,6 +2,7 @@ import { trackFor, type MusicListSummary } from '../../../core/music'
 import type { ProjectSummary } from '../../../core/summary'
 import type { RefreshResult, RefreshSharedResult } from '../../../services/refresh'
 import { useMusicMaking, useRefreshDialog, useRefreshShared } from '../../api'
+import { STATUS_LABEL, type TrackStatus } from '../../../core/musicChoose'
 import { Problems } from '../../components/Problems'
 import { PlayIcon } from '../../components/icons'
 import { clock, shortTitle } from '../../format'
@@ -10,6 +11,14 @@ import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
 import { routeHref, type MusicRoute } from '../../route'
 import { NoMusic } from './NoMusic'
 import { TrackView } from './TrackView'
+
+/** The chip class of each status: green when chosen, amber when it needs a look. */
+const STATUS_CHIP: Record<TrackStatus, string> = {
+  chosen: 'chip chip-ok',
+  'not-chosen': 'chip',
+  changed: 'chip chip-warn',
+  missing: 'chip chip-warn',
+}
 
 /** A Music page: an act's loops or the stingers, or how to set Music up when the project has none. */
 export function MusicView({ summary, route }: { summary: ProjectSummary; route: MusicRoute }) {
@@ -160,9 +169,13 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
                   </td>
                   <td>{clock(track.seconds)}</td>
                   <td>
-                    <span className="chip">
-                      {making[track.id] ? makingStatusText(making[track.id]!) : 'not chosen'}
-                    </span>
+                    {making[track.id] ? (
+                      <span className="chip">{makingStatusText(making[track.id]!)}</span>
+                    ) : (
+                      <span className={STATUS_CHIP[track.status]}>
+                        {STATUS_LABEL[track.status]}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

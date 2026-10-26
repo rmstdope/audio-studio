@@ -49,6 +49,37 @@ describe('gitChanges', () => {
     ])
   })
 
+  it('lists the music files and clips that changed', async () => {
+    const root = tempRepo({
+      ...files,
+      'audio-studio.json': projectJson({
+        music: {
+          paths: {
+            loops: 'tts/{part}/music.json',
+            stingers: 'tts/stingers.json',
+            briefs: 'music/briefs.json',
+            lock: 'music/music.lock.json',
+            clips: 'web/music',
+            manifest: 'web/music/manifest.json',
+          },
+        },
+      }),
+    })
+    git(root, 'init', '-q')
+    git(root, 'add', '.')
+    git(root, 'commit', '-q', '-m', 'start')
+    mkdirSync(join(root, 'web/music'), { recursive: true })
+    writeFileSync(join(root, 'web/music/a.mp3'), 'music')
+    writeFileSync(join(root, 'web/music/manifest.json'), '{}')
+    const result = await gitChanges(join(root, 'audio-studio.json'))
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.groups.total).toBe(2)
+    expect(result.groups.music?.files).toEqual([
+      { path: 'web/music/manifest.json', change: 'new', role: 'manifest' },
+    ])
+    expect(result.groups.music?.clips.new).toBe(1)
+  })
+
   it('gives paths from the project root when it is inside the repository', async () => {
     const top = tempRepo({})
     const root = join(top, 'game')

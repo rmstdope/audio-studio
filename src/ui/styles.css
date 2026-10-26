@@ -2764,6 +2764,20 @@ a.btn {
   gap: 8px;
   min-width: 0;
 }
+.take-chosen {
+  background: var(--kept-bg);
+  border-color: var(--kept-line);
+}
+.warnbox {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+}
 .take-making {
   border-style: dashed;
   color: var(--muted);

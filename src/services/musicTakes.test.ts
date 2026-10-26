@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { wavSeconds } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setTrackBrief } from './briefs'
 import { createSerial } from './serial'
 import type { MusicGenerator, MusicReady, MusicRequest } from './music'
+import type { Encoder } from './audio'
+import { loadProject } from './workspace'
 import { createMusicTakes } from './musicTakes'
 
 const music = {
@@ -49,8 +51,13 @@ function setup(ready?: MusicReady, extra: Record<string, unknown> = {}, failOn: 
   const file = join(root, 'audio-studio.json')
   const { generator, requests } = fakeGenerator(ready, failOn)
   let seed = 100
+  const encode: Encoder = async (_wav, out) => {
+    mkdirSync(dirname(out), { recursive: true })
+    writeFileSync(out, 'mp3')
+  }
   const takes = createMusicTakes({
     generator,
+    encode,
     queue: createSerial(),
     now: () => 0,
     newSeed: () => seed++,
@@ -384,5 +391,121 @@ describe('createMusicTakes', () => {
       .filter((f) => !f.startsWith('.audio-studio'))
     expect(added).toEqual([])
     expect(existsSync(join(root, '.audio-studio/music-takes/hall'))).toBe(true)
+  })
+})
+
+describe('choosing a take', () => {
+  async function twoTakes(extra: Record<string, unknown> = {}) {
+    const made = setup(undefined, extra)
+    await made.takes.make(made.file, 'hall', { count: 2 })
+    await made.settled('hall')
+    return made
+  }
+  const lockOf = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+
+  it('writes the take as the track’s music, and the view marks it chosen', async () => {
+    const { root, file, takes, settled } = await twoTakes()
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(view.takes.map((t) => t.chosen)).toEqual([false, false])
+    expect(await takes.choose(file, 'hall', view.takes[1]!.file)).toEqual({ ok: true })
+    expect(readFileSync(join(root, 'audio/music/hall.mp3'), 'utf8')).toBe('mp3')
+    expect(lockOf(root).hall).toMatchObject({ take: 2, seed: 101, list: 'act1' })
+    const after = await takes.view(file, 'hall')
+    if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
+    expect(after.takes.map((t) => t.chosen)).toEqual([false, true])
+  })
+
+  it('makes the track chosen in the project summary, and a stinger’s list is stingers', async () => {
+    const { file, takes } = setup()
+    await takes.make(file, 'victory', { count: 1 })
+    for (let i = 0; i < 100; i++) {
+      const v = await takes.view(file, 'victory')
+      if (v && 'ok' in v && v.ok && !v.making.length) break
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    const view = await takes.view(file, 'victory')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(await takes.choose(file, 'victory', view.takes[0]!.file)).toEqual({ ok: true })
+    const loaded = await loadProject(file)
+    if (!loaded.ok) throw new Error('project')
+    const stingers = loaded.summary.music!.lists.find((l) => l.kind === 'stingers')!
+    expect(stingers.tracks[0]).toMatchObject({ id: 'victory', status: 'chosen' })
+  })
+
+  it('chooses another take over the first; the first stays on the board', async () => {
+    const { root, file, takes, settled } = await twoTakes()
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    await takes.choose(file, 'hall', view.takes[0]!.file)
+    await takes.choose(file, 'hall', view.takes[1]!.file)
+    expect(lockOf(root).hall.take).toBe(2)
+    const after = await takes.view(file, 'hall')
+    if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
+    expect(after.takes.map((t) => [t.n, t.chosen])).toEqual([
+      [1, false],
+      [2, true],
+    ])
+  })
+
+  it('refuses a take that is not on the board, and an unknown track', async () => {
+    const { file, takes } = await twoTakes()
+    expect(await takes.choose(file, 'hall', '0123456789abcdef.9.wav')).toMatchObject({ ok: false })
+    expect(await takes.choose(file, 'nope', '0123456789abcdef.1.wav')).toBeNull()
+  })
+
+  it('refuses to drop the chosen take, and drops another', async () => {
+    const { root, file, takes, settled } = await twoTakes()
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    const [one, two] = view.takes
+    await takes.choose(file, 'hall', one!.file)
+    expect(await takes.drop(file, 'hall', one!.file)).toMatchObject({ ok: false })
+    expect(existsSync(join(root, '.audio-studio/music-takes/hall', one!.file))).toBe(true)
+    expect(await takes.drop(file, 'hall', two!.file)).toEqual({ ok: true })
+  })
+
+  it('leaves the track changed when a take from an earlier brief is chosen', async () => {
+    const { root, file, takes, settled } = await twoTakes()
+    await setTrackBrief(file, 'hall', { brief: 'a new brief' })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(view.takes[0]!.earlier).toBe(true)
+    await takes.choose(file, 'hall', view.takes[0]!.file)
+    const loaded = await loadProject(file)
+    if (!loaded.ok) throw new Error('project')
+    const row = loaded.summary.music!.lists[0]!.tracks[0]!
+    expect(row).toMatchObject({ status: 'changed', changed: ['brief'] })
+    expect(lockOf(root).hall.inputs.brief).toBe('warm lute')
+  })
+
+  it('never lets a drop of the take being chosen slip between the choice and the board', async () => {
+    const { root, file, takes, settled } = await twoTakes()
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    const name = view.takes[0]!.file
+    const [chosen, dropped] = await Promise.all([
+      takes.choose(file, 'hall', name),
+      takes.drop(file, 'hall', name),
+    ])
+    const after = await takes.view(file, 'hall')
+    if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
+    const lock = existsSync(join(root, 'music/music.lock.json')) ? lockOf(root).hall : undefined
+    // Either the take was chosen and stays, or it was dropped and nothing names it.
+    if (lock) expect(after.takes.some((t) => t.chosen)).toBe(true)
+    else expect(after.takes.some((t) => t.n === 1)).toBe(false)
+    const succeeded = (answer: unknown) =>
+      Boolean(answer && typeof answer === 'object' && 'ok' in answer && answer.ok === true)
+    // Exactly one of the two wins.
+    expect([succeeded(chosen), succeeded(dropped)].filter(Boolean)).toHaveLength(1)
+  })
+
+  it('refuses to drop anything while the lock cannot be read', async () => {
+    const { file, takes, settled } = await twoTakes({ 'music/music.lock.json': '{ nope' })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    const answer = await takes.drop(file, 'hall', view.takes[0]!.file)
+    expect(answer).toMatchObject({ ok: false, file: 'music/music.lock.json' })
   })
 })
