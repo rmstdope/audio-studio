@@ -756,6 +756,13 @@ describe('alignWords, in any alphabet', () => {
     expect(align('Über alles.', 'über alles', 'de').ratio).toBe(1)
   })
 
+  it('hears ss and ß as the same in German (grosse and große)', () => {
+    expect(align('Der grosse Hund bellt.', 'Der große Hund bellt.', 'de').ratio).toBe(1)
+    expect(align('Der große Hund bellt.', 'Der grosse Hund bellt.', 'de').ratio).toBe(1)
+    expect(align('Die STRASSE ist lang.', 'Die Straße ist lang.', 'de').ratio).toBe(1)
+    expect(align('Der grosse Hund bellt.', 'Der Grüße Hund bellt.', 'de').missed).toEqual([1])
+  })
+
   it('matches number words of the line’s language to the digits Whisper writes', () => {
     expect(align('I have twenty coins.', 'I have 20 coins.').ratio).toBe(1)
     expect(align('I have twenty-one coins.', 'I have 21 coins.').ratio).toBe(1)
