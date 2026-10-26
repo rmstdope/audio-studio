@@ -3,8 +3,14 @@ import {
   DEFAULT_MUSIC_MODEL,
   MUSIC_MODELS,
   eachWords,
+  MUSIC_GROUPS,
+  canMake,
+  lengthReason,
+  longestFor,
   menuEntry,
   missingOnTrack,
+  setupShortLine,
+  tooLongOnTrack,
   saveFailureHeading,
   modelLine,
   modelOfRecipe,
@@ -21,7 +27,14 @@ describe('the music models', () => {
 
   test('every model has its own recipe and folders', () => {
     expect(new Set(MUSIC_MODELS.map((m) => m.recipe)).size).toBe(MUSIC_MODELS.length)
-    expect(MUSIC_MODELS.map((m) => m.id)).toEqual(['balanced', 'quick', 'quickest', 'careful'])
+    expect(MUSIC_MODELS.map((m) => m.id)).toEqual([
+      'balanced',
+      'quick',
+      'quickest',
+      'careful',
+      'short',
+      'shortest',
+    ])
     expect(musicModel('careful').folders).toEqual(['acestep-v15-xl-sft', 'acestep-5Hz-lm-4B'])
     expect(musicModel('quickest').folders).toEqual(['acestep-v15-turbo', 'acestep-5Hz-lm-1.7B'])
   })
@@ -45,6 +58,84 @@ describe('the music models', () => {
     expect(menuEntry('careful', false)).toBe(
       'Careful · XL sft · 4B — about 7 min a take — not on this computer',
     )
+  })
+})
+
+describe('the Stable Audio models', () => {
+  test('are named Short and Shortest, with their own recipes and folders', () => {
+    expect(modelLine('stable-audio-open-1.0')).toBe('Short · Stable Audio Open 1.0')
+    expect(modelLine('stable-audio-open-small')).toBe('Shortest · Stable Audio Open Small')
+    expect(musicModel('short').folders).toEqual(['stable-audio-open-1.0'])
+    expect(musicModel('shortest').folders).toEqual(['stable-audio-open-small'])
+  })
+  test('the menus have two groups under headings', () => {
+    expect(MUSIC_GROUPS).toEqual([
+      { heading: 'ACE-Step · any length', ids: ['balanced', 'quick', 'quickest', 'careful'] },
+      { heading: 'Stable Audio · short music only', ids: ['short', 'shortest'] },
+    ])
+  })
+  test('the longest loop is the longest piece less what a loop is made longer by', () => {
+    expect(longestFor('short', 'loop')).toBe(27)
+    expect(longestFor('shortest', 'loop')).toBe(0)
+    expect(longestFor('short', 'stinger')).toBeNull()
+    expect(longestFor('balanced', 'loop')).toBeNull()
+  })
+  test('every stinger can be made by every model', () => {
+    for (const { id } of MUSIC_MODELS) expect(canMake(id, 'stinger', 10)).toBe(true)
+  })
+  test('a loop too long is refused, with the reason in the agreed words', () => {
+    expect(canMake('short', 'loop', 27)).toBe(true)
+    expect(canMake('short', 'loop', 28)).toBe(false)
+    expect(lengthReason('short', 'loop', 90)).toBe('makes loops up to 27 s · this one is 1:30')
+    expect(lengthReason('shortest', 'loop', 90)).toBe('makes no loops · this one is 1:30')
+    expect(lengthReason('short', 'loop', 20)).toBeNull()
+    expect(lengthReason('balanced', 'loop', 130)).toBeNull()
+  })
+  test('the entry shows the reason in place of the time, and the reason wins over missing', () => {
+    const track = { kind: 'loop', seconds: 90 } as const
+    expect(menuEntry('short', true)).toBe('Short · Stable Audio Open 1.0 — about 40 s a take')
+    expect(menuEntry('shortest', true)).toBe(
+      'Shortest · Stable Audio Open Small — about 10 s a take',
+    )
+    expect(menuEntry('short', true, track)).toBe(
+      'Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 1:30',
+    )
+    expect(menuEntry('short', false, track)).toBe(
+      'Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 1:30',
+    )
+    expect(menuEntry('short', false, { kind: 'stinger', seconds: 5 })).toBe(
+      'Short · Stable Audio Open 1.0 — about 40 s a take — not on this computer',
+    )
+  })
+  test('under a track’s menu, what the picked model cannot do', () => {
+    expect(tooLongOnTrack('short', 'loop', 90)).toBe(
+      'Short makes loops up to 27 s, and this one is 1:30. Pick another model for these takes.',
+    )
+    expect(tooLongOnTrack('shortest', 'loop', 90)).toBe(
+      'Shortest makes no loops, and this one is 1:30. Pick another model for these takes.',
+    )
+    expect(tooLongOnTrack('short', 'loop', 20)).toBeNull()
+  })
+  test('each take takes about this many seconds', () => {
+    expect(eachWords('short')).toBe('about 40 seconds each')
+  })
+  test('Setup says what a short default means, and how many loops it leaves out', () => {
+    const loops = [20, 90, 100, 130]
+    expect(setupShortLine('short', loops)).toBe(
+      'Short makes stingers, and loops up to 27 s. 3 loops are longer: their takes will need another model, picked on their page.',
+    )
+    expect(setupShortLine('short', [20, 30])).toBe(
+      'Short makes stingers, and loops up to 27 s. 1 loop is longer: its takes will need another model, picked on their page.',
+    )
+    expect(setupShortLine('short', [20])).toBe('Short makes stingers, and loops up to 27 s.')
+    expect(setupShortLine('shortest', [20, 90])).toBe(
+      'Shortest makes stingers, and no loops. 2 loops will need another model, picked on their page.',
+    )
+    expect(setupShortLine('shortest', [5])).toBe(
+      'Shortest makes stingers, and no loops. 1 loop will need another model, picked on their page.',
+    )
+    expect(setupShortLine('shortest', [])).toBe('Shortest makes stingers, and no loops.')
+    expect(setupShortLine('balanced', loops)).toBeNull()
   })
 })
 
@@ -79,6 +170,13 @@ describe('music.model in the project file', () => {
     const known = projectJson({ music: { ...music, model: 'careful' } })
     expect(ProjectSchema.safeParse(known).success).toBe(true)
     expect(ProjectSchema.safeParse(projectJson({ music })).success).toBe(true)
+  })
+  test('accepts the Stable Audio models', () => {
+    for (const model of ['short', 'shortest']) {
+      expect(ProjectSchema.safeParse(projectJson({ music: { ...music, model } })).success).toBe(
+        true,
+      )
+    }
   })
   test('refuses an unknown one, naming where', () => {
     const result = ProjectSchema.safeParse(projectJson({ music: { ...music, model: 'huge' } }))

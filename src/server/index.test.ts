@@ -265,6 +265,7 @@ describe('server', () => {
       'requests',
       'refresh',
       'music',
+      'stableAudio',
     ])
   })
 
@@ -3537,7 +3538,15 @@ describe('server, the music model', () => {
     const view = await (await fetch(at('/api/models'))).json()
     expect(view.music).toEqual({
       model: 'balanced',
-      installed: { balanced: true, quick: true, quickest: true, careful: false },
+      installed: {
+        balanced: true,
+        quick: true,
+        quickest: true,
+        careful: false,
+        short: true,
+        shortest: true,
+      },
+      loops: [5],
     })
   })
 

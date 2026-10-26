@@ -52,7 +52,7 @@ export function missingFolders(checkpoints: string, model: MusicModelId): string
 }
 
 /** A path with the home folder written as `~`, as a person would name it. */
-function withHome(path: string): string {
+export function withHome(path: string): string {
   const home = homedir()
   return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path
 }
@@ -87,6 +87,8 @@ export function aceStepReady(
       fix: 'brew install uv (then start the studio again if it is still not found)',
     }
   }
+  // A Stable Audio model keeps its own folders elsewhere: nothing of ACE-Step's is needed for it.
+  if (musicModel(model).family !== 'acestep') return { ok: true }
   const missing = missingFolders(checkpoints, model)
   if (!missing.length) return { ok: true }
   const { name, folders, download } = musicModel(model)
@@ -94,6 +96,36 @@ export function aceStepReady(
     ok: false,
     message: `The project's music model, ${name}, is not on this computer: ${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} missing from ${withHome(checkpoints)}.`,
     fix: `Put the models ${folders.join(' and ')}${download ? ` (${download})` : ''} in ${checkpoints}, or set ACESTEP_CHECKPOINTS to the folder that holds them.`,
+  }
+}
+
+/**
+ * The two generators as one: each model goes to its own family's worker, and when a take needs
+ * the other family the first one is stopped, so its models leave memory (one GPU, one at a time).
+ */
+export function createMusicRouter({
+  acestep,
+  stableAudio,
+}: {
+  acestep: MusicGenerator
+  stableAudio: MusicGenerator
+}): MusicGenerator {
+  const of = (model: MusicModelId) =>
+    musicModel(model).family === 'acestep' ? acestep : stableAudio
+  let last: MusicGenerator | null = null
+  return {
+    ready: (model) => of(model).ready(model),
+    installed: (model) => of(model).installed(model),
+    generate(request, signal) {
+      const generator = of(request.model)
+      if (last && last !== generator) last.close()
+      last = generator
+      return generator.generate(request, signal)
+    },
+    close() {
+      acestep.close()
+      stableAudio.close()
+    },
   }
 }
 

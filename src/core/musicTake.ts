@@ -1,12 +1,11 @@
 import { z } from 'zod'
-import { MUSIC_MODEL_IDS, musicModel, type MusicModelId } from './musicModels'
+import { LOOP_EXTRA_SECONDS, MUSIC_MODEL_IDS, musicModel, type MusicModelId } from './musicModels'
 import { readWav, writeWav, type Wav } from './wav'
 
 /** What a take made before models were chosen records, and what the take fingerprint begins with. */
 export const MUSIC_MODEL = musicModel('balanced').recipe
 
-/** How much longer than it plays a loop is generated, since every take closes as a song does. */
-export const LOOP_EXTRA_SECONDS = 20
+export { LOOP_EXTRA_SECONDS }
 
 /** The seconds after a loop's cut that are crossfaded over its start. */
 export const SEAM_SECONDS = 4

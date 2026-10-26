@@ -68,7 +68,8 @@ import {
 import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
 import { heardFor } from '../services/heard'
 import { onGpu } from '../services/gpu'
-import { createAceStepWorker, type MusicGenerator } from '../services/music'
+import { createAceStepWorker, createMusicRouter, type MusicGenerator } from '../services/music'
+import { createStableAudioWorker } from '../services/stableAudio'
 import { createFakeMusic } from '../services/musicFake'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
@@ -123,7 +124,12 @@ function sharedWhisper(): Transcriber {
 function sharedMusic(): MusicGenerator {
   const state = globalThis as { audioStudioMusic?: MusicGenerator }
   state.audioStudioMusic ??=
-    process.env.AUDIO_STUDIO_FAKE_MUSIC === '1' ? createFakeMusic() : createAceStepWorker()
+    process.env.AUDIO_STUDIO_FAKE_MUSIC === '1'
+      ? createFakeMusic()
+      : createMusicRouter({
+          acestep: createAceStepWorker(),
+          stableAudio: createStableAudioWorker(),
+        })
   return state.audioStudioMusic
 }
 

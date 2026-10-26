@@ -17,7 +17,14 @@ afterAll(() => {
   GlobalRegistrator.unregister()
 })
 
-const installed = { balanced: true, quick: true, quickest: true, careful: true }
+const installed = {
+  balanced: true,
+  quick: true,
+  quickest: true,
+  careful: true,
+  short: true,
+  shortest: true,
+}
 
 const answer = (music: Extract<ModelsAnswer, { ok: true }>['music']): ModelsAnswer => ({
   ok: true,
@@ -62,7 +69,7 @@ function render(data: ModelsAnswer) {
 
 describe('the Music row of the Models panel', () => {
   it('is a fourth row with its purpose, one menu of whole recipes, and Free', () => {
-    const page = render(answer({ model: 'balanced', installed }))
+    const page = render(answer({ model: 'balanced', installed, loops: [90, 25] }))
     const rows = [...page.container.querySelectorAll('.mrow .mname')].map((n) => n.textContent)
     expect(rows).toEqual(['Audition', 'Draft', 'Final', 'Music'])
     const text = page.container.textContent!
@@ -78,6 +85,12 @@ describe('the Music row of the Models panel', () => {
       'Quick · XL turbo · 1.7B — about 1¼ min a take',
       'Quickest · Turbo · 1.7B — about 1 min a take',
       'Careful · XL sft · 4B — about 7 min a take',
+      'Short · Stable Audio Open 1.0 — about 40 s a take',
+      'Shortest · Stable Audio Open Small — about 10 s a take',
+    ])
+    expect([...page.menu()!.querySelectorAll('optgroup')].map((g) => g.label)).toEqual([
+      'ACE-Step · any length',
+      'Stable Audio · short music only',
     ])
     expect(page.menu()!.parentElement!.textContent).toContain('Free')
   })
@@ -91,7 +104,7 @@ describe('the Music row of the Models panel', () => {
   it('saves a pick at once, with no question, and says Saving… while it does', async () => {
     let finish: (r: Response) => void = () => {}
     reply = () => new Promise((resolve) => (finish = resolve))
-    const page = render(answer({ model: 'balanced', installed }))
+    const page = render(answer({ model: 'balanced', installed, loops: [90, 25] }))
     await page.pick('quick')
     expect(put).toEqual([{ model: 'quick', was: 'balanced' }])
     expect(page.menu()!.value).toBe('quick')
@@ -110,7 +123,7 @@ describe('the Music row of the Models panel', () => {
         }),
         { status: 409 },
       )
-    const page = render(answer({ model: 'balanced', installed }))
+    const page = render(answer({ model: 'balanced', installed, loops: [90, 25] }))
     await page.pick('quick')
     const box = page.container.querySelector('[role="alert"]')!
     expect(box.textContent).toContain('Quick could not be saved as the music model.')
@@ -126,7 +139,9 @@ describe('the Music row of the Models panel', () => {
   })
 
   it('marks a model this computer lacks, which can still be the project’s default', async () => {
-    const page = render(answer({ model: 'careful', installed: { ...installed, careful: false } }))
+    const page = render(
+      answer({ model: 'careful', installed: { ...installed, careful: false }, loops: [] }),
+    )
     const careful = [...page.menu()!.options].find((o) => o.value === 'careful')!
     expect(careful.textContent).toBe(
       'Careful · XL sft · 4B — about 7 min a take — not on this computer',
@@ -135,5 +150,35 @@ describe('the Music row of the Models panel', () => {
     expect(page.container.querySelector('.warnline')!.textContent).toBe('not on this computer')
     await page.pick('quick')
     expect(put).toEqual([{ model: 'quick', was: 'careful' }])
+  })
+
+  it('says what a Stable Audio default means, and how many loops it leaves out', () => {
+    const short = render(answer({ model: 'short', installed, loops: [90, 25, 130] }))
+    expect(short.container.querySelector('.mshort')!.textContent).toBe(
+      'Short makes stingers, and loops up to 27 s. 2 loops are longer: their takes will need another model, picked on their page.',
+    )
+    const shortest = render(answer({ model: 'shortest', installed, loops: [90] }))
+    expect(shortest.container.querySelector('.mshort')!.textContent).toBe(
+      'Shortest makes stingers, and no loops. 1 loop will need another model, picked on their page.',
+    )
+  })
+
+  it('shows no such line for an ACE-Step model, and greys nothing for length', () => {
+    const page = render(answer({ model: 'balanced', installed, loops: [90] }))
+    expect(page.container.querySelector('.mshort')).toBeNull()
+    expect([...page.menu()!.options].every((o) => !o.disabled)).toBe(true)
+  })
+
+  it('marks Stable Audio missing here, and it can still be the default', async () => {
+    const page = render(
+      answer({ model: 'balanced', installed: { ...installed, short: false }, loops: [] }),
+    )
+    const short = [...page.menu()!.options].find((o) => o.value === 'short')!
+    expect(short.textContent).toBe(
+      'Short · Stable Audio Open 1.0 — about 40 s a take — not on this computer',
+    )
+    expect(short.disabled).toBe(false)
+    await page.pick('short')
+    expect(put).toEqual([{ model: 'short', was: 'balanced' }])
   })
 })

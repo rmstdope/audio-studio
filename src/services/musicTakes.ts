@@ -21,6 +21,7 @@ import {
   MUSIC_MODELS,
   modelLine,
   musicModel,
+  tooLongOnTrack,
   type MusicModelId,
 } from '../core/musicModels'
 import { trackFor, type TrackRow } from '../core/music'
@@ -377,6 +378,8 @@ export function createMusicTakes({
         'retry' in request ? active.get(`${projectFile}\0${id}`)?.get(request.retry) : undefined
       const model =
         retried?.model ?? ('retry' in request ? found.model : (request.model ?? found.model))
+      const tooLong = tooLongOnTrack(model, inputs.kind, inputs.seconds)
+      if (tooLong) return { ok: false, message: tooLong }
       if (!generator.installed(model)) {
         return { ok: false, message: `${musicModel(model).name} is not on this computer.` }
       }

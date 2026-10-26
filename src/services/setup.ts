@@ -1,6 +1,8 @@
 import { dirname } from 'node:path'
 import { setupChecks, type SetupCheck, type SetupFacts } from '../core/setup'
 import { fishApiKey } from './env'
+import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS } from '../core/musicModels'
+import { missingStableAudio, STABLE_AUDIO_DIR } from './stableAudio'
 import { aceStepCheckpoints, aceStepReady } from './music'
 import type { CreditResult } from './fish'
 import { openProject, type ProjectFailure } from './workspace'
@@ -32,6 +34,7 @@ export async function checkSetup(
   credit: () => Promise<CreditResult>,
   machine: Machine = thisMachine,
   environment: Record<string, string | undefined> = process.env,
+  stableAudioDir: string = STABLE_AUDIO_DIR,
 ): Promise<SetupResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -53,7 +56,15 @@ export async function checkSetup(
     parallel: narration.quality.parallel,
     fishTier: narration.quality.fishTier ?? null,
     music: project.music
-      ? { ready: aceStepReady(machine, checkpoints, project.music.model), checkpoints }
+      ? {
+          ready: aceStepReady(machine, checkpoints, project.music.model),
+          checkpoints,
+          model: project.music.model ?? DEFAULT_MUSIC_MODEL,
+          stableAudioMissing: MUSIC_MODELS.filter(
+            ({ id, family }) =>
+              family === 'stable-audio' && missingStableAudio(stableAudioDir, id).length > 0,
+          ).map(({ id }) => id),
+        }
       : null,
   }
   return { ok: true, checks: setupChecks(facts) }
