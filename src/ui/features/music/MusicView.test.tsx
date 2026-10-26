@@ -109,7 +109,12 @@ describe.each(['act', 'stingers'] as const)('the play button on a %s page', (kin
   })
 
   it('still plays a chosen take whose track changed since', () => {
-    expect(button('Cellar').disabled).toBe(false)
+    const play = button('Cellar')
+    expect(play.disabled).toBe(false)
+    expect(play.getAttribute('aria-label')).toBe('Play Cellar: take 3')
+    played.length = 0
+    act(() => play.click())
+    expect(played).toEqual(['/api/music/tracks/cellar/current'])
   })
 
   it('is dim and says so when the music file is missing', () => {
