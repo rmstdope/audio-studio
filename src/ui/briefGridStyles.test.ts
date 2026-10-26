@@ -35,3 +35,10 @@ describe("Setup's short-model line is a quiet note", () => {
     expect(declarations).toMatch(/font-size: 1[0-3]px/)
   })
 })
+
+describe("a music take card's model line and length are quiet notes", () => {
+  it('styles the faint and small spans inside a take card', () => {
+    expect(rule(css, '.take .faint')).toContain('color: var(--faint)')
+    expect(rule(css, '.take .small')).toMatch(/font-size: 1[0-3]px/)
+  })
+})

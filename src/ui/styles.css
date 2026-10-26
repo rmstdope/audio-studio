@@ -2118,6 +2118,12 @@ button.cue-chip[aria-expanded='true'] {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.take .faint {
+  color: var(--faint);
+}
+.take .small {
+  font-size: 12px;
+}
 .mshort {
   display: block;
   font-size: 12px;
