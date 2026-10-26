@@ -162,7 +162,7 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
           {!here && <span className="warnline">not on this computer</span>}
           {pending && <span className="muted">Saving…</span>}
         </div>
-        {shortLine && <span className="mshort faint small">{shortLine}</span>}
+        {shortLine && <span className="mshort">{shortLine}</span>}
         {state.phase === 'failed' && (
           <section className="notice notice-err" role="alert">
             <div className="notice-text">
