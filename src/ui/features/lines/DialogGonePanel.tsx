@@ -27,9 +27,9 @@ export function DialogGonePanel({
   canRefresh: boolean
   refresh: ReturnType<typeof useRefreshDialog>
 }) {
-  const panel = dialogGonePanel({ partTitle, partLabel, language, path, recorded, canRefresh })
+  const panel = dialogGonePanel({ partTitle, partLabel, language, recorded, canRefresh })
   return (
-    <section className="panel dialog-gone" role="status">
+    <section className="problems dialog-gone" role="status">
       <h2>{panel.heading}</h2>
       {variant === 'overview' ? (
         <>

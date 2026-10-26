@@ -141,8 +141,6 @@ export function dialogGonePanel({
   partTitle: string
   partLabel: string
   language: string | null
-  /** The file's path is shown by the component, in monospace. */
-  path: string
   recorded: Recorded
   canRefresh: boolean
 }): { heading: string; before: string; advice: string; lines: string; refresh: boolean } {

@@ -592,6 +592,17 @@ describe('a part in several languages', () => {
     expect(part.problems.map((p) => p.file)).toContain('tts/act1/en/script.json')
   })
 
+  it('says the source dialog is missing when it is gone, and not when it is unreadable', async () => {
+    const gone = await open('sv', 'act1', {
+      'tts/act1/en/script.json': undefined,
+      'audio/act1/en/manifest.json': { a: { file: 'a.mp3' } },
+    })
+    expect(gone.part.problems.map((p) => p.file)).toContain('tts/act1/en/script.json')
+    const bad = await open('sv', 'act1', { 'tts/act1/en/script.json': '[bad' })
+    const about = bad.part.problems.filter((p) => p.file === 'tts/act1/en/script.json')
+    expect(about.map((p) => p.message.includes('missing'))).toEqual([false])
+  })
+
   it('serves a clip from the language’s folder', async () => {
     const { root } = await open()
     const projectFile = join(root, 'audio-studio.json')

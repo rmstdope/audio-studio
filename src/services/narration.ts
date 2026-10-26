@@ -603,6 +603,8 @@ export async function removeOrphans(
     if (read.problems.length) {
       throw new Error(read.problems.map((p) => `${p.file}: ${p.message}`).join('; '))
     }
+    // Without a readable dialog nothing is known to be orphaned: the last check before deleting.
+    if (read.input.held) return 0
     const root = dirname(projectFile)
     const lines = new Set(read.input.lines.map((line) => line.key))
     const manifest = { ...read.input.manifest }

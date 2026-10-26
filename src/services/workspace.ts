@@ -390,7 +390,7 @@ export async function readPart(
     language !== sourceLanguage && dialog.status === 'ok'
       ? await readDialog(root, project, part, problems, sourceLanguage)
       : null
-  if (source && source.status !== 'ok') {
+  if (source?.status === 'missing' || source?.status === 'gone') {
     problems.push({
       file: partPathFor(templates.dialog, part.id, sourceLanguage),
       path: '',

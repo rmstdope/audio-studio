@@ -92,7 +92,6 @@ describe('dialogGonePanel', () => {
     partTitle: 'Act 1',
     partLabel: 'Act',
     language: 'Svenska' as string | null,
-    path: 'tts/act1/sv/script.json',
     recorded: { clips: 12, cues: 3 },
     canRefresh: true,
   }
