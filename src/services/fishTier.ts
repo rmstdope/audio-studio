@@ -27,8 +27,9 @@ export function setFishTier(projectFile: string, tier: FishTier | null): Promise
     const file = basename(projectFile)
     const parsed = ProjectSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
-    await saveProject(projectFile, opened, (indent) => projectJson(raw, indent))
-    return { ok: true }
+    return saveProject(projectFile, opened, 'narration.quality.fishTier', (indent) =>
+      projectJson(raw, indent),
+    )
   })
 }
 

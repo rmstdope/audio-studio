@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setFishTier } from './fishTier'
 
@@ -57,5 +57,26 @@ describe('setFishTier', () => {
     const { projectFile, read } = repo()
     await Promise.all([setFishTier(projectFile, '100'), setFishTier(projectFile, '1000')])
     expect(JSON.parse(read()).narration.quality.fishTier).toBe('1000')
+  })
+
+  it('says why the file could not be written when the disk refuses it', async () => {
+    const { projectFile, read } = repo()
+    const before = read()
+    chmodSync(dirname(projectFile), 0o555)
+    try {
+      expect(await setFishTier(projectFile, '100')).toEqual({
+        ok: false,
+        problems: [
+          {
+            file: 'audio-studio.json',
+            path: 'narration.quality.fishTier',
+            message: 'permission denied',
+          },
+        ],
+      })
+    } finally {
+      chmodSync(dirname(projectFile), 0o755)
+    }
+    expect(read()).toBe(before)
   })
 })

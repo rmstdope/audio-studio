@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
-import { ProjectSchema, problemsFrom, type Project } from '../core/project'
-import { writeAtomic } from './files'
+import { ProjectSchema, problemsFrom, type Problem, type Project } from '../core/project'
+import { writeAtomic, writeFailure } from './files'
 import { createSerial } from './serial'
 import type { ProjectFailure } from './workspace'
 
@@ -45,23 +45,36 @@ export async function openProject(projectFile: string): Promise<OpenedProject | 
   return { ok: true, text, raw, project: current.data }
 }
 
+/** A written project file, or why the disk refused it. */
+export type ProjectSave = { ok: true } | { ok: false; problems: Problem[] }
+
 /**
  * Writes the project file again from `render`, which is given the indentation the file used and
- * returns its JSON with `\n` line ends: the file's own line endings and last newline are kept.
+ * returns its JSON with `\n` line ends: the file's own line endings and last newline are kept. A
+ * write the disk refuses is answered with why ("permission denied") at `path`, what changed.
  */
 export async function saveProject(
   projectFile: string,
   opened: OpenedProject,
+  path: string,
   render: (indent: string) => string,
-): Promise<void> {
+): Promise<ProjectSave> {
   const { text } = opened
   const indent = /\n([ \t]+)"/.exec(text)?.[1] ?? '  '
   const eol = text.includes('\r\n') ? '\r\n' : '\n'
-  await writeAtomic(
-    dirname(projectFile),
-    basename(projectFile),
-    render(indent).replace(/\n/g, eol) + (/\n$/.test(text) ? eol : ''),
-  )
+  try {
+    await writeAtomic(
+      dirname(projectFile),
+      basename(projectFile),
+      render(indent).replace(/\n/g, eol) + (/\n$/.test(text) ? eol : ''),
+    )
+    return { ok: true }
+  } catch (error) {
+    return {
+      ok: false,
+      problems: [{ file: basename(projectFile), path, message: writeFailure(error) }],
+    }
+  }
 }
 
 /**

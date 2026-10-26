@@ -1137,7 +1137,7 @@ export function useSetFishTier() {
         throw new Error(`saving the tier answered ${response.status}`)
       }
       const change = (await response.json()) as FishTierChange
-      if (!change.ok) throw new Error('the tier was not saved')
+      if (!change.ok) throw new Error(change.problems.map((p) => p.message).join('; '))
     },
     // Saved or not, the row checks again, so it shows what the file holds.
     onSettled: () =>
