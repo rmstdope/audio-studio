@@ -173,7 +173,7 @@ export function planPart(input: PlanInput): PartState {
     const followsScene =
       scene !== null &&
       narration.sceneCueSpeakers.includes(line.speaker) &&
-      cueFor(cues, line.key) === undefined
+      openingFor(cues, line.key, line.text) === undefined
     if (line.text.trim() === '' && english !== null) {
       counts.untranslated++
       return {

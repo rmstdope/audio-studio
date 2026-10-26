@@ -604,6 +604,20 @@ describe('planPart, cues inside a line', () => {
     expect(planPart(input()).lines[0]!.sourceInside).toEqual([])
   })
 
+  it('counts a line with cues inside and no opening cue as following its scene', () => {
+    const scened: Line[] = [
+      { key: 'n1', speaker: 'narrator', text: 'Light fades slowly.', scene: 'Cave' },
+    ]
+    const state = planPart(
+      input({
+        lines: scened,
+        cues: { 'scene:Cave': '[dark]', n1: 'Light [hushed] fades slowly.' },
+      }),
+    )
+    expect(state.lines[0]).toMatchObject({ cue: '[dark]', cueFrom: 'scene', followsScene: true })
+    expect(state.scenes[0]).toMatchObject({ following: 1 })
+  })
+
   it('takes a line with cues inside but no opening cue as the style’s', () => {
     const state = planPart(input({ cues: { n1: 'Elior [low] wakes.' } }))
     expect(state.lines[0]).toMatchObject({
