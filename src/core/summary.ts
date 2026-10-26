@@ -3,9 +3,26 @@ import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } 
 import type { Pronunciation } from './pronounce'
 import { pronounceOf, voiceOf, type Cast, type Line } from './resources'
 
-/** What reading a part's dialog gave: its lines, no file yet, or a file that failed validation. */
+/** What was recorded for a part in one language: clips in its manifest, and cues of its own. */
+export interface Recorded {
+  clips: number
+  cues: number
+}
+
+/**
+ * What reading a part's dialog gave: its lines, no file yet, a file that failed validation, or no
+ * file although recordings were made with it (`gone`, with how many).
+ */
 export type DialogState =
-  { status: 'ok'; lines: Line[] } | { status: 'missing' } | { status: 'invalid' }
+  | { status: 'ok'; lines: Line[] }
+  | { status: 'missing' }
+  | { status: 'invalid' }
+  | ({ status: 'gone' } & Recorded)
+
+/** The recordings of a dialog that is gone; null for any other state. */
+export function recordedOf(dialog: DialogState): Recorded | null {
+  return dialog.status === 'gone' ? { clips: dialog.clips, cues: dialog.cues } : null
+}
 
 /** How many lines a character has in one part. */
 export interface Appearance {
@@ -19,6 +36,8 @@ export interface PartSummary {
   title: string
   dialogPath: string
   dialog: DialogState['status']
+  /** What was recorded for the part while its dialog is gone; null otherwise. */
+  recorded: Recorded | null
   lineCount: number
   /** The characters speaking in this part, most lines first. */
   characters: { id: string; lines: number }[]
@@ -155,6 +174,7 @@ export function summarize({
       title: part.title,
       dialogPath: partPathFor(narration.paths.dialog, part.id, narration.languages[0]),
       dialog: dialog.status,
+      recorded: recordedOf(dialog),
       lineCount: lines.length,
       characters: byLinesThenId([...counts].map(([id, count]) => ({ id, lines: count }))),
     }

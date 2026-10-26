@@ -412,7 +412,11 @@ The **planner** gives every line one status:
 Clips in the manifest whose key is no longer in the dialog are listed as **orphans** (removed after
 confirmation when generating), and cues whose key is gone as **orphaned cues**. While the dialog
 file is there but cannot be read, neither is listed: its problem is shown instead, and generation
-is refused until it is fixed.
+is refused until it is fixed. The same holds while the file is **gone** but clips are in that
+language's manifest or cues of its own are in its cues file (`DialogState` `gone`, with the counts):
+the recordings are held, nothing is orphaned or offered for removal (the planner's `held` input),
+and the part's overview, lines page, language switch ("Dialog gone") and sidebar ("dialog gone")
+say so in amber. Nothing is stored; it is read from the files each time.
 
 A stale line's reasons come from comparing the lock entry with today's inputs: `voice`, `model`,
 `cue`, `text`, `pronunciation` (the words as said changed but the words did not) and `settings`.

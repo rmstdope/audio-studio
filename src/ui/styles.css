@@ -2143,6 +2143,26 @@ a.btn {
   max-width: 100%;
 }
 
+.dialog-gone {
+  /* Looks like .problems (its amber panel); this adds the heading and text. */
+  color: var(--text-soft);
+}
+
+.dialog-gone h2 {
+  color: var(--warn);
+}
+
+.dialog-gone p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tab-warn .tab-count,
+.nav-item .meta.meta-warn {
+  color: var(--warn);
+}
+
 .tab-dim {
   opacity: 0.6;
 }

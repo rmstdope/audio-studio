@@ -137,6 +137,17 @@ describe('planPart', () => {
     expect(state.orphans).toEqual([{ key: 'old', speaker: 'mira', file: 'old.mp3' }])
     expect(state.orphanCues).toEqual([{ key: 'gone', cue: '[soft]' }])
   })
+
+  it('lists no orphan while the dialog is held (unreadable or gone)', () => {
+    const state = planPart(
+      input({
+        held: true,
+        manifest: { ...input().manifest, old: { file: 'old.mp3', speaker: 'mira' } },
+        cues: { gone: '[soft]' },
+      }),
+    )
+    expect([state.orphans, state.orphanCues]).toEqual([[], []])
+  })
 })
 
 describe('planPart, orphaned cues', () => {

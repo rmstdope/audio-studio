@@ -4,6 +4,7 @@ import { sharesVoiceWith, type PartSummary, type ProjectSummary } from '../../..
 import type { PartDetail } from '../../../services/workspace'
 import { useAdopt, useMoveCue, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
+import { DialogGonePanel } from '../lines/DialogGonePanel'
 import { PartLanguageSwitch } from '../lines/PartLanguageSwitch'
 import { noDialogPanel } from '../../languages'
 import { CharacterCard } from '../../components/CharacterCard'
@@ -36,6 +37,8 @@ export function PartOverview({
   const refresh = useRefreshDialog(part.id)
   // Another language than the source may have no dialog yet, whatever the source has.
   const noLanguageDialog = several && loaded?.dialog === 'missing'
+  // The dialog file is gone although recordings were made with it: they are held, not orphaned.
+  const goneRecorded = several ? (loaded?.recorded ?? null) : part.recorded
   const showsLines = (several ? loaded?.dialog === 'ok' : hasDialog) && loaded !== null
   const lineCount = several ? (loaded?.lines.length ?? 0) : part.lineCount
 
@@ -97,7 +100,7 @@ export function PartOverview({
         />
       )}
 
-      {!hasDialog && !several ? (
+      {!hasDialog && !several && !goneRecorded ? (
         <NoDialog summary={summary} part={part} />
       ) : (
         <>
@@ -108,7 +111,18 @@ export function PartOverview({
             />
           )}
           {loaded && loaded.orphanCues.length > 0 && <OrphanCues part={loaded} language={asked} />}
-          {noLanguageDialog ? (
+          {goneRecorded ? (
+            <DialogGonePanel
+              variant="overview"
+              partTitle={shortTitle(part.title)}
+              partLabel={summary.partLabel}
+              language={several ? active.name : null}
+              path={loaded?.dialogPath ?? part.dialogPath}
+              recorded={goneRecorded}
+              canRefresh={summary.canRefresh}
+              refresh={refresh}
+            />
+          ) : noLanguageDialog ? (
             <NoLanguageDialog summary={summary} part={part} name={active.name} refresh={refresh} />
           ) : loaded ? (
             <StatusPanel part={loaded} language={asked} />
@@ -119,7 +133,9 @@ export function PartOverview({
                 : 'Checking clips…'}
             </section>
           )}
-          <CastSection summary={summary} part={part} detail={loaded} language={asked} />
+          {(several || !goneRecorded) && (
+            <CastSection summary={summary} part={part} detail={loaded} language={asked} />
+          )}
         </>
       )}
     </>

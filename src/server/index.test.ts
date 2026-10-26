@@ -1205,6 +1205,36 @@ describe('server, refreshing and generating', () => {
   })
 })
 
+describe('server, generating a part whose dialog is gone', () => {
+  const goneRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    'audio/act1/manifest.json': {
+      a: { file: 'a.mp3', speaker: 'narrator', duration: 1, words: [] },
+    },
+    'audio/act1/a.mp3': 'clip',
+  })
+  const gone = startServer({
+    projectFile: join(goneRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => gone.stop(true))
+
+  it('offers nothing and removes nothing', async () => {
+    const planned = await (await fetch(new URL('/api/parts/act1/plan', gone.url))).json()
+    expect(planned.plan).toMatchObject({ keys: [], orphans: [] })
+    const response = await fetch(new URL('/api/parts/act1/jobs', gone.url), {
+      method: 'POST',
+      headers: { origin: gone.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ speaker: null, keys: [], orphans: ['a'] }),
+    })
+    expect(response.status).toBe(409)
+    expect(existsSync(join(goneRoot, 'audio/act1/a.mp3'))).toBe(true)
+  })
+})
+
 describe('server, generating only what was shown', () => {
   const shownRoot = tempRepo({
     'audio-studio.json': projectJson(),

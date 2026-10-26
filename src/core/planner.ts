@@ -103,6 +103,11 @@ export interface PlanInput {
   /** File names present in the part's clips folder. */
   files: Set<string>
   narration: Project['narration']
+  /**
+   * The dialog says nothing about which lines left it (the file cannot be read, or is gone while
+   * recordings exist): no clip or cue is listed as an orphan.
+   */
+  held?: boolean
 }
 
 /** The state of every line's clip in a part, its orphaned clips and cues, and counts per status. */
@@ -189,11 +194,11 @@ export function planPart(input: PlanInput): PartState {
 
   const keys = new Set(lines.map(({ line }) => line.key))
   const orphans = Object.entries(manifest)
-    .filter(([key]) => !keys.has(key))
+    .filter(([key]) => !input.held && !keys.has(key))
     .map(([key, clip]) => ({ key, speaker: clip.speaker ?? null, file: clip.file }))
     .sort((a, b) => a.key.localeCompare(b.key))
   const orphanCues = Object.entries(own)
-    .filter(([key]) => !keys.has(key))
+    .filter(([key]) => !input.held && !keys.has(key))
     .map(([key, cue]) => ({ key, cue }))
 
   return { lines: states, orphans, orphanCues, counts }

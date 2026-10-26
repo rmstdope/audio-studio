@@ -1,4 +1,5 @@
 import type { GenerationPlan } from '../core/generation'
+import type { Recorded } from '../core/summary'
 import type { LanguageProgress } from '../services/workspace'
 import { plural } from './format'
 
@@ -6,7 +7,15 @@ import { plural } from './format'
 export function languageTab(
   language: LanguageProgress,
   partTitle: string,
-): { count: string; title: string; dimmed: boolean } {
+): { count: string; title: string; dimmed: boolean; warn?: true } {
+  if (language.dialog === 'gone') {
+    return {
+      count: 'Dialog gone',
+      title: `${partTitle}’s ${language.name} dialog is gone`,
+      dimmed: false,
+      warn: true,
+    }
+  }
   if (language.dialog === 'missing') {
     return {
       count: 'No dialog',
@@ -103,6 +112,51 @@ export function noDialogPanel(
     text: `The game has not written ${name} lines for this ${partLabel.toLowerCase()}. Once it does, ${
       canRefresh ? 'Refresh dialog' : 'the studio'
     } reads them in.`,
+    refresh: canRefresh,
+  }
+}
+
+/** What was recorded, in words: "12 clips and 3 cues", naming only what exists. */
+export function recordedWords(recorded: Recorded): string {
+  return [
+    recorded.clips ? plural(recorded.clips, 'clip') : '',
+    recorded.cues ? plural(recorded.cues, 'cue') : '',
+  ]
+    .filter(Boolean)
+    .join(' and ')
+}
+
+/**
+ * The words of the panels for a dialog that is gone while recordings were made with it: the
+ * heading, the sentence that follows the file's path, the advice, the lines page's sentence, and
+ * whether the game can refresh. The language is null in a one-language project.
+ */
+export function dialogGonePanel({
+  partTitle,
+  partLabel,
+  language,
+  recorded,
+  canRefresh,
+}: {
+  partTitle: string
+  partLabel: string
+  language: string | null
+  recorded: Recorded
+  canRefresh: boolean
+}): { heading: string; before: string; advice: string; lines: string; refresh: boolean } {
+  const words = recordedWords(recorded)
+  const dropped = `If the game no longer has ${language ? `${language} lines for ` : ''}this ${partLabel.toLowerCase()}, delete the clips and their manifest yourself.`
+  return {
+    heading: `${partTitle}’s ${language ? `${language} ` : ''}dialog is gone`,
+    before: ` is not there, but ${words} were recorded for ${partTitle}${
+      language ? ` in ${language}` : ''
+    }. The studio keeps them as they are and offers to remove none of them until the dialog is back.`,
+    advice: `${
+      canRefresh
+        ? 'Refresh dialog writes it again from the game.'
+        : 'Once the game writes it again, the studio reads it in.'
+    } ${dropped}`,
+    lines: `${words} were recorded for these lines. Nothing can be generated or removed until the dialog is back.`,
     refresh: canRefresh,
   }
 }

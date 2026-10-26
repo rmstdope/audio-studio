@@ -248,6 +248,18 @@ describe('recordLine', () => {
   })
 })
 
+describe('removeOrphans, a dialog that is gone', () => {
+  it('removes nothing, whatever it is asked for', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson(),
+      'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'mira', duration: 1, words: [] } },
+      'audio/act1/a.mp3': 'clip',
+    })
+    expect(await removeOrphans(join(root, 'audio-studio.json'), 'act1', ['a'])).toBe(0)
+    expect(existsSync(join(root, 'audio/act1/a.mp3'))).toBe(true)
+  })
+})
+
 describe('removeOrphans', () => {
   const orphanFiles = {
     ...files,

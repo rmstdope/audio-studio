@@ -163,6 +163,98 @@ describe('loadPart', () => {
   })
 })
 
+describe('loadPart, a dialog that is gone', () => {
+  const entry = { file: 'a.mp3', speaker: 'narrator' }
+  const base = { 'audio-studio.json': projectJson(), 'tts/cast.json': { speakers: {} } }
+  const load = async (files: Record<string, unknown>) => {
+    const root = tempRepo(files)
+    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    if (!result?.ok) throw new Error('expected the part to load')
+    return result.part
+  }
+
+  it('holds clips and cues instead of calling them orphans', async () => {
+    const part = await load({
+      ...base,
+      'audio/act1/manifest.json': { a: entry, b: entry },
+      'tts/act1/cues.json': { a: '[softly]' },
+    })
+    expect([part.dialog, part.recorded]).toEqual(['gone', { clips: 2, cues: 1 }])
+    expect([part.orphans, part.orphanCues, part.lines]).toEqual([[], [], []])
+  })
+
+  it('counts only what exists', async () => {
+    expect((await load({ ...base, 'audio/act1/manifest.json': { a: entry } })).recorded).toEqual({
+      clips: 1,
+      cues: 0,
+    })
+    expect((await load({ ...base, 'tts/act1/cues.json': { a: 'x' } })).recorded).toEqual({
+      clips: 0,
+      cues: 1,
+    })
+  })
+
+  it('stays missing when nothing was recorded', async () => {
+    const part = await load({ ...base, 'audio/act1/manifest.json': {} })
+    expect([part.dialog, part.recorded]).toEqual(['missing', null])
+  })
+
+  it('reads as usual when the file comes back, with the unmatched clips orphaned', async () => {
+    const part = await load({
+      ...base,
+      'tts/act1/script.json': script,
+      'audio/act1/manifest.json': { zzz: entry },
+    })
+    expect([part.dialog, part.recorded]).toEqual(['ok', null])
+    expect(part.orphans.map((o) => o.key)).toEqual(['zzz'])
+  })
+
+  it('carries a gone language into the progress and the project summary', async () => {
+    const project = {
+      ...projectJson(),
+      narration: {
+        ...(projectJson().narration as object),
+        languages: ['en', 'sv'],
+        paths: {
+          dialog: 'tts/{part}/{language}/script.json',
+          cues: 'tts/{part}/{language}/cues.json',
+          lock: 'tts/{part}/{language}/narration.lock.json',
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
+        },
+      },
+    }
+    const root = tempRepo({
+      'audio-studio.json': project,
+      'tts/act1/en/script.json': script,
+      'audio/act1/sv/manifest.json': { a: entry },
+    })
+    const file = join(root, 'audio-studio.json')
+    const result = await loadPart(file, 'act1', 'sv')
+    if (!result?.ok) throw new Error('expected the part to load')
+    expect(result.part.dialog).toBe('gone')
+    expect(result.part.languages.map((l) => [l.id, l.dialog, l.recorded])).toEqual([
+      ['en', 'ok', null],
+      ['sv', 'gone', { clips: 1, cues: 0 }],
+    ])
+    // The summary shows the source language, which is fine.
+    const summary = await loadProject(file)
+    expect(summary.ok && summary.summary.parts[0]).toMatchObject({ dialog: 'ok', recorded: null })
+  })
+
+  it('carries a gone source language into the project summary', async () => {
+    const root = tempRepo({
+      ...base,
+      'audio/act1/manifest.json': { a: entry },
+    })
+    const result = await loadProject(join(root, 'audio-studio.json'))
+    expect(result.ok && result.summary.parts[0]).toMatchObject({
+      dialog: 'gone',
+      recorded: { clips: 1, cues: 0 },
+    })
+  })
+})
+
 describe('adoptPart', () => {
   const files = {
     'audio-studio.json': projectJson(),
@@ -396,9 +488,9 @@ describe('a part in several languages', () => {
   it('counts every language: up to date out of all its lines, no dialog, unreadable', async () => {
     const { part } = await open('sv')
     expect(part.languages).toEqual([
-      { id: 'en', name: 'English', dialog: 'ok', upToDate: 0, total: 2 },
-      { id: 'sv', name: 'Svenska', dialog: 'ok', upToDate: 0, total: 3 },
-      { id: 'de', name: 'Deutsch', dialog: 'missing', upToDate: 0, total: 0 },
+      { id: 'en', name: 'English', dialog: 'ok', recorded: null, upToDate: 0, total: 2 },
+      { id: 'sv', name: 'Svenska', dialog: 'ok', recorded: null, upToDate: 0, total: 3 },
+      { id: 'de', name: 'Deutsch', dialog: 'missing', recorded: null, upToDate: 0, total: 0 },
     ])
     const act2 = await open('en', 'act2')
     expect(act2.part.languages.find((l) => l.id === 'en')!.dialog).toBe('invalid')
@@ -498,6 +590,17 @@ describe('a part in several languages', () => {
   it('says so when the source dialog is missing, since lines cannot be matched', async () => {
     const { part } = await open('sv', 'act1', { 'tts/act1/en/script.json': undefined })
     expect(part.problems.map((p) => p.file)).toContain('tts/act1/en/script.json')
+  })
+
+  it('says the source dialog is missing when it is gone, and not when it is unreadable', async () => {
+    const gone = await open('sv', 'act1', {
+      'tts/act1/en/script.json': undefined,
+      'audio/act1/en/manifest.json': { a: { file: 'a.mp3' } },
+    })
+    expect(gone.part.problems.map((p) => p.file)).toContain('tts/act1/en/script.json')
+    const bad = await open('sv', 'act1', { 'tts/act1/en/script.json': '[bad' })
+    const about = bad.part.problems.filter((p) => p.file === 'tts/act1/en/script.json')
+    expect(about.map((p) => p.message.includes('missing'))).toEqual([false])
   })
 
   it('serves a clip from the language’s folder', async () => {

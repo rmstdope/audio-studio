@@ -10,10 +10,26 @@ import {
   noDialogPanel,
   planHeadline,
   translatedNote,
+  dialogGonePanel,
+  recordedWords,
 } from './languages'
 
-const sv = { id: 'sv', name: 'Svenska', dialog: 'ok' as const, upToDate: 40, total: 481 }
-const de = { id: 'de', name: 'Deutsch', dialog: 'missing' as const, upToDate: 0, total: 0 }
+const sv = {
+  id: 'sv',
+  name: 'Svenska',
+  dialog: 'ok' as const,
+  recorded: null,
+  upToDate: 40,
+  total: 481,
+}
+const de = {
+  id: 'de',
+  name: 'Deutsch',
+  dialog: 'missing' as const,
+  recorded: null,
+  upToDate: 0,
+  total: 0,
+}
 
 describe('languageTab', () => {
   it('shows up to date out of all lines, spelling it out on hover', () => {
@@ -40,6 +56,77 @@ describe('languageTab', () => {
 
   it('reads 481/481 when every line is up to date', () => {
     expect(languageTab({ ...sv, upToDate: 481 }, 'Act II').count).toBe('481/481')
+  })
+})
+
+const svGone = {
+  ...sv,
+  dialog: 'gone' as const,
+  recorded: { clips: 12, cues: 3 },
+  upToDate: 0,
+  total: 0,
+}
+
+describe('languageTab, a dialog that is gone', () => {
+  it('says Dialog gone in amber, not dimmed', () => {
+    expect(languageTab(svGone, 'Act 1')).toEqual({
+      count: 'Dialog gone',
+      title: 'Act 1’s Svenska dialog is gone',
+      dimmed: false,
+      warn: true,
+    })
+  })
+})
+
+describe('recordedWords', () => {
+  it('pluralises and joins with and', () => {
+    expect(recordedWords({ clips: 12, cues: 3 })).toBe('12 clips and 3 cues')
+    expect(recordedWords({ clips: 1, cues: 1 })).toBe('1 clip and 1 cue')
+    expect(recordedWords({ clips: 12, cues: 0 })).toBe('12 clips')
+    expect(recordedWords({ clips: 0, cues: 3 })).toBe('3 cues')
+  })
+})
+
+describe('dialogGonePanel', () => {
+  const several = {
+    partTitle: 'Act 1',
+    partLabel: 'Act',
+    language: 'Svenska' as string | null,
+    recorded: { clips: 12, cues: 3 },
+    canRefresh: true,
+  }
+
+  it('names the language, the path and the recordings, with the refresh advice', () => {
+    expect(dialogGonePanel(several)).toEqual({
+      heading: 'Act 1’s Svenska dialog is gone',
+      before:
+        ' is not there, but 12 clips and 3 cues were recorded for Act 1 in Svenska. The studio keeps them as they are and offers to remove none of them until the dialog is back.',
+      advice:
+        'Refresh dialog writes it again from the game. If the game no longer has Svenska lines for this act, delete the clips and their manifest yourself.',
+      lines:
+        '12 clips and 3 cues were recorded for these lines. Nothing can be generated or removed until the dialog is back.',
+      refresh: true,
+    })
+  })
+
+  it('has other advice without a refresh command', () => {
+    expect(dialogGonePanel({ ...several, canRefresh: false })).toMatchObject({
+      advice:
+        'Once the game writes it again, the studio reads it in. If the game no longer has Svenska lines for this act, delete the clips and their manifest yourself.',
+      refresh: false,
+    })
+  })
+
+  it('leaves the language out in a one-language project', () => {
+    expect(
+      dialogGonePanel({ ...several, language: null, recorded: { clips: 34, cues: 5 } }),
+    ).toMatchObject({
+      heading: 'Act 1’s dialog is gone',
+      before:
+        ' is not there, but 34 clips and 5 cues were recorded for Act 1. The studio keeps them as they are and offers to remove none of them until the dialog is back.',
+      advice:
+        'Refresh dialog writes it again from the game. If the game no longer has this act, delete the clips and their manifest yourself.',
+    })
   })
 })
 
