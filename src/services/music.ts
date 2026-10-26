@@ -107,6 +107,8 @@ export function createAceStepWorker({
     env: { ACESTEP_CHECKPOINTS: checkpoints },
     couldNotStart: (why) =>
       `The music generator could not start (${why}). It needs uv and Apple silicon.`,
+    killed:
+      'The music generator was stopped by the computer, most likely because it ran out of memory. Close other music jobs, then Try again.',
   })
   return {
     ready,

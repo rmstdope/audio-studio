@@ -36,6 +36,17 @@ describe('createLineWorker', () => {
     worker.close()
   })
 
+  it('says what it was told to, not its log, when the system kills it', async () => {
+    const script = `console.error('noisy log line'); process.kill(process.pid, 'SIGKILL')`
+    const command = [process.execPath, '-e', script]
+    await expect(make({ command }).request({})).rejects.toThrow(
+      /^The fake stopped \(exit code 137\)/,
+    )
+    const told = make({ command, killed: 'The system stopped it.' })
+    await expect(told.request({})).rejects.toThrow(/^The system stopped it\.$/)
+    told.close()
+  })
+
   it('names the worker when it takes too long', async () => {
     const worker = make({ timeoutMs: 300 })
     await expect(worker.request({ path: '/c/hang.wav' })).rejects.toThrow(
