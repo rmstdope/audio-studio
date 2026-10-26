@@ -98,6 +98,12 @@ async function changeCues(
   if (!read || !read.ok) return read
   const inDialog = new Set(read.input.lines.map((line) => line.key))
   if (!lines.every((key) => inDialog.has(key))) return null
+  if (read.input.held) {
+    // Nothing is orphaned while the dialog is unreadable or gone, so no cue moves or goes.
+    const message =
+      'the dialog cannot be read or is gone; cues are kept as they are until it is back'
+    return { ok: false, problems: [{ file: read.paths.cuesPath, path: '', message }] }
+  }
   const root = dirname(projectFile)
   const path = read.paths.cuesPath
 

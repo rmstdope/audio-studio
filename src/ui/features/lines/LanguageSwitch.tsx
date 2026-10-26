@@ -8,6 +8,8 @@ export interface LanguageTab {
   count: string | null
   title?: string
   dimmed: boolean
+  /** Shown in amber: something needs attention in this language. */
+  warn?: boolean
 }
 
 /**
@@ -49,7 +51,7 @@ export function LanguageSwitch({
           lang={tab.id}
           data-language={tab.id}
           tabIndex={active === tab.id ? 0 : -1}
-          className={tab.dimmed ? 'tab tab-dim' : 'tab'}
+          className={tab.dimmed ? 'tab tab-dim' : tab.warn ? 'tab tab-warn' : 'tab'}
           aria-selected={active === tab.id}
           title={tab.title}
           onClick={() => onChoose(tab.id)}

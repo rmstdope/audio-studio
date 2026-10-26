@@ -18,6 +18,7 @@ import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { RefreshOutcome } from '../overview/PartOverview'
 import { GeneratePanel } from './GeneratePanel'
+import { DialogGonePanel } from './DialogGonePanel'
 import { PartLanguageSwitch } from './PartLanguageSwitch'
 import { HeardComparison } from './HeardComparison'
 import { LineTakes } from './LineTakes'
@@ -224,6 +225,31 @@ export function LinesView({
   )
 
   const dialog = loaded ? loaded.dialog : several ? 'ok' : part.dialog
+  const gone = loaded ? loaded.recorded : several ? null : part.recorded
+  if (gone) {
+    return (
+      <>
+        {header}
+        <DialogGonePanel
+          variant="lines"
+          partTitle={shortTitle(part.title)}
+          partLabel={summary.partLabel}
+          language={several ? active.name : null}
+          path={loaded?.dialogPath ?? part.dialogPath}
+          recorded={gone}
+          canRefresh={summary.canRefresh}
+          refresh={refresh}
+        />
+        {refresh.outcome && (
+          <RefreshOutcome
+            result={refresh.outcome.result}
+            error={refresh.outcome.error}
+            onClose={refresh.dismiss}
+          />
+        )}
+      </>
+    )
+  }
   if (loaded && dialog === 'missing' && several) {
     const panel = noDialogPanel(
       shortTitle(part.title),

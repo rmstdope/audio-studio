@@ -2143,6 +2143,32 @@ a.btn {
   max-width: 100%;
 }
 
+.dialog-gone {
+  padding: 16px 18px;
+  background: #1f1a10;
+  border: 1px solid #5a4418;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dialog-gone h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--warn);
+}
+
+.dialog-gone p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tab-warn .tab-count,
+.nav-item .meta.meta-warn {
+  color: var(--warn);
+}
+
 .tab-dim {
   opacity: 0.6;
 }

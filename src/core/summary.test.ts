@@ -30,6 +30,16 @@ describe('summarize', () => {
     })
   })
 
+  it('reports a part whose dialog is gone with what was recorded for it', () => {
+    const summary = summarize(input({ dialogs: { act1: { status: 'gone', clips: 12, cues: 3 } } }))
+    expect(summary.parts[0]).toMatchObject({
+      dialog: 'gone',
+      lineCount: 0,
+      recorded: { clips: 12, cues: 3 },
+    })
+    expect(summary.parts[1]!.recorded).toBeNull()
+  })
+
   it('counts each part’s lines per character, most lines first', () => {
     const summary = summarize(
       input({ dialogs: { act1: { status: 'ok', lines: lines('mira', 'narrator', 'narrator') } } }),

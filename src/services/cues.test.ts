@@ -135,6 +135,16 @@ describe('moveCue', () => {
     )
   })
 
+  it('keeps every cue while the dialog is gone', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson(),
+      'tts/act1/cues.json': { gone: '[sad]' },
+    })
+    const result = await moveCue(join(root, 'audio-studio.json'), 'act1', 'gone', null)
+    expect(result).toMatchObject({ ok: false, problems: [{ file: 'tts/act1/cues.json' }] })
+    expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toContain('gone')
+  })
+
   it('removes an orphaned cue', async () => {
     const root = tempRepo(withOrphan)
     expect(await moveCue(join(root, 'audio-studio.json'), 'act1', 'gone', null)).toEqual({

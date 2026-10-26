@@ -94,12 +94,14 @@ export function Sidebar({
           >
             <span className="num">{index + 1}</span>
             <span className="grow">{longTitle(part.title)}</span>
-            <span className="meta">
+            <span className={part.dialog === 'gone' ? 'meta meta-warn' : 'meta'}>
               {part.dialog === 'ok'
                 ? plural(part.lineCount, 'line')
                 : part.dialog === 'missing'
                   ? 'no script'
-                  : 'invalid'}
+                  : part.dialog === 'gone'
+                    ? 'dialog gone'
+                    : 'invalid'}
             </span>
           </a>
         ))}

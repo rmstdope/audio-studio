@@ -38,6 +38,7 @@ export function PartLanguageSwitch({
           count: tab?.count ?? null,
           title: tab?.title,
           dimmed: tab?.dimmed ?? false,
+          warn: tab?.warn,
         }
       })}
       active={active}

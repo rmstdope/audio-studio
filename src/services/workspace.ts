@@ -27,7 +27,13 @@ import {
   type Cast,
   type Cues,
 } from '../core/resources'
-import { summarize, type DialogState, type ProjectSummary } from '../core/summary'
+import {
+  recordedOf,
+  summarize,
+  type DialogState,
+  type ProjectSummary,
+  type Recorded,
+} from '../core/summary'
 import {
   formatEntriesPerLine,
   listFiles,
@@ -191,6 +197,8 @@ export interface LanguageProgress {
   id: string
   name: string
   dialog: DialogState['status']
+  /** What was recorded while the dialog is gone; null otherwise. */
+  recorded: Recorded | null
   upToDate: number
   /** All the language's lines, those not translated included; 0 without a dialog. */
   total: number
@@ -201,6 +209,8 @@ export interface PartDetail extends PartState {
   id: string
   title: string
   dialog: DialogState['status']
+  /** What was recorded while the dialog is gone; null otherwise. */
+  recorded: Recorded | null
   dialogPath: string
   clipsPath: string
   lockPath: string
@@ -243,6 +253,7 @@ export async function loadPart(
       id,
       name: languageName(id),
       dialog: other.dialog.status,
+      recorded: recordedOf(other.dialog),
       upToDate: total ? state.counts.ok : 0,
       total,
     })
@@ -254,6 +265,7 @@ export async function loadPart(
       id: part.id,
       title: part.title,
       dialog: dialog.status,
+      recorded: recordedOf(dialog),
       ...read.paths,
       language: read.language,
       languages,
@@ -263,8 +275,6 @@ export async function loadPart(
       notes: onLines(notes.notes.lines, input.lines),
       problems: notes.problem ? [...problems, notes.problem] : problems,
       ...plan,
-      // An unreadable dialog says nothing about which lines left it: no clip or cue is orphaned.
-      ...(dialog.status === 'invalid' ? { orphans: [], orphanCues: [] } : {}),
     },
   }
 }
@@ -380,7 +390,7 @@ export async function readPart(
     language !== sourceLanguage && dialog.status === 'ok'
       ? await readDialog(root, project, part, problems, sourceLanguage)
       : null
-  if (source?.status === 'missing') {
+  if (source && source.status !== 'ok') {
     problems.push({
       file: partPathFor(templates.dialog, part.id, sourceLanguage),
       path: '',
@@ -438,6 +448,7 @@ export async function readPart(
       manifest: manifest ?? {},
       files,
       narration: project.narration,
+      held: dialog.status === 'invalid' || dialog.status === 'gone',
     },
     paths: {
       dialogPath: at(templates.dialog),
@@ -471,7 +482,16 @@ async function readDialog(
 ): Promise<DialogState> {
   const path = partPathFor(project.narration.paths.dialog, part.id, language)
   const read = await readResource(root, path, DialogSchema, problems)
-  return read === 'missing' || read === 'invalid' ? { status: read } : { status: 'ok', lines: read }
+  if (read === 'invalid') return { status: 'invalid' }
+  if (read !== 'missing') return { status: 'ok', lines: read }
+  // No file: gone if recordings were made with it, so they are held and not orphaned.
+  const templates = project.narration.paths
+  const at = (template: string) => partPathFor(template, part.id, language)
+  const quiet: Problem[] = []
+  const clips = usable(await readResource(root, at(templates.manifest), ManifestSchema, quiet))
+  const cues = usable(await readResource(root, at(templates.cues), CuesSchema, quiet))
+  const recorded = { clips: Object.keys(clips ?? {}).length, cues: Object.keys(cues ?? {}).length }
+  return recorded.clips || recorded.cues ? { status: 'gone', ...recorded } : { status: 'missing' }
 }
 
 /** The validated project file, or why it cannot be used. */
