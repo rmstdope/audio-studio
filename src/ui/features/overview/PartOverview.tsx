@@ -251,7 +251,8 @@ function AdoptBanner({ part, language }: { part: PartDetail; language?: string }
   )
 }
 
-function CastSection({
+/** A card per character speaking in the part, with how their lines stand once that is known. */
+export function CastSection({
   summary,
   part,
   detail,
@@ -265,6 +266,8 @@ function CastSection({
 }) {
   const byId = new Map(summary.characters.map((c) => [c.id, c]))
   const titles = new Map(summary.parts.map((p) => [p.id, shortTitle(p.title)]))
+  // Without a dialog read in this language there are no lines to count, so none is up to date.
+  const readable = detail?.dialog === 'ok'
   const countsBySpeaker = new Map<string, Partial<Record<LineStatus, number>>>()
   for (const line of detail?.lines ?? []) {
     const counts = countsBySpeaker.get(line.speaker) ?? {}
@@ -301,7 +304,7 @@ function CastSection({
             key={character.id}
             character={character}
             lines={lines}
-            counts={detail ? (countsBySpeaker.get(character.id) ?? {}) : undefined}
+            counts={readable ? (countsBySpeaker.get(character.id) ?? {}) : undefined}
             otherParts={character.appearances
               .filter((a) => a.part !== part.id)
               .map((a) => `Also in ${titles.get(a.part) ?? a.part}`)}
