@@ -272,21 +272,32 @@ describe('Un-choose', () => {
     )
   })
 
-  it('says why when it was refused for a lock that cannot be read, after the page re-reads', async () => {
-    answer = {
+  it('says why, with focus on the block, when refused for a lock that cannot be read', async () => {
+    const refusal = {
       ok: false,
       file: 'music/music.lock.json',
       problems: [{ file: 'music/music.lock.json', path: '', message: 'not valid JSON' }],
     }
+    let answerNow = () => {}
+    globalThis.fetch = (async (_url: unknown, _init?: RequestInit) => {
+      await new Promise<void>((resolve) => (answerNow = resolve))
+      return new Response(JSON.stringify(refusal), { status: 409 })
+    }) as typeof fetch
     const page = chosen()
     await click(page.button('Un-choose'))
     await click(page.button('Un-choose'))
-    // The page re-reads the project: with the lock unreadable, what plays is not known.
+    // The page re-reads the project before the question closes: with the lock unreadable, what
+    // plays is not known, and the block has no Un-choose to give focus back to.
     page.rerender(row({ status: 'not-chosen', chosenAt: null, current: { kind: 'unknown' } }))
+    await act(async () => {
+      answerNow()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
     const block = page.block()!
     expect(block.textContent).toContain('The music lock could not be read')
     expect(block.textContent).toContain(
       'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',
     )
+    expect(document.activeElement).toBe(block)
   })
 })
