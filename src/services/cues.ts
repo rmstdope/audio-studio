@@ -1,5 +1,12 @@
 import { dirname } from 'node:path'
-import { composeCued, normalizeCue, parseCued, wordsOf, withInside } from '../core/cued'
+import {
+  WORDS_CHANGED,
+  composeCued,
+  normalizeCue,
+  parseCued,
+  wordsOf,
+  withInside,
+} from '../core/cued'
 import { resolveInRoot } from '../core/paths'
 import { problemsFrom, type Problem } from '../core/project'
 import { CuesSchema } from '../core/resources'
@@ -63,7 +70,7 @@ export async function setInsideCue(
     const refuse = (message: string) => ({ problems: [{ file: path, path: key, message }] })
     const words = text(key)
     if (wordsOf(change.text).join(' ') !== wordsOf(words).join(' ')) {
-      return refuse('this line’s words changed in the game; place the cue again')
+      return refuse(WORDS_CHANGED)
     }
     if (!Number.isInteger(change.at) || change.at < 1 || change.at >= wordsOf(words).length) {
       return refuse('a cue goes between two words')

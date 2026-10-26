@@ -8,6 +8,7 @@ export type LineKeyAction =
   | 'accept'
   | 'heard'
   | 'cue'
+  | 'place'
   | 'note'
   | 'takes'
 
@@ -29,6 +30,7 @@ export const LINE_KEYS: LineKey[] = [
   { keys: ['a'], shown: 'a', does: 'accept', action: 'accept' },
   { keys: ['h'], shown: 'h', does: 'what was heard', action: 'heard' },
   { keys: ['c'], shown: 'c', does: 'cue', action: 'cue' },
+  { keys: ['p'], shown: 'p', does: 'place a cue inside', action: 'place' },
   { keys: ['n'], shown: 'n', does: 'note', action: 'note' },
   { keys: ['t'], shown: 't', does: 'takes', action: 'takes' },
 ]

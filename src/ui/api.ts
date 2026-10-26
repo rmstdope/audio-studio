@@ -1275,12 +1275,53 @@ export function useAllowVoices(characterId: string, language?: string) {
 }
 
 /**
+ * Saves the cue at one gap inside a line (empty removes it), with the words the page showed so a
+ * line changed in the game is refused; then reloads the part.
+ */
+export function useSetInsideCue(partId: string, language?: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      key,
+      ...body
+    }: {
+      key: string
+      at: number
+      cue: string
+      text: string
+    }) => {
+      const response = await fetch(
+        inLanguage(
+          `/api/parts/${encodeURIComponent(partId)}/cues/${encodeURIComponent(key)}/inside`,
+          language,
+        ),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the cue answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<CueChange>
+    },
+    onSuccess: async (saved) => {
+      if (!saved.ok) return
+      void client.invalidateQueries({ queryKey: ['plan', partId] })
+      void client.invalidateQueries({ queryKey: ['project'] })
+      await client.invalidateQueries({ queryKey: ['part', partId] })
+    },
+  })
+}
+
+/**
  * Hears a line with a cue before saving it: the server records the line as a take with the cue
  * (empty: the character's style) and answers with the take to play, or why there is none.
  */
 export function useTryCue(partId: string, language?: string) {
   return useMutation({
-    mutationFn: async ({ key, cue }: { key: string; cue: string }) => {
+    mutationFn: async ({ key, cue, at }: { key: string; cue: string; at?: number }) => {
       const response = await fetch(
         inLanguage(
           `/api/parts/${encodeURIComponent(partId)}/lines/${encodeURIComponent(key)}/try`,
@@ -1289,7 +1330,7 @@ export function useTryCue(partId: string, language?: string) {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ cue }),
+          body: JSON.stringify(at === undefined ? { cue } : { cue, at }),
         },
       )
       if (!response.ok && response.status !== 409) {

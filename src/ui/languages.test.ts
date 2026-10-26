@@ -184,6 +184,10 @@ describe('the words around a language', () => {
     expect(cueNote('source', 'Mira', 'English')).toBe('from English')
     expect(cueNote('style', 'Mira', 'English')).toBe('Mira’s style')
     expect(cueNote('own', 'Mira', 'English')).toBeNull()
+    expect(cueNote('source', 'Mira', 'English', true)).toBe(
+      'from English · cues inside stay with English',
+    )
+    expect(cueNote('style', 'Mira', 'English', true)).toBe('Mira’s style')
   })
 
   it('words the cue editor for a language following or not following the source', () => {

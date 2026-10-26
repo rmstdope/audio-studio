@@ -66,8 +66,12 @@ export function cueNote(
   from: 'own' | 'source' | 'style',
   character: string,
   source: string,
+  sourceInside = false,
 ): string | null {
-  return from === 'source' ? `from ${source}` : from === 'style' ? `${character}’s style` : null
+  if (from === 'source') {
+    return sourceInside ? `from ${source} · cues inside stay with ${source}` : `from ${source}`
+  }
+  return from === 'style' ? `${character}’s style` : null
 }
 
 /**

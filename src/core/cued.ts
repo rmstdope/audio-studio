@@ -20,6 +20,9 @@ export interface ParsedCue {
   stale: string | null
 }
 
+/** What a refused cue says when the line's words are not the ones the page showed. */
+export const WORDS_CHANGED = 'this line’s words changed in the game; place the cue again'
+
 const GROUP = /\[[^\]]*\]/g
 const LEADING_GROUPS = /^(?:\s*\[[^\]]*\])*/
 

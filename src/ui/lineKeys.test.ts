@@ -18,6 +18,7 @@ describe('lineKeyAction', () => {
     expect(press('r')).toBe('record')
     expect(press('a')).toBe('accept')
     expect(press('c')).toBe('cue')
+    expect(press('p')).toBe('place')
     expect(press('n')).toBe('note')
     expect(press('f')).toBe('fromHere')
     expect(press('h')).toBe('heard')
@@ -40,7 +41,7 @@ describe('lineKeyAction', () => {
     expect(press('j', { onButton: true })).toBe('next')
   })
 
-  it('lists every action once in the hint', () => {
+  it('lists every action once in the hint, the cue inside after the cue', () => {
     const actions: LineKeyAction[] = [
       'next',
       'previous',
@@ -50,10 +51,13 @@ describe('lineKeyAction', () => {
       'accept',
       'heard',
       'cue',
+      'place',
       'note',
       'takes',
     ]
     expect(LINE_KEYS.map((k) => k.action).sort()).toEqual([...actions].sort())
+    const hint = LINE_KEYS.map((k) => `${k.shown} ${k.does}`)
+    expect(hint.indexOf('p place a cue inside')).toBe(hint.indexOf('c cue') + 1)
   })
 })
 
