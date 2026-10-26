@@ -13,7 +13,9 @@ import { isPaid } from '../core/sitting'
 import { cueFor, projectCast, ttsFor, type Cast } from '../core/resources'
 import type { ProjectSummary } from '../core/summary'
 import { auditionText, takeKey, type AuditionText } from '../core/takes'
-import { spokenText } from '../core/spoken'
+import { normalizeCue, withInside, wordsOf } from '../core/cued'
+import { clipInputs } from '../core/fingerprint'
+import { spokenPieces, spokenText } from '../core/spoken'
 import type { FishFactory } from './auditions'
 import { writeAtomic } from './files'
 import type { Limiter } from './limit'
@@ -116,6 +118,7 @@ export async function tryLine(
   fishFor: FishFactory,
   limiter: Limiter,
   language?: string,
+  at?: number,
 ): Promise<TryResult> {
   const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return read
@@ -135,8 +138,31 @@ export async function tryLine(
     }
   }
   // Nothing typed: the cue the line would follow, the source language's, else the character's style.
-  const tried = cue.trim() || cueFor(read.sourceCues, key) || (character.style ?? '')
-  const spoken = spokenText(line.text, tried, cast.pronounce)
+  let spoken: string
+  if (at === undefined) {
+    const tried = cue.trim() || cueFor(read.sourceCues, key) || (character.style ?? '')
+    spoken = spokenText(line.text, tried, cast.pronounce)
+  } else {
+    // A cue tried inside the line: its opening and the cues saved inside stay, the typed cue is
+    // added at the gap (replacing the one there; empty: without it), the whole line in one request.
+    if (!Number.isInteger(at) || at < 1 || at >= wordsOf(line.text).length) {
+      return {
+        ok: false,
+        problems: [
+          { file: read.paths.cuesPath, path: key, message: 'a cue goes between two words' },
+        ],
+      }
+    }
+    const inputs = clipInputs(
+      line,
+      character,
+      read.input.cues,
+      cast.pronounce,
+      read.project.narration,
+    )!
+    const inside = withInside(inputs.inside, at, normalizeCue(cue))
+    spoken = spokenPieces(line.text, inputs.cue, cast.pronounce, Infinity, inside)[0]!
+  }
   const tts = ttsFor(read.project.narration.tts, character)
   return speak(
     dirname(projectFile),

@@ -2873,6 +2873,22 @@ describe('server, generating per language', () => {
     expect(result).toMatchObject({ ok: false, reason: 'uncast' })
   })
 
+  it('places a cue inside a line of a language, in that language’s file only', async () => {
+    const place = (body: unknown) =>
+      send('PATCH', '/api/parts/act1/cues/a/inside?language=sv', body)
+    expect(await place({ at: 1, cue: 'mjukt', text: 'En gång.' })).toEqual({ ok: true })
+    expect(JSON.parse(readFileSync(join(languageRoot, 'tts/act1/sv/cues.json'), 'utf8'))).toEqual({
+      a: 'En [mjukt] gång.',
+    })
+    expect(await place({ at: 1, cue: 'x', text: 'Ett annat.' })).toMatchObject({ ok: false })
+    expect(await place({ at: 'one', cue: 'x', text: 'En gång.' })).toEqual({
+      error: 'expected { at, cue, text }',
+    })
+    const sv = await get('/api/parts/act1?language=sv')
+    expect(sv.part.lines[0]).toMatchObject({ inside: [{ at: 1, cue: '[mjukt]' }] })
+    expect(await place({ at: 1, cue: '', text: 'En gång.' })).toEqual({ ok: true })
+  })
+
   it('saves a cue, pronunciations and words that sound the same for the language asked for', async () => {
     expect(await send('PATCH', '/api/parts/act1/cues/a?language=sv', { cue: '[mjukt]' })).toEqual({
       ok: true,

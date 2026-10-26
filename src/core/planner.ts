@@ -7,6 +7,7 @@ import {
 } from './fingerprint'
 import { sameModel } from './retirement'
 import type { Project } from './project'
+import { parseCued, type InsideCue } from './cued'
 import { cueFor, type Cast, type Cues, type Line, type Lock, type Manifest } from './resources'
 
 /**
@@ -51,6 +52,10 @@ export interface LineState {
    * the line (another language follows it), or its character's style.
    */
   cueFrom: 'own' | 'source' | 'style'
+  /** The cues placed inside the line's words, as they are recorded. */
+  inside: InsideCue[]
+  /** The line's previous cued text when its words changed and its cues inside were set aside. */
+  insideStale: string | null
   /** The source language's own cue for the line, when this is another language and it has one. */
   sourceCue: string | null
   /** Whether the clip was made with the final model (when it differs from the draft one). */
@@ -128,6 +133,8 @@ export function planPart(input: PlanInput): PartState {
         cue: '',
         cueFrom: 'style',
         sourceCue: null,
+        inside: [],
+        insideStale: null,
         final: false,
         status: 'untranslated',
         reasons: [],
@@ -174,12 +181,14 @@ export function planPart(input: PlanInput): PartState {
       speaker: line.speaker,
       text: line.text,
       english,
-      cue: inputs?.cue ?? cueFor(cues, line.key) ?? character?.style ?? '',
+      cue: inputs?.cue ?? ownOpening(cues, line) ?? character?.style ?? '',
+      inside: inputs?.inside ?? parseCued(cueFor(cues, line.key) ?? '', line.text).inside,
+      insideStale: parseCued(cueFor(own, line.key) ?? '', line.text).stale,
       sourceCue: (input.sourceCues && cueFor(input.sourceCues, line.key)) ?? null,
       cueFrom:
-        cueFor(own, line.key) !== undefined
+        ownOpening(own, line) !== undefined
           ? 'own'
-          : cueFor(cues, line.key) !== undefined
+          : ownOpening(cues, line) !== undefined
             ? 'source'
             : 'style',
       final,
@@ -202,6 +211,12 @@ export function planPart(input: PlanInput): PartState {
     .map(([key, cue]) => ({ key, cue }))
 
   return { lines: states, orphans, orphanCues, counts }
+}
+
+/** The opening cue of a line's entry in `cues`, or undefined when it has none. */
+function ownOpening(cues: Cues, line: Line): string | undefined {
+  const entry = cueFor(cues, line.key)
+  return entry === undefined ? undefined : parseCued(entry, line.text).opening || undefined
 }
 
 /**

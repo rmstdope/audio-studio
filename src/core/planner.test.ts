@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { projectJson } from '../../test/helpers'
 import { clipInputs, fingerprint } from './fingerprint'
+import { mergeCues } from './cued'
 import { adoptUntracked, planPart, type PlanInput } from './planner'
 import { ProjectSchema } from './project'
 import type { Cast, Line, LockEntry } from './resources'
@@ -410,5 +411,80 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
     const lock = { n1: { fp, voice: inputs.voice, model: 's1', parts, at: 'then' } }
     const state = planPart(input({ lock, narration: split, cues: { n1: '[sad]' } }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['cue'] })
+  })
+})
+
+describe('planPart, cues inside a line', () => {
+  const inside = '[warm] Elior [low] wakes.'
+
+  it('keeps the opening cue in `cue`, lists the cues inside, and leaves the fingerprint alone without them', () => {
+    const state = planPart(input({ lock: trackedLock, cues: { n1: '[warm]' } }))
+    expect(state.lines[0]).toMatchObject({ status: 'ok', inside: [], insideStale: null })
+    const placed = planPart(input({ lock: trackedLock, cues: { n1: inside } })).lines[0]!
+    expect(placed).toMatchObject({
+      cue: '[warm]',
+      cueFrom: 'own',
+      inside: [{ at: 1, cue: '[low]' }],
+      insideStale: null,
+      status: 'stale',
+      reasons: ['cue'],
+    })
+  })
+
+  it('is stale again when the cue inside changes, and ok when a clip was made with it', () => {
+    const entry = (cue: string) => {
+      const inputs = clipInputs(lines[0]!, cast.speakers.narrator, { n1: cue }, {}, narration)!
+      const { fp, parts } = fingerprint(inputs)
+      return { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then' }
+    }
+    const lock = { ...trackedLock, n1: entry(inside) }
+    expect(planPart(input({ lock, cues: { n1: inside } })).lines[0]!.status).toBe('ok')
+    expect(
+      planPart(input({ lock, cues: { n1: '[warm] Elior [high] wakes.' } })).lines[0]!.status,
+    ).toBe('stale')
+  })
+
+  it('uses only the opening cue, and says so, when the words changed', () => {
+    const state = planPart(input({ cues: { n1: '[warm] Elior [low] sleeps.' } }))
+    expect(state.lines[0]).toMatchObject({
+      cue: '[warm]',
+      inside: [],
+      insideStale: '[warm] Elior [low] sleeps.',
+    })
+  })
+
+  it('takes a line with cues inside but no opening cue as the style’s', () => {
+    const state = planPart(input({ cues: { n1: 'Elior [low] wakes.' } }))
+    expect(state.lines[0]).toMatchObject({
+      cue: '[warm]',
+      cueFrom: 'style',
+      inside: [{ at: 1, cue: '[low]' }],
+    })
+  })
+})
+
+describe('mergeCues', () => {
+  const english: Line[] = [{ key: 'n1', speaker: 'narrator', text: 'Elior wakes.' }]
+  const swedish: Line[] = [{ key: 'n1', speaker: 'narrator', text: 'Elior vaknar.' }]
+
+  it('follows only the source’s opening cue, never its cues inside', () => {
+    const merged = mergeCues(swedish, {}, { n1: '[worried] Elior [low] wakes.' }, english)
+    expect(merged.sourceCues).toEqual({ n1: '[worried]' })
+    expect(merged.cues).toEqual({ n1: '[worried]' })
+  })
+
+  it('lets the language’s own cues inside ride on the source’s opening cue', () => {
+    const merged = mergeCues(swedish, { n1: 'Elior [low] vaknar.' }, { n1: '[worried]' }, english)
+    expect(merged.cues).toEqual({ n1: '[worried] Elior [low] vaknar.' })
+    expect(
+      mergeCues(swedish, { n1: '[sad] Elior [low] vaknar.' }, { n1: '[worried]' }, english).cues,
+    ).toEqual({
+      n1: '[sad] Elior [low] vaknar.',
+    })
+  })
+
+  it('keeps the source’s opening cue for an entry that no longer fits', () => {
+    const merged = mergeCues(swedish, { n1: 'Elior [low] sover.' }, { n1: '[worried]' }, english)
+    expect(merged.cues).toEqual({ n1: '[worried] Elior [low] sover.' })
   })
 })

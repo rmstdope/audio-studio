@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Project } from './project'
+import { parseCued, type InsideCue } from './cued'
 import { cueFor, ttsFor, type Character, type LockEntry } from './resources'
 import { REPLACEMENT_MODEL, RETIRED_MODEL, sameModel } from './retirement'
 import { saidText } from './spoken'
@@ -10,6 +11,8 @@ export interface ClipInputs {
   voice: string
   /** The delivery cue: the line's own cue, else the character's style. */
   cue: string
+  /** The cues placed inside the line's words; none for most lines. */
+  inside: InsideCue[]
   /** The line as shown. */
   text: string
   /** The line as said: pronunciations and list reading applied. */
@@ -23,6 +26,8 @@ export type InputHashes = LockEntry['parts']
 
 /** Why a clip no longer matches its inputs. */
 export type StaleReason = 'voice' | 'model' | 'cue' | 'text' | 'pronunciation' | 'settings'
+
+const NONE = { opening: '', inside: [] as InsideCue[] }
 
 /**
  * The inputs of a line's clip, or null when its speaker has no voice yet. The model is the draft
@@ -39,10 +44,13 @@ export function clipInputs(
   if (!character?.voice) return null
   const { output, quality } = narration
   const tts = ttsFor(narration.tts, character)
+  const entry = cueFor(cues, line.key)
+  const { opening, inside } = entry === undefined ? NONE : parseCued(entry, line.text)
   return {
     model,
     voice: character.voice,
-    cue: cueFor(cues, line.key) ?? character.style ?? '',
+    cue: opening || (character.style ?? ''),
+    inside,
     text: line.text,
     said: saidText(line.text, pronounce),
     settings: JSON.stringify([
@@ -61,11 +69,19 @@ export function clipInputs(
 export function fingerprint(inputs: ClipInputs): { fp: string; parts: InputHashes } {
   return {
     fp: hash(
-      JSON.stringify([inputs.model, inputs.voice, inputs.cue, inputs.said, inputs.settings]),
+      JSON.stringify([
+        inputs.model,
+        inputs.voice,
+        inputs.cue,
+        inputs.said,
+        inputs.settings,
+        // Only when there are some: a clip made before cues inside stays up to date.
+        ...(inputs.inside.length ? [inputs.inside] : []),
+      ]),
       16,
     ),
     parts: {
-      cue: hash(inputs.cue, 8),
+      cue: hash(inputs.inside.length ? JSON.stringify([inputs.cue, inputs.inside]) : inputs.cue, 8),
       text: hash(inputs.text, 8),
       said: hash(inputs.said, 8),
       settings: hash(inputs.settings, 8),

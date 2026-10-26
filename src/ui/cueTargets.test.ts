@@ -11,6 +11,8 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     cue: '',
     cueFrom: 'style',
     sourceCue: null,
+    inside: [],
+    insideStale: null,
     final: false,
     status: 'missing',
     reasons: [],

@@ -20,6 +20,8 @@ function line(
     cue: '',
     cueFrom: 'style',
     sourceCue: null,
+    inside: [],
+    insideStale: null,
     final: false,
     status,
     reasons,

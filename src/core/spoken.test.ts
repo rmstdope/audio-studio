@@ -64,3 +64,32 @@ describe('spokenPieces', () => {
     ])
   })
 })
+
+describe('spokenPieces with cues inside', () => {
+  const text = 'One two three. Four five six. Seven eight.'
+
+  it('is as it was without cues inside', () => {
+    expect(spokenPieces(text, '[o]', {}, 15, [])).toEqual(spokenPieces(text, '[o]', {}, 15))
+  })
+
+  it('sends each cue where it was placed', () => {
+    expect(spokenPieces('One two three.', '[o]', {}, 100, [{ at: 1, cue: '[a]' }])).toEqual([
+      '[o] One [a] two three.',
+    ])
+  })
+
+  it('starts each piece with the cue in effect there, not the opening cue again', () => {
+    expect(
+      spokenPieces(text, '[o]', {}, 15, [
+        { at: 1, cue: '[a]' },
+        { at: 5, cue: '[b]' },
+      ]),
+    ).toEqual(['[o] One [a] two three.', '[a] Four five [b] six.', '[b] Seven eight.'])
+  })
+
+  it('says each stretch as cast', () => {
+    expect(
+      spokenPieces('Elior ran home.', '', { Elior: 'El-ee-or' }, 100, [{ at: 1, cue: '[a]' }]),
+    ).toEqual(['El-ee-or [a] ran home.'])
+  })
+})

@@ -25,7 +25,7 @@ import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { createSpendLog, readSpending } from '../services/spending'
 import { outcomeOf, summariseSpending } from '../core/spending'
-import { moveCue, setCue } from '../services/cues'
+import { moveCue, setCue, setInsideCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { setTrackBrief } from '../services/briefs'
 import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
@@ -167,6 +167,18 @@ const StageModelBody = z.object({ model: z.string().min(1), was: z.string().min(
 
 /** Where an orphaned cue goes: a line key, or null to remove it. */
 const MoveCueBody = z.object({ to: z.string().min(1).max(200).nullable() }).strict()
+
+/** A cue tried or placed at a gap inside a line (`at`: the words before it). */
+const TryBody = z.object({ cue: z.string().max(1_000), at: z.number().int().optional() }).strict()
+
+/** A cue placed, changed (or, empty, removed) at a gap inside a line, and the words the page showed. */
+const InsideCueBody = z
+  .object({
+    at: z.number().int(),
+    cue: z.string().max(1_000),
+    text: z.string().max(20_000),
+  })
+  .strict()
 
 /** A line's own cue; empty to go back to the character's style. */
 const CueBody = z.object({ cue: z.string().max(1_000) }).strict()
@@ -516,7 +528,7 @@ export function startServer({
       model: narration.models[stage],
       // What is sent: each piece of a line with its cue and the cast's pronunciations.
       sent: (line: LineState) =>
-        spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit),
+        spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit, line.inside),
       takes: narration.quality.transcriber === 'none' ? 1 : narration.quality.takes,
     }
     const plan = planGeneration(state, {
@@ -1188,12 +1200,33 @@ export function startServer({
       },
       '/api/parts/:part/lines/:key/try': {
         POST: fromOwnPage(async (request) => {
-          const body = CueBody.safeParse(await request.json().catch(() => null))
+          const body = TryBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { cue }' }, { status: 400 })
           const { part, key } = request.params
           const result = await whileGoing('part', part, () =>
-            tryLine(projectFile, part, key, body.data.cue, fishFor, fishWork, languageOf(request)),
+            tryLine(
+              projectFile,
+              part,
+              key,
+              body.data.cue,
+              fishFor,
+              fishWork,
+              languageOf(request),
+              body.data.at,
+            ),
           )
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/cues/:key/inside': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = InsideCueBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { at, cue, text }' }, { status: 400 })
+          }
+          const { part, key } = request.params
+          const result = await setInsideCue(projectFile, part, key, body.data, languageOf(request))
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
