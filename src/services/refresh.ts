@@ -43,7 +43,7 @@ export interface LoopsChange {
 /** What refreshing the stingers did, or why it did not. */
 export type RefreshSharedResult =
   | { ok: true; stingers: number; change: LoopsChange | null; output: string }
-  | { ok: false; reason: 'none' | 'busy'; message: string }
+  | { ok: false; reason: 'none'; message: string }
   | { ok: false; reason: 'failed'; message: string; output: string }
   | { ok: false; problems: Problem[]; output: string }
   | ProjectFailure
@@ -102,11 +102,6 @@ export function refreshShared(
       if (left) active.set(key, left)
       else active.delete(key)
     })
-}
-
-/** Whether the stingers are being refreshed or a refresh of them waits to run. */
-export function isRefreshingShared(projectFile: string): boolean {
-  return active.has(sharedKey(projectFile))
 }
 
 /** Refreshes asked for and not finished, per part: a generation waits for none of them. */

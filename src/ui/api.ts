@@ -493,7 +493,7 @@ function useRefreshRun<R>(
   const client = useQueryClient()
   const mutation = useMutation({
     mutationKey,
-    scope: { id: mutationKey.join('-') },
+    scope: { id: `refresh\0${mutationKey.join('\0')}` },
     mutationFn: async () => {
       const response = await fetch(url, { method: 'POST' })
       if (!response.ok && response.status !== 409) {

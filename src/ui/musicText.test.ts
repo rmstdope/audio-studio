@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { changeSummary, listLine, listNotice } from './musicText'
+import { changeSummary, listFor, listLine, listNotice } from './musicText'
 
 const list = (over = {}) => ({
   id: 'act2',
@@ -8,6 +8,7 @@ const list = (over = {}) => ({
   state: 'ok' as const,
   tracks: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
   canRefresh: true,
+  dropped: 0,
   ...over,
 })
 
@@ -79,5 +80,33 @@ describe('changeSummary', () => {
     expect(changeSummary({ total: 2, noun: 'stinger', change: null }).headline).toBe(
       '2 stingers · what changed is not known',
     )
+  })
+})
+
+describe('listNotice with tracks left out', () => {
+  it('does not say the game asks for none when every track repeats an id', () => {
+    expect(listNotice(list({ tracks: [], dropped: 2 }), 'Act I')).toBe(
+      'The game lists 2 tracks for Act I, but their ids are used more than once; the problems above say why.',
+    )
+    expect(listNotice(list({ kind: 'stingers', tracks: [], dropped: 1 }), 'Stingers')).toBe(
+      'The game lists 1 track for the stingers, but their ids are used more than once; the problems above say why.',
+    )
+  })
+})
+
+describe('listFor', () => {
+  const lists: { id: string; kind: 'act' | 'stingers' }[] = [
+    { id: 'act1', kind: 'act' },
+    { id: 'stingers', kind: 'stingers' },
+    { id: 'act2', kind: 'act' },
+  ]
+  it('finds the act or the stingers the route names', () => {
+    expect(listFor(lists, { view: 'music', page: 'act', part: 'act2' })?.id).toBe('act2')
+    expect(listFor(lists, { view: 'music', page: 'stingers' })?.kind).toBe('stingers')
+  })
+  it('shows the first list for a bare route or one that names nothing', () => {
+    expect(listFor(lists, { view: 'music', page: null })?.id).toBe('act1')
+    expect(listFor(lists, { view: 'music', page: 'act', part: 'nosuch' })?.id).toBe('act1')
+    expect(listFor([], { view: 'music', page: null })).toBeUndefined()
   })
 })

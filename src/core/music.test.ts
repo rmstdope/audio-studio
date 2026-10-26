@@ -132,6 +132,14 @@ describe('summarizeMusic', () => {
     expect(problems[1]!.message).toContain('tts/act1/music.json[0].id')
   })
 
+  it('counts the tracks left out for a repeated id', () => {
+    const { music } = summarizeMusic(
+      [list('act1', [track('x'), track('a')]), list('act2', [track('x')])],
+      {},
+    )
+    expect(music.lists.map((l) => l.dropped)).toEqual([1, 1])
+  })
+
   it('catches an id used twice in one list', () => {
     const { music, problems } = summarizeMusic([list('act1', [track('x'), track('x')])], {})
     expect(music.lists[0]!.tracks).toEqual([])

@@ -1,8 +1,9 @@
 import type { MusicListSummary, TrackRef } from '../core/music'
 import { plural } from './format'
+import type { MusicRoute } from './route'
 
 /** What a list page needs of a list to word its sentences. */
-type ListWords = Pick<MusicListSummary, 'kind' | 'state' | 'canRefresh'> & {
+type ListWords = Pick<MusicListSummary, 'kind' | 'state' | 'canRefresh' | 'dropped'> & {
   tracks: readonly unknown[]
 }
 
@@ -31,6 +32,10 @@ export function listNotice(list: ListWords, name: string): string | null {
   if (list.state === 'invalid') {
     const which = list.kind === 'stingers' ? 'stingers' : `loops for ${name}`
     return `The list of ${which} could not be read; the problems above say why.`
+  }
+  if (list.dropped > 0) {
+    const where = list.kind === 'stingers' ? 'the stingers' : name
+    return `The game lists ${plural(list.dropped, 'track')} for ${where}, but their ids are used more than once; the problems above say why.`
   }
   if (list.state === 'missing') {
     const sentence = `The game has not listed ${loops} yet.`
@@ -64,4 +69,18 @@ export function changeSummary({
     added: change.added.map((t) => t.title),
     removed: change.removed.map((t) => t.title),
   }
+}
+
+/** The list a Music route names; the first list when it names none, or one that is not there. */
+export function listFor<T extends Pick<MusicListSummary, 'id' | 'kind'>>(
+  lists: T[],
+  route: MusicRoute,
+): T | undefined {
+  const named =
+    route.page === 'stingers'
+      ? lists.find((list) => list.kind === 'stingers')
+      : route.page === 'act'
+        ? lists.find((list) => list.kind === 'act' && list.id === route.part)
+        : undefined
+  return named ?? lists[0]
 }

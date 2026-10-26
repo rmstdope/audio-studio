@@ -5,23 +5,9 @@ import { useRefreshDialog, useRefreshShared } from '../../api'
 import { Problems } from '../../components/Problems'
 import { PlayIcon } from '../../components/icons'
 import { clock, shortTitle } from '../../format'
-import { changeSummary, listLine, listNotice } from '../../musicText'
+import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
 import type { MusicRoute } from '../../route'
 import { NoMusic } from './NoMusic'
-
-/** The list a Music route names; the first list when it names none, or one that is not there. */
-export function listFor(
-  lists: MusicListSummary[],
-  route: MusicRoute,
-): MusicListSummary | undefined {
-  const named =
-    route.page === 'stingers'
-      ? lists.find((list) => list.kind === 'stingers')
-      : route.page === 'act'
-        ? lists.find((list) => list.kind === 'act' && list.id === route.part)
-        : undefined
-  return named ?? lists[0]
-}
 
 /** A Music page: an act's loops or the stingers, or how to set Music up when the project has none. */
 export function MusicView({ summary, route }: { summary: ProjectSummary; route: MusicRoute }) {
@@ -217,7 +203,10 @@ function FailedPanel({
   onClose: () => void
 }) {
   const message =
-    error ?? (result && 'message' in result ? result.message : 'The list could not be refreshed.')
+    error ??
+    (result && 'message' in result
+      ? result.message
+      : 'The command ran, but what it wrote cannot be used.')
   return (
     <section className="panel refresh-outcome" aria-label="Refresh from the game">
       <div className="refresh-head">
@@ -230,7 +219,7 @@ function FailedPanel({
         </button>
       </div>
       {result && 'problems' in result && (
-        <Problems title="The new list cannot be used" problems={result.problems} />
+        <Problems title="What the command wrote cannot be used" problems={result.problems} />
       )}
       {result && 'output' in result && result.output && (
         <pre className="refresh-output mono">{result.output}</pre>

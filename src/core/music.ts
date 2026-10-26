@@ -86,6 +86,8 @@ export interface MusicListSummary {
   title: string
   state: MusicListState['status']
   tracks: TrackRow[]
+  /** Tracks the game lists that are not shown because their id is used more than once. */
+  dropped: number
   canRefresh: boolean
 }
 
@@ -135,17 +137,22 @@ export function summarizeMusic(
         kind: list.kind,
         title: list.title,
         state: list.state.status,
-        tracks:
-          list.state.status === 'ok'
-            ? list.state.tracks
-                .filter((track) => uses.get(track.id)!.length === 1)
-                .map((track) => rowOf(track, briefs[track.id]))
-            : [],
+        tracks: shown(list, uses).map((track) => rowOf(track, briefs[track.id])),
+        dropped: listed(list).length - shown(list, uses).length,
         canRefresh: list.canRefresh,
       })),
     },
     problems,
   }
+}
+
+function listed(list: MusicListInput): Track[] {
+  return list.state.status === 'ok' ? list.state.tracks : []
+}
+
+/** The list's tracks whose id is used once in the whole game. */
+function shown(list: MusicListInput, uses: Map<string, unknown[]>): Track[] {
+  return listed(list).filter((track) => uses.get(track.id)!.length === 1)
 }
 
 function rowOf(track: Track, change: Briefs[string] | undefined): TrackRow {

@@ -2,13 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import {
-  isRefreshing,
-  isRefreshingShared,
-  refreshDialog,
-  refreshShared,
-  stopRefreshes,
-} from './refresh'
+import { isRefreshing, refreshDialog, refreshShared, stopRefreshes } from './refresh'
 
 const before = [
   { key: 'a', speaker: 'mira', text: 'Hello.' },
@@ -268,15 +262,5 @@ describe('refreshing the music lists', () => {
       ok: false,
       problems: [{ file: 'tts/stingers.json', path: '[0].seconds' }],
     })
-  })
-
-  it('says while the stingers are refreshing, apart from any part', async () => {
-    const root = tempRepo(withMusic('true', 'sleep 0.3; echo "[]" > tts/stingers.json'))
-    const file = join(root, 'audio-studio.json')
-    const running = refreshShared(file)
-    expect(isRefreshingShared(file)).toBe(true)
-    expect(isRefreshing(file, 'act1')).toBe(false)
-    await running
-    expect(isRefreshingShared(file)).toBe(false)
   })
 })
