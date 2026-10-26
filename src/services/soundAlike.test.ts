@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setSoundAlike } from './soundAlike'
 
@@ -132,6 +132,27 @@ describe('setSoundAlike', () => {
     const { projectFile, read } = repo({ name: 'broken' })
     const before = read()
     expect(await setSoundAlike(projectFile, [['a', 'b']], [])).toMatchObject({ ok: false })
+    expect(read()).toBe(before)
+  })
+
+  it('says why the file could not be written when the disk refuses it', async () => {
+    const { projectFile, read } = repo()
+    const before = read()
+    chmodSync(dirname(projectFile), 0o555)
+    try {
+      expect(await setSoundAlike(projectFile, [['inn', 'Inne']], [])).toEqual({
+        ok: false,
+        problems: [
+          {
+            file: 'audio-studio.json',
+            path: 'narration.quality.soundAlike',
+            message: 'permission denied',
+          },
+        ],
+      })
+    } finally {
+      chmodSync(dirname(projectFile), 0o755)
+    }
     expect(read()).toBe(before)
   })
 })

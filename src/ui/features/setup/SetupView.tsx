@@ -82,7 +82,7 @@ export function SetupView() {
  * at once in the project file; the menu always shows what the last check found saved, so the choice shows while it saves (the check after it asks Fish again), and a failed
  * save leaves it where it was, with a line saying so.
  */
-function TierMenu({ chosen }: { chosen: FishTier | null }) {
+export function TierMenu({ chosen }: { chosen: FishTier | null }) {
   const save = useSetFishTier()
   return (
     <>
@@ -105,7 +105,7 @@ function TierMenu({ chosen }: { chosen: FishTier | null }) {
       </span>
       {save.isError && (
         <span className="adopt-error setup-hint" role="alert">
-          Could not save the tier: the project file could not be written. Your choice is not saved.
+          Could not save the tier: {save.error.message}. Your choice is not saved.
         </span>
       )}
     </>
