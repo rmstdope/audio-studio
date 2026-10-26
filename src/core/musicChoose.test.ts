@@ -164,6 +164,12 @@ describe('the Un-choose question', () => {
     )
   })
 
+  it('reads a refusal as the end of the sentence', () => {
+    expect(unchooseFailure(3, 'No take is chosen for this track.')).toBe(
+      'Take 3 could not be un-chosen: no take is chosen for this track. Nothing was changed.',
+    )
+  })
+
   it('says why it failed and that nothing changed', () => {
     expect(unchooseFailure(3, 'the music lock could not be read')).toBe(
       'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',

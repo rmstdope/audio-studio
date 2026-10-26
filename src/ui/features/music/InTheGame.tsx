@@ -45,6 +45,7 @@ export function InTheGame({
   const opener = useRef<HTMLButtonElement | null>(null)
   const block = useRef<HTMLElement | null>(null)
   const refocus = useFocusWhenClosed(asking, opener)
+  const focusBlock = useFocusWhenClosed(asking, block)
 
   if (asking && state.kind === 'take') {
     const cancel = () => {
@@ -74,8 +75,13 @@ export function InTheGame({
               unchoose.mutate(undefined, {
                 onSuccess: (result) => {
                   setAsking(false)
-                  if (result.ok) block.current?.focus()
+                  if (result.ok) focusBlock()
                   else refocus()
+                },
+                // The question was refused by the server or never got there: the block stays.
+                onError: () => {
+                  setAsking(false)
+                  refocus()
                 },
               })
             }
@@ -94,16 +100,18 @@ export function InTheGame({
           state.take,
           failed && 'message' in failed
             ? failed.message.replace(/\.$/, '')
-            : 'the music lock could not be read',
+            : unchoose.isError && !failed
+              ? unchoose.error.message
+              : 'the music lock could not be read',
         )
       : null
   const cls =
     state.kind === 'nothing'
-      ? 'in-game in-game-none'
+      ? 'track-in-game track-in-game-none'
       : (state.kind === 'take' && state.missing) || (state.kind === 'game' && !state.exists)
-        ? 'in-game in-game-warn'
-        : 'in-game'
-  const label = <span className="in-game-label">In the game</span>
+        ? 'track-in-game track-in-game-warn'
+        : 'track-in-game'
+  const label = <span className="track-in-game-label">In the game</span>
   const hint = <span className="faint small">{state.hint}</span>
 
   if (state.kind === 'nothing')
@@ -158,7 +166,7 @@ export function InTheGame({
         {take && <span className="faint small">{take.model}</span>}
       </div>
       {take && <Playback trackId={track.id} kind={view.kind} take={take} player={player} />}
-      <div className="in-game-actions">
+      <div className="track-in-game-actions">
         <span className="grow" />
         <button
           type="button"

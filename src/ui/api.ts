@@ -693,10 +693,12 @@ export function useUnchooseTake(trackId: string) {
       }
       return (await response.json()) as NonNullable<ChooseResult>
     },
-    onSettled: () => {
-      void client.invalidateQueries({ queryKey: ['project'] })
-      return client.invalidateQueries({ queryKey: ['music-takes', trackId] })
-    },
+    // Both reloaded before the question closes, so the block never shows the old choice.
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
+      ]),
   })
 }
 

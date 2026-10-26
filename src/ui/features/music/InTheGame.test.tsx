@@ -144,7 +144,7 @@ describe('the In the game block', () => {
       [],
     )
     const block = page.block()!
-    expect(block.className).toContain('in-game-warn')
+    expect(block.className).toContain('track-in-game-warn')
     expect(block.textContent).toContain('The file is not there.')
     expect(block.querySelector('.play')).toBeNull()
   })
@@ -155,7 +155,7 @@ describe('the In the game block', () => {
       [],
     )
     const block = page.block()!
-    expect(block.className).toContain('in-game-none')
+    expect(block.className).toContain('track-in-game-none')
     expect(block.textContent).toContain('Nothing plays here yet')
     expect(block.textContent).toContain('Choose a take below and the game plays it.')
     expect(page.container.textContent).toContain('No takes yet')
@@ -174,7 +174,7 @@ describe('the In the game block', () => {
       [take(3, { chosen: true })],
     )
     const block = page.block()!
-    expect(block.className).toContain('in-game-warn')
+    expect(block.className).toContain('track-in-game-warn')
     expect(block.textContent).toContain('music file missing')
     await click(page.button('Choose again'))
     expect(requests.at(0)).toMatchObject({ method: 'POST' })
@@ -227,6 +227,26 @@ describe('Un-choose', () => {
     expect(post.url).toBe('/api/music/tracks/hall/unchoose')
   })
 
+  it('un-chooses, closes the question and puts focus on the block', async () => {
+    const page = chosen()
+    await click(page.button('Un-choose'))
+    await click(page.button('Un-choose'))
+    expect(page.container.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(document.activeElement).toBe(page.block())
+  })
+
+  it('keeps the block and says why when the server answers an error', async () => {
+    globalThis.fetch = (async (_url: unknown, _init?: RequestInit) =>
+      new Response('boom', { status: 500 })) as typeof fetch
+    const page = chosen()
+    await click(page.button('Un-choose'))
+    await click(page.button('Un-choose'))
+    expect(page.container.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(page.block()!.textContent).toContain('Take 3 could not be un-chosen:')
+    expect(page.block()!.textContent).toContain('Nothing was changed.')
+    expect(document.activeElement).toBe(page.button('Un-choose') ?? null)
+  })
+
   it('keeps the block and says why when it failed', async () => {
     answer = { ok: false, message: 'The disk is full.' }
     const page = chosen()
@@ -234,7 +254,7 @@ describe('Un-choose', () => {
     await click(page.button('Un-choose'))
     const block = page.block()!
     expect(block.textContent).toContain(
-      'Take 3 could not be un-chosen: The disk is full. Nothing was changed.',
+      'Take 3 could not be un-chosen: the disk is full. Nothing was changed.',
     )
   })
 })

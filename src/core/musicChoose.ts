@@ -153,5 +153,7 @@ export function unchooseQuestion(take: number, gameFile: string | null): string 
 
 /** The red line when un-choosing failed. */
 export function unchooseFailure(take: number, reason: string): string {
-  return `Take ${take} could not be un-chosen: ${reason}. Nothing was changed.`
+  const plain = reason.replace(/\.$/, '')
+  const said = plain.charAt(0).toLowerCase() + plain.slice(1)
+  return `Take ${take} could not be un-chosen: ${said}. Nothing was changed.`
 }

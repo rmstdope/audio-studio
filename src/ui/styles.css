@@ -2971,7 +2971,7 @@ button.cue-chip[aria-expanded='true'] {
   min-width: 0;
 }
 /* Music: what the game plays, above the takes */
-.in-game {
+.track-in-game {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2981,32 +2981,32 @@ button.cue-chip[aria-expanded='true'] {
   border: 1px solid var(--kept-line);
   min-width: 0;
 }
-.in-game-warn {
+.track-in-game-warn {
   background: var(--warn-bg);
   border-color: var(--warn);
 }
-.in-game-warn .in-game-label {
+.track-in-game-warn .track-in-game-label {
   color: var(--warn);
 }
-.in-game-none {
+.track-in-game-none {
   background: transparent;
   border: 1px dashed var(--line-strong);
   color: var(--muted);
 }
-.in-game-label {
+.track-in-game-label {
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ok-ink);
 }
-.in-game-none .in-game-label {
+.track-in-game-none .track-in-game-label {
   color: var(--muted);
 }
-.in-game .take-row {
+.track-in-game .take-row {
   flex-wrap: wrap;
 }
-.in-game-actions {
+.track-in-game-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

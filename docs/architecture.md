@@ -881,7 +881,7 @@ not on disk when the page loads is marked "The file is not there." and has no bu
 empty cell keeps the column aligned.
 Play runs once from the start (a loop too), one row at a time, and stops on leaving the page; a
 play that fails says so in its row. The audio is `GET /api/music/tracks/:id/current`, which the
-studio resolves itself from the row (the page sends no path). A track opens its own page (built: its Brief panel and its Takes panel; its board: More takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).
+studio resolves itself from the row (the page sends no path). A track opens its own page (built: its Brief panel and its Takes panel; its board: the In the game block with Un-choose, More takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
