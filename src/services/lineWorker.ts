@@ -42,6 +42,11 @@ export interface LineWorkerOptions {
   timeoutMs: number
   /** What to say when the process cannot be started at all; `why` is the system's reason. */
   couldNotStart: (why: string) => string
+  /**
+   * What to say when the system killed the worker (SIGKILL, exit code 137: on macOS, most often
+   * memory running out), in place of its exit code and last log lines.
+   */
+  killed?: string
   /** Extra environment for the process, over the studio's own. */
   env?: Record<string, string>
 }
@@ -58,6 +63,7 @@ export function createLineWorker({
   command,
   timeoutMs,
   couldNotStart,
+  killed,
   env,
 }: LineWorkerOptions): LineWorker {
   let worker: Running | null = null
@@ -100,8 +106,12 @@ export function createLineWorker({
     void proc.exited.then((code) => {
       if (worker === current) worker = null
       const why = stderr.trim().split('\n').slice(-3).join(' ')
+      const wasKilled = code === 137 || current.proc.signalCode === 'SIGKILL'
       const reason =
-        current.stoppedBecause ?? `${name} stopped (exit code ${code})${why ? `: ${why}` : ''}`
+        current.stoppedBecause ??
+        (killed && wasKilled
+          ? killed
+          : `${name} stopped (exit code ${code})${why ? `: ${why}` : ''}`)
       for (const waiting of current.pending.values()) waiting.reject(new Error(reason))
       current.pending.clear()
     })

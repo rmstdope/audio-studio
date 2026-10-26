@@ -33,6 +33,15 @@ describe('createAceStepWorker', () => {
     expect((await worker.generate({ ...request, brief: 'again' })).seed).toBe(42)
   })
 
+  it('says plainly why, and what to do, when the system kills the worker', async () => {
+    const take = worker.generate({ ...request, brief: 'killed' })
+    await expect(take).rejects.toThrow(
+      'The music generator was stopped by the computer, most likely because it ran out of memory. Close other music jobs, then Try again.',
+    )
+    await expect(take).rejects.not.toThrow('acestep')
+    expect((await worker.generate({ ...request, brief: 'again' })).seed).toBe(42)
+  })
+
   it('ends a take at once when it is stopped, and makes the next one', async () => {
     const stop = new AbortController()
     const take = worker.generate({ ...request, brief: 'hang' }, stop.signal)
