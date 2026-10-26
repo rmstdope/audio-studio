@@ -341,6 +341,20 @@ language's clips stale for the cue, and `LineState.cueFrom` (`own`, `source`, `s
 `sourceCue` tell the page where a cue comes from. Editing a cue in a language writes that
 language's file only.
 
+**Cues inside a line** (as-vhm): a line's entry is its opening cue alone (as always), or the _cued
+text_: the opening cue, then the line's own words with a bracketed cue between some of them
+(`"[ashamed] I did it. [resolute] I will fix it."`). `core/cued.ts` reads it against the line's
+words: an entry is cued only when a bracket group follows a word, so `[sad] very slowly` stays an
+opening cue; the opening cue is what precedes the first word; a cue is never before the first word
+or after the last, one per gap, `at` counting the words before it. An entry whose words, cues
+removed, are not the line's (the game changed them) gives no cues inside and is `insideStale`: the
+line records with its opening cue only and the page shows the previous text. Recording sends each
+cue where it was placed, and each piece of a long line starts with the cue in effect there
+(`spokenPieces`, `piecesOf`); the fingerprint counts the cues inside only when there are some, so
+clips made before stay up to date. A language besides the source follows the source's opening cue
+only; the source's cues inside stay with it (`mergeCues`). The Whisper check compares the line's
+words, which never include cues.
+
 **Manifest** (`manifest.json`, written): unchanged, `{ key: { file, speaker, duration, words[] } }`.
 This is what the game reads.
 
@@ -951,7 +965,7 @@ Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's stat
 `GET /api/characters/:id/voice` (its cast voice as Fish knows it, its take and the audition
 phrase; one lookup, no search), `PATCH /api/characters/:id`
 (keywords or phrase), `POST /api/characters/:id/takes` (record a take), `GET /api/takes/:file`,
-`POST /api/parts/:part/lines/:key/try` (`{ cue }`: a take of the line said with that cue, nothing saved)
+`POST /api/parts/:part/lines/:key/try` (`{ cue }`: a take of the line said with that cue, nothing saved; with `at`, the cue is added at that gap inside the line)
 and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, manifest and lock;
 `{ confirmedCost }` on a paid model, else 409 with the ceiling to confirm),
 `GET /api/parts/:part/plan?speaker=&weak=1` (what generating would do, weak lines included if
@@ -1002,6 +1016,8 @@ POST   /api/parts/:part/refresh                  run refreshDialog (its result n
 POST   /api/music/stingers/refresh               run music.refreshShared; the stingers added and removed
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
+PATCH  /api/parts/:part/cues/:key/inside         a cue at a gap inside the line ({ at, cue, text }; empty cue: remove;
+                                                 refused when `text` is no longer the line's words)
 POST   /api/parts/:part/cues/:key/move           an orphaned cue to a line ({ to }; null: remove)
 GET    /api/parts/:part/plan?speaker=&weak=1&stage=final   scope → plan (no side effects)
 GET    /api/characters                           all characters, with the parts and line counts of each
@@ -1211,6 +1227,8 @@ Small, independently useful increments:
       in dialog order, with cue and status, played one by one or all in turn.
 10. **The lines page as a studio**, in small pull requests:
     1. **Hear it** (built): a line's cue heard before it is saved, as a free take (§8.3).
+       **Cues inside a line** (built, as-vhm): cues placed between a line's words, shown as chips,
+       placed from the gaps on hover or the `p` key, heard before they are saved.
     2. **Playthrough** (built): the lines shown played in turn, from the first or from a row, the
        row playing marked and kept in view (§8.3).
     3. **A character's speed** (built): `speed` in the cast, edited on the character page; its
