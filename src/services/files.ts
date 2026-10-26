@@ -77,7 +77,7 @@ const WRITE_FAILURES: Record<string, string> = {
  */
 export function writeFailure(error: unknown): string {
   const code = (error as NodeJS.ErrnoException | null)?.code
-  if (code && code in WRITE_FAILURES) return WRITE_FAILURES[code]!
+  if (code && Object.hasOwn(WRITE_FAILURES, code)) return WRITE_FAILURES[code]!
   return error instanceof Error ? error.message : String(error)
 }
 

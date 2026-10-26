@@ -70,11 +70,14 @@ describe('writeFailure', () => {
 
   it('names the cause a user can act on, not the call that met it', () => {
     expect(writeFailure(failed('EACCES'))).toBe('permission denied')
+    expect(writeFailure(failed('EPERM'))).toBe('permission denied')
     expect(writeFailure(failed('EROFS'))).toBe('the disk is read-only')
     expect(writeFailure(failed('ENOSPC'))).toBe('the disk is full')
+    expect(writeFailure(failed('EDQUOT'))).toBe('the disk quota is used up')
   })
 
   it('gives an unknown error’s own message', () => {
     expect(writeFailure(failed('EIO'))).toBe("EIO: open 'x.tmp'")
+    expect(writeFailure(failed('toString'))).toBe("toString: open 'x.tmp'")
   })
 })
