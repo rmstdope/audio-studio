@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setStageModel, switchRetiredModels } from './models'
 import { setSoundAlike } from './soundAlike'
@@ -97,6 +97,23 @@ describe('switchRetiredModels', () => {
     expect(narration.models).toEqual({ draft: 's2.1-pro', final: 's2.1-pro' })
     expect(narration.quality.soundAlike).toEqual([['inn', 'Inne']])
   })
+
+  it('says why the file could not be written when the switch is refused by the disk', async () => {
+    const { projectFile, read } = repo(projectWith({ draft: 's1', final: 's1' }))
+    const before = read()
+    chmodSync(dirname(projectFile), 0o555)
+    try {
+      expect(await switchRetiredModels(projectFile, ['draft', 'final'])).toEqual({
+        ok: false,
+        problems: [
+          { file: 'audio-studio.json', path: 'narration.models', message: 'permission denied' },
+        ],
+      })
+    } finally {
+      chmodSync(dirname(projectFile), 0o755)
+    }
+    expect(read()).toBe(before)
+  })
 })
 
 describe('setStageModel', () => {
@@ -154,5 +171,26 @@ describe('setStageModel', () => {
     const { projectFile, read } = repo(projectWith({ ...models, final: 's1' }))
     expect(await setStageModel(projectFile, 'final', 's2.1-pro', 's1')).toEqual({ ok: true })
     expect(JSON.parse(read()).narration.models.final).toBe('s2.1-pro')
+  })
+
+  it('says why the file could not be written, not that something failed', async () => {
+    const { projectFile, read } = repo(projectWith(models))
+    const before = read()
+    chmodSync(dirname(projectFile), 0o555)
+    try {
+      expect(await setStageModel(projectFile, 'draft', 's2.1-pro', 's2.1-pro-free')).toEqual({
+        ok: false,
+        problems: [
+          {
+            file: 'audio-studio.json',
+            path: 'narration.models.draft',
+            message: 'permission denied',
+          },
+        ],
+      })
+    } finally {
+      chmodSync(dirname(projectFile), 0o755)
+    }
+    expect(read()).toBe(before)
   })
 })

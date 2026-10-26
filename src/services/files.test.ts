@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
-import { formatEntriesPerLine, listFiles, readJson, writeAtomic } from './files'
+import { formatEntriesPerLine, listFiles, readJson, writeAtomic, writeFailure } from './files'
 
 describe('formatEntriesPerLine', () => {
   it('writes one sorted entry per line, as valid JSON', () => {
@@ -62,5 +62,19 @@ describe('readJson, unreadable', () => {
     const root = tempRepo({ 'folder/x': 'x' })
     const read = await readJson(join(root, 'folder'))
     expect(read.status).toBe('invalid')
+  })
+})
+
+describe('writeFailure', () => {
+  const failed = (code: string) => Object.assign(new Error(`${code}: open 'x.tmp'`), { code })
+
+  it('names the cause a user can act on, not the call that met it', () => {
+    expect(writeFailure(failed('EACCES'))).toBe('permission denied')
+    expect(writeFailure(failed('EROFS'))).toBe('the disk is read-only')
+    expect(writeFailure(failed('ENOSPC'))).toBe('the disk is full')
+  })
+
+  it('gives an unknown error’s own message', () => {
+    expect(writeFailure(failed('EIO'))).toBe("EIO: open 'x.tmp'")
   })
 })
