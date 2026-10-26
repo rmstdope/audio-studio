@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { LineStatus } from '../../../core/planner'
 import { sharesVoiceWith, type PartSummary, type ProjectSummary } from '../../../core/summary'
 import type { PartDetail } from '../../../services/workspace'
-import { useAdopt, useMoveCue, usePart, useRefreshDialog } from '../../api'
+import { useAdopt, useMoveCue, useMoveSceneCue, usePart, useRefreshDialog } from '../../api'
 import type { RefreshResult } from '../../../services/refresh'
 import { DialogGonePanel } from '../lines/DialogGonePanel'
 import { PartLanguageSwitch } from '../lines/PartLanguageSwitch'
@@ -12,6 +12,7 @@ import { AlertIcon, ListIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusBar, StatusDot } from '../../components/StatusBar'
 import { longTitle, plural, shortTitle } from '../../format'
+import { sceneOfKey } from '../../../core/resources'
 import { cueTargets, type CueTarget } from '../../cueTargets'
 import { routeHref } from '../../route'
 import { REASON, STATUS, reasonCounts } from '../../status'
@@ -415,24 +416,98 @@ function OrphanCues({ part, language }: { part: PartDetail; language?: string })
     <section className="panel orphan-cues" aria-label="Orphaned cues">
       <div>
         <span className="label">Orphaned cues</span>
-        <strong>{plural(part.orphanCues.length, 'cue')} without a line</strong>
+        <strong>{plural(part.orphanCues.length, 'cue')} without a line or scene</strong>
       </div>
-      <span className="muted">
-        Their lines left the dialog, usually reworded under a new key. Give each cue to its line’s
-        new key, or remove it.
-      </span>
+      <span className="muted">Cues whose line or scene is no longer in the dialog.</span>
       <ul>
-        {part.orphanCues.map((orphan) => (
-          <OrphanCue
-            key={orphan.key}
-            partId={part.id}
-            language={language}
-            orphan={orphan}
-            targets={targets}
-          />
-        ))}
+        {part.orphanCues.map((orphan) => {
+          const scene = sceneOfKey(orphan.key)
+          return scene === null ? (
+            <OrphanCue
+              key={orphan.key}
+              partId={part.id}
+              language={language}
+              orphan={orphan}
+              targets={targets}
+            />
+          ) : (
+            <OrphanSceneCue
+              key={orphan.key}
+              partId={part.id}
+              language={language}
+              scene={scene}
+              cue={orphan.cue}
+              targets={part.scenes.filter((s) => s.cueFrom !== 'own').map((s) => s.name)}
+            />
+          )
+        })}
       </ul>
     </section>
+  )
+}
+
+/**
+ * A scene cue whose scene left the dialog, usually renamed: given to a scene that has no cue of
+ * its own, or removed.
+ */
+function OrphanSceneCue({
+  partId,
+  language,
+  scene,
+  cue,
+  targets,
+}: {
+  partId: string
+  language?: string
+  scene: string
+  cue: string
+  /** The scenes of the dialog that can take it: those without a cue of their own. */
+  targets: string[]
+}) {
+  const move = useMoveSceneCue(partId, language)
+  const [picked, setPicked] = useState('')
+  // Only a scene still offered counts: after a reload the picked one may have its own cue now.
+  const to = targets.includes(picked) ? picked : ''
+  const problems = move.data && !move.data.ok && 'problems' in move.data ? move.data.problems : []
+  return (
+    <li>
+      <div className="orphan-cue-head">
+        <span className="muted">Scene</span> <strong>{scene}</strong>{' '}
+        <span className="mono cue">{cue}</span>
+      </div>
+      <div className="orphan-cue-actions">
+        <select
+          aria-label={`Scene to give the cue ${cue} to`}
+          value={to}
+          onChange={(e) => setPicked(e.target.value)}
+        >
+          <option value="">Give to scene ▾</option>
+          {targets.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <button
+          className="btn"
+          type="button"
+          disabled={!to || move.isPending}
+          onClick={() => move.mutate({ from: scene, to })}
+        >
+          Give
+        </button>
+        <button
+          className="btn"
+          type="button"
+          disabled={move.isPending}
+          onClick={() => move.mutate({ from: scene, to: null })}
+        >
+          Remove
+        </button>
+      </div>
+      {problems.length > 0 && <Problems title="The cue could not be moved" problems={problems} />}
+      {move.isError && <span className="adopt-error">{move.error.message}</span>}
+    </li>
   )
 }
 

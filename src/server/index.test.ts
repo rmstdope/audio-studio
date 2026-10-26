@@ -317,6 +317,50 @@ describe('server', () => {
     expect(after.part.lines.find((l: { key: string }) => l.key === 'a').cueFrom).toBe('style')
   })
 
+  it('saves and moves a scene’s cue, from the studio’s own page only', async () => {
+    const send = (path: string, method: string, body: unknown, origin = server.url.origin) =>
+      fetch(url(path), {
+        method,
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    const script = readFileSync(join(root, 'tts/act1/script.json'), 'utf8')
+    writeFileSync(
+      join(root, 'tts/act1/script.json'),
+      JSON.stringify([{ key: 'a', speaker: 'narrator', text: 'Once.', scene: 'Old Cave' }]),
+    )
+    const save = (body: unknown, origin?: string) =>
+      send('/api/parts/act1/scene-cues', 'PATCH', body, origin)
+    expect((await save({ scene: 'Old Cave', cue: '[dark]' }, 'https://evil.example')).status).toBe(
+      403,
+    )
+    expect((await save({ scene: 'Old Cave', cue: 3 })).status).toBe(400)
+    expect((await save({ scene: 'Nowhere', cue: '[dark]' })).status).toBe(404)
+    expect((await save({ scene: 'Old Cave', cue: '[dark]' })).status).toBe(200)
+    const part = await (await fetch(url('/api/parts/act1'))).json()
+    expect(part.part.lines[0]).toMatchObject({ cue: '[dark]', cueFrom: 'scene', scene: 'Old Cave' })
+    expect(part.part.scenes[0]).toMatchObject({ name: 'Old Cave', cue: '[dark]', cueFrom: 'own' })
+    expect(part.part.sceneCueSpeakers).toEqual(['narrator'])
+
+    writeFileSync(
+      join(root, 'tts/act1/script.json'),
+      JSON.stringify([{ key: 'a', speaker: 'narrator', text: 'Once.', scene: 'Cave' }]),
+    )
+    const move = (to: string | null, origin?: string) =>
+      send('/api/parts/act1/scene-cues/move', 'POST', { from: 'Old Cave', to }, origin)
+    expect((await move('Cave', 'https://evil.example')).status).toBe(403)
+    expect((await send('/api/parts/act1/scene-cues/move', 'POST', { to: 3 })).status).toBe(400)
+    const after = await (await fetch(url('/api/parts/act1'))).json()
+    expect(after.part.orphanCues).toEqual([{ key: 'scene:Old Cave', cue: '[dark]' }])
+    expect((await move('Cave')).status).toBe(200)
+    expect((await move(null)).status).toBe(404)
+    expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe(
+      '{\n  "scene:Cave": "[dark]"\n}\n',
+    )
+    writeFileSync(join(root, 'tts/act1/script.json'), script)
+    writeFileSync(join(root, 'tts/act1/cues.json'), '{}\n')
+  })
+
   it('tries a cue on a line, from the studio’s own page only, and serves the take', async () => {
     const tryCue = (key: string, body: unknown, origin = server.url.origin) =>
       fetch(url(`/api/parts/act1/lines/${key}/try`), {

@@ -18,6 +18,8 @@ function line(overrides: Partial<LineState>): LineState {
     english: null,
     cue: '',
     cueFrom: 'style',
+    scene: null,
+    followsScene: false,
     sourceCue: null,
     inside: [],
     insideStale: null,

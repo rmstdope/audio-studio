@@ -89,6 +89,15 @@ function insideOf(body: string): InsideCue[] | null {
   return pending ? null : inside
 }
 
+/** A line's opening cue in `cues` (read against its words), or undefined when it has none. */
+export function openingFor(
+  cues: Record<string, string>,
+  key: string,
+  text: string,
+): string | undefined {
+  return Object.hasOwn(cues, key) ? parseCued(cues[key]!, text).opening || undefined : undefined
+}
+
 /** Whether `cue` can sit between words: one bracket group, with no brackets inside it. */
 export function isCue(cue: string): boolean {
   return /^\[[^[\]]*\]$/.test(cue)

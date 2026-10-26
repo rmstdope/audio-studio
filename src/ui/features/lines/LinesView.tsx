@@ -28,6 +28,8 @@ import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
 import { dollars, longTitle, plural, shortTitle } from '../../format'
 import { cueButtonTitle, cueHint, cueNote, noDialogPanel } from '../../languages'
+import { bandsBefore, sceneCueWithoutOwn, tableRows } from '../../sceneBands'
+import { SceneBand } from './SceneBand'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
@@ -40,6 +42,9 @@ type Filter = 'all' | 'attention' | LineStatus | 'orphans' | 'notes'
  * (Retake).
  */
 const RECORDABLE = new Set<LineStatus>(['missing', 'stale', 'weak'])
+
+/** The columns of the lines table, which a scene's band spans. */
+const LINE_COLUMNS = 6
 
 /** Lines that need something done: everything but up to date. */
 const needsAttention = (line: LineState) => line.status !== 'ok'
@@ -128,6 +133,8 @@ export function LinesView({
         (!words || line.text.toLowerCase().includes(words) || line.key.includes(words)),
     )
   }, [loaded, filter, speaker, search])
+  // The band before the first shown line of each scene's run; none when the dialog names no scenes.
+  const bands = useMemo(() => bandsBefore(tableRows(loaded?.lines ?? [], lines)), [loaded, lines])
 
   // A playthrough: the lines shown with a clip, in turn, from the first or from one line.
   const turn = clipsInTurn(lines)
@@ -415,6 +422,22 @@ export function LinesView({
             <tbody onKeyDown={onRowKey}>
               {lines.map((line) => (
                 <Fragment key={line.key}>
+                  {bands.has(line.key) && loaded && (
+                    <SceneBand
+                      partId={loaded.id}
+                      language={asked}
+                      band={bands.get(line.key)!}
+                      scene={
+                        loaded.scenes.find((s) => s.name === bands.get(line.key)!.scene) ?? null
+                      }
+                      filtered={lines.length < loaded.lines.length}
+                      speakers={loaded.sceneCueSpeakers}
+                      names={foreign ? { language: active.name, source: source.name } : null}
+                      columns={LINE_COLUMNS}
+                      playing={playing}
+                      toggle={toggle}
+                    />
+                  )}
                   <tr
                     ref={playing === line.key ? playingRow : undefined}
                     className={playing === line.key ? 'playing' : undefined}
@@ -483,6 +506,7 @@ export function LinesView({
                         line={line}
                         language={asked}
                         names={foreign ? { language: active.name, source: source.name } : null}
+                        sceneCue={sceneCueWithoutOwn(loaded.scenes, loaded.sceneCueSpeakers, line)}
                         playing={playing}
                         toggle={toggle}
                       />
@@ -730,6 +754,7 @@ function CueCell({
   line,
   language,
   names,
+  sceneCue,
   playing,
   toggle,
 }: {
@@ -739,6 +764,8 @@ function CueCell({
   language?: string
   /** In a language besides the source: its name and the source's, for what the cue says it follows. */
   names: { language: string; source: string } | null
+  /** The cue the line would follow without its own, when that is its scene's. */
+  sceneCue: string | null
   playing: string | null
   toggle: (id: string, url: string) => void
 }) {
@@ -760,10 +787,14 @@ function CueCell({
   const refocus = useRef(false)
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
   const own = line.cueFrom === 'own' ? line.cue : ''
-  const note =
-    names && line.cue
-      ? cueNote(line.cueFrom, displayName(line.speaker), names.source, line.sourceInside.length > 0)
-      : null
+  const note = line.cue
+    ? cueNote(
+        line.cueFrom,
+        displayName(line.speaker),
+        names ? names.source : null,
+        line.sourceInside.length > 0,
+      )
+    : null
   const hint = names ? cueHint(line.cueFrom, line.sourceCue, names.source) : null
 
   // Back on the cue after editing, so the keyboard keeps its place in the table.
@@ -804,7 +835,9 @@ function CueCell({
               ? cueButtonTitle(line.cueFrom, names.language, names.source)
               : line.cueFrom === 'own'
                 ? 'This line’s own cue: edit'
-                : 'The character’s style: give this line its own cue'
+                : line.cueFrom === 'scene'
+                  ? 'The scene’s cue: give this line its own cue'
+                  : 'The character’s style: give this line its own cue'
           }
           onClick={() => {
             save.reset()
@@ -829,7 +862,9 @@ function CueCell({
         className="mono"
         autoFocus
         aria-label={`Cue for ${line.key}`}
-        placeholder={line.cueFrom === 'own' ? '' : line.cue || '[a cue for this line]'}
+        placeholder={
+          line.cueFrom === 'own' ? (sceneCue ?? '') : line.cue || '[a cue for this line]'
+        }
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => e.key === 'Escape' && close()}
@@ -846,7 +881,11 @@ function CueCell({
             disabled={save.isPending}
             onClick={() => save.mutate({ key: line.key, cue: '' }, { onSuccess: done })}
           >
-            {names && line.sourceCue ? `Follow ${names.source}` : 'Use style'}
+            {names && line.sourceCue
+              ? `Follow ${names.source}`
+              : sceneCue !== null
+                ? 'Use scene cue'
+                : 'Use style'}
           </button>
         )}
         <button className="btn" type="button" onClick={close}>

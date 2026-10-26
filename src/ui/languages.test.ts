@@ -190,6 +190,17 @@ describe('the words around a language', () => {
     expect(cueNote('style', 'Mira', 'English', true)).toBe('Mira’s style')
   })
 
+  it('says a line follows its scene’s cue in any language, and that it follows English', () => {
+    expect(cueNote('scene', 'Mira', null)).toBe("The scene's cue")
+    expect(cueNote('scene', 'Mira', 'English')).toBe("The scene's cue")
+    expect(cueNote('sceneSource', 'Mira', 'English')).toBe("The scene's cue, following English")
+    expect(cueNote('style', 'Mira', null)).toBeNull()
+    expect(cueButtonTitle('scene', 'Svenska', 'English')).toBe(
+      'The scene’s cue: give this line its own cue',
+    )
+    expect(cueHint('scene', '[worried]', 'English')).toBeNull()
+  })
+
   it('words the cue editor for a language following or not following the source', () => {
     expect(cueHint('source', '[worried]', 'English')).toBe(
       'Empty: this line follows the English cue [worried].',

@@ -5,7 +5,13 @@ import { soundAlikes, type SoundAlike } from '../core/align'
 import { capitalisesNouns, languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
-import { adoptUntracked, planPart, type PartState, type PlanInput } from '../core/planner'
+import {
+  adoptUntracked,
+  planPart,
+  withSourceScenes,
+  type PartState,
+  type PlanInput,
+} from '../core/planner'
 import {
   PROJECT_FILE,
   ProjectSchema,
@@ -223,6 +229,8 @@ export interface PartDetail extends PartState {
   minHeard: number
   /** The longest a piece of a line recorded in several is, in characters (`chunkLimit`). */
   chunkLimit: number
+  /** The speakers whose lines follow their scene's cue (the project's `sceneCueSpeakers`). */
+  sceneCueSpeakers: string[]
   /** The model everyday plans record with (the project's draft stage). */
   draftModel: string
   /** The model of the final recording; the same as the draft one when there is no final step. */
@@ -277,6 +285,7 @@ export async function loadPart(
       languages,
       minHeard: project.narration.quality.minHeard,
       chunkLimit: project.narration.quality.chunkLimit,
+      sceneCueSpeakers: project.narration.sceneCueSpeakers,
       draftModel: project.narration.models.draft,
       finalModel: project.narration.models.final,
       notes: onLines(notes.notes.lines, input.lines),
@@ -477,7 +486,10 @@ export async function readPart(
     part,
     dialog,
     input: {
-      lines: dialog.status === 'ok' ? dialog.lines : [],
+      lines: withSourceScenes(
+        dialog.status === 'ok' ? dialog.lines : [],
+        source?.status === 'ok' ? source.lines : undefined,
+      ),
       ...(source?.status === 'ok' ? { source: source.lines } : {}),
       cast: projectCast(
         cast ?? { speakers: {}, pronounce: {} },

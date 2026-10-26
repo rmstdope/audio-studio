@@ -19,6 +19,8 @@ function line(
     english: null,
     cue: '',
     cueFrom: 'style',
+    scene: null,
+    followsScene: false,
     sourceCue: null,
     inside: [],
     insideStale: null,

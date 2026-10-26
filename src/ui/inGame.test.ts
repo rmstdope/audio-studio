@@ -10,6 +10,8 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     english: null,
     cue: '[warm]',
     cueFrom: 'style',
+    scene: null,
+    followsScene: false,
     sourceCue: null,
     inside: [],
     insideStale: null,

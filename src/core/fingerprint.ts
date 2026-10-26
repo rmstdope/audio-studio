@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { Project } from './project'
-import { parseCued, type InsideCue } from './cued'
-import { cueFor, ttsFor, type Character, type LockEntry } from './resources'
+import { openingFor, parseCued, type InsideCue } from './cued'
+import { cueFor, sceneKey, ttsFor, type Character, type LockEntry } from './resources'
 import { REPLACEMENT_MODEL, RETIRED_MODEL, sameModel } from './retirement'
 import { saidText } from './spoken'
 
@@ -9,7 +9,7 @@ import { saidText } from './spoken'
 export interface ClipInputs {
   model: string
   voice: string
-  /** The delivery cue: the line's own cue, else the character's style. */
+  /** The delivery cue: the line's own cue, else its scene's, else the character's style. */
   cue: string
   /** The cues placed inside the line's words; none for most lines. */
   inside: InsideCue[]
@@ -27,6 +27,30 @@ export type InputHashes = LockEntry['parts']
 /** Why a clip no longer matches its inputs. */
 export type StaleReason = 'voice' | 'model' | 'cue' | 'text' | 'pronunciation' | 'settings'
 
+/** A line as the cue rules see it. */
+export interface CueLine {
+  key: string
+  speaker?: string
+  scene?: string | null
+  /** The line's words, to read its own cue against. */
+  text?: string
+}
+
+/**
+ * The scene's cue a line follows: its scene's, when its speaker is one the project names and it
+ * has no cue of its own; undefined otherwise.
+ */
+export function sceneCueFor(
+  line: CueLine,
+  cues: Record<string, string>,
+  narration: Pick<Project['narration'], 'sceneCueSpeakers'>,
+): string | undefined {
+  if (!line.scene || !line.speaker || openingFor(cues, line.key, line.text ?? '') !== undefined)
+    return undefined
+  if (!narration.sceneCueSpeakers.includes(line.speaker)) return undefined
+  return cueFor(cues, sceneKey(line.scene))
+}
+
 const NONE = { opening: '', inside: [] as InsideCue[] }
 
 /**
@@ -34,7 +58,7 @@ const NONE = { opening: '', inside: [] as InsideCue[] }
  * stage's: everyday generation uses it.
  */
 export function clipInputs(
-  line: { key: string; text: string },
+  line: CueLine & { text: string },
   character: Character | undefined,
   cues: Record<string, string>,
   pronounce: Record<string, string>,
@@ -49,7 +73,7 @@ export function clipInputs(
   return {
     model,
     voice: character.voice,
-    cue: opening || (character.style ?? ''),
+    cue: opening || (sceneCueFor(line, cues, narration) ?? character.style ?? ''),
     inside,
     text: line.text,
     said: saidText(line.text, pronounce),
