@@ -126,12 +126,13 @@ export function priceWords(model: string, at: Date, dialog: Dialog): string {
   )
   if (model === RETIRED_MODEL) parts.push('retires 31 December')
   if (dialog.lines > 0) {
-    const total = (price: number) => money((dialog.bytes / 1_000_000) * price)
+    const cost = (price: number) => (dialog.bytes / 1_000_000) * price
+    const total = (price: number) => about(cost(price))
     const count = `${dialog.lines.toLocaleString('en-US')} line${dialog.lines === 1 ? '' : 's'}`
     parts.push(
       promotion
-        ? `about ${total(promotion.price)} for all ${count} (${total(detail.price)} from ${day(promotion.until)})`
-        : `about ${total(detail.price)} for all ${count}`,
+        ? `${total(promotion.price)} for all ${count} (${money(cost(detail.price))} from ${day(promotion.until)})`
+        : `${total(detail.price)} for all ${count}`,
     )
   }
   return parts.join(' · ')
