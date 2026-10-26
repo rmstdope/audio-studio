@@ -117,6 +117,17 @@ describe('the In the game block', () => {
     expect(page.block()!.textContent).toContain('Un-choose and the game plays nothing here.')
   })
 
+  it('says the music lock could not be read, not the game’s own file, without Un-choose', () => {
+    const page = render(
+      row({ status: 'not-chosen', chosenAt: null, current: { kind: 'unknown' } }),
+      [take(1), take(3)],
+    )
+    const block = page.block()!
+    expect(block.textContent).not.toContain("The game's own file")
+    expect(block.textContent).toContain('The music lock could not be read')
+    expect(page.button('Un-choose')).toBeUndefined()
+  })
+
   it('shows the game’s own file, without Un-choose, when no take is chosen', () => {
     const page = render(
       row({

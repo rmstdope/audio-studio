@@ -90,7 +90,7 @@ async function dropStale(
 ): Promise<string[]> {
   const problems: Problem[] = []
   const chosen = await readChosen(root, music, problems)
-  if (problems.length) return []
+  if (!chosen || problems.length) return []
   const boards = [...(await listFiles(resolveInRoot(root, MUSIC_BOARD_DIR)))]
     .filter((name) => name.endsWith('.json'))
     .map((name) => name.slice(0, -'.json'.length))

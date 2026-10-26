@@ -106,11 +106,13 @@ export function InTheGame({
         )
       : null
   const cls =
-    state.kind === 'nothing'
-      ? 'track-in-game track-in-game-none'
-      : (state.kind === 'take' && state.missing) || (state.kind === 'game' && !state.exists)
-        ? 'track-in-game track-in-game-warn'
-        : 'track-in-game'
+    state.kind === 'unknown'
+      ? 'track-in-game track-in-game-warn'
+      : state.kind === 'nothing'
+        ? 'track-in-game track-in-game-none'
+        : (state.kind === 'take' && state.missing) || (state.kind === 'game' && !state.exists)
+          ? 'track-in-game track-in-game-warn'
+          : 'track-in-game'
   const label = <span className="track-in-game-label">In the game</span>
   const hint = <span className="faint small">{state.hint}</span>
 
@@ -119,6 +121,15 @@ export function InTheGame({
       <section className={cls} aria-label="In the game" ref={block} tabIndex={-1}>
         {label}
         <b>Nothing plays here yet</b>
+        {hint}
+      </section>
+    )
+
+  if (state.kind === 'unknown')
+    return (
+      <section className={cls} aria-label="In the game" ref={block} tabIndex={-1}>
+        {label}
+        <b>The music lock could not be read</b>
         {hint}
       </section>
     )

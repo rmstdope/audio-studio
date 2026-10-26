@@ -98,11 +98,15 @@ export interface GameBrief {
   key: string | null
 }
 
-/** What a row's play button plays: the chosen take, else the game's own file, else nothing. */
+/**
+ * What a row's play button plays: the chosen take, else the game's own file, else nothing; not
+ * known while the music lock cannot be read, since the lock is what says a take is chosen.
+ */
 export type CurrentMusic =
   | { kind: 'take'; take: number; exists: boolean }
   | { kind: 'game'; file: string; exists: boolean }
   | { kind: 'none' }
+  | { kind: 'unknown' }
 
 /** A track as a list page shows it; its brief, length, tempo and key are the ones in force. */
 export interface TrackRow {
@@ -168,12 +172,13 @@ export interface MusicSummary {
 /**
  * The Music pages from the lists the game wrote and the studio's changes to their briefs. An id
  * used twice, in one list or two, is a problem at every place it is used, and none of those
- * tracks is shown: which one the music file belongs to is not for the studio to guess.
+ * tracks is shown: which one the music file belongs to is not for the studio to guess. `chosen`
+ * is null when the music lock cannot be read, and then what each track plays is not known.
  */
 export function summarizeMusic(
   lists: MusicListInput[],
   briefs: Briefs,
-  chosen: Record<string, ChosenState> = {},
+  chosen: Record<string, ChosenState> | null = {},
   gameFiles: Record<string, boolean> = {},
 ): { music: MusicSummary; problems: Problem[] } {
   const uses = new Map<string, { file: string; path: string }[]>()
@@ -210,9 +215,9 @@ export function summarizeMusic(
         title: list.title,
         state: list.state.status,
         tracks: shown(list, uses).map((track) =>
-          rowOf(track, briefs[track.id], list.kind, chosen[track.id], gameFiles[track.id] ?? false),
+          rowOf(track, briefs[track.id], list.kind, chosen, gameFiles[track.id] ?? false),
         ),
-        orphans: orphansOf(list, named, chosen),
+        orphans: orphansOf(list, named, chosen ?? {}),
         dropped: listed(list).length - shown(list, uses).length,
         canRefresh: list.canRefresh,
       })),
@@ -283,9 +288,10 @@ function rowOf(
   track: Track,
   change: Briefs[string] | undefined,
   kind: MusicListInput['kind'],
-  chosen: ChosenState | undefined,
+  lock: Record<string, ChosenState> | null,
   gameFileExists: boolean,
 ): TrackRow {
+  const chosen = lock?.[track.id]
   const row = {
     id: track.id,
     title: track.title,
@@ -319,11 +325,13 @@ function rowOf(
     status,
     changed: status === 'changed' ? changedFields(chosen!.lock, current) : [],
     chosenAt: chosen?.lock.at ?? null,
-    current: chosen
-      ? { kind: 'take', take: chosen.lock.take, exists: chosen.fileExists }
-      : track.file
-        ? { kind: 'game', file: track.file, exists: gameFileExists }
-        : { kind: 'none' },
+    current: !lock
+      ? { kind: 'unknown' }
+      : chosen
+        ? { kind: 'take', take: chosen.lock.take, exists: chosen.fileExists }
+        : track.file
+          ? { kind: 'game', file: track.file, exists: gameFileExists }
+          : { kind: 'none' },
     gameFile: track.file ? { file: track.file, exists: gameFileExists } : null,
   }
 }

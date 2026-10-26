@@ -324,7 +324,7 @@ export function createMusicTakes({
       const entries = entriesOf(projectFile, id)
       const board = await readBoard(root, found.board)
       if ('ok' in board) return board
-      const chosen = (await readChosen(root, found.music, []))[id]?.lock
+      const chosen = (await readChosen(root, found.music, []))?.[id]?.lock
       const takes: TakeView[] = []
       for (const take of board.takes) {
         if (!(await Bun.file(join(root, folder, fileOf(take))).exists())) continue
@@ -455,7 +455,8 @@ export function createMusicTakes({
           const problems: Problem[] = []
           const chosenTracks = await readChosen(found.root, found.music, problems)
           // Which take the game plays is not known: nothing is dropped.
-          if (problems.length) return { ok: false, file: found.music.paths.lock, problems }
+          if (!chosenTracks || problems.length)
+            return { ok: false, file: found.music.paths.lock, problems }
           const chosen = chosenTracks[id]?.lock
           const take = board.takes.find((t) => fileOf(t) === name)
           if (!take) return { ok: false, message: 'That take is not on the board.' }

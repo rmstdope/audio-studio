@@ -15,6 +15,11 @@ describe('playsText', () => {
     expect(playsText(take())).toEqual({ lead: 'Take 3' })
   })
 
+  it('says what plays is not known while the music lock cannot be read', () => {
+    expect(playsText({ kind: 'unknown' })).toEqual({ lead: 'Not known', faint: true })
+    expect(canPlay({ kind: 'unknown' })).toBe(false)
+  })
+
   it('names the game’s file and puts the file name beneath', () => {
     expect(playsText(game())).toEqual({
       lead: "The game's file",
