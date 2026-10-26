@@ -145,18 +145,22 @@ export function dialogGonePanel({
   canRefresh: boolean
 }): { heading: string; before: string; advice: string; lines: string; refresh: boolean } {
   const words = recordedWords(recorded)
+  const one = recorded.clips + recorded.cues === 1
+  const were = one ? 'was' : 'were'
   const dropped = `If the game no longer has ${language ? `${language} lines for ` : ''}this ${partLabel.toLowerCase()}, delete the clips and their manifest yourself.`
   return {
     heading: `${partTitle}’s ${language ? `${language} ` : ''}dialog is gone`,
-    before: ` is not there, but ${words} were recorded for ${partTitle}${
+    before: ` is not there, but ${words} ${were} recorded for ${partTitle}${
       language ? ` in ${language}` : ''
-    }. The studio keeps them as they are and offers to remove none of them until the dialog is back.`,
+    }. The studio keeps ${one ? 'it as it is' : 'them as they are'} and offers to remove none of ${
+      one ? 'it' : 'them'
+    } until the dialog is back.`,
     advice: `${
       canRefresh
         ? 'Refresh dialog writes it again from the game.'
         : 'Once the game writes it again, the studio reads it in.'
     } ${dropped}`,
-    lines: `${words} were recorded for these lines. Nothing can be generated or removed until the dialog is back.`,
+    lines: `${words} ${were} recorded for these lines. Nothing can be generated or removed until the dialog is back.`,
     refresh: canRefresh,
   }
 }
