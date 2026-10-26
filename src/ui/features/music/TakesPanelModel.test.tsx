@@ -60,6 +60,7 @@ const view = (over: Partial<MusicTakesView> = {}): MusicTakesView => ({
   ],
   making: [],
   failed: [],
+  lockUnread: false,
   ...over,
 })
 
@@ -100,6 +101,40 @@ function render(data: MusicTakesView, row: TrackRow = track) {
     )!
   return { container, menu, button }
 }
+
+describe('the Takes panel while the music lock cannot be read', () => {
+  const why =
+    'Choosing and dropping wait until the music lock can be read. You can still listen and make more takes.'
+
+  it('says why above the cards and greys out Choose and Drop, leaving More takes alone', () => {
+    const page = render(view({ lockUnread: true }))
+    expect(page.container.textContent).toContain(why)
+    expect(page.button('Choose').disabled).toBe(true)
+    expect(page.button('Drop').disabled).toBe(true)
+    expect(page.button('More takes').disabled).toBe(false)
+  })
+
+  it('says why as soon as the first take is being made', () => {
+    const making = [
+      {
+        n: 1,
+        state: 'making' as const,
+        elapsed: 5,
+        model: 'Quick · XL turbo · 1.7B',
+        expected: 75,
+      },
+    ]
+    const page = render(view({ lockUnread: true, takes: [], making }))
+    expect(page.container.textContent).toContain(why)
+  })
+
+  it('says nothing on an empty panel, nor when the lock is readable', () => {
+    expect(render(view({ lockUnread: true, takes: [] })).container.textContent).not.toContain(why)
+    const ok = render(view({ lockUnread: false }))
+    expect(ok.container.textContent).not.toContain(why)
+    expect(ok.button('Choose').disabled).toBe(false)
+  })
+})
 
 describe('the model menu on a track’s Takes panel', () => {
   it('sits just before More takes, starting on the project’s model', () => {

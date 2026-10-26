@@ -157,6 +157,12 @@ export function TakesPanel({ track }: { track: TrackRow }) {
             </div>
           )}
         </div>
+        {!none && view.lockUnread && (
+          <span className="takes-missing small">
+            Choosing and dropping wait until the music lock can be read. You can still listen and
+            make more takes.
+          </span>
+        )}
         {!none && missing}
         {none ? (
           <div className="takes-empty">
@@ -190,6 +196,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
                 kind={view.kind}
                 take={take}
                 player={player}
+                locked={view.lockUnread}
               />
             ))}
             {view.making.map((making, index) => (
@@ -211,11 +218,14 @@ function TakeCard({
   kind,
   take,
   player,
+  locked,
 }: {
   trackId: string
   kind: MusicTakesView['kind']
   take: TakeView
   player: ReturnType<typeof useClipPlayer>
+  /** The music lock cannot be read: Choose and Drop wait. */
+  locked: boolean
 }) {
   const id = `music-take-${trackId}-${take.n}`
   const url = `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${take.file}`
@@ -257,7 +267,7 @@ function TakeCard({
         <button
           type="button"
           className="btn btn-ghost btn-small"
-          disabled={drop.isPending || choose.isPending}
+          disabled={locked || drop.isPending || choose.isPending}
           onClick={() => {
             if (playing || seamPlaying) player.stop()
             drop.mutate(take.file)
@@ -268,7 +278,7 @@ function TakeCard({
         <button
           type="button"
           className="btn btn-small"
-          disabled={choose.isPending}
+          disabled={locked || choose.isPending}
           onClick={() => choose.mutate(take.file)}
         >
           {choose.isPending ? 'Choosing…' : 'Choose'}

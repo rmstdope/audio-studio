@@ -58,6 +58,7 @@ const view = (takes: TakeView[]): MusicTakesView => ({
   takes,
   making: [],
   failed: [],
+  lockUnread: false,
 })
 
 let answer: unknown

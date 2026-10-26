@@ -37,7 +37,8 @@ export type MusicLock = z.infer<typeof MusicLockSchema>
 export type MusicManifest = z.infer<typeof MusicManifestSchema>
 
 /** Where a track stands: no take chosen, the chosen one is current, changed since, or its file is gone. */
-export type TrackStatus = 'not-chosen' | 'chosen' | 'changed' | 'missing'
+/** `unknown` while the music lock cannot be read: the lock is what says a take is chosen. */
+export type TrackStatus = 'not-chosen' | 'chosen' | 'changed' | 'missing' | 'unknown'
 
 /** What can have changed since a take was chosen. */
 export type ChangedField = 'brief' | 'length' | 'tempo' | 'key'
@@ -90,6 +91,7 @@ export const STATUS_LABEL: Record<TrackStatus, string> = {
   chosen: 'chosen',
   changed: 'changed since chosen',
   missing: 'music file missing',
+  unknown: 'not known',
 }
 
 /** How many of a list's tracks are chosen, and how many of those have lost their music file. */

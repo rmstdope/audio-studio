@@ -200,6 +200,8 @@ export interface MusicTakesView {
   takes: TakeView[]
   making: MakingView[]
   failed: FailedView[]
+  /** The music lock cannot be read, so which take is chosen is not known and none can be chosen or dropped. */
+  lockUnread: boolean
 }
 
 /** What a take was made from: the track's inputs at the time. */

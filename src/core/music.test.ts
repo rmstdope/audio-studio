@@ -127,6 +127,11 @@ describe('summarizeMusic', () => {
     expect(music.lists[0]!.tracks[0]).toMatchObject({ brief: 'ours', seconds: 60 })
   })
 
+  it('gives every track the status not known while the music lock cannot be read', () => {
+    const { music } = summarizeMusic([list('act1', [track('a'), track('b')])], {}, null)
+    expect(music.lists[0]!.tracks.map((t) => t.status)).toEqual(['unknown', 'unknown'])
+  })
+
   it('carries tempo and key, and the game’s own values beside the studio’s', () => {
     const { music } = summarizeMusic(
       [list('act1', [track('a', { bpm: 84, key: 'D major' }), track('b')])],
