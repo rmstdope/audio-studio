@@ -22,4 +22,8 @@ describe('the brief grid keeps labels level', () => {
     expect(wide).toContain('grid-template-rows: subgrid')
     expect(wide).toContain('grid-row: span 3')
   })
+
+  it('keeps the Kind chip as wide as its text now that its cell is a grid', () => {
+    expect(rule(css, '.music-kind')).toContain('justify-self: start')
+  })
 })

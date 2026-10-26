@@ -2682,13 +2682,13 @@ a.btn {
   }
 }
 /* Side by side, the fields share three rows (head, input, messages), so a tag that wraps makes
-   every head row taller and the labels and inputs stay level. */
+   every head row taller and the labels and inputs stay level. A field must keep to three children
+   (label row, input, one message), or the fourth lands on the message row. */
 @media (min-width: 701px) {
   .music-brief-grid > .brief-field {
     display: grid;
     grid-row: span 3;
     grid-template-rows: subgrid;
-    row-gap: 6px;
   }
 }
 .brief-field {
@@ -2734,6 +2734,7 @@ a.btn {
 }
 .music-kind {
   align-self: flex-start;
+  justify-self: start;
   margin-top: 6px;
 }
 
