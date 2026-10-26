@@ -1,6 +1,11 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import type { TrackRow } from '../../../core/music'
-import { inTheGame, unchooseFailure, unchooseQuestion } from '../../../core/musicChoose'
+import {
+  chooseUnread,
+  inTheGame,
+  unchooseFailure,
+  unchooseQuestion,
+} from '../../../core/musicChoose'
 import type { MusicTakesView, TakeView } from '../../../core/musicTake'
 import { useChooseTake, useUnchooseTake } from '../../api'
 import { Confirm } from '../../components/Confirm'
@@ -222,7 +227,7 @@ export function InTheGame({
       {failedLine && <span className="adopt-error">{failedLine}</span>}
       {choose.data && !choose.data.ok && (
         <span className="adopt-error">
-          {'message' in choose.data ? choose.data.message : 'The take could not be chosen.'}
+          {'message' in choose.data ? choose.data.message : chooseUnread(state.take, choose.data)}
         </span>
       )}
       {choose.isError && <span className="adopt-error">{choose.error.message}</span>}

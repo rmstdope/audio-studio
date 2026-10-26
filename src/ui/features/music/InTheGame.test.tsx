@@ -317,3 +317,36 @@ describe('Un-choose', () => {
     )
   })
 })
+
+describe('Choose refused for a file that cannot be read', () => {
+  const unread = {
+    ok: false,
+    file: '.audio-studio/music/hall.json',
+    problems: [
+      { file: '.audio-studio/music/hall.json', path: '', message: 'JSON Parse error: Expected }' },
+    ],
+  }
+
+  it('names the file and the reason on the take’s card', async () => {
+    answer = unread
+    const page = render(row({ status: 'not-chosen', chosenAt: null, current: { kind: 'none' } }), [
+      take(2),
+    ])
+    await click(page.button('Choose'))
+    expect(page.container.querySelector('.take .adopt-error')!.textContent).toBe(
+      'Take 2 could not be chosen: .audio-studio/music/hall.json could not be read (JSON Parse error: Expected }). Nothing was changed.',
+    )
+  })
+
+  it('names the file and the reason under Choose again', async () => {
+    answer = unread
+    const page = render(
+      row({ status: 'missing', current: { kind: 'take', take: 3, exists: false } }),
+      [take(3, { chosen: true })],
+    )
+    await click(page.button('Choose again'))
+    expect(page.block()!.querySelector('.adopt-error')!.textContent).toBe(
+      'Take 3 could not be chosen: .audio-studio/music/hall.json could not be read (JSON Parse error: Expected }). Nothing was changed.',
+    )
+  })
+})

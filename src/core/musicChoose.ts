@@ -166,3 +166,16 @@ export function unchooseFailure(take: number, reason: string): string {
   const said = plain.charAt(0).toLowerCase() + plain.slice(1)
   return `Take ${take} could not be un-chosen: ${said}. Nothing was changed.`
 }
+
+/**
+ * The red line when choosing a take was refused for a file that could not be read: the file and
+ * the first reason the server gave for it.
+ */
+export function chooseUnread(
+  take: number,
+  failure: { file: string; problems: { message: string }[] },
+): string {
+  const reason = failure.problems[0]?.message
+  const why = reason ? ` (${reason.replace(/\.$/, '')})` : ''
+  return `Take ${take} could not be chosen: ${failure.file} could not be read${why}. Nothing was changed.`
+}

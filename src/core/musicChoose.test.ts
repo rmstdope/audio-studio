@@ -4,6 +4,7 @@ import {
   MusicManifestSchema,
   changedFields,
   changedLine,
+  chooseUnread,
   chosenLine,
   inTheGame,
   unchooseFailure,
@@ -180,6 +181,24 @@ describe('the Un-choose question', () => {
   it('says why it failed and that nothing changed', () => {
     expect(unchooseFailure(3, 'the music lock could not be read')).toBe(
       'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',
+    )
+  })
+})
+
+describe('the line when Choose is refused for a file that cannot be read', () => {
+  it('names the file and the first reason, without a doubled full stop', () => {
+    const problems = [
+      { message: 'JSON Parse error: Expected }.' },
+      { message: 'a second reason, not shown' },
+    ]
+    expect(chooseUnread(2, { file: '.audio-studio/music/hall.json', problems })).toBe(
+      'Take 2 could not be chosen: .audio-studio/music/hall.json could not be read (JSON Parse error: Expected }). Nothing was changed.',
+    )
+  })
+
+  it('names the file alone when no reason came with it', () => {
+    expect(chooseUnread(2, { file: 'audio-studio.json', problems: [] })).toBe(
+      'Take 2 could not be chosen: audio-studio.json could not be read. Nothing was changed.',
     )
   })
 })

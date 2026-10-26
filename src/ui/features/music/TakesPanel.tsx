@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { changedLine } from '../../../core/musicChoose'
+import { changedLine, chooseUnread } from '../../../core/musicChoose'
 import type { TrackRow } from '../../../core/music'
 import type { MakingView, MusicTakesView, TakeView } from '../../../core/musicTake'
 import {
@@ -288,9 +288,11 @@ function TakeCard({
         <span className="adopt-error">
           {choose.isError
             ? choose.error.message
-            : choose.data && 'message' in choose.data
-              ? choose.data.message
-              : 'The take could not be chosen.'}
+            : choose.data && !choose.data.ok
+              ? 'message' in choose.data
+                ? choose.data.message
+                : chooseUnread(take.n, choose.data)
+              : null}
         </span>
       )}
       {(drop.isError || (drop.data && !drop.data.ok)) && (
