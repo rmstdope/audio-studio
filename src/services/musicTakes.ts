@@ -324,7 +324,8 @@ export function createMusicTakes({
       const entries = entriesOf(projectFile, id)
       const board = await readBoard(root, found.board)
       if ('ok' in board) return board
-      const chosen = (await readChosen(root, found.music, []))?.[id]?.lock
+      const chosenTracks = await readChosen(root, found.music, [])
+      const chosen = chosenTracks?.[id]?.lock
       const takes: TakeView[] = []
       for (const take of board.takes) {
         if (!(await Bun.file(join(root, folder, fileOf(take))).exists())) continue
@@ -368,6 +369,7 @@ export function createMusicTakes({
         takes,
         making,
         failed,
+        lockUnread: chosenTracks === null,
       }
     },
 

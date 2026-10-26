@@ -754,4 +754,15 @@ describe('choosing a take', () => {
     const answer = await takes.drop(file, 'hall', view.takes[0]!.file)
     expect(answer).toMatchObject({ ok: false, file: 'music/music.lock.json' })
   })
+
+  it('tells the view the lock cannot be read, and not when it can', async () => {
+    const bad = await twoTakes({ 'music/music.lock.json': '{ nope' })
+    const unread = await bad.settled('hall')
+    if (!unread || !('ok' in unread) || !unread.ok) throw new Error('expected a view')
+    expect(unread.lockUnread).toBe(true)
+    const good = await twoTakes()
+    const read = await good.settled('hall')
+    if (!read || !('ok' in read) || !read.ok) throw new Error('expected a view')
+    expect(read.lockUnread).toBe(false)
+  })
 })

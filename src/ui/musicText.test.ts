@@ -22,7 +22,7 @@ const list = (over = {}) => ({
 })
 
 describe('listLine', () => {
-  const tracks = (...statuses: ('chosen' | 'changed' | 'missing' | 'not-chosen')[]) =>
+  const tracks = (...statuses: ('chosen' | 'changed' | 'missing' | 'not-chosen' | 'unknown')[]) =>
     statuses.map((status, i) => ({ id: `t${i}`, status }))
 
   it('counts the tracks chosen, a track changed since its take was chosen among them', () => {
@@ -43,6 +43,15 @@ describe('listLine', () => {
     )
     expect(listLine(list({ tracks: tracks('missing', 'missing') }), 'Act II')).toBe(
       'The loops the game asks for in Act II. 0 of 2 chosen; 2 music files are missing.',
+    )
+  })
+
+  it('says which are chosen is not known, instead of counting, while the lock cannot be read', () => {
+    expect(listLine(list({ tracks: tracks('unknown', 'unknown') }), 'Act II')).toBe(
+      'The loops the game asks for in Act II. Which tracks are chosen is not known: the music lock could not be read.',
+    )
+    expect(listLine(list({ kind: 'stingers', tracks: tracks('unknown') }), 'Stingers')).toBe(
+      'Played once, for a moment, anywhere in the game. Which stingers are chosen is not known: the music lock could not be read.',
     )
   })
 

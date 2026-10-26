@@ -45,6 +45,7 @@ function stopButton(making: MakingView[]) {
     takes: [],
     making,
     failed: [],
+    lockUnread: false,
   }
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   client.setQueryData(['music-takes', 'hall'], view)

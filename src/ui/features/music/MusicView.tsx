@@ -22,6 +22,7 @@ const STATUS_CHIP: Record<TrackStatus, string> = {
   'not-chosen': 'chip',
   changed: 'chip chip-warn',
   missing: 'chip chip-warn',
+  unknown: 'chip chip-warn',
 }
 
 /** A Music page: an act's loops or the stingers, or how to set Music up when the project has none. */

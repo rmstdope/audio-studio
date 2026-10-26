@@ -27,6 +27,8 @@ export function listLine(list: ListWords, name: string): string {
       ? 'Played once, for a moment, anywhere in the game.'
       : `The loops the game asks for in ${name}.`
   if (!list.tracks.length) return what
+  if (list.tracks.some((track) => track.status === 'unknown'))
+    return `${what} Which ${list.kind === 'stingers' ? 'stingers' : 'tracks'} are chosen is not known: the music lock could not be read.`
   const count = (...statuses: TrackStatus[]) =>
     list.tracks.filter((track) => statuses.includes(track.status)).length
   return `${what} ${chosenLine({

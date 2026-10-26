@@ -315,11 +315,9 @@ function rowOf(
     bpm: row.bpm,
     key: row.key,
   }
-  const status = trackStatus({
-    lock: chosen?.lock,
-    current,
-    fileExists: chosen?.fileExists ?? false,
-  })
+  const status: TrackStatus = lock
+    ? trackStatus({ lock: chosen?.lock, current, fileExists: chosen?.fileExists ?? false })
+    : 'unknown'
   return {
     ...row,
     status,
