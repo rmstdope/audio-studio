@@ -171,7 +171,9 @@ export function RetirementNotice({
       >
         <Confirm
           title="Switch this project to s2.1-pro?"
-          effects={questionItems(state.takes, file)}
+          effects={questionItems(state.takes, file).map((item) => (
+            <Words text={item} file={file} />
+          ))}
           back="Keep s1 for now"
           onBack={() => dispatch({ type: 'keep' })}
           backDisabled={saving}

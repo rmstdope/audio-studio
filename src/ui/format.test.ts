@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   centsUp,
   compact,
+  aboutDollars,
   dollars,
   longTitle,
   plural,
@@ -64,6 +65,13 @@ describe('compact', () => {
       '112k',
       '1.3M',
     ])
+  })
+})
+
+describe('aboutDollars', () => {
+  it('says "about" before an amount, and nothing before "under"', () => {
+    expect(aboutDollars(1.5)).toBe('about $1.50')
+    expect(aboutDollars(0.0004)).toBe('under $0.01')
   })
 })
 

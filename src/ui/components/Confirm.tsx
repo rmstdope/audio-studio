@@ -14,7 +14,7 @@ export function Confirm({
   children,
 }: {
   title: string
-  effects: string[]
+  effects: ReactNode[]
   note?: string
   /** What the button that goes back without acting says. */
   back?: string
@@ -36,8 +36,8 @@ export function Confirm({
     <section ref={panel} className="panel confirm" role="alertdialog" aria-label={title}>
       <h2 className="section-title">{title}</h2>
       <ul className="confirm-effects">
-        {effects.map((effect) => (
-          <li key={effect}>{effect}</li>
+        {effects.map((effect, i) => (
+          <li key={i}>{effect}</li>
         ))}
       </ul>
       {note && <span className="muted">{note}</span>}
