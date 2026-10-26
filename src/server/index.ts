@@ -79,6 +79,7 @@ import {
   cacheNameFor,
   clipFile,
   musicClipFile,
+  musicCurrentFile,
   loadPart,
   loadProject,
   openProject,
@@ -970,6 +971,12 @@ export function startServer({
       '/api/music/clips/:file': {
         GET: guard(async (request) => {
           const file = await musicClipFile(projectFile, request.params.file)
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
+      },
+      '/api/music/tracks/:id/current': {
+        GET: guard(async (request) => {
+          const file = await musicCurrentFile(projectFile, request.params.id)
           return file ? new Response(Bun.file(file)) : notFound()
         }),
       },

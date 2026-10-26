@@ -8,6 +8,8 @@ import {
   type MusicListState,
   type MusicSummary,
 } from '../core/music'
+import { lstat } from 'node:fs/promises'
+import { resolveInRoot } from '../core/paths'
 import { partPathFor, type Problem, type Project } from '../core/project'
 import { readResource } from './files'
 import { readChosen } from './musicClips'
@@ -52,7 +54,8 @@ export async function readMusic(
   })
   const briefs = await readResource(root, music.paths.briefs, BriefsSchema, problems)
   const shown: Briefs = briefs === 'missing' || briefs === 'invalid' ? {} : briefs
-  const summary = summarizeMusic(lists, shown, await readChosen(root, music, problems))
+  const gameFiles = await presentGameFiles(root, lists)
+  const summary = summarizeMusic(lists, shown, await readChosen(root, music, problems), gameFiles)
   problems.push(...summary.problems)
   return summary.music
 }
@@ -68,4 +71,33 @@ export async function readList(
   return read === 'missing' || read === 'invalid'
     ? { status: read }
     : { status: 'ok', tracks: read }
+}
+
+/**
+ * The path of a music file the game names, when it is a plain file inside the project root (a
+ * folder, a link or a path outside the root is not one); null otherwise. Only looked at, never
+ * written.
+ */
+export async function gameFilePath(root: string, file: string): Promise<string | null> {
+  try {
+    const full = resolveInRoot(root, file)
+    return (await lstat(full)).isFile() ? full : null
+  } catch {
+    return null
+  }
+}
+
+/** Whether the file each listed track names is there, by track id. */
+async function presentGameFiles(
+  root: string,
+  lists: MusicListInput[],
+): Promise<Record<string, boolean>> {
+  const found: Record<string, boolean> = {}
+  for (const list of lists) {
+    if (list.state.status !== 'ok') continue
+    for (const track of list.state.tracks) {
+      if (track.file) found[track.id] = (await gameFilePath(root, track.file)) !== null
+    }
+  }
+  return found
 }
