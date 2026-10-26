@@ -1,0 +1,805 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Scene cues: the states</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --stale: #ffc24b;
+        --stale-bg: #2d2412;
+        --missing: #8fb5ff;
+        --missing-bg: #142033;
+        --chip: #1a1d26;
+        --own-bg: #16223a;
+        --own-ink: #8fb4ff;
+        --scene-bg: #211c35;
+        --scene-ink: #b9a9ff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .note {
+        background: #1d1a10;
+        border-bottom: 1px solid #3a3420;
+        color: #e8d9a8;
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+      .shell {
+        display: flex;
+        min-height: 100vh;
+      }
+      .side {
+        width: 220px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        padding: 18px 14px;
+        font-size: 13px;
+        color: var(--muted);
+        flex: none;
+      }
+      .side b {
+        color: var(--text);
+        display: block;
+        margin-bottom: 14px;
+      }
+      .side div {
+        padding: 6px 8px;
+        border-radius: 6px;
+      }
+      .side .on {
+        background: var(--raised);
+        color: var(--text);
+      }
+      .content {
+        flex: 1;
+        max-width: 1100px;
+        padding: 28px 36px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        min-width: 0;
+      }
+      .crumbs {
+        font-size: 12.5px;
+        color: var(--faint);
+      }
+      h1 {
+        font-size: 28px;
+        font-weight: 600;
+        margin: 6px 0;
+      }
+      h2 {
+        font-size: 17px;
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        background: none;
+        border: 0;
+        color: var(--muted);
+        padding: 7px 12px;
+        border-radius: 7px;
+        font: inherit;
+      }
+      .tab.on {
+        background: var(--raised);
+        color: var(--text);
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 7px;
+        padding: 5px 11px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .table-box {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--panel);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        text-align: left;
+        font-size: 12px;
+        color: var(--faint);
+        font-weight: 500;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .pill {
+        display: inline-block;
+        font-size: 12px;
+        padding: 2px 9px;
+        border-radius: 99px;
+      }
+      .ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .stale {
+        background: var(--stale-bg);
+        color: var(--stale);
+      }
+      .missing {
+        background: var(--missing-bg);
+        color: var(--missing);
+      }
+      .speaker {
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .text {
+        display: block;
+        margin-top: 3px;
+      }
+      .detail {
+        display: block;
+        font-size: 12.5px;
+        margin-top: 4px;
+        color: var(--stale);
+      }
+      .cue {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+        color: var(--text);
+      }
+      .cue.dim {
+        color: var(--faint);
+      }
+      .from {
+        display: block;
+        font-size: 12px;
+        color: var(--faint);
+        margin-top: 3px;
+      }
+      .chip {
+        display: inline-block;
+        font-size: 11px;
+        padding: 1px 7px;
+        border-radius: 99px;
+        margin-right: 6px;
+        vertical-align: 1px;
+      }
+      .chip.scene {
+        background: var(--scene-bg);
+        color: var(--scene-ink);
+      }
+      .chip.own {
+        background: var(--own-bg);
+        color: var(--own-ink);
+      }
+      .chip.style {
+        background: var(--chip);
+        color: var(--faint);
+      }
+      .band td {
+        background: var(--raised);
+        padding: 9px 12px;
+      }
+      .band .name {
+        font-weight: 600;
+      }
+      .band .cue {
+        margin-left: 4px;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 16px 18px;
+      }
+      .edit {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .edit input {
+        background: var(--bg);
+        border: 1px solid var(--accent);
+        color: var(--text);
+        border-radius: 7px;
+        padding: 7px 9px;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+        width: 100%;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .warn {
+        color: var(--stale);
+        font-size: 12.5px;
+      }
+      .label {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin: 26px 0 6px;
+      }
+      @media (max-width: 760px) {
+        .side {
+          display: none;
+        }
+        .content {
+          padding: 18px 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      Scene cues (as-2qh), every state as agreed: a band per scene on an act’s lines page carries
+      the scene’s cue; a line says under its cue when it follows its scene; the warning is in the
+      editor; another language follows English until it has its own.
+    </div>
+    <div class="shell">
+      <div class="side">
+        <b>Audio Studio</b>
+        <div>Setup</div>
+        <div>Characters</div>
+        <div class="on">Act I</div>
+        <div>Act II</div>
+        <div>Music</div>
+      </div>
+      <div class="content">
+        <div>
+          <div class="crumbs">Act I › Lines</div>
+          <h1>Act I lines</h1>
+        </div>
+        <div class="label">
+          1 · Scenes with and without a cue, and lines the game put in no scene
+        </div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="band">
+                <td colspan="3">
+                  <span class="name">No scene</span>
+                  <span class="faint"
+                    >· 3 lines · the game names no scene for these, so they keep their own cue or
+                    the character's style</span
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">intro_01</span></span
+                  ><span class="text">Long ago, in a village by the sea…</span>
+                </td>
+                <td><span class="cue dim">[storyteller, calm]</span></td>
+              </tr>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="row">
+                    <span class="name">Village square</span><span class="faint">· 44 lines</span
+                    ><span class="faint" style="margin-left: 8px">Scene cue</span
+                    ><button class="btn" style="padding: 2px 8px; color: var(--faint)">
+                      + Add a cue
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">square_01</span></span
+                  ><span class="text">The square is loud with gulls and traders.</span>
+                </td>
+                <td><span class="cue dim">[storyteller, calm]</span></td>
+              </tr>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="row">
+                    <span class="name">Grandmother's cottage</span
+                    ><span class="faint">· 27 lines</span
+                    ><span class="faint" style="margin-left: 8px">Scene cue</span
+                    ><button class="btn" style="padding: 2px 8px">
+                      <span class="cue">[warm, unhurried, a little wistful]</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">cottage_12</span></span
+                  ><span class="text">The kettle sings as she sets out two cups.</span>
+                </td>
+                <td>
+                  <span class="cue dim">[warm, unhurried, a little wistful]</span
+                  ><span class="from">The scene's cue</span>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Grandmother <span class="mono faint">cottage_13</span></span
+                  ><span class="text">Sit, child. Sit.</span>
+                </td>
+                <td><span class="cue dim">[frail, kind]</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="label">2 · Editing a scene's cue: recorded lines will need re-recording</div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="edit">
+                    <div>
+                      <span class="name">The well</span>
+                      <span class="faint"
+                        >· 22 lines · The narrator's lines follow this cue unless they have their
+                        own.</span
+                      >
+                    </div>
+                    <input
+                      value="[low, echoing, uneasy]"
+                      aria-label="Cue for the scene The well"
+                    /><span class="warn">Saving marks 19 recorded lines for re-recording.</span>
+                    <div class="row">
+                      <button class="btn primary">Save</button
+                      ><button class="btn">Remove cue</button><button class="btn">Cancel</button
+                      ><button class="btn">Hear it</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">well_01</span></span
+                  ><span class="text">You lean over the edge of the old well.</span>
+                </td>
+                <td>
+                  <span class="cue dim">[ominous]</span><span class="from">The scene's cue</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="label">
+          3 · Adding a first cue to a scene with nothing recorded yet (no warning)
+        </div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="edit">
+                    <div>
+                      <span class="name">Lights out</span>
+                      <span class="faint"
+                        >· 9 lines · The narrator's lines follow this cue unless they have their
+                        own.</span
+                      >
+                    </div>
+                    <input value="" placeholder="[a cue for this scene]" />
+                    <div class="row">
+                      <button class="btn primary" disabled style="opacity: 0.5">Save</button
+                      ><button class="btn">Cancel</button><button class="btn">Hear it</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="label">
+          4 · After saving: the scene's recorded lines are stale, with the reason
+        </div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="row">
+                    <span class="name">The well</span><span class="faint">· 22 lines</span
+                    ><span class="faint" style="margin-left: 8px">Scene cue</span
+                    ><button class="btn" style="padding: 2px 8px">
+                      <span class="cue">[low, echoing, uneasy]</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill stale">stale</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">well_03</span></span
+                  ><span class="text">The rope creaks as you lower yourself into the dark.</span
+                  ><span class="detail">The cue changed</span>
+                </td>
+                <td>
+                  <span class="cue dim">[low, echoing, uneasy]</span
+                  ><span class="from">The scene's cue</span>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Mira <span class="mono faint">well_04</span></span
+                  ><span class="text">Careful down there!</span>
+                </td>
+                <td><span class="cue dim">[anxious, calling out]</span></td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">well_05</span></span
+                  ><span class="text">Something glints at the bottom.</span>
+                </td>
+                <td><span class="cue">[a hushed discovery]</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="label">5 · A line's own cue editor, on a line that follows its scene</div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">well_05</span></span
+                  ><span class="text">Something glints at the bottom.</span>
+                </td>
+                <td>
+                  <div class="edit">
+                    <input value="[a hushed discovery]" />
+                    <div class="row">
+                      <button class="btn primary">Save</button
+                      ><button class="btn">Use scene cue</button><button class="btn">Cancel</button
+                      ><button class="btn">Hear it</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="faint" style="font-size: 12.5px">
+          "Use scene cue" replaces "Use style" when the line is in a scene with a cue; an empty line
+          cue placeholder shows the scene's cue.
+        </div>
+
+        <div class="label">6 · A scene that comes back later in the act</div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="row">
+                    <span class="name">The festival</span><span class="faint">· 51 lines</span
+                    ><span class="faint" style="margin-left: 8px">Scene cue</span
+                    ><button class="btn" style="padding: 2px 8px">
+                      <span class="cue">[bright, celebratory]</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">fest_10</span></span
+                  ><span class="text">Lanterns rise over the harbour.</span>
+                </td>
+                <td>
+                  <span class="cue dim">[bright, celebratory]</span
+                  ><span class="from">The scene's cue</span>
+                </td>
+              </tr>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="row">
+                    <span class="name">The well</span><span class="faint">· 22 lines</span
+                    ><span class="faint" style="margin-left: 8px">Scene cue</span
+                    ><button class="btn" style="padding: 2px 8px">
+                      <span class="cue">[low, echoing, uneasy]</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill ok">ok</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">well_20</span></span
+                  ><span class="text">Back at the well, the water has gone still.</span>
+                </td>
+                <td>
+                  <span class="cue dim">[low, echoing, uneasy]</span
+                  ><span class="from">The scene's cue</span>
+                </td>
+              </tr>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="row">
+                    <span class="name">The festival, continued</span
+                    ><span class="faint">· 51 lines</span
+                    ><span class="faint" style="margin-left: 8px">Scene cue</span
+                    ><button class="btn" style="padding: 2px 8px">
+                      <span class="cue">[bright, celebratory]</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="label">7 · Svenska: a scene follows English until it has its own</div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="row">
+                    <span class="name">Brunnen</span><span class="faint">· 22 lines</span
+                    ><span class="faint" style="margin-left: 8px">Scene cue (Svenska)</span
+                    ><button class="btn" style="padding: 2px 8px">
+                      <span class="cue dim">[low, echoing, uneasy]</span></button
+                    ><span class="faint" style="font-size: 12px">follows English</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill stale">stale</span></td>
+                <td>
+                  <span class="speaker">Berättare <span class="mono faint">well_03</span></span
+                  ><span class="text">Repet knarrar när du sänker dig ner i mörkret.</span
+                  ><span class="detail">The cue changed</span>
+                </td>
+                <td>
+                  <span class="cue dim">[low, echoing, uneasy]</span
+                  ><span class="from">The scene's cue, following English</span>
+                </td>
+              </tr>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="edit">
+                    <div>
+                      <span class="name">Festen</span>
+                      <span class="faint"
+                        >· 51 lines · The narrator's lines follow this cue unless they have their
+                        own.</span
+                      >
+                    </div>
+                    <input value="[glad, festlig]" /><span class="warn"
+                      >Saving marks 40 recorded lines for re-recording.</span
+                    >
+                    <div class="row">
+                      <button class="btn primary">Save</button
+                      ><button class="btn">Follow English</button><button class="btn">Cancel</button
+                      ><button class="btn">Hear it</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="label">8 · Filtered: Stale tab — only bands with a line shown</div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="row">
+                    <span class="name">The well</span
+                    ><span class="faint">· 1 of 22 lines shown</span
+                    ><span class="faint" style="margin-left: 8px">Scene cue</span
+                    ><button class="btn" style="padding: 2px 8px">
+                      <span class="cue">[low, echoing, uneasy]</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="pill stale">stale</span></td>
+                <td>
+                  <span class="speaker">Narrator <span class="mono faint">well_03</span></span
+                  ><span class="text">The rope creaks as you lower yourself into the dark.</span
+                  ><span class="detail">The cue changed</span>
+                </td>
+                <td>
+                  <span class="cue dim">[low, echoing, uneasy]</span
+                  ><span class="from">The scene's cue</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="label">9 · Saving failed</div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 110px">Status</th>
+                <th>Line</th>
+                <th style="width: 280px">Delivery</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="band">
+                <td colspan="3">
+                  <div class="edit">
+                    <div><span class="name">The well</span></div>
+                    <input value="[low, echoing, uneasy]" />
+                    <div class="row">
+                      <button class="btn primary">Save</button><button class="btn">Cancel</button
+                      ><button class="btn">Hear it</button>
+                    </div>
+                    <div style="color: #ff94a8; font-size: 12.5px">
+                      <b>The scene cue could not be saved</b><br />tts/act1/cues.json: … the file's
+                      own problem, as for a line's cue …
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="label">
+          10 · An act whose game names no scenes: the table as today, no bands
+        </div>
+        <div class="faint" style="font-size: 12.5px">
+          No bands and no "No scene" band; nothing about scenes appears until the game's dialog
+          names one.
+        </div>
+
+        <div class="label">11 · The act's overview: a scene cue whose scene left the dialog</div>
+        <section class="panel">
+          <h2>Orphaned cues</h2>
+          <div class="muted" style="margin: 6px 0 10px">
+            Cues whose line or scene is no longer in the dialog.
+          </div>
+          <div
+            class="row"
+            style="
+              justify-content: space-between;
+              border-top: 1px solid var(--line);
+              padding-top: 10px;
+            "
+          >
+            <div>
+              <span class="faint">Scene</span> <b>The old well</b>
+              <span class="cue">[low, echoing, uneasy]</span>
+            </div>
+            <div class="row">
+              <span class="muted">Give to scene ▾</span><button class="btn">Give</button
+              ><button class="btn">Remove</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>
