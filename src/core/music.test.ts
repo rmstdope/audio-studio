@@ -240,6 +240,20 @@ describe('what a track plays now', () => {
     expect(b!.current).toEqual({ kind: 'game', file: 'g/b.mp3', exists: false })
   })
 
+  it('keeps the game’s own file beside a chosen take, for Un-choose to go back to', () => {
+    const [a, b, c] = rows(
+      [track('a', { file: 'g/a.mp3' }), track('b'), track('c', { file: 'g/c.mp3' })],
+      {
+        a: { lock: entry(1), fileExists: true },
+        b: { lock: entry(1), fileExists: true },
+      },
+      { a: true },
+    )
+    expect(a!.gameFile).toEqual({ file: 'g/a.mp3', exists: true })
+    expect(b!.gameFile).toBeNull()
+    expect(c!.gameFile).toEqual({ file: 'g/c.mp3', exists: false })
+  })
+
   it('is nothing without a take or a file', () => {
     const [row] = rows([track('a')], {}, {})
     expect(row!.current).toEqual({ kind: 'none' })

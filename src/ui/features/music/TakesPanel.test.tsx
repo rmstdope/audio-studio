@@ -31,6 +31,7 @@ const track: TrackRow = {
   changed: [],
   chosenAt: null,
   current: { kind: 'none' },
+  gameFile: null,
 }
 
 /** The Takes panel's Stop button, with these takes being made. */

@@ -44,6 +44,7 @@ const track = (id: string, title: string, status: TrackStatus): TrackRow => ({
     status === 'not-chosen'
       ? { kind: 'none' }
       : { kind: 'take', take: 3, exists: status !== 'missing' },
+  gameFile: null,
 })
 
 const list = (id: string, kind: MusicListSummary['kind']): MusicListSummary => ({

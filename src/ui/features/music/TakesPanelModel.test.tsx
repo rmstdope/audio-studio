@@ -31,6 +31,7 @@ const track: TrackRow = {
   changed: [],
   chosenAt: '2026-10-01T10:00:00.000Z',
   current: { kind: 'take', take: 1, exists: true },
+  gameFile: null,
 }
 
 const everyModel = (missing: string[] = []) =>
