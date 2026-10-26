@@ -4,6 +4,16 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import type { CreditResult } from './fish'
 import { checkSetup, type Machine } from './setup'
 
+const musicSection = {
+  paths: {
+    loops: 'tts/{part}/music.json',
+    stingers: 'tts/stingers.json',
+    briefs: 'music/briefs.json',
+    lock: 'music/music.lock.json',
+    clips: 'web/public/audio/music/generated',
+    manifest: 'web/public/audio/music/generated/manifest.json',
+  },
+}
 const credit = async (): Promise<CreditResult> => ({ ok: true, credit: 3 })
 const mac: Machine = { which: () => true, platform: 'darwin', arch: 'arm64' }
 const byId = (checks: { id: string; state: string }[]) =>
@@ -22,6 +32,7 @@ describe('checkSetup', () => {
       fish: 'ok',
       requests: 'ok',
       refresh: 'off',
+      music: 'off',
     })
   })
 
@@ -46,6 +57,7 @@ describe('checkSetup', () => {
       fish: 'off',
       requests: 'off',
       refresh: 'off',
+      music: 'off',
     })
     expect(asked).toBe(0)
   })
@@ -95,5 +107,25 @@ describe('checkSetup, requests at once', () => {
     expect(await states(quality({ parallel: 8, fishTier: 'under-100' })).then((c) => c.fix)).toBe(
       'Set quality.parallel to 5 or less in the project file.',
     )
+  })
+
+  it('checks the music generator in a project with music, against the models folder', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson({ music: musicSection }),
+      'models/acestep-v15-xl-turbo/.keep': '',
+    })
+    const run = async () => {
+      const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {
+        ACESTEP_CHECKPOINTS: join(root, 'models'),
+      })
+      if (!result.ok) throw new Error('expected checks')
+      return result.checks.find((c) => c.id === 'music')
+    }
+    expect(await run()).toMatchObject({
+      state: 'problem',
+      detail: expect.stringContaining('acestep-5Hz-lm-4B'),
+    })
+    await Bun.write(join(root, 'models/acestep-5Hz-lm-4B/.keep'), '')
+    expect(await run()).toMatchObject({ state: 'ok' })
   })
 })

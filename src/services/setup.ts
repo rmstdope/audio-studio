@@ -1,6 +1,7 @@
 import { dirname } from 'node:path'
 import { setupChecks, type SetupCheck, type SetupFacts } from '../core/setup'
 import { fishApiKey } from './env'
+import { aceStepCheckpoints, aceStepReady } from './music'
 import type { CreditResult } from './fish'
 import { openProject, type ProjectFailure } from './workspace'
 
@@ -23,7 +24,7 @@ const thisMachine: Machine = {
 
 /**
  * Checks what the studio needs on this machine and in the project (ffmpeg, uv for Whisper, the
- * Fish key and whether Fish answers, the refresh command), each with a fix. `credit` is the
+ * music generator's models, the Fish key and whether Fish answers, the refresh command), each with a fix. `credit` is the
  * server's lookup of the account's credit (which asks Fish); it is called only when there is a key.
  */
 export async function checkSetup(
@@ -50,6 +51,12 @@ export async function checkSetup(
     refreshDialog: Boolean(narration.refreshDialog),
     parallel: narration.quality.parallel,
     fishTier: narration.quality.fishTier ?? null,
+    music: project.music
+      ? {
+          ready: aceStepReady(machine, aceStepCheckpoints(environment)),
+          checkpoints: aceStepCheckpoints(environment),
+        }
+      : null,
   }
   return { ok: true, checks: setupChecks(facts) }
 }

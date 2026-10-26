@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { writeWav } from '../core/wav'
+import { readWav, writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { FishError, type FishClient } from '../services/fish'
 import { createLimiter } from '../services/limit'
@@ -257,7 +257,15 @@ describe('server', () => {
     )
     // No key in this fixture: Fish is not asked. The tools depend on the machine running the tests.
     expect(states).toMatchObject({ key: 'problem', fish: 'off', refresh: 'off' })
-    expect(Object.keys(states)).toEqual(['ffmpeg', 'whisper', 'key', 'fish', 'requests', 'refresh'])
+    expect(Object.keys(states)).toEqual([
+      'ffmpeg',
+      'whisper',
+      'key',
+      'fish',
+      'requests',
+      'refresh',
+      'music',
+    ])
   })
 
   it('tells the account’s credit', async () => {
@@ -3017,5 +3025,100 @@ describe('server, the music pages', () => {
     } finally {
       plain.stop(true)
     }
+  })
+})
+
+describe('server, a track’s takes', () => {
+  const musicRoot = tempRepo({
+    'audio-studio.json': projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+  })
+  let ready: { ok: true } | { ok: false; message: string } = { ok: true }
+  const made: string[] = []
+  const studio = startServer({
+    projectFile: join(musicRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    music: {
+      ready: () => ready,
+      async generate(request) {
+        made.push(request.brief)
+        const samples = new Int16Array(request.seconds * 1000).fill(4000)
+        const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
+        return {
+          wav: writeWav({ format, data: new Uint8Array(samples.buffer) }),
+          seed: request.seed,
+        }
+      },
+      close() {},
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const takes = (path = 'hall/takes') => new URL(`/api/music/tracks/${path}`, studio.url)
+  const make = (body: unknown, origin = studio.url.origin) =>
+    fetch(takes(), {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('makes takes from the studio’s own page only, and refuses a body that is not a request', async () => {
+    expect((await make({ count: 2 }, 'https://evil.example')).status).toBe(403)
+    expect((await make({ count: 0 })).status).toBe(400)
+    expect((await make({ count: 50 })).status).toBe(400)
+    expect((await make('two')).status).toBe(400)
+  })
+
+  it('answers 404 for a track nobody lists', async () => {
+    expect((await fetch(takes('nobody/takes'))).status).toBe(404)
+    const answer = await fetch(takes('nobody/takes'), {
+      method: 'POST',
+      headers: { origin: studio.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ count: 2 }),
+    })
+    expect(answer.status).toBe(404)
+  })
+
+  it('refuses with the reason when the generator is not ready', async () => {
+    ready = { ok: false, message: 'uv is not on the PATH.' }
+    const answer = await make({ count: 2 })
+    expect(answer.status).toBe(409)
+    expect(await answer.json()).toEqual({ ok: false, message: 'uv is not on the PATH.' })
+    expect(made).toEqual([])
+    ready = { ok: true }
+  })
+
+  it('makes two takes, lists them, and serves each as a WAV', async () => {
+    expect(await (await make({ count: 2 })).json()).toEqual({ ok: true })
+    let view = await (await fetch(takes())).json()
+    for (let i = 0; i < 200 && view.making.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      view = await (await fetch(takes())).json()
+    }
+    expect(view).toMatchObject({ ok: true, kind: 'loop', generator: { ok: true } })
+    expect(view.takes.map((t: { n: number }) => t.n)).toEqual([1, 2])
+    const clip = await fetch(takes(`hall/takes/${view.takes[0].file}`))
+    expect(clip.status).toBe(200)
+    expect(new Uint8Array(await clip.arrayBuffer()).slice(0, 4)).toEqual(
+      new TextEncoder().encode('RIFF'),
+    )
+    const seam = await fetch(takes(`hall/takes/${view.takes[0].file}?seam=1`))
+    const heard = readWav(new Uint8Array(await seam.arrayBuffer()))
+    expect(heard.data.length / 2 / heard.format.sampleRate).toBe(8)
+    expect((await fetch(takes('hall/takes/x.wav'))).status).toBe(404)
   })
 })
