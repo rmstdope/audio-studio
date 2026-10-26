@@ -1,40 +1,329 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Music list play</title><style>
-:root{--bg:#0b0c10;--panel:#12141a;--raised:#191c24;--line:#1f232d;--line-strong:#2a2e39;--text:#eceef3;--soft:#c7ccd6;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--accent-soft:#2a1b12;--accent-ink:#ff9a6b;--ok:#3ddc97;--ok-bg:#10291f;--warn:#ffc24b;--warn-bg:#2d2412;--danger-bg:#2e1720;--danger:#ff94a8;--chip:#1a1d26;color-scheme:dark}
-*{box-sizing:border-box}body{margin:0;background:#07080b;color:var(--text);font:14px/1.45 system-ui,-apple-system,sans-serif;padding:24px}
-.intro,.note{max-width:1100px;margin:0 auto 14px;color:var(--muted)}.intro h1{color:var(--text);font-size:20px;margin:0 0 6px}.note{margin-top:26px;color:var(--soft)}
-.frame{max-width:1100px;margin:0 auto;border:1px solid var(--line-strong);border-radius:12px;background:var(--bg);padding:22px 26px}
-.frame.narrow{max-width:420px}
-h2{margin:0;font-size:22px}.crumbs{color:var(--faint);font-size:12px}.muted{color:var(--muted)}.faint{color:var(--faint)}.small{font-size:12.5px}
-.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
-table{width:100%;border-collapse:collapse;margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:500;padding:9px 10px;border-bottom:1px solid var(--line)}
-td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
-.play{width:30px;height:30px;border-radius:50%;border:1px solid var(--line-strong);background:var(--raised);color:var(--text);font-size:11px;cursor:pointer}
-.play.on{background:var(--accent);border-color:var(--accent);color:#1a0a02}.play[disabled]{opacity:.35;cursor:default}
-.chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--soft);font-size:12px;white-space:nowrap}
-.ok{background:var(--ok-bg);color:var(--ok)}.warn{background:var(--warn-bg);color:var(--warn)}
-.brief{max-width:280px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.err{color:var(--danger);font-size:12.5px}.tag{font-size:11px;color:var(--faint)}
-.label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
-.callout{border-left:3px solid var(--accent);padding:2px 10px;color:var(--soft);font-size:13px;margin:6px 0}
-.ncard{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-top:10px;padding:12px;display:flex;gap:10px}
-</style></head><body>
-<div class="intro"><h1>Play from the Music list (agreed)</h1>On an act's Music page and on the Stingers page, the Plays column says what the play button plays: the chosen take, otherwise the game's own file (named underneath), otherwise nothing. A missing file is shown before you press play. A play that fails says so in its row. Play runs once from the start; ■ stops it. Only one row plays at a time.</div>
-<div class="frame">
-<span class="crumbs">Music</span><h2>Act 1</h2><span class="muted">The loops the game asks for in Act 1. 1 of 6 chosen.</span>
-<table><thead><tr><th></th><th>Track</th><th>Brief</th><th>Length</th><th>Plays</th><th>Status</th></tr></thead><tbody>
-<tr><td><button class="play">▶</button></td><td><strong>Tavern at dusk</strong><div class="mono faint">act1-tavern</div></td><td><div class="brief">Warm lute and low fiddle</div></td><td>1:20</td><td>Take 3</td><td><span class="chip ok">chosen</span></td></tr>
-<tr><td><button class="play on">■</button></td><td><strong>Forest path</strong><div class="mono faint">act1-forest</div></td><td><div class="brief">Airy flute over soft strings</div></td><td>1:40</td><td>The game's file<div class="mono faint">forest-walk.mp3</div></td><td><span class="chip">not chosen</span></td></tr>
-<tr><td><button class="play" disabled>▶</button></td><td><strong>Cave drip</strong><div class="mono faint">act1-cave</div></td><td><div class="brief">Sparse, cold, a single low drone</div></td><td>1:00</td><td class="faint">Nothing to play yet</td><td><span class="chip">not chosen</span></td></tr>
-<tr><td><button class="play" disabled>▶</button></td><td><strong>Market square</strong><div class="mono faint">act1-market</div></td><td><div class="brief">Busy, bright, hand drums</div></td><td>1:30</td><td>The game's file<div class="mono faint">market.mp3</div><div class="err">The file is not there.</div></td><td><span class="chip">not chosen</span></td></tr>
-<tr><td><button class="play">▶</button></td><td><strong>Harbour</strong><div class="mono faint">act1-harbour</div></td><td><div class="brief">Gulls, creaking rope, accordion</div></td><td>1:10</td><td>The game's file<div class="mono faint">harbour.ogg</div><div class="err">Couldn't play it: the file won't open.</div></td><td><span class="chip">not chosen</span></td></tr>
-<tr><td><button class="play">▶</button></td><td><strong>Castle gate</strong><div class="mono faint">act1-gate</div></td><td><div class="brief">Brass fanfare, held back</div></td><td>0:50</td><td>Take 2</td><td><span class="chip warn">changed since chosen</span></td></tr>
-</tbody></table></div>
-<div class="note">Narrow window: Brief is hidden first. The Plays text stays beside the button.</div>
-<div class="frame narrow">
-<table><thead><tr><th></th><th>Track</th><th>Plays</th><th>Status</th></tr></thead><tbody>
-<tr><td><button class="play on">■</button></td><td><strong>Forest path</strong></td><td>The game's file<div class="mono faint">forest-walk.mp3</div></td><td><span class="chip">not chosen</span></td></tr>
-<tr><td><button class="play" disabled>▶</button></td><td><strong>Cave drip</strong></td><td class="faint">Nothing to play yet</td><td><span class="chip">not chosen</span></td></tr>
-</tbody></table></div>
-</body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Music list play</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft: #2a1b12;
+        --accent-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger: #ff94a8;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 26px;
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 22px 26px;
+      }
+      .frame.narrow {
+        max-width: 420px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        font-weight: 500;
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .play {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .play.on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0a02;
+      }
+      .play[disabled] {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--soft);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .brief {
+        max-width: 280px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .err {
+        color: var(--danger);
+        font-size: 12.5px;
+      }
+      .tag {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .callout {
+        border-left: 3px solid var(--accent);
+        padding: 2px 10px;
+        color: var(--soft);
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      .ncard {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        margin-top: 10px;
+        padding: 12px;
+        display: flex;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Play from the Music list (agreed)</h1>
+      On an act's Music page and on the Stingers page, the Plays column says what the play button
+      plays: the chosen take, otherwise the game's own file (named underneath), otherwise nothing. A
+      missing file is shown before you press play. A play that fails says so in its row. Play runs
+      once from the start; ■ stops it. Only one row plays at a time.
+    </div>
+    <div class="frame">
+      <span class="crumbs">Music</span>
+      <h2>Act 1</h2>
+      <span class="muted">The loops the game asks for in Act 1. 1 of 6 chosen.</span>
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Track</th>
+            <th>Brief</th>
+            <th>Length</th>
+            <th>Plays</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><button class="play">▶</button></td>
+            <td>
+              <strong>Tavern at dusk</strong>
+              <div class="mono faint">act1-tavern</div>
+            </td>
+            <td><div class="brief">Warm lute and low fiddle</div></td>
+            <td>1:20</td>
+            <td>Take 3</td>
+            <td><span class="chip ok">chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play on">■</button></td>
+            <td>
+              <strong>Forest path</strong>
+              <div class="mono faint">act1-forest</div>
+            </td>
+            <td><div class="brief">Airy flute over soft strings</div></td>
+            <td>1:40</td>
+            <td>
+              The game's file
+              <div class="mono faint">forest-walk.mp3</div>
+            </td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play" disabled>▶</button></td>
+            <td>
+              <strong>Cave drip</strong>
+              <div class="mono faint">act1-cave</div>
+            </td>
+            <td><div class="brief">Sparse, cold, a single low drone</div></td>
+            <td>1:00</td>
+            <td class="faint">Nothing to play yet</td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play" disabled>▶</button></td>
+            <td>
+              <strong>Market square</strong>
+              <div class="mono faint">act1-market</div>
+            </td>
+            <td><div class="brief">Busy, bright, hand drums</div></td>
+            <td>1:30</td>
+            <td>
+              The game's file
+              <div class="mono faint">market.mp3</div>
+              <div class="err">The file is not there.</div>
+            </td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play">▶</button></td>
+            <td>
+              <strong>Harbour</strong>
+              <div class="mono faint">act1-harbour</div>
+            </td>
+            <td><div class="brief">Gulls, creaking rope, accordion</div></td>
+            <td>1:10</td>
+            <td>
+              The game's file
+              <div class="mono faint">harbour.ogg</div>
+              <div class="err">Couldn't play it: the file won't open.</div>
+            </td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play">▶</button></td>
+            <td>
+              <strong>Castle gate</strong>
+              <div class="mono faint">act1-gate</div>
+            </td>
+            <td><div class="brief">Brass fanfare, held back</div></td>
+            <td>0:50</td>
+            <td>Take 2</td>
+            <td><span class="chip warn">changed since chosen</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      Narrow window: Brief is hidden first. The Plays text stays beside the button.
+    </div>
+    <div class="frame narrow">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Track</th>
+            <th>Plays</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><button class="play on">■</button></td>
+            <td><strong>Forest path</strong></td>
+            <td>
+              The game's file
+              <div class="mono faint">forest-walk.mp3</div>
+            </td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play" disabled>▶</button></td>
+            <td><strong>Cave drip</strong></td>
+            <td class="faint">Nothing to play yet</td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>
