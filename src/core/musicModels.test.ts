@@ -8,8 +8,8 @@ import {
   lengthReason,
   longestFor,
   menuEntry,
-  shortMenuLabel,
   missingOnTrack,
+  shortMenuLabel,
   setupShortLine,
   tooLongOnTrack,
   saveFailureHeading,
@@ -190,6 +190,7 @@ describe('the closed menu’s short label', () => {
   const loop90 = { kind: 'loop', seconds: 90 } as const
   test('the plain name and the time', () => {
     expect(shortMenuLabel('balanced', true)).toBe('Balanced — about 3 min a take')
+    expect(shortMenuLabel('careful', true)).toBe('Careful — about 7 min a take')
     expect(shortMenuLabel('quick', true)).toBe('Quick — about 1¼ min a take')
     expect(shortMenuLabel('short', true)).toBe('Short — about 40 s a take')
   })

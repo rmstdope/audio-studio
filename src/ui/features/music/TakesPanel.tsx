@@ -76,7 +76,11 @@ export function TakesPanel({ track }: { track: TrackRow }) {
       onMouseDown={() => setListOpen(true)}
       onKeyDown={(event) => {
         if (event.key === 'Escape') setListOpen(false)
-        else if (event.key === ' ' || event.key === 'Enter' || event.key === 'F4' || event.altKey)
+        else if (
+          [' ', 'Enter', 'F4', 'ArrowUp', 'ArrowDown'].includes(event.key) &&
+          // Alt+Arrow opens the list everywhere; a bare arrow does on macOS.
+          (event.key.startsWith('Arrow') || !event.altKey)
+        )
           setListOpen(true)
       }}
       onBlur={() => setListOpen(false)}

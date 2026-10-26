@@ -380,6 +380,13 @@ describe('the closed model menu’s short label', () => {
     expect(labels(menu)[0]).toBeNull()
     fire(menu, new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(labels(menu)[0]).toBe('Balanced — about 3 min a take')
+    for (const key of ['Enter', 'F4', 'ArrowDown', 'ArrowUp']) {
+      fire(menu, new KeyboardEvent('keydown', { key, bubbles: true }))
+      expect(labels(menu)[0]).toBeNull()
+      fire(menu, new FocusEvent('focusout', { bubbles: true }))
+    }
+    fire(menu, new KeyboardEvent('keydown', { key: 'Alt', altKey: true, bubbles: true }))
+    expect(labels(menu)[0]).toBe('Balanced — about 3 min a take')
     fire(menu, new MouseEvent('mousedown', { bubbles: true }))
     act(() => {
       menu.value = 'quick'
