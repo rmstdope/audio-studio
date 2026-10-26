@@ -157,6 +157,15 @@ describe('the requests-at-once check', () => {
       expect(byId({ ...ready, music }).music!.fix).toContain('/models')
     })
 
+    it('says only the machine was checked when the project’s model is a Stable Audio one', () => {
+      const music = { ...ready.music!, model: 'short' as const }
+      expect(byId({ ...ready, music }).music).toMatchObject({
+        state: 'ok',
+        detail:
+          "uv is in place. ACE-Step's models are not checked while the project's music model is a Stable Audio one.",
+      })
+    })
+
     it('gives the fix the generator found, whatever the problem is', () => {
       const music = {
         ready: { ok: false as const, message: 'uv is not on the PATH.', fix: 'brew install uv' },

@@ -1373,7 +1373,9 @@ Small, independently useful increments:
    signup credits only). Of the open models, MusicGen's weights are non-commercial (CC-BY-NC) and
    Stable Audio Open is limited to 47 seconds and stronger at effects than at melody; ACE-Step's
    code and weights are MIT-licensed, it makes full instrumental tracks, and it runs on Apple
-   Silicon. Tracks are chosen from takes, since every generation differs.
+   Silicon. Tracks are chosen from takes, since every generation differs. Stable Audio Open was added later
+   (as-ui4) as an alternative for stingers and short loops, with the same weights-outside-the-studio rule;
+   ACE-Step stays the one that makes the game's act loops.
 5. **ACE-Step's XL turbo model with the 4B language model** (the spike, 12.1, on a MacBook M5 Pro
    with 48 GB, MLX). A 96-second take takes 2 to 4 minutes with it, about a minute more for the
    first after a start, while the models load; the length matters little (with the 1.7B language

@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { musicModel, type MusicModelId } from './musicModels'
+import { MUSIC_MODELS, musicModel, type MusicModelId } from './musicModels'
 import type { FishTierSchema } from './project'
 
 /** The name of the variable that holds the Fish Audio API key (`services/env.ts` reads it). */
@@ -252,6 +252,15 @@ function music(facts: SetupFacts): SetupCheck {
   if (!facts.music) {
     return { id: 'music', title, state: 'off', detail: 'The project has no music section.' }
   }
+  if (facts.music.ready.ok && musicModel(facts.music.model).family !== 'acestep') {
+    return {
+      id: 'music',
+      title,
+      state: 'ok',
+      detail:
+        "uv is in place. ACE-Step's models are not checked while the project's music model is a Stable Audio one.",
+    }
+  }
   if (facts.music.ready.ok) {
     return {
       id: 'music',
@@ -273,7 +282,9 @@ function music(facts: SetupFacts): SetupCheck {
 const STABLE_AUDIO_HOME = '~/.cache/stable-audio'
 
 /** The Hugging Face repositories of the Stable Audio models, which the folders are named after. */
-const STABLE_AUDIO_REPOS = ['stable-audio-open-1.0', 'stable-audio-open-small']
+const STABLE_AUDIO_REPOS = MUSIC_MODELS.filter((m) => m.family === 'stable-audio').flatMap(
+  (m) => m.folders,
+)
 
 function stableAudio(facts: SetupFacts): SetupCheck {
   const title = 'Music generator (Stable Audio Open)'
@@ -334,6 +345,10 @@ function stableAudio(facts: SetupFacts): SetupCheck {
   const detail =
     missing.length === 2
       ? 'Optional: for stingers and short loops. Its models are not on this computer.'
-      : `${musicModel(missing[0] === 'short' ? 'shortest' : 'short').name} is in place; ${musicModel(missing[0]!).name} is missing from ${STABLE_AUDIO_HOME}.`
+      : `${MUSIC_MODELS.filter((m) => m.family === 'stable-audio' && !missing.includes(m.id))
+          .map((m) => m.name)
+          .join(
+            ' and ',
+          )} is in place; ${missing.map((id) => musicModel(id).name).join(' and ')} is missing from ${STABLE_AUDIO_HOME}.`
   return { id: 'stableAudio', title, state: 'off', label: 'Not set up', detail, steps }
 }

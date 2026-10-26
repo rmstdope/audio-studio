@@ -180,3 +180,28 @@ describe('MusicBoardSchema', () => {
     expect(MusicBoardSchema.safeParse({ next: 0, takes: [] }).success).toBe(false)
   })
 })
+
+describe('a take at another sample rate and in stereo', () => {
+  /** A 44.1 kHz stereo tone, as Stable Audio makes. */
+  function stereo(seconds: number) {
+    const rate = 44100
+    const frames = Math.round(seconds * rate)
+    const samples = new Int16Array(frames * 2)
+    for (let i = 0; i < frames; i++) {
+      samples[2 * i] = Math.round(8000 * Math.sin(i / 20))
+      samples[2 * i + 1] = Math.round(6000 * Math.sin(i / 25))
+    }
+    return {
+      format: { channels: 2, sampleRate: rate, bitsPerSample: 16 },
+      data: new Uint8Array(samples.buffer),
+    }
+  }
+  test('cuts a loop at its length', () => {
+    const wav = shapeLoop(stereo(27 + 20), 27)
+    expect(wavSeconds(wav)).toBe(27)
+    expect(wav.format).toMatchObject({ channels: 2, sampleRate: 44100 })
+  })
+  test('cuts a stinger at its length', () => {
+    expect(wavSeconds(shapeStinger(stereo(10), 6))).toBe(6)
+  })
+})

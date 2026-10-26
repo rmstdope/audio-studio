@@ -170,6 +170,12 @@ export function canMake(id: MusicModelId, kind: 'loop' | 'stinger', seconds: num
   return longest === null || seconds <= longest
 }
 
+/** What a model's loops come to, for a model that cannot make every loop: "makes loops up to 27 s". */
+function makes(id: MusicModelId): string {
+  const longest = longestFor(id, 'loop')!
+  return longest === 0 ? 'makes no loops' : `makes loops up to ${longest} s`
+}
+
 /** Why a model cannot make this track, in a menu entry: what it can make, and how long this is; null if it can. */
 export function lengthReason(
   id: MusicModelId,
@@ -177,9 +183,7 @@ export function lengthReason(
   seconds: number,
 ): string | null {
   if (canMake(id, kind, seconds)) return null
-  const longest = longestFor(id, kind)!
-  const makes = longest === 0 ? 'makes no loops' : `makes loops up to ${longest} s`
-  return `${makes} · this one is ${clock(seconds)}`
+  return `${makes(id)} · this one is ${clock(seconds)}`
 }
 
 /**
@@ -210,9 +214,7 @@ export function tooLongOnTrack(
   seconds: number,
 ): string | null {
   if (canMake(id, kind, seconds)) return null
-  const longest = longestFor(id, kind)!
-  const makes = longest === 0 ? 'makes no loops' : `makes loops up to ${longest} s`
-  return `${musicModel(id).name} ${makes}, and this one is ${clock(seconds)}. Pick another model for these takes.`
+  return `${musicModel(id).name} ${makes(id)}, and this one is ${clock(seconds)}. Pick another model for these takes.`
 }
 
 /**

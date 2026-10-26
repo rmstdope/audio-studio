@@ -171,6 +171,13 @@ describe('music.model in the project file', () => {
     expect(ProjectSchema.safeParse(known).success).toBe(true)
     expect(ProjectSchema.safeParse(projectJson({ music })).success).toBe(true)
   })
+  test('accepts the Stable Audio models', () => {
+    for (const model of ['short', 'shortest']) {
+      expect(ProjectSchema.safeParse(projectJson({ music: { ...music, model } })).success).toBe(
+        true,
+      )
+    }
+  })
   test('refuses an unknown one, naming where', () => {
     const result = ProjectSchema.safeParse(projectJson({ music: { ...music, model: 'huge' } }))
     expect(result.success).toBe(false)

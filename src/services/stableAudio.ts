@@ -71,8 +71,9 @@ export function createStableAudioWorker({
     name: 'The music generator',
     command,
     timeoutMs,
-    // The models are read from their folders: nothing is fetched, so no token is ever needed.
-    env: { HF_HUB_OFFLINE: '1' },
+    // The Stable Audio models come from their folders; only the public t5-base text encoder both
+    // load is fetched on the first take, with no token (the studio gives the worker none).
+    env: { HF_HUB_DISABLE_TELEMETRY: '1' },
     couldNotStart: (why) =>
       `The music generator could not start (${why}). It needs uv and Apple silicon.`,
     killed:
