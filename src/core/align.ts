@@ -26,7 +26,8 @@ export interface HeardSegment {
 /**
  * A word without case or punctuation (narrate.py `_plain`), for comparison, in any alphabet:
  * letters and their marks ("får" is not "för", "Да" is a word) and digits are kept, composed as
- * one (NFC), with Russian ё as е, as it is often written. Numbers are matched as words that sound
+ * one (NFC), with Russian ё as е, as it is often written, and German ß as ss, as Swiss German and
+ * capitals write it ("große" is "grosse"). Numbers are matched as words that sound
  * the same (see `soundAlikes`), not here. Apostrophes stay inside a word
  * ("don't") but not at its ends, where they are single quotes around speech ("'You",
  * "will.'"), unlike narrate.py, which kept them and so never matched a quoted word. A possessive
@@ -40,6 +41,7 @@ function plain(word: string): string {
     .toLowerCase()
     .replace(/&/g, 'and')
     .replace(/ё/g, 'е')
+    .replace(/ß/g, 'ss')
     .replace(/[^\p{L}\p{M}\p{N}']/gu, '')
     .replace(/^'+|'+$/g, '')
     .replace(/s?'s$/, 's')
