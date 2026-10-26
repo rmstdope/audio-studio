@@ -94,9 +94,8 @@ export function listFor<
   return named ?? lists[0]
 }
 
-/** What the tag beside a brief field's label says about where its value comes from. */
-export function fieldTag(source: 'game' | 'changed' | 'unset'): string {
-  if (source === 'changed') return "changed here · use the game's"
+/** What the tag beside a brief field's label says when the value is the game's or not set. */
+export function fieldTag(source: 'game' | 'unset'): string {
   return source === 'game' ? 'from the game' : 'not set'
 }
 

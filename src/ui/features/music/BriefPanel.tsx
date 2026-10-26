@@ -18,7 +18,6 @@ function gameChange(field: BriefField, game: TrackRow['game']): BriefChange {
  * tempo and key. Every field is always editable and is saved as it is left.
  */
 export function BriefPanel({ track, kind }: { track: TrackRow; kind: MusicListSummary['kind'] }) {
-  const save = useSetTrackBrief(track.id)
   const [saved, setSaved] = useState(false)
   const field = (name: BriefField, label: string, extra: Partial<FieldProps> = {}) => (
     <FieldRow
@@ -27,19 +26,8 @@ export function BriefPanel({ track, kind }: { track: TrackRow; kind: MusicListSu
       label={label}
       track={track}
       kind={kind}
-      onSave={(change, done) =>
-        save.mutate(change, {
-          onSuccess: (result) => {
-            if (!result.ok) return
-            done()
-            setSaved(true)
-          },
-        })
-      }
-      onEdit={() => {
-        setSaved(false)
-        if (save.data || save.error) save.reset()
-      }}
+      onSaved={() => setSaved(true)}
+      onEdit={() => setSaved(false)}
       {...extra}
     />
   )
@@ -65,10 +53,6 @@ export function BriefPanel({ track, kind }: { track: TrackRow; kind: MusicListSu
         {field('bpm', 'Tempo in bpm', { inputMode: 'numeric' })}
         {field('key', 'Key', { placeholder: 'e.g. D minor' })}
       </div>
-      {save.data && !save.data.ok && 'problems' in save.data && (
-        <Problems title="The brief could not be saved" problems={save.data.problems} />
-      )}
-      {save.isError && <span className="adopt-error">{save.error.message}</span>}
     </section>
   )
 }
@@ -82,8 +66,8 @@ interface FieldProps {
   multiline?: boolean
   placeholder?: string
   inputMode?: 'numeric'
-  /** Saves a change; `done` runs once it is saved. */
-  onSave: (change: BriefChange, done: () => void) => void
+  /** The field was saved. */
+  onSaved: () => void
   /** The person began changing the field. */
   onEdit: () => void
 }
@@ -97,9 +81,11 @@ function FieldRow({
   multiline,
   placeholder,
   inputMode,
-  onSave,
+  onSaved,
   onEdit,
 }: FieldProps) {
+  // One save per field: a refusal or a draft belongs to the field it was typed in.
+  const save = useSetTrackBrief(track.id)
   const id = useId()
   const [draft, setDraft] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
@@ -110,17 +96,26 @@ function FieldRow({
     setDraft(null)
     setProblem(null)
   }
+  const send = (change: BriefChange) =>
+    save.mutate(change, {
+      onSuccess: (result) => {
+        if (!result.ok) return
+        clear()
+        onSaved()
+      },
+    })
   const leave = () => {
     if (draft === null) return
     if (draft.trim() === shown) return clear()
     const parsed = parseField(field, draft, kind)
     if (!parsed.ok) return setProblem(parsed.message)
     setProblem(null)
-    onSave(parsed.change, clear)
+    send(parsed.change)
   }
   const change = (value: string) => {
     onEdit()
     setProblem(null)
+    if (save.data || save.error) save.reset()
     setDraft(value)
   }
   return (
@@ -138,7 +133,7 @@ function FieldRow({
               onClick={() => {
                 clear()
                 onEdit()
-                onSave(gameChange(field, track.game), clear)
+                send(gameChange(field, track.game))
               }}
             >
               use the game&apos;s
@@ -172,6 +167,10 @@ function FieldRow({
         />
       )}
       {problem && <span className="adopt-error">{problem}</span>}
+      {save.data && !save.data.ok && 'problems' in save.data && (
+        <Problems title="The brief could not be saved" problems={save.data.problems} />
+      )}
+      {save.isError && <span className="adopt-error">{save.error.message}</span>}
     </div>
   )
 }

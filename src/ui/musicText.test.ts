@@ -129,9 +129,8 @@ describe('listFor', () => {
 })
 
 describe('fieldTag', () => {
-  it('words where a value comes from', () => {
+  it('words the tag of a value that is not changed', () => {
     expect(fieldTag('game')).toBe('from the game')
-    expect(fieldTag('changed')).toBe("changed here · use the game's")
     expect(fieldTag('unset')).toBe('not set')
   })
 })

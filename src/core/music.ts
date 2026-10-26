@@ -222,6 +222,8 @@ export function fieldSource(row: TrackRow, field: BriefField): 'game' | 'changed
   return 'changed'
 }
 
+const FIELD_ORDER: BriefField[] = ['brief', 'seconds', 'bpm', 'key']
+
 /**
  * The briefs with one field of a track set to `value`. A value the game already has removes the
  * change (and the track's entry once nothing is left of it); `null` for tempo or key means none
@@ -235,9 +237,13 @@ export function applyBriefChange(
   game: GameBrief,
 ): Briefs {
   const { [id]: before, ...others } = briefs
-  const entry: Record<string, BriefValue | undefined> = { ...before }
-  if (value === game[field]) delete entry[field]
-  else entry[field] = value
+  const changed: Record<string, BriefValue | undefined> = { ...before }
+  if (value === game[field]) delete changed[field]
+  else changed[field] = value
+  // Always in the same order, so setting fields in another order is no diff.
+  const entry = Object.fromEntries(
+    FIELD_ORDER.flatMap((f) => (f in changed ? [[f, changed[f]]] : [])),
+  )
   const next: Briefs = { ...others }
   if (Object.keys(entry).length) next[id] = entry
   return Object.fromEntries(Object.entries(next).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
@@ -265,8 +271,8 @@ export function parseClock(text: string): number | null {
 
 /** One field of a track's brief to change (the body of a save); null means no tempo or key. */
 export const BriefChangeBody = z.union([
-  z.object({ brief: z.string().max(5_000) }).strict(),
-  z.object({ seconds: z.number().int().positive().max(3_600) }).strict(),
+  z.object({ brief: z.string() }).strict(),
+  z.object({ seconds: z.number().int().positive() }).strict(),
   z.object({ bpm: z.number().int().min(30).max(300).nullable() }).strict(),
   z.object({ key: z.string().max(100).nullable() }).strict(),
 ])

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setTrackBrief } from './briefs'
@@ -53,11 +53,18 @@ describe('setTrackBrief', () => {
     expect(JSON.parse(briefs())).toEqual({ lane: { bpm: null, key: null } })
   })
 
-  it('does not write the game’s lists', async () => {
+  it('writes briefs.json and nothing else', async () => {
     const { root, file } = repo()
-    const before = readFileSync(join(root, 'tts/act1/music.json'), 'utf8')
+    const files = () =>
+      readdirSync(root, { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => `${entry.parentPath}/${entry.name}`)
+        .sort()
+    const before = files()
+    const lists = readFileSync(join(root, 'tts/act1/music.json'), 'utf8')
     await setTrackBrief(file, 'hall', { brief: 'ours' })
-    expect(readFileSync(join(root, 'tts/act1/music.json'), 'utf8')).toBe(before)
+    expect(files()).toEqual([...before, join(root, 'music/briefs.json')].sort())
+    expect(readFileSync(join(root, 'tts/act1/music.json'), 'utf8')).toBe(lists)
   })
 
   it('knows no track that is not listed, and writes nothing for it', async () => {
@@ -100,7 +107,7 @@ describe('setTrackBrief', () => {
     })
   })
 
-  it('says why a project without music cannot save', async () => {
+  it('knows no track in a project without music', async () => {
     const root = tempRepo({ 'audio-studio.json': projectJson() })
     expect(await setTrackBrief(join(root, 'audio-studio.json'), 'hall', { brief: 'x' })).toBeNull()
   })

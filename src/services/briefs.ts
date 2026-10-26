@@ -43,8 +43,8 @@ async function save(
   if (!opened.ok) return opened
   const { project } = opened
   const root = dirname(projectFile)
-  const file = project.music?.paths.briefs
-  if (!project.music || !file) return null
+  if (!project.music) return null
+  const file = project.music.paths.briefs
   const found = trackFor((await readMusic(root, project, []))?.lists ?? [], id)
   if (!found) return null
 

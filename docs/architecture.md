@@ -835,7 +835,8 @@ has `refreshDialog`: the same command as Refresh dialog, which brings the act's 
 together, and its summary names the loops added and removed besides the lines. A refresh of an act
 and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
 refresh of the stingers and takes being made for a stinger. A project without a `music` section
-shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel; the board of its takes comes with takes). Choosing an act the same way in Narration is a change of its own.
+shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel; the board of its takes comes with takes).
+Choosing an act the same way in Narration is a change of its own.
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:

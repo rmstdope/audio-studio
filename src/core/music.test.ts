@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  BriefChangeBody,
   BriefsSchema,
   LoopListSchema,
   applyBriefChange,
@@ -222,10 +223,26 @@ describe('applyBriefChange', () => {
     expect(applyBriefChange({}, 'a', 'key', null, none)).toEqual({})
   })
 
+  it('keeps the fields of an entry in one order, whichever was set first', () => {
+    const a = applyBriefChange({ a: { seconds: 60 } }, 'a', 'brief', 'x', game)
+    const b = applyBriefChange({ a: { brief: 'x' } }, 'a', 'seconds', 60, game)
+    expect(JSON.stringify(a)).toBe('{"a":{"brief":"x","seconds":60}}')
+    expect(JSON.stringify(b)).toBe(JSON.stringify(a))
+    const c = applyBriefChange({ a: { key: 'C', bpm: 90 } }, 'a', 'brief', 'x', game)
+    expect(Object.keys(c.a!)).toEqual(['brief', 'bpm', 'key'])
+  })
+
   it('does not change the briefs it was given', () => {
     const before = { a: { brief: 'ours' } }
     applyBriefChange(before, 'a', 'brief', 'g', game)
     expect(before).toEqual({ a: { brief: 'ours' } })
+  })
+})
+
+describe('BriefChangeBody', () => {
+  it('takes any length and brief the game’s own list could hold', () => {
+    expect(BriefChangeBody.safeParse({ seconds: 4000 }).success).toBe(true)
+    expect(BriefChangeBody.safeParse({ brief: 'x'.repeat(6000) }).success).toBe(true)
   })
 })
 
