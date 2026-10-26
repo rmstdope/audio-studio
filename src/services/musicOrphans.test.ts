@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { MUSIC_MODEL } from '../core/musicTake'
@@ -102,11 +102,35 @@ describe('removeOrphan', () => {
     expect(json(root, 'music/briefs.json')).toHaveProperty('castle-gates')
   })
 
-  it('finds no orphan, and deletes nothing, when the lock cannot be read', async () => {
+  it('reports the lock’s problems, and deletes nothing, when the lock cannot be read', async () => {
     const { root, file } = repo({ 'music/music.lock.json': '[1]' })
     const result = await removeOrphan(file, 'castle-gates')
-    expect(result).toBeNull()
+    expect(result).toMatchObject({ ok: false, file: 'music/music.lock.json' })
     expect(existsSync(join(root, 'audio/music/castle-gates.mp3'))).toBe(true)
+  })
+
+  it('keeps the lock entry when a step fails, so the removal can be done again', async () => {
+    const { root, file } = repo()
+    // The board is a folder with something in it, which cannot be deleted as a file.
+    const board = join(root, '.audio-studio/music/castle-gates.json')
+    rmSync(board)
+    mkdirSync(join(board, 'inner'), { recursive: true })
+    expect(await removeOrphan(file, 'castle-gates')).toMatchObject({ ok: false })
+    expect(Object.keys(json(root, 'music/music.lock.json'))).toContain('castle-gates')
+    rmSync(board, { recursive: true })
+    writeFileSync(board, '{ "next": 2, "takes": [] }')
+    expect(await removeOrphan(file, 'castle-gates')).toEqual({ ok: true })
+    expect(Object.keys(json(root, 'music/music.lock.json'))).toEqual(['hall'])
+  })
+
+  it('removes the orphan even when the briefs cannot be read, and says so', async () => {
+    const { root, file } = repo({ 'music/briefs.json': '{ nope' })
+    expect(await removeOrphan(file, 'castle-gates')).toMatchObject({
+      ok: false,
+      file: 'music/briefs.json',
+    })
+    expect(Object.keys(json(root, 'music/music.lock.json'))).toEqual(['hall'])
+    expect(existsSync(join(root, 'audio/music/castle-gates.mp3'))).toBe(false)
   })
 
   it('removes the orphan of the stingers from their page too', async () => {

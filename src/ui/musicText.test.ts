@@ -200,7 +200,8 @@ describe('parseField', () => {
 
 describe('chosenOn', () => {
   it('says the day a take was chosen, in short', () => {
-    expect(chosenOn('2026-11-02T12:00:00.000Z')).toBe('chosen 2 Nov')
-    expect(chosenOn('2026-03-15T12:00:00.000Z')).toBe('chosen 15 Mar')
+    // Built from local noon, so the day is the same in every time zone.
+    expect(chosenOn(new Date(2026, 10, 2, 12).toISOString())).toBe('chosen 2 Nov')
+    expect(chosenOn(new Date(2026, 2, 15, 12).toISOString())).toBe('chosen 15 Mar')
   })
 })

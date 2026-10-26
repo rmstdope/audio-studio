@@ -909,8 +909,8 @@ while its list is there, is an orphan, shown on the page of the list its lock en
 "Music the game no longer asks for" (built, 12.7): a play button, its name (its id as words, since
 the lock keeps no title) with its file name under it, when it was chosen, and **Remove**. Remove
 asks first ("Remove the music for Castle gates?", saying what goes) and then deletes, in this
-order so a failure can be repeated, its manifest entry, its clip, its board and takes, its briefs
-entry and, last, its lock entry (`POST /api/music/tracks/:id/remove`, 404 for a track that is not
+order so a failure can be repeated, its manifest entry, its clip, its board and takes and its lock
+entry, then its briefs entry (which the next save of the briefs would drop anyway) (`POST /api/music/tracks/:id/remove`, 404 for a track that is not
 an orphan; a manifest or lock that cannot be read deletes nothing). A list that is missing or
 unreadable has no orphans, and one another list names is not one. The briefs and board of a track
 never chosen that no list names are dropped at the next save of the briefs, and only when every

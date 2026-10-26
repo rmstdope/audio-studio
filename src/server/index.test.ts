@@ -3317,6 +3317,15 @@ describe('server, removing music the game no longer asks for', () => {
     // A listed track and an unknown one are not orphans.
     expect((await remove('hall')).status).toBe(404)
     expect((await remove('nobody')).status).toBe(404)
+    // A manifest that cannot be read: refused with why, nothing deleted.
+    const manifestFile = join(musicRoot, 'audio/music/manifest.json')
+    const manifest = readFileSync(manifestFile, 'utf8')
+    writeFileSync(manifestFile, '{ nope')
+    const refused = await remove('castle-gates')
+    expect(refused.status).toBe(409)
+    expect((await refused.json()).problems.length).toBeGreaterThan(0)
+    expect(existsSync(join(musicRoot, 'audio/music/castle-gates.mp3'))).toBe(true)
+    writeFileSync(manifestFile, manifest)
     expect(await (await remove('castle-gates')).json()).toEqual({ ok: true })
     expect(existsSync(join(musicRoot, 'audio/music/castle-gates.mp3'))).toBe(false)
     const after = await (await fetch(at('/api/project'))).json()

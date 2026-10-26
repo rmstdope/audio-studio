@@ -32,28 +32,39 @@ export async function removeOrphan(projectFile: string, id: string): Promise<Rem
     const root = dirname(projectFile)
     const music = project.music
     if (!music) return null
-    return choices().run(`music-choice\0${projectFile}`, async (): Promise<RemoveResult> => {
-      const summary = await readMusic(root, project, [])
-      if (!summary || !orphanOf(summary.lists, id)) return null
-      const found: Problem[] = []
-      const manifest = await manifestNow(root, music, found)
-      const lock = await lockNow(root, music, found)
-      if (!manifest || !lock) return { ok: false, file: found[0]!.file, problems: found }
-      try {
-        if (id in manifest) {
-          delete manifest[id]
-          await writeAtomic(root, music.paths.manifest, `${pythonJson(sorted(manifest))}\n`)
+    const removed = await choices().run(
+      `music-choice\0${projectFile}`,
+      async (): Promise<RemoveResult> => {
+        // A lock that cannot be read says nothing of what is chosen: its problems, not "no orphan".
+        const found: Problem[] = []
+        const lock = await lockNow(root, music, found)
+        if (!lock) return { ok: false, file: found[0]!.file, problems: found }
+        const summary = await readMusic(root, project, [])
+        if (!summary || !orphanOf(summary.lists, id)) return null
+        const manifest = await manifestNow(root, music, found)
+        if (!manifest) return { ok: false, file: found[0]!.file, problems: found }
+        try {
+          if (id in manifest) {
+            delete manifest[id]
+            await writeAtomic(root, music.paths.manifest, `${pythonJson(sorted(manifest))}\n`)
+          }
+          await rm(resolveInRoot(root, `${music.paths.clips}/${id}.mp3`), { force: true })
+          await deleteBoard(root, id)
+          delete lock[id]
+          await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
+          return { ok: true }
+        } catch (error) {
+          return { ok: false, message: error instanceof Error ? error.message : String(error) }
         }
-        await rm(resolveInRoot(root, `${music.paths.clips}/${id}.mp3`), { force: true })
-        await deleteBoard(root, id)
-        const briefs = await forgetBriefs(projectFile, root, music.paths.briefs, [id])
-        if (!briefs.ok) return { ok: false, file: music.paths.briefs, problems: briefs.problems }
-        delete lock[id]
-        await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
-        return { ok: true }
-      } catch (error) {
-        return { ok: false, message: error instanceof Error ? error.message : String(error) }
-      }
-    })
+      },
+    )
+    if (!removed?.ok) return removed
+    // Outside the choice turn (the briefs' turn is taken before the boards', never inside it). With
+    // the lock entry gone the track's brief changes are those of an unlisted track never chosen,
+    // which the next save of the briefs drops anyway, so a failure here costs nothing.
+    const briefs = await forgetBriefs(projectFile, root, music.paths.briefs, [id])
+    return briefs.ok
+      ? { ok: true }
+      : { ok: false, file: music.paths.briefs, problems: briefs.problems }
   })
 }

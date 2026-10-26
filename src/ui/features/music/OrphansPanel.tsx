@@ -23,6 +23,15 @@ export function OrphansPanel({ orphans }: { orphans: OrphanRow[] }) {
     refocus()
     setAsking(null)
   }
+  // The row (or the whole panel) is going, so focus goes to the page's heading, which stays.
+  const removed = () => {
+    setAsking(null)
+    const heading = document.querySelector<HTMLElement>('h1')
+    if (heading) {
+      heading.tabIndex = -1
+      heading.focus()
+    }
+  }
   const orphan = orphans.find((o) => o.id === asking)
   return (
     <>
@@ -78,13 +87,23 @@ export function OrphansPanel({ orphans }: { orphans: OrphanRow[] }) {
           </tbody>
         </table>
       </section>
-      {orphan && <RemoveConfirm key={orphan.id} orphan={orphan} onBack={closeAsking} />}
+      {orphan && (
+        <RemoveConfirm key={orphan.id} orphan={orphan} onBack={closeAsking} onRemoved={removed} />
+      )}
     </>
   )
 }
 
 /** The question before removing an orphan: what goes, Cancel, and Remove. */
-function RemoveConfirm({ orphan, onBack }: { orphan: OrphanRow; onBack: () => void }) {
+function RemoveConfirm({
+  orphan,
+  onBack,
+  onRemoved,
+}: {
+  orphan: OrphanRow
+  onBack: () => void
+  onRemoved: () => void
+}) {
   const remove = useRemoveOrphan(orphan.id)
   return (
     <>
@@ -100,7 +119,7 @@ function RemoveConfirm({ orphan, onBack }: { orphan: OrphanRow; onBack: () => vo
           className="btn btn-primary"
           type="button"
           disabled={remove.isPending}
-          onClick={() => remove.mutate(undefined, { onSuccess: (r) => r.ok && onBack() })}
+          onClick={() => remove.mutate(undefined, { onSuccess: (r) => r.ok && onRemoved() })}
         >
           {remove.isPending ? 'Removing…' : 'Remove'}
         </button>
