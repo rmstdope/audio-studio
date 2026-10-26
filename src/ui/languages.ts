@@ -1,4 +1,5 @@
 import type { GenerationPlan } from '../core/generation'
+import type { LineState } from '../core/planner'
 import type { Recorded } from '../core/summary'
 import type { LanguageProgress } from '../services/workspace'
 import { plural } from './format'
@@ -61,12 +62,18 @@ export function translatedNote(lines: number): string {
   return `Not recorded until translated: ${lines} ${lines === 1 ? 'line' : 'lines'}.`
 }
 
-/** Where a line's cue comes from, under it: the source language's, or the character's style. */
-export function cueNote(
-  from: 'own' | 'source' | 'style',
-  character: string,
-  source: string,
-): string | null {
+/** Where a line's cue comes from, as the planner says. */
+type CueFrom = LineState['cueFrom']
+
+/**
+ * Where a line's cue comes from, under it: its scene's (said in every language, with the source
+ * language's named when that is the one followed), and in a language besides the source (`source`
+ * is its name, else null) the source language's cue or the character's style.
+ */
+export function cueNote(from: CueFrom, character: string, source: string | null): string | null {
+  if (from === 'scene') return "The scene's cue"
+  if (from === 'sceneSource') return `The scene's cue, following ${source ?? 'the source language'}`
+  if (source === null) return null
   return from === 'source' ? `from ${source}` : from === 'style' ? `${character}’s style` : null
 }
 
@@ -74,11 +81,7 @@ export function cueNote(
  * The hint under the cue field in a language besides the source: that an empty field follows the
  * source's cue, or what the source's cue is. Nothing when the source has none to show.
  */
-export function cueHint(
-  from: 'own' | 'source' | 'style',
-  sourceCue: string | null,
-  source: string,
-): string | null {
+export function cueHint(from: CueFrom, sourceCue: string | null, source: string): string | null {
   if (!sourceCue) return null
   return from === 'source'
     ? `Empty: this line follows the ${source} cue ${sourceCue}.`
@@ -87,17 +90,15 @@ export function cueHint(
       : null
 }
 
-/** The hover text of the cue button of a line that follows the source language's cue. */
-export function cueButtonTitle(
-  from: 'own' | 'source' | 'style',
-  language: string,
-  source: string,
-): string {
+/** The hover text of the cue button of a line that follows another cue than its own. */
+export function cueButtonTitle(from: CueFrom, language: string, source: string): string {
   return from === 'source'
     ? `Follows the ${source} cue: give this line its own ${language} cue`
     : from === 'own'
       ? 'This line’s own cue: edit'
-      : 'The character’s style: give this line its own cue'
+      : from === 'style'
+        ? 'The character’s style: give this line its own cue'
+        : 'The scene’s cue: give this line its own cue'
 }
 
 /** The panel for a language with no dialog for the part; the button only if the game can refresh. */
