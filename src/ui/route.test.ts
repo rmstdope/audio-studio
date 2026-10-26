@@ -125,6 +125,14 @@ describe('the Music pages in the address', () => {
     expect(parseRoute('#/music')).toEqual({ view: 'music', page: null })
     expect(parseRoute('#/music/parts/act2')).toEqual({ view: 'music', page: 'act', part: 'act2' })
     expect(parseRoute('#/music/stingers')).toEqual({ view: 'music', page: 'stingers' })
+    expect(parseRoute('#/music/tracks/game-over')).toEqual({
+      view: 'music',
+      page: 'track',
+      track: 'game-over',
+    })
+    expect(routeHref({ view: 'music', page: 'track', track: 'game-over' })).toBe(
+      '#/music/tracks/game-over',
+    )
     expect(routeHref({ view: 'music', page: null })).toBe('#/music')
     expect(routeHref({ view: 'music', page: 'act', part: 'act 2' })).toBe('#/music/parts/act%202')
     expect(routeHref({ view: 'music', page: 'stingers' })).toBe('#/music/stingers')

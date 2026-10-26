@@ -835,8 +835,8 @@ has `refreshDialog`: the same command as Refresh dialog, which brings the act's 
 together, and its summary names the loops added and removed besides the lines. A refresh of an act
 and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
 refresh of the stingers and takes being made for a stinger. A project without a `music` section
-shows Music with a page saying how to add one. A track opens its own page: its brief and the board
-of its takes. Choosing an act the same way in Narration is a change of its own.
+shows Music with a page saying how to add one. A track opens its own page (built: its Brief panel; the board of its takes comes with takes).
+Choosing an act the same way in Narration is a change of its own.
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
@@ -1196,8 +1196,9 @@ Small, independently useful increments:
        act's page, and on the Stingers page running `refreshShared` (CLAUDE.md's consumer rules
        updated in that step to name both buttons and the new command); the sample project in
        `test/fixtures/sample` gains loop and stinger lists.
-    3. **Briefs**: a track's page, its brief, length, tempo and key changed and saved in the
-       studio's briefs, marked "changed here", and the game's taken back.
+    3. **Briefs** (built): a track's page (a track opens from its row), its brief, length, tempo
+       and key changed and saved in the studio's briefs as each field is left, marked "changed
+       here", and the game's taken back; `PATCH /api/music/tracks/:id`, one field at a time.
     4. **Takes**: the ACE-Step worker behind `MusicGenerator` (and in the setup checklist), a take
        generated, shaped and cached per click on a track's page, and played, loops around their
        seam too.

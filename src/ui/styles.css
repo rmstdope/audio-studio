@@ -2637,3 +2637,87 @@ a.btn {
 .music-id {
   font-size: 12px;
 }
+
+.music-track-link {
+  color: var(--text);
+  text-decoration: none;
+}
+.music-track-link:hover {
+  text-decoration: underline;
+}
+
+/* A track's Brief panel */
+
+.brief-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.brief-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.brief-panel-head h2 {
+  margin: 0;
+}
+.saved {
+  font-size: 12px;
+  color: var(--ok-ink);
+}
+.music-brief-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+@media (max-width: 700px) {
+  .music-brief-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.brief-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.brief-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.brief-field-head .label {
+  margin-right: auto;
+}
+.field-tag {
+  font-size: 12px;
+  color: var(--faint);
+}
+.field-tag.changed {
+  color: var(--warn);
+}
+.link-button {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+  color: var(--warn);
+}
+.brief-input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 8px 10px;
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+.music-kind {
+  align-self: flex-start;
+  margin-top: 6px;
+}

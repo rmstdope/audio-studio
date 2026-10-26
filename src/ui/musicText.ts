@@ -1,5 +1,13 @@
-import type { MusicListSummary, TrackRef } from '../core/music'
-import { plural } from './format'
+import {
+  MAX_STINGER_SECONDS,
+  parseClock,
+  type BriefChange,
+  type BriefField,
+  type MusicListSummary,
+  type TrackRef,
+  type TrackRow,
+} from '../core/music'
+import { clock, plural } from './format'
 import type { MusicRoute } from './route'
 
 /** What a list page needs of a list to word its sentences. */
@@ -72,15 +80,60 @@ export function changeSummary({
 }
 
 /** The list a Music route names; the first list when it names none, or one that is not there. */
-export function listFor<T extends Pick<MusicListSummary, 'id' | 'kind'>>(
-  lists: T[],
-  route: MusicRoute,
-): T | undefined {
+export function listFor<
+  T extends Pick<MusicListSummary, 'id' | 'kind'> & { tracks: readonly { id: string }[] },
+>(lists: T[], route: MusicRoute): T | undefined {
   const named =
     route.page === 'stingers'
       ? lists.find((list) => list.kind === 'stingers')
       : route.page === 'act'
         ? lists.find((list) => list.kind === 'act' && list.id === route.part)
-        : undefined
+        : route.page === 'track'
+          ? lists.find((list) => list.tracks.some((track) => track.id === route.track))
+          : undefined
   return named ?? lists[0]
+}
+
+/** What the tag beside a brief field's label says when the value is the game's or not set. */
+export function fieldTag(source: 'game' | 'unset'): string {
+  return source === 'game' ? 'from the game' : 'not set'
+}
+
+/** A brief field's value as it is typed into its input (a tempo or key that is not set is empty). */
+export function fieldText(row: Pick<TrackRow, BriefField>, field: BriefField): string {
+  const value = row[field]
+  if (value === null) return ''
+  return field === 'seconds' ? clock(row.seconds) : String(value)
+}
+
+/**
+ * What was typed into a brief field as the change to save, or what is wrong with it. A stinger's
+ * length is held to the ten seconds the game's list is held to.
+ */
+export function parseField(
+  field: BriefField,
+  text: string,
+  kind: MusicListSummary['kind'],
+): { ok: true; change: BriefChange } | { ok: false; message: string } {
+  const typed = text.trim()
+  if (field === 'brief') {
+    return typed ? { ok: true, change: { brief: typed } } : bad('A brief cannot be empty.')
+  }
+  if (field === 'key') return { ok: true, change: { key: typed || null } }
+  if (field === 'bpm') {
+    if (!typed) return { ok: true, change: { bpm: null } }
+    const bpm = Number(typed)
+    return /^\d+$/.test(typed) && bpm >= 30 && bpm <= 300
+      ? { ok: true, change: { bpm } }
+      : bad('Use a whole number from 30 to 300.')
+  }
+  const seconds = parseClock(typed)
+  if (seconds === null) return bad('Use minutes and seconds, like 1:20.')
+  return kind === 'stingers' && seconds > MAX_STINGER_SECONDS
+    ? bad(`A stinger is at most ${clock(MAX_STINGER_SECONDS)}.`)
+    : { ok: true, change: { seconds } }
+}
+
+function bad(message: string): { ok: false; message: string } {
+  return { ok: false, message }
 }

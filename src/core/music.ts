@@ -68,13 +68,25 @@ export interface MusicListInput {
   canRefresh: boolean
 }
 
-/** A track as a list page shows it. */
+/** The values the game gave a track, which the studio's changes are over. */
+export interface GameBrief {
+  brief: string
+  seconds: number
+  bpm: number | null
+  key: string | null
+}
+
+/** A track as a list page shows it; its brief, length, tempo and key are the ones in force. */
 export interface TrackRow {
   id: string
   title: string
   plays: string | null
   brief: string
   seconds: number
+  bpm: number | null
+  key: string | null
+  /** What the game's list says, for "from the game" and "use the game's". */
+  game: GameBrief
   /** Only "not chosen" is known until choosing exists. */
   status: 'not-chosen'
 }
@@ -162,6 +174,15 @@ function rowOf(track: Track, change: Briefs[string] | undefined): TrackRow {
     plays: track.plays ?? null,
     brief: change?.brief ?? track.brief,
     seconds: change?.seconds ?? track.seconds,
+    // `null` is the studio's "none", over a tempo or key the game gave.
+    bpm: change?.bpm === undefined ? (track.bpm ?? null) : change.bpm,
+    key: change?.key === undefined ? (track.key ?? null) : change.key,
+    game: {
+      brief: track.brief,
+      seconds: track.seconds,
+      bpm: track.bpm ?? null,
+      key: track.key ?? null,
+    },
     status: 'not-chosen',
   }
 }
@@ -185,3 +206,76 @@ export function loopsDiff(
     removed: before.filter((track) => !has.has(track.id)).map(ref),
   }
 }
+
+/** A field of a track's brief that the studio can change. */
+export type BriefField = 'brief' | 'seconds' | 'bpm' | 'key'
+
+/** The value of a brief field: text for the brief and key, whole numbers otherwise, null for none. */
+export type BriefValue = string | number | null
+
+/**
+ * Where a field's value in force comes from: the game's, a change made here, or nothing (the
+ * game gave no tempo or key and none was set).
+ */
+export function fieldSource(row: TrackRow, field: BriefField): 'game' | 'changed' | 'unset' {
+  if (row[field] === row.game[field]) return row[field] === null ? 'unset' : 'game'
+  return 'changed'
+}
+
+const FIELD_ORDER: BriefField[] = ['brief', 'seconds', 'bpm', 'key']
+
+/**
+ * The briefs with one field of a track set to `value`. A value the game already has removes the
+ * change (and the track's entry once nothing is left of it); `null` for tempo or key means none
+ * over the game's. Entries stay in id order, so the file's diffs stay small.
+ */
+export function applyBriefChange(
+  briefs: Briefs,
+  id: string,
+  field: BriefField,
+  value: BriefValue,
+  game: GameBrief,
+): Briefs {
+  const { [id]: before, ...others } = briefs
+  const changed: Record<string, BriefValue | undefined> = { ...before }
+  if (value === game[field]) delete changed[field]
+  else changed[field] = value
+  // Always in the same order, so setting fields in another order is no diff.
+  const entry = Object.fromEntries(
+    FIELD_ORDER.flatMap((f) => (f in changed ? [[f, changed[f]]] : [])),
+  )
+  const next: Briefs = { ...others }
+  if (Object.keys(entry).length) next[id] = entry
+  return Object.fromEntries(Object.entries(next).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+}
+
+/** The list that holds a track and its row, by id. */
+export function trackFor<L extends { tracks: TrackRow[] }>(
+  lists: L[],
+  id: string,
+): { list: L; track: TrackRow } | undefined {
+  for (const list of lists) {
+    const track = list.tracks.find((t) => t.id === id)
+    if (track) return { list, track }
+  }
+  return undefined
+}
+
+/** A length typed as m:ss (`1:20` is 80), or null when it is not one or is zero. */
+export function parseClock(text: string): number | null {
+  const match = /^(\d+):([0-5]\d)$/.exec(text.trim())
+  if (!match) return null
+  const seconds = Number(match[1]) * 60 + Number(match[2])
+  return seconds > 0 ? seconds : null
+}
+
+/** One field of a track's brief to change (the body of a save); null means no tempo or key. */
+export const BriefChangeBody = z.union([
+  z.object({ brief: z.string() }).strict(),
+  z.object({ seconds: z.number().int().positive() }).strict(),
+  z.object({ bpm: z.number().int().min(30).max(300).nullable() }).strict(),
+  z.object({ key: z.string().max(100).nullable() }).strict(),
+])
+
+/** A change to one field of a track's brief. */
+export type BriefChange = z.infer<typeof BriefChangeBody>
