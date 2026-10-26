@@ -1128,6 +1128,12 @@ a.btn {
   gap: 8px;
 }
 
+/* The speed field and its two buttons are wider than the side column together: they wrap rather
+   than widen it, which would drop the character page to one column. */
+.speed-row {
+  flex-wrap: wrap;
+}
+
 .keyword-add .search {
   flex: 1;
   width: auto;

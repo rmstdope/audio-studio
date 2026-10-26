@@ -329,7 +329,7 @@ function SpeedField({
         {label ??
           `Speed · ${speed === null ? `the project’s, ${projectSpeed}` : 'this character’s own'}`}
       </label>
-      <div className="keyword-add">
+      <div className="keyword-add speed-row">
         <input
           id="speed"
           className="style-input mono"
