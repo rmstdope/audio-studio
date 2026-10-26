@@ -1,3 +1,4 @@
+import { spokenPieces } from './spoken'
 import type { StaleReason } from './fingerprint'
 import type { LineState, Orphan } from './planner'
 import { priceOf } from './prices'
@@ -59,7 +60,7 @@ export function planGeneration(
   {
     model,
     speaker,
-    sent = (line) => [line.cue ? `${line.cue} ${line.text}` : line.text],
+    sent = (line) => spokenPieces(line.text, line.cue, {}, Infinity, line.inside),
     takes = 1,
     checked = false,
     includeWeak = false,
@@ -152,7 +153,7 @@ export function costCeiling(
   keys: string[],
   {
     model,
-    sent = (line) => [line.cue ? `${line.cue} ${line.text}` : line.text],
+    sent = (line) => spokenPieces(line.text, line.cue, {}, Infinity, line.inside),
     takes = 1,
     at,
   }: { model: string; sent?: (line: LineState) => string[]; takes?: number; at: Date },

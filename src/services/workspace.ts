@@ -1,3 +1,4 @@
+import { mergeCues } from '../core/cued'
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { soundAlikes, type SoundAlike } from '../core/align'
@@ -226,6 +227,8 @@ export interface PartDetail extends PartState {
   manifestPath: string
   /** The share of words a take must be heard at to count as good (the project's `minHeard`). */
   minHeard: number
+  /** The longest a piece of a line recorded in several is, in characters (`chunkLimit`). */
+  chunkLimit: number
   /** The speakers whose lines follow their scene's cue (the project's `sceneCueSpeakers`). */
   sceneCueSpeakers: string[]
   /** The model everyday plans record with (the project's draft stage). */
@@ -281,6 +284,7 @@ export async function loadPart(
       language: read.language,
       languages,
       minHeard: project.narration.quality.minHeard,
+      chunkLimit: project.narration.quality.chunkLimit,
       sceneCueSpeakers: project.narration.sceneCueSpeakers,
       draftModel: project.narration.models.draft,
       finalModel: project.narration.models.final,
@@ -441,8 +445,9 @@ export async function readPart(
   }
   const cast = await readCast(root, project, problems)
   const ownCues = usable(await readResource(root, at(templates.cues), CuesSchema, problems)) ?? {}
-  // Another language follows the source language's cue for a line until it has one of its own.
-  const sourceCues =
+  // Another language follows the source language's opening cue for a line until it has one of its
+  // own; the cues inside a source line stay with it.
+  const sourceEntries =
     language === sourceLanguage
       ? {}
       : (usable(
@@ -453,7 +458,12 @@ export async function readPart(
             problems,
           ),
         ) ?? {})
-  const cues = { ...sourceCues, ...ownCues }
+  const { cues, sourceCues, sourceInside } = mergeCues(
+    dialog.status === 'ok' ? dialog.lines : [],
+    ownCues,
+    sourceEntries,
+    source?.status === 'ok' ? source.lines : [],
+  )
   const lock = usable(await readResource(root, at(templates.lock), LockSchema, problems))
   const manifest = usable(
     await readResource(root, at(templates.manifest), ManifestSchema, problems),
@@ -489,6 +499,7 @@ export async function readPart(
       cues,
       ownCues,
       sourceCues,
+      sourceInside,
       lock: lock ?? {},
       manifest: manifest ?? {},
       files,

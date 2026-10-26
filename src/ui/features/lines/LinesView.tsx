@@ -18,6 +18,7 @@ import { Problems } from '../../components/Problems'
 import { StatusDot, StatusPill } from '../../components/StatusBar'
 import { RefreshOutcome } from '../overview/PartOverview'
 import { GeneratePanel } from './GeneratePanel'
+import { CuedText, LineWords } from './CueGaps'
 import { DialogGonePanel } from './DialogGonePanel'
 import { PartLanguageSwitch } from './PartLanguageSwitch'
 import { HeardComparison } from './HeardComparison'
@@ -190,6 +191,9 @@ export function LinesView({
         break
       case 'cue':
         click('.cue-button')
+        break
+      case 'place':
+        row.querySelector<HTMLElement>('.cue-slot')?.focus()
         break
       case 'note':
         click('.note-button, .note-add')
@@ -457,13 +461,22 @@ export function LinesView({
                         {line.status === 'untranslated' ? (
                           <span className="line-gap">No {active.name} text for this line yet.</span>
                         ) : (
-                          <span className="line-text">{line.text}</span>
+                          <LineWords
+                            // A new filter or search closes an open box: nothing unsaved survives it.
+                            key={`${asked ?? ''}/${line.key}/${filter}/${speaker}/${search}`}
+                            partId={loaded.id}
+                            line={line}
+                            language={asked}
+                            chunkLimit={loaded.chunkLimit}
+                            playing={playing}
+                            toggle={toggle}
+                          />
                         )}
                         {foreign &&
                           (line.english !== null ? (
                             <span className="line-english">
                               <b>{source.name}</b>
-                              {line.english}
+                              <CuedText text={line.english} inside={line.sourceInside} />
                             </span>
                           ) : (
                             <span className="line-gap line-english">No {source.name} line.</span>
@@ -775,7 +788,12 @@ function CueCell({
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []
   const own = line.cueFrom === 'own' ? line.cue : ''
   const note = line.cue
-    ? cueNote(line.cueFrom, displayName(line.speaker), names ? names.source : null)
+    ? cueNote(
+        line.cueFrom,
+        displayName(line.speaker),
+        names ? names.source : null,
+        line.sourceInside.length > 0,
+      )
     : null
   const hint = names ? cueHint(line.cueFrom, line.sourceCue, names.source) : null
 

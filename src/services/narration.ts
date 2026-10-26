@@ -347,6 +347,7 @@ export async function speakLine({
         inputs.cue,
         cast.pronounce,
         narration.quality.chunkLimit,
+        inputs.inside,
       )
       for (const text of texts) {
         // Charged before it is sent: nothing beyond what was confirmed reaches Fish.

@@ -1,4 +1,13 @@
 import { dirname } from 'node:path'
+import {
+  WORDS_CHANGED,
+  composeChecked,
+  composeCued,
+  normalizeCue,
+  parseCued,
+  wordsOf,
+  withInside,
+} from '../core/cued'
 import { resolveInRoot } from '../core/paths'
 import { problemsFrom, type Problem } from '../core/project'
 import { CuesSchema, sceneKey } from '../core/resources'
@@ -24,17 +33,66 @@ export async function setCue(
   cue: string,
   language?: string,
 ): Promise<CueChange> {
-  const own = cue.trim()
-  return changeCues(projectFile, partId, [key], language, (entries) => {
-    const current = entries.find(([k]) => k === key)?.[1] ?? ''
-    if (current === own) return { entries }
-    if (!own) return { entries: entries.filter(([k]) => k !== key) }
-    return {
-      entries: entries.some(([k]) => k === key)
-        ? entries.map(([k, v]): Cue => [k, k === key ? own : v])
-        : [...entries, [key, own]],
-    }
+  const opening = cue.trim()
+  return changeCues(projectFile, partId, [key], language, (entries, _path, _inDialog, text) => {
+    const current = entries.find(([k]) => k === key)?.[1]
+    // The cues inside the line stay; ones that no longer fit its words are replaced.
+    const parsed = parseCued(current ?? '', text(key))
+    const next = composeCued(opening, parsed.inside, text(key))
+    if (current === undefined ? !next : current === next) return { entries }
+    return { entries: replaceEntry(entries, key, next) }
   })
+}
+
+/** What the page sends to place, change or remove a cue inside a line. */
+export interface InsideCueChange {
+  /** The gap: the number of words before the cue. */
+  at: number
+  /** The cue as typed (brackets are added); empty removes the cue at the gap. */
+  cue: string
+  /** The line's words as the page showed them; a line that changed since is refused. */
+  text: string
+}
+
+/**
+ * Places, changes or removes the cue at one gap of a line, keeping its opening cue and its other
+ * cues inside. Refused when the line's words are not the ones the page showed, or when the gap is
+ * not between two words. Nothing is written when nothing changes.
+ */
+export async function setInsideCue(
+  projectFile: string,
+  partId: string,
+  key: string,
+  change: InsideCueChange,
+  language?: string,
+): Promise<CueChange> {
+  const cue = normalizeCue(change.cue)
+  return changeCues(projectFile, partId, [key], language, (entries, path, _inDialog, text) => {
+    const refuse = (message: string) => ({ problems: [{ file: path, path: key, message }] })
+    const words = text(key)
+    if (wordsOf(change.text).join(' ') !== wordsOf(words).join(' ')) {
+      return refuse(WORDS_CHANGED)
+    }
+    if (!Number.isInteger(change.at) || change.at < 1 || change.at >= wordsOf(words).length) {
+      return refuse('a cue goes between two words')
+    }
+    const current = entries.find(([k]) => k === key)?.[1]
+    const parsed = parseCued(current ?? '', words)
+    const next = composeChecked(parsed.opening, withInside(parsed.inside, change.at, cue), words)
+    if (next === null) {
+      return refuse('this cue cannot go in this line: brackets inside a cue or in the line’s words')
+    }
+    if (current === undefined ? !next : current === next) return { entries }
+    return { entries: replaceEntry(entries, key, next) }
+  })
+}
+
+/** `entries` with the cue of `key` set (in place, or at the end); empty removes it. */
+function replaceEntry(entries: Cue[], key: string, cue: string): Cue[] {
+  if (!cue) return entries.filter(([k]) => k !== key)
+  return entries.some(([k]) => k === key)
+    ? entries.map(([k, v]): Cue => [k, k === key ? cue : v])
+    : [...entries, [key, cue]]
 }
 
 /**
@@ -121,6 +179,7 @@ async function changeCues(
     entries: Cue[],
     path: string,
     inDialog: Set<string>,
+    text: (key: string) => string,
   ) => { entries: Cue[] } | { problems: Problem[] } | null,
 ): Promise<CueChange> {
   const read = await readPart(projectFile, partId, language)
@@ -135,6 +194,7 @@ async function changeCues(
       ...read.input.lines.filter((l) => !inSource.has(l.key)),
     ].flatMap((line) => (line.scene ? [sceneKey(line.scene)] : [])),
   ])
+  const textOf = (key: string) => read.input.lines.find((l) => l.key === key)?.text ?? ''
   if (!lines.every((key) => inDialog.has(key))) return null
   if (read.input.held) {
     // Nothing is orphaned while the dialog is unreadable or gone, so no cue moves or goes.
@@ -155,7 +215,7 @@ async function changeCues(
     if (!parsed.success) return { ok: false, problems: problemsFrom(path, parsed.error) }
     const entries = Object.entries(raw as Record<string, string>)
 
-    const outcome = change(entries, path, inDialog)
+    const outcome = change(entries, path, inDialog, textOf)
     if (outcome === null) return null
     if ('problems' in outcome) return { ok: false, problems: outcome.problems }
     const changed = outcome.entries

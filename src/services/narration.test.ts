@@ -130,6 +130,24 @@ describe('recordLine', () => {
     expect(result).toEqual({ ok: true, key: 'k2', duration: 2.25 })
   })
 
+  it('records a long line with each cue where it was placed, and each piece starting with the cue in effect', async () => {
+    const text = files['tts/act1/script.json'][1]!.text
+    const root = tempRepo({
+      ...files,
+      'tts/act1/cues.json': {
+        k2: `[warm] ${text.replace('A long sentence that goes on. A long', 'A long sentence that goes on. A [hushed] long')}`,
+      },
+    })
+    const { fish, requests } = fakeFish()
+    await record(root, 'k2', fish)
+    expect(requests.map((r) => r.text.split(' ').slice(0, 2).join(' '))).toEqual([
+      '[warm] A',
+      '[hushed] A',
+    ])
+    expect(requests[0]!.text).toContain('A [hushed] long sentence')
+    expect(requests[1]!.text).not.toContain('[warm]')
+  })
+
   it('writes the manifest the way it was written, changing only its own entry', async () => {
     const root = tempRepo(files)
     await record(root, 'k4', fakeFish().fish)

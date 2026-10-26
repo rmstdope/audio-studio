@@ -258,6 +258,65 @@ describe('recordedTakes', () => {
 describe('tryLine', () => {
   const projectFileOf = (root: string) => join(root, 'audio-studio.json')
 
+  it('adds the cue typed at a gap to the line: the saved opening and cues inside stay, a long line is one request', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': [
+        { key: 'a', speaker: 'grandmother', text: 'Elior, dear. Come here. Sit down now.' },
+      ],
+      'tts/act1/cues.json': { a: '[soft] Elior, dear. Come [low] here. Sit down now.' },
+    })
+    const { fish, requests } = fakeFish()
+    const result = await tryLine(
+      projectFileOf(root),
+      'act1',
+      'a',
+      'whispering',
+      async () => fish,
+      createLimiter(),
+      undefined,
+      4,
+    )
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.spoken).toBe('[soft] El-ee-or, dear. Come [low] here. [whispering] Sit down now.')
+    expect(requests).toHaveLength(1)
+  })
+
+  it('keeps the saved cues inside when only the opening cue is tried', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+      'tts/act1/cues.json': { a: 'Come [low] here now.' },
+    })
+    const { fish } = fakeFish()
+    const result = await tryLine(
+      projectFileOf(root),
+      'act1',
+      'a',
+      '[soft]',
+      async () => fish,
+      createLimiter(),
+    )
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.spoken).toBe('[soft] Come [low] here now.')
+  })
+
+  it('refuses a gap that is not between two words', async () => {
+    const root = tempRepo(files)
+    const { fish } = fakeFish()
+    const result = await tryLine(
+      projectFileOf(root),
+      'act1',
+      'a',
+      '[x]',
+      async () => fish,
+      createLimiter(),
+      undefined,
+      1,
+    )
+    expect(result).toMatchObject({ ok: false })
+  })
+
   it('has the cast voice say the line with the cue tried, as the cast says it, and keeps it', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()

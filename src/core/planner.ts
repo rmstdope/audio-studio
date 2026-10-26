@@ -8,6 +8,7 @@ import {
 } from './fingerprint'
 import { sameModel } from './retirement'
 import type { Project } from './project'
+import { openingFor, parseCued, type InsideCue } from './cued'
 import {
   cueFor,
   sceneKey,
@@ -62,6 +63,12 @@ export interface LineState {
    * source language's), or its character's style.
    */
   cueFrom: 'own' | 'source' | 'scene' | 'sceneSource' | 'style'
+  /** The cues placed inside the line's words, as they are recorded. */
+  inside: InsideCue[]
+  /** The line's previous cued text when its words changed and its cues inside were set aside. */
+  insideStale: string | null
+  /** The cues inside the source language's line, shown with it; not recorded in this language. */
+  sourceInside: InsideCue[]
   /** The scene the line is in (the source language's name for it when it has one), or null. */
   scene: string | null
   /**
@@ -140,6 +147,8 @@ export interface PlanInput {
   ownCues?: Cues
   /** The source language's cues, in a language besides the source; absent: none. */
   sourceCues?: Cues
+  /** The cues inside the source language's lines, by key; absent: none. */
+  sourceInside?: Record<string, InsideCue[]>
   lock: Lock
   manifest: Manifest
   /** File names present in the part's clips folder. */
@@ -164,7 +173,7 @@ export function planPart(input: PlanInput): PartState {
     const followsScene =
       scene !== null &&
       narration.sceneCueSpeakers.includes(line.speaker) &&
-      cueFor(cues, line.key) === undefined
+      openingFor(cues, line.key, line.text) === undefined
     if (line.text.trim() === '' && english !== null) {
       counts.untranslated++
       return {
@@ -177,6 +186,9 @@ export function planPart(input: PlanInput): PartState {
         scene,
         followsScene,
         sourceCue: null,
+        inside: [],
+        insideStale: null,
+        sourceInside: [],
         final: false,
         status: 'untranslated',
         reasons: [],
@@ -225,10 +237,15 @@ export function planPart(input: PlanInput): PartState {
       english,
       cue:
         inputs?.cue ??
-        cueFor(cues, line.key) ??
+        openingFor(cues, line.key, line.text) ??
         sceneCueFor(line, cues, narration) ??
         character?.style ??
         '',
+      inside: inputs?.inside ?? parseCued(cueFor(cues, line.key) ?? '', line.text).inside,
+      insideStale: parseCued(cueFor(own, line.key) ?? '', line.text).stale,
+      sourceInside: Object.hasOwn(input.sourceInside ?? {}, line.key)
+        ? input.sourceInside![line.key]!
+        : [],
       scene,
       followsScene,
       sourceCue: (input.sourceCues && cueFor(input.sourceCues, line.key)) ?? null,
@@ -267,8 +284,8 @@ function cueFrom(
   own: Cues,
   narration: Project['narration'],
 ): LineState['cueFrom'] {
-  if (cueFor(own, line.key) !== undefined) return 'own'
-  if (cueFor(cues, line.key) !== undefined) return 'source'
+  if (openingFor(own, line.key, line.text) !== undefined) return 'own'
+  if (openingFor(cues, line.key, line.text) !== undefined) return 'source'
   if (sceneCueFor(line, cues, narration) === undefined) return 'style'
   return cueFor(own, sceneKey(line.scene!)) !== undefined ? 'scene' : 'sceneSource'
 }

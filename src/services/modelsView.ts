@@ -36,6 +36,7 @@ export async function modelsView(projectFile: string): Promise<ModelsView> {
           line.cue,
           input.cast.pronounce,
           project.narration.quality.chunkLimit,
+          line.inside,
         ).reduce((sum, text) => sum + encoder.encode(text).length, 0)
         dialog.lines++
         dialog.bytes += bytes

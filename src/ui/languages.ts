@@ -70,11 +70,19 @@ type CueFrom = LineState['cueFrom']
  * language's named when that is the one followed), and in a language besides the source (`source`
  * is its name, else null) the source language's cue or the character's style.
  */
-export function cueNote(from: CueFrom, character: string, source: string | null): string | null {
+export function cueNote(
+  from: CueFrom,
+  character: string,
+  source: string | null,
+  sourceInside = false,
+): string | null {
   if (from === 'scene') return "The scene's cue"
   if (from === 'sceneSource') return `The scene's cue, following ${source ?? 'the source language'}`
   if (source === null) return null
-  return from === 'source' ? `from ${source}` : from === 'style' ? `${character}’s style` : null
+  if (from === 'source') {
+    return sourceInside ? `from ${source} · cues inside stay with ${source}` : `from ${source}`
+  }
+  return from === 'style' ? `${character}’s style` : null
 }
 
 /**
