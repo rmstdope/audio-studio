@@ -129,7 +129,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
         <div className="takes-head">
           <h2>Takes</h2>
           {!none && (
-            <>
+            <div className="takes-controls">
               {view.making.length > 0 && (
                 <button
                   type="button"
@@ -149,7 +149,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
               >
                 More takes
               </button>
-            </>
+            </div>
           )}
         </div>
         {!none && missing}
