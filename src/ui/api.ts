@@ -15,9 +15,9 @@ import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
-import type { MusicTakesView } from '../core/musicTake'
+import type { MakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
-import type { MakeRequest, MakeResult } from '../services/musicTakes'
+import type { DropResult, MakeRequest, MakeResult, StopResult } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
 import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
@@ -640,7 +640,55 @@ export function useMakeTakes(trackId: string) {
       }
       return (await response.json()) as NonNullable<MakeResult>
     },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['music-takes', trackId] })
+      return client.invalidateQueries({ queryKey: ['music-making'] })
+    },
+  })
+}
+
+/** Takes a take off a track's board, then reloads its takes. */
+export function useDropTake(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (file: string) => {
+      const response = await fetch(
+        `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${encodeURIComponent(file)}`,
+        { method: 'DELETE' },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`dropping the take answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<DropResult>
+    },
     onSettled: () => client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
+  })
+}
+
+/** Cancels a track's waiting takes, then reloads its takes. */
+export function useStopTakes(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/stop`, {
+        method: 'POST',
+      })
+      if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
+      return (await response.json()) as NonNullable<StopResult>
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['music-takes', trackId] })
+      return client.invalidateQueries({ queryKey: ['music-making'] })
+    },
+  })
+}
+
+/** What is being made for each track of the project, for the lists' status; polled meanwhile. */
+export function useMusicMaking() {
+  return useQuery({
+    queryKey: ['music-making'],
+    queryFn: () => getJson<Record<string, MakingSummary>>('/api/music/making'),
+    refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length ? 3000 : false),
   })
 }
 

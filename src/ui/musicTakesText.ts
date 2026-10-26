@@ -1,4 +1,4 @@
-import type { MakingView } from '../core/musicTake'
+import type { MakingSummary, MakingView } from '../core/musicTake'
 
 /** What a take being made says beside its name: its wait, or about how long is left. */
 export function timeLeftText(making: MakingView, expected: number): string {
@@ -22,4 +22,10 @@ export function failureLine(message: string, otherTakes: boolean): string {
 /** Whether any take waits or is being made, which the page polls for. */
 export function takesAreBeingMade(making: readonly MakingView[]): boolean {
   return making.length > 0
+}
+
+/** A track's status on its list while takes are made: how many, and about how long is left. */
+export function makingStatusText({ takes, left }: MakingSummary): string {
+  const minutes = Math.max(1, Math.ceil(left / 60))
+  return `making ${takes} ${takes === 1 ? 'take' : 'takes'} · about ${minutes} min`
 }

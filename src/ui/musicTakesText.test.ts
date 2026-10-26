@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { failureLine, progressOf, takesAreBeingMade, timeLeftText } from './musicTakesText'
+import {
+  failureLine,
+  makingStatusText,
+  progressOf,
+  takesAreBeingMade,
+  timeLeftText,
+} from './musicTakesText'
 
 describe('timeLeftText', () => {
   it('says a take waits for its turn', () => {
@@ -48,5 +54,15 @@ describe('takesAreBeingMade', () => {
   it('is true while any take waits or is made', () => {
     expect(takesAreBeingMade([])).toBe(false)
     expect(takesAreBeingMade([{ n: 1, state: 'waiting', elapsed: 0 }])).toBe(true)
+  })
+})
+
+describe('makingStatusText', () => {
+  it('says how many takes and about how many minutes, rounded up', () => {
+    expect(makingStatusText({ takes: 2, left: 240 })).toBe('making 2 takes · about 4 min')
+    expect(makingStatusText({ takes: 2, left: 241 })).toBe('making 2 takes · about 5 min')
+  })
+  it('says one take in the singular, and never less than a minute', () => {
+    expect(makingStatusText({ takes: 1, left: 0 })).toBe('making 1 take · about 1 min')
   })
 })

@@ -2732,6 +2732,18 @@ a.btn {
   padding: 22px 0;
   text-align: center;
 }
+.takes-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.takes-head h2 {
+  flex: 1;
+  margin: 0;
+}
+.grow {
+  flex: 1;
+}
 .takes {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

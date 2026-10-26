@@ -1,5 +1,5 @@
 import type { MakingView, MusicTakesView, TakeView } from '../../../core/musicTake'
-import { useMakeTakes, useMusicTakes } from '../../api'
+import { useDropTake, useMakeTakes, useMusicTakes, useStopTakes } from '../../api'
 import { Failure } from '../../components/Failure'
 import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
@@ -15,6 +15,7 @@ import { routeHref } from '../../route'
 export function TakesPanel({ trackId }: { trackId: string }) {
   const takes = useMusicTakes(trackId)
   const make = useMakeTakes(trackId)
+  const stop = useStopTakes(trackId)
   const player = useClipPlayer()
   const view = takes.data
   if (!view)
@@ -62,7 +63,31 @@ export function TakesPanel({ trackId }: { trackId: string }) {
         </div>
       ))}
       <section className="panel takes-panel">
-        <h2>Takes</h2>
+        <div className="takes-head">
+          <h2>Takes</h2>
+          {!none && (
+            <>
+              {view.making.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={stop.isPending || !view.making.some((m) => m.state === 'waiting')}
+                  onClick={() => stop.mutate()}
+                >
+                  Stop
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!generator.ok || make.isPending || view.making.length > 0}
+                onClick={() => make.mutate({ count: 2 })}
+              >
+                More takes
+              </button>
+            </>
+          )}
+        </div>
         {none ? (
           <div className="takes-empty">
             <strong>No takes yet</strong>
@@ -120,9 +145,13 @@ function TakeCard({
   const playing = player.playing === id
   const seamId = `${id}-seam`
   const seamPlaying = player.playing === seamId
+  const drop = useDropTake(trackId)
   return (
     <div className="take">
-      <b>Take {take.n}</b>
+      <div className="take-row">
+        <b className="grow">Take {take.n}</b>
+        {take.earlier && <span className="faint small">earlier brief</span>}
+      </div>
       <div className="take-row">
         <button
           type="button"
@@ -140,8 +169,8 @@ function TakeCard({
         </div>
         <span className="faint small">{clock(take.seconds)}</span>
       </div>
-      {kind === 'loop' && (
-        <div className="take-row">
+      <div className="take-row">
+        {kind === 'loop' && (
           <button
             type="button"
             className="btn btn-small"
@@ -149,8 +178,20 @@ function TakeCard({
           >
             {seamPlaying ? 'Stop' : 'Hear the seam'}
           </button>
-        </div>
-      )}
+        )}
+        <span className="grow" />
+        <button
+          type="button"
+          className="btn btn-ghost btn-small"
+          disabled={drop.isPending}
+          onClick={() => {
+            if (playing || seamPlaying) player.stop()
+            drop.mutate(take.file)
+          }}
+        >
+          Drop
+        </button>
+      </div>
     </div>
   )
 }

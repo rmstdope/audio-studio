@@ -3130,4 +3130,45 @@ describe('server, a track’s takes', () => {
     expect(heard.data.length / 2 / heard.format.sampleRate).toBe(8)
     expect((await fetch(takes('hall/takes/x.wav'))).status).toBe(404)
   })
+
+  it('drops a take from the studio’s own page only, and its file is gone', async () => {
+    await make({ count: 1 })
+    let view = await (await fetch(takes())).json()
+    for (let i = 0; i < 200 && view.making.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      view = await (await fetch(takes())).json()
+    }
+    const file = view.takes.at(-1).file
+    const drop = (name: string, origin = studio.url.origin) =>
+      fetch(takes(`hall/takes/${name}`), { method: 'DELETE', headers: { origin } })
+    expect((await drop(file, 'https://evil.example')).status).toBe(403)
+    expect((await fetch(takes(`hall/takes/${file}`))).status).toBe(200)
+    expect(await (await drop(file)).json()).toEqual({ ok: true })
+    expect((await fetch(takes(`hall/takes/${file}`))).status).toBe(404)
+    const answer = await drop(file)
+    expect(answer.status).toBe(409)
+    expect(await answer.json()).toEqual({ ok: false, message: 'That take is not on the board.' })
+    expect(
+      (
+        await fetch(takes('nobody/takes/aaaaaaaaaaaaaaaa.1.wav'), {
+          method: 'DELETE',
+          headers: { origin: studio.url.origin },
+        })
+      ).status,
+    ).toBe(404)
+  })
+
+  it('stops waiting takes from the studio’s own page only, and says what is making', async () => {
+    const stop = (id = 'hall', origin = studio.url.origin) =>
+      fetch(takes(`${id}/stop`), { method: 'POST', headers: { origin } })
+    expect((await stop('hall', 'https://evil.example')).status).toBe(403)
+    expect((await stop('nobody')).status).toBe(404)
+    expect(await (await stop()).json()).toEqual({ ok: true, stopped: 0 })
+    const making = new URL('/api/music/making', studio.url)
+    expect(await (await fetch(making)).json()).toEqual({})
+    await make({ count: 2 })
+    const summary = await (await fetch(making)).json()
+    expect(summary.hall.takes).toBeGreaterThan(0)
+    expect(summary.hall.left).toBeGreaterThan(0)
+  })
 })
