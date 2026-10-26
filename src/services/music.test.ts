@@ -33,6 +33,17 @@ describe('createAceStepWorker', () => {
     expect((await worker.generate({ ...request, brief: 'again' })).seed).toBe(42)
   })
 
+  it('ends a take at once when it is stopped, and makes the next one', async () => {
+    const stop = new AbortController()
+    const take = worker.generate({ ...request, brief: 'hang' }, stop.signal)
+    stop.abort()
+    await expect(take).rejects.toThrow('The music generator stopped')
+    await expect(
+      worker.generate({ ...request, brief: 'never' }, AbortSignal.abort()),
+    ).rejects.toThrow('The music generator was stopped.')
+    expect((await worker.generate({ ...request, brief: 'again' })).seed).toBe(42)
+  })
+
   it('says what is missing when the worker cannot start', async () => {
     const missing = createAceStepWorker({ command: ['no-such-command-xyz'] })
     await expect(missing.generate({ ...request, brief: 'a' })).rejects.toThrow(

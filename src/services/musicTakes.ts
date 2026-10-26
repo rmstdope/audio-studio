@@ -56,7 +56,7 @@ export type MakeResult = { ok: true } | { ok: false; message: string } | Project
 /** What dropping a take answered; null for a track the project does not list. */
 export type DropResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
 
-/** What stopping answered: how many waiting takes were cancelled; null for an unknown track. */
+/** What stopping answered: how many takes were stopped, made or waiting; null for an unknown track. */
 export type StopResult = { ok: true; stopped: number } | ProjectFailure | null
 
 /** What choosing a take answered; null for a track the project does not list. */
@@ -103,6 +103,8 @@ interface Entry {
   message: string
   /** The hash of the inputs it is made for; the page shows only the current inputs'. */
   hash: string
+  /** Ends the take while it is being made (Stop). */
+  stop?: AbortController
 }
 
 /** A hash of what went into a take: the model and the track's inputs. */
@@ -130,7 +132,7 @@ export interface MusicTakes {
   view(projectFile: string, id: string): Promise<TakesResult>
   /** Queues takes on the GPU queue and returns at once; they are made one at a time. */
   make(projectFile: string, id: string, request: MakeRequest): Promise<MakeResult>
-  /** Cancels the takes still waiting; the one being made finishes and is kept. */
+  /** Stops the track's takes: the one being made ends and is discarded, the waiting ones never start. */
   stop(projectFile: string, id: string): Promise<StopResult>
   /** Makes a take on the board the track's music: levelled, encoded, with the manifest and lock. */
   choose(projectFile: string, id: string, name: string): Promise<ChooseResult>
@@ -242,16 +244,23 @@ export function createMusicTakes({
     if (waiting.get(entry.n) !== entry || entry.state !== 'waiting') return
     entry.state = 'making'
     entry.startedAt = now()
+    const stop = new AbortController()
+    entry.stop = stop
     try {
       const seed = newSeed()
-      const take = await generator.generate({
-        brief: inputs.brief,
-        kind: inputs.kind,
-        seconds: generatedSeconds(inputs.kind, inputs.seconds),
-        bpm: inputs.bpm,
-        key: inputs.key,
-        seed,
-      })
+      const take = await generator.generate(
+        {
+          brief: inputs.brief,
+          kind: inputs.kind,
+          seconds: generatedSeconds(inputs.kind, inputs.seconds),
+          bpm: inputs.bpm,
+          key: inputs.key,
+          seed,
+        },
+        stop.signal,
+      )
+      // Stopped while it was made: it is discarded, and no longer in the map.
+      if (stop.signal.aborted) return
       const shaped = shapeTake(take.wav, inputs.kind, inputs.seconds)
       const wav = readWav(shaped)
       const made: BoardTake = {
@@ -266,11 +275,18 @@ export function createMusicTakes({
       // The file first: a take is on the board only once its WAV is there.
       await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, shaped)
       const saved = await changeBoard(projectFile, found, (board) => {
+        // Stopped while its file was written or it waited for the board: not put on it.
+        if (stop.signal.aborted) return
         board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort((a, b) => a.n - b.n)
       })
+      if (stop.signal.aborted) {
+        await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
+        return
+      }
       if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       waiting.delete(entry.n)
     } catch (error) {
+      if (stop.signal.aborted) return
       entry.state = 'failed'
       entry.message = describeFailure(error)
     }
@@ -376,9 +392,12 @@ export function createMusicTakes({
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       let stopped = 0
-      for (const [n, entry] of active.get(`${projectFile}\0${id}`) ?? []) {
-        if (entry.state !== 'waiting') continue
-        active.get(`${projectFile}\0${id}`)?.delete(n)
+      const entries = active.get(`${projectFile}\0${id}`)
+      if (!entries) return { ok: true, stopped: 0 }
+      for (const [n, entry] of entries) {
+        if (entry.state === 'failed') continue
+        entry.stop?.abort()
+        entries.delete(n)
         stopped++
       }
       return { ok: true, stopped }

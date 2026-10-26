@@ -924,8 +924,9 @@ the manifest and lock update (built, 12.6): the temporary file is renamed over t
 **Status** of a track, from the lock and its takes: "chosen" (`ok`), "not chosen" (no take chosen),
 "changed since chosen" (`changed`; the track's page says what changed: the brief, length, tempo, key
 or model), "music file missing" (a take was chosen but its clip is gone from disk), and "making 2
-takes" while its takes are being made. **Stop** cancels the takes still waiting; the one being made
-finishes and is kept. A take that fails says why, and **Try again** makes it again; the other takes
+takes" while its takes are being made. **Stop** stops the track's takes: the one being made ends at once
+(the music worker is stopped, and starts again with the next take) and is discarded, nothing on the
+board or on disk, and the ones waiting never start; the takes already made stay. A take that fails says why, and **Try again** makes it again; the other takes
 are kept. Without ACE-Step or its models on the computer, a track's page says so, with **Open
 Setup**, and takes cannot be made.
 
@@ -1008,7 +1009,7 @@ POST   /api/music/tracks/:id/takes               { count } or { retry } queue ta
 POST   /api/music/tracks/:id/choose              { file } make a take the track's music: levelled, encoded, manifest and lock written (409 and why if it cannot)
 POST   /api/music/tracks/:id/remove              remove an orphan's music: clip, manifest, lock, board, takes, brief changes (404 if it is not one)
 GET    /api/music/clips/:file                    a music clip (a plain .mp3 in the music clips folder)
-POST   /api/music/tracks/:id/stop                cancel the takes still waiting; the one being made finishes
+POST   /api/music/tracks/:id/stop                stop the takes: the one being made ends and is discarded, the waiting ones are cancelled
 DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
 GET    /api/music/making                         what is being made, by track ({ takes, left seconds }), for the lists' status
 GET    /api/music/tracks/:id/takes/:file         a take's WAV (?seam=1: its seam)

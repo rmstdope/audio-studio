@@ -29,8 +29,11 @@ export type MusicReady = { ok: true } | { ok: false; message: string; fix: strin
 export interface MusicGenerator {
   /** Whether a take can be made now: the machine, uv and the models are there. */
   ready(): MusicReady
-  /** One take of the brief; slow (minutes), and the first one loads the models. */
-  generate(request: MusicRequest): Promise<GeneratedTake>
+  /**
+   * One take of the brief; slow (minutes), and the first one loads the models. Aborting `signal`
+   * ends it at once (Stop), and it rejects.
+   */
+  generate(request: MusicRequest, signal?: AbortSignal): Promise<GeneratedTake>
   /** Stops the worker, if one is running. */
   close(): void
 }
@@ -107,12 +110,18 @@ export function createAceStepWorker({
   })
   return {
     ready,
-    async generate(request) {
+    async generate(request, signal) {
       const out = join(tmpdir(), `audio-studio-music-${randomUUID()}.wav`)
+      // The worker makes one take at a time, so ending this one means stopping the worker; the
+      // next take starts it again.
+      const stop = () => worker.close()
+      signal?.addEventListener('abort', stop, { once: true })
       try {
+        if (signal?.aborted) throw new Error('The music generator was stopped.')
         const answer = await worker.request({ ...request, out })
         return { wav: new Uint8Array(await readFile(out)), seed: Number(answer.seed) }
       } finally {
+        signal?.removeEventListener('abort', stop)
         await rm(out, { force: true })
       }
     },

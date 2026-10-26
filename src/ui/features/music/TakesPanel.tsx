@@ -83,7 +83,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  disabled={stop.isPending || !view.making.some((m) => m.state === 'waiting')}
+                  disabled={stop.isPending}
                   onClick={() => stop.mutate()}
                 >
                   Stop
