@@ -4,7 +4,13 @@ import { soundAlikes, type SoundAlike } from '../core/align'
 import { capitalisesNouns, languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
-import { adoptUntracked, planPart, type PartState, type PlanInput } from '../core/planner'
+import {
+  adoptUntracked,
+  planPart,
+  withSourceScenes,
+  type PartState,
+  type PlanInput,
+} from '../core/planner'
 import {
   PROJECT_FILE,
   ProjectSchema,
@@ -470,7 +476,10 @@ export async function readPart(
     part,
     dialog,
     input: {
-      lines: dialog.status === 'ok' ? dialog.lines : [],
+      lines: withSourceScenes(
+        dialog.status === 'ok' ? dialog.lines : [],
+        source?.status === 'ok' ? source.lines : undefined,
+      ),
       ...(source?.status === 'ok' ? { source: source.lines } : {}),
       cast: projectCast(
         cast ?? { speakers: {}, pronounce: {} },

@@ -309,6 +309,19 @@ function sceneStates(
 }
 
 /**
+ * A language's lines with the scene the source language gives them, the scene every cue rule reads
+ * (a line the source does not have keeps its own).
+ */
+export function withSourceScenes(lines: Line[], source: Line[] | undefined): Line[] {
+  if (!source) return lines
+  const scenes = new Map(source.map((line) => [line.key, line.scene]))
+  return lines.map((line) => {
+    const scene = scenes.get(line.key) ?? line.scene
+    return scene === undefined ? line : { ...line, scene }
+  })
+}
+
+/**
  * The lines of a part in a language as they are planned: with a source dialog, the source's lines
  * in its order (an untranslated one with empty text), then the lines only this language has.
  */

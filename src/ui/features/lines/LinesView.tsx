@@ -42,6 +42,9 @@ type Filter = 'all' | 'attention' | LineStatus | 'orphans' | 'notes'
  */
 const RECORDABLE = new Set<LineStatus>(['missing', 'stale', 'weak'])
 
+/** The columns of the lines table, which a scene's band spans. */
+const LINE_COLUMNS = 6
+
 /** Lines that need something done: everything but up to date. */
 const needsAttention = (line: LineState) => line.status !== 'ok'
 
@@ -426,7 +429,7 @@ export function LinesView({
                       filtered={lines.length < loaded.lines.length}
                       speakers={loaded.sceneCueSpeakers}
                       names={foreign ? { language: active.name, source: source.name } : null}
-                      columns={6}
+                      columns={LINE_COLUMNS}
                       playing={playing}
                       toggle={toggle}
                     />

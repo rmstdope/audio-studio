@@ -39,7 +39,8 @@ export function SceneBand({
   const [draft, setDraft] = useState<string | null>(null)
   const button = useRef<HTMLButtonElement>(null)
   const refocus = useRef(false)
-  const tryId = `try/scene/${band.scene}`
+  // By the run, so a scene's later band never stops a try playing from its first.
+  const tryId = `try/scene/${band.id}`
   const heard = hear.data?.ok ? hear.data : null
   const refused = hear.data && !hear.data.ok ? hear.data : null
   const problems = save.data && !save.data.ok && 'problems' in save.data ? save.data.problems : []

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { loadPart } from './workspace'
+import { clipInputs } from '../core/fingerprint'
+import { loadPart, readPart } from './workspace'
 import { moveCue, moveSceneCue, setCue, setSceneCue } from './cues'
 
 const files = {
@@ -316,6 +317,19 @@ describe('scene cues', () => {
       return part?.ok ? part.part.lines[0] : undefined
     }
     expect(await line()).toMatchObject({ cue: '[dark]', cueFrom: 'sceneSource' })
+    // What is recorded, adopted and tried reads the same lines as the page: with the source's scene.
+    const read = await readPart(projectFile, 'act1', 'sv')
+    if (!read?.ok) throw new Error('part unreadable')
+    const sv = read.input.lines[0]!
+    expect(sv.scene).toBe('Cave')
+    const inputs = clipInputs(
+      sv,
+      read.input.cast.speakers.narrator,
+      read.input.cues,
+      {},
+      read.project.narration,
+    )
+    expect(inputs?.cue).toBe('[dark]')
     expect(await setSceneCue(projectFile, 'act1', 'Cave', '[mörkt]', 'sv')).toEqual({ ok: true })
     expect(await line()).toMatchObject({ cue: '[mörkt]', cueFrom: 'scene' })
     expect(readFileSync(join(root, 'tts/act1/en/cues.json'), 'utf8')).toBe(
