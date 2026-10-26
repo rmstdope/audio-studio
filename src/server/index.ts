@@ -70,6 +70,7 @@ import { heardFor } from '../services/heard'
 import { onGpu } from '../services/gpu'
 import { createAceStepWorker, type MusicGenerator } from '../services/music'
 import { createFakeMusic } from '../services/musicFake'
+import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
 import { declaredLanguage } from '../core/project'
@@ -955,6 +956,13 @@ export function startServer({
           const body = ChooseTakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { file }' }, { status: 400 })
           const result = await musicTakes.choose(projectFile, request.params.id, body.data.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/remove': {
+        POST: fromOwnPage(async (request) => {
+          const result = await removeOrphan(projectFile, request.params.id)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

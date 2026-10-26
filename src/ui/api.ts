@@ -25,6 +25,7 @@ import type {
   StopResult,
 } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
+import type { RemoveResult } from '../services/musicOrphans'
 import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
@@ -693,6 +694,31 @@ export function useChooseTake(trackId: string) {
       void client.invalidateQueries({ queryKey: ['project'] })
       return client.invalidateQueries({ queryKey: ['music-takes', trackId] })
     },
+  })
+}
+
+/**
+ * Removes the music of a track the game no longer asks for, then reloads the project, whose
+ * Music pages no longer show it.
+ */
+export function useRemoveOrphan(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/remove`, {
+        method: 'POST',
+      })
+      if (!response.ok && response.status !== 409 && response.status !== 404) {
+        throw new Error(`removing the music answered ${response.status}`)
+      }
+      return response.status === 404
+        ? ({
+            ok: false,
+            message: 'The game asks for this track again, or it is already gone.',
+          } as const)
+        : ((await response.json()) as NonNullable<RemoveResult>)
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
   })
 }
 

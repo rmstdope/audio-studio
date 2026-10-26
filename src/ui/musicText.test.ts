@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   changeSummary,
+  chosenOn,
   fieldTag,
   fieldText,
   listFor,
@@ -194,5 +195,13 @@ describe('parseField', () => {
       ok: false,
       message: 'A stinger is at most 0:10.',
     })
+  })
+})
+
+describe('chosenOn', () => {
+  it('says the day a take was chosen, in short', () => {
+    // Built from local noon, so the day is the same in every time zone.
+    expect(chosenOn(new Date(2026, 10, 2, 12).toISOString())).toBe('chosen 2 Nov')
+    expect(chosenOn(new Date(2026, 2, 15, 12).toISOString())).toBe('chosen 15 Mar')
   })
 })

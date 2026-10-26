@@ -3262,3 +3262,74 @@ describe('server, choosing a take', () => {
     expect((await fetch(at('/api/music/clips/link.mp3'))).status).toBe(404)
   })
 })
+
+describe('server, removing music the game no longer asks for', () => {
+  const musicRoot = tempRepo({
+    'audio-studio.json': projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act2/music.json': [],
+    'tts/stingers.json': [],
+    'music/music.lock.json': {
+      'castle-gates': {
+        fp: '0123456789abcdef',
+        model: 'm',
+        seed: 1,
+        list: 'act1',
+        take: 1,
+        inputs: { brief: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
+        at: '2026-11-02T10:00:00.000Z',
+      },
+    },
+    'audio/music/manifest.json': { 'castle-gates': { file: 'castle-gates.mp3', duration: 5 } },
+    'audio/music/castle-gates.mp3': 'mp3',
+  })
+  const studio = startServer({
+    projectFile: join(musicRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => studio.stop(true))
+  const at = (path: string) => new URL(path, studio.url)
+  const remove = (id: string, origin = studio.url.origin) =>
+    fetch(at(`/api/music/tracks/${id}/remove`), { method: 'POST', headers: { origin } })
+
+  it('lists the orphan on its act, and removes it from the studio’s own page only', async () => {
+    const before = await (await fetch(at('/api/project'))).json()
+    expect(before.summary.music.lists[0].orphans.map((o: { id: string }) => o.id)).toEqual([
+      'castle-gates',
+    ])
+    expect((await remove('castle-gates', 'https://evil.example')).status).toBe(403)
+    expect(existsSync(join(musicRoot, 'audio/music/castle-gates.mp3'))).toBe(true)
+    // A listed track and an unknown one are not orphans.
+    expect((await remove('hall')).status).toBe(404)
+    expect((await remove('nobody')).status).toBe(404)
+    // A manifest that cannot be read: refused with why, nothing deleted.
+    const manifestFile = join(musicRoot, 'audio/music/manifest.json')
+    const manifest = readFileSync(manifestFile, 'utf8')
+    writeFileSync(manifestFile, '{ nope')
+    const refused = await remove('castle-gates')
+    expect(refused.status).toBe(409)
+    expect((await refused.json()).problems.length).toBeGreaterThan(0)
+    expect(existsSync(join(musicRoot, 'audio/music/castle-gates.mp3'))).toBe(true)
+    writeFileSync(manifestFile, manifest)
+    expect(await (await remove('castle-gates')).json()).toEqual({ ok: true })
+    expect(existsSync(join(musicRoot, 'audio/music/castle-gates.mp3'))).toBe(false)
+    const after = await (await fetch(at('/api/project'))).json()
+    expect(after.summary.music.lists[0].orphans).toEqual([])
+    expect((await remove('castle-gates')).status).toBe(404)
+  })
+})

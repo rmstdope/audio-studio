@@ -144,3 +144,9 @@ export function parseField(
 function bad(message: string): { ok: false; message: string } {
   return { ok: false, message }
 }
+
+/** When an orphan's take was chosen, as its row says it ("chosen 2 Nov"). */
+export function chosenOn(at: string): string {
+  const day = new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return `chosen ${day}`
+}

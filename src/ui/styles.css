@@ -2630,6 +2630,15 @@ a.btn {
 .nav-workspace:not([aria-current='page']) {
   color: var(--text);
 }
+.music-orphans {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+.music-orphan-action {
+  text-align: right;
+}
 .music-id {
   font-size: 12px;
 }

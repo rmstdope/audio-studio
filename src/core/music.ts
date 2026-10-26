@@ -109,6 +109,19 @@ export interface ChosenState {
   fileExists: boolean
 }
 
+/** A track the game no longer asks for whose music is still there, as its list's page shows it. */
+export interface OrphanRow {
+  id: string
+  /** The id as words: the lock keeps no title. */
+  title: string
+  /** Its music file's name in the clips folder. */
+  file: string
+  /** When its take was chosen (ISO time). */
+  chosenAt: string
+  /** Whether the music file is still on disk. */
+  fileExists: boolean
+}
+
 /** One page of Music: an act's loops or the stingers. */
 export interface MusicListSummary {
   id: string
@@ -116,6 +129,8 @@ export interface MusicListSummary {
   title: string
   state: MusicListState['status']
   tracks: TrackRow[]
+  /** Chosen tracks this list no longer names, by id; none while the list is missing or unreadable. */
+  orphans: OrphanRow[]
   /** Tracks the game lists that are not shown because their id is used more than once. */
   dropped: number
   canRefresh: boolean
@@ -161,6 +176,7 @@ export function summarizeMusic(
       })
     })
   }
+  const named = new Set(uses.keys())
   return {
     music: {
       lists: lists.map((list) => ({
@@ -171,12 +187,62 @@ export function summarizeMusic(
         tracks: shown(list, uses).map((track) =>
           rowOf(track, briefs[track.id], list.kind, chosen[track.id]),
         ),
+        orphans: orphansOf(list, named, chosen),
         dropped: listed(list).length - shown(list, uses).length,
         canRefresh: list.canRefresh,
       })),
     },
     problems,
   }
+}
+
+/** The chosen tracks the list's lock entries name and no list names any more. */
+function orphansOf(
+  list: MusicListInput,
+  named: Set<string>,
+  chosen: Record<string, ChosenState>,
+): OrphanRow[] {
+  if (list.state.status !== 'ok') return []
+  return Object.keys(chosen)
+    .sort()
+    .filter((id) => chosen[id]!.lock.list === list.id && !named.has(id))
+    .map((id) => ({
+      id,
+      title: orphanTitle(id),
+      file: `${id}.mp3`,
+      chosenAt: chosen[id]!.lock.at,
+      fileExists: chosen[id]!.fileExists,
+    }))
+}
+
+/** A track id as words ("castle-gates" is "Castle gates"). */
+export function orphanTitle(id: string): string {
+  const words = id.replace(/-/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/** The orphan with this id and the list that shows it, or undefined when it is not one. */
+export function orphanOf(
+  lists: MusicListSummary[],
+  id: string,
+): { list: MusicListSummary; orphan: OrphanRow } | undefined {
+  for (const list of lists) {
+    const orphan = list.orphans.find((o) => o.id === id)
+    if (orphan) return { list, orphan }
+  }
+  return undefined
+}
+
+/**
+ * Of these ids (kept briefs and boards), those of tracks never chosen that the game no longer
+ * lists. Nothing while any list is missing, unreadable or has a repeated id: which list named a
+ * track that was never chosen is not known, so the game must have said everything.
+ */
+export function staleIds(music: MusicSummary, candidates: string[], chosenIds: string[]): string[] {
+  if (music.lists.some((list) => list.state !== 'ok' || list.dropped > 0)) return []
+  const named = new Set(music.lists.flatMap((list) => list.tracks.map((track) => track.id)))
+  const kept = new Set(chosenIds)
+  return candidates.filter((id) => !named.has(id) && !kept.has(id))
 }
 
 function listed(list: MusicListInput): Track[] {
