@@ -461,7 +461,7 @@ describe('planPart, scene cues', () => {
           cues: { 'scene:Cave': '[dark]' },
           narration: { ...narration, sceneCueSpeakers: ['mira'] },
         }),
-      ).m1.cue,
+      ).m1?.cue,
     ).toBe('[dark]')
   })
 
@@ -477,7 +477,7 @@ describe('planPart, scene cues', () => {
     const files = new Set(Object.values(manifest).map((c) => c.file))
     const changed = plan({ lock, manifest, files, cues: { 'scene:Cave': '[dark]' } })
     expect(by(changed).n1).toMatchObject({ status: 'stale', reasons: ['cue'] })
-    expect(by(changed).n3.status).toBe('ok')
+    expect(by(changed).n3?.status).toBe('ok')
     expect(plan({ lock, manifest, files }).counts.ok).toBe(4)
   })
 

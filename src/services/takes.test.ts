@@ -333,6 +333,30 @@ describe('tryLine', () => {
     expect(requests).toHaveLength(1)
   })
 
+  it('tries the scene’s cue for an empty cue when the line follows it', async () => {
+    const root = tempRepo({
+      ...files,
+      'audio-studio.json': projectJson({
+        narration: {
+          ...(projectJson().narration as Record<string, unknown>),
+          sceneCueSpeakers: ['grandmother'],
+        },
+      }),
+      'tts/act1/script.json': [
+        { key: 'a', speaker: 'grandmother', text: 'Hello.', scene: 'Cave' },
+        { key: 'b', speaker: 'grandmother', text: 'Bye.', scene: 'Cave' },
+      ],
+      'tts/act1/cues.json': { 'scene:Cave': '[dark]', b: '[own]' },
+    })
+    const { fish } = fakeFish()
+    const limiter = createLimiter()
+    const follows = await tryLine(projectFileOf(root), 'act1', 'a', '', async () => fish, limiter)
+    // The line's own cue is what an empty draft removes, so the scene's cue is what it would follow.
+    const own = await tryLine(projectFileOf(root), 'act1', 'b', '', async () => fish, limiter)
+    expect(follows).toMatchObject({ ok: true, spoken: '[dark] Hello.' })
+    expect(own).toMatchObject({ ok: true, spoken: '[dark] Bye.' })
+  })
+
   it('is null for an unknown part or line, and refuses a line whose speaker has no voice', async () => {
     const root = tempRepo({
       ...files,

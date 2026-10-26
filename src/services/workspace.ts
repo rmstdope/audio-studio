@@ -220,6 +220,8 @@ export interface PartDetail extends PartState {
   manifestPath: string
   /** The share of words a take must be heard at to count as good (the project's `minHeard`). */
   minHeard: number
+  /** The speakers whose lines follow their scene's cue (the project's `sceneCueSpeakers`). */
+  sceneCueSpeakers: string[]
   /** The model everyday plans record with (the project's draft stage). */
   draftModel: string
   /** The model of the final recording; the same as the draft one when there is no final step. */
@@ -273,6 +275,7 @@ export async function loadPart(
       language: read.language,
       languages,
       minHeard: project.narration.quality.minHeard,
+      sceneCueSpeakers: project.narration.sceneCueSpeakers,
       draftModel: project.narration.models.draft,
       finalModel: project.narration.models.final,
       notes: onLines(notes.notes.lines, input.lines),

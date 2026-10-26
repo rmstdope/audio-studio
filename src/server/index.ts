@@ -25,7 +25,7 @@ import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { createSpendLog, readSpending } from '../services/spending'
 import { outcomeOf, summariseSpending } from '../core/spending'
-import { moveCue, setCue } from '../services/cues'
+import { moveCue, moveSceneCue, setCue, setSceneCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { setTrackBrief } from '../services/briefs'
 import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
@@ -167,6 +167,16 @@ const StageModelBody = z.object({ model: z.string().min(1), was: z.string().min(
 
 /** Where an orphaned cue goes: a line key, or null to remove it. */
 const MoveCueBody = z.object({ to: z.string().min(1).max(200).nullable() }).strict()
+
+/** A scene's cue, by the scene's name; empty to remove it. */
+const SceneCueBody = z
+  .object({ scene: z.string().min(1).max(200), cue: z.string().max(1_000) })
+  .strict()
+
+/** Where an orphaned scene cue goes: the name of a scene, or null to remove it. */
+const MoveSceneCueBody = z
+  .object({ from: z.string().min(1).max(200), to: z.string().min(1).max(200).nullable() })
+  .strict()
 
 /** A line's own cue; empty to go back to the character's style. */
 const CueBody = z.object({ cue: z.string().max(1_000) }).strict()
@@ -1204,6 +1214,42 @@ export function startServer({
           if (!body.success) return Response.json({ error: 'expected { cue }' }, { status: 400 })
           const { part, key } = request.params
           const result = await setCue(projectFile, part, key, body.data.cue, languageOf(request))
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/scene-cues': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = SceneCueBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { scene, cue }' }, { status: 400 })
+          }
+          const { scene, cue } = body.data
+          const result = await setSceneCue(
+            projectFile,
+            request.params.part,
+            scene,
+            cue,
+            languageOf(request),
+          )
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/parts/:part/scene-cues/move': {
+        POST: fromOwnPage(async (request) => {
+          const body = MoveSceneCueBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { from, to }' }, { status: 400 })
+          }
+          const { from, to } = body.data
+          const result = await moveSceneCue(
+            projectFile,
+            request.params.part,
+            from,
+            to,
+            languageOf(request),
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
