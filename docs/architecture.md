@@ -822,13 +822,13 @@ value typed back to the game's, removes it again. The game's lists are never wri
 Validated like every resource and written through `writeAtomic` in stable key order.
 
 **Pages.** Music in the sidebar opens into the acts and Stingers, a page each, listing its tracks
-with their status (see Status below). An act's page has **Refresh from the game** when the project has `refreshDialog`: the
-same command as Refresh dialog, which brings the act's lines and loops together, and its summary
-names the loops added and removed besides the lines. A refresh of an act and takes being made for
-its tracks refuse each other, as a refresh and a generation do, and so do a refresh of the stingers
-and takes being made for a stinger. A project without a `music` section
-shows Music with a page saying how to add one. A track opens its own page: its brief and the
-board of its takes. Choosing an act the same way in Narration is a change of its own.
+with their status (see Status below). An act's page has **Refresh from the game** when the project
+has `refreshDialog`: the same command as Refresh dialog, which brings the act's lines and loops
+together, and its summary names the loops added and removed besides the lines. A refresh of an act
+and takes being made for its tracks refuse each other, as a refresh and a generation do, and so do a
+refresh of the stingers and takes being made for a stinger. A project without a `music` section
+shows Music with a page saying how to add one. A track opens its own page: its brief and the board
+of its takes. Choosing an act the same way in Narration is a change of its own.
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
@@ -863,13 +863,13 @@ element is not relied on. Safari and Firefox are checked with the game (12.8). A
 the encoder writes a hidden temporary file in the clips folder, renamed into place together with
 the manifest and lock update. Clips are served only as plain files in the music clips folder.
 
-**Status** of a track, from the lock and its takes: "chosen" (`ok`), "not chosen" (no take
-chosen), "changed since chosen" (`changed`; the track's page says what changed: the brief, length,
-tempo, key or model), "music file missing" (a take was chosen but its clip is gone from disk), and
-"making 2 takes" while its takes are being made. **Stop** cancels the takes still waiting; the one
-being made finishes and is kept. A take that fails says why, and **Try again** makes it again; the
-other takes are kept. Without ACE-Step or its models on the computer, a track's page says so, with
-**Open Setup**, and takes cannot be made.
+**Status** of a track, from the lock and its takes: "chosen" (`ok`), "not chosen" (no take chosen),
+"changed since chosen" (`changed`; the track's page says what changed: the brief, length, tempo, key
+or model), "music file missing" (a take was chosen but its clip is gone from disk), and "making 2
+takes" while its takes are being made. **Stop** cancels the takes still waiting; the one being made
+finishes and is kept. A take that fails says why, and **Try again** makes it again; the other takes
+are kept. Without ACE-Step or its models on the computer, a track's page says so, with **Open
+Setup**, and takes cannot be made.
 
 **Manifest** (`manifest.json` in the clips folder, what the game reads): `{ track: { file,
 duration } }`, its layout fixed once written. The game decides where a track plays, so the kind is
@@ -878,18 +878,17 @@ not in it.
 **Lock** (`music.lock.json`, committed, one entry per line): per track, the chosen take's model,
 seed, a hash of what went into it (model, brief, kind, seconds, bpm, key; not the output settings,
 as narration leaves the loudness out; the chosen take's own inputs, so a take from an earlier brief
-leaves the track "changed since chosen"), which list it came from (an act or the stingers), and
-when it was chosen. Changing the model in the code marks
-every track `changed`, as a new model makes new music. A track is `missing` (nothing chosen, or its
-clip is gone from disk), `ok`, or `changed` (its brief, kind, length, tempo or key changed since its
-take was chosen: the old one keeps playing in the game until another is chosen). A manifest entry
-without a lock entry is reported as a problem. Nothing is generated again by itself: a new brief
-means new takes. A track the game no longer lists, while its list is there, is an orphan, shown on
-the page of the list its lock entry names under "Music the game no longer asks for"; removing it,
-after confirmation, deletes its clip, its manifest and lock entries, its board, its takes and its
-briefs entry. The brief changes and board of a track never chosen are dropped when the list that
-named it is there and no longer names it, at the next save of the briefs or of that board; while a
-list is missing, nothing of its tracks is dropped.
+leaves the track "changed since chosen"), which list it came from (an act or the stingers), and when
+it was chosen. Changing the model in the code marks every track `changed`, as a new model makes new
+music. A track is `missing` (nothing chosen, or its clip is gone from disk), `ok`, or `changed` (its
+brief, kind, length, tempo or key changed since its take was chosen: the old one keeps playing in
+the game until another is chosen). A manifest entry without a lock entry is reported as a problem.
+Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
+while its list is there, is an orphan, shown on the page of the list its lock entry names under
+"Music the game no longer asks for"; removing it, after confirmation, deletes its clip, its manifest
+and lock entries, its board, its takes and its briefs entry. The brief changes and board of a track
+never chosen are dropped when the list that named it is there and no longer names it, at the next
+save of the briefs or of that board; while a list is missing, nothing of its tracks is dropped.
 
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
 kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Python worker
