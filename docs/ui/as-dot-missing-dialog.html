@@ -1,0 +1,534 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Dialog gone — hold the clips, and say so</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --ok: #3ddc97;
+        --stale: #ffc24b;
+        --stale-bg: #2d2412;
+        --missing: #8fb5ff;
+        --orphan: #5e6575;
+        --bad: #ff7a7a;
+        --bad-bg: #2e1616;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .note {
+        background: #1d1a10;
+        border-bottom: 1px solid #3a3420;
+        color: #e8d9a8;
+        padding: 10px 16px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .frame-title {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin: 28px 0 8px;
+      }
+      .shell {
+        display: flex;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 8px;
+      }
+      .sidebar {
+        flex: 0 0 220px;
+        background: var(--sidebar);
+        border-right: 1px solid #1e212a;
+        padding: 18px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .brand {
+        font-weight: 600;
+        margin-bottom: 14px;
+      }
+      .nav {
+        display: flex;
+        gap: 8px;
+        padding: 7px 8px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .nav.on {
+        background: var(--raised);
+        color: var(--text);
+      }
+      .nav .grow {
+        flex: 1;
+      }
+      .nav .meta {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .nav .meta.warn {
+        color: var(--stale);
+      }
+      main {
+        flex: 1;
+        padding: 22px 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-width: 0;
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 16px 40px;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      h1 {
+        margin: 2px 0;
+        font-size: 22px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 3px;
+      }
+      .tab {
+        padding: 6px 10px;
+        border-radius: 7px;
+        font-size: 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .tab small {
+        color: var(--faint);
+        font-size: 11px;
+      }
+      .tab.on {
+        background: var(--raised);
+      }
+      .tab.dim {
+        opacity: 0.55;
+      }
+      .tab small.warn {
+        color: var(--stale);
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid #2a2e39;
+        color: var(--text);
+        border-radius: 8px;
+        padding: 7px 12px;
+        font-size: 13px;
+        display: inline-block;
+      }
+      .btn-danger {
+        border-color: #5a2a2a;
+        color: var(--bad);
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .panel h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .panel p {
+        margin: 0;
+        line-height: 1.5;
+      }
+      .panel.warn {
+        border-color: #4a3c18;
+        background: #17140c;
+      }
+      .panel.warn h2 {
+        color: var(--stale);
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .stats {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      .stat {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .stat span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .stat strong {
+        font-size: 22px;
+      }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 4px;
+      }
+      ul.cues {
+        margin: 4px 0 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      ul.cues li {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        background: var(--raised);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+      ul.cues li .grow {
+        flex: 1;
+      }
+      .facts {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .facts b {
+        color: var(--text);
+      }
+      .cast {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 13px;
+        min-width: 150px;
+      }
+      .modal {
+        background: var(--panel);
+        border: 1px solid #5a2a2a;
+        border-radius: 12px;
+        padding: 16px 18px;
+        max-width: 520px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .callout {
+        border-left: 3px solid var(--accent);
+        padding: 6px 10px;
+        color: var(--muted);
+        font-size: 13px;
+        background: #14161c;
+        border-radius: 0 8px 8px 0;
+      }
+      @media (max-width: 760px) {
+        .shell {
+          flex-direction: column;
+        }
+        .sidebar {
+          flex: none;
+          flex-direction: row;
+          flex-wrap: wrap;
+        }
+        .brand {
+          display: none;
+        }
+        main {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      <b>Option A — Hold the clips, and say the dialog is gone.</b> When a part's dialog file is not
+      there but clips were recorded for it, nothing counts as orphaned: no orphaned clips, no
+      orphaned cues, nothing offered for removal — the same as when the file is there but broken.
+      The page says the dialog is <i>gone</i> rather than <i>not written yet</i>, and how much was
+      recorded with it. A language that never had lines looks as it does today.
+    </div>
+    <div class="wrap">
+      <div class="frame-title">
+        1 · Act 1's overview in Svenska — the Svenska dialog file is gone, 12 clips and 3 cues were
+        recorded
+      </div>
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="brand">Audio Studio · RetroQuest</div>
+          <div class="nav"><span class="grow">Setup</span></div>
+          <div class="label" style="margin: 10px 8px 2px">Narration</div>
+          <div class="nav">
+            <span>0</span><span class="grow">Prologue</span><span class="meta">8 lines</span>
+          </div>
+          <div class="nav on">
+            <span>1</span><span class="grow">Act 1 — The Harbour</span
+            ><span class="meta">34 lines</span>
+          </div>
+          <div class="nav">
+            <span>2</span><span class="grow">Act 2 — The Tower</span
+            ><span class="meta">41 lines</span>
+          </div>
+          <div class="label" style="margin: 10px 8px 2px">Characters</div>
+          <div class="nav"><span class="grow">Narrator</span></div>
+          <div class="nav"><span class="grow">Mira</span></div>
+        </aside>
+        <main>
+          <div class="head">
+            <div>
+              <div class="crumbs">Narration / Act 1</div>
+              <h1>Act 1 — The Harbour</h1>
+              <div class="mono">tts/act1/sv/script.json</div>
+            </div>
+            <div class="actions">
+              <div class="tabs">
+                <div class="tab"><span>English</span><small>34/34</small></div>
+                <div class="tab on dim2">
+                  <span>Svenska</span><small class="warn">Dialog gone</small>
+                </div>
+                <div class="tab dim"><span>Deutsch</span><small>No dialog</small></div>
+              </div>
+              <span class="btn">Refresh dialog</span>
+            </div>
+          </div>
+          <section class="panel warn">
+            <h2>Act 1's Svenska dialog is gone</h2>
+            <p>
+              <span class="mono">tts/act1/sv/script.json</span> is not there, but 12 clips and 3
+              cues were recorded for Act 1 in Svenska. The studio keeps them as they are and offers
+              to remove none of them until the dialog is back.
+            </p>
+            <p class="muted">
+              Refresh dialog writes it again from the game. If the game no longer has Svenska lines
+              for this act, delete the clips and their manifest yourself.
+            </p>
+            <div><span class="btn">Refresh dialog</span></div>
+          </section>
+          <div class="callout">
+            A game with no Refresh dialog command: no button, and the second paragraph reads "Once
+            the game writes it again, the studio reads it in. If the game no longer has Svenska
+            lines for this act, delete the clips and their manifest yourself."
+          </div>
+          <div class="label">Cast</div>
+          <div class="cast">
+            <div class="card"><b>Narrator</b><br /><span class="muted">Act 1</span></div>
+            <div class="card">
+              <b>Mira</b><br /><span class="muted">Act 1 · Also in Act 2</span>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <div class="frame-title">2 · The same act's lines page in Svenska</div>
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="brand">Audio Studio · RetroQuest</div>
+          <div class="nav"><span class="grow">Setup</span></div>
+          <div class="label" style="margin: 10px 8px 2px">Narration</div>
+          <div class="nav">
+            <span>0</span><span class="grow">Prologue</span><span class="meta">8 lines</span>
+          </div>
+          <div class="nav on">
+            <span>1</span><span class="grow">Act 1 — The Harbour</span
+            ><span class="meta">34 lines</span>
+          </div>
+          <div class="nav">
+            <span>2</span><span class="grow">Act 2 — The Tower</span
+            ><span class="meta">41 lines</span>
+          </div>
+          <div class="label" style="margin: 10px 8px 2px">Characters</div>
+          <div class="nav"><span class="grow">Narrator</span></div>
+          <div class="nav"><span class="grow">Mira</span></div>
+        </aside>
+        <main>
+          <div class="head">
+            <div>
+              <div class="crumbs">Narration / Act 1 / Lines</div>
+              <h1>Act 1 — The Harbour</h1>
+            </div>
+            <div class="tabs">
+              <div class="tab"><span>English</span><small>34/34</small></div>
+              <div class="tab on dim2">
+                <span>Svenska</span><small class="warn">Dialog gone</small>
+              </div>
+              <div class="tab dim"><span>Deutsch</span><small>No dialog</small></div>
+            </div>
+          </div>
+          <section class="panel warn">
+            <h2>Act 1's Svenska dialog is gone</h2>
+            <p>
+              12 clips were recorded for these lines. Nothing can be generated or removed until the
+              dialog is back.
+            </p>
+            <div><span class="btn">Refresh dialog</span></div>
+          </section>
+        </main>
+      </div>
+
+      <div class="frame-title">
+        3 · For contrast: Deutsch, which never had lines or clips — unchanged from today
+      </div>
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="brand">Audio Studio · RetroQuest</div>
+          <div class="nav"><span class="grow">Setup</span></div>
+          <div class="label" style="margin: 10px 8px 2px">Narration</div>
+          <div class="nav">
+            <span>0</span><span class="grow">Prologue</span><span class="meta">8 lines</span>
+          </div>
+          <div class="nav on">
+            <span>1</span><span class="grow">Act 1 — The Harbour</span
+            ><span class="meta">34 lines</span>
+          </div>
+          <div class="nav">
+            <span>2</span><span class="grow">Act 2 — The Tower</span
+            ><span class="meta">41 lines</span>
+          </div>
+          <div class="label" style="margin: 10px 8px 2px">Characters</div>
+          <div class="nav"><span class="grow">Narrator</span></div>
+          <div class="nav"><span class="grow">Mira</span></div>
+        </aside>
+        <main>
+          <div class="head">
+            <div>
+              <div class="crumbs">Narration / Act 1</div>
+              <h1>Act 1 — The Harbour</h1>
+            </div>
+            <div class="tabs">
+              <div class="tab"><span>English</span><small>34/34</small></div>
+              <div class="tab"><span>Svenska</span><small class="warn">Dialog gone</small></div>
+              <div class="tab on dim"><span>Deutsch</span><small>No dialog</small></div>
+            </div>
+          </div>
+          <section class="panel">
+            <h2>Act 1 has no Deutsch dialog yet</h2>
+            <p class="muted">
+              The game has not written Deutsch lines for this act. Once it does, Refresh dialog
+              reads them in.
+            </p>
+            <div><span class="btn">Refresh dialog</span></div>
+          </section>
+        </main>
+      </div>
+
+      <div class="frame-title">
+        4 · A project with one language — its only dialog file is gone, 34 clips recorded
+      </div>
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="brand">Audio Studio · RetroQuest</div>
+          <div class="nav"><span class="grow">Setup</span></div>
+          <div class="label" style="margin: 10px 8px 2px">Narration</div>
+          <div class="nav">
+            <span>0</span><span class="grow">Prologue</span><span class="meta">8 lines</span>
+          </div>
+          <div class="nav on">
+            <span>1</span><span class="grow">Act 1 — The Harbour</span
+            ><span class="meta warn">dialog gone</span>
+          </div>
+          <div class="nav">
+            <span>2</span><span class="grow">Act 2 — The Tower</span
+            ><span class="meta">41 lines</span>
+          </div>
+          <div class="label" style="margin: 10px 8px 2px">Characters</div>
+          <div class="nav"><span class="grow">Narrator</span></div>
+          <div class="nav"><span class="grow">Mira</span></div>
+        </aside>
+        <main>
+          <div class="head">
+            <div>
+              <div class="crumbs">Narration / Act 1</div>
+              <h1>Act 1 — The Harbour</h1>
+              <div class="mono">tts/act1/script.json</div>
+            </div>
+            <span class="btn">Refresh dialog</span>
+          </div>
+          <section class="panel warn">
+            <h2>Act 1's dialog is gone</h2>
+            <p>
+              <span class="mono">tts/act1/script.json</span> is not there, but 34 clips and 5 cues
+              were recorded for Act 1. The studio keeps them as they are and offers to remove none
+              of them until the dialog is back.
+            </p>
+            <p class="muted">
+              Refresh dialog writes it again from the game. If the game no longer has this act,
+              delete the clips and their manifest yourself.
+            </p>
+          </section>
+          <div class="callout">
+            Without the dialog the studio does not know who speaks in the act, so the Cast section
+            is not shown — as today.
+          </div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
