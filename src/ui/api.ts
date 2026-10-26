@@ -14,6 +14,8 @@ import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
+import type { BriefChange } from '../core/music'
+import type { BriefChangeResult } from '../services/briefs'
 import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
@@ -576,6 +578,33 @@ export function useRefreshShared() {
     '/api/music/stingers/refresh',
     (client) => client.invalidateQueries({ queryKey: ['project'] }),
   )
+}
+
+/**
+ * Saves one field of a track's brief, length, tempo or key (the studio's change over the game's),
+ * then reloads the project, whose Music pages show the result.
+ */
+export function useSetTrackBrief(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `brief-${trackId}` },
+    mutationFn: async (change: BriefChange) => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(change),
+      })
+      if (response.status === 404) {
+        throw new Error('The game no longer lists this track; the page shows it as it is now.')
+      }
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the brief answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<BriefChangeResult>
+    },
+    // Saved or not (a 404 means the list changed), the page shows the project as it is now.
+    onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
 }
 
 /** Gives an orphaned cue to a line (`to`), or removes it (null), then reloads the part. */

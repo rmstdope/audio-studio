@@ -2,6 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import {
   BriefsSchema,
   LoopListSchema,
+  applyBriefChange,
+  fieldSource,
+  parseClock,
   StingerListSchema,
   loopsDiff,
   summarizeMusic,
@@ -118,6 +121,18 @@ describe('summarizeMusic', () => {
     expect(music.lists[0]!.tracks[0]).toMatchObject({ brief: 'ours', seconds: 60 })
   })
 
+  it('carries tempo and key, and the game’s own values beside the studio’s', () => {
+    const { music } = summarizeMusic(
+      [list('act1', [track('a', { bpm: 84, key: 'D major' }), track('b')])],
+      { a: { bpm: 100, key: null, brief: 'ours' } },
+    )
+    const [a, b] = music.lists[0]!.tracks
+    expect(a).toMatchObject({ brief: 'ours', bpm: 100, key: null })
+    expect(a!.game).toEqual({ brief: 'a brief', seconds: 80, bpm: 84, key: 'D major' })
+    expect(b).toMatchObject({ bpm: null, key: null })
+    expect(b!.game).toEqual({ brief: 'b brief', seconds: 80, bpm: null, key: null })
+  })
+
   it('reports an id used twice at both places and shows neither track', () => {
     const { music, problems } = summarizeMusic(
       [list('act1', [track('x'), track('a')]), list('act2', [track('b'), track('x')])],
@@ -157,5 +172,73 @@ describe('loopsDiff', () => {
     expect(loopsDiff([track('a'), track('b')], [track('b'), track('c', { title: 'Sea' })])).toEqual(
       { added: [{ id: 'c', title: 'Sea' }], removed: [{ id: 'a', title: 'A' }] },
     )
+  })
+})
+
+describe('fieldSource', () => {
+  const rows = (change: Parameters<typeof summarizeMusic>[1], extra: Partial<Track> = {}) =>
+    summarizeMusic([list('act1', [track('a', extra)])], change).music.lists[0]!.tracks[0]!
+
+  it('says from the game, changed here, or not set', () => {
+    const row = rows({ a: { seconds: 60, key: null } }, { key: 'D major', bpm: 84 })
+    expect(fieldSource(row, 'brief')).toBe('game')
+    expect(fieldSource(row, 'seconds')).toBe('changed')
+    expect(fieldSource(row, 'bpm')).toBe('game')
+    expect(fieldSource(row, 'key')).toBe('changed')
+  })
+
+  it('calls a tempo the game did not give not set, and a tempo added here changed', () => {
+    expect(fieldSource(rows({}), 'bpm')).toBe('unset')
+    expect(fieldSource(rows({ a: { bpm: 90 } }), 'bpm')).toBe('changed')
+  })
+})
+
+describe('applyBriefChange', () => {
+  const game = { brief: 'g', seconds: 80, bpm: 84, key: 'D major' }
+
+  it('records a change, in id order', () => {
+    const next = applyBriefChange({ z: { seconds: 5 } }, 'a', 'brief', 'ours', game)
+    expect(Object.keys(next)).toEqual(['a', 'z'])
+    expect(next.a).toEqual({ brief: 'ours' })
+  })
+
+  it('drops a field typed back to the game’s, and the entry once empty', () => {
+    const next = applyBriefChange(
+      { a: { brief: 'ours' }, b: { seconds: 5 } },
+      'a',
+      'brief',
+      'g',
+      game,
+    )
+    expect(next).toEqual({ b: { seconds: 5 } })
+    const kept = applyBriefChange({ a: { brief: 'ours', seconds: 5 } }, 'a', 'brief', 'g', game)
+    expect(kept).toEqual({ a: { seconds: 5 } })
+  })
+
+  it('stores null for no tempo over the game’s, and nothing when the game has none', () => {
+    expect(applyBriefChange({}, 'a', 'bpm', null, game)).toEqual({ a: { bpm: null } })
+    const none = { ...game, bpm: null, key: null }
+    expect(applyBriefChange({ a: { bpm: 90 } }, 'a', 'bpm', null, none)).toEqual({})
+    expect(applyBriefChange({}, 'a', 'key', null, none)).toEqual({})
+  })
+
+  it('does not change the briefs it was given', () => {
+    const before = { a: { brief: 'ours' } }
+    applyBriefChange(before, 'a', 'brief', 'g', game)
+    expect(before).toEqual({ a: { brief: 'ours' } })
+  })
+})
+
+describe('parseClock', () => {
+  it('reads minutes and seconds', () => {
+    expect(parseClock('1:20')).toBe(80)
+    expect(parseClock(' 0:05 ')).toBe(5)
+    expect(parseClock('12:00')).toBe(720)
+  })
+
+  it('refuses anything else', () => {
+    for (const bad of ['90', '1:75', '0:00', '', 'a:bc', '1:2', '-1:20', '1:20:00']) {
+      expect(parseClock(bad)).toBeNull()
+    }
   })
 })

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 
-/** The Music pages: none chosen (the first list), an act's loops, or the stingers. */
+/** The Music pages: none chosen (the first list), an act's loops, the stingers, or one track. */
 export type MusicRoute =
   | { view: 'music'; page: null }
   | { view: 'music'; page: 'act'; part: string }
   | { view: 'music'; page: 'stingers' }
+  | { view: 'music'; page: 'track'; track: string }
 
 /**
  * Where the UI is: a part's overview or its lines, every character, one character's page or its
@@ -23,7 +24,7 @@ export type Route =
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers`; anything else is the
+ * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers`, `#/music/tracks/victory`; anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
@@ -36,6 +37,9 @@ export function parseRoute(hash: string): Route {
   if (first === 'music') {
     if (second === 'parts' && third) {
       return { view: 'music', page: 'act', part: decodeURIComponent(third) }
+    }
+    if (second === 'tracks' && third) {
+      return { view: 'music', page: 'track', track: decodeURIComponent(third) }
     }
     return second === 'stingers'
       ? { view: 'music', page: 'stingers' }
@@ -61,6 +65,7 @@ export function routeHref(route: Route): string {
   if (route.view === 'spending') return '#/spending'
   if (route.view === 'setup') return '#/setup'
   if (route.view === 'music') {
+    if (route.page === 'track') return `#/music/tracks/${encodeURIComponent(route.track)}`
     return route.page === 'act'
       ? `#/music/parts/${encodeURIComponent(route.part)}`
       : route.page === 'stingers'

@@ -1,4 +1,4 @@
-import type { MusicListSummary } from '../../../core/music'
+import { trackFor, type MusicListSummary } from '../../../core/music'
 import type { ProjectSummary } from '../../../core/summary'
 import type { RefreshResult, RefreshSharedResult } from '../../../services/refresh'
 import { useRefreshDialog, useRefreshShared } from '../../api'
@@ -6,14 +6,17 @@ import { Problems } from '../../components/Problems'
 import { PlayIcon } from '../../components/icons'
 import { clock, shortTitle } from '../../format'
 import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
-import type { MusicRoute } from '../../route'
+import { routeHref, type MusicRoute } from '../../route'
 import { NoMusic } from './NoMusic'
+import { TrackView } from './TrackView'
 
 /** A Music page: an act's loops or the stingers, or how to set Music up when the project has none. */
 export function MusicView({ summary, route }: { summary: ProjectSummary; route: MusicRoute }) {
   if (!summary.music) return <NoMusic />
   const list = listFor(summary.music.lists, route)
   if (!list) return <NoMusic />
+  const found = route.page === 'track' ? trackFor(summary.music.lists, route.track) : undefined
+  if (found) return <TrackView list={found.list} track={found.track} />
   return list.kind === 'stingers' ? (
     <StingersPage key="stingers" list={list} />
   ) : (
@@ -140,7 +143,12 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
                     </button>
                   </td>
                   <td>
-                    <strong>{track.title}</strong>
+                    <a
+                      className="music-track-link"
+                      href={routeHref({ view: 'music', page: 'track', track: track.id })}
+                    >
+                      <strong>{track.title}</strong>
+                    </a>
                     <div className="mono muted music-id">{track.id}</div>
                   </td>
                   <td className="music-brief-cell">
