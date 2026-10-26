@@ -55,7 +55,7 @@ retroquest/                      ← user runs `audio-studio` here
 │   ├── script.json              ← dialog resource (read)
 │   ├── cues.json                ← per-line delivery cues (read + written)
 │   ├── narration.lock.json      ← per-clip fingerprints (written, committed)
-│   └── music.json               ← the act's loops, from the game (read; planned, §8.5)
+│   └── music.json               ← the act's loops, from the game (read; built, §8.5)
 ├── tts/stingers.json            ← the game's stingers (read; built)
 ├── music/
 │   ├── briefs.json              ← the studio's changes to the game's briefs (read + written)
