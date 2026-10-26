@@ -52,7 +52,9 @@ export async function checkSetup(
     refreshDialog: Boolean(narration.refreshDialog),
     parallel: narration.quality.parallel,
     fishTier: narration.quality.fishTier ?? null,
-    music: project.music ? { ready: aceStepReady(machine, checkpoints), checkpoints } : null,
+    music: project.music
+      ? { ready: aceStepReady(machine, checkpoints, project.music.model), checkpoints }
+      : null,
   }
   return { ok: true, checks: setupChecks(facts) }
 }

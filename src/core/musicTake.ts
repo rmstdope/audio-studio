@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { MUSIC_MODEL_IDS, musicModel, type MusicModelId } from './musicModels'
 import { readWav, writeWav, type Wav } from './wav'
 
-/** The music model the takes come from; a take made with another is another set of takes. */
-export const MUSIC_MODEL = 'acestep-v15-xl-turbo+lm-4B'
+/** What a take made before models were chosen records, and what the take fingerprint begins with. */
+export const MUSIC_MODEL = musicModel('balanced').recipe
 
 /** How much longer than it plays a loop is generated, since every take closes as a song does. */
 export const LOOP_EXTRA_SECONDS = 20
@@ -163,6 +164,8 @@ export interface TakeView {
   earlier: boolean
   /** The take the game plays. */
   chosen: boolean
+  /** The music model that made it, as a line: "Balanced · XL turbo · 4B". */
+  model: string
 }
 
 /** A take being made or waiting its turn. */
@@ -171,12 +174,18 @@ export interface MakingView {
   state: 'waiting' | 'making'
   /** Seconds since it began; 0 while it waits. */
   elapsed: number
+  /** The music model it is made with, as a line. */
+  model: string
+  /** About how long that model takes, in seconds. */
+  expected: number
 }
 
 /** A take that could not be made, and why. */
 export interface FailedView {
   n: number
   message: string
+  /** The music model it was asked with, as a line. */
+  model: string
 }
 
 /** A track's takes as its page shows them. */
@@ -185,8 +194,10 @@ export interface MusicTakesView {
   kind: 'loop' | 'stinger'
   /** Whether takes can be made on this computer, and what is missing if not. */
   generator: { ok: true } | { ok: false; message: string }
-  /** About how long a take takes, in seconds, for the progress shown. */
-  expected: number
+  /** The music model the project makes takes with unless a track asks for another. */
+  defaultModel: MusicModelId
+  /** Every music model, and whether this computer has its files. */
+  models: { id: MusicModelId; installed: boolean }[]
   takes: TakeView[]
   making: MakingView[]
   failed: FailedView[]
@@ -238,9 +249,14 @@ export interface MakingSummary {
 /** The most takes one click asks for. */
 export const MAX_TAKES_AT_ONCE = 4
 
-/** The body of a request for takes: this many new ones, or a failed one again. */
+/** The body of a request for takes: this many new ones (with a model, else the project's), or a failed one again. */
 export const MakeTakesBody = z.union([
-  z.object({ count: z.number().int().min(1).max(MAX_TAKES_AT_ONCE) }).strict(),
+  z
+    .object({
+      count: z.number().int().min(1).max(MAX_TAKES_AT_ONCE),
+      model: z.enum(MUSIC_MODEL_IDS).optional(),
+    })
+    .strict(),
   z.object({ retry: z.number().int().positive() }).strict(),
 ])
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { setStageModel, switchRetiredModels } from './models'
+import { setMusicModel, setStageModel, switchRetiredModels } from './models'
 import { setSoundAlike } from './soundAlike'
 
 function projectWith(models: Record<string, string>) {
@@ -192,5 +192,52 @@ describe('setStageModel', () => {
       chmodSync(dirname(projectFile), 0o755)
     }
     expect(read()).toBe(before)
+  })
+})
+
+describe('setMusicModel', () => {
+  const musicPaths = {
+    loops: 'tts/{part}/music.json',
+    stingers: 'tts/stingers.json',
+    briefs: 'music/briefs.json',
+    lock: 'music/music.lock.json',
+    clips: 'audio/music',
+    manifest: 'audio/music/manifest.json',
+  }
+  const withMusic = (extra: Record<string, unknown> = {}) =>
+    projectJson({ music: { paths: musicPaths, ...extra } })
+
+  it('writes music.model and nothing else, in the file’s own indentation', async () => {
+    const { projectFile, read } = repo(withMusic(), 4)
+    expect(await setMusicModel(projectFile, 'careful', 'balanced')).toEqual({ ok: true })
+    const saved = withMusic({ model: 'careful' })
+    expect(read()).toBe(`${JSON.stringify(saved, null, 4)}\n`)
+  })
+
+  it('changes a model the file already names', async () => {
+    const { projectFile, read } = repo(withMusic({ model: 'quick' }))
+    await setMusicModel(projectFile, 'quickest', 'quick')
+    expect(JSON.parse(read()).music.model).toBe('quickest')
+  })
+
+  it('refuses, writing nothing, when the file changed since the page read it', async () => {
+    const { projectFile, read } = repo(withMusic({ model: 'quick' }))
+    const before = read()
+    expect(await setMusicModel(projectFile, 'careful', 'balanced')).toMatchObject({
+      ok: false,
+      problems: [{ file: 'audio-studio.json', path: 'music.model' }],
+    })
+    expect(read()).toBe(before)
+  })
+
+  it('refuses a model it does not know, and a project with no music', async () => {
+    const { projectFile, read } = repo(withMusic())
+    expect(await setMusicModel(projectFile, 'huge', 'balanced')).toMatchObject({ ok: false })
+    const plain = repo(projectJson())
+    expect(await setMusicModel(plain.projectFile, 'quick', 'balanced')).toMatchObject({
+      ok: false,
+      problems: [{ path: 'music' }],
+    })
+    expect(read()).toBe(`${JSON.stringify(withMusic(), null, 2)}\n`)
   })
 })

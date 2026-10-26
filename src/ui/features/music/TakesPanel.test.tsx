@@ -39,7 +39,8 @@ function stopButton(making: MakingView[]) {
     ok: true,
     kind: 'loop',
     generator: { ok: true },
-    expected: 180,
+    defaultModel: 'balanced',
+    models: [{ id: 'balanced', installed: true }],
     takes: [],
     making,
     failed: [],
@@ -60,13 +61,17 @@ function stopButton(making: MakingView[]) {
 
 describe('the Takes panel’s Stop', () => {
   it('can stop the last take while it is being made, with none waiting', () => {
-    expect(stopButton([{ n: 1, state: 'making', elapsed: 20 }])?.disabled).toBe(false)
+    expect(
+      stopButton([
+        { n: 1, state: 'making', elapsed: 20, model: 'Balanced · XL turbo · 4B', expected: 180 },
+      ])?.disabled,
+    ).toBe(false)
   })
 
   it('can stop takes waiting behind the one being made', () => {
     const making: MakingView[] = [
-      { n: 1, state: 'making', elapsed: 20 },
-      { n: 2, state: 'waiting', elapsed: 0 },
+      { n: 1, state: 'making', elapsed: 20, model: 'Balanced · XL turbo · 4B', expected: 180 },
+      { n: 2, state: 'waiting', elapsed: 0, model: 'Balanced · XL turbo · 4B', expected: 180 },
     ]
     expect(stopButton(making)?.disabled).toBe(false)
   })

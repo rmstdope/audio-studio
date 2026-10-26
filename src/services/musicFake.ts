@@ -9,6 +9,7 @@ import type { MusicGenerator } from './music'
 export function createFakeMusic(delayMs = 4000): MusicGenerator {
   return {
     ready: () => ({ ok: true }),
+    installed: () => true,
     async generate(request) {
       await new Promise((resolve) => setTimeout(resolve, delayMs))
       if (request.brief.includes('fail')) throw new Error('The music generator: out of memory')

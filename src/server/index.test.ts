@@ -3135,6 +3135,7 @@ describe('server, a track’s takes', () => {
     transcriber: null,
     music: {
       ready: () => ready,
+      installed: () => true,
       async generate(request) {
         made.push(request.brief)
         const samples = new Int16Array(request.seconds * 1000).fill(4000)
@@ -3278,6 +3279,7 @@ describe('server, choosing a take', () => {
     transcriber: null,
     music: {
       ready: () => ({ ok: true }),
+      installed: () => true,
       async generate(request) {
         const samples = new Int16Array(request.seconds * 1000).fill(4000)
         const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
@@ -3486,5 +3488,103 @@ describe('server, removing music the game no longer asks for', () => {
     const after = await (await fetch(at('/api/project'))).json()
     expect(after.summary.music.lists[0].orphans).toEqual([])
     expect((await remove('castle-gates')).status).toBe(404)
+  })
+})
+
+describe('server, the music model', () => {
+  const paths = {
+    loops: 'tts/{part}/music.json',
+    stingers: 'tts/stingers.json',
+    briefs: 'music/briefs.json',
+    lock: 'music/music.lock.json',
+    clips: 'audio/music',
+    manifest: 'audio/music/manifest.json',
+  }
+  const root = tempRepo({
+    'audio-studio.json': projectJson({ music: { paths } }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+  })
+  const asked: string[] = []
+  const studio = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    music: {
+      ready: () => ({ ok: true }),
+      installed: (model) => model !== 'careful',
+      async generate(request) {
+        asked.push(request.model)
+        const samples = new Int16Array(request.seconds * 1000).fill(4000)
+        const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
+        return { wav: writeWav({ format, data: new Uint8Array(samples.buffer) }), seed: 1 }
+      },
+      close() {},
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const at = (path: string) => new URL(path, studio.url)
+  const send = (method: string, path: string, body: unknown, origin = studio.url.origin) =>
+    fetch(at(path), {
+      method,
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('shows the project’s music model and which models are here', async () => {
+    const view = await (await fetch(at('/api/models'))).json()
+    expect(view.music).toEqual({
+      model: 'balanced',
+      installed: { balanced: true, quick: true, quickest: true, careful: false },
+    })
+  })
+
+  it('saves the default from its own page only, and the page then shows it', async () => {
+    const body = { model: 'careful', was: 'balanced' }
+    expect((await send('PUT', '/api/music/model', body, 'http://evil.test')).status).toBe(403)
+    expect((await send('PUT', '/api/music/model', { model: 'careful' })).status).toBe(400)
+    const saved = await send('PUT', '/api/music/model', body)
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await send('PUT', '/api/music/model', body)).status).toBe(409)
+    const view = await (await fetch(at('/api/models'))).json()
+    expect(view.music.model).toBe('careful')
+    const takes = await (await fetch(at('/api/music/tracks/hall/takes'))).json()
+    expect(takes.defaultModel).toBe('careful')
+  })
+
+  it('makes takes with the model the page asked for, and refuses one not here', async () => {
+    expect(
+      (await send('POST', '/api/music/tracks/hall/takes', { count: 1, model: 'huge' })).status,
+    ).toBe(400)
+    const refused = await send('POST', '/api/music/tracks/hall/takes', {
+      count: 1,
+      model: 'careful',
+    })
+    expect(refused.status).toBe(409)
+    const made = await send('POST', '/api/music/tracks/hall/takes', { count: 1, model: 'quick' })
+    expect(made.status).toBe(200)
+    for (let i = 0; i < 100 && !asked.length; i++) await new Promise((r) => setTimeout(r, 10))
+    expect(asked).toEqual(['quick'])
+  })
+})
+
+describe('server, no music model without music', () => {
+  it('has no music on the models view', async () => {
+    const root = tempRepo({ 'audio-studio.json': projectJson() })
+    const studio = startServer({
+      projectFile: join(root, 'audio-studio.json'),
+      port: 0,
+      fish,
+      encode,
+      transcriber: null,
+    })
+    try {
+      const view = await (await fetch(new URL('/api/models', studio.url))).json()
+      expect(view.music).toBeNull()
+    } finally {
+      studio.stop(true)
+    }
   })
 })

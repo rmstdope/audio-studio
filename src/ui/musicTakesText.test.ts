@@ -9,33 +9,101 @@ import {
 
 describe('timeLeftText', () => {
   it('says a take waits for its turn', () => {
-    expect(timeLeftText({ n: 5, state: 'waiting', elapsed: 0 }, 180)).toBe('waiting')
+    expect(
+      timeLeftText({
+        n: 5,
+        state: 'waiting',
+        elapsed: 0,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+      }),
+    ).toBe('waiting')
   })
 
   it('rounds the time left up to whole minutes', () => {
-    expect(timeLeftText({ n: 4, state: 'making', elapsed: 1 }, 180)).toBe(
-      'making · about 3 min left',
-    )
-    expect(timeLeftText({ n: 4, state: 'making', elapsed: 70 }, 180)).toBe(
-      'making · about 2 min left',
-    )
-    expect(timeLeftText({ n: 4, state: 'making', elapsed: 175 }, 180)).toBe(
-      'making · about 1 min left',
-    )
+    expect(
+      timeLeftText({
+        n: 4,
+        state: 'making',
+        elapsed: 1,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+      }),
+    ).toBe('making · about 3 min left')
+    expect(
+      timeLeftText({
+        n: 4,
+        state: 'making',
+        elapsed: 70,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+      }),
+    ).toBe('making · about 2 min left')
+    expect(
+      timeLeftText({
+        n: 4,
+        state: 'making',
+        elapsed: 175,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+      }),
+    ).toBe('making · about 1 min left')
+  })
+
+  it('counts by the take’s own model', () => {
+    const careful = {
+      n: 4,
+      state: 'making',
+      elapsed: 60,
+      model: 'Careful · XL sft · 4B',
+      expected: 420,
+    } as const
+    expect(timeLeftText(careful)).toBe('making · about 6 min left')
+    expect(progressOf(careful)).toBeCloseTo(1 / 7)
   })
 
   it('admits a take that takes longer than usual', () => {
-    expect(timeLeftText({ n: 4, state: 'making', elapsed: 400 }, 180)).toBe(
-      'making · taking longer than usual',
-    )
+    expect(
+      timeLeftText({
+        n: 4,
+        state: 'making',
+        elapsed: 400,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+      }),
+    ).toBe('making · taking longer than usual')
   })
 })
 
 describe('progressOf', () => {
   it('is empty while waiting, and never reaches the end before the take is done', () => {
-    expect(progressOf({ n: 1, state: 'waiting', elapsed: 0 }, 180)).toBe(0)
-    expect(progressOf({ n: 1, state: 'making', elapsed: 90 }, 180)).toBe(0.5)
-    expect(progressOf({ n: 1, state: 'making', elapsed: 900 }, 180)).toBe(0.95)
+    expect(
+      progressOf({
+        n: 1,
+        state: 'waiting',
+        elapsed: 0,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+      }),
+    ).toBe(0)
+    expect(
+      progressOf({
+        n: 1,
+        state: 'making',
+        elapsed: 90,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+      }),
+    ).toBe(0.5)
+    expect(
+      progressOf({
+        n: 1,
+        state: 'making',
+        elapsed: 900,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+      }),
+    ).toBe(0.95)
   })
 })
 
@@ -53,7 +121,11 @@ describe('failureLine', () => {
 describe('takesAreBeingMade', () => {
   it('is true while any take waits or is made', () => {
     expect(takesAreBeingMade([])).toBe(false)
-    expect(takesAreBeingMade([{ n: 1, state: 'waiting', elapsed: 0 }])).toBe(true)
+    expect(
+      takesAreBeingMade([
+        { n: 1, state: 'waiting', elapsed: 0, model: 'Balanced · XL turbo · 4B', expected: 180 },
+      ]),
+    ).toBe(true)
   })
 })
 

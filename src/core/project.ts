@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { knownLanguage } from './languages'
+import { MUSIC_MODEL_IDS } from './musicModels'
 import { isPriced } from './prices'
 import { SOUND_ALIKE_WORD } from './soundAlikeEdit'
 
@@ -232,6 +233,8 @@ const musicPath = z
 const MusicSchema = z.object({
   /** The game's command for what belongs to no act (the stingers); run in the project root. */
   refreshShared: z.string().min(1).optional(),
+  /** The music model new takes are made with unless a track asks for another; absent is Balanced. */
+  model: z.enum(MUSIC_MODEL_IDS).optional(),
   paths: z.object({
     /** An act's loops, written by the game. */
     loops: musicPath.refine((path) => path.includes('{part}'), {

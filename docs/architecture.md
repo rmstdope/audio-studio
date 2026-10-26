@@ -82,8 +82,10 @@ retroquest/                      ← user runs `audio-studio` here
    page (`music.refreshShared`), run in the project root, only when the user clicks one on the
    studio's page; what a command writes is the game's business, and the studio does not check it
    beyond reading the dialog, the loops or the stingers again.
-   Besides those paths, the studio writes the project file itself in one place only: the project's
-   own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3).
+   Besides those paths, the studio writes the project file itself in a few places only: the project's
+   own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3),
+   the models (`narration.models`, and `music.model`) from Setup's Models panel, the retirement
+   switch of `s1`, and `narration.quality.fishTier`.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 
@@ -795,11 +797,15 @@ The steps are in §12, step 12; the spike's findings (12.1) are in §13, decisio
 drawn in `docs/ui/music-workspace.html`.
 
 **Project file.** An optional `music` section beside `narration`, its acts the narration's parts.
-Only the paths are settled; the model, the number of takes and the output settings are fixed in the
-code until a project needs another value:
+Only the paths and the model are settled; the number of takes and the output settings are fixed in
+the code until a project needs another value. `model` (optional; `balanced`, `quick`, `quickest` or
+`careful`, Balanced when absent) is the music model new takes are made with, saved from Setup's
+Models panel (the fifth place the studio writes the project file, with the same rules as the
+stages' models):
 
 ```json
 "music": {
+  "model": "balanced",
   "refreshShared": "cd web && npx -y tsx@4.23.15 --tsconfig tsconfig.json ../tts/extract-shared.ts",
   "paths": {
     "loops": "tts/{part}/music.json",
@@ -891,8 +897,8 @@ the board is what the game will play:
   fanfare asked for at 10 seconds ends after about 6).
 
 The numbers are fixed in `core/musicTake.ts` and its tests (built, 12.4). A take is cached in
-`.audio-studio/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (model, brief, kind,
-seconds, bpm, key) and a take number counted from 1 per hash, with `<hash>.<n>.json` beside it
+`.audio-studio/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (brief, kind,
+seconds, bpm, key; the hash still begins with Balanced's recipe, so choosing a model never changes it) and a take number counted from 1 per hash, with `<hash>.<n>.json` beside it
 (seed, length, waveform bars). The same seed does not make the same take again on the Mac, so the cache keeps the take
 itself; the seed is kept with it, in the board and the lock, to say where it came from. The brief a
 take is made from is the game's with the studio's changes over it. What is built is the Takes panel on a track's page: "Make 2 takes" (when there are none) queues two,
@@ -910,7 +916,7 @@ the page can be left meanwhile; **Drop** removes one (not the chosen one); **Cho
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
 `.audio-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed,
-seconds, peaks, inputs, model }] }` (`model` is the music model that made the take, which Choose records in the lock; a board without it is read as the current model), the take's WAV beside the others in `music-takes/<track>/`. Take
+seconds, peaks, inputs, model }] }` (`model` is the recipe of the music model that made the take, which Choose records in the lock; a board without it is read as Balanced, the only model there was), the take's WAV beside the others in `music-takes/<track>/`. Take
 numbers are per track and never reused (`next` is reserved when takes are asked for), and a take
 is on the board only once its WAV is written. The cache no longer keeps a sidecar file per take. A dropped take is just gone:
 seeds don't come back, so nothing is ruled out.
@@ -925,8 +931,7 @@ the encoder writes a hidden temporary file in the clips folder, renamed into pla
 the manifest and lock update (built, 12.6): the temporary file is renamed over the clip, the manifest written, the lock last, all in one turn per project. A failure of the encode, or of reading the manifest or lock, leaves everything as it was; a write that fails after the rename (a full disk) leaves the new clip beside the old lock, and choosing again repairs it. A take is chosen and dropped in the track's board turn, so neither slips between the other's check and write, and a drop is refused while the lock cannot be read. On the board the chosen take is a green card, "chosen · in the game", without Drop (a drop of it is refused, 409); every other card has **Choose**. A chosen track whose clip is gone shows "music file missing" on its card and keeps Choose, so the file can be written again. Clips are served only as plain files in the music clips folder (`GET /api/music/clips/<track>.mp3`: no folders, links, hidden files or the manifest).
 
 **Status** of a track, from the lock and its takes: "chosen" (`ok`), "not chosen" (no take chosen),
-"changed since chosen" (`changed`; the track's page says what changed: the brief, length, tempo, key
-or model), "music file missing" (a take was chosen but its clip is gone from disk), and "making 2
+"changed since chosen" (`changed`; the track's page says what changed: the brief, length, tempo or key), "music file missing" (a take was chosen but its clip is gone from disk), and "making 2
 takes" while its takes are being made. **Stop** stops the track's takes: the one being made ends at once
 (the music worker is stopped, and starts again with the next take) and is discarded, nothing on the
 board or on disk, and the ones waiting never start; the takes already made stay. A take that fails says why, and **Try again** makes it again; the other takes
@@ -939,12 +944,12 @@ not in it.
 
 **Lock** (`music.lock.json`, committed, one entry per line, `{ fp, model, seed, list, take, inputs,
 at }`): per track, the chosen take's model,
-seed, the number of the take on the board, a hash of what went into it (model, brief, kind, seconds, bpm, key; not the output settings,
+seed, the number of the take on the board, a hash of what went into it (brief, kind, seconds, bpm, key; not the output settings,
 as narration leaves the loudness out; the chosen take's own inputs, so a take from an earlier brief
 leaves the track "changed since chosen"), which list it came from (an act or the stingers), and when
-it was chosen. Changing the model in the code marks every track `changed`, as a new model makes new
-music. A track is `not-chosen` (no lock entry), `chosen`, `changed` (its brief, length, tempo or key,
-or the music model, differs from the chosen take's own: the old one keeps playing in the game until
+it was chosen. The model is not a cause: a take keeps the model that made it, and changing the project's model (or
+making takes with another) never marks a track `changed`. A track is `not-chosen` (no lock entry), `chosen`, `changed` (its brief, length, tempo or key
+differs from the chosen take's own: the old one keeps playing in the game until
 another is chosen; the page says which) or `missing` (a take was chosen but its clip is gone from
 disk, which is said ahead of `changed`). A manifest entry without a lock entry is reported as a problem (with the orphans, 12.7).
 Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
@@ -966,8 +971,17 @@ kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Py
 studio), the same JSON-lines protocol as the Whisper worker. Both workers run in the studio's own
 `worker/` folder, not in the game's repository the studio runs from, so what they write beside
 themselves (ACE-Step's `.cache/acestep/progress_estimates.json`) stays with the studio, ignored by
-its git. It uses ACE-Step's XL turbo model with
-its 4B language model, which plans the piece (decision 5). ACE-Step and Whisper share the one GPU
+its git. Each request names the pair of models to make the take with (`dit` and `lm`, folders in the
+checkpoints folder); the worker loads a pair on the first take that needs it and swaps it, freeing the
+old, when a take asks for another. The pairs are the **music models** (`core/musicModels.ts`), each a
+plain name, the generator's own names and a time per take: **Balanced** (XL turbo, 4B planner: the
+model of decision 5, the default), **Quick** (XL turbo, 1.7B), **Quickest** (turbo, 1.7B) and
+**Careful** (XL sft, 4B). Only Balanced's time was measured; the others are the agreed estimates.
+The project's model is `music.model`; a track's Takes panel has a menu "Model for new takes" that starts
+on it, holds while the page is open, and applies only to the takes being asked for; each take card
+names its model; Try again remakes a take with its own. A model whose folders are not on the
+computer is marked "not on this computer", can still be the project's default (a teammate may have
+it) and cannot make takes here. ACE-Step and Whisper share the one GPU
 and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`, a process-wide
 `createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a Whisper check at a
 time. In the spike, with both loaded and running together, 42 of the 48 GB were in use (20 GB of it
@@ -1093,9 +1107,9 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   from `quality.fishTier`: ready up to 5 with no tier, a problem above it until the tier is
   chosen, and above the chosen tier's limit; off without a key; saving the tier checks again,
   which asks Fish once more), the optional `refreshDialog` and, with a `music` section, the music
-  generator (Apple silicon, uv, and the two model folders `acestep-v15-xl-turbo` and
-  `acestep-5Hz-lm-4B` in `$ACESTEP_CHECKPOINTS` or `~/.cache/ace-step/checkpoints`; downloaded
-  outside the studio, about 28 GB), each with what to do about it.
+  generator (Apple silicon, uv, and the two model folders of the project's music model, Balanced's
+  `acestep-v15-xl-turbo` and `acestep-5Hz-lm-4B` by default, in `$ACESTEP_CHECKPOINTS` or
+  `~/.cache/ace-step/checkpoints`; downloaded outside the studio, about 28 GB for Balanced), each with what to do about it.
   Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
   the problems from a check at most five minutes old and never on a window focus, so the studio
   does not ask Fish more than it did. The CLI still warns about ffmpeg, and recording says so.
@@ -1303,6 +1317,10 @@ Small, independently useful increments:
        manifest and plays a track per room or region, and the stingers, looping through Web Audio;
        checked in Chrome, Safari and Firefox. If a browser pads an MP3, the manifest gains loop
        points.
+    10. **Music models** (built): `music.model` in the project file, saved from a Music row in Setup's
+        Models panel; four models (Balanced, Quick, Quickest, Careful); a menu "Model for new
+        takes" on a track's Takes panel; every take names its model; the model is no longer a cause of
+        "changed since chosen".
 13. **Languages** (epic as-170), in small pull requests:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's

@@ -1,6 +1,7 @@
 import { basename } from 'node:path'
 import { ProjectSchema, problemsFrom, type Problem } from '../core/project'
 import type { Stage } from '../core/models'
+import { MUSIC_MODEL_IDS, DEFAULT_MUSIC_MODEL } from '../core/musicModels'
 import { isPriced } from '../core/prices'
 import { REPLACEMENT_MODEL, RETIRED_MODEL, retiringTakes, type Take } from '../core/retirement'
 import { openProject, projectJson, projectWrites, saveProject } from './projectFile'
@@ -78,5 +79,44 @@ export function setStageModel(
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
     return saveProject(projectFile, opened, path, (indent) => projectJson(opened.raw, indent))
+  })
+}
+
+/**
+ * Saves the music model new takes are made with (`music.model` in the project file). `was` is the
+ * model the page showed (Balanced when the file names none): if the file names another, someone
+ * changed it meanwhile and nothing is written. A project with no music section has no model to
+ * save. The rest of the file stays as it was, in its own indentation and line endings.
+ */
+export function setMusicModel(
+  projectFile: string,
+  model: string,
+  was: string,
+): Promise<ModelsChange> {
+  return projectWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const file = basename(projectFile)
+    const refuse = (path: string, message: string): ModelsChange => ({
+      ok: false,
+      problems: [{ file, path, message }],
+    })
+    if (!opened.project.music) return refuse('music', 'the project has no music section')
+    if (!(MUSIC_MODEL_IDS as readonly string[]).includes(model)) {
+      return refuse('music.model', `${model} is not a music model the studio knows`)
+    }
+    if ((opened.project.music.model ?? DEFAULT_MUSIC_MODEL) !== was) {
+      return refuse(
+        'music.model',
+        'the model in the file changed since the page was read; reload the studio',
+      )
+    }
+    const music = (opened.raw as { music: Record<string, unknown> }).music
+    music.model = model
+    const parsed = ProjectSchema.safeParse(opened.raw)
+    if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
+    return saveProject(projectFile, opened, 'music.model', (indent) =>
+      projectJson(opened.raw, indent),
+    )
   })
 }

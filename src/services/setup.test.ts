@@ -128,4 +128,22 @@ describe('checkSetup, requests at once', () => {
     await Bun.write(join(root, 'models/acestep-5Hz-lm-4B/.keep'), '')
     expect(await run()).toMatchObject({ state: 'ok' })
   })
+
+  it('checks the model the project names, and says which one is missing', async () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson({ music: { ...musicSection, model: 'careful' } }),
+      'models/acestep-v15-xl-turbo/.keep': '',
+      'models/acestep-5Hz-lm-4B/.keep': '',
+    })
+    const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {
+      ACESTEP_CHECKPOINTS: join(root, 'models'),
+    })
+    if (!result.ok) throw new Error('expected checks')
+    const check = result.checks.find((c) => c.id === 'music')
+    expect(check).toMatchObject({
+      state: 'problem',
+      detail: `The project's music model, Careful, is not on this computer: acestep-v15-xl-sft is missing from ${join(root, 'models')}.`,
+      fix: expect.stringContaining('acestep-v15-xl-sft and acestep-5Hz-lm-4B'),
+    })
+  })
 })

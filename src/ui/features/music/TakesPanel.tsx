@@ -1,6 +1,8 @@
+import { useState, type ReactNode } from 'react'
 import { changedLine, type TrackStatus } from '../../../core/musicChoose'
 import type { TrackRow } from '../../../core/music'
 import type { MakingView, MusicTakesView, TakeView } from '../../../core/musicTake'
+import { eachWords, menuEntry, missingOnTrack, type MusicModelId } from '../../../core/musicModels'
 import { useChooseTake, useDropTake, useMakeTakes, useMusicTakes, useStopTakes } from '../../api'
 import { Failure } from '../../components/Failure'
 import { Problems } from '../../components/Problems'
@@ -21,6 +23,8 @@ export function TakesPanel({ track }: { track: TrackRow }) {
   const stop = useStopTakes(trackId)
   const player = useClipPlayer()
   const view = takes.data
+  // The pick holds while the page stays open; until there is one, the project's model.
+  const [picked, setPicked] = useState<MusicModelId | null>(null)
   if (!view)
     return (
       <section className="panel">
@@ -31,6 +35,31 @@ export function TakesPanel({ track }: { track: TrackRow }) {
     return <Problems title="The takes could not be listed" problems={view.problems} />
   const { generator } = view
   const none = !view.takes.length && !view.making.length
+  const model = picked ?? view.defaultModel
+  const here = view.models.find((m) => m.id === model)?.installed ?? false
+  const canMake = generator.ok && here
+  // Only when some other model could be picked: with none installed, Setup is the answer above.
+  const missing =
+    !here && generator.ok ? (
+      <span className="takes-missing small" role="status">
+        {missingOnTrack(model)}
+      </span>
+    ) : null
+  const menu: ReactNode = (
+    <select
+      className="takes-model"
+      aria-label="Model for new takes"
+      value={model}
+      disabled={view.making.length > 0}
+      onChange={(event) => setPicked(event.target.value as MusicModelId)}
+    >
+      {view.models.map((m) => (
+        <option key={m.id} value={m.id} disabled={!m.installed}>
+          {menuEntry(m.id, m.installed)}
+        </option>
+      ))}
+    </select>
+  )
   const result = make.data
   return (
     <>
@@ -89,33 +118,39 @@ export function TakesPanel({ track }: { track: TrackRow }) {
                   Stop
                 </button>
               )}
+              {menu}
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={!generator.ok || make.isPending || view.making.length > 0}
-                onClick={() => make.mutate({ count: 2 })}
+                disabled={!canMake || make.isPending || view.making.length > 0}
+                onClick={() => make.mutate({ count: 2, model })}
               >
                 More takes
               </button>
             </>
           )}
         </div>
+        {!none && missing}
         {none ? (
           <div className="takes-empty">
             <strong>No takes yet</strong>
             <span className="muted">
-              Each take is new music made from the brief, about 3 minutes each.
+              Each take is new music made from the brief, {eachWords(model)}.
               <br />
               Make a few, listen, and choose the one the game plays.
             </span>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!generator.ok || make.isPending}
-              onClick={() => make.mutate({ count: 2 })}
-            >
-              Make 2 takes
-            </button>
+            <div className="takes-make">
+              {menu}
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!canMake || make.isPending}
+                onClick={() => make.mutate({ count: 2, model })}
+              >
+                Make 2 takes
+              </button>
+            </div>
+            {missing}
           </div>
         ) : (
           <div className="takes">
@@ -130,7 +165,7 @@ export function TakesPanel({ track }: { track: TrackRow }) {
               />
             ))}
             {view.making.map((making, index) => (
-              <MakingCard key={making.n} making={making} view={view} first={index === 0} />
+              <MakingCard key={making.n} making={making} first={index === 0} />
             ))}
           </div>
         )}
@@ -174,6 +209,7 @@ function TakeCard({
         {lost && <span className="chip chip-warn">music file missing</span>}
         {take.earlier && <span className="faint small">earlier brief</span>}
       </div>
+      <span className="faint small">{take.model}</span>
       <div className="take-row">
         <button
           type="button"
@@ -249,23 +285,16 @@ function TakeCard({
 }
 
 /** A take waiting or being made: a dashed card with a progress bar and the time left. */
-function MakingCard({
-  making,
-  view,
-  first,
-}: {
-  making: MakingView
-  view: MusicTakesView
-  first: boolean
-}) {
+function MakingCard({ making, first }: { making: MakingView; first: boolean }) {
   return (
     <div className="take take-making">
       <div className="take-row">
         <b>Take {making.n}</b>
-        <span className="small">{timeLeftText(making, view.expected)}</span>
+        <span className="small">{timeLeftText(making)}</span>
       </div>
+      <span className="faint small">{making.model}</span>
       <div className="bar" role="progressbar" aria-label={`Take ${making.n}`}>
-        <i style={{ width: `${Math.round(progressOf(making, view.expected) * 100)}%` }} />
+        <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />
       </div>
       {first && (
         <span className="small faint">

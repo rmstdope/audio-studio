@@ -17,6 +17,7 @@ for await (const line of console) {
     seed?: number
     out: string
   }
+  if (process.env.FAKE_ACESTEP_LOG) writeFileSync(process.env.FAKE_ACESTEP_LOG, line)
   if (request.brief.includes('crash')) process.exit(3)
   if (request.brief.includes('killed')) {
     console.error('2026-10-26 | INFO | acestep resource_tracker: leaked semaphore objects')
