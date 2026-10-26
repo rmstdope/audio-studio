@@ -982,7 +982,11 @@ The project's model is `music.model`; a track's Takes panel has a menu "Model fo
 on it, holds while the page is open, and applies only to the takes being asked for; each take card
 names its model; Try again remakes a take with its own. A model whose folders are not on the
 computer is marked "not on this computer", can still be the project's default (a teammate may have
-it) and cannot make takes here.
+it) and cannot make takes here. The closed menu shows a short label (`shortMenuLabel`: the plain name
+and the time, or why the model can't be used) so it fits beside the button in a narrow window; the
+opened list keeps every entry in full, so the label is dropped while the list is probably open
+(on a click, Space, Enter, F4 or an arrow key) and comes back on a pick or when the menu loses focus; a
+list dismissed without a pick shows the full label until then.
 
 **Stable Audio Open** (as-ui4) adds two models of another generator: **Short** (Stable Audio Open
 1.0, about 47 s of music at most) and **Shortest** (Stable Audio Open Small, about 11 s). Each

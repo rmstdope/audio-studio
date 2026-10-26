@@ -8,6 +8,7 @@ import {
   eachWords,
   menuEntry,
   missingOnTrack,
+  shortMenuLabel,
   tooLongOnTrack,
   type MusicModelId,
 } from '../../../core/musicModels'
@@ -34,6 +35,8 @@ export function TakesPanel({ track }: { track: TrackRow }) {
   const view = takes.data
   // The pick holds while the page stays open; until there is one, the project's model.
   const [picked, setPicked] = useState<MusicModelId | null>(null)
+  // Whether the model menu's list is probably open: then every entry reads in full.
+  const [listOpen, setListOpen] = useState(false)
   if (!view)
     return (
       <section className="panel">
@@ -66,7 +69,21 @@ export function TakesPanel({ track }: { track: TrackRow }) {
       aria-label="Model for new takes"
       value={model}
       disabled={view.making.length > 0}
-      onChange={(event) => setPicked(event.target.value as MusicModelId)}
+      onChange={(event) => {
+        setPicked(event.target.value as MusicModelId)
+        setListOpen(false)
+      }}
+      onMouseDown={() => setListOpen(true)}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setListOpen(false)
+        else if (
+          [' ', 'Enter', 'F4', 'ArrowUp', 'ArrowDown'].includes(event.key) &&
+          // Alt+Arrow opens the list everywhere; a bare arrow does on macOS.
+          (event.key.startsWith('Arrow') || !event.altKey)
+        )
+          setListOpen(true)
+      }}
+      onBlur={() => setListOpen(false)}
     >
       {MUSIC_GROUPS.map((group) => (
         <optgroup key={group.heading} label={group.heading}>
@@ -76,6 +93,10 @@ export function TakesPanel({ track }: { track: TrackRow }) {
               <option
                 key={id}
                 value={id}
+                // The closed menu shows this; the browser lists the entry's own text when open.
+                label={
+                  id === model && !listOpen ? shortMenuLabel(id, installed, length) : undefined
+                }
                 disabled={!installed || !canMakeTrack(id, length.kind, length.seconds)}
               >
                 {menuEntry(id, installed, length)}
