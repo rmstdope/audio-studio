@@ -255,7 +255,7 @@ function CueBox({
         )}
         <div className="cue-actions">
           <button
-            className="btn"
+            className="btn btn-primary"
             type="submit"
             disabled={save.isPending || changed || !cue || cue === placed}
           >
