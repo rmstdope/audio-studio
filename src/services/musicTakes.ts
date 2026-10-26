@@ -275,8 +275,14 @@ export function createMusicTakes({
       // The file first: a take is on the board only once its WAV is there.
       await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, shaped)
       const saved = await changeBoard(projectFile, found, (board) => {
+        // Stopped while its file was written or it waited for the board: not put on it.
+        if (stop.signal.aborted) return
         board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort((a, b) => a.n - b.n)
       })
+      if (stop.signal.aborted) {
+        await rm(resolveInRoot(found.root, `${found.folder}/${fileOf(made)}`), { force: true })
+        return
+      }
       if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       waiting.delete(entry.n)
     } catch (error) {
@@ -387,10 +393,11 @@ export function createMusicTakes({
       if (!found || !('inputs' in found)) return found
       let stopped = 0
       const entries = active.get(`${projectFile}\0${id}`)
-      for (const [n, entry] of entries ?? []) {
+      if (!entries) return { ok: true, stopped: 0 }
+      for (const [n, entry] of entries) {
         if (entry.state === 'failed') continue
         entry.stop?.abort()
-        entries?.delete(n)
+        entries.delete(n)
         stopped++
       }
       return { ok: true, stopped }

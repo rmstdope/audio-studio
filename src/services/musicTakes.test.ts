@@ -9,7 +9,8 @@ import { createSerial } from './serial'
 import type { MusicGenerator, MusicReady, MusicRequest } from './music'
 import type { Encoder } from './audio'
 import { loadProject } from './workspace'
-import { createMusicTakes } from './musicTakes'
+import { boardQueue, createMusicTakes } from './musicTakes'
+import { GPU } from './gpu'
 
 const music = {
   paths: {
@@ -259,7 +260,8 @@ describe('createMusicTakes', () => {
         return inner.generator.generate(request)
       },
     }
-    const takes = createMusicTakes({ generator: slow, queue: createSerial(), newSeed: () => 1 })
+    const queue = createSerial()
+    const takes = createMusicTakes({ generator: slow, queue, newSeed: () => 1 })
     await takes.make(file, 'hall', { count: 3 })
     for (let i = 0; i < 200 && !signals.length; i++) await new Promise((r) => setTimeout(r, 5))
     expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 3 })
@@ -270,7 +272,7 @@ describe('createMusicTakes', () => {
       failed: [],
     })
     release()
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await queue.run(GPU, async () => {})
     // Nothing more is made: no board entry, no file, no further request; the earlier take stays.
     expect(await takes.view(file, 'hall')).toMatchObject({
       takes: [{ n: 1 }],
@@ -282,6 +284,30 @@ describe('createMusicTakes', () => {
     expect(await takes.making(file)).toEqual({})
     expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 0 })
     expect(await takes.stop(file, 'nope')).toBeNull()
+  })
+
+  it('discards a take stopped after it was made but before it was saved', async () => {
+    const { root, file } = setup()
+    const queue = createSerial()
+    const takes = createMusicTakes({
+      generator: fakeGenerator().generator,
+      queue,
+      newSeed: () => 1,
+    })
+    await takes.make(file, 'hall', { count: 1 })
+    // The track's board turn is held, so the finished take waits there to be saved.
+    let release: () => void = () => {}
+    const held = boardQueue().run(`${file}\0hall`, () => new Promise<void>((r) => (release = r)))
+    const folder = join(root, '.audio-studio/music-takes/hall')
+    for (let i = 0; i < 200 && !(existsSync(folder) && readdirSync(folder).length); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 1 })
+    release()
+    await held
+    await queue.run(GPU, async () => {})
+    expect(await takes.view(file, 'hall')).toMatchObject({ takes: [], making: [], failed: [] })
+    expect(readdirSync(folder)).toEqual([])
   })
 
   it('sums what is being made across the project: takes and about how long', async () => {
