@@ -165,6 +165,7 @@ describe('GeneratePanel, when generation cannot be planned', () => {
     expect(container.textContent).toContain('Generation cannot be planned')
     expect(container.textContent).toContain(cues.message)
     expect(container.textContent).not.toContain(cast.message)
+    expect(container.textContent).not.toContain('until the problems above are fixed')
     await act(() => page.unmount())
   })
 })
