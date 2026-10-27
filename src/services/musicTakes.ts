@@ -27,6 +27,7 @@ import {
 import { trackFor, type TrackRow } from '../core/music'
 import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
+import { movedBoardTake } from '../core/musicMove'
 import { readWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
@@ -34,6 +35,7 @@ import { gpuQueue, GPU } from './gpu'
 import type { MusicGenerator } from './music'
 import { commitChoice, readChosen, uncommitChoice, type CommitResult } from './musicClips'
 import { readMusic } from './musicLists'
+import { isRefreshing, isRefreshingShared } from './refresh'
 import { createSerial, type Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
@@ -60,6 +62,10 @@ export type MakeResult = { ok: true } | { ok: false; message: string } | Project
 
 /** What dropping a take answered; null for a track the project does not list. */
 export type DropResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
+
+/** What moving a take answered: its number on the other track; null for a track the project does not list. */
+export type MoveResult =
+  { ok: true; n: number } | { ok: false; message: string } | ProjectFailure | null
 
 /** What stopping answered: how many takes were stopped, made or waiting; null for an unknown track. */
 export type StopResult = { ok: true; stopped: number } | ProjectFailure | null
@@ -154,6 +160,12 @@ export interface MusicTakes {
   unchoose(projectFile: string, id: string): Promise<ChooseResult>
   /** Takes a take off the board and deletes its file; the chosen take stays. */
   drop(projectFile: string, id: string, name: string): Promise<DropResult>
+  /**
+   * Moves a take to the board of another track of the same kind, as that track's next take, made
+   * for its brief; it keeps where it came from. Not the chosen take, and not while either track's
+   * list is being refreshed from the game.
+   */
+  move(projectFile: string, id: string, name: string, toId: string): Promise<MoveResult>
   /** What is being made in the project, by track, for the lists' status. */
   making(projectFile: string): Promise<Record<string, MakingSummary>>
   /** The path of a take's WAV, or null for a track not listed or a name that is not a take's. */
@@ -215,6 +227,7 @@ export function createMusicTakes({
       music: project.music,
       model: project.music.model ?? DEFAULT_MUSIC_MODEL,
       listId: found.list.id,
+      title: row.title,
       inputs,
       hash: musicTakeHash(inputs),
       folder: `${MUSIC_TAKES_DIR}/${id}`,
@@ -338,6 +351,7 @@ export function createMusicTakes({
           earlier: take.hash !== hash,
           chosen: chosen?.take === take.n && chosen.fp === take.hash,
           model: modelLine(take.model),
+          ...(take.movedFrom && { movedFrom: take.movedFrom }),
         })
       }
       const making: MakingView[] = entries
@@ -510,6 +524,78 @@ export function createMusicTakes({
       // In the board's turn, like Choose and Drop, so none slips between another's check and write.
       return boards.run(`${projectFile}\0${id}`, () =>
         uncommitChoice({ root: found.root, projectFile, music: found.music, id }),
+      )
+    },
+
+    async move(projectFile, id, name, toId) {
+      const from = await resolve(projectFile, id)
+      if (!from || !('inputs' in from)) return from
+      const to = await resolve(projectFile, toId)
+      if (!to) return { ok: false, message: 'That track is not in the game’s list.' }
+      if (!('inputs' in to)) return to
+      if (to.id === from.id)
+        return { ok: false, message: 'A take cannot move to the track it is on.' }
+      if (to.inputs.kind !== from.inputs.kind) {
+        return { ok: false, message: 'A loop can only move to a loop, and a stinger to a stinger.' }
+      }
+      // Checked before the boards' turns: a refresh rewrites the game's list, never the boards, so one
+      // that starts in between cannot harm the move.
+      for (const track of [from, to]) {
+        const busy =
+          track.listId === 'stingers'
+            ? isRefreshingShared(projectFile)
+            : isRefreshing(projectFile, track.listId)
+        if (busy) return { ok: false, message: `${track.title} is being refreshed from the game.` }
+      }
+      // Both boards' turns, in a fixed order, so two moves the other way round cannot wait on each other.
+      const [first, second] = [from.id, to.id].sort()
+      return boards.run(`${projectFile}\0${first}`, () =>
+        boards.run(`${projectFile}\0${second}`, async (): Promise<MoveResult> => {
+          const problems: Problem[] = []
+          const chosenTracks = await readChosen(from.root, from.music, problems)
+          if (!chosenTracks || problems.length) {
+            return { ok: false, message: 'The music lock could not be read.' }
+          }
+          const source = await readBoard(from.root, from.board)
+          if ('ok' in source) return source
+          const target = await readBoard(to.root, to.board)
+          if ('ok' in target) return target
+          const take = source.takes.find((t) => fileOf(t) === name)
+          if (!take) return { ok: false, message: 'That take is not on the board.' }
+          const chosen = chosenTracks[id]?.lock
+          if (chosen?.take === take.n && chosen.fp === take.hash) {
+            return { ok: false, message: 'That take is the one in the game; choose another first.' }
+          }
+          let wav: Uint8Array
+          try {
+            wav = new Uint8Array(
+              await Bun.file(resolveInRoot(from.root, `${from.folder}/${name}`)).arrayBuffer(),
+            )
+          } catch {
+            return { ok: false, message: 'That take’s sound is gone, so it cannot be moved.' }
+          }
+          // The number a take being made there holds is not taken.
+          const n = Math.max(
+            target.next,
+            ...entriesOf(projectFile, to.id).map((entry) => entry.n + 1),
+          )
+          const moved = movedBoardTake(take, {
+            n,
+            hash: to.hash,
+            inputs: to.inputs,
+            from: from.title,
+          })
+          // The sound first, then the destination's board, then the source's: a failure part-way
+          // leaves the take on both boards, never on neither.
+          await writeAtomic(to.root, `${to.folder}/${fileOf(moved)}`, wav)
+          target.next = n + 1
+          target.takes = [...target.takes, moved].sort((a, b) => a.n - b.n)
+          await writeAtomic(to.root, to.board, `${JSON.stringify(target, null, 2)}\n`)
+          source.takes = source.takes.filter((t) => t !== take)
+          await writeAtomic(from.root, from.board, `${JSON.stringify(source, null, 2)}\n`)
+          await rm(resolveInRoot(from.root, `${from.folder}/${name}`), { force: true })
+          return { ok: true, n }
+        }),
       )
     },
 

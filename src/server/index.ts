@@ -14,7 +14,7 @@ import { createLimiter } from '../services/limit'
 import { costCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
 import { BriefChangeBody } from '../core/music'
-import { ChooseTakeBody, MakeTakesBody, seamWav } from '../core/musicTake'
+import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
@@ -986,6 +986,22 @@ export function startServer({
           const body = ChooseTakeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { file }' }, { status: 400 })
           const result = await musicTakes.choose(projectFile, request.params.id, body.data.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/move': {
+        POST: fromOwnPage(async (request) => {
+          const body = MoveTakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { file, to }' }, { status: 400 })
+          }
+          const result = await musicTakes.move(
+            projectFile,
+            request.params.id,
+            body.data.file,
+            body.data.to,
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

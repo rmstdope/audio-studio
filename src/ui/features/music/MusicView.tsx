@@ -31,7 +31,7 @@ export function MusicView({ summary, route }: { summary: ProjectSummary; route: 
   const list = listFor(summary.music.lists, route)
   if (!list) return <NoMusic />
   const found = route.page === 'track' ? trackFor(summary.music.lists, route.track) : undefined
-  if (found) return <TrackView list={found.list} track={found.track} />
+  if (found) return <TrackView list={found.list} lists={summary.music.lists} track={found.track} />
   return list.kind === 'stingers' ? (
     <StingersPage key="stingers" list={list} />
   ) : (

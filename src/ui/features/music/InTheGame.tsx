@@ -7,6 +7,7 @@ import { Confirm } from '../../components/Confirm'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { clock } from '../../format'
+import { movedFromLine } from '../../../core/musicMove'
 
 /** One clip at a time, shared with the takes below. */
 type Player = ReturnType<typeof useClipPlayer>
@@ -191,6 +192,7 @@ export function InTheGame({
         )}
         {take && <span className="faint small">{take.model}</span>}
       </div>
+      {take?.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
       {take && <Playback trackId={track.id} kind={view.kind} take={take} player={player} />}
       <div className="track-in-game-actions">
         <span className="grow" />

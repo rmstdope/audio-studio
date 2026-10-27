@@ -116,6 +116,11 @@ export function isRefreshing(projectFile: string, partId: string): boolean {
   return active.has(partKey(projectFile, partId))
 }
 
+/** Whether a refresh of the stingers' list is running or waiting to run. */
+export function isRefreshingShared(projectFile: string): boolean {
+  return active.has(sharedKey(projectFile))
+}
+
 /**
  * The process groups of the commands running now, so they can be stopped with the studio, and
  * whether the studio's exit is watched. Kept on `globalThis`, as `--dev` reruns this module: one

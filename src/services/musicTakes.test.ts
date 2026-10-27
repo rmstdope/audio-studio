@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  chmodSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { wavSeconds } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
@@ -11,6 +19,7 @@ import type { Encoder } from './audio'
 import { loadProject } from './workspace'
 import { boardQueue, createMusicTakes, musicTakeHash } from './musicTakes'
 import { GPU } from './gpu'
+import { refreshDialog, refreshShared, stopRefreshes } from './refresh'
 import { createHash } from 'node:crypto'
 
 const music = {
@@ -765,5 +774,236 @@ describe('choosing a take', () => {
     const read = await good.settled('hall')
     if (!read || !('ok' in read) || !read.ok) throw new Error('expected a view')
     expect(read.lockUnread).toBe(false)
+  })
+})
+
+describe('moving a take', () => {
+  const lists = {
+    'tts/act1/music.json': [
+      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
+      { id: 'inn', title: 'Inn', brief: 'jolly', seconds: 40 },
+    ],
+    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', brief: 'eerie', seconds: 20 }],
+    'tts/stingers.json': [
+      { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
+      { id: 'defeat', title: 'Defeat', brief: 'sad', seconds: 5 },
+    ],
+  }
+  async function made(count = 2, extra: Record<string, unknown> = {}) {
+    const m = setup(undefined, { ...lists, ...extra })
+    await m.takes.make(m.file, 'hall', { count })
+    await m.settled('hall')
+    return m
+  }
+  const viewOf = async (m: Awaited<ReturnType<typeof made>>, id: string) => {
+    const view = await m.takes.view(m.file, id)
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    return view
+  }
+  const lockOf = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+
+  it('moves a take to a loop in another act as that loop’s next take, sound and all', async () => {
+    const m = await made()
+    await m.takes.make(m.file, 'hut', { count: 1 })
+    await m.settled('hut')
+    const [one, two] = (await viewOf(m, 'hall')).takes
+    expect(await m.takes.move(m.file, 'hall', two!.file, 'hut')).toEqual({ ok: true, n: 2 })
+    const hall = await viewOf(m, 'hall')
+    expect(hall.takes.map((t) => t.n)).toEqual([one!.n])
+    expect(existsSync(join(m.root, '.audio-studio/music-takes/hall', two!.file))).toBe(false)
+    const hut = await viewOf(m, 'hut')
+    expect(hut.takes.map((t) => t.n)).toEqual([1, 2])
+    const moved = hut.takes[1]!
+    expect(moved).toMatchObject({
+      seconds: two!.seconds,
+      seed: two!.seed,
+      peaks: two!.peaks,
+      earlier: false,
+      chosen: false,
+      movedFrom: { title: 'Hall', n: 2 },
+    })
+    expect(existsSync(join(m.root, '.audio-studio/music-takes/hut', moved.file))).toBe(true)
+    expect(hut.takes[0]!.movedFrom).toBeUndefined()
+  })
+
+  it('counts the moved take as made for the new brief: chosen is plain chosen, and a later change marks it', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m, 'hall')).takes
+    expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({ ok: true, n: 1 })
+    const hut = await viewOf(m, 'hut')
+    expect(await m.takes.choose(m.file, 'hut', hut.takes[0]!.file)).toEqual({ ok: true })
+    expect(lockOf(m.root).hut.inputs).toMatchObject({ brief: 'eerie', seconds: 20 })
+    const loaded = await loadProject(m.file)
+    if (!loaded.ok) throw new Error('project')
+    const row = loaded.summary.music!.lists.flatMap((l) => l.tracks).find((t) => t.id === 'hut')!
+    expect(row.status).toBe('chosen')
+    expect((await viewOf(m, 'hut')).takes[0]!.movedFrom).toEqual({ title: 'Hall', n: 1 })
+    await setTrackBrief(m.file, 'hut', { brief: 'sinister' })
+    const after = await loadProject(m.file)
+    if (!after.ok) throw new Error('project')
+    const changed = after.summary.music!.lists.flatMap((l) => l.tracks).find((t) => t.id === 'hut')!
+    expect(changed.status).toBe('changed')
+  })
+
+  it('numbers after a take being made at the destination', async () => {
+    let release = () => {}
+    const m = setup(undefined, lists, [], new Promise<void>((resolve) => (release = resolve)))
+    await m.takes.make(m.file, 'hut', { count: 2 })
+    // Takes 1 and 2 of the hut are waiting; hall has a take from the board file.
+    release()
+    await m.settled('hut')
+    await m.takes.make(m.file, 'hall', { count: 1 })
+    await m.settled('hall')
+    const [take] = (await viewOf(m, 'hall')).takes
+    expect(await m.takes.move(m.file, 'hall', take!.file, 'hut')).toEqual({ ok: true, n: 3 })
+  })
+
+  it('moves a stinger to a stinger', async () => {
+    const m = setup(undefined, lists)
+    await m.takes.make(m.file, 'victory', { count: 1 })
+    await m.settled('victory')
+    const [take] = (await viewOf(m, 'victory')).takes
+    expect(await m.takes.move(m.file, 'victory', take!.file, 'defeat')).toEqual({ ok: true, n: 1 })
+    expect((await viewOf(m, 'victory')).takes).toEqual([])
+    expect((await viewOf(m, 'defeat')).takes[0]).toMatchObject({ earlier: false })
+  })
+
+  it('refuses what cannot move, naming why, and changes nothing', async () => {
+    const m = await made()
+    const [one, two] = (await viewOf(m, 'hall')).takes
+    await m.takes.choose(m.file, 'hall', one!.file)
+    const refused = async (name: string, to: string, message: string) => {
+      expect(await m.takes.move(m.file, 'hall', name, to)).toEqual({ ok: false, message })
+    }
+    await refused(one!.file, 'hut', 'That take is the one in the game; choose another first.')
+    await refused(
+      two!.file,
+      'victory',
+      'A loop can only move to a loop, and a stinger to a stinger.',
+    )
+    await refused(two!.file, 'hall', 'A take cannot move to the track it is on.')
+    await refused(two!.file, 'nope', 'That track is not in the game’s list.')
+    await refused('0123456789abcdef.9.wav', 'hut', 'That take is not on the board.')
+    expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
+    expect((await viewOf(m, 'hut')).takes).toHaveLength(0)
+    expect(await m.takes.move(m.file, 'nope', two!.file, 'hut')).toBeNull()
+  })
+
+  it('refuses while the music lock cannot be read', async () => {
+    const m = await made(2, { 'music/music.lock.json': '{ nope' })
+    const [one] = (await viewOf(m, 'hall')).takes
+    expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({
+      ok: false,
+      message: 'The music lock could not be read.',
+    })
+  })
+
+  it('refuses a take whose sound is gone', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m, 'hall')).takes
+    // Board entry kept, file removed behind the studio's back.
+    const board = join(m.root, '.audio-studio/music/hall.json')
+    const text = readFileSync(board, 'utf8')
+    const gone = join(m.root, '.audio-studio/music-takes/hall', one!.file)
+    rmSync(gone)
+    expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toMatchObject({ ok: false })
+    expect(readFileSync(board, 'utf8')).toBe(text)
+  })
+
+  it('refuses while the destination’s list is being refreshed from the game', async () => {
+    const json = projectJson({ music })
+    ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
+    const m = await made(2, { 'audio-studio.json': json })
+    const [one] = (await viewOf(m, 'hall')).takes
+    const refreshing = refreshDialog(m.file, 'act2')
+    try {
+      expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({
+        ok: false,
+        message: 'Hut is being refreshed from the game.',
+      })
+    } finally {
+      stopRefreshes()
+      await refreshing.catch(() => {})
+    }
+    expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
+  })
+
+  it('refuses while the source’s list is being refreshed, and while the stingers are', async () => {
+    const json = projectJson({ music: { ...music, refreshShared: 'sleep 1' } })
+    ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
+    const m = await made(2, { 'audio-studio.json': json })
+    const [one] = (await viewOf(m, 'hall')).takes
+    const refreshing = refreshDialog(m.file, 'act1')
+    try {
+      expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({
+        ok: false,
+        message: 'Hall is being refreshed from the game.',
+      })
+    } finally {
+      stopRefreshes()
+      await refreshing.catch(() => {})
+    }
+    await m.takes.make(m.file, 'victory', { count: 1 })
+    await m.settled('victory')
+    const [take] = (await viewOf(m, 'victory')).takes
+    const shared = refreshShared(m.file)
+    try {
+      expect(await m.takes.move(m.file, 'victory', take!.file, 'defeat')).toEqual({
+        ok: false,
+        message: 'Victory is being refreshed from the game.',
+      })
+    } finally {
+      stopRefreshes()
+      await shared.catch(() => {})
+    }
+    expect((await viewOf(m, 'victory')).takes).toHaveLength(1)
+  })
+
+  it('leaves the take on its board when the destination cannot be written', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m, 'hall')).takes
+    // The destination's takes folder is a file: its sound cannot be written.
+    mkdirSync(join(m.root, '.audio-studio/music-takes'), { recursive: true })
+    writeFileSync(join(m.root, '.audio-studio/music-takes/hut'), 'in the way')
+    await expect(m.takes.move(m.file, 'hall', one!.file, 'hut')).rejects.toThrow()
+    expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
+  })
+
+  it('never loses the take when the boards cannot be written: it stays on the first', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m, 'hall')).takes
+    const folder = join(m.root, '.audio-studio/music')
+    chmodSync(folder, 0o555)
+    try {
+      await expect(m.takes.move(m.file, 'hall', one!.file, 'hut')).rejects.toThrow()
+    } finally {
+      chmodSync(folder, 0o755)
+    }
+    expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
+  })
+
+  it('lands both of two opposite moves at once', async () => {
+    const m = await made(1)
+    await m.takes.make(m.file, 'hut', { count: 1 })
+    await m.settled('hut')
+    const a = (await viewOf(m, 'hall')).takes[0]!
+    const b = (await viewOf(m, 'hut')).takes[0]!
+    const answers = await Promise.all([
+      m.takes.move(m.file, 'hall', a.file, 'hut'),
+      m.takes.move(m.file, 'hut', b.file, 'hall'),
+    ])
+    expect(answers.map((x) => x && 'ok' in x && x.ok)).toEqual([true, true])
+    expect((await viewOf(m, 'hall')).takes).toHaveLength(1)
+    expect((await viewOf(m, 'hut')).takes).toHaveLength(1)
+  })
+
+  it('writes under .audio-studio only', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m, 'hall')).takes
+    const before = readdirSync(m.root).sort()
+    await m.takes.move(m.file, 'hall', one!.file, 'hut')
+    expect(readdirSync(m.root).sort()).toEqual(before)
+    expect(existsSync(join(m.root, 'music/music.lock.json'))).toBe(false)
   })
 })

@@ -3191,3 +3191,154 @@ button.cue-chip[aria-expanded='true'] {
   font-size: 12px;
   color: var(--warn);
 }
+
+/* Move a take to another track (as-824): the dialog, its list, and the line after a move. */
+.modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.modal h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.modal .filter {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 10px;
+  font: inherit;
+  margin: 8px 0 2px;
+}
+
+.modal-list {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.modal-list .group {
+  margin-top: 10px;
+}
+
+.modal-note {
+  padding: 6px;
+}
+
+.dest {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dest:hover:not(:disabled),
+.dest.sel {
+  background: var(--raised);
+}
+
+.dest.sel {
+  outline: 1px solid var(--accent);
+}
+
+.dest:disabled {
+  cursor: default;
+}
+
+.dest.off {
+  opacity: 0.45;
+}
+
+.dest-title,
+.dest-line {
+  display: block;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.moved {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--text-soft);
+}
+
+.move-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.move-wrap button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.move-tip {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  z-index: 2;
+  display: none;
+  width: max-content;
+  max-width: 240px;
+  margin-bottom: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--text-soft);
+}
+
+.move-wrap:hover .move-tip,
+.move-wrap:focus-within .move-tip {
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .modal-back {
+    padding: 0;
+  }
+
+  .modal {
+    max-width: none;
+    height: 100%;
+    border-radius: 0;
+  }
+}

@@ -149,6 +149,12 @@ export function shapeTake(
   return writeWav(kind === 'loop' ? shapeLoop(wav, seconds) : shapeStinger(wav, seconds))
 }
 
+/** Where a moved take came from: the track's title as it was, and the take's number there. */
+export const MovedFromSchema = z.object({ title: z.string(), n: z.number().int().positive() })
+
+/** Where a moved take came from. */
+export type MovedFrom = z.infer<typeof MovedFromSchema>
+
 /** One take on a track's page. */
 export interface TakeView {
   n: number
@@ -165,6 +171,8 @@ export interface TakeView {
   chosen: boolean
   /** The music model that made it, as a line: "Balanced · XL turbo · 4B". */
   model: string
+  /** The track it was moved from and its number there; absent on a take made for this track. */
+  movedFrom?: MovedFrom
 }
 
 /** A take being made or waiting its turn. */
@@ -227,6 +235,8 @@ export const BoardTakeSchema = z.object({
   seconds: z.number(),
   peaks: z.array(z.number()),
   inputs: TakeInputsSchema,
+  /** Set when the take was moved here from another track, for good. */
+  movedFrom: MovedFromSchema.optional(),
 })
 
 /** A track's board: the takes kept, and the number the next take gets (numbers are never reused). */
@@ -263,3 +273,6 @@ export const MakeTakesBody = z.union([
 
 /** The body of a choice: the file name of the take on the track's board. */
 export const ChooseTakeBody = z.object({ file: z.string().min(1) }).strict()
+
+/** The body of a move: the take's file on this track's board, and the id of the track it moves to. */
+export const MoveTakeBody = z.object({ file: z.string().min(1), to: z.string().min(1) }).strict()

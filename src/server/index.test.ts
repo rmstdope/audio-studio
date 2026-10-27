@@ -3613,3 +3613,72 @@ describe('server, no music model without music', () => {
     }
   })
 })
+
+describe('server, moving a take', () => {
+  const musicRoot = tempRepo({
+    'audio-studio.json': projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/act2/music.json': [{ id: 'hut', title: 'Hut', brief: 'eerie', seconds: 5 }],
+  })
+  const studio = startServer({
+    projectFile: join(musicRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    music: {
+      ready: () => ({ ok: true }),
+      installed: () => true,
+      async generate(request) {
+        const samples = new Int16Array(request.seconds * 1000).fill(4000)
+        const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
+        return {
+          wav: writeWav({ format, data: new Uint8Array(samples.buffer) }),
+          seed: request.seed,
+        }
+      },
+      close() {},
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const at = (path: string) => new URL(path, studio.url)
+  const post = (path: string, body: unknown, origin = studio.url.origin) =>
+    fetch(at(path), {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('moves a take from the studio’s own page only, and answers its new number', async () => {
+    await post('/api/music/tracks/hall/takes', { count: 1 })
+    let view = await (await fetch(at('/api/music/tracks/hall/takes'))).json()
+    for (let i = 0; i < 300 && (view.making.length || !view.takes.length); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      view = await (await fetch(at('/api/music/tracks/hall/takes'))).json()
+    }
+    const file = view.takes[0].file
+    const path = '/api/music/tracks/hall/move'
+    expect((await post(path, { file, to: 'hut' }, 'https://evil.example')).status).toBe(403)
+    expect((await post(path, { file })).status).toBe(400)
+    expect((await post('/api/music/tracks/nobody/move', { file, to: 'hut' })).status).toBe(404)
+    const refused = await post(path, { file, to: 'hall' })
+    expect(refused.status).toBe(409)
+    expect(await post(path, { file, to: 'hut' }).then((r) => r.json())).toEqual({ ok: true, n: 1 })
+    const hut = await (await fetch(at('/api/music/tracks/hut/takes'))).json()
+    expect(hut.takes[0].movedFrom).toEqual({ title: 'Hall', n: 1 })
+    const hall = await (await fetch(at('/api/music/tracks/hall/takes'))).json()
+    expect(hall.takes).toEqual([])
+  })
+})
