@@ -31,6 +31,8 @@ const answer = (music: Extract<ModelsAnswer, { ok: true }>['music']): ModelsAnsw
   ok: true,
   file: 'audio-studio.json',
   models: { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 's2.1-pro-free' },
+  elevenlabs: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_v3' },
+  castsEleven: false,
   dialog: { lines: 0, bytes: 0 },
   recorded: {},
   music,
@@ -200,5 +202,110 @@ describe('the Music row of the Models panel', () => {
     expect(short.disabled).toBe(false)
     await page.pick('short')
     expect(put).toEqual([{ model: 'short', was: 'balanced' }])
+  })
+})
+
+describe('the ElevenLabs rows of the Models panel', () => {
+  const withEleven = (
+    recorded: Record<
+      string,
+      { lines: number; bytes: number; characters: number; bare: number }
+    > = {},
+    final = 'eleven_v3',
+  ) => ({
+    ...(answer(null) as Extract<ModelsAnswer, { ok: true }>),
+    elevenlabs: { audition: 'eleven_v3', draft: 'eleven_v3', final },
+    castsEleven: true,
+    recorded,
+  })
+  const elevenPut: { url: string; body: unknown }[] = []
+  beforeEach(() => {
+    elevenPut.length = 0
+    globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PUT')
+        elevenPut.push({ url: String(url), body: JSON.parse(String(init.body)) })
+      return new Response(JSON.stringify({ ok: true }))
+    }) as typeof fetch
+  })
+  const elevenMenu = (container: HTMLElement, name: string) =>
+    container.querySelector<HTMLSelectElement>(`select[aria-label="ElevenLabs ${name} model"]`)!
+
+  it('shows ElevenLabs’ draft and final only in a project with an ElevenLabs voice', () => {
+    const fishOnly = render(answer(null))
+    expect(
+      [...fishOnly.container.querySelectorAll('.mrow .mname')].map((n) => n.textContent),
+    ).toEqual(['Audition', 'Draft', 'Final'])
+    const page = render(withEleven())
+    expect([...page.container.querySelectorAll('.mrow .mname')].map((n) => n.textContent)).toEqual([
+      'Audition',
+      'Draft',
+      'Final',
+      'ElevenLabs draft',
+      'ElevenLabs final',
+    ])
+    const menu = elevenMenu(page.container, 'draft')
+    expect(menu.value).toBe('eleven_v3')
+    expect([...menu.options].map((o) => o.textContent)).toEqual([
+      'Eleven v3 · 1 credit a character',
+      'Multilingual v2 · 1 credit a character · cues not spoken',
+      'Flash v2.5 · 0.5 credits a character · cues not spoken',
+    ])
+  })
+
+  it('saves a model at once when no line goes out of date', async () => {
+    const page = render(withEleven())
+    await act(async () => {
+      const menu = elevenMenu(page.container, 'draft')
+      menu.value = 'eleven_flash_v2_5'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(elevenPut).toEqual([
+      {
+        url: '/api/models/elevenlabs/draft',
+        body: { model: 'eleven_flash_v2_5', was: 'eleven_v3' },
+      },
+    ])
+  })
+
+  it('asks first when lines go out of date, naming the credits', async () => {
+    const page = render(
+      withEleven(
+        { eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 } },
+        'eleven_multilingual_v2',
+      ),
+    )
+    await act(async () => {
+      const menu = elevenMenu(page.container, 'draft')
+      menu.value = 'eleven_flash_v2_5'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(elevenPut).toEqual([])
+    expect(page.container.textContent).toContain('Switch ElevenLabs drafts to Flash v2.5?')
+    expect(page.container.textContent).toContain('about 150 credits')
+    const confirm = [...page.container.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Switch to Flash v2.5',
+    )!
+    await act(async () => confirm.click())
+    expect(elevenPut).toHaveLength(1)
+  })
+
+  it('says a switch failed, with Keep and Try again', async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ ok: false, problems: [{ message: 'Act I is recording' }] }), {
+        status: 409,
+      })) as unknown as typeof fetch
+    const page = render(withEleven())
+    await act(async () => {
+      const menu = elevenMenu(page.container, 'draft')
+      menu.value = 'eleven_flash_v2_5'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    for (let i = 0; i < 50 && !page.container.querySelector('[role="alert"]'); i++) {
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+    const alert = page.container.querySelector('[role="alert"]')!.textContent
+    expect(alert).toContain('Could not switch ElevenLabs drafts to Flash v2.5')
+    expect(alert).toContain('Keep Eleven v3')
+    expect(alert).toContain('Try again')
   })
 })

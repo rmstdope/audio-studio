@@ -35,14 +35,17 @@ export function GeneratePanel({
   /** The language to record, in a project with several; null in a project with one. */
   language: { id: string; name: string } | null
   speaker: string | null
-  /** The draft and final models: a final step is offered only when they differ. */
-  models: { draft: string; final: string }
+  /**
+   * The draft and final stages as named (Fish's model, and ElevenLabs' beside it in a part with
+   * an ElevenLabs voice, `both`), and whether there is a final step: offered only then.
+   */
+  models: { draft: string; final: string; finalStep: boolean; both: boolean }
   /** The problems the page already shows above the panel, which it does not repeat. */
   shown: Problem[]
 }) {
   const [retakeWeak, setRetakeWeak] = useState(false)
   const [stage, setStage] = useState<'draft' | 'final'>('draft')
-  const hasFinal = models.final !== models.draft
+  const hasFinal = models.finalStep
   const plan = usePlan(partId, speaker, retakeWeak, hasFinal ? stage : 'draft', language?.id)
   const job = useJob(partId, language?.id)
   const { start, cancel } = useJobActions(partId, language?.id)
@@ -258,7 +261,9 @@ export function GeneratePanel({
       )}
       {stage === 'final' && hasFinal && (
         <span className="muted">
-          The final recording records every line whose clip was not made with {models.final} yet;
+          {models.both
+            ? 'The final recording records every line whose clip was not made with its voice’s final model yet;'
+            : `The final recording records every line whose clip was not made with ${models.final} yet;`}{' '}
           draft plans leave final clips alone.
         </span>
       )}

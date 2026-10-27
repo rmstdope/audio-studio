@@ -37,6 +37,7 @@ describe('modelsView', () => {
     if (!view.ok) throw new Error(JSON.stringify(view.problems))
     expect(view.file).toBe('audio-studio.json')
     expect(view.models).toEqual(models)
+    expect(view.castsEleven).toBe(false)
     expect(view.dialog.lines).toBe(3)
     expect(view.dialog.bytes).toBeGreaterThan(3 * 'Once.'.length)
     expect(Object.keys(view.recorded)).toEqual(['s2.1-pro-free'])
@@ -130,5 +131,28 @@ describe('modelsView', () => {
       join(tempRepo({ 'audio-studio.json': projectJson() }), 'audio-studio.json'),
     )
     expect(view).toMatchObject({ ok: true, music: null })
+  })
+})
+
+describe('modelsView, with ElevenLabs', () => {
+  it('gives ElevenLabs’ stage models, and the characters each model’s recorded lines were sent', async () => {
+    const root = tempRepo({
+      'audio-studio.json': project(models),
+      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1', style: '[warm]' } } },
+      'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+      'audio/act1/a.mp3': 'x',
+      'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
+      'tts/act1/narration.lock.json': { a: entry('eleven_v3') },
+    })
+    const view = await modelsView(join(root, 'audio-studio.json'))
+    if (!view.ok) throw new Error(JSON.stringify(view.problems))
+    expect(view.elevenlabs).toEqual({
+      audition: 'eleven_v3',
+      draft: 'eleven_v3',
+      final: 'eleven_v3',
+    })
+    expect(view.castsEleven).toBe(true)
+    // Sent with its style, which Eleven v3 reads: "[warm] Once."
+    expect(view.recorded.eleven_v3).toEqual({ lines: 1, bytes: 12, characters: 12, bare: 5 })
   })
 })

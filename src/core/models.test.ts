@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  sameAsDraftWords,
+  elevenChangeOf,
+  elevenOptions,
+  elevenQuestionWords,
   busyWords,
   changeOf,
   failureHeading,
@@ -63,7 +67,7 @@ describe('modelOptions', () => {
 })
 
 describe('priceWords', () => {
-  const dialog = { lines: 2340, bytes: 118_000 }
+  const dialog = { lines: 2340, bytes: 118_000, characters: 118_000 }
   it('never writes "about under" for a tiny project total', () => {
     const words = priceWords('s2.1-pro', before, { lines: 1, bytes: 40 })
     expect(words).toBe('$15 per million characters · under $0.01 for all 1 line')
@@ -108,9 +112,9 @@ describe('priceWords', () => {
 
 describe('changeOf', () => {
   const recorded = {
-    's2.1-pro-free': { lines: 1412, bytes: 71_400 },
-    's2.1-pro': { lines: 640, bytes: 21_333 },
-    s1: { lines: 10, bytes: 400 },
+    's2.1-pro-free': { lines: 1412, bytes: 71_400, characters: 71_400, bare: 71_400 },
+    's2.1-pro': { lines: 640, bytes: 21_333, characters: 21_333, bare: 21_333 },
+    s1: { lines: 10, bytes: 400, characters: 400, bare: 400 },
   }
   const models = { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 'drama-3' }
 
@@ -147,7 +151,7 @@ describe('changeOf', () => {
 
   it('gives both prices of a promotion, and says free for a free model', () => {
     const m = { ...models, draft: 's2.1-pro', final: 's2.1-pro' }
-    const rec = { 's2.1-pro': { lines: 640, bytes: 32_000 } }
+    const rec = { 's2.1-pro': { lines: 640, bytes: 32_000, characters: 32_000, bare: 32_000 } }
     const promo = changeOf('final', 'drama-3', { ...m, draft: 's2-pro' }, rec, before)
     expect(promo).toMatchObject({ kind: 'ask', lines: 640 })
     expect(promo.kind === 'ask' && promo.cost.now).toBeCloseTo(0.32, 6)
@@ -253,6 +257,79 @@ describe('busyWords and SAME_AS_DRAFT', () => {
     )
     expect(SAME_AS_DRAFT).toBe(
       'Same as draft: every line is recorded once, with no separate final recording.',
+    )
+  })
+})
+
+describe('ElevenLabs’ stages on the Models panel', () => {
+  const eleven = { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_v3' }
+  const recorded = {
+    eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 },
+    's2.1-pro-free': { lines: 3, bytes: 90, characters: 90, bare: 90 },
+  }
+
+  it('offers ElevenLabs’ models, each with its credits and whether it speaks cues', () => {
+    expect(elevenOptions()).toEqual([
+      { model: 'eleven_v3', label: 'Eleven v3 · 1 credit a character' },
+      {
+        model: 'eleven_multilingual_v2',
+        label: 'Multilingual v2 · 1 credit a character · cues not spoken',
+      },
+      {
+        model: 'eleven_flash_v2_5',
+        label: 'Flash v2.5 · 0.5 credits a character · cues not spoken',
+      },
+    ])
+  })
+
+  it('saves at once when no ElevenLabs line goes out of date, and asks when some do', () => {
+    expect(elevenChangeOf('draft', 'eleven_v3', eleven, recorded)).toEqual({ kind: 'none' })
+    expect(elevenChangeOf('audition', 'eleven_flash_v2_5', eleven, recorded)).toEqual({
+      kind: 'save',
+    })
+    // With one model for both, a draft switch leaves its clips in date as final ones.
+    expect(elevenChangeOf('final', 'eleven_flash_v2_5', eleven, recorded)).toEqual({ kind: 'save' })
+    expect(elevenChangeOf('draft', 'eleven_flash_v2_5', eleven, recorded)).toEqual({ kind: 'save' })
+    const separate = { ...eleven, final: 'eleven_multilingual_v2' }
+    expect(elevenChangeOf('draft', 'eleven_flash_v2_5', separate, recorded)).toEqual({
+      kind: 'ask',
+      lines: 12,
+      // Flash is sent the lines without their cues: 300 characters at half a credit.
+      credits: 150,
+    })
+  })
+
+  it('asks in its own words, with the credits and the cues not spoken', () => {
+    expect(
+      elevenQuestionWords(
+        'draft',
+        'eleven_v3',
+        'eleven_flash_v2_5',
+        { lines: 12, credits: 190 },
+        'audio-studio.json',
+      ),
+    ).toEqual({
+      heading: 'Switch ElevenLabs drafts to Flash v2.5?',
+      items: [
+        'ElevenLabs draft: Eleven v3 → Flash v2.5',
+        '12 lines drafted with Eleven v3 become out of date: the next draft records them again, about 190 credits.',
+        'Flash v2.5 speaks cues aloud, so lines are sent without them; they stay in the cue files.',
+        'Saved in audio-studio.json; nothing else in it changes.',
+      ],
+      keep: 'Keep Eleven v3',
+      confirm: 'Switch to Flash v2.5',
+    })
+  })
+})
+
+describe('sameAsDraftWords', () => {
+  it('says a final row is the draft’s, for whose voices when the project casts both providers’', () => {
+    expect(sameAsDraftWords(null)).toBe(SAME_AS_DRAFT)
+    expect(sameAsDraftWords('fish')).toBe(
+      'Same as draft: Fish voices’ lines are recorded once, with no separate final recording.',
+    )
+    expect(sameAsDraftWords('elevenlabs')).toBe(
+      'Same as draft: ElevenLabs voices’ lines are recorded once, with no separate final recording.',
     )
   })
 })

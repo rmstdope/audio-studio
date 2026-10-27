@@ -759,6 +759,65 @@ describe('a line on an ElevenLabs model that reads no cues', () => {
   })
 })
 
+describe('a final step on ElevenLabs’ side only', () => {
+  const elevenCast: Cast = {
+    speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]' } },
+    pronounce: {},
+  }
+  const withElevenFinal = {
+    ...narration,
+    elevenlabs: {
+      models: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_multilingual_v2' },
+    },
+  }
+
+  it('leaves a Fish line, whose stages are one, final when up to date', () => {
+    const lock = { n1: entryFor(lines[0]!, elevenCast) }
+    const state = planPart(input({ cast: elevenCast, lock, narration: withElevenFinal }))
+    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({ status: 'ok', final: true })
+  })
+
+  it('gives a part with Fish voices alone no final step, so no clip is badged final', () => {
+    const lock = { n1: entryFor(lines[0]!) }
+    const state = planPart(input({ lock, narration: withElevenFinal }))
+    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({ status: 'ok', final: false })
+  })
+
+  it('counts an ElevenLabs line drafted with v3 as not final yet', () => {
+    const lock = { m1: entryFor(lines[1]!, elevenCast) }
+    const state = planPart(input({ cast: elevenCast, lock, narration: withElevenFinal }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'ok', final: false })
+  })
+})
+
+describe('which stages of a line are sent without its cues', () => {
+  const elevenCast: Cast = {
+    speakers: { ...cast.speakers, mira: { voice: 'eleven:abc' } },
+    pronounce: {},
+  }
+  const on = (draft: string, final: string) =>
+    planPart(
+      input({
+        cast: elevenCast,
+        narration: {
+          ...narration,
+          elevenlabs: { models: { audition: 'eleven_v3', draft, final } },
+        },
+      }),
+    ).lines.map((l) => [l.key, l.unspokenCues])
+
+  it('names the stages whose ElevenLabs model would speak them, and none for Fish’s lines', () => {
+    expect(on('eleven_multilingual_v2', 'eleven_multilingual_v2')).toEqual([
+      ['n1', null],
+      ['m1', 'both'],
+      ['t1', null],
+    ])
+    expect(on('eleven_v3', 'eleven_flash_v2_5')[1]).toEqual(['m1', 'final'])
+    expect(on('eleven_flash_v2_5', 'eleven_v3')[1]).toEqual(['m1', 'draft'])
+    expect(on('eleven_v3', 'eleven_v3')[1]).toEqual(['m1', null])
+  })
+})
+
 describe('a Fish voice’s fingerprint', () => {
   it('is what it was before ElevenLabs, so no consumer’s clip goes stale', () => {
     const inputs = clipInputs(

@@ -32,3 +32,17 @@ export function cueTargets(lines: LineState[]): {
   const recorded = free.filter(({ line }) => line.file !== null).map(target)
   return { fresh, recorded, suggested: fresh.length === 1 ? fresh[0]!.key : null }
 }
+
+/** What the cue editor says of a line whose voice's model for a stage would speak a cue: none is sent. */
+export function unspokenCueNote(line: LineState): string | null {
+  switch (line.unspokenCues) {
+    case 'both':
+      return 'This voice’s ElevenLabs models speak cues aloud, so the line is recorded without them.'
+    case 'draft':
+      return 'This voice’s ElevenLabs draft model speaks cues aloud, so its drafts are recorded without them.'
+    case 'final':
+      return 'This voice’s ElevenLabs final model speaks cues aloud, so its final recording is made without them.'
+    default:
+      return null
+  }
+}

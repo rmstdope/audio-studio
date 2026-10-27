@@ -78,11 +78,13 @@ bundle breaks.
   Music page, and so does `music.refreshShared` when the user clicks Refresh from the game on the
   Stingers page; each writes what the game writes.
   The studio runs nothing else of the consumer's.
-- The project file itself is read, and changed in six kinds of places only: the words that sound
+- The project file itself is read, and changed in seven kinds of places only: the words that sound
   the same (`narration.quality.soundAlike`, and `narration.quality.soundAlikeByLanguage` for the
   other languages), saved from the Words that sound the same panel, `narration.models.draft` /
   `final`, moved from `s1` to `s2.1-pro` when the user confirms the retirement banner,
   `narration.models.audition` / `draft` / `final`, saved from the Models panel on Setup,
+  `narration.elevenlabs.models.draft` / `final` (with `audition` in a file that named none),
+  saved from that panel's ElevenLabs rows,
   `music.model`, saved from the Music row of the same panel,
   `narration.quality.fishTier`, saved from the menu on Setup's Requests at once row, and
   `takeFade`, saved from the Playing takes panel on Setup. Each save

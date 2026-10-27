@@ -24,6 +24,7 @@ function line(key: string, scene: string | null): LineState {
     insideStale: null,
     sourceInside: [],
     final: false,
+    unspokenCues: null,
     status: 'missing',
     reasons: [],
     heard: null,

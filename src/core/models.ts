@@ -1,3 +1,4 @@
+import { ELEVEN_MODEL_IDS, elevenCredits, elevenModelName, readsCues } from './elevenSpeech'
 import { priceDetail, pricedModels } from './prices'
 import { RETIRED_MODEL, sameModel } from './retirement'
 import { usd } from './spend'
@@ -27,8 +28,25 @@ export const STAGES: readonly { stage: Stage; name: string; purpose: string }[] 
 export const SAME_AS_DRAFT =
   'Same as draft: every line is recorded once, with no separate final recording.'
 
-/** What the project's recorded clips were made with: lines and bytes sent, by model. */
-export type Recorded = Record<string, { lines: number; bytes: number }>
+/**
+ * The line under a final row naming its draft's model: for every line in a project of one
+ * provider's voices (`whose` null), else for that provider's voices' lines.
+ */
+export function sameAsDraftWords(whose: 'fish' | 'elevenlabs' | null): string {
+  if (!whose) return SAME_AS_DRAFT
+  const voices = whose === 'fish' ? 'Fish voices’' : 'ElevenLabs voices’'
+  return `Same as draft: ${voices} lines are recorded once, with no separate final recording.`
+}
+
+/**
+ * What the project's recorded clips were made with, by model: lines, the bytes they were sent,
+ * and their characters with their cues and without (`bare`), for pricing them again on a model
+ * that reads cues or on one that speaks them.
+ */
+export type Recorded = Record<
+  string,
+  { lines: number; bytes: number; characters: number; bare: number }
+>
 
 /** The project's whole dialog: every line in every language, and the bytes sent to say them. */
 export interface Dialog {
@@ -249,4 +267,91 @@ export type Busy = { kind: 'recording' | 'auditioning'; name: string }
 /** The line at the top of the panel naming what is going on. */
 export function busyWords(busy: Busy): string {
   return `${busy.name} is ${busy.kind}. The models can be changed when it ends.`
+}
+
+/** A number of ElevenLabs credits as the panel writes them: "1 credit", "0.5 credits", "1,200 credits". */
+function creditWords(amount: number): string {
+  return `${amount.toLocaleString('en-US')} ${amount === 1 ? 'credit' : 'credits'}`
+}
+
+/** One entry of an ElevenLabs stage's menu. */
+export interface ElevenOption {
+  model: string
+  label: string
+}
+
+/** What an ElevenLabs stage's menu offers: each of ElevenLabs' speech models, its credits a character, and whether it speaks cues. */
+export function elevenOptions(): ElevenOption[] {
+  return ELEVEN_MODEL_IDS.map((model) => ({
+    model,
+    label: [
+      elevenModelName(model),
+      `${creditWords(elevenCredits(model, 'x')!)} a character`,
+      ...(readsCues(model) ? [] : ['cues not spoken']),
+    ].join(' · '),
+  }))
+}
+
+/** What choosing an ElevenLabs model does: nothing, a save at once, or a question first. */
+export type ElevenChange =
+  { kind: 'none' } | { kind: 'save' } | { kind: 'ask'; lines: number; credits: number }
+
+/**
+ * What choosing `to` for an ElevenLabs stage does, as `changeOf` does for Fish's: the audition
+ * model saves at once; a draft or final change asks first when recorded lines are made with a
+ * model in date now and not after it, with how many and the credits recording them again takes.
+ */
+export function elevenChangeOf(
+  stage: Stage,
+  to: string,
+  models: StageModels,
+  recorded: Recorded,
+): ElevenChange {
+  if (to === models[stage]) return { kind: 'none' }
+  if (stage === 'audition') return { kind: 'save' }
+  const after = { ...models, [stage]: to }
+  let lines = 0
+  let characters = 0
+  for (const [made, got] of Object.entries(recorded)) {
+    if (inUse(made, models) && !inUse(made, after)) {
+      lines += got.lines
+      // Recorded again on `to`: with their cues, or without them on a model that speaks them.
+      characters += readsCues(to) ? got.characters : got.bare
+    }
+  }
+  if (lines === 0) return { kind: 'save' }
+  return { kind: 'ask', lines, credits: (elevenCredits(to, 'x') ?? 0) * characters }
+}
+
+/** The words of the question before an ElevenLabs draft or final change. */
+export function elevenQuestionWords(
+  stage: 'draft' | 'final',
+  from: string,
+  to: string,
+  change: { lines: number; credits: number },
+  file: string,
+): Question {
+  const [fromName, toName] = [elevenModelName(from), elevenModelName(to)]
+  const one = change.lines === 1
+  const count = `${change.lines.toLocaleString('en-US')} line${one ? '' : 's'}`
+  const draft = stage === 'draft'
+  const made = draft ? `drafted with ${fromName}` : `recorded for the final with ${fromName}`
+  const next = draft ? 'the next draft' : 'the next final recording'
+  return {
+    heading: draft
+      ? `Switch ElevenLabs drafts to ${toName}?`
+      : `Switch ElevenLabs' final recording to ${toName}?`,
+    items: [
+      `ElevenLabs ${draft ? 'draft' : 'final'}: ${fromName} → ${toName}`,
+      `${count} ${made} ${one ? 'becomes' : 'become'} out of date: ${next} records ${one ? 'it' : 'them'} again, about ${creditWords(Math.ceil(change.credits))}.`,
+      ...(readsCues(to)
+        ? []
+        : [
+            `${toName} speaks cues aloud, so lines are sent without them; they stay in the cue files.`,
+          ]),
+      `Saved in ${file}; nothing else in it changes.`,
+    ],
+    keep: `Keep ${fromName}`,
+    confirm: `Switch to ${toName}`,
+  }
 }

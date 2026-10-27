@@ -84,7 +84,12 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
             partId: 'act1',
             language: null,
             speaker: null,
-            models: { draft: 's2.1-pro-free', final: 's2.1-pro-free' },
+            models: {
+              draft: 's2.1-pro-free',
+              final: 's2.1-pro-free',
+              finalStep: false,
+              both: false,
+            },
             shown: [],
           }),
         ),
@@ -104,6 +109,47 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
     expect(started[0]).toMatchObject({ keys: ['a', 'b'], confirmedCredits: 15 })
     expect(started[0]).not.toHaveProperty('confirmedCost')
 
+    await act(() => page.unmount())
+  })
+
+  it('offers the final recording when only ElevenLabs’ stages differ, naming both models', async () => {
+    globalThis.fetch = (async (path: string) =>
+      path.startsWith('/api/parts/act1/plan')
+        ? Response.json({ ok: true, plan, parallel: 4, elevenAccount: { ok: true, account } })
+        : new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(GeneratePanel, {
+            partId: 'act1',
+            language: null,
+            speaker: null,
+            models: {
+              draft: 's2.1-pro-free · Eleven v3',
+              final: 's2.1-pro-free · Multilingual v2',
+              finalStep: true,
+              both: true,
+            },
+            shown: [],
+          }),
+        ),
+      ),
+    )
+    const stages = () =>
+      container.querySelector('[aria-label="Which recording"]')?.textContent ?? ''
+    await until(() => stages() !== '')
+    expect(stages()).toBe('Draft s2.1-pro-free · Eleven v3Final s2.1-pro-free · Multilingual v2')
+    const final = [...container.querySelectorAll('input[type="radio"]')][1] as HTMLInputElement
+    await act(() => final.click())
+    await until(() => (container.textContent ?? '').includes('The final recording records'))
+    expect(container.textContent).toContain(
+      'The final recording records every line whose clip was not made with its voice’s final model yet; draft plans leave final clips alone.',
+    )
     await act(() => page.unmount())
   })
 })
@@ -140,7 +186,12 @@ describe('GeneratePanel, when generation cannot be planned', () => {
             partId: 'act1',
             language: null,
             speaker: null,
-            models: { draft: 's2.1-pro-free', final: 's2.1-pro-free' },
+            models: {
+              draft: 's2.1-pro-free',
+              final: 's2.1-pro-free',
+              finalStep: false,
+              both: false,
+            },
             shown,
           }),
         ),

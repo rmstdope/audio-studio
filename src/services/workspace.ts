@@ -1,4 +1,6 @@
 import { mergeCues } from '../core/cued'
+import { finalStepFor, stageWords, voicesOf } from '../core/elevenSpeech'
+import { providerOf } from '../core/voices'
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { soundAlikes, type SoundAlike } from '../core/align'
@@ -233,8 +235,11 @@ export interface PartDetail extends PartState {
   sceneCueSpeakers: string[]
   /** The model everyday plans record with (the project's draft stage). */
   draftModel: string
-  /** The model of the final recording; the same as the draft one when there is no final step. */
-  finalModel: string
+  /**
+   * The stages as the generate panel names them (the Fish model, and ElevenLabs' beside it in a
+   * part with an ElevenLabs voice, `both`), and whether the part's voices have a final step.
+   */
+  stages: { draft: string; final: string; finalStep: boolean; both: boolean }
   /** The language these lines are in (the one asked for, or the source language). */
   language: string
   /** Every declared language with how far it has come, in the order the project declares them. */
@@ -273,6 +278,11 @@ export async function loadPart(
     })
   }
   const notes = await readNotes(dirname(projectFile), read.cacheName)
+  // Whether a speaker of the part has an ElevenLabs voice, whose stage models then show too.
+  const eleven = input.lines.some((line) => {
+    const voice = input.cast.speakers[line.speaker]?.voice
+    return voice !== undefined && providerOf(voice) === 'elevenlabs'
+  })
   return {
     ok: true,
     part: {
@@ -287,7 +297,12 @@ export async function loadPart(
       chunkLimit: project.narration.quality.chunkLimit,
       sceneCueSpeakers: project.narration.sceneCueSpeakers,
       draftModel: project.narration.models.draft,
-      finalModel: project.narration.models.final,
+      stages: {
+        draft: stageWords(project.narration, 'draft', eleven),
+        final: stageWords(project.narration, 'final', eleven),
+        finalStep: finalStepFor(project.narration, voicesOf(input.lines, input.cast.speakers)),
+        both: eleven,
+      },
       notes: onLines(notes.notes.lines, input.lines),
       problems: notes.problem ? [...problems, notes.problem] : problems,
       ...plan,

@@ -18,7 +18,7 @@ import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/mu
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import { FISH_VOICE_ID, providerOf, VOICE_ID } from '../core/voices'
-import { DEFAULT_ELEVEN_MODEL, modelForStage } from '../core/elevenSpeech'
+import { finalStepFor, modelForStage, voicesOf } from '../core/elevenSpeech'
 import type { ElevenAnswer } from '../core/setup'
 import {
   accountOf,
@@ -50,7 +50,14 @@ import { gitChanges } from '../services/git'
 import { setTrackBrief } from '../services/briefs'
 import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
-import { setMusicModel, setStageModel, switchRetiredModels } from '../services/models'
+import {
+  setElevenModel,
+  setMusicModel,
+  setStageModel,
+  switchRetiredModels,
+  type ModelsChange,
+} from '../services/models'
+import type { Stage } from '../core/models'
 import { modelsView } from '../services/modelsView'
 import type { Busy } from '../core/models'
 import { setFishTier } from '../services/fishTier'
@@ -704,9 +711,13 @@ export function startServer({
     if (!read.ok) return read
     if (read.problems.length) return { ok: false as const, problems: read.problems }
     const { narration } = read.project
-    // With one model for both, there is no final step: the final plan is the draft one.
+    // Without a final step for its voices (one model for both, on each one's provider), the final
+    // plan is the draft one.
     const stage: 'draft' | 'final' =
-      asked === 'final' && narration.models.final !== narration.models.draft ? 'final' : 'draft'
+      asked === 'final' &&
+      finalStepFor(narration, voicesOf(read.input.lines, read.input.cast.speakers))
+        ? 'final'
+        : 'draft'
     const { pronounce, speakers } = read.input.cast
     const state = planPart(read.input)
     // A line with an ElevenLabs voice is recorded, and priced, by ElevenLabs.
@@ -746,7 +757,8 @@ export function startServer({
       ok: true as const,
       plan,
       model: pricing.model,
-      elevenModel: plan.eleven?.model ?? DEFAULT_ELEVEN_MODEL,
+      // The stage's ElevenLabs model, which every ElevenLabs line of the part is recorded with.
+      elevenModel: narration.elevenlabs.models[stage],
       ceilingOf,
       creditsOf,
       parallel: narration.quality.parallel,
@@ -785,6 +797,43 @@ export function startServer({
       const recorded = result?.ok === true && !(result && 'skipped' in result)
       await followed.end({ lines: recorded ? 1 : 0, outcome: recorded ? 'done' : 'error' })
     }
+  }
+
+  /**
+   * Saves one stage's model with `save` (Fish's or ElevenLabs'), from the body's `{ model, was }`:
+   * 404 for a stage that is not one, and refused while a part records or a character auditions,
+   * naming it, so no recording changes model under its feet.
+   */
+  async function putStageModel(
+    request: Request,
+    asked: string,
+    path: string,
+    save: (projectFile: string, stage: Stage, model: string, was: string) => Promise<ModelsChange>,
+  ): Promise<Response> {
+    const stage = StageParam.safeParse(asked)
+    if (!stage.success) return notFound()
+    const body = StageModelBody.safeParse(await request.json().catch(() => null))
+    if (!body.success) {
+      return Response.json({ error: 'expected { model, was }' }, { status: 400 })
+    }
+    const busy = await busyNow()
+    if (busy) {
+      return Response.json(
+        {
+          ok: false,
+          problems: [
+            {
+              file: basename(projectFile),
+              path: `${path}.${stage.data}`,
+              message: `${busy.name} is ${busy.kind}`,
+            },
+          ],
+        },
+        { status: 409 },
+      )
+    }
+    const result = await save(projectFile, stage.data, body.data.model, body.data.was)
+    return Response.json(result, { status: result.ok ? 200 : 409 })
   }
 
   /** Only requests addressed to the studio itself reach `handler`. */
@@ -1367,37 +1416,19 @@ export function startServer({
         }),
       },
       '/api/models/:stage': {
-        PUT: fromOwnPage(async (request) => {
-          const stage = StageParam.safeParse(request.params.stage)
-          if (!stage.success) return notFound()
-          const body = StageModelBody.safeParse(await request.json().catch(() => null))
-          if (!body.success) {
-            return Response.json({ error: 'expected { model, was }' }, { status: 400 })
-          }
-          const busy = await busyNow()
-          if (busy) {
-            return Response.json(
-              {
-                ok: false,
-                problems: [
-                  {
-                    file: basename(projectFile),
-                    path: `narration.models.${stage.data}`,
-                    message: `${busy.name} is ${busy.kind}`,
-                  },
-                ],
-              },
-              { status: 409 },
-            )
-          }
-          const result = await setStageModel(
-            projectFile,
-            stage.data,
-            body.data.model,
-            body.data.was,
-          )
-          return Response.json(result, { status: result.ok ? 200 : 409 })
-        }),
+        PUT: fromOwnPage((request) =>
+          putStageModel(request, request.params.stage, 'narration.models', setStageModel),
+        ),
+      },
+      '/api/models/elevenlabs/:stage': {
+        PUT: fromOwnPage((request) =>
+          putStageModel(
+            request,
+            request.params.stage,
+            'narration.elevenlabs.models',
+            setElevenModel,
+          ),
+        ),
       },
       '/api/parts/:part/lines/:key/takes': {
         GET: guard(async (request) => {
