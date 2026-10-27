@@ -23,11 +23,11 @@ import { declaredLanguage, type Problem } from '../core/project'
 import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import type { Candidate, Voice } from '../core/voiceSearch'
-import { providerId, providerOf } from '../core/voices'
-import { findCandidates, setVoice, type FishFactory } from './auditions'
+import { providerOf } from '../core/voices'
+import { elevenVoiceFor, findCandidates, setVoice, type FishFactory } from './auditions'
 import { designTakes, readDesigns } from './designStore'
 import { characterFile, readJson, writeAtomic } from './files'
-import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
+import type { ElevenLabsFactory } from './elevenlabs'
 import { NO_KEY } from './fish'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
@@ -73,17 +73,19 @@ export async function sessionFor(
 
 /**
  * Starts (or starts over) a character's audition from a fresh search with its keywords: the
- * current voice on the shortlist, the top candidates to hear, the rest queued.
+ * current voice on the shortlist (an ElevenLabs one looked up with `elevenFor`), the top
+ * candidates to hear, the rest queued.
  */
 export async function startAudition(
   projectFile: string,
   characterId: string,
   fishFor: FishFactory,
   language?: string,
+  elevenFor?: ElevenLabsFactory,
 ): Promise<SessionResult> {
   const name = await cacheNameFor(projectFile, characterId, language)
   return sessionWrites.run(key(projectFile, name), async () => {
-    const found = await findCandidates(projectFile, characterId, fishFor, {}, language)
+    const found = await findCandidates(projectFile, characterId, fishFor, { elevenFor }, language)
     if (!found || !found.ok) return found
     if (found.audition.phrase === null) {
       return {
@@ -335,14 +337,8 @@ export async function addVoiceById(
       const known = session.voices[voiceId]
       if (known) return addVoice(session, known)
       if (providerOf(voiceId) === 'elevenlabs') {
-        const eleven = await elevenFor(root, opened.project)
-        if (!eleven) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
-        try {
-          return addVoice(session, await eleven.voice(providerId(voiceId)))
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          return { ok: false, reason: 'elevenlabs', message }
-        }
+        const found = await elevenVoiceFor(elevenFor, root, opened.project, voiceId)
+        return found.ok ? addVoice(session, found.voice) : found
       }
       const fish = await fishFor(root, opened.project)
       if (!fish) {

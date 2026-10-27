@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { readWav, writeWav } from '../core/wav'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
 import type { ElevenLabsClient } from '../services/elevenlabs'
 import { FishError, type FishClient } from '../services/fish'
 import { createLimiter } from '../services/limit'
@@ -3828,26 +3828,7 @@ describe('casting an ElevenLabs voice', () => {
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
-  const asked: string[] = []
-  const eleven: ElevenLabsClient = {
-    subscription: () => Promise.reject(new Error('not used')),
-    music: () => Promise.reject(new Error('not used')),
-    tts: () => Promise.reject(new Error('not used')),
-    async voice(id) {
-      asked.push(id)
-      return {
-        id: `eleven:${id}`,
-        title: 'George',
-        description: 'Warm storyteller',
-        tags: [],
-        languages: ['en'],
-        uses: 0,
-        likes: 0,
-        author: '',
-        sample: { text: '', audio: 'https://example.com/george.mp3' },
-      }
-    },
-  }
+  const { client: eleven, asked } = fakeEleven({ g1: elevenVoiceOf('g1') })
   const elevenServer = startServer({
     projectFile: join(elevenRoot, 'audio-studio.json'),
     port: 0,

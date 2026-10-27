@@ -70,12 +70,16 @@ describe('providerWords', () => {
       sample: 'Fish sample',
       noSample: 'No sample from Fish',
       play: 'Play Fish’s sample',
+      ownClip: 'Fish’s own clip',
+      none: 'None from Fish',
     })
     expect(providerWords('eleven:g1')).toEqual({
       name: 'ElevenLabs',
       sample: 'ElevenLabs preview',
       noSample: 'No preview from ElevenLabs',
       play: 'Play ElevenLabs’ preview',
+      ownClip: 'ElevenLabs’ own clip',
+      none: 'None from ElevenLabs',
     })
   })
 })

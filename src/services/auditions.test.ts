@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
 import {
   characterVoice,
@@ -16,7 +16,7 @@ import {
 import { createLimiter } from './limit'
 import { recordTake } from './takes'
 import type { FishClient } from './fish'
-import { NO_ELEVENLABS_KEY, type ElevenLabsClient } from './elevenlabs'
+import { NO_ELEVENLABS_KEY } from './elevenlabs'
 
 function voice(id: string, title: string, uses = 0): Voice {
   return {
@@ -213,17 +213,7 @@ describe('characterVoice', () => {
       'tts/cast.json': { speakers: { grandmother: { voice: 'eleven:g1' } }, pronounce: {} },
     })
     const projectFile = join(root, 'audio-studio.json')
-    const asked: string[] = []
-    const eleven: ElevenLabsClient = {
-      subscription: () => Promise.reject(new Error('not used')),
-      music: () => Promise.reject(new Error('not used')),
-      tts: () => Promise.reject(new Error('not used')),
-      async voice(id) {
-        asked.push(id)
-        if (id !== 'g1') throw new Error('not found')
-        return { ...(await fish.getVoice('cur')), id: 'eleven:g1', title: 'George' }
-      },
-    }
+    const { client: eleven, asked } = fakeEleven({ g1: elevenVoiceOf('g1') })
     const noFish = async () => {
       throw new Error('Fish is not asked about an ElevenLabs voice')
     }

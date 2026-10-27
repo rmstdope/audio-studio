@@ -665,12 +665,8 @@ function VoicePanel({
                 : sample
                   ? sample.text
                     ? `“${sample.text}”`
-                    : eleven
-                      ? 'ElevenLabs’ own clip'
-                      : 'Fish’s own clip'
-                  : eleven
-                    ? 'None from ElevenLabs'
-                    : 'None from Fish'}
+                    : words.ownClip
+                  : words.none}
             </span>
           </span>
         </div>

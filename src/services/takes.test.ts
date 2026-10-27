@@ -46,6 +46,28 @@ function fakeFish() {
 }
 
 describe('recordTake', () => {
+  it('makes no take with an ElevenLabs voice, on the board or its page, and asks Fish nothing', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    for (const board of [false, true]) {
+      expect(
+        await recordTake(
+          join(root, 'audio-studio.json'),
+          'grandmother',
+          'eleven:g1',
+          async () => fish,
+          createLimiter(),
+          { board },
+        ),
+      ).toEqual({
+        ok: false,
+        reason: 'not-yet',
+        message: 'Takes and tries are not made with ElevenLabs voices yet.',
+      })
+    }
+    expect(requests).toEqual([])
+  })
+
   it('has the voice say the character’s phrase in its style, and keeps the audio', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
@@ -474,7 +496,7 @@ describe('tryLine with an ElevenLabs voice', () => {
     )
     expect(result).toEqual({
       ok: false,
-      reason: 'elevenlabs',
+      reason: 'not-yet',
       message: 'Takes and tries are not made with ElevenLabs voices yet.',
     })
     expect(requests).toEqual([])

@@ -41,6 +41,8 @@ export function providerWords(id: string): {
   sample: string
   noSample: string
   play: string
+  ownClip: string
+  none: string
 } {
   return providerOf(id) === 'elevenlabs'
     ? {
@@ -48,11 +50,15 @@ export function providerWords(id: string): {
         sample: 'ElevenLabs preview',
         noSample: 'No preview from ElevenLabs',
         play: 'Play ElevenLabs’ preview',
+        ownClip: 'ElevenLabs’ own clip',
+        none: 'None from ElevenLabs',
       }
     : {
         name: 'Fish Audio',
         sample: 'Fish sample',
         noSample: 'No sample from Fish',
         play: 'Play Fish’s sample',
+        ownClip: 'Fish’s own clip',
+        none: 'None from Fish',
       }
 }

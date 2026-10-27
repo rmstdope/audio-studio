@@ -566,7 +566,8 @@ An audition is for a character, not for a part: the result applies to every part
 
 - **To hear** holds the candidates being listened to, best match first. **Bring in more** adds
   the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
-  **Bring in a specific voice** adds one by its Fish id or URL.
+  **Bring in a specific voice** adds one by its Fish id or URL, or, with ElevenLabs chosen in the
+  menu beside it, by the bare id of one of the user's ElevenLabs voices (§8.6), looked up there.
 - **Drop** takes a voice out of the audition at once and rules it out for the character: no later
   search for it shows that voice again. Its take or sample stops at once if it is playing (as
   does whatever plays when the board goes, on a stop or a cast). The last drop can be undone.

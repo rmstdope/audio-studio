@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
-import { NO_ELEVENLABS_KEY, type ElevenLabsClient } from './elevenlabs'
+import { NO_ELEVENLABS_KEY } from './elevenlabs'
 import type { FishClient } from './fish'
 import {
   addVoiceById,
@@ -130,6 +130,58 @@ describe('startAudition', () => {
     const path = join(root, '.audio-studio/auditions', file!)
     writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), version: 1 }))
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
+  })
+})
+
+describe('startAudition, for a character cast with an ElevenLabs voice', () => {
+  it('shows its voice as ElevenLabs knows it, and asks Fish nothing about it', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': {
+        speakers: { mira: { voice: 'eleven:g1', audition: { keywords: ['warm'] } } },
+        pronounce: {},
+      },
+    })
+    const askedFish: string[] = []
+    const watching: FishClient = {
+      ...fish,
+      getVoice: (id) => (askedFish.push(id), fish.getVoice(id)),
+    }
+    const { client, asked } = fakeEleven({ g1: elevenVoiceOf('g1') })
+    const result = await startAudition(
+      join(root, 'audio-studio.json'),
+      'mira',
+      async () => watching,
+      undefined,
+      async () => client,
+    )
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.session.shortlist).toEqual(['eleven:g1'])
+    expect(result.session.voices['eleven:g1']).toEqual(elevenVoiceOf('g1'))
+    expect(asked).toEqual(['g1'])
+    expect(askedFish).toEqual([])
+  })
+
+  it('asks Fish nothing about it without an ElevenLabs client either', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': {
+        speakers: { mira: { voice: 'eleven:g1', audition: { keywords: ['warm'] } } },
+        pronounce: {},
+      },
+    })
+    const askedFish: string[] = []
+    const watching: FishClient = {
+      ...fish,
+      getVoice: (id) => (askedFish.push(id), fish.getVoice(id)),
+    }
+    const result = await startAudition(
+      join(root, 'audio-studio.json'),
+      'mira',
+      async () => watching,
+    )
+    expect(result?.ok && result.session.shortlist).toEqual(['eleven:g1'])
+    expect(askedFish).toEqual([])
   })
 })
 
@@ -279,29 +331,14 @@ describe('addVoiceById', () => {
 })
 
 describe('addVoiceById, an ElevenLabs voice', () => {
-  /** An ElevenLabs client that knows one voice, `g1`, and records what it was asked. */
-  function fakeEleven() {
-    const asked: string[] = []
-    const client: ElevenLabsClient = {
-      subscription: () => Promise.reject(new Error('not used')),
-      music: () => Promise.reject(new Error('not used')),
-      tts: () => Promise.reject(new Error('not used')),
-      async voice(id) {
-        asked.push(id)
-        if (id !== 'g1')
-          throw new Error('ElevenLabs answered 404: A voice with the voice_id was not found.')
-        return voice('eleven:g1', 'George')
-      },
-    }
-    return { client, asked }
-  }
+  const george = { g1: elevenVoiceOf('g1') }
   const noFish = async () => {
     throw new Error('Fish is not asked about an ElevenLabs voice')
   }
 
   it('looks it up on ElevenLabs by its own id, and asks Fish nothing', async () => {
     const { projectFile } = await started()
-    const { client, asked } = fakeEleven()
+    const { client, asked } = fakeEleven(george)
     const result = await addVoiceById(
       projectFile,
       'mira',
@@ -323,7 +360,7 @@ describe('addVoiceById, an ElevenLabs voice', () => {
     expect(await addVoiceById(projectFile, 'mira', 'eleven:g1', noFish)).toMatchObject({
       reason: 'no-key',
     })
-    const { client } = fakeEleven()
+    const { client } = fakeEleven(george)
     expect(
       await addVoiceById(projectFile, 'mira', 'eleven:nope', noFish, undefined, async () => client),
     ).toEqual({

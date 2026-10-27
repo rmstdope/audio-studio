@@ -98,6 +98,9 @@ const ApiVoiceSchema = z.looseObject({
 /** How long asking for the account may take: it holds up Setup, so not as long as other work. */
 const ACCOUNT_TIMEOUT_MS = 10_000
 
+/** How long looking a voice up may take: it holds up a character's page, as the account holds up Setup. */
+const LOOKUP_TIMEOUT_MS = 10_000
+
 /** How long making a piece may take: up to ten minutes of music, made in the cloud. */
 const MUSIC_TIMEOUT_MS = 10 * 60_000
 
@@ -204,7 +207,7 @@ export function createElevenLabsClient(
 
     async voice(id) {
       const parsed = ApiVoiceSchema.safeParse(
-        await get(`/v1/voices/${encodeURIComponent(id)}`, timeoutMs),
+        await get(`/v1/voices/${encodeURIComponent(id)}`, Math.min(timeoutMs, LOOKUP_TIMEOUT_MS)),
       )
       if (!parsed.success) throw new Error(UNREADABLE)
       const api = parsed.data

@@ -270,13 +270,10 @@ const RecordBody = z
   })
   .strict()
 
-const MoveBody = z.object({
-  voice: z.string().regex(VOICE_ID),
-  move: z.enum(['shortlist', 'unlist', 'drop']),
-})
-
 /** A voice to bring in or cast: either provider's. */
 const VoiceBody = z.object({ voice: z.string().regex(VOICE_ID) })
+
+const MoveBody = VoiceBody.extend({ move: z.enum(['shortlist', 'unlist', 'drop']) })
 
 /**
  * A take to record: for the board (the audition model, paid from the sitting) or the cast voice's
@@ -1483,7 +1480,7 @@ export function startServer({
             sittings.set(await sittingKey(id, request), admitted)
           }
           const started = await whileGoing('character', id, () =>
-            startAudition(projectFile, id, fishFor, languageOf(request)),
+            startAudition(projectFile, id, fishFor, languageOf(request), elevenFor),
           )
           // An audition that did not start has no sitting.
           if (admitted && !started?.ok) endSitting(await sittingKey(id, request))

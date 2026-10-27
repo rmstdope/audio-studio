@@ -32,7 +32,7 @@ export type TakeResult =
   | { ok: true; key: string; spoken: string; cached: boolean }
   | {
       ok: false
-      reason: 'no-key' | 'fish' | 'elevenlabs' | 'no-sitting' | 'waits' | 'no-phrase'
+      reason: 'no-key' | 'fish' | 'not-yet' | 'no-sitting' | 'waits' | 'no-phrase'
       message: string
     }
   | { ok: false; problems: Problem[] }
@@ -218,7 +218,7 @@ async function speak(
   if (providerOf(voice) !== 'fish') {
     return {
       ok: false,
-      reason: 'elevenlabs',
+      reason: 'not-yet',
       message: 'Takes and tries are not made with ElevenLabs voices yet.',
     }
   }
