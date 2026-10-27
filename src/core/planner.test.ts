@@ -680,3 +680,42 @@ describe('mergeCues', () => {
     expect(merged.cues).toEqual({ n1: '[worried] Elior [low] sover.' })
   })
 })
+
+describe('a line with an ElevenLabs voice', () => {
+  const elevenCast: Cast = {
+    speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]', speed: 1.1 } },
+    pronounce: {},
+  }
+  const m1 = lines[1]!
+
+  it('is made with ElevenLabs’ model and its settings, not Fish’s temperature', () => {
+    const inputs = clipInputs(m1, elevenCast.speakers.mira, {}, {}, narration)!
+    expect(inputs.model).toBe('eleven_v3')
+    expect(inputs.voice).toBe('eleven:abc')
+    const { output, quality } = narration
+    expect(JSON.parse(inputs.settings)).toEqual([
+      0.5,
+      0.75,
+      0,
+      1.1,
+      quality.chunkLimit,
+      output.codec,
+      output.bitrate,
+      output.channels,
+    ])
+  })
+
+  it('is up to date as made, and has no final step of its own while Fish’s stages differ', () => {
+    const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    const lock = { m1: entryFor(m1, elevenCast) }
+    const state = planPart(input({ cast: elevenCast, lock, narration: withFinal }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'ok', final: false })
+  })
+
+  it('goes stale for its voice when its character is recast from Fish', () => {
+    const lock = { m1: entryFor(m1) }
+    const state = planPart(input({ cast: elevenCast, lock }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'stale' })
+    expect(state.lines.find((l) => l.key === 'm1')!.reasons).toContain('voice')
+  })
+})

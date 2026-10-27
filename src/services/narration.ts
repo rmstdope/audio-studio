@@ -23,6 +23,7 @@ import {
   ManifestSchema,
   ttsFor,
   type Cast,
+  type Character,
   type Line,
   type Lock,
   type Manifest,
@@ -39,7 +40,10 @@ import type { Transcriber } from './transcriber'
 import { keepHeard } from './heard'
 import { inPartTurn } from './partFiles'
 import { readPart, type Ears, type ProjectFailure } from './workspace'
-import { NO_KEY, type FishClient } from './fish'
+import { NO_KEY } from './fish'
+import type { ElevenLabsClient } from './elevenlabs'
+import { ELEVEN_TTS, modelForStage, speedProblem } from '../core/elevenSpeech'
+import { providerId, providerOf } from '../core/voices'
 
 /** Seconds of silence between the pieces of a long line (as in RetroQuest's narrate.py). */
 export const GAP_SECONDS = 0.25
@@ -56,6 +60,7 @@ export type RecordResult =
         | 'uncast'
         | 'untranslated'
         | 'no-key'
+        | 'speed'
         | 'spend'
         | 'fish'
         | 'audio'
@@ -70,9 +75,6 @@ export type RecordResult =
 
 /** The budget of a recording given none: the free model only. */
 const FREE_ONLY = createBudget({ model: FREE_MODELS[0], dollars: 0 })
-
-/** Text as Fish counts it for billing: UTF-8 bytes. */
-const utf8 = new TextEncoder()
 
 /** A request to Fish refused by the recording's budget. */
 class SpendRefused extends Error {}
@@ -106,6 +108,70 @@ export interface RecordOptions {
   transcriber?: Transcriber | null
   /** The language to record (the source language when absent or not declared). */
   language?: string
+  /** The ElevenLabs client for a line with an ElevenLabs voice: none, and such a line is refused. */
+  elevenlabs?: ElevenLabsFactory
+}
+
+/** The ElevenLabs client for a project, or null when it has no key. Replaced in tests. */
+export type ElevenLabsFactory = (root: string, project: Project) => Promise<ElevenLabsClient | null>
+
+/** What the studio says when a line needs ElevenLabs and there is no key. */
+export const NO_ELEVENLABS_KEY =
+  'Set ELEVENLABS_API_KEY in the project’s env file, or in the environment.'
+
+/** Speaks one piece of a line's text in its voice: its audio as WAV. */
+export type Speak = (text: string) => Promise<Uint8Array>
+
+/**
+ * What speaks a line's pieces: its voice's provider, Fish with its temperature, top-p and speed,
+ * or ElevenLabs with its voice settings, the speed and the language; or why it cannot (no key for
+ * that provider, or a speed ElevenLabs does not take).
+ */
+export async function speakerFor({
+  root,
+  project,
+  inputs,
+  character,
+  language,
+  fishFor,
+  elevenlabs = async () => null,
+}: {
+  root: string
+  project: Project
+  inputs: ClipInputs
+  character: Character | undefined
+  language: string
+  fishFor: FishFactory
+  elevenlabs?: ElevenLabsFactory
+}): Promise<
+  { ok: true; speak: Speak } | { ok: false; reason: 'no-key' | 'speed'; message: string }
+> {
+  const tts = ttsFor(project.narration.tts, character)
+  if (providerOf(inputs.voice) === 'elevenlabs') {
+    const slow = speedProblem(tts.speed)
+    if (slow) return { ok: false, reason: 'speed', message: slow }
+    const client = await elevenlabs(root, project)
+    if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+    const settings = { ...ELEVEN_TTS, speed: tts.speed }
+    return {
+      ok: true,
+      speak: (text) =>
+        client.tts({
+          text,
+          voice: providerId(inputs.voice),
+          model: inputs.model,
+          settings,
+          language,
+        }),
+    }
+  }
+  const fish = await fishFor(root, project)
+  if (!fish) return { ok: false, reason: 'no-key', message: NO_KEY }
+  return {
+    ok: true,
+    speak: (text) =>
+      fish.tts({ text, voice: inputs.voice, model: inputs.model, ...tts, format: 'wav' }),
+  }
 }
 
 /**
@@ -146,6 +212,7 @@ export async function recordLine(
     budget = FREE_ONLY,
     stage = 'draft',
     language,
+    elevenlabs,
   }: RecordOptions,
 ): Promise<RecordResult> {
   const read = await readPart(projectFile, partId, language)
@@ -163,9 +230,13 @@ export async function recordLine(
   }
   const { cast, cues } = read.input
   const { narration } = read.project
-  // With one model for both, there is no final step: a "final" recording is a draft one.
-  const final = stage === 'final' && narration.models.final !== narration.models.draft
-  const model = final ? narration.models.final : narration.models.draft
+  // With one model for both, there is no final step: a "final" recording is a draft one. The
+  // stages are the voice's provider's.
+  const voice = cast.speakers[line.speaker]?.voice ?? ''
+  const draftModel = modelForStage(narration, voice, 'draft')
+  const finalModel = modelForStage(narration, voice, 'final')
+  const final = stage === 'final' && finalModel !== draftModel
+  const model = final ? finalModel : draftModel
   // In a draft recording: the fingerprint the line would have as a final clip, so one that lands
   // meanwhile is never overwritten.
   const finalFp = final ? null : finalFingerprint(line, cast, cues, narration)
@@ -185,14 +256,17 @@ export async function recordLine(
     }
   }
   const root = dirname(projectFile)
-  const fish = await fishFor(root, read.project)
-  if (!fish) {
-    return {
-      ok: false,
-      reason: 'no-key',
-      message: NO_KEY,
-    }
-  }
+  const speaker = await speakerFor({
+    root,
+    project: read.project,
+    inputs,
+    character: cast.speakers[line.speaker],
+    language: read.language,
+    fishFor,
+    elevenlabs,
+  })
+  if (!speaker.ok) return speaker
+  const { speak } = speaker
 
   // The same line asked for again while it is being recorded shares that recording.
   // Per model too: a final recording never takes a draft one's result as its own.
@@ -205,13 +279,13 @@ export async function recordLine(
   recording.then(forget, forget)
   return recording
 
-  /** One take: the line spoken by Fish (holding a Fish slot only while speaking), joined. */
+  /** One take: the line spoken by its voice's provider (holding a slot only while speaking), joined. */
   async function makeTake(take: number): Promise<Spoken> {
-    if (!inputs || !fish || !line) {
+    if (!inputs || !line) {
       return { ok: false, reason: 'fish', message: 'nothing to speak' }
     }
     return speakLine({
-      fish,
+      speak,
       line,
       inputs,
       cast,
@@ -223,7 +297,7 @@ export async function recordLine(
   }
 
   async function record(): Promise<RecordResult> {
-    if (!inputs || !fish || !read || !read.ok || !line) return null
+    if (!inputs || !read || !read.ok || !line) return null
     if (onlyIfNeeded) {
       // Checked only now that this recording is registered: a recording of the same line that
       // finished meanwhile has written its files before leaving, so it is seen here.
@@ -302,14 +376,16 @@ export function finalFingerprint(
   cues: Record<string, string>,
   narration: Project['narration'],
 ): string | null {
-  if (narration.models.final === narration.models.draft) return null
+  const voice = cast.speakers[line.speaker]?.voice ?? ''
+  const finalModel = modelForStage(narration, voice, 'final')
+  if (finalModel === modelForStage(narration, voice, 'draft')) return null
   const inputs = clipInputs(
     line,
     cast.speakers[line.speaker],
     cues,
     cast.pronounce,
     narration,
-    narration.models.final,
+    finalModel,
   )
   return inputs ? fingerprint(inputs).fp : null
 }
@@ -320,7 +396,7 @@ export function finalFingerprint(
  * under `limiterKey`) only while speaking; the pieces joined with a short pause.
  */
 export async function speakLine({
-  fish,
+  speak,
   line,
   inputs,
   cast,
@@ -329,7 +405,7 @@ export async function speakLine({
   limiter,
   limiterKey,
 }: {
-  fish: FishClient
+  speak: Speak
   line: Line
   inputs: ClipInputs
   cast: Cast
@@ -351,17 +427,9 @@ export async function speakLine({
       )
       for (const text of texts) {
         // Charged before it is sent: nothing beyond what was confirmed reaches Fish.
-        const refused = budget.spend(inputs.model, utf8.encode(text).length, new Date())
+        const refused = budget.spend(inputs.model, text, new Date())
         if (refused) throw new SpendRefused(refused)
-        spoken.push(
-          await fish.tts({
-            text,
-            voice: inputs.voice,
-            model: inputs.model,
-            ...ttsFor(narration.tts, cast.speakers[line.speaker]),
-            format: 'wav',
-          }),
-        )
+        spoken.push(await speak(text))
       }
       return spoken
     })

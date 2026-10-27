@@ -215,7 +215,6 @@ async function speak(
   const recorded = { ok: true as const, key, spoken }
   if (existsSync(file)) return { ...recorded, cached: true }
 
-  const bytes = new TextEncoder().encode(spoken).length
   const paid = isPaid(model, new Date())
   if (paid && !options.budget) {
     return {
@@ -247,7 +246,7 @@ async function speak(
         return true
       }
       if (paid && budget) {
-        waits = budget.spend(model, bytes, new Date())
+        waits = budget.spend(model, spoken, new Date())
         if (waits) return true
       }
       const cost = before - (budget?.left ?? 0)

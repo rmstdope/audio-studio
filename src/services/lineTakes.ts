@@ -10,9 +10,16 @@ import type { Budget, SpendProblem } from '../core/spend'
 import type { FishFactory } from './auditions'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { characterFile, listFiles, readJson, writeAtomic } from './files'
-import { NO_KEY } from './fish'
 import type { Limiter } from './limit'
-import { checkTake, commitClip, finalFingerprint, speakLine, type RecordResult } from './narration'
+import {
+  checkTake,
+  commitClip,
+  finalFingerprint,
+  speakLine,
+  speakerFor,
+  type ElevenLabsFactory,
+  type RecordResult,
+} from './narration'
 import type { Transcriber } from './transcriber'
 import { openProject, readPart, type PartRead, type ProjectFailure } from './workspace'
 
@@ -28,7 +35,7 @@ export type TakeLineResult =
   | { ok: true; take: LineTakeView }
   | {
       ok: false
-      reason: 'uncast' | 'no-key' | 'spend' | 'fish' | 'audio' | 'transcribe'
+      reason: 'uncast' | 'no-key' | 'speed' | 'spend' | 'fish' | 'audio' | 'transcribe'
       message: string
     }
   | { ok: false; problems: Problem[] }
@@ -73,7 +80,15 @@ export async function takeLine(
     transcriber = null,
     budget,
     language,
-  }: { limiter: Limiter; transcriber?: Transcriber | null; budget: Budget; language?: string },
+    elevenlabs,
+  }: {
+    limiter: Limiter
+    transcriber?: Transcriber | null
+    budget: Budget
+    language?: string
+    /** The ElevenLabs client, for a line with an ElevenLabs voice. */
+    elevenlabs?: ElevenLabsFactory
+  },
 ): Promise<TakeLineResult> {
   const found = await lineAndInputs(projectFile, partId, key, language)
   if (found.kind === 'problems') return { ok: false, problems: found.problems }
@@ -88,11 +103,19 @@ export async function takeLine(
   }
   const { narration } = read.project
   const root = dirname(projectFile)
-  const fish = await fishFor(root, read.project)
-  if (!fish) return { ok: false, reason: 'no-key', message: NO_KEY }
+  const speaker = await speakerFor({
+    root,
+    project: read.project,
+    inputs,
+    character: read.input.cast.speakers[line.speaker],
+    language: read.language,
+    fishFor,
+    elevenlabs,
+  })
+  if (!speaker.ok) return speaker
   const id = randomBytes(8).toString('hex')
   const spoken = await speakLine({
-    fish,
+    speak: speaker.speak,
     line,
     inputs,
     cast: read.input.cast,

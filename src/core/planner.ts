@@ -1,3 +1,4 @@
+import { modelForStage } from './elevenSpeech'
 import {
   clipInputs,
   sceneCueFor,
@@ -203,8 +204,11 @@ export function planPart(input: PlanInput): PartState {
     const clip = manifest[line.key]
     const file = clip && files.has(clip.file) ? clip.file : null
     const entry = lock[line.key]
-    // A clip made with the final model is up to date too: draft plans leave it alone.
-    const { draft, final: finalModel } = narration.models
+    // A clip made with the final model is up to date too: draft plans leave it alone. The stages
+    // are the voice's provider's.
+    const voice = character?.voice ?? ''
+    const draft = modelForStage(narration, voice, 'draft')
+    const finalModel = modelForStage(narration, voice, 'final')
     const finalInputs =
       finalModel !== draft
         ? clipInputs(line, character, cues, cast.pronounce, narration, finalModel)

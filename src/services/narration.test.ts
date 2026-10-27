@@ -7,6 +7,7 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import { HEARD_DIR, heardFor } from './heard'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
+import type { ElevenLabsClient, SpeechRequest } from './elevenlabs'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
 import type { Transcriber } from './transcriber'
@@ -1280,5 +1281,84 @@ describe('recording in a language besides the source', () => {
     })
     expect(asked.length).toBeGreaterThan(0)
     expect(asked.every((language) => language === undefined)).toBe(true)
+  })
+})
+
+describe('recordLine with an ElevenLabs voice', () => {
+  /** An ElevenLabs client that speaks a second of silence, recording what it was asked. */
+  function fakeEleven() {
+    const requests: SpeechRequest[] = []
+    const client: ElevenLabsClient = {
+      subscription: () => Promise.reject(new Error('not used')),
+      music: () => Promise.reject(new Error('not used')),
+      async tts(request) {
+        requests.push(request)
+        return silence(1)
+      },
+    }
+    return { client, requests }
+  }
+  /** The fixture with mira cast with an ElevenLabs voice at `speed`. */
+  const elevenRoot = (speed = 1.1) =>
+    tempRepo({
+      ...files,
+      'tts/cast.json': {
+        speakers: {
+          narrator: { voice: 'v-n', style: '[warm]' },
+          mira: { voice: 'eleven:abc', speed },
+        },
+        pronounce: {},
+      },
+    })
+  const recordEleven = (
+    root: string,
+    eleven: ElevenLabsClient | null,
+    credits = 100,
+    fish = fakeFish().fish,
+  ) =>
+    recordLine(join(root, 'audio-studio.json'), 'act1', 'k4', async () => fish, {
+      encode: keepWav,
+      limiter: createLimiter(),
+      elevenlabs: async () => eleven,
+      budget: createBudget({ model: 'eleven_v3', dollars: credits }),
+    })
+
+  it('speaks the line with ElevenLabs, in its voice, model, settings and speed, and Fish not at all', async () => {
+    const root = elevenRoot()
+    const { client, requests } = fakeEleven()
+    const fish = fakeFish()
+    const result = await recordEleven(root, client, 100, fish.fish)
+    expect(result).toMatchObject({ ok: true, key: 'k4' })
+    expect(fish.requests).toEqual([])
+    expect(requests).toEqual([
+      {
+        text: 'Welcome.',
+        voice: 'abc',
+        model: 'eleven_v3',
+        settings: { stability: 0.5, similarityBoost: 0.75, style: 0, speed: 1.1 },
+        language: 'en',
+      },
+    ])
+    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    expect(lock.k4).toMatchObject({ voice: 'eleven:abc', model: 'eleven_v3' })
+  })
+
+  it('charges the confirmed credits a character, refusing what goes past them', async () => {
+    const root = elevenRoot()
+    expect(await recordEleven(root, fakeEleven().client, 3)).toMatchObject({
+      ok: false,
+      reason: 'spend',
+      message: 'this would go past the confirmed budget (3 credits left); plan again',
+    })
+  })
+
+  it('refuses without an ElevenLabs key, and at a speed ElevenLabs does not take', async () => {
+    expect(await recordEleven(elevenRoot(), null)).toEqual({
+      ok: false,
+      reason: 'no-key',
+      message: 'Set ELEVENLABS_API_KEY in the project’s env file, or in the environment.',
+    })
+    const fast = await recordEleven(elevenRoot(1.5), fakeEleven().client)
+    expect(fast).toMatchObject({ ok: false, reason: 'speed' })
   })
 })
