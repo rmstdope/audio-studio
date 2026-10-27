@@ -113,15 +113,17 @@ function render(
     act(() => root.unmount())
     container.remove()
   })
-  act(() =>
-    root.render(
-      createElement(
-        QueryClientProvider,
-        { client },
-        createElement(TakesPanel, { track: trackRow, lists: all }),
+  const show = (shown: MusicListSummary[]) =>
+    act(() =>
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(TakesPanel, { track: trackRow, lists: shown }),
+        ),
       ),
-    ),
-  )
+    )
+  show(all)
   const buttons = (name: string) =>
     [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
       (b) => b.textContent === name,
@@ -130,7 +132,7 @@ function render(
     act(() => {
       target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }))
     })
-  return { client, buttons, key }
+  return { client, buttons, key, rerender: show }
 }
 
 async function click(button: HTMLElement | undefined) {
@@ -260,6 +262,19 @@ describe('the Move dialog', () => {
     )
     expect(option("Witch's hut").getAttribute('aria-selected')).toBe('true')
     expect(document.querySelector('.moved')).toBeNull()
+  })
+
+  it('selects nothing and greys the button when the picked track leaves the game’s list', async () => {
+    const page = render(village, view([take(3)]))
+    await click(page.buttons('Move…')[0])
+    await click(option("Witch's hut"))
+    expect(page.buttons('Move take 3')[0]!.disabled).toBe(false)
+    page.rerender([lists[0]!, list('act2', 'act', 'Act 2: The Wood', []), lists[2]!, lists[3]!])
+    expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
+    // It does not come back selected when the track returns.
+    page.rerender(lists)
+    expect(option("Witch's hut").getAttribute('aria-selected')).toBe('false')
+    expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
   })
 
   it('moves with Up, Down and Enter, and closes with Esc, focus back on Move…', async () => {

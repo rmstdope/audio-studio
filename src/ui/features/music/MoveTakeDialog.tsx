@@ -53,6 +53,12 @@ export function MoveTakeDialog({
   const loops = kind === 'loop'
   const pending = move.isPending
 
+  // A pick whose row has left the game's list is dropped, so Move is greyed until another is picked.
+  useEffect(() => {
+    if (selected && !all.some((group) => group.tracks.some((t) => t.id === selected)))
+      setSelected(null)
+  }, [all, selected])
+
   // Focus starts in the search box, or on the first row for stingers.
   useEffect(() => {
     if (loops) search.current?.focus()
