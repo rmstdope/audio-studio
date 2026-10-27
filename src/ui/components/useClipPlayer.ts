@@ -19,12 +19,14 @@ export function useClipPlayer(onFailed?: (id: string) => void) {
     const made = createPlayer(element, setState, (id) => failed.current?.(id), {
       fadeSeconds: TAKE_FADE_SECONDS,
     })
+    element.addEventListener('playing', made.playing)
     element.addEventListener('ended', made.ended)
     element.addEventListener('error', made.failed)
     player.current = made
     return () => {
       // Disposed, not just paused: a play still loading must not start the next clip.
       made.dispose()
+      element.removeEventListener('playing', made.playing)
       element.removeEventListener('ended', made.ended)
       element.removeEventListener('error', made.failed)
       player.current = null
