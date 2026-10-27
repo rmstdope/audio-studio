@@ -30,6 +30,12 @@ describe('summarize', () => {
     })
   })
 
+  it('carries the take fade, 0.2 s until one is saved', () => {
+    expect(summarize(input()).takeFade).toBe(0.2)
+    expect(summarize(input({ project: { ...project, takeFade: 0 } })).takeFade).toBe(0)
+    expect(summarize(input({ project: { ...project, takeFade: 1 } })).takeFade).toBe(1)
+  })
+
   it('reports a part whose dialog is gone with what was recorded for it', () => {
     const summary = summarize(input({ dialogs: { act1: { status: 'gone', clips: 12, cues: 3 } } }))
     expect(summary.parts[0]).toMatchObject({

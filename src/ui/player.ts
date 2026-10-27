@@ -16,9 +16,6 @@ export interface AudioLike {
   pause(): void
 }
 
-/** How long a take fades in and out when played in the studio, in seconds. */
-export const TAKE_FADE_SECONDS = 0.2
-
 /** A clock the fade runs on: the time in milliseconds, and a repeating call that can be cancelled. */
 export interface Clock {
   now(): number
@@ -48,18 +45,26 @@ export interface PlayerState {
  * play replaced meanwhile is let be. `onChange` hears every change of state, `onFailed` the id of
  * each clip that failed; `dispose` ends it.
  *
- * With `options.fadeSeconds`, a clip played with `fade: true` fades in (from when the element says
- * it plays, `playing()`, since a start can lag), fades out before its natural end, and a stop (or
- * another clip started) fades it out before the element pauses; the state still changes at once. A clip without the flag plays as it is and is cut on stop; with no
+ * With `options.fadeSeconds` (a number of seconds, or a function giving it, asked as each clip
+ * begins; 0 is no fade), a clip played with `fade: true` fades in (from when the element says it
+ * plays, `playing()`, since a start can lag), fades out before its natural end, and a stop (or
+ * another clip started) fades it out before the element pauses; the state still changes at once.
+ * A clip without the flag plays as it is and is cut on stop; with no
  * `fadeSeconds` the element's volume is never touched.
  */
 export function createPlayer(
   element: AudioLike,
   onChange: (state: PlayerState) => void,
   onFailed: (id: string) => void = () => {},
-  options: { fadeSeconds?: number; clock?: Clock } = {},
+  options: { fadeSeconds?: number | (() => number); clock?: Clock } = {},
 ) {
-  const fadeMs = (options.fadeSeconds ?? 0) * 1000
+  // The fade length of the clip now playing: asked for as each clip begins, so a change of the
+  // setting is heard from the next clip, and a clip already playing keeps the length it began with.
+  let fadeMs = 0
+  const lengthMs = () => {
+    const { fadeSeconds } = options
+    return (typeof fadeSeconds === 'function' ? fadeSeconds() : (fadeSeconds ?? 0)) * 1000
+  }
   const clock = options.clock ?? browserClock
   // Fade state: when the clip began to sound (null until the element says it plays), when its
   // fade-out began (null: not stopping), the clip to start once that fade-out is over, whether the
@@ -128,10 +133,11 @@ export function createPlayer(
     element.src = clip.url
     element.currentTime = 0
     current = clip.id
-    if (fadeMs > 0) {
+    fadeMs = lengthMs()
+    if (options.fadeSeconds !== undefined) {
       endTicker()
       outSince = null
-      if (clip.fade) {
+      if (clip.fade && fadeMs > 0) {
         element.volume = 0
         startedAt = null
         audible = true

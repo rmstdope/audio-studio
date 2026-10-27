@@ -180,6 +180,15 @@ describe('ProjectSchema', () => {
     expect(problems(tier('50')).map((p) => p.path)).toEqual(['narration.quality.fishTier'])
   })
 
+  it('takes the length of a take fade in seconds, or none', () => {
+    const base = projectJson()
+    expect(parse(base).data!.takeFade).toBeUndefined()
+    expect(parse({ ...base, takeFade: 0 }).data!.takeFade).toBe(0)
+    expect(parse({ ...base, takeFade: 0.3 }).data!.takeFade).toBe(0.3)
+    expect(problems({ ...base, takeFade: -1 }).map((p) => p.path)).toEqual(['takeFade'])
+    expect(problems({ ...base, takeFade: 'long' }).map((p) => p.path)).toEqual(['takeFade'])
+  })
+
   it('requires {part} in part paths', () => {
     const base = projectJson()
     const narration = base.narration as { paths: Record<string, string> }

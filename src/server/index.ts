@@ -34,6 +34,7 @@ import { setMusicModel, setStageModel, switchRetiredModels } from '../services/m
 import { modelsView } from '../services/modelsView'
 import type { Busy } from '../core/models'
 import { setFishTier } from '../services/fishTier'
+import { setTakeFade } from '../services/takeFade'
 import { setSoundAlike } from '../services/soundAlike'
 import { recordTake, takeFile, tryLine } from '../services/takes'
 import { checkSetup } from '../services/setup'
@@ -154,6 +155,9 @@ const SoundAlikeBody = z.object({ groups: Groups, was: Groups }).strict()
 
 /** The Fish tier the user chose, or null to clear it. */
 const FishTierBody = z.object({ tier: FishTierSchema.nullable() }).strict()
+
+/** How long takes fade in the studio, in seconds. */
+const TakeFadeBody = z.object({ seconds: z.number().min(0) }).strict()
 
 /** The takes whose model the page offered to switch from s1. */
 const ModelsBody = z
@@ -1115,6 +1119,16 @@ export function startServer({
             return Response.json({ error: 'expected { tier }' }, { status: 400 })
           }
           const result = await setFishTier(projectFile, body.data.tier)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/take-fade': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = TakeFadeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { seconds }' }, { status: 400 })
+          }
+          const result = await setTakeFade(projectFile, body.data.seconds)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

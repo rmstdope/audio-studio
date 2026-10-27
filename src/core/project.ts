@@ -258,6 +258,11 @@ export const ProjectSchema = z.object({
   env: z.string().default('.env'),
   narration: NarrationSchema,
   music: MusicSchema.optional(),
+  /**
+   * How long a take fades in and out when played in the studio, in seconds (0: no fade); absent is
+   * 0.2. Saved from Setup's Playing takes panel; the game's own file never fades.
+   */
+  takeFade: z.number().min(0).optional(),
 })
 
 /** A validated project file, with defaults filled in. */
