@@ -176,7 +176,7 @@ describe('createMusicRouter', () => {
 
   it('sends each model to its own generator, and closes the other when the family changes', async () => {
     const log: string[] = []
-    const router = createMusicRouter({ acestep: make('ace', log), stableAudio: make('sa', log) })
+    const router = createMusicRouter({ acestep: make('ace', log), 'stable-audio': make('sa', log) })
     const base = { brief: 'a', kind: 'loop', seconds: 3, bpm: null, key: null, seed: 1 } as const
     await router.generate({ ...base, model: 'balanced' })
     await router.generate({ ...base, model: 'quick' })
@@ -195,7 +195,7 @@ describe('createMusicRouter', () => {
   })
 
   it('asks the generator of the model’s family whether it is ready and installed', () => {
-    const router = createMusicRouter({ acestep: make('ace', []), stableAudio: make('sa', []) })
+    const router = createMusicRouter({ acestep: make('ace', []), 'stable-audio': make('sa', []) })
     expect(router.installed('quick')).toBe(false)
     expect(router.installed('short')).toBe(true)
     expect(router.ready('careful').ok).toBe(false)
@@ -204,7 +204,7 @@ describe('createMusicRouter', () => {
 
   it('stops both', () => {
     const log: string[] = []
-    createMusicRouter({ acestep: make('ace', log), stableAudio: make('sa', log) }).close()
+    createMusicRouter({ acestep: make('ace', log), 'stable-audio': make('sa', log) }).close()
     expect(log.sort()).toEqual(['ace:close', 'sa:close'])
   })
 })

@@ -3,7 +3,12 @@ import { existsSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_MUSIC_MODEL, musicModel, type MusicModelId } from '../core/musicModels'
+import {
+  DEFAULT_MUSIC_MODEL,
+  musicModel,
+  type MusicFamily,
+  type MusicModelId,
+} from '../core/musicModels'
 import { createLineWorker } from './lineWorker'
 import type { Machine } from './setup'
 
@@ -19,10 +24,10 @@ export interface MusicRequest {
   model: MusicModelId
 }
 
-/** One take as generated: a WAV, and the seed it was made from. */
+/** One take as generated: a WAV, and the seed it was made from (absent from one that takes none). */
 export interface GeneratedTake {
   wav: Uint8Array
-  seed: number
+  seed?: number
 }
 
 /** Whether takes can be made on this computer, and what is missing if not. */
@@ -100,18 +105,11 @@ export function aceStepReady(
 }
 
 /**
- * The two generators as one: each model goes to its own family's worker, and when a take needs
- * the other family the first one is stopped, so its models leave memory (one GPU, one at a time).
+ * The generators of every family as one: each model goes to its own family's, and when a take needs
+ * another family the last one used is stopped, so its models leave memory (one GPU, one at a time).
  */
-export function createMusicRouter({
-  acestep,
-  stableAudio,
-}: {
-  acestep: MusicGenerator
-  stableAudio: MusicGenerator
-}): MusicGenerator {
-  const of = (model: MusicModelId) =>
-    musicModel(model).family === 'acestep' ? acestep : stableAudio
+export function createMusicRouter(generators: Record<MusicFamily, MusicGenerator>): MusicGenerator {
+  const of = (model: MusicModelId) => generators[musicModel(model).family]
   let last: MusicGenerator | null = null
   return {
     ready: (model) => of(model).ready(model),
@@ -123,8 +121,7 @@ export function createMusicRouter({
       return generator.generate(request, signal)
     },
     close() {
-      acestep.close()
-      stableAudio.close()
+      for (const generator of Object.values(generators)) generator.close()
     },
   }
 }
