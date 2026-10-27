@@ -901,7 +901,7 @@ not on disk when the page loads is marked "The file is not there." and has no bu
 empty cell keeps the column aligned.
 Play runs once from the start (a loop too), one row at a time, and stops on leaving the page; a
 play that fails says so in its row. The audio is `GET /api/music/tracks/:id/current`, which the
-studio resolves itself from the row (the page sends no path). A track opens its own page (built: its Brief panel and its Takes panel; its board: the In the game block with Un-choose, More takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).
+studio resolves itself from the row (the page sends no path). A track opens its own page (built: its Brief panel and its Takes panel; its board: the In the game block with Un-choose, Make N more takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
@@ -923,7 +923,7 @@ seconds, bpm, key; the hash still begins with Balanced's recipe, so choosing a m
 (seed, length, waveform bars). The same seed does not make the same take again on the Mac, so the cache keeps the take
 itself; the seed is kept with it, in the board and the lock, to say where it came from (absent from
 a take whose model takes none, as ElevenLabs' will not, §8.6). The brief a
-take is made from is the game's with the studio's changes over it. What is built is the Takes panel on a track's page: "Make 2 takes" (when there are none) queues two,
+take is made from is the game's with the studio's changes over it. What is built is the Takes panel on a track's page: "Make N takes" (when there are none) queues N, 1 to 6 from the count menu (as-3ek),
 made one at a time on the GPU queue, each a dashed card with a progress bar (about 3 minutes
 expected, a guess) and its time left, then a card with play, its waveform (a loop's seam marked),
 its length and, for a loop, **Hear the seam** (`GET …/takes/<file>?seam=1` is the last 4 seconds
@@ -933,7 +933,7 @@ computer killed (exit code 137, most often memory running out) says so in plain 
 log: "The music generator was stopped by the computer, most likely because it ran out of memory.
 Close other music jobs, then Try again." The making state is
 in memory (a restart forgets a failure, not a take). The board for a track shows its
-takes as cards: **More takes** generates two more (about six minutes), made in the background, so
+takes as cards: The count menu ("Number of new takes", between the model menu and the button) starts at 2 and goes back to 2 after every press; it is page state, never remembered. **Make N more takes** generates N more (two by default, about six minutes), made in the background, so
 the page can be left meanwhile; **Drop** removes one (not the chosen one); **Choose** writes one at
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
@@ -1030,7 +1030,7 @@ list dismissed without a pick shows the full label until then.
 every stinger (at most 10 s, generated at 10) fits both. `canMake`/`lengthReason` (`core/musicModels.ts`)
 decide it: a track's menu greys a model that cannot make its length with the reason ("makes loops up
 to 27 s · this one is 1:30", which wins over "not on this computer"), the track's line says why when the
-picked model, Setup's included, cannot make it and More takes is disabled until another is picked, and
+picked model, Setup's included, cannot make it and the make button is disabled until another is picked, and
 `make` refuses it too. Setup's menu greys nothing and, while a Stable Audio model is the default,
 says how many of the project's loops (`modelsView`'s `loops`) are longer. The menus are two groups,
 "ACE-Step · any length", "Stable Audio · short music only" and "ElevenLabs · in the cloud,
@@ -1200,7 +1200,7 @@ read by an older studio.
   once, and Eleven Music (`services/elevenMusic.ts`) reads the project's key each time: the model is
   installed when the key is set, and ready then too; the account's state is Setup's, and a take that
   fails says why in ElevenLabs' own words (a Free plan's refusal among them). Its menu entry says
-  "needs an ElevenLabs key" instead of "not on this computer", as does a refused More takes. It runs
+  "needs an ElevenLabs key" instead of "not on this computer", as does a refused make button. It runs
   on any computer, not only Apple silicon; Setup's Music row is off while the project's model is
   Eleven Music, and the Models panel's Music row says it is made in the cloud and is Paid.
 - **No GPU.** The take queue chooses by family: local takes wait for the GPU as before
@@ -1211,8 +1211,8 @@ read by an older studio.
   price; null for the free ones), and a take costs it for the whole take, the 20 seconds a loop is
   made longer included (`takePrice`). A track's menu entry says "about 1 min and $0.28 a take",
   Setup's menu "about 1 min a take, $0.15 a minute of music" with "$0.15 a minute" beside it, and
-  More takes and Make 2 takes the price of both, twice a take's as the menu shows it ("More takes ·
-  $0.56"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed;
+  the make button the price of all N takes, N times a take's as the menu shows it ("Make 2 more
+  takes · $0.56"; the count menu lists each total, "3 takes · $0.84"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed;
   each is logged in the spending record (14.7d). Stop aborts the request; ElevenLabs may still
   bill a take stopped while being made, which Stop's title says while a paid take is being made.
 
@@ -1546,7 +1546,7 @@ Small, independently useful increments:
     4. **Takes** (built): the ACE-Step worker behind `MusicGenerator` (and in the setup checklist), a take
        generated, shaped and cached per click on a track's page, and played, loops around their
        seam too.
-    5. **Board** (built): a track's takes as cards, More takes (two, in the background), Drop;
+    5. **Board** (built): a track's takes as cards, Make N more takes (N chosen, 1 to 6, in the background), Drop;
        takes from an earlier brief marked; Stop and Try again; the board saved in
        `.audio-studio/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
     6. **Choose** (built): the chosen take levelled, encoded and written with the manifest and lock; each
@@ -1593,7 +1593,7 @@ Small, independently useful increments:
     4. **Eleven Music takes** (built): the family and model in every music menu, takes made, decoded
        and shaped, outside the GPU queue (the take queue by family), ready by key, Setup's Music
        row, an opt-in live take.
-    5. **What music costs** (built): the price on the menus, More takes and Make 2 takes, and Stop's
+    5. **What music costs** (built): the price on the menus, the make button, and Stop's
        warning. Music rows in the spending log came with its version 2, in 14.7d.
     6. **A voice says whose it is** (built): `eleven:` voice ids (`core/voices.ts`: `providerOf`,
        `providerId`, `elevenVoice`, `FISH_VOICE_ID` and `VOICE_ID`), and no Fish page linked for an

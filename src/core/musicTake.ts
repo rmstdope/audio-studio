@@ -262,7 +262,7 @@ export interface MakingSummary {
 }
 
 /** The most takes one click asks for. */
-export const MAX_TAKES_AT_ONCE = 4
+export const MAX_TAKES_AT_ONCE = 6
 
 /** The body of a request for takes: this many new ones (with a model, else the project's), or a failed one again. */
 export const MakeTakesBody = z.union([
