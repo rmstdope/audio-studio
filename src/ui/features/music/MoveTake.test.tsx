@@ -337,7 +337,7 @@ describe('the Move dialog', () => {
   it('keeps Tab and Shift+Tab inside the dialog while Move is greyed, and Esc still closes it', async () => {
     const page = render(village, view([take(3)]))
     await click(page.buttons('Move…')[0])
-    const input = document.querySelector('input.filter')!
+    const input = document.querySelector<HTMLInputElement>('input.filter')!
     const cancel = page.buttons('Cancel')[0]!
     expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
     cancel.focus()
