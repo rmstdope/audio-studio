@@ -1,6 +1,8 @@
 # /// script
 # requires-python = ">=3.10,<3.11"
-# dependencies = ["stable-audio-tools", "soundfile"]
+# dependencies = ["stable-audio-tools==0.0.20", "pytorch-lightning==2.5.5", "numpy<2", "soundfile"]
+# [tool.uv]
+# exclude-newer = "2026-10-27T00:00:00Z"
 # ///
 """Audio Studio's Stable Audio Open worker: makes one take of a track, the model loaded once.
 
@@ -87,6 +89,9 @@ def make(request: dict) -> int:
         steps=8 if small else 100,
         cfg_scale=1.0 if small else 7.0,
         sampler_type="pingpong" if small else "dpmpp-3m-sde",
+        # 0.0.20 guides with APG by default, which needs float64, and MPS has none: plain guidance,
+        # as the models were released with.
+        apg_scale=0.0,
         device="mps",
         seed=request["seed"],
     )
