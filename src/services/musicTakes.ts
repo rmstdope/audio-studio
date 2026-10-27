@@ -538,6 +538,8 @@ export function createMusicTakes({
       if (to.inputs.kind !== from.inputs.kind) {
         return { ok: false, message: 'A loop can only move to a loop, and a stinger to a stinger.' }
       }
+      // Checked before the boards' turns: a refresh rewrites the game's list, never the boards, so one
+      // that starts in between cannot harm the move.
       for (const track of [from, to]) {
         const busy =
           track.listId === 'stingers'
@@ -552,7 +554,7 @@ export function createMusicTakes({
           const problems: Problem[] = []
           const chosenTracks = await readChosen(from.root, from.music, problems)
           if (!chosenTracks || problems.length) {
-            return { ok: false, file: from.music.paths.lock, problems }
+            return { ok: false, message: 'The music lock could not be read.' }
           }
           const source = await readBoard(from.root, from.board)
           if ('ok' in source) return source
@@ -566,7 +568,9 @@ export function createMusicTakes({
           }
           let wav: Uint8Array
           try {
-            wav = new Uint8Array(await Bun.file(join(from.root, from.folder, name)).arrayBuffer())
+            wav = new Uint8Array(
+              await Bun.file(resolveInRoot(from.root, `${from.folder}/${name}`)).arrayBuffer(),
+            )
           } catch {
             return { ok: false, message: 'That take’s sound is gone, so it cannot be moved.' }
           }

@@ -70,7 +70,10 @@ export function MoveTakeDialog({
     try {
       answer = await move.mutateAsync({ file: take.file, to: selected })
     } catch (error) {
-      setFailure(moveFailure(take.n, error instanceof Error ? error.message : String(error)))
+      // The server did not answer with a refusal: how far it got is not known, so it is not said
+      // that nothing was changed.
+      const why = error instanceof Error ? error.message : String(error)
+      setFailure(`Take ${take.n} could not be moved: ${why}. Check the takes on both tracks.`)
       return
     }
     if (answer && answer.ok && 'n' in answer) onMoved({ id: selected, n: answer.n })

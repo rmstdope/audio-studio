@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  chmodSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { wavSeconds } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
@@ -11,7 +19,7 @@ import type { Encoder } from './audio'
 import { loadProject } from './workspace'
 import { boardQueue, createMusicTakes, musicTakeHash } from './musicTakes'
 import { GPU } from './gpu'
-import { refreshDialog, stopRefreshes } from './refresh'
+import { refreshDialog, refreshShared, stopRefreshes } from './refresh'
 import { createHash } from 'node:crypto'
 
 const music = {
@@ -885,9 +893,9 @@ describe('moving a take', () => {
   it('refuses while the music lock cannot be read', async () => {
     const m = await made(2, { 'music/music.lock.json': '{ nope' })
     const [one] = (await viewOf(m, 'hall')).takes
-    expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toMatchObject({
+    expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({
       ok: false,
-      file: 'music/music.lock.json',
+      message: 'The music lock could not be read.',
     })
   })
 
@@ -917,6 +925,60 @@ describe('moving a take', () => {
     } finally {
       stopRefreshes()
       await refreshing.catch(() => {})
+    }
+    expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
+  })
+
+  it('refuses while the source’s list is being refreshed, and while the stingers are', async () => {
+    const json = projectJson({ music: { ...music, refreshShared: 'sleep 1' } })
+    ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
+    const m = await made(2, { 'audio-studio.json': json })
+    const [one] = (await viewOf(m, 'hall')).takes
+    const refreshing = refreshDialog(m.file, 'act1')
+    try {
+      expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({
+        ok: false,
+        message: 'Hall is being refreshed from the game.',
+      })
+    } finally {
+      stopRefreshes()
+      await refreshing.catch(() => {})
+    }
+    await m.takes.make(m.file, 'victory', { count: 1 })
+    await m.settled('victory')
+    const [take] = (await viewOf(m, 'victory')).takes
+    const shared = refreshShared(m.file)
+    try {
+      expect(await m.takes.move(m.file, 'victory', take!.file, 'defeat')).toEqual({
+        ok: false,
+        message: 'Victory is being refreshed from the game.',
+      })
+    } finally {
+      stopRefreshes()
+      await shared.catch(() => {})
+    }
+    expect((await viewOf(m, 'victory')).takes).toHaveLength(1)
+  })
+
+  it('leaves the take on its board when the destination cannot be written', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m, 'hall')).takes
+    // The destination's takes folder is a file: its sound cannot be written.
+    mkdirSync(join(m.root, '.audio-studio/music-takes'), { recursive: true })
+    writeFileSync(join(m.root, '.audio-studio/music-takes/hut'), 'in the way')
+    await expect(m.takes.move(m.file, 'hall', one!.file, 'hut')).rejects.toThrow()
+    expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
+  })
+
+  it('never loses the take when the boards cannot be written: it stays on the first', async () => {
+    const m = await made()
+    const [one] = (await viewOf(m, 'hall')).takes
+    const folder = join(m.root, '.audio-studio/music')
+    chmodSync(folder, 0o555)
+    try {
+      await expect(m.takes.move(m.file, 'hall', one!.file, 'hut')).rejects.toThrow()
+    } finally {
+      chmodSync(folder, 0o755)
     }
     expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
   })

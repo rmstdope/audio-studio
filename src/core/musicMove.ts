@@ -125,11 +125,6 @@ export function movedLineParts(
   return [`Take ${n} moved to `, to, `${act ? ` (${act})` : ''}, where it is take ${becameN}.`]
 }
 
-/** The line after a move as one sentence. */
-export function movedLine(n: number, to: string, act: string | null, becameN: number): string {
-  return movedLineParts(n, to, act, becameN).join('')
-}
-
 /** The line a moved take keeps under its name. */
 export function movedFromLine(from: { title: string; n: number }): string {
   return `moved from ${from.title}, where it was take ${from.n}`

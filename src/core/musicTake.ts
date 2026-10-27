@@ -150,10 +150,10 @@ export function shapeTake(
 }
 
 /** Where a moved take came from: the track's title as it was, and the take's number there. */
-export interface MovedFrom {
-  title: string
-  n: number
-}
+export const MovedFromSchema = z.object({ title: z.string(), n: z.number().int().positive() })
+
+/** Where a moved take came from. */
+export type MovedFrom = z.infer<typeof MovedFromSchema>
 
 /** One take on a track's page. */
 export interface TakeView {
@@ -236,7 +236,7 @@ export const BoardTakeSchema = z.object({
   peaks: z.array(z.number()),
   inputs: TakeInputsSchema,
   /** Set when the take was moved here from another track, for good. */
-  movedFrom: z.object({ title: z.string(), n: z.number().int().positive() }).optional(),
+  movedFrom: MovedFromSchema.optional(),
 })
 
 /** A track's board: the takes kept, and the number the next take gets (numbers are never reused). */

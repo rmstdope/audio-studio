@@ -285,6 +285,35 @@ describe('the Move dialog', () => {
     expect(requests.find((r) => r.method === 'POST')!.body).toMatchObject({ to: 'inn' })
   })
 
+  it('says it did not get an answer without claiming nothing was changed', async () => {
+    globalThis.fetch = (async () => new Response('{}', { status: 500 })) as unknown as typeof fetch
+    const page = render(village, view([take(3)]))
+    await click(page.buttons('Move…')[0])
+    await click(option("Witch's hut"))
+    await click(page.buttons('Move take 3')[0])
+    expect(dialog()!.textContent).toContain(
+      'Take 3 could not be moved: moving the take answered 500.',
+    )
+    expect(dialog()!.textContent).not.toContain('Nothing was changed')
+  })
+
+  it('greys Cancel and the button and says Moving… while the move is under way', async () => {
+    let finish = (_: Response) => {}
+    globalThis.fetch = (() =>
+      new Promise<Response>((resolve) => (finish = resolve))) as unknown as typeof fetch
+    const page = render(village, view([take(3)]))
+    await click(page.buttons('Move…')[0])
+    await click(option("Witch's hut"))
+    await click(page.buttons('Move take 3')[0])
+    expect(page.buttons('Moving…')[0]!.disabled).toBe(true)
+    expect(page.buttons('Cancel')[0]!.disabled).toBe(true)
+    await act(async () => {
+      finish(new Response(JSON.stringify({ ok: true, n: 5 })))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(dialog()).toBeNull()
+  })
+
   it('cancels with the button', async () => {
     const page = render(village, view([take(3)]))
     await click(page.buttons('Move…')[0])

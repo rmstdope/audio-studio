@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  BoardTakeSchema,
   MusicBoardSchema,
   LOOP_EXTRA_SECONDS,
   SEAM_SECONDS,
@@ -203,5 +204,22 @@ describe('a take at another sample rate and in stereo', () => {
   })
   test('cuts a stinger at its length', () => {
     expect(wavSeconds(shapeStinger(stereo(10), 6))).toBe(6)
+  })
+})
+
+describe('a take on the board', () => {
+  const take = {
+    n: 2,
+    hash: 'aaaaaaaaaaaaaaaa',
+    seed: 1,
+    seconds: 10,
+    peaks: [0.5],
+    inputs: { brief: 'b', kind: 'loop', seconds: 10, bpm: null, key: null },
+  }
+  test('may say where it was moved from, and a board kept before that still parses', () => {
+    expect(BoardTakeSchema.safeParse(take).success).toBe(true)
+    const moved = BoardTakeSchema.parse({ ...take, movedFrom: { title: 'Hall', n: 3 } })
+    expect(moved.movedFrom).toEqual({ title: 'Hall', n: 3 })
+    expect(BoardTakeSchema.safeParse({ ...take, movedFrom: { title: 'Hall' } }).success).toBe(false)
   })
 })

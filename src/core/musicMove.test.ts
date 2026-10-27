@@ -9,7 +9,7 @@ import {
   moveTitle,
   movedBoardTake,
   movedFromLine,
-  movedLine,
+  movedLineParts,
   moveTargets,
   nowhereLine,
 } from './musicMove'
@@ -137,10 +137,12 @@ describe('the words', () => {
     expect(nowhereLine('loop')).toBe('There is no other loop to move it to.')
   })
   it('words the line afterwards, with the act for loops only', () => {
-    expect(movedLine(3, "Witch's hut", 'Act 2', 5)).toBe(
+    expect(movedLineParts(3, "Witch's hut", 'Act 2', 5).join('')).toBe(
       "Take 3 moved to Witch's hut (Act 2), where it is take 5.",
     )
-    expect(movedLine(1, 'Victory', null, 2)).toBe('Take 1 moved to Victory, where it is take 2.')
+    expect(movedLineParts(1, 'Victory', null, 2).join('')).toBe(
+      'Take 1 moved to Victory, where it is take 2.',
+    )
     expect(movedFromLine({ title: 'Willowbrook village', n: 3 })).toBe(
       'moved from Willowbrook village, where it was take 3',
     )
