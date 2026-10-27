@@ -1,17 +1,21 @@
 import { z } from 'zod'
-import { LOOP_EXTRA_SECONDS, MUSIC_MODEL_IDS, musicModel, type MusicModelId } from './musicModels'
+import {
+  LOOP_EXTRA_SECONDS,
+  MUSIC_MODEL_IDS,
+  STINGER_GENERATED_SECONDS,
+  generatedSeconds,
+  musicModel,
+  type MusicModelId,
+} from './musicModels'
 import { readWav, writeWav, type Wav } from './wav'
 
 /** What a take made before models were chosen records, and what the take fingerprint begins with. */
 export const MUSIC_MODEL = musicModel('balanced').recipe
 
-export { LOOP_EXTRA_SECONDS }
+export { LOOP_EXTRA_SECONDS, STINGER_GENERATED_SECONDS, generatedSeconds }
 
 /** The seconds after a loop's cut that are crossfaded over its start. */
 export const SEAM_SECONDS = 4
-
-/** ACE-Step's shortest take, which every stinger is generated at. */
-export const STINGER_GENERATED_SECONDS = 10
 
 /** How long a stinger's ending fades out. */
 export const STINGER_FADE_SECONDS = 0.3
@@ -21,11 +25,6 @@ const STINGER_TAIL_SECONDS = 0.15
 
 /** Samples below this (of 32768) count as silence when a stinger's end is looked for. */
 const SILENCE = 300
-
-/** The length ACE-Step is asked for, for a track of this kind that should play `seconds`. */
-export function generatedSeconds(kind: 'loop' | 'stinger', seconds: number): number {
-  return kind === 'loop' ? seconds + LOOP_EXTRA_SECONDS : STINGER_GENERATED_SECONDS
-}
 
 /** The samples of a 16-bit WAV, channels interleaved. */
 function samplesOf(wav: Wav): Int16Array {
@@ -185,6 +184,8 @@ export interface MakingView {
   model: string
   /** About how long that model takes, in seconds. */
   expected: number
+  /** Made with a paid model, which may bill a take stopped while it is being made. */
+  paid: boolean
 }
 
 /** A take that could not be made, and why. */
@@ -193,6 +194,8 @@ export interface FailedView {
   message: string
   /** The music model it was asked with, as a line. */
   model: string
+  /** That model's id, which Try again makes the take with again. */
+  modelId: MusicModelId
 }
 
 /** A track's takes as its page shows them. */

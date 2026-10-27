@@ -373,6 +373,7 @@ describe('createMusicTakes', () => {
         n: 2,
         message: 'The music generator stopped: out of memory.',
         model: 'Balanced · XL turbo · 4B',
+        modelId: 'balanced',
       },
     ])
   })
@@ -621,7 +622,9 @@ describe('createMusicTakes', () => {
     await takes.make(file, 'hall', { count: 1, model: 'careful' })
     await settled('hall')
     const failed = await takes.view(file, 'hall')
-    expect(failed).toMatchObject({ failed: [{ n: 1, model: 'Careful · XL sft · 4B' }] })
+    expect(failed).toMatchObject({
+      failed: [{ n: 1, model: 'Careful · XL sft · 4B', modelId: 'careful' }],
+    })
     await takes.make(file, 'hall', { retry: 1 })
     await settled('hall')
     expect(requests.map((r) => r.model)).toEqual(['careful', 'careful'])
@@ -636,11 +639,22 @@ describe('createMusicTakes', () => {
     const view = await takes.view(file, 'hall')
     expect(view).toMatchObject({
       making: [
-        { n: 1, model: 'Careful · XL sft · 4B', expected: 420 },
-        { n: 2, model: 'Quickest · Turbo · 1.7B', expected: 60 },
+        { n: 1, model: 'Careful · XL sft · 4B', expected: 420, paid: false },
+        { n: 2, model: 'Quickest · Turbo · 1.7B', expected: 60, paid: false },
       ],
     })
     expect(await takes.making(file)).toEqual({ hall: { takes: 2, left: 480 } })
+    release()
+  })
+
+  it('marks a take made with a paid model as paid, being made or failed', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes } = setup(undefined, {}, [], gate)
+    await takes.make(file, 'hall', { count: 1, model: 'eleven' })
+    expect(await takes.view(file, 'hall')).toMatchObject({
+      making: [{ n: 1, model: 'Eleven Music · ElevenLabs, in the cloud', paid: true }],
+    })
     release()
   })
 

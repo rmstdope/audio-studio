@@ -88,7 +88,7 @@ describe('the Music row of the Models panel', () => {
       'Careful · XL sft · 4B — about 7 min a take',
       'Short · Stable Audio Open 1.0 — about 40 s a take',
       'Shortest · Stable Audio Open Small — about 10 s a take',
-      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take',
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take, $0.15 a minute of music',
     ])
     expect([...page.menu()!.querySelectorAll('optgroup')].map((g) => g.label)).toEqual([
       'ACE-Step · any length',
@@ -104,7 +104,7 @@ describe('the Music row of the Models panel', () => {
     expect(text).toContain(
       "Loops and stingers, made by ElevenLabs in the cloud. A track's takes can use another.",
     )
-    expect(page.menu()!.parentElement!.querySelector('.price')!.textContent).toBe('Paid')
+    expect(page.menu()!.parentElement!.querySelector('.price')!.textContent).toBe('$0.15 a minute')
     expect(page.menu()!.parentElement!.querySelector('.free')).toBeNull()
     expect(page.container.querySelector('.warnline')).toBeNull()
     const keyless = render(

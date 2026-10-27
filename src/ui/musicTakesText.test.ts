@@ -16,6 +16,7 @@ describe('timeLeftText', () => {
         elapsed: 0,
         model: 'Balanced · XL turbo · 4B',
         expected: 180,
+        paid: false,
       }),
     ).toBe('waiting')
   })
@@ -28,6 +29,7 @@ describe('timeLeftText', () => {
         elapsed: 1,
         model: 'Balanced · XL turbo · 4B',
         expected: 180,
+        paid: false,
       }),
     ).toBe('making · about 3 min left')
     expect(
@@ -37,6 +39,7 @@ describe('timeLeftText', () => {
         elapsed: 70,
         model: 'Balanced · XL turbo · 4B',
         expected: 180,
+        paid: false,
       }),
     ).toBe('making · about 2 min left')
     expect(
@@ -46,6 +49,7 @@ describe('timeLeftText', () => {
         elapsed: 175,
         model: 'Balanced · XL turbo · 4B',
         expected: 180,
+        paid: false,
       }),
     ).toBe('making · about 1 min left')
   })
@@ -57,6 +61,7 @@ describe('timeLeftText', () => {
       elapsed: 60,
       model: 'Careful · XL sft · 4B',
       expected: 420,
+      paid: false,
     } as const
     expect(timeLeftText(careful)).toBe('making · about 6 min left')
     expect(progressOf(careful)).toBeCloseTo(1 / 7)
@@ -70,6 +75,7 @@ describe('timeLeftText', () => {
         elapsed: 400,
         model: 'Balanced · XL turbo · 4B',
         expected: 180,
+        paid: false,
       }),
     ).toBe('making · taking longer than usual')
   })
@@ -84,6 +90,7 @@ describe('progressOf', () => {
         elapsed: 0,
         model: 'Balanced · XL turbo · 4B',
         expected: 180,
+        paid: false,
       }),
     ).toBe(0)
     expect(
@@ -93,6 +100,7 @@ describe('progressOf', () => {
         elapsed: 90,
         model: 'Balanced · XL turbo · 4B',
         expected: 180,
+        paid: false,
       }),
     ).toBe(0.5)
     expect(
@@ -102,6 +110,7 @@ describe('progressOf', () => {
         elapsed: 900,
         model: 'Balanced · XL turbo · 4B',
         expected: 180,
+        paid: false,
       }),
     ).toBe(0.95)
   })
@@ -123,7 +132,14 @@ describe('takesAreBeingMade', () => {
     expect(takesAreBeingMade([])).toBe(false)
     expect(
       takesAreBeingMade([
-        { n: 1, state: 'waiting', elapsed: 0, model: 'Balanced · XL turbo · 4B', expected: 180 },
+        {
+          n: 1,
+          state: 'waiting',
+          elapsed: 0,
+          model: 'Balanced · XL turbo · 4B',
+          expected: 180,
+          paid: false,
+        },
       ]),
     ).toBe(true)
   })
