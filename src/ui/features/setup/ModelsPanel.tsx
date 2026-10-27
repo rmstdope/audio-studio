@@ -591,7 +591,8 @@ function ElevenRow({
           <section className="notice notice-err" role="alert">
             <div className="notice-text">
               <strong>
-                Could not switch {name.toLowerCase()} to {elevenModelName(state.to)}
+                Could not switch ElevenLabs {stage === 'draft' ? 'drafts' : 'final recording'} to{' '}
+                {elevenModelName(state.to)}
               </strong>
               <span className="muted">
                 <Mono text={failureBody(view.file, state.reason)} words={[view.file]} />

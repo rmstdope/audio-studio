@@ -285,4 +285,24 @@ describe('the ElevenLabs rows of the Models panel', () => {
     await act(async () => confirm.click())
     expect(elevenPut).toHaveLength(1)
   })
+
+  it('says a switch failed, with Keep and Try again', async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ ok: false, problems: [{ message: 'Act I is recording' }] }), {
+        status: 409,
+      })) as typeof fetch
+    const page = render(withEleven())
+    await act(async () => {
+      const menu = elevenMenu(page.container, 'draft')
+      menu.value = 'eleven_flash_v2_5'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    for (let i = 0; i < 50 && !page.container.querySelector('[role="alert"]'); i++) {
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+    const alert = page.container.querySelector('[role="alert"]')!.textContent
+    expect(alert).toContain('Could not switch ElevenLabs drafts to Flash v2.5')
+    expect(alert).toContain('Keep Eleven v3')
+    expect(alert).toContain('Try again')
+  })
 })
