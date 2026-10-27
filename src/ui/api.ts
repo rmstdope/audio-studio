@@ -22,6 +22,7 @@ import type {
   DropResult,
   MakeRequest,
   MakeResult,
+  MoveResult,
   StopResult,
 } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
@@ -717,6 +718,34 @@ export function useDropTake(trackId: string) {
       return (await response.json()) as NonNullable<DropResult>
     },
     onSettled: () => client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
+  })
+}
+
+/**
+ * Moves a take of this track to another track, then reloads both tracks' takes, the project (the
+ * lists' status) and what is being made.
+ */
+export function useMoveTake(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (request: { file: string; to: string }) => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/move`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`moving the take answered ${response.status}`)
+      }
+      return (await response.json()) as MoveResult
+    },
+    onSettled: (_answer, _error, request) =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
+        client.invalidateQueries({ queryKey: ['music-takes', request.to] }),
+        client.invalidateQueries({ queryKey: ['music-making'] }),
+      ]),
   })
 }
 

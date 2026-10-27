@@ -85,7 +85,11 @@ function render(track: TrackRow, takes: TakeView[]) {
   const show = (track: TrackRow) =>
     act(() =>
       root.render(
-        createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track })),
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(TakesPanel, { track, lists: [] }),
+        ),
       ),
     )
   show(track)

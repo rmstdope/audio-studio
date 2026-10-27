@@ -840,12 +840,7 @@ describe('moving a take', () => {
 
   it('numbers after a take being made at the destination', async () => {
     let release = () => {}
-    const m = setup(
-      undefined,
-      lists,
-      [],
-      new Promise<void>((resolve) => (release = resolve)),
-    )
+    const m = setup(undefined, lists, [], new Promise<void>((resolve) => (release = resolve)))
     await m.takes.make(m.file, 'hut', { count: 2 })
     // Takes 1 and 2 of the hut are waiting; hall has a take from the board file.
     release()
@@ -874,7 +869,11 @@ describe('moving a take', () => {
       expect(await m.takes.move(m.file, 'hall', name, to)).toEqual({ ok: false, message })
     }
     await refused(one!.file, 'hut', 'That take is the one in the game; choose another first.')
-    await refused(two!.file, 'victory', 'A loop can only move to a loop, and a stinger to a stinger.')
+    await refused(
+      two!.file,
+      'victory',
+      'A loop can only move to a loop, and a stinger to a stinger.',
+    )
     await refused(two!.file, 'hall', 'A take cannot move to the track it is on.')
     await refused(two!.file, 'nope', 'That track is not in the game’s list.')
     await refused('0123456789abcdef.9.wav', 'hut', 'That take is not on the board.')

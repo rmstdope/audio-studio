@@ -5,7 +5,16 @@ import { BriefPanel } from './BriefPanel'
 import { TakesPanel } from './TakesPanel'
 
 /** A track's own page: where it plays, its Brief and its Takes. */
-export function TrackView({ list, track }: { list: MusicListSummary; track: TrackRow }) {
+export function TrackView({
+  list,
+  lists,
+  track,
+}: {
+  list: MusicListSummary
+  /** Every list of the game's music, for where a take can move to. */
+  lists: readonly MusicListSummary[]
+  track: TrackRow
+}) {
   const name = list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)
   const listRoute =
     list.kind === 'stingers'
@@ -23,7 +32,7 @@ export function TrackView({ list, track }: { list: MusicListSummary; track: Trac
         </div>
       </header>
       <BriefPanel key={track.id} track={track} kind={list.kind} />
-      <TakesPanel key={`takes-${track.id}`} track={track} />
+      <TakesPanel key={`takes-${track.id}`} track={track} lists={lists} />
     </>
   )
 }

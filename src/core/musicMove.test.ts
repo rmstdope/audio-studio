@@ -38,7 +38,16 @@ const list = (
   title: string,
   tracks: TrackRow[],
   state: MusicListSummary['state'] = 'ok',
-): MusicListSummary => ({ id, kind, title, state, tracks, orphans: [], dropped: 0, canRefresh: false })
+): MusicListSummary => ({
+  id,
+  kind,
+  title,
+  state,
+  tracks,
+  orphans: [],
+  dropped: 0,
+  canRefresh: false,
+})
 
 const lists = [
   list('act1', 'act', 'Act 1: The Call', [
@@ -57,7 +66,7 @@ describe('moveTargets', () => {
     const { groups } = moveTargets(lists, { id: 'village', kind: 'loop' })
     expect(groups.map((g) => g.heading)).toEqual(['Act 1', 'Act 2', 'Act 3'])
     expect(groups[0]!.tracks).toEqual([
-      { id: 'village', title: 'Willowbrook village', here: true, line: 'not chosen · 1:00' },
+      { id: 'village', title: 'Willowbrook village', here: true, line: 'this track' },
       { id: 'inn', title: 'The inn', here: false, line: 'chosen · 1:30' },
     ])
     expect(groups[1]!.tracks[0]!.line).toBe('changed since chosen · 2:00')
@@ -80,7 +89,11 @@ describe('moveTargets', () => {
   })
 
   it('says how many takes a track is making', () => {
-    const { groups } = moveTargets(lists, { id: 'village', kind: 'loop' }, { inn: { takes: 2, left: 5 } })
+    const { groups } = moveTargets(
+      lists,
+      { id: 'village', kind: 'loop' },
+      { inn: { takes: 2, left: 5 } },
+    )
     expect(groups[0]!.tracks[1]!.line).toBe('making 2 takes · 1:30')
   })
 

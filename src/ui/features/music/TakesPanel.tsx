@@ -1,6 +1,14 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { changedLine } from '../../../core/musicChoose'
-import type { TrackRow } from '../../../core/music'
+import { trackFor, type MusicListSummary, type TrackRow } from '../../../core/music'
+import {
+  actName,
+  hasNowhere,
+  moveTargets,
+  movedFromLine,
+  movedLineParts,
+  nowhereLine,
+} from '../../../core/musicMove'
 import type { MakingView, MusicTakesView, TakeView } from '../../../core/musicTake'
 import {
   MUSIC_GROUPS,
@@ -12,7 +20,14 @@ import {
   tooLongOnTrack,
   type MusicModelId,
 } from '../../../core/musicModels'
-import { useChooseTake, useDropTake, useMakeTakes, useMusicTakes, useStopTakes } from '../../api'
+import {
+  useChooseTake,
+  useDropTake,
+  useMakeTakes,
+  useMusicMaking,
+  useMusicTakes,
+  useStopTakes,
+} from '../../api'
 import { Failure } from '../../components/Failure'
 import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
@@ -20,19 +35,44 @@ import { clock } from '../../format'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { InTheGame, Wave } from './InTheGame'
+import { MoveTakeDialog } from './MoveTakeDialog'
 
 /**
  * A track's Takes panel: the takes made, played from the start and, for a loop, around their
  * seam; the ones being made; and "Make 2 takes" when there are none yet. A take that failed says
  * why, with Try again; without the music generator on this computer, it says so and links Setup.
  */
-export function TakesPanel({ track }: { track: TrackRow }) {
+export function TakesPanel({
+  track,
+  lists,
+}: {
+  track: TrackRow
+  /** Every list of the game's music, for where a take can move to. */
+  lists: readonly MusicListSummary[]
+}) {
   const trackId = track.id
   const takes = useMusicTakes(trackId)
   const make = useMakeTakes(trackId)
   const stop = useStopTakes(trackId)
   const player = useClipPlayer()
   const view = takes.data
+  const making = useMusicMaking().data ?? {}
+  // The take the Move… dialog is open for, and where the last move went; neither outlives the page.
+  const [moving, setMoving] = useState<number | null>(null)
+  const [moved, setMoved] = useState<{ n: number; id: string; became: number } | null>(null)
+  const movedLine = useRef<HTMLDivElement>(null)
+  const openers = useRef(new Map<number, HTMLButtonElement>())
+  const refocus = useRef<number | null>(null)
+  useEffect(() => {
+    if (moved) movedLine.current?.focus()
+  }, [moved])
+  useEffect(() => {
+    // Back to the Move… button of the take the dialog was closed on, once it is drawn again.
+    if (moving === null && refocus.current !== null) {
+      openers.current.get(refocus.current)?.focus()
+      refocus.current = null
+    }
+  }, [moving])
   // The pick holds while the page stays open; until there is one, the project's model.
   const [picked, setPicked] = useState<MusicModelId | null>(null)
   // Whether the model menu's list is probably open: then every entry reads in full.
@@ -108,6 +148,11 @@ export function TakesPanel({ track }: { track: TrackRow }) {
     </select>
   )
   const result = make.data
+  const movingTake = view.takes.find((take) => take.n === moving)
+  const nowhere = hasNowhere(moveTargets(lists, { id: trackId, kind: view.kind }).groups)
+    ? nowhereLine(view.kind)
+    : null
+  const destination = moved ? trackFor([...lists], moved.id) : undefined
   return (
     <>
       {!generator.ok && (
@@ -178,10 +223,44 @@ export function TakesPanel({ track }: { track: TrackRow }) {
             </div>
           )}
         </div>
+        {moved && destination && (
+          <div className="moved" role="status" tabIndex={-1} ref={movedLine}>
+            <span className="grow">
+              {(([before, name, after]) => (
+                <>
+                  {before}
+                  <b>{name}</b>
+                  {after}
+                </>
+              ))(
+                movedLineParts(
+                  moved.n,
+                  destination.track.title,
+                  destination.list.kind === 'act' ? actName(destination.list.title) : null,
+                  moved.became,
+                ),
+              )}
+            </span>
+            <a
+              className="btn btn-small"
+              href={routeHref({ view: 'music', page: 'track', track: moved.id })}
+            >
+              Open {destination.track.title}
+            </a>
+            <button
+              type="button"
+              className="btn btn-ghost btn-small"
+              aria-label="Close"
+              onClick={() => setMoved(null)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
         {!none && view.lockUnread && (
           <span className="takes-missing small">
-            Choosing and dropping wait until the music lock can be read. You can still listen and
-            make more takes.
+            Choosing, dropping and moving wait until the music lock can be read. You can still
+            listen and make more takes.
           </span>
         )}
         {!none && missing}
@@ -218,12 +297,37 @@ export function TakesPanel({ track }: { track: TrackRow }) {
                 take={take}
                 player={player}
                 locked={view.lockUnread}
+                nowhere={nowhere}
+                onMove={() => setMoving(take.n)}
+                opener={(button) => {
+                  if (button) openers.current.set(take.n, button)
+                  else openers.current.delete(take.n)
+                }}
               />
             ))}
             {view.making.map((making, index) => (
               <MakingCard key={making.n} making={making} first={index === 0} />
             ))}
           </div>
+        )}
+        {movingTake && (
+          <MoveTakeDialog
+            trackId={trackId}
+            trackTitle={track.title}
+            kind={view.kind}
+            take={movingTake}
+            lists={lists}
+            making={making}
+            onClose={() => {
+              refocus.current = movingTake.n
+              setMoving(null)
+            }}
+            onMoving={() => player.stop()}
+            onMoved={({ id, n }) => {
+              setMoved({ n: movingTake.n, id, became: n })
+              setMoving(null)
+            }}
+          />
         )}
         <Failure title="The takes could not be made" result={result} />
         {stop.isError && <span className="adopt-error">{stop.error.message}</span>}
@@ -240,13 +344,21 @@ function TakeCard({
   take,
   player,
   locked,
+  nowhere,
+  onMove,
+  opener,
 }: {
   trackId: string
   kind: MusicTakesView['kind']
   take: TakeView
   player: ReturnType<typeof useClipPlayer>
-  /** The music lock cannot be read: Choose and Drop wait. */
+  /** The music lock cannot be read: Choose, Drop and Move… wait. */
   locked: boolean
+  /** Why Move… is greyed when there is nowhere to move the take; null when there is. */
+  nowhere: string | null
+  onMove: () => void
+  /** Hands the Move… button to the panel, to give it focus back when the dialog closes. */
+  opener: (button: HTMLButtonElement | null) => void
 }) {
   const id = `music-take-${trackId}-${take.n}`
   const url = `/api/music/tracks/${encodeURIComponent(trackId)}/takes/${take.file}`
@@ -261,6 +373,7 @@ function TakeCard({
         <b className="grow">Take {take.n}</b>
         {take.earlier && <span className="faint small">earlier brief</span>}
       </div>
+      {take.movedFrom && <span className="faint small">{movedFromLine(take.movedFrom)}</span>}
       <span className="faint small">{take.model}</span>
       <div className="take-row">
         <button
@@ -285,6 +398,26 @@ function TakeCard({
           </button>
         )}
         <span className="grow" />
+        <span className="move-wrap">
+          <button
+            type="button"
+            ref={opener}
+            className="btn btn-ghost btn-small"
+            disabled={locked}
+            aria-disabled={nowhere ? true : undefined}
+            aria-describedby={nowhere ? `${id}-nowhere` : undefined}
+            onClick={() => {
+              if (!nowhere) onMove()
+            }}
+          >
+            Move…
+          </button>
+          {nowhere && (
+            <span className="move-tip small" role="tooltip" id={`${id}-nowhere`}>
+              {nowhere}
+            </span>
+          )}
+        </span>
         <button
           type="button"
           className="btn btn-ghost btn-small"

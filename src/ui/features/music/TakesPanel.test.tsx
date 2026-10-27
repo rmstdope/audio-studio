@@ -55,7 +55,11 @@ function stopButton(making: MakingView[]) {
   cleanups.push(() => act(() => root.unmount()))
   act(() =>
     root.render(
-      createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track })),
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(TakesPanel, { track, lists: [] }),
+      ),
     ),
   )
   return [...container.querySelectorAll('button')].find((b) => b.textContent === 'Stop')

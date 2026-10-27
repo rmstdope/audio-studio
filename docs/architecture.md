@@ -922,6 +922,20 @@ numbers are per track and never reused (`next` is reserved when takes are asked 
 is on the board only once its WAV is written. The cache no longer keeps a sidecar file per take. A dropped take is just gone:
 seeds don't come back, so nothing is ruled out.
 
+**Move a take** (built, as-824): a take that is made, not chosen and not dropped can be moved to another track of
+the same kind (loop to loop in any act, stinger to stinger) from the **Move…** button on its card, which opens a
+dialog listing the game's other tracks of that kind with their status and length. A move is a move, not a copy: the
+take leaves one board and joins the other's, as that track's next number (`max(next, the numbers being made there +
+1)`), keeping its sound, seed, model, length and peaks, but with the destination's hash and inputs, so it counts as
+made for that track's brief (never "earlier brief", and choosing it reads plain "chosen"); a later change to that
+brief marks it as for any take. Its board entry gains `movedFrom: { title, n }` (the track's title as it was and
+the take's number there), kept for good and shown on the card and the In the game block. The service takes both
+boards' turns in sorted order, refuses the chosen take, an unreadable lock, a destination or source whose list is
+being refreshed from the game, and a kind mismatch, and writes the destination's WAV, then its board, then the
+source's board, and removes the source's WAV last, so a failure part-way leaves the take on both boards, never on
+neither. The manifest, lock and clips are not touched. The page stays on the first track and says where the take
+went (a line that is not kept across a reload).
+
 **Choose** levels the take to −20 LUFS as narration is levelled (`level.py`'s commands; RetroQuest
 levels its music to −20 today) and encodes it into the clips folder as `<track>.mp3`, stereo,
 160 kbps, with ffmpeg's LAME encoder, which writes the header that tells a decoder how much
@@ -1050,6 +1064,7 @@ POST   /api/music/tracks/:id/choose              { file } make a take the track'
 POST   /api/music/tracks/:id/remove              remove an orphan's music: clip, manifest, lock, board, takes, brief changes (404 if it is not one)
 GET    /api/music/clips/:file                    a music clip (a plain .mp3 in the music clips folder)
 POST   /api/music/tracks/:id/stop                stop the takes: the one being made ends and is discarded, the waiting ones are cancelled
+POST   /api/music/tracks/:id/move                { file, to } move a take to the track `to` of the same kind: `{ ok, n }` its new number (409 and why if it cannot)
 DELETE /api/music/tracks/:id/takes/:file         Drop: take it off the board and delete its file (409 if it is not on the board)
 GET    /api/music/making                         what is being made, by track ({ takes, left seconds }), for the lists' status
 GET    /api/music/tracks/:id/takes/:file         a take's WAV (?seam=1: its seam)
@@ -1352,6 +1367,8 @@ Small, independently useful increments:
         headings, greyed on a track too long for them; their own worker and optional Setup row.
     12. **In the game** (built): what a track plays shown above its other takes, and a chosen take
         that can be un-chosen (§8.5).
+    13. **Move a take** (built, as-824): Move… on a take card moves it to another loop in any act, or
+        another stinger, counted as made for the track it joins (§8.5).
 13. **Languages** (epic as-170), in small pull requests:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's

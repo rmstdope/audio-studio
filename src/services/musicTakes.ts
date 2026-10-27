@@ -64,7 +64,8 @@ export type MakeResult = { ok: true } | { ok: false; message: string } | Project
 export type DropResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
 
 /** What moving a take answered: its number on the other track; null for a track the project does not list. */
-export type MoveResult = { ok: true; n: number } | { ok: false; message: string } | ProjectFailure | null
+export type MoveResult =
+  { ok: true; n: number } | { ok: false; message: string } | ProjectFailure | null
 
 /** What stopping answered: how many takes were stopped, made or waiting; null for an unknown track. */
 export type StopResult = { ok: true; stopped: number } | ProjectFailure | null
@@ -532,7 +533,8 @@ export function createMusicTakes({
       const to = await resolve(projectFile, toId)
       if (!to) return { ok: false, message: 'That track is not in the game’s list.' }
       if (!('inputs' in to)) return to
-      if (to.id === from.id) return { ok: false, message: 'A take cannot move to the track it is on.' }
+      if (to.id === from.id)
+        return { ok: false, message: 'A take cannot move to the track it is on.' }
       if (to.inputs.kind !== from.inputs.kind) {
         return { ok: false, message: 'A loop can only move to a loop, and a stinger to a stinger.' }
       }

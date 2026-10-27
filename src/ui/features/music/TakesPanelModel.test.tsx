@@ -90,7 +90,11 @@ function render(data: MusicTakesView, row: TrackRow = track) {
   cleanups.push(() => act(() => root.unmount()))
   act(() =>
     root.render(
-      createElement(QueryClientProvider, { client }, createElement(TakesPanel, { track: row })),
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(TakesPanel, { track: row, lists: [] }),
+      ),
     ),
   )
   const menu = () =>
@@ -104,7 +108,7 @@ function render(data: MusicTakesView, row: TrackRow = track) {
 
 describe('the Takes panel while the music lock cannot be read', () => {
   const why =
-    'Choosing and dropping wait until the music lock can be read. You can still listen and make more takes.'
+    'Choosing, dropping and moving wait until the music lock can be read. You can still listen and make more takes.'
 
   it('says why above the cards and greys out Choose and Drop, leaving More takes alone', () => {
     const page = render(view({ lockUnread: true }))

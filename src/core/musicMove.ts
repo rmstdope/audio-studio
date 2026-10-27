@@ -8,7 +8,7 @@ export interface MoveTarget {
   title: string
   /** The track the take is on now: listed, but it cannot be picked. */
   here: boolean
-  /** Its status and length: "not chosen · 1:00". */
+  /** Its status and length ("not chosen · 1:00"); "this track" for the track the take is on. */
   line: string
 }
 
@@ -59,14 +59,15 @@ export function moveTargets(
             : null,
         tracks: list.tracks.map((track) => {
           const busy = making[track.id]
+          const here = track.id === from.id
           const status = busy
             ? `making ${busy.takes} ${busy.takes === 1 ? 'take' : 'takes'}`
             : STATUS_LABEL[track.status]
           return {
             id: track.id,
             title: track.title,
-            here: track.id === from.id,
-            line: `${status} · ${clock(track.seconds)}`,
+            here,
+            line: here ? 'this track' : `${status} · ${clock(track.seconds)}`,
           }
         }),
       }
@@ -111,9 +112,22 @@ export function nowhereLine(kind: 'loop' | 'stinger'): string {
   return `There is no other ${kind} to move it to.`
 }
 
-/** The line at the top of the Takes panel after a move; `act` is null for a stinger. */
+/**
+ * The line at the top of the Takes panel after a move, in three parts so the track's name can be
+ * set in bold; `act` is null for a stinger.
+ */
+export function movedLineParts(
+  n: number,
+  to: string,
+  act: string | null,
+  becameN: number,
+): [string, string, string] {
+  return [`Take ${n} moved to `, to, `${act ? ` (${act})` : ''}, where it is take ${becameN}.`]
+}
+
+/** The line after a move as one sentence. */
 export function movedLine(n: number, to: string, act: string | null, becameN: number): string {
-  return `Take ${n} moved to ${to}${act ? ` (${act})` : ''}, where it is take ${becameN}.`
+  return movedLineParts(n, to, act, becameN).join('')
 }
 
 /** The line a moved take keeps under its name. */
