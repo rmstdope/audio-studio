@@ -185,9 +185,32 @@ function fadingSetUp(duration = 10) {
 }
 
 describe('createPlayer, fading', () => {
+  it('starts the fade-in when the sound starts, not at play', () => {
+    const { element, player, wait } = fadingSetUp()
+    player.toggle('a', '/a.mp3', { fade: true })
+    wait(300)
+    expect(element.volume).toBe(0)
+    player.playing()
+    wait(100)
+    expect(element.volume).toBeCloseTo(0.5, 1)
+    wait(100)
+    expect(element.volume).toBe(1)
+  })
+
+  it('does not restart the fade-in when playing is told again (a stall resumed)', () => {
+    const { element, player, wait } = fadingSetUp()
+    player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
+    wait(100)
+    player.playing()
+    wait(100)
+    expect(element.volume).toBe(1)
+  })
+
   it('fades a clip in from silence', () => {
     const { element, player, wait } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     expect(element.volume).toBe(0)
     wait(100)
     expect(element.volume).toBeCloseTo(0.5, 1)
@@ -198,6 +221,7 @@ describe('createPlayer, fading', () => {
   it('fades out over the last of the clip', () => {
     const { element, player, wait } = fadingSetUp(1)
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     wait(700)
     expect(element.volume).toBe(1)
     wait(200)
@@ -207,6 +231,7 @@ describe('createPlayer, fading', () => {
   it('fades out on stop, and says stopped at once', () => {
     const { element, player, wait, last } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     wait(500)
     player.stop()
     expect([last(), element.paused]).toEqual([{ playing: null, inTurn: false }, false])
@@ -220,12 +245,16 @@ describe('createPlayer, fading', () => {
   it('fades the old take out before the next starts, and only the last asked starts', () => {
     const { element, player, wait, last } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     wait(500)
     player.toggle('b', '/b.mp3', { fade: true })
+    player.playing()
     player.toggle('c', '/c.mp3', { fade: true })
+    player.playing()
     expect([element.src, last()]).toEqual(['/a.mp3', { playing: 'c', inTurn: false }])
     wait(200)
     expect([element.src, element.volume, element.paused]).toEqual(['/c.mp3', 0, false])
+    player.playing()
     wait(200)
     expect(element.volume).toBe(1)
   })
@@ -233,8 +262,10 @@ describe('createPlayer, fading', () => {
   it('starts nothing after a stop that came during a fade-out', () => {
     const { element, player, wait } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     wait(500)
     player.toggle('b', '/b.mp3', { fade: true })
+    player.playing()
     player.stop()
     wait(300)
     expect([element.src, element.paused]).toEqual(['/a.mp3', true])
@@ -243,7 +274,9 @@ describe('createPlayer, fading', () => {
   it('still starts the next take if the old one ends during its fade-out', () => {
     const { element, player } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     player.toggle('b', '/b.mp3', { fade: true })
+    player.playing()
     player.ended()
     expect(element.src).toBe('/b.mp3')
   })
@@ -251,12 +284,15 @@ describe('createPlayer, fading', () => {
   it('leaves no ticker running once a clip ends, fails or is disposed', () => {
     const { ticks, player } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     player.ended()
     expect(ticks.size).toBe(0)
     player.toggle('b', '/b.mp3', { fade: true })
+    player.playing()
     player.failed()
     expect(ticks.size).toBe(0)
     player.toggle('c', '/c.mp3', { fade: true })
+    player.playing()
     player.dispose()
     expect(ticks.size).toBe(0)
   })
@@ -264,6 +300,7 @@ describe('createPlayer, fading', () => {
   it('does not fade a clip played without the fade flag, nor leave the volume down', () => {
     const { element, player, wait } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     wait(500)
     player.toggle('g', '/g.mp3')
     wait(200)
@@ -275,6 +312,7 @@ describe('createPlayer, fading', () => {
   it('does not fade down to rise again when stopped during the fade-in', () => {
     const { element, player, wait } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     wait(60)
     const at = element.volume
     player.stop()
@@ -287,7 +325,9 @@ describe('createPlayer, fading', () => {
   it('lets an error from the old take during a switch end its fade, not drop the new take', () => {
     const { element, player, last } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     player.toggle('b', '/b.mp3', { fade: true })
+    player.playing()
     player.failed()
     expect([element.src, last()]).toEqual(['/b.mp3', { playing: 'b', inTurn: false }])
   })
@@ -297,6 +337,7 @@ describe('createPlayer, fading', () => {
     const touched = Object.assign(element, { volume: 1 })
     const player = createPlayer(touched, () => {})
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     player.stop()
     expect([touched.volume, touched.paused]).toEqual([1, true])
   })
