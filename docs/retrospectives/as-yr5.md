@@ -15,7 +15,7 @@ planned) that a page-level test would have counted.
 page"), and the reproduction test asserted on a helper's output instead of on the page's text,
 so a banner outside the helper was invisible to it.
 **Cost.** A failed verification, a reopened P0 bead, a second bugfix pass and PR.
-**Prevent by.** In `fix-bug` step 2 (*Reproduce with a test*): when the bead's acceptance is about
+**Prevent by.** In `fix-bug` step 2 (_Reproduce with a test_): when the bead's acceptance is about
 what a page shows, the reproduction test renders that page and asserts on its text.
 `src/ui/features/lines/LinesView.test.tsx` shows it can be done here: it runs the real studio on
 the sample in the same file and counts the message on the page.
