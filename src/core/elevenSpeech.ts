@@ -7,11 +7,12 @@ import { providerOf } from './voices'
  * Flash half of one). A table of its own, beside Fish's prices, so neither provider's models can
  * stand for the other's.
  */
-const ELEVEN_SPEECH: Record<string, { credits: number; language: boolean }> = {
-  eleven_v3: { credits: 1, language: true },
-  // ElevenLabs takes no language_code with Multilingual v2.
-  eleven_multilingual_v2: { credits: 1, language: false },
-  eleven_flash_v2_5: { credits: 0.5, language: true },
+const ELEVEN_SPEECH: Record<string, { credits: number; language: boolean; cues: boolean }> = {
+  // Eleven v3 reads `[bracket]` tags as directions, as Fish's models do.
+  eleven_v3: { credits: 1, language: true, cues: true },
+  // ElevenLabs takes no language_code with Multilingual v2; it and Flash would speak a cue aloud.
+  eleven_multilingual_v2: { credits: 1, language: false, cues: false },
+  eleven_flash_v2_5: { credits: 0.5, language: true, cues: false },
 }
 
 /** The ElevenLabs model every stage records with until the project names its own (§8.6). */
@@ -35,6 +36,14 @@ export function isElevenModel(model: string): boolean {
 export function elevenCredits(model: string, text: string): number | undefined {
   const entry = Object.hasOwn(ELEVEN_SPEECH, model) ? ELEVEN_SPEECH[model] : undefined
   return entry && [...text].length * entry.credits
+}
+
+/**
+ * Whether a model reads `[bracket]` cues as directions (every Fish model, and Eleven v3) rather
+ * than speaking them, so a line's cues are sent to it.
+ */
+export function readsCues(model: string): boolean {
+  return !isElevenModel(model) || ELEVEN_SPEECH[model]!.cues
 }
 
 /** Whether an ElevenLabs model is told the language it speaks. */

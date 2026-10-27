@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { chunkText, saidText, spokenPieces, spokenText } from './spoken'
+import { chunkText, saidText, sentPieces, spokenPieces, spokenText } from './spoken'
 
 describe('spokenText', () => {
   it('adds the cue and says names as cast', () => {
@@ -91,5 +91,19 @@ describe('spokenPieces with cues inside', () => {
     expect(
       spokenPieces('Elior ran home.', '', { Elior: 'El-ee-or' }, 100, [{ at: 1, cue: '[a]' }]),
     ).toEqual(['El-ee-or [a] ran home.'])
+  })
+})
+
+describe('sentPieces', () => {
+  const line = { text: 'Come in. Sit down.', cue: '[soft]', inside: [{ at: 2, cue: '[low]' }] }
+  it('sends the cues to a model that reads them, as spokenPieces does', () => {
+    expect(sentPieces(line, 's2-pro', {}, 300)).toEqual(
+      spokenPieces(line.text, line.cue, {}, 300, line.inside),
+    )
+    expect(sentPieces(line, 'eleven_v3', {}, 300)).toEqual(['[soft] Come in. [low] Sit down.'])
+  })
+
+  it('sends none to a model that would speak them', () => {
+    expect(sentPieces(line, 'eleven_multilingual_v2', {}, 300)).toEqual(['Come in. Sit down.'])
   })
 })
