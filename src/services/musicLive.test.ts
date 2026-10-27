@@ -3,6 +3,7 @@ import { wavSeconds } from '../core/musicTake'
 import { readWav } from '../core/wav'
 import { aceStepCheckpoints, aceStepReady, createAceStepWorker } from './music'
 import { STABLE_AUDIO_DIR, createStableAudioWorker, stableAudioReady } from './stableAudio'
+import { createElevenMusic } from './elevenMusic'
 
 // Live: makes one 10-second stinger with the real ACE-Step (XL turbo, 4B language model), and one
 // with each Stable Audio model that is downloaded, which takes minutes the first time. Opt in with
@@ -72,3 +73,27 @@ for (const model of ['short', 'shortest'] as const) {
     },
   )
 }
+
+// Live, and paid: makes one 10-second stinger with Eleven Music. Opt in with
+// AUDIO_STUDIO_LIVE_ELEVENLABS=1 and ELEVENLABS_API_KEY in the environment, on a paid plan.
+const elevenKey = process.env.ELEVENLABS_API_KEY ?? null
+const liveEleven = process.env.AUDIO_STUDIO_LIVE_ELEVENLABS === '1' && elevenKey !== null
+describe.skipIf(!liveEleven)('createElevenMusic, with real ElevenLabs', () => {
+  it(
+    'makes a short take, as long as asked, with no seed',
+    async () => {
+      const take = await createElevenMusic({ apiKey: async () => elevenKey }).generate({
+        brief: 'short triumphant brass fanfare',
+        kind: 'stinger',
+        seconds: 10,
+        bpm: null,
+        key: null,
+        seed: 7,
+        model: 'eleven',
+      })
+      expect(take.seed).toBeUndefined()
+      expect(wavSeconds(readWav(take.wav))).toBeGreaterThan(9)
+    },
+    10 * 60_000,
+  )
+})

@@ -6,6 +6,7 @@ export const MUSIC_MODEL_IDS = [
   'careful',
   'short',
   'shortest',
+  'eleven',
 ] as const
 
 /** One of the music models the studio can make takes with. */
@@ -15,9 +16,12 @@ export type MusicModelId = (typeof MUSIC_MODEL_IDS)[number]
 export const LOOP_EXTRA_SECONDS = 20
 
 /** The generators the models run on. */
-export type MusicFamily = 'acestep' | 'stable-audio'
+export type MusicFamily = 'acestep' | 'stable-audio' | 'elevenlabs'
 
-/** A music model: ACE-Step's diffusion model with a planning language model, or a Stable Audio Open model. */
+/**
+ * A music model: ACE-Step's diffusion model with a planning language model, a Stable Audio Open
+ * model, or ElevenLabs' Eleven Music in the cloud.
+ */
 export interface MusicModel {
   id: MusicModelId
   /** The generator it runs on. */
@@ -32,7 +36,7 @@ export interface MusicModel {
   recipe: string
   /**
    * The folders it needs: in ACE-Step's checkpoints the diffusion model, then the language model;
-   * for Stable Audio the one folder of the model, in its own folder.
+   * for Stable Audio the one folder of the model, in its own folder; none for ElevenLabs.
    */
   folders: readonly string[]
   /** About how long a take takes, in seconds, for the progress shown. */
@@ -117,13 +121,38 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     minutes: '10 s',
     download: null,
   },
+  {
+    id: 'eleven',
+    family: 'elevenlabs',
+    // ElevenLabs makes up to ten minutes a request.
+    longest: 600,
+    name: 'Eleven Music',
+    generator: 'ElevenLabs, in the cloud',
+    recipe: 'eleven-music-v2.5',
+    folders: [],
+    // Not measured yet: the user's first takes say.
+    seconds: 60,
+    minutes: '1 min',
+    download: null,
+  },
 ]
 
-/** The menus' two groups: each under its heading, in the order the menus list them. */
+/** The menus' groups: each under its heading, in the order the menus list them. */
 export const MUSIC_GROUPS: readonly { heading: string; ids: readonly MusicModelId[] }[] = [
   { heading: 'ACE-Step · any length', ids: ['balanced', 'quick', 'quickest', 'careful'] },
   { heading: 'Stable Audio · short music only', ids: ['short', 'shortest'] },
+  { heading: 'ElevenLabs · in the cloud, paid', ids: ['eleven'] },
 ]
+
+/** Whether a model's takes are made on this computer, and so wait for its one GPU. */
+export function onThisComputer(id: MusicModelId): boolean {
+  return musicModel(id).family !== 'elevenlabs'
+}
+
+/** What a model needs that it lacks, in a menu: its key for ElevenLabs, its files for the others. */
+export function lacking(id: MusicModelId): string {
+  return musicModel(id).family === 'elevenlabs' ? 'needs an ElevenLabs key' : 'not on this computer'
+}
 
 /** The model a project uses when its file names none, and what every earlier take was made with. */
 export const DEFAULT_MUSIC_MODEL: MusicModelId = 'balanced'
@@ -197,7 +226,7 @@ export function menuEntry(id: MusicModelId, installed: boolean, track?: TrackLen
   const reason = track ? lengthReason(id, track.kind, track.seconds) : null
   if (reason) return `${heading} — ${reason}`
   const base = `${heading} — about ${model.minutes} a take`
-  return installed ? base : `${base} — not on this computer`
+  return installed ? base : `${base} — ${lacking(id)}`
 }
 
 /**
@@ -207,7 +236,7 @@ export function menuEntry(id: MusicModelId, installed: boolean, track?: TrackLen
 export function shortMenuLabel(id: MusicModelId, installed: boolean, track?: TrackLength): string {
   const { name, minutes } = musicModel(id)
   if (track && !canMake(id, track.kind, track.seconds)) return `${name} — ${makes(id)}`
-  return installed ? `${name} — about ${minutes} a take` : `${name} — not on this computer`
+  return installed ? `${name} — about ${minutes} a take` : `${name} — ${lacking(id)}`
 }
 
 /** What an empty track says a take takes with this model: "about 3 minutes each". */
@@ -245,9 +274,12 @@ export function setupShortLine(id: MusicModelId, loopSeconds: readonly number[])
   return `${first} ${rest}`
 }
 
-/** The line under a track's menu when it starts on a model this computer does not have. */
+/** The line under a track's menu when it starts on a model this computer does not have, or has no key for. */
 export function missingOnTrack(id: MusicModelId): string {
-  return `${musicModel(id).name} isn't on this computer. Pick another model for these takes, or see Setup for how to download it.`
+  const { name, family } = musicModel(id)
+  return family === 'elevenlabs'
+    ? `${name} needs an ElevenLabs key. Pick another model for these takes, or see Setup for where the key goes.`
+    : `${name} isn't on this computer. Pick another model for these takes, or see Setup for how to download it.`
 }
 
 /** The heading of the box shown when saving the project's music model failed. */

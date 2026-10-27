@@ -13,7 +13,9 @@ import {
 import { failureBody, RETIRED_MODEL } from '../../../core/retirement'
 import {
   MUSIC_GROUPS,
+  lacking,
   menuEntry,
+  onThisComputer,
   setupShortLine,
   musicModel,
   saveFailureHeading,
@@ -136,7 +138,9 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
       <div className="mname">Music</div>
       <div className="mtx">
         <span className="muted">
-          Loops and stingers, made on this computer. A track's takes can use another.
+          {onThisComputer(shown)
+            ? "Loops and stingers, made on this computer. A track's takes can use another."
+            : "Loops and stingers, made by ElevenLabs in the cloud. A track's takes can use another."}
         </span>
         <div className="mmenu">
           <select
@@ -158,8 +162,8 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
               </optgroup>
             ))}
           </select>
-          <span className="free">Free</span>
-          {!here && <span className="warnline">not on this computer</span>}
+          <span className="free">{onThisComputer(shown) ? 'Free' : 'Paid'}</span>
+          {!here && <span className="warnline">{lacking(shown)}</span>}
           {pending && <span className="muted">Saving…</span>}
         </div>
         {shortLine && <span className="mshort">{shortLine}</span>}

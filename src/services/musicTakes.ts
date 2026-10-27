@@ -21,6 +21,7 @@ import {
   MUSIC_MODELS,
   modelLine,
   musicModel,
+  onThisComputer,
   tooLongOnTrack,
   type MusicModelId,
 } from '../core/musicModels'
@@ -32,6 +33,9 @@ import { readWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
 import { gpuQueue, GPU } from './gpu'
+
+/** The queue's key for takes made in the cloud: one at a time, beside the GPU's. */
+const CLOUD = 'music-cloud'
 import type { MusicGenerator } from './music'
 import { commitChoice, readChosen, uncommitChoice, type CommitResult } from './musicClips'
 import { readMusic } from './musicLists'
@@ -370,14 +374,16 @@ export function createMusicTakes({
           message: entry.message,
           model: lineOf(entry.model),
         }))
-      const models = MUSIC_MODELS.map(({ id }) => ({ id, installed: generator.installed(id) }))
+      const models = await Promise.all(
+        MUSIC_MODELS.map(async ({ id }) => ({ id, installed: await generator.installed(id) })),
+      )
       // Not installed at all when no model is here: the first one that is says the rest (the
       // machine and uv); with none, the project's model says what to download.
       const here = models.find((m) => m.installed)
       return {
         ok: true,
         kind: inputs.kind,
-        generator: generator.ready(here?.id ?? found.model),
+        generator: await generator.ready(here?.id ?? found.model),
         defaultModel: found.model,
         models,
         takes,
@@ -398,10 +404,16 @@ export function createMusicTakes({
         retried?.model ?? ('retry' in request ? found.model : (request.model ?? found.model))
       const tooLong = tooLongOnTrack(model, inputs.kind, inputs.seconds)
       if (tooLong) return { ok: false, message: tooLong }
-      if (!generator.installed(model)) {
-        return { ok: false, message: `${musicModel(model).name} is not on this computer.` }
+      if (!(await generator.installed(model))) {
+        const { name } = musicModel(model)
+        return {
+          ok: false,
+          message: onThisComputer(model)
+            ? `${name} is not on this computer.`
+            : `${name} needs an ElevenLabs key.`,
+        }
       }
-      const ready = generator.ready(model)
+      const ready = await generator.ready(model)
       if (!ready.ok) return { ok: false, message: ready.message }
       const key = `${projectFile}\0${id}`
       const entries = active.get(key) ?? new Map<number, Entry>()
@@ -440,7 +452,10 @@ export function createMusicTakes({
         }
       }
       for (const entry of queued) {
-        void queue.run(GPU, () => run(projectFile, found, entry, inputs, entries))
+        // Takes made on this computer wait for its GPU; takes made in the cloud wait only for
+        // each other.
+        const turn = onThisComputer(entry.model) ? GPU : CLOUD
+        void queue.run(turn, () => run(projectFile, found, entry, inputs, entries))
       }
       return { ok: true }
     },

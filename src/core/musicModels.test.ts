@@ -35,6 +35,7 @@ describe('the music models', () => {
       'careful',
       'short',
       'shortest',
+      'eleven',
     ])
     expect(musicModel('careful').folders).toEqual(['acestep-v15-xl-sft', 'acestep-5Hz-lm-4B'])
     expect(musicModel('quickest').folders).toEqual(['acestep-v15-turbo', 'acestep-5Hz-lm-1.7B'])
@@ -69,10 +70,11 @@ describe('the Stable Audio models', () => {
     expect(musicModel('short').folders).toEqual(['stable-audio-open-1.0'])
     expect(musicModel('shortest').folders).toEqual(['stable-audio-open-small'])
   })
-  test('the menus have two groups under headings', () => {
+  test('the menus group the models under headings', () => {
     expect(MUSIC_GROUPS).toEqual([
       { heading: 'ACE-Step · any length', ids: ['balanced', 'quick', 'quickest', 'careful'] },
       { heading: 'Stable Audio · short music only', ids: ['short', 'shortest'] },
+      { heading: 'ElevenLabs · in the cloud, paid', ids: ['eleven'] },
     ])
   })
   test('the longest loop is the longest piece less what a loop is made longer by', () => {
@@ -137,6 +139,59 @@ describe('the Stable Audio models', () => {
     )
     expect(setupShortLine('shortest', [])).toBe('Shortest makes stingers, and no loops.')
     expect(setupShortLine('balanced', loops)).toBeNull()
+  })
+})
+
+describe('Eleven Music', () => {
+  test('is ElevenLabs’ model, in the cloud, with no folders and a length up to ten minutes', () => {
+    expect(musicModel('eleven')).toMatchObject({
+      family: 'elevenlabs',
+      name: 'Eleven Music',
+      generator: 'ElevenLabs, in the cloud',
+      recipe: 'eleven-music-v2.5',
+      folders: [],
+      download: null,
+      longest: 600,
+    })
+    expect(longestFor('eleven', 'loop')).toBe(580)
+    expect(modelLine('eleven-music-v2.5')).toBe('Eleven Music · ElevenLabs, in the cloud')
+  })
+  test('has a menu group of its own, last', () => {
+    expect(MUSIC_GROUPS.at(-1)).toEqual({
+      heading: 'ElevenLabs · in the cloud, paid',
+      ids: ['eleven'],
+    })
+  })
+  test('needs a key where a local model needs its files', () => {
+    expect(menuEntry('eleven', true)).toBe(
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take',
+    )
+    expect(menuEntry('eleven', false)).toBe(
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take — needs an ElevenLabs key',
+    )
+    expect(shortMenuLabel('eleven', false)).toBe('Eleven Music — needs an ElevenLabs key')
+    expect(missingOnTrack('eleven')).toBe(
+      'Eleven Music needs an ElevenLabs key. Pick another model for these takes, or see Setup for where the key goes.',
+    )
+  })
+  test('is a model the project file may name', () => {
+    expect(
+      ProjectSchema.safeParse(
+        projectJson({
+          music: {
+            paths: {
+              loops: 'l/{part}.json',
+              stingers: 's.json',
+              briefs: 'b.json',
+              lock: 'k.json',
+              clips: 'c',
+              manifest: 'm.json',
+            },
+            model: 'eleven',
+          },
+        }),
+      ).success,
+    ).toBe(true)
   })
 })
 

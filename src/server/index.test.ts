@@ -3601,6 +3601,7 @@ describe('server, the music model', () => {
         careful: false,
         short: true,
         shortest: true,
+        eleven: true,
       },
       loops: [5],
     })
@@ -3736,6 +3737,9 @@ describe('the ElevenLabs account on Setup', () => {
     overage: 0,
     voiceSlots: { used: 3, limit: 10 },
   }
+  const unused = async (): Promise<Uint8Array> => {
+    throw new Error('not used')
+  }
   const setupOf = async (elevenlabs: ElevenLabsClient) => {
     const server = startServer({
       projectFile: join(elevenRoot, 'audio-studio.json'),
@@ -3752,7 +3756,7 @@ describe('the ElevenLabs account on Setup', () => {
   }
 
   it('shows the plan and the characters left', async () => {
-    expect(await setupOf({ subscription: async () => starter })).toMatchObject({
+    expect(await setupOf({ subscription: async () => starter, music: unused })).toMatchObject({
       state: 'ok',
       detail: 'Answers. Starter plan: 27,450 of 30,000 credits left.',
     })
@@ -3780,6 +3784,7 @@ describe('the ElevenLabs account on Setup', () => {
       subscription: async () => {
         throw new Error('ElevenLabs answered 401: Invalid API key')
       },
+      music: unused,
     })
     expect(check).toMatchObject({
       state: 'problem',

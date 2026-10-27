@@ -510,6 +510,39 @@ describe('createMusicTakes', () => {
     expect(view).toMatchObject({ takes: [{ model: 'Balanced · XL turbo · 4B' }] })
   })
 
+  it('refuses Eleven Music without a key, saying so', async () => {
+    const { file, takes } = setup(undefined, {}, [], undefined, ['eleven'])
+    expect(await takes.make(file, 'hall', { count: 1, model: 'eleven' })).toEqual({
+      ok: false,
+      message: 'Eleven Music needs an ElevenLabs key.',
+    })
+  })
+
+  it('makes an Eleven Music take while the GPU is busy, and local takes wait for it', async () => {
+    const { file } = setup()
+    const queue = createSerial()
+    const takes = createMusicTakes({
+      generator: fakeGenerator().generator,
+      queue,
+      newSeed: () => 1,
+    })
+    let release: () => void = () => {}
+    const busy = queue.run(GPU, () => new Promise<void>((resolve) => (release = resolve)))
+    await takes.make(file, 'hall', { count: 1, model: 'eleven' })
+    await takes.make(file, 'hall', { count: 1, model: 'balanced' })
+    let view = await takes.view(file, 'hall')
+    for (let i = 0; i < 200 && view && 'ok' in view && view.ok && !view.takes.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      view = await takes.view(file, 'hall')
+    }
+    expect(view).toMatchObject({
+      takes: [{ n: 1, model: 'Eleven Music · ElevenLabs, in the cloud' }],
+      making: [{ n: 2, state: 'waiting' }],
+    })
+    release()
+    await busy
+  })
+
   it('refuses a model that is not on this computer, and says which models are', async () => {
     const { file, takes } = setup(undefined, {}, [], undefined, ['careful'])
     expect(await takes.make(file, 'hall', { count: 1, model: 'careful' })).toEqual({
@@ -528,6 +561,7 @@ describe('createMusicTakes', () => {
         { id: 'careful', installed: false },
         { id: 'short', installed: true },
         { id: 'shortest', installed: true },
+        { id: 'eleven', installed: true },
       ],
     })
   })

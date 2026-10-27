@@ -153,6 +153,24 @@ describe('the requests-at-once check', () => {
       expect(byId({ ...ready, music: null }).music).toMatchObject({ state: 'off' })
     })
 
+    it('is not needed while the project’s music model is Eleven Music, on any computer', () => {
+      const music = {
+        ready: {
+          ok: false as const,
+          message: 'ACE-Step runs on macOS with Apple silicon only.',
+          fix: 'Music is made on a Mac with Apple silicon; there is nothing to install on this computer.',
+        },
+        checkpoints: '/models',
+        model: 'eleven' as const,
+        stableAudioMissing: [],
+      }
+      expect(byId({ ...ready, music }).music).toMatchObject({
+        state: 'off',
+        detail:
+          "Not needed while the project's music model is Eleven Music, made by ElevenLabs in the cloud (its rows are below).",
+      })
+    })
+
     it('says what is missing and where the models go', () => {
       const music = {
         ready: {
