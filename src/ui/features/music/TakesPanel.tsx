@@ -24,6 +24,7 @@ import {
   missingOnTrack,
   shortMenuLabel,
   takeCountEntry,
+  takesCount,
   takesButton,
   tooLongOnTrack,
   type MusicModelId,
@@ -174,7 +175,7 @@ export function TakesPanel({
       className="takes-count"
       aria-label="Number of new takes"
       value={count}
-      disabled={view.making.length > 0}
+      disabled={view.making.length > 0 || make.isPending}
       onChange={(event) => {
         setCount(Number(event.target.value))
         setCountOpen(false)
@@ -183,11 +184,7 @@ export function TakesPanel({
     >
       {counts.map((n) => (
         // The closed menu shows only the count; the open list shows each entry in full.
-        <option
-          key={n}
-          value={n}
-          label={n === count && !countOpen ? `${n} ${n === 1 ? 'take' : 'takes'}` : undefined}
-        >
+        <option key={n} value={n} label={n === count && !countOpen ? takesCount(n) : undefined}>
           {takeCountEntry(n, model, length)}
         </option>
       ))}

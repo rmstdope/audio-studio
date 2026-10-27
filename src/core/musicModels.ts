@@ -221,8 +221,8 @@ export function perMinuteWords(id: MusicModelId): string | null {
 }
 
 /**
- * A button that makes `count` takes, with what they cost when the model is paid: "More takes ·
- * $0.56", the price of one take as the menu shows it, times `count`, so the two always agree.
+ * A button that makes `count` takes, with what they cost when the model is paid: "Make 2 more
+ * takes · $0.56", the price of one take as the menu shows it, times `count`, so the two always agree.
  */
 export function takesButton(
   words: string,
@@ -235,7 +235,7 @@ export function takesButton(
 }
 
 /** "3 takes", or "1 take": a number of takes in words. */
-function takesCount(count: number): string {
+export function takesCount(count: number): string {
   return `${count} ${count === 1 ? 'take' : 'takes'}`
 }
 
@@ -249,7 +249,7 @@ export function takeCountEntry(count: number, id: MusicModelId, track: TrackLeng
 
 /** The make button's words for a number of takes: "Make 3 takes", later batches "Make 3 more takes". */
 export function makeTakesWords(count: number, later: boolean): string {
-  return `Make ${count}${later ? ' more' : ''} ${count === 1 ? 'take' : 'takes'}`
+  return `Make ${takesCount(count).replace(' ', later ? ' more ' : ' ')}`
 }
 
 /** How long a take takes, and for a paid model what it costs: "about 1 min and $0.28 a take". */

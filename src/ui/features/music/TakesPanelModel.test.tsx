@@ -545,6 +545,19 @@ describe('the count menu on a track’s Takes panel', () => {
     expect(first.count().value).toBe('2')
   })
 
+  it('is greyed from the press until the answer, so no pick can outlive the reset', async () => {
+    let answer: (response: Response) => void = () => {}
+    globalThis.fetch = (() =>
+      new Promise<Response>((resolve) => (answer = resolve))) as unknown as typeof fetch
+    const page = render(view())
+    await act(async () => {
+      page.button('Make 2 more takes').click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(page.count().disabled).toBe(true)
+    await act(async () => answer(new Response(JSON.stringify({ ok: true }))))
+  })
+
   it('keeps the count when the model changes, and the prices follow', () => {
     const page = render(view())
     pick(page.count(), '4')
@@ -588,7 +601,7 @@ describe('the count menu on a track’s Takes panel', () => {
 })
 
 describe('what Eleven Music takes cost, on the panel', () => {
-  it('puts the price of the two takes on More takes and Make 2 takes, and none on a free model', () => {
+  it('puts the price of the two takes on Make 2 more takes and Make 2 takes, and none on a free model', () => {
     const paid = render(view({ defaultModel: 'eleven' }))
     expect(paid.button('Make 2 more takes · $0.26')).toBeDefined()
     const empty = render(view({ defaultModel: 'eleven', takes: [] }))
