@@ -289,6 +289,42 @@ describe('the Move dialog', () => {
     expect(dialog()).toBeNull()
   })
 
+  it('puts the focus on the first row left in a stinger dialog when the pick is dropped', async () => {
+    const three = (rows: TrackRow[]) => [
+      lists[0]!,
+      lists[1]!,
+      lists[2]!,
+      list('stingers', 'stingers', 'Stingers', rows),
+    ]
+    const page = render(
+      row('win', 'Victory'),
+      view([take(1)], { kind: 'stinger' }),
+      three([row('win', 'Victory'), row('lose', 'Game over'), row('lvl', 'Level up')]),
+    )
+    await click(page.buttons('Move…')[0])
+    await click(option('Game over'))
+    ;(page.buttons('Move take 1')[0] as HTMLButtonElement).focus()
+    page.rerender(three([row('win', 'Victory'), row('lvl', 'Level up')]))
+    expect(document.activeElement).toBe(option('Level up'))
+  })
+
+  it('puts the focus on Cancel when no row is left to pick', async () => {
+    const page = render(row('win', 'Victory'), view([take(1)], { kind: 'stinger' }))
+    await click(page.buttons('Move…')[0])
+    await click(option('Game over'))
+    ;(page.buttons('Move take 1')[0] as HTMLButtonElement).focus()
+    page.rerender([
+      lists[0]!,
+      lists[1]!,
+      lists[2]!,
+      list('stingers', 'stingers', 'Stingers', [row('win', 'Victory')]),
+    ])
+    expect(document.activeElement).toBe(page.buttons('Cancel')[0]!)
+    page.key(document.activeElement!, 'Escape')
+    await act(async () => {})
+    expect(dialog()).toBeNull()
+  })
+
   it('moves with Up, Down and Enter, and closes with Esc, focus back on Move…', async () => {
     const page = render(village, view([take(3)]))
     const opener = page.buttons('Move…')[0]!

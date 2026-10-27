@@ -53,13 +53,17 @@ export function MoveTakeDialog({
   const loops = kind === 'loop'
   const pending = move.isPending
 
-  /** Focus goes to the search box, or to the first row that can be picked for stingers. */
+  /**
+   * Focus goes to the search box, or to the first row that can be picked for stingers; with no row
+   * to pick it goes to Cancel, so Esc and Tab still work from inside the dialog.
+   */
   function focusStart() {
     if (loops) search.current?.focus()
     else
-      root.current
-        ?.querySelector<HTMLButtonElement>('button[role="option"]:not([disabled])')
-        ?.focus()
+      (
+        root.current?.querySelector<HTMLElement>('button[role="option"]:not([disabled])') ??
+        root.current?.querySelector<HTMLElement>('.modal-actions .btn-ghost')
+      )?.focus()
   }
 
   // A pick whose row has left the game's list is dropped, so Move is greyed until another is
