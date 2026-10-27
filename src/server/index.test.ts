@@ -452,6 +452,10 @@ describe('server', () => {
     expect((await send('DELETE', '/api/characters/narrator/ruled-out/not%20an%20id')).status).toBe(
       400,
     )
+    // An ElevenLabs voice's id is one too: nothing of it was ruled out, so nothing changes.
+    const eleven = await send('DELETE', '/api/characters/narrator/ruled-out/eleven%3Aabc')
+    expect(eleven.status).toBe(200)
+    expect(await eleven.json()).toEqual({ ok: true, voices: [] })
     for (const path of [
       '/api/characters/narrator/ruled-out',
       '/api/characters/narrator/ruled-out/w1',

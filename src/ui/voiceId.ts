@@ -1,3 +1,5 @@
+import { providerOf } from '../core/voices'
+
 /** What a Fish voice id looks like. */
 const VOICE_ID = /^[\w-]{1,64}$/
 
@@ -20,7 +22,8 @@ export function voiceIdFrom(input: string): string | null {
   }
 }
 
-/** The voice's page on Fish Audio. */
-export function voiceUrl(id: string): string {
+/** The voice's page on Fish Audio; none for an ElevenLabs voice, which has no public page. */
+export function voiceUrl(id: string): string | null {
+  if (providerOf(id) !== 'fish') return null
   return `https://fish.audio/m/${encodeURIComponent(id)}/`
 }

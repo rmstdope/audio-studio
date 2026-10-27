@@ -541,6 +541,7 @@ function VoicePanel({
   const voice = answer?.voice ?? null
   const sample = voice?.sample ?? null
   const take = answer?.take ?? null
+  const page = voiceUrl(id)
   return (
     <section className="panel voice-panel" aria-label="Voice">
       <div className="section-head">
@@ -656,9 +657,11 @@ function VoicePanel({
       {recorder.errors[id] && <span className="adopt-error">{recorder.errors[id]}</span>}
       <div className="voice-foot">
         <span className="mono muted voice-id">{id}</span>
-        <a href={voiceUrl(id)} target="_blank" rel="noreferrer">
-          Open on Fish Audio ↗
-        </a>
+        {page && (
+          <a href={page} target="_blank" rel="noreferrer">
+            Open on Fish Audio ↗
+          </a>
+        )}
       </div>
     </section>
   )

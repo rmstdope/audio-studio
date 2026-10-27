@@ -17,6 +17,7 @@ import { BriefChangeBody } from '../core/music'
 import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
+import { VOICE_ID } from '../core/voices'
 import type { ElevenAnswer } from '../core/setup'
 import { accountOf, createElevenLabsClient, type ElevenLabsClient } from '../services/elevenlabs'
 import { createElevenMusic } from '../services/elevenMusic'
@@ -262,9 +263,6 @@ const RecordBody = z
     stage: z.enum(['draft', 'final']).default('draft'),
   })
   .strict()
-
-/** What a Fish voice id may look like: letters, digits, `_` and `-`. */
-const VOICE_ID = /^[\w-]{1,64}$/
 
 const MoveBody = z.object({
   voice: z.string().regex(VOICE_ID),
