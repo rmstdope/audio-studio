@@ -3,7 +3,7 @@ import { cpSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tempRepo } from '../../test/helpers'
 import { loadPart, loadProject } from '../services/workspace'
-import { partOnlyProblems } from './problems'
+import { notShown } from './problems'
 
 describe('the problems on a part’s page', () => {
   it('lists each cast-file problem once, across the top banner and the part’s own', async () => {
@@ -22,7 +22,7 @@ describe('the problems on a part’s page', () => {
     if (!project.ok || !part?.ok) throw new Error('the sample did not load')
 
     const top = project.summary.problems
-    const own = partOnlyProblems(part.part.problems, top)
+    const own = notShown(part.part.problems, top)
     const castProblems = [...top, ...own].filter((p) => p.file === 'tts/cast.json')
     expect(castProblems.length).toBeGreaterThan(0)
     const said = castProblems.map((p) => `${p.path}: ${p.message}`)
@@ -32,6 +32,6 @@ describe('the problems on a part’s page', () => {
   it('keeps a problem only the part has', () => {
     const shown = [{ file: 'tts/cast.json', path: 'speakers', message: 'is wrong' }]
     const notes = { file: 'tts/act1/notes.json', path: '', message: 'is not JSON' }
-    expect(partOnlyProblems([...shown, notes], shown)).toEqual([notes])
+    expect(notShown([...shown, notes], shown)).toEqual([notes])
   })
 })

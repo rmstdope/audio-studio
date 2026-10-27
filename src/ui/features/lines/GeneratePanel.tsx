@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { StaleReason } from '../../../core/fingerprint'
+import type { Problem } from '../../../core/project'
 import { displayName } from '../../../core/summary'
 import type { JobKind } from '../../../services/jobs'
 import { useJob, useJobActions, usePlan } from '../../api'
@@ -8,6 +9,7 @@ import { elevenPlanFacts, planPayWords } from '../../agreed'
 import { aboutDollars, centsUp, plural } from '../../format'
 import { castNote, generateLabel, planHeadline, translatedNote } from '../../languages'
 import { REASON } from '../../status'
+import { notShown } from '../../problems'
 
 /** How a job of each kind is told: while it runs, a line in it, and a line done. */
 const WORDS: Record<JobKind, { running: string; doing: string; done: string }> = {
@@ -27,6 +29,7 @@ export function GeneratePanel({
   language,
   speaker,
   models,
+  shown,
 }: {
   partId: string
   /** The language to record, in a project with several; null in a project with one. */
@@ -34,6 +37,8 @@ export function GeneratePanel({
   speaker: string | null
   /** The draft and final models: a final step is offered only when they differ. */
   models: { draft: string; final: string }
+  /** The problems the page already shows above the panel, which it does not repeat. */
+  shown: Problem[]
 }) {
   const [retakeWeak, setRetakeWeak] = useState(false)
   const [stage, setStage] = useState<'draft' | 'final'>('draft')
@@ -148,7 +153,15 @@ export function GeneratePanel({
     return <section className="panel muted">Could not plan: {plan.error.message}</section>
   const answer = plan.data
   if (!answer.ok) {
-    return <Problems title="Generation cannot be planned" problems={answer.problems} />
+    const unshown = notShown(answer.problems, shown)
+    if (unshown.length === 0) {
+      return (
+        <section className="panel muted">
+          Generation cannot be planned until the problems above are fixed.
+        </section>
+      )
+    }
+    return <Problems title="Generation cannot be planned" problems={unshown} />
   }
   const { plan: p } = answer
   const fishPaid = p.keys.length > 0 && (p.ceiling ?? 0) > 0
