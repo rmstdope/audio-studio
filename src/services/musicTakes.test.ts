@@ -614,13 +614,38 @@ describe('createMusicTakes', () => {
     ])
   })
 
-  it('says a paid take stopped while it was made may have cost its price', async () => {
+  it('says a paid take cost its price when ElevenLabs made it but the studio could not keep it', async () => {
     const { file } = setup()
-    let release = () => {}
-    const gate = new Promise<void>((resolve) => (release = resolve))
     const spent: MusicSpend[] = []
     const takes = createMusicTakes({
-      generator: fakeGenerator(undefined, [], gate).generator,
+      generator: {
+        ...fakeGenerator().generator,
+        // Made and billed, but not audio the studio can read.
+        generate: async () => ({ wav: new Uint8Array([1, 2, 3]) }),
+      },
+      queue: createSerial(),
+      newSeed: () => 1,
+      spent: (_file, take) => void spent.push(take),
+    })
+    await takes.make(file, 'victory', { count: 1, model: 'eleven' })
+    for (let i = 0; i < 200 && spent.length === 0; i++) await Bun.sleep(5)
+    expect(spent).toMatchObject([{ track: 'victory', cost: 0.025, outcome: 'done' }])
+    const view = await takes.view(file, 'victory')
+    expect(view).toMatchObject({ failed: [{ n: 1 }] })
+  })
+
+  it('says a paid take stopped while it was made may have cost its price', async () => {
+    const { file } = setup()
+    const spent: MusicSpend[] = []
+    const takes = createMusicTakes({
+      generator: {
+        ...fakeGenerator().generator,
+        // As ElevenLabs' client does: a stop ends the request, which then fails.
+        generate: (_request, signal) =>
+          new Promise((_resolve, reject) =>
+            signal?.addEventListener('abort', () => reject(new Error('stopped'))),
+          ),
+      },
       queue: createSerial(),
       newSeed: () => 1,
       spent: (_file, take) => void spent.push(take),
@@ -632,7 +657,6 @@ describe('createMusicTakes', () => {
       await Bun.sleep(5)
     }
     await takes.stop(file, 'victory')
-    release()
     await Bun.sleep(20)
     expect(spent).toMatchObject([
       { part: 'stingers', track: 'victory', seconds: 10, cost: 0.025, outcome: 'stopped' },

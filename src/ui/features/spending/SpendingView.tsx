@@ -25,9 +25,10 @@ export function SpendingView({ summary }: { summary: ProjectSummary }) {
           <span className="crumbs">Project</span>
           <h1>Spending</h1>
           <span className="muted">
-            Every recording and music take made with a paid model, newest first. Costs are worked
-            out as each line is sent: Fish’s at its prices, ElevenLabs’ in your plan’s credits;
-            music at its price a minute. The bills themselves can differ slightly.
+            Every recording and music take made with a paid model, newest first. A recording’s cost
+            is worked out as each line is sent, at Fish’s prices or in your ElevenLabs plan’s
+            credits; a music take’s at its model’s price a minute. The bills themselves can differ
+            slightly.
           </span>
         </div>
       </header>

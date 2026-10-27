@@ -288,9 +288,10 @@ export function createMusicTakes({
     entry.startedAt = now()
     const stop = new AbortController()
     entry.stop = stop
-    // What the take costs, sent once it is made or stopped while being made.
+    // What the take costs, sent once ElevenLabs made it (billed, kept or not), or once it was
+    // stopped while being made (the request was sent, so it may be billed).
     const price = takePrice(entry.model, inputs)
-    let finished = false
+    let generated = false
     try {
       const seed = newSeed()
       const take = await generator.generate(
@@ -305,6 +306,7 @@ export function createMusicTakes({
         },
         stop.signal,
       )
+      generated = true
       // Stopped while it was made: it is discarded, and no longer in the map.
       if (stop.signal.aborted) return
       const shaped = shapeTake(take.wav, inputs.kind, inputs.seconds)
@@ -331,13 +333,12 @@ export function createMusicTakes({
       }
       if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       waiting.delete(entry.n)
-      finished = true
     } catch (error) {
       if (stop.signal.aborted) return
       entry.state = 'failed'
       entry.message = describeFailure(error)
     } finally {
-      const outcome = stop.signal.aborted ? 'stopped' : finished ? 'done' : null
+      const outcome = generated ? 'done' : stop.signal.aborted ? 'stopped' : null
       if (price !== null && outcome) {
         // Saving what was spent must never undo or crash the take it describes.
         try {

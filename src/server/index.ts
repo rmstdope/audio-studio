@@ -367,7 +367,8 @@ export function startServer({
       const saved = await appendMusic(file, take)
       if (!saved.ok) {
         console.error(
-          'Audio Studio: a paid music take was not saved: the spending record is damaged.',
+          'Audio Studio: a paid music take was not saved to the spending record:',
+          saved.problems,
         )
       }
     },
@@ -1248,11 +1249,12 @@ export function startServer({
             readSpending(projectFile),
           ])
           if (!saved.ok) return Response.json({ ok: false, problems: saved.problems })
-          // The acts, and the stingers when the project has music: a music take's list is one.
+          // The acts, and the stingers once a stinger take cost something: a take's list is one.
+          const stingers = saved.music.some((take) => take.part === 'stingers')
           const parts = project.ok
             ? [
                 ...project.summary.parts.map((p) => ({ id: p.id, title: p.title })),
-                ...(project.summary.music ? [{ id: 'stingers', title: 'Stingers' }] : []),
+                ...(stingers ? [{ id: 'stingers', title: 'Stingers' }] : []),
               ]
             : []
           return Response.json({

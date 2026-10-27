@@ -3230,7 +3230,8 @@ describe('server, what music takes cost', () => {
     expect(spending.rows).toMatchObject([
       { kind: 'music', part: 'act1', track: 'Hall', model: 'eleven', seconds: 25, state: 'done' },
     ])
-    expect(spending.acts.map((a: { part: string }) => a.part)).toContain('stingers')
+    // No stinger cost anything: no Stingers tile.
+    expect(spending.acts.map((a: { part: string }) => a.part)).not.toContain('stingers')
   })
 })
 

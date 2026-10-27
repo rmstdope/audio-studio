@@ -113,8 +113,11 @@ export function createSpendLog(projectFile: string): SpendLog {
       const id = randomUUID()
       const at = new Date().toISOString()
       // The ElevenLabs credits spent, and their model, on a recording given any.
+      // Only credits spent are kept: a row without them stays readable by an older studio.
       const eleven = () =>
-        elevenlabs ? { credits: elevenlabs.spent, elevenModel: elevenlabs.model } : {}
+        elevenlabs && elevenlabs.spent > 0
+          ? { credits: elevenlabs.spent, elevenModel: elevenlabs.model }
+          : {}
       live.set(id, () => ({
         id,
         at,

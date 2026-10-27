@@ -166,3 +166,50 @@ describe('the spend log, with ElevenLabs credits', () => {
     expect(JSON.parse(readFileSync(join(dirname(file), SPENDING_FILE), 'utf8')).version).toBe(1)
   })
 })
+
+describe('the spend log, credits given but not spent', () => {
+  it('saves the recording as Fish’s alone, so the record stays version 1', async () => {
+    const file = project()
+    const log = createSpendLog(file)
+    const budget = createBudget({ model: 's2-pro', dollars: 1 })
+    const followed = log.follow({
+      part: 'act1',
+      language: 'en',
+      model: 's2-pro',
+      stage: 'draft',
+      planned: 2,
+      budget,
+      credits: createBudget({ model: 'eleven_v3', dollars: 100 }),
+      progress: () => ({ lines: 0 }),
+    })
+    budget.spend('s2-pro', 'x'.repeat(1000), new Date())
+    expect(log.running()[0]).not.toHaveProperty('credits')
+    await followed.end({ lines: 1, outcome: 'error' })
+    const read = await readSpending(file)
+    expect(read.ok && read.recordings[0]).not.toHaveProperty('elevenModel')
+    expect(JSON.parse(readFileSync(join(dirname(file), SPENDING_FILE), 'utf8')).version).toBe(1)
+  })
+})
+
+describe('appendMusic, to a damaged record', () => {
+  it('leaves the record as it is and gives its problems', async () => {
+    const file = project()
+    const path = join(dirname(file), SPENDING_FILE)
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, JSON.stringify({ version: 2, recordings: [], music: [{ id: 1 }] }))
+    const added = await appendMusic(file, {
+      id: 'm1',
+      at: '2026-10-25T16:00:00.000Z',
+      part: 'act1',
+      track: 'cave',
+      title: 'The cave',
+      model: 'eleven',
+      seconds: 110,
+      cost: 0.275,
+      outcome: 'done',
+    })
+    expect(added.ok).toBe(false)
+    expect(!added.ok && added.problems[0]).toMatchObject({ path: 'music[0].id' })
+    expect(readFileSync(path, 'utf8')).toContain('"id":1')
+  })
+})

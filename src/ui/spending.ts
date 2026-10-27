@@ -20,7 +20,7 @@ export function whenText(at: string, running = false): string {
 export function linesText(row: SpendingRow): { count: string; note: string | null } {
   if (row.kind === 'music') {
     const count = `Music take · ${row.track ?? ''}`
-    if (row.state === 'stopped') return { count, note: 'stopped while made, may be billed' }
+    if (row.state === 'stopped') return { count, note: 'stopped while being made; may be billed' }
     return { count, note: `${clock(row.seconds ?? 0)} made` }
   }
   if (row.state === 'done') return { count: String(row.lines), note: null }
@@ -44,7 +44,9 @@ export function costText(row: SpendingRow): string {
 /** The Model cell: a recording's Fish model and its ElevenLabs one, or a music model's name. */
 export function modelText(row: SpendingRow): string {
   if (row.kind === 'music') return MUSIC_MODELS.find((m) => m.id === row.model)?.name ?? row.model
-  return row.elevenModel ? `${row.model} · ${row.elevenModel}` : row.model
+  if (!row.elevenModel) return row.model
+  // Only the models that spent: a recording on ElevenLabs alone names no Fish model.
+  return row.cost > 0 ? `${row.model} · ${row.elevenModel}` : row.elevenModel
 }
 
 /** The act's full title; an act no longer in the project is its id (the page adds the note). */

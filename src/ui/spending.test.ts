@@ -103,6 +103,8 @@ describe('the page’s words for credits and music takes', () => {
     expect(modelText(row())).toBe('drama-3')
     expect(modelText(row({ elevenModel: 'eleven_v3' }))).toBe('drama-3 · eleven_v3')
     expect(modelText(row({ kind: 'music', model: 'eleven' }))).toBe('Eleven Music')
+    // Only the models that spent: an ElevenLabs-only recording names no Fish model.
+    expect(modelText(row({ cost: 0, credits: 300, elevenModel: 'eleven_v3' }))).toBe('eleven_v3')
   })
 
   it('says what a music take was, in the Lines column', () => {
@@ -110,7 +112,7 @@ describe('the page’s words for credits and music takes', () => {
     expect(linesText(take)).toEqual({ count: 'Music take · The cave', note: '1:50 made' })
     expect(linesText({ ...take, state: 'stopped' })).toEqual({
       count: 'Music take · The cave',
-      note: 'stopped while made, may be billed',
+      note: 'stopped while being made; may be billed',
     })
   })
 

@@ -766,7 +766,8 @@ An audition is for a character, not for a part: the result applies to every part
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
-- **Spending** page (built): what paid recordings cost, project-wide and read only. Every
+- **Spending** page (built): what paid recordings (and, with ElevenLabs, music takes) cost,
+  project-wide and read only. Every
   recording made with a paid model (a whole part's, draft or final, or one line's record or extra
   take) is added to `.audio-studio/spending.json` when it ends: when it started, part, language
   (the source language, as recording is), model, lines recorded out of lines planned, how it ended
@@ -1152,11 +1153,14 @@ and adds the ElevenLabs credits its lines took (`credits`) and their model (`ele
 per recording, since its lines are counted together; a recording on ElevenLabs alone is followed
 and saved as a Fish one is. Music takes are a list of their own (`music`: when, the list, the
 track and its title, the model, the seconds made and billed, the dollars at the model's price a
-minute, and whether it was made or stopped while being made, which may still be billed; a take
-that fails costs nothing and is not listed). A version 1 log is read with no credits and no music.
-The Spending page totals dollars and credits apart (`$0.78 · 1,200 credits`), for all and per act,
-music takes in their act and stingers on a tile of their own; a recording's Cost and Model cells
-name both providers', a take's Lines cell says "Music take · The cave" and how long it was made.
+minute, and whether it was made (billed, also when the studio then could not keep it) or stopped
+while being made, which may still be billed; a take that fails before ElevenLabs makes it costs
+nothing and is not listed). Only credits spent are kept, so a recording given credits but
+spending none stays a version 1 row. A version 1 log is read with no credits and no music.
+The Spending page and the sidebar total dollars and credits apart (`$0.78 · 1,200 credits`), for
+all and per act, music takes in their act and stingers on a tile of their own once one cost
+something; a recording's Cost and Model cells name the providers that spent, a take's Lines cell
+says "Music take · The cave" and how long it was made.
 
 **Casting.** The audition board searches either provider (a switch above the search: _Fish Audio_,
 _ElevenLabs_). ElevenLabs' search is its shared voice library (`GET /v1/shared-voices`: the
@@ -1206,9 +1210,9 @@ read by an older studio.
   made longer included (`takePrice`). A track's menu entry says "about 1 min and $0.28 a take",
   Setup's menu "about 1 min a take, $0.15 a minute of music" with "$0.15 a minute" beside it, and
   More takes and Make 2 takes the price of both, twice a take's as the menu shows it ("More takes ·
-  $0.56"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed; each
-  is logged in the spending record (14.7d). Stop aborts the request; ElevenLabs may still bill a take stopped while
-  being made, which Stop's title says while a paid take is being made.
+  $0.56"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed;
+  each is logged in the spending record (14.7d). Stop aborts the request; ElevenLabs may still
+  bill a take stopped while being made, which Stop's title says while a paid take is being made.
 
 **Testing.** Every test uses a fake `ElevenLabsClient`. Opt-in live tests
 (`AUDIO_STUDIO_LIVE_ELEVENLABS=1`, with a key; §11 says so when they come) speak one short line,
