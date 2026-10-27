@@ -340,15 +340,14 @@ const typeNames: Record<string, string> = {
   boolean: 'true or false',
   array: 'a list',
   object: 'an object',
+  record: 'an object',
 }
 
-/** What a wrong value should be, for a zod "too small" or "too big" issue: `bound` is "0 or more". */
+/** The limit a zod "too small" or "too big" issue broke, worded as "0 or more" or "fewer than 3 items". */
 function limitOf(issue: z.core.$ZodIssueTooSmall | z.core.$ZodIssueTooBig): string {
   const small = issue.code === 'too_small'
   const limit = Number(small ? issue.minimum : issue.maximum)
-  const exclusive = !(small
-    ? (issue as z.core.$ZodIssueTooSmall).inclusive
-    : (issue as z.core.$ZodIssueTooBig).inclusive)
+  const exclusive = !issue.inclusive
   const unit = issue.origin === 'string' ? ' characters' : issue.origin === 'array' ? ' items' : ''
   if (issue.origin === 'number' || issue.origin === 'int') {
     if (exclusive) return small ? `more than ${limit}` : `less than ${limit}`
@@ -370,10 +369,16 @@ function plainMessage(issue: z.core.$ZodIssue, path: string): string {
   }
   if (issue.code === 'invalid_type' && issue.message.startsWith('Invalid input:')) {
     if (issue.message.endsWith('received undefined')) return `${subject} is missing`
-    return `${subject} must be ${typeNames[issue.expected] ?? issue.expected}`
+    const got = /received (\w+)$/.exec(issue.message)?.[1]
+    const gotText =
+      got === undefined || issue.expected === 'int' ? '' : ` (it is ${typeNames[got] ?? got})`
+    return `${subject} must be ${typeNames[issue.expected] ?? issue.expected}${gotText}`
   }
-  if (issue.code === 'invalid_value' && issue.message.startsWith('Invalid option:')) {
-    return `${subject} must be one of ${issue.values.map((v) => JSON.stringify(v)).join(', ')}`
+  if (issue.code === 'invalid_value' && /^Invalid (option|input):/.test(issue.message)) {
+    const values = issue.values.map((v) => JSON.stringify(v)).join(', ')
+    return issue.values.length === 1
+      ? `${subject} must be ${values}`
+      : `${subject} must be one of ${values}`
   }
   return issue.message
 }
