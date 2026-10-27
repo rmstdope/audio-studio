@@ -34,7 +34,7 @@ describe("the Takes panel's model menu fills a narrow panel", () => {
     expect(rule(css, '.takes-head')).toContain('flex-wrap: nowrap')
   })
 
-  it('puts the menu and More takes on their own line under the heading, the menu uncapped', () => {
+  it('puts the menus and the make button on their own line under the heading, the menu uncapped', () => {
     const body = narrow(css)
     expect(inner(body, '.takes-head')).toContain('flex-wrap: wrap')
     expect(inner(body, '.takes-controls')).toContain('flex: 1 1 100%')
@@ -42,8 +42,13 @@ describe("the Takes panel's model menu fills a narrow panel", () => {
     expect(inner(body, '.takes-model')).toContain('max-width: none')
   })
 
-  it('keeps Make 2 takes beside the menu in the empty state, the menu filling the line', () => {
+  it('keeps the make button beside the menus in the empty state, the menu filling the line', () => {
     expect(inner(narrow(css), '.takes-make')).toContain('flex-wrap: nowrap')
+  })
+
+  it('keeps the count menu at its own width beside the model menu, which takes the spare room', () => {
+    expect(rule(css, '.takes-count')).toContain('flex: 0 0 auto')
+    expect(rule(css, '.takes-count:disabled')).toContain('opacity')
   })
 
   it('no longer keys the menu on the window width, which left it capped beside a gap', () => {
