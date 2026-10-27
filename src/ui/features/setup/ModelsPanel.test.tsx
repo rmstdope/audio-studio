@@ -290,7 +290,7 @@ describe('the ElevenLabs rows of the Models panel', () => {
     globalThis.fetch = (async () =>
       new Response(JSON.stringify({ ok: false, problems: [{ message: 'Act I is recording' }] }), {
         status: 409,
-      })) as typeof fetch
+      })) as unknown as typeof fetch
     const page = render(withEleven())
     await act(async () => {
       const menu = elevenMenu(page.container, 'draft')
