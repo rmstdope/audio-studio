@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   BoardTakeSchema,
+  MakeTakesBody,
   MusicBoardSchema,
   LOOP_EXTRA_SECONDS,
   SEAM_SECONDS,
@@ -221,5 +222,12 @@ describe('a take on the board', () => {
     const moved = BoardTakeSchema.parse({ ...take, movedFrom: { title: 'Hall', n: 3 } })
     expect(moved.movedFrom).toEqual({ title: 'Hall', n: 3 })
     expect(BoardTakeSchema.safeParse({ ...take, movedFrom: { title: 'Hall' } }).success).toBe(false)
+  })
+})
+
+describe('a request for takes', () => {
+  test('asks for 1 to 6 at once', () => {
+    for (const count of [1, 6]) expect(MakeTakesBody.safeParse({ count }).success).toBe(true)
+    for (const count of [0, 7, 1.5]) expect(MakeTakesBody.safeParse({ count }).success).toBe(false)
   })
 })
