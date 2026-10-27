@@ -154,7 +154,7 @@ describe('createPlayer, telling a failure', () => {
 })
 
 /** A fake element with a volume and a length, and a clock the test moves by hand. */
-function fadingSetUp(duration = 10) {
+function fadingSetUp(duration = 10, fadeSeconds: number | (() => number) = 0.2) {
   const { element } = fakeAudio()
   const fake = Object.assign(element, { volume: 1, duration })
   let now = 0
@@ -171,7 +171,7 @@ function fadingSetUp(duration = 10) {
     fake,
     (s) => states.push(s),
     () => {},
-    { fadeSeconds: 0.2, clock },
+    { fadeSeconds, clock },
   )
   /** Moves the clock on in 10 ms steps, the playhead with it, ticking at each. */
   const wait = (ms: number) => {
@@ -183,6 +183,48 @@ function fadingSetUp(duration = 10) {
   }
   return { element: fake, ticks, player, wait, last: () => states.at(-1) }
 }
+
+describe('createPlayer, the length of the fade', () => {
+  it('asks for the length as each take starts, and a take keeps the one it began with', () => {
+    let seconds = 0.2
+    const { element, player, wait } = fadingSetUp(10, () => seconds)
+    player.toggle('a', '/a.mp3', { fade: true })
+    wait(200)
+    seconds = 1
+    // A take already playing keeps its 0.2 s: it is out in 0.2 s after a stop.
+    player.stop()
+    wait(200)
+    expect([element.volume, element.paused]).toEqual([0, true])
+    // The next take uses the new length.
+    player.toggle('b', '/b.mp3', { fade: true })
+    wait(500)
+    expect(element.volume).toBeCloseTo(0.5, 1)
+    wait(500)
+    expect(element.volume).toBe(1)
+  })
+
+  it('plays a take as it is, and cuts it on stop, with no fade', () => {
+    const { element, player, wait, ticks } = fadingSetUp(10, 0)
+    player.toggle('a', '/a.mp3', { fade: true })
+    expect([element.volume, ticks.size]).toEqual([1, 0])
+    wait(50)
+    player.stop()
+    expect(element.paused).toBe(true)
+  })
+
+  it('brings the volume back to full for a take with no fade after one that faded', () => {
+    let seconds = 0.2
+    const { element, player, wait } = fadingSetUp(10, () => seconds)
+    player.toggle('a', '/a.mp3', { fade: true })
+    wait(300)
+    player.stop()
+    wait(300)
+    expect(element.volume).toBe(0)
+    seconds = 0
+    player.toggle('b', '/b.mp3', { fade: true })
+    expect(element.volume).toBe(1)
+  })
+})
 
 describe('createPlayer, fading', () => {
   it('starts the fade-in when the sound starts, not at play', () => {

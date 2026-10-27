@@ -85,7 +85,7 @@ retroquest/                      ← user runs `audio-studio` here
    Besides those paths, the studio writes the project file itself in a few places only: the project's
    own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3),
    the models (`narration.models`, and `music.model`) from Setup's Models panel, the retirement
-   switch of `s1`, and `narration.quality.fishTier`.
+   switch of `s1`, `narration.quality.fishTier`, and `takeFade` from Setup's Playing takes panel.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
 
@@ -177,7 +177,7 @@ audio-studio/
 │       │   ├── audition/        the audition board, ruled-out voices
 │       │   ├── characters/      all characters, a character's page, the casting brief
 │       │   └── narration/       line table, plan, job progress, inspector
-│       ├── player.ts            plays clips one at a time, or a list in turn; takes fade in (from the element's playing event) and out, the game's file does not
+│       ├── player.ts            plays clips one at a time, or a list in turn; takes fade in (from the element's playing event) and out for the project's `takeFade`, the game's file does not
 │       └── components/          buttons, chips, waveform, player, status pills
 ├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
 └── docs/
@@ -265,6 +265,13 @@ an id and a title.
   sets how many requests Fish takes at once (5, 15, 50). Fish offers no way to ask, so the user
   says it once in the menu on Setup's Requests at once row, saved at once
   (`PATCH /api/fish-tier`, `services/fishTier.ts`). Optional; absent means not told.
+- `takeFade` (seconds, 0 or more; 0 is no fade) is how long a music take fades in and out when it
+  plays in the studio, chosen in the Playing takes panel on Setup (No fade, 0.1, 0.2, 0.5, 1 or 2 s;
+  a length set by hand shows as an extra entry) and saved at once (`PATCH /api/take-fade`,
+  `services/takeFade.ts`). Top level, not under `music`, since the panel shows in a project with no
+  music yet. Optional; absent means 0.2 s. `ProjectSummary.takeFade` carries it; `useClipPlayer`
+  reads it from the project as each clip begins, so a take already playing keeps its fade. The
+  game's file and narration never fade.
 
 ---
 

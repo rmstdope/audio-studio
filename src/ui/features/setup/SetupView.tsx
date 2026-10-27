@@ -1,6 +1,7 @@
 import { FISH_TIERS, type FishTier, type SetupCheck } from '../../../core/setup'
 import { useModelsView, useSetFishTier, useSetup } from '../../api'
 import { ModelsPanel } from './ModelsPanel'
+import { PlayingPanel } from './PlayingPanel'
 import { AlertIcon, CheckIcon } from '../../components/icons'
 import { dollars } from '../../format'
 
@@ -48,6 +49,7 @@ export function SetupView() {
       ) : (
         <>
           <ModelsPanel />
+          <PlayingPanel />
           <ul className="setup-list">
             {setup.data.checks.map((check) => (
               <SetupCheckRow key={check.id} check={check} />

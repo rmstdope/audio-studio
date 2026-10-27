@@ -1,23 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPlayer, TAKE_FADE_SECONDS, type Clip, type PlayerState } from '../player'
+import { DEFAULT_TAKE_FADE } from '../../core/takeFade'
+import { useProject } from '../api'
+import { createPlayer, type Clip, type PlayerState } from '../player'
 
 /**
  * One clip playing at a time (see `createPlayer`): `toggle(id, url)` plays it, or stops it if it
  * is the one playing; `playInTurn(clips)` plays clips one after another, skipping one that fails
  * (any toggle stops that). `onFailed` hears the id of a clip that failed. `playing` is the id of
  * the clip playing, or null; `inTurn` says whether a list is being played. `toggle(id, url, { fade: true })`
- * plays a take: it fades in and out, and a stop is a short fade, never a cut.
+ * plays a take: it fades in and out, and a stop is a short fade, never a cut. The length is the
+ * project's `takeFade` (Setup's Playing takes), asked as each clip begins.
  */
 export function useClipPlayer(onFailed?: (id: string) => void) {
   const [state, setState] = useState<PlayerState>({ playing: null, inTurn: false })
   const player = useRef<ReturnType<typeof createPlayer> | null>(null)
   const failed = useRef(onFailed)
   failed.current = onFailed
+  const project = useProject()
+  const fade = useRef(DEFAULT_TAKE_FADE)
+  fade.current = project.data?.ok ? project.data.summary.takeFade : DEFAULT_TAKE_FADE
 
   useEffect(() => {
     const element = new Audio()
     const made = createPlayer(element, setState, (id) => failed.current?.(id), {
-      fadeSeconds: TAKE_FADE_SECONDS,
+      fadeSeconds: () => fade.current,
     })
     element.addEventListener('playing', made.playing)
     element.addEventListener('ended', made.ended)

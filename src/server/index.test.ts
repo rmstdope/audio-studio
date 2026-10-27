@@ -1021,6 +1021,40 @@ describe('server, the Fish tier', () => {
   })
 })
 
+describe('server, the take fade', () => {
+  const ownRoot = tempRepo({ 'audio-studio.json': projectJson() })
+  const server = startServer({
+    projectFile: join(ownRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => server.stop(true))
+  const patch = (body: unknown, origin: string | null = server.url.origin) =>
+    fetch(new URL('/api/take-fade', server.url), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
+      body: JSON.stringify(body),
+    })
+  const shown = async () =>
+    (await (await fetch(new URL('/api/project', server.url))).json()).summary.takeFade
+
+  it('saves the length from its own page, and the project then shows it', async () => {
+    expect(await shown()).toBe(0.2)
+    expect((await patch({ seconds: 1 }, 'http://evil.test')).status).toBe(403)
+    expect((await patch({ seconds: -1 })).status).toBe(400)
+    expect((await patch({ seconds: 'long' })).status).toBe(400)
+    expect((await patch({})).status).toBe(400)
+    expect(await shown()).toBe(0.2)
+    const saved = await patch({ seconds: 1 })
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect(await shown()).toBe(1)
+    expect((await patch({ seconds: 0 })).status).toBe(200)
+    expect(await shown()).toBe(0)
+  })
+})
+
 describe('allowedHosts', () => {
   it('names both addresses with the port', () => {
     expect(allowedHosts(4801)).toEqual(['127.0.0.1:4801', 'localhost:4801'])

@@ -2,6 +2,7 @@ import { languageName } from './languages'
 import type { MusicSummary } from './music'
 import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
+import { DEFAULT_TAKE_FADE } from './takeFade'
 import { pronounceOf, voiceOf, type Cast, type Line } from './resources'
 
 /** What was recorded for a part in one language: clips in its manifest, and cues of its own. */
@@ -122,6 +123,8 @@ export interface ProjectSummary {
   models: { draft: string; final: string }
   /** The project's speaking speed (`tts.speed`), which a character may have its own in place of. */
   speed: number
+  /** How long a take fades when played in the studio, in seconds (`takeFade`, 0.2 if unset). */
+  takeFade: number
   /** The project file's name, where `soundAlike` is saved. */
   projectFile: string
   /** The Music pages; null when the project file has no `music` section. */
@@ -275,6 +278,7 @@ export function summarize({
     ),
     models: { draft: narration.models.draft, final: narration.models.final },
     speed: narration.tts.speed,
+    takeFade: project.takeFade ?? DEFAULT_TAKE_FADE,
     projectFile,
     music,
     problems,

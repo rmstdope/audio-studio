@@ -44,6 +44,7 @@ import type { ModelsView } from '../services/modelsView'
 import type { Busy, Stage } from '../core/models'
 import type { SoundAlikeChange } from '../services/soundAlike'
 import type { FishTierChange } from '../services/fishTier'
+import type { TakeFadeChange } from '../services/takeFade'
 import type { SetupResult } from '../services/setup'
 import type { NoteChange } from '../services/notes'
 import type { LineTakesResult, TakeLineResult, UseTakeResult } from '../services/lineTakes'
@@ -1516,6 +1517,30 @@ export function useSetFishTier() {
         client.invalidateQueries({ queryKey: ['setup'] }),
         client.invalidateQueries({ queryKey: ['project'] }),
       ]),
+  })
+}
+
+/**
+ * Saves how long takes fade when played in the studio (seconds, 0 for none), then reads the
+ * project again, saved or not, so the page shows what the file holds.
+ */
+export function useSetTakeFade() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'take-fade' },
+    mutationFn: async (seconds: number) => {
+      const response = await fetch('/api/take-fade', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ seconds }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the fade answered ${response.status}`)
+      }
+      const change = (await response.json()) as TakeFadeChange
+      if (!change.ok) throw new Error(change.problems.map((p) => p.message).join('; '))
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
   })
 }
 
