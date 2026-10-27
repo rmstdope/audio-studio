@@ -925,7 +925,7 @@ takes as cards: **More takes** generates two more (about six minutes), made in t
 the page can be left meanwhile; **Drop** removes one (not the chosen one); **Choose** writes one at
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
-`.audio-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed,
+`.audio-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed?,
 seconds, peaks, inputs, model }] }` (`model` is the recipe of the music model that made the take, which Choose records in the lock; a board without it is read as Balanced, the only model there was), the take's WAV beside the others in `music-takes/<track>/`. Take
 numbers are per track and never reused (`next` is reserved when takes are asked for), and a take
 is on the board only once its WAV is written. The cache no longer keeps a sidecar file per take. A dropped take is just gone:
@@ -966,9 +966,9 @@ Setup**, and takes cannot be made.
 duration } }`, its layout fixed once written. The game decides where a track plays, so the kind is
 not in it.
 
-**Lock** (`music.lock.json`, committed, one entry per line, `{ fp, model, seed, list, take, inputs,
+**Lock** (`music.lock.json`, committed, one entry per line, `{ fp, model, seed?, list, take, inputs,
 at }`): per track, the chosen take's model,
-seed, the number of the take on the board, a hash of what went into it (brief, kind, seconds, bpm, key; not the output settings,
+seed (when its model takes one), the number of the take on the board, a hash of what went into it (brief, kind, seconds, bpm, key; not the output settings,
 as narration leaves the loudness out; the chosen take's own inputs, so a take from an earlier brief
 leaves the track "changed since chosen"), which list it came from (an act or the stingers), and when
 it was chosen. The model is not a cause: a take keeps the model that made it, and changing the project's model (or
@@ -1167,8 +1167,8 @@ naming `eleven` as `music.model` cannot be read by an older studio.
   Apple silicon; Setup's Music row says which generator the project's model uses.
 - **No GPU.** The take queue chooses by family: local takes wait for the GPU as today (`musicTakes`,
   `queue.run(GPU, …)`), ElevenLabs takes run in `elevenWork` beside them and Whisper; "waiting" on a
-  card means waiting for a free request. The router becomes a table from family to generator, and
-  switching to or from ElevenLabs closes no local worker.
+  card means waiting for a free request. The router is a table from family to generator (built, 14.3),
+  and switching to or from ElevenLabs closes no local worker.
 - **Price.** The price of a take (the whole take, the 20 seconds a loop is made longer included) is
   on the menu entry and on More takes; takes are not confirmed, and each is logged. Stop aborts the
   request; ElevenLabs may still bill a take stopped while being made, which Stop's title says.

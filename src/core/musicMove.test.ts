@@ -174,4 +174,12 @@ describe('movedBoardTake', () => {
       movedFrom: { title: 'Willowbrook village', n: 3 },
     })
   })
+
+  it('keeps a take made without a seed without one', () => {
+    const { seed: _, ...seedless } = take
+    const inputs = { brief: 'new', kind: 'loop' as const, seconds: 60, bpm: null, key: null }
+    expect(
+      movedBoardTake(seedless, { n: 5, hash: 'bbbbbbbbbbbbbbbb', inputs, from: 'Hall' }),
+    ).not.toHaveProperty('seed')
+  })
 })
