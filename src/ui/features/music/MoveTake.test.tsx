@@ -265,7 +265,6 @@ describe('the Move dialog', () => {
   })
 
   it('selects nothing and greys the button when the picked track leaves the game’s list', async () => {
-    answer = { ok: false, message: 'x' }
     const page = render(village, view([take(3)]))
     await click(page.buttons('Move…')[0])
     await click(option("Witch's hut"))
