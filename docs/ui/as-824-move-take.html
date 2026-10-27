@@ -1,0 +1,1194 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Move a take</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft: #2a1b12;
+        --accent-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger: #ff94a8;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 26px;
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 22px 26px;
+      }
+      .frame.narrow {
+        max-width: 420px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        font-weight: 500;
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .play {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .play.on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0a02;
+      }
+      .play[disabled] {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--soft);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .brief {
+        max-width: 280px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .err {
+        color: var(--danger);
+        font-size: 12.5px;
+      }
+      .tag {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .callout {
+        border-left: 3px solid var(--accent);
+        padding: 2px 10px;
+        color: var(--soft);
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      .ncard {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        margin-top: 10px;
+        padding: 12px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .banner {
+        max-width: 1100px;
+        margin: 0 auto 12px;
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-radius: 10px;
+        padding: 9px 14px;
+        font-size: 13px;
+      }
+      .banner .mono {
+        color: var(--soft);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-top: 14px;
+      }
+      .panel h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .grow {
+        flex: 1;
+      }
+      .btn {
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 5px 12px;
+        font: inherit;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0a02;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn[disabled] {
+        opacity: 0.4;
+      }
+      .warnbox {
+        border: 1px solid #5a4719;
+        background: var(--warn-bg);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-top: 14px;
+      }
+      .warnbox strong {
+        color: var(--warn);
+      }
+      .takes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .take {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .wave {
+        flex: 1;
+        height: 26px;
+        background: repeating-linear-gradient(90deg, #3a3f4c 0 2px, transparent 2px 4px);
+        border-radius: 4px;
+      }
+      .hint {
+        color: var(--warn);
+        font-size: 12.5px;
+        margin-top: 10px;
+      }
+      .empty {
+        border: 1px dashed var(--line-strong);
+        border-radius: 10px;
+        padding: 18px;
+        margin-top: 12px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .opt {
+        display: inline-block;
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      section.case {
+        margin-top: 30px;
+      }
+    </style>
+    <style>
+      .modal-back {
+        background: rgba(0, 0, 0, 0.55);
+        border-radius: 12px;
+        padding: 40px 20px;
+        margin-top: 14px;
+      }
+      .modal {
+        max-width: 560px;
+        margin: 0 auto;
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 16px 18px;
+      }
+      .modal h3 {
+        margin: 0 0 4px;
+        font-size: 16px;
+      }
+      .dest {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 8px 6px;
+        border-radius: 8px;
+      }
+      .dest:hover,
+      .dest.sel {
+        background: var(--raised);
+      }
+      .dest.sel {
+        outline: 1px solid var(--accent);
+      }
+      .dest.off {
+        opacity: 0.45;
+      }
+      .group {
+        margin-top: 10px;
+      }
+      .menu {
+        position: absolute;
+        right: 0;
+        top: 30px;
+        width: 300px;
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 6px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+        z-index: 2;
+      }
+      .menu .item {
+        padding: 6px 8px;
+        border-radius: 6px;
+        display: flex;
+        gap: 8px;
+      }
+      .menu .item:hover,
+      .menu .item.sel {
+        background: var(--raised);
+      }
+      .menu .item.off {
+        opacity: 0.45;
+      }
+      .anchor {
+        position: relative;
+      }
+      .moved {
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 9px 12px;
+        margin-top: 12px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        color: var(--soft);
+      }
+      .from {
+        font-size: 11.5px;
+        color: var(--accent-ink);
+      }
+      input.filter {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        color: var(--text);
+        padding: 6px 10px;
+        font: inherit;
+        margin: 8px 0 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Move a take to another track (agreed)</h1>
+      A take that is not chosen can be moved to another loop in any act, or to another stinger.
+      Chosen: a dialog to pick where; the take counts as made for the track it joins and keeps a
+      "moved from" line for good; you stay where you were with a line saying where it went; with
+      nowhere to move it, Move… is greyed and says why.
+    </div>
+    <div class="intro">
+      <h1>Where to move a take — Option A: a dialog</h1>
+      Each take card gets <b>Move…</b>. It opens a dialog listing every other loop in the game, by
+      act, with what each one plays now and how long it is, so you can see where the take fits. Pick
+      one, press <b>Move take 3</b>. Esc or Cancel closes it and nothing changes.
+    </div>
+    <div class="frame">
+      <span class="crumbs">Music › Act 1</span>
+      <h2>Willowbrook village</h2>
+      <span class="muted small">Willowbrook, the village square · loop · 1:30</span>
+      <div class="panel">
+        <div class="head"><h3>In the game</h3></div>
+        <div class="take" style="margin-top: 10px; border-color: #1d4d39">
+          <div class="row"><b class="grow">Take 1</b><span class="chip ok">chosen</span></div>
+          <div class="row">
+            <button class="play">▶</button>
+            <div class="wave"></div>
+            <span class="faint small">1:30</span>
+          </div>
+          <div class="row">
+            <button class="btn">Hear the seam</button><span class="grow"></span
+            ><button class="btn ghost">Un-choose</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head">
+          <h3>Takes</h3>
+          <span class="grow"></span><button class="btn">More takes</button>
+        </div>
+        <div class="takes">
+          <div class="take">
+            <div class="row"><b class="grow">Take 2</b></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn btn-small ghost">Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+          <div class="take">
+            <div class="row"><b class="grow">Take 3</b></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn btn-small ghost">Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+          <div class="take">
+            <div class="row"><b class="grow">Take 4</b></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn btn-small ghost">Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-back">
+        <div class="modal">
+          <h3>Move take 3 to another loop</h3>
+          <span class="muted small"
+            >It leaves Willowbrook village and joins the takes of the loop you pick.</span
+          >
+          <input class="filter" placeholder="Find a loop" />
+          <div class="group">
+            <div class="label">Act 1</div>
+            <div class="dest off">
+              <div class="grow">
+                <div>Willowbrook village</div>
+                <div class="faint small">this track</div>
+              </div>
+            </div>
+            <div class="dest">
+              <div class="grow">
+                <div>Castle gates</div>
+                <div class="faint small">not chosen · 1:00</div>
+              </div>
+            </div>
+            <div class="dest">
+              <div class="grow">
+                <div>Mill by the river</div>
+                <div class="faint small">chosen · 1:30</div>
+              </div>
+            </div>
+          </div>
+          <div class="group">
+            <div class="label">Act 2</div>
+            <div class="dest">
+              <div class="grow">
+                <div>Dark forest</div>
+                <div class="faint small">changed since chosen · 2:00</div>
+              </div>
+            </div>
+            <div class="dest sel">
+              <div class="grow">
+                <div>Witch's hut</div>
+                <div class="faint small">not chosen · 1:30</div>
+              </div>
+            </div>
+          </div>
+          <div class="group">
+            <div class="label">Act 3</div>
+            <div class="faint small" style="padding: 6px">
+              The game has not listed the loops for Act 3 yet.
+            </div>
+          </div>
+          <div class="row" style="margin-top: 14px">
+            <span class="grow"></span><button class="btn ghost">Cancel</button
+            ><button class="btn primary">Move take 3</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="intro note">
+      For a stinger the list is every other stinger, with no acts. Cost: two presses and a dialog,
+      but room to show each loop's length and status.
+    </div>
+    <hr style="border: 0; border-top: 1px solid #2a2e39; margin: 40px 0" />
+    <div class="intro">
+      <h1>On the loop it moved to — Option A: it counts as made for this loop</h1>
+      The take gets this loop's next number (take 5) and says where it came from. From then on it
+      counts as made for this loop's brief, so choosing it shows plain <b>chosen</b>; editing this
+      loop's brief later marks it changed as usual.
+    </div>
+    <div class="frame">
+      <span class="crumbs">Music › Act 2</span>
+      <h2>Witch's hut</h2>
+      <span class="muted small">Willowbrook, the village square · loop · 1:30</span>
+      <div class="panel">
+        <div class="head"><h3>In the game</h3></div>
+        <div class="empty">Nothing plays here yet. Choose a take below and the game plays it.</div>
+      </div>
+      <div class="panel">
+        <div class="head">
+          <h3>Takes</h3>
+          <span class="grow"></span><button class="btn">More takes</button>
+        </div>
+        <div class="takes">
+          <div class="take">
+            <div class="row"><b class="grow">Take 1</b></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn btn-small ghost">Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+          <div class="take">
+            <div class="row"><b class="grow">Take 2</b></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn btn-small ghost">Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+          <div class="take">
+            <div class="row"><b class="grow">Take 5</b><span class="from">moved</span></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn btn-small ghost">Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="intro"><h1>…after choosing it</h1></div>
+    <div class="frame">
+      <span class="crumbs">Music › Act 2</span>
+      <h2>Witch's hut</h2>
+      <span class="muted small">Willowbrook, the village square · loop · 1:30</span>
+      <div class="panel">
+        <div class="head"><h3>In the game</h3></div>
+        <div class="take" style="margin-top: 10px; border-color: #1d4d39">
+          <div class="row"><b class="grow">Take 5</b><span class="chip ok">chosen</span></div>
+          <div class="from">moved from Willowbrook village, where it was take 3</div>
+          <div class="row">
+            <button class="play">▶</button>
+            <div class="wave"></div>
+            <span class="faint small">1:30</span>
+          </div>
+          <div class="row">
+            <button class="btn">Hear the seam</button><span class="grow"></span
+            ><button class="btn ghost">Un-choose</button>
+          </div>
+        </div>
+      </div>
+      <div class="intro note" style="margin-top: 8px">
+        Status on the Act 2 list: <span class="chip ok">chosen</span>
+      </div>
+    </div>
+    <hr style="border: 0; border-top: 1px solid #2a2e39; margin: 40px 0" />
+    <div class="intro">
+      <h1>Right after the move — Option A: stay here, with a line saying where it went</h1>
+      The card is gone; a line at the top of Takes says where it went, with a button to go there.
+      The line stays until it is closed, you leave the page, or you move another take.
+    </div>
+    <div class="frame">
+      <span class="crumbs">Music › Act 1</span>
+      <h2>Willowbrook village</h2>
+      <span class="muted small">Willowbrook, the village square · loop · 1:30</span>
+      <div class="panel">
+        <div class="head"><h3>In the game</h3></div>
+        <div class="take" style="margin-top: 10px; border-color: #1d4d39">
+          <div class="row"><b class="grow">Take 1</b><span class="chip ok">chosen</span></div>
+          <div class="row">
+            <button class="play">▶</button>
+            <div class="wave"></div>
+            <span class="faint small">1:30</span>
+          </div>
+          <div class="row">
+            <button class="btn">Hear the seam</button><span class="grow"></span
+            ><button class="btn ghost">Un-choose</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="head">
+          <h3>Takes</h3>
+          <span class="grow"></span><button class="btn">More takes</button>
+        </div>
+        <div class="moved">
+          <span class="grow">Take 3 moved to <b>Witch's hut</b> (Act 2), where it is take 5.</span
+          ><button class="btn">Open Witch's hut</button><button class="btn ghost">✕</button>
+        </div>
+        <div class="takes">
+          <div class="take">
+            <div class="row"><b class="grow">Take 2</b></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn btn-small ghost">Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+          <div class="take">
+            <div class="row"><b class="grow">Take 4</b></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn btn-small ghost">Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <hr style="border: 0; border-top: 1px solid #2a2e39; margin: 40px 0" />
+    <div class="intro">
+      <h1>Moving a take — every state (for your check)</h1>
+      Built on the choices you made: the dialog, the take counts as made for the loop it joins, and
+      you stay where you were with a line saying where it went.
+    </div>
+    <section class="case">
+      <div class="intro">
+        <h1>1. The dialog, a loop selected</h1>
+        Focus starts in <b>Find a loop</b>. Up and down move through the list, Enter moves the take,
+        Esc or Cancel closes it with nothing changed, and focus goes back to the take's Move…
+        button. <b>Move take 3</b> stays greyed until a loop is picked. Typing filters by name;
+        nothing matching shows <i>No loop is called that.</i>
+      </div>
+      <div class="frame">
+        <div class="modal-back">
+          <div class="modal">
+            <h3>Move take 3 to another loop</h3>
+            <span class="muted small"
+              >It leaves Willowbrook village and joins the takes of the loop you pick.</span
+            ><input class="filter" placeholder="Find a loop" />
+            <div class="group">
+              <div class="label">Act 1</div>
+              <div class="dest off">
+                <div class="grow">
+                  <div>Willowbrook village</div>
+                  <div class="faint small">this track</div>
+                </div>
+              </div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Castle gates</div>
+                  <div class="faint small">not chosen · 1:00</div>
+                </div>
+              </div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Mill by the river</div>
+                  <div class="faint small">chosen · 1:30</div>
+                </div>
+              </div>
+            </div>
+            <div class="group">
+              <div class="label">Act 2</div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Dark forest</div>
+                  <div class="faint small">changed since chosen · 2:00</div>
+                </div>
+              </div>
+              <div class="dest sel">
+                <div class="grow">
+                  <div>Witch's hut</div>
+                  <div class="faint small">not chosen · 1:30</div>
+                </div>
+              </div>
+            </div>
+            <div class="group">
+              <div class="label">Act 3</div>
+              <div class="faint small" style="padding: 6px">
+                The game has not listed the loops for Act 3 yet.
+              </div>
+            </div>
+            <div class="row" style="margin-top: 14px">
+              <span class="grow"></span><button class="btn ghost">Cancel</button
+              ><button class="btn primary">Move take 3</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro">
+        <h1>2. A stinger's take</h1>
+        Only stingers, no acts, no search box (there are few).
+      </div>
+      <div class="frame">
+        <div class="modal-back">
+          <div class="modal">
+            <h3>Move take 2 to another stinger</h3>
+            <span class="muted small"
+              >It leaves Victory and joins the takes of the stinger you pick.</span
+            >
+            <div class="group">
+              <div class="dest off">
+                <div class="grow">
+                  <div>Victory</div>
+                  <div class="faint small">this track</div>
+                </div>
+              </div>
+              <div class="dest sel">
+                <div class="grow">
+                  <div>Game over</div>
+                  <div class="faint small">not chosen · 0:06</div>
+                </div>
+              </div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Item found</div>
+                  <div class="faint small">chosen · 0:04</div>
+                </div>
+              </div>
+            </div>
+            <div class="row" style="margin-top: 14px">
+              <span class="grow"></span><button class="btn ghost">Cancel</button
+              ><button class="btn primary">Move take 2</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro">
+        <h1>3. The move is refused</h1>
+        The dialog stays open with the reason in red, so you can pick another loop or cancel. The
+        take is still on Willowbrook village.
+      </div>
+      <div class="frame">
+        <div class="modal-back">
+          <div class="modal">
+            <h3>Move take 3 to another loop</h3>
+            <span class="muted small"
+              >It leaves Willowbrook village and joins the takes of the loop you pick.</span
+            ><input class="filter" placeholder="Find a loop" />
+            <div class="group">
+              <div class="label">Act 1</div>
+              <div class="dest off">
+                <div class="grow">
+                  <div>Willowbrook village</div>
+                  <div class="faint small">this track</div>
+                </div>
+              </div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Castle gates</div>
+                  <div class="faint small">not chosen · 1:00</div>
+                </div>
+              </div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Mill by the river</div>
+                  <div class="faint small">chosen · 1:30</div>
+                </div>
+              </div>
+            </div>
+            <div class="group">
+              <div class="label">Act 2</div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Dark forest</div>
+                  <div class="faint small">changed since chosen · 2:00</div>
+                </div>
+              </div>
+              <div class="dest sel">
+                <div class="grow">
+                  <div>Witch's hut</div>
+                  <div class="faint small">not chosen · 1:30</div>
+                </div>
+              </div>
+            </div>
+            <div class="group">
+              <div class="label">Act 3</div>
+              <div class="faint small" style="padding: 6px">
+                The game has not listed the loops for Act 3 yet.
+              </div>
+            </div>
+            <div class="err" style="margin-top: 10px">
+              Take 3 could not be moved: Witch's hut is being refreshed from the game. Nothing was
+              changed.
+            </div>
+            <div class="row" style="margin-top: 14px">
+              <span class="grow"></span><button class="btn ghost">Cancel</button
+              ><button class="btn primary">Move take 3</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro">
+        <h1>4. Moving</h1>
+        Quick; the buttons hold while it happens. A take that was playing stops when you press Move.
+      </div>
+      <div class="frame">
+        <div class="modal-back">
+          <div class="modal">
+            <h3>Move take 3 to another loop</h3>
+            <span class="muted small"
+              >It leaves Willowbrook village and joins the takes of the loop you pick.</span
+            ><input class="filter" placeholder="Find a loop" />
+            <div class="group">
+              <div class="label">Act 1</div>
+              <div class="dest off">
+                <div class="grow">
+                  <div>Willowbrook village</div>
+                  <div class="faint small">this track</div>
+                </div>
+              </div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Castle gates</div>
+                  <div class="faint small">not chosen · 1:00</div>
+                </div>
+              </div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Mill by the river</div>
+                  <div class="faint small">chosen · 1:30</div>
+                </div>
+              </div>
+            </div>
+            <div class="group">
+              <div class="label">Act 2</div>
+              <div class="dest">
+                <div class="grow">
+                  <div>Dark forest</div>
+                  <div class="faint small">changed since chosen · 2:00</div>
+                </div>
+              </div>
+              <div class="dest sel">
+                <div class="grow">
+                  <div>Witch's hut</div>
+                  <div class="faint small">not chosen · 1:30</div>
+                </div>
+              </div>
+            </div>
+            <div class="group">
+              <div class="label">Act 3</div>
+              <div class="faint small" style="padding: 6px">
+                The game has not listed the loops for Act 3 yet.
+              </div>
+            </div>
+            <div class="row" style="margin-top: 14px">
+              <span class="grow"></span><button class="btn ghost" disabled>Cancel</button
+              ><button class="btn primary" disabled>Moving…</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro">
+        <h1>5. Afterwards, on Willowbrook village</h1>
+        Focus lands on the line. It goes when closed, when you leave the page, or when you move
+        another take (that one's line replaces it); it does not come back after a reload. If it was
+        the last take, the Takes panel shows its usual empty state under the line.
+      </div>
+      <div class="frame">
+        <span class="crumbs">Music › Act 1</span>
+        <h2>Willowbrook village</h2>
+        <span class="muted small">Willowbrook, the village square · loop · 1:30</span>
+        <div class="panel">
+          <div class="head"><h3>In the game</h3></div>
+          <div class="take" style="margin-top: 10px; border-color: #1d4d39">
+            <div class="row"><b class="grow">Take 1</b><span class="chip ok">chosen</span></div>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">1:30</span>
+            </div>
+            <div class="row">
+              <button class="btn">Hear the seam</button><span class="grow"></span
+              ><button class="btn ghost">Un-choose</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head">
+            <h3>Takes</h3>
+            <span class="grow"></span><button class="btn">More takes</button>
+          </div>
+          <div class="moved">
+            <span class="grow">Take 3 moved to <b>Witch's hut</b> (Act 2), where it is take 5.</span
+            ><button class="btn">Open Witch's hut</button
+            ><button class="btn ghost" aria-label="Close">✕</button>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 2</b></div>
+              <span class="faint small">Balanced</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:30</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn btn-small ghost">Move…</button
+                ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 4</b></div>
+              <span class="faint small">Balanced</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:30</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn btn-small ghost">Move…</button
+                ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro">
+        <h1>6. On Witch's hut</h1>
+        Take 5 has the next number here. A take that was marked <i>earlier brief</i> on Willowbrook
+        village loses that mark: it now counts as made for Witch's hut's brief. Its length stays its
+        own (1:30 here, whatever Witch's hut asks for). The 'moved from' line stays with it for
+        good, also once chosen.
+      </div>
+      <div class="frame">
+        <span class="crumbs">Music › Act 2</span>
+        <h2>Witch's hut</h2>
+        <span class="muted small">Willowbrook, the village square · loop · 1:30</span>
+        <div class="panel">
+          <div class="head"><h3>In the game</h3></div>
+          <div class="empty">
+            Nothing plays here yet. Choose a take below and the game plays it.
+          </div>
+        </div>
+        <div class="panel">
+          <div class="head">
+            <h3>Takes</h3>
+            <span class="grow"></span><button class="btn">More takes</button>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 1</b></div>
+              <span class="faint small">Balanced</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:30</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn btn-small ghost">Move…</button
+                ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 2</b></div>
+              <span class="faint small">Balanced</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:30</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn btn-small ghost">Move…</button
+                ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 5</b><span class="from">moved</span></div>
+              <span class="from">moved from Willowbrook village, where it was take 3</span
+              ><span class="faint small">Balanced</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:30</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn btn-small ghost">Move…</button
+                ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro">
+        <h1>7. While the music lock cannot be read</h1>
+        Move… is greyed with Choose and Drop, because which take is chosen is not known. The
+        existing amber line gains the word <i>moving</i>.
+      </div>
+      <div class="frame">
+        <span class="crumbs">Music › Act 1</span>
+        <h2>Willowbrook village</h2>
+        <span class="muted small">Willowbrook, the village square · loop · 1:30</span>
+        <div class="panel">
+          <div class="head">
+            <h3>Takes</h3>
+            <span class="grow"></span><button class="btn">More takes</button>
+          </div>
+          <span class="hint" style="display: block"
+            >Choosing, dropping and moving wait until the music lock can be read. You can still
+            listen and make more takes.</span
+          >
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 3</b></div>
+              <span class="faint small">Balanced</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:30</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn btn-small ghost" disabled>Move…</button
+                ><button class="btn ghost" disabled>Drop</button
+                ><button class="btn" disabled>Choose</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 4</b></div>
+              <span class="faint small">Balanced</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1:30</span>
+              </div>
+              <div class="row">
+                <button class="btn">Hear the seam</button><span class="grow"></span
+                ><button class="btn btn-small ghost" disabled>Move…</button
+                ><button class="btn ghost" disabled>Drop</button
+                ><button class="btn" disabled>Choose</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="case">
+      <div class="intro">
+        <h1>8. What has no Move…</h1>
+        Takes being made and takes that could not be made have no Move…, nor do the chosen take (in
+        In the game) and the game's own file.
+      </div>
+      <div class="frame">
+        <div class="takes">
+          <div class="take" style="border-style: dashed">
+            <div class="row">
+              <b class="grow">Take 6</b><span class="faint small">about 2 min left</span>
+            </div>
+            <div class="faint small">being made — no Move… until it is done</div>
+          </div>
+          <div class="take">
+            <div class="row"><b class="grow">Take 7</b></div>
+            <div class="err">could not be made</div>
+            <div class="row"><span class="grow"></span><button class="btn">Try again</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <hr style="border: 0; border-top: 1px solid #2a2e39; margin: 40px 0" />
+    <div class="intro">
+      <h1>Nowhere to move it — Option A: Move… is there, greyed, and says why</h1>
+      The game lists only one stinger (or only one loop in the whole game).
+    </div>
+    <div class="frame">
+      <span class="crumbs">Music › Stingers</span>
+      <h2>Victory</h2>
+      <span class="muted small">After a won fight · stinger · 0:06</span>
+      <div class="panel">
+        <div class="head">
+          <h3>Takes</h3>
+          <span class="grow"></span><button class="btn">More takes</button>
+        </div>
+        <div class="takes">
+          <div class="take">
+            <div class="row"><b class="grow">Take 1</b></div>
+            <span class="faint small">Balanced</span>
+            <div class="row">
+              <button class="play">▶</button>
+              <div class="wave"></div>
+              <span class="faint small">0:06</span>
+            </div>
+            <div class="row">
+              <span class="grow"></span
+              ><button
+                class="btn btn-small ghost"
+                disabled
+                title="There is no other stinger to move it to."
+              >
+                Move…</button
+              ><button class="btn ghost">Drop</button><button class="btn">Choose</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="faint small" style="margin-top: 8px">
+        On hover or focus: <i>There is no other stinger to move it to.</i>
+      </div>
+    </div>
+  </body>
+</html>
