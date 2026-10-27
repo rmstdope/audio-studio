@@ -329,8 +329,58 @@ export function problemsFrom(file: string, error: z.ZodError): Problem[] {
   return error.issues.map((issue) => ({
     file,
     path: formatPath(issue.path),
-    message: issue.message,
+    message: plainMessage(issue, formatPath(issue.path)),
   }))
+}
+
+const typeNames: Record<string, string> = {
+  string: 'text',
+  number: 'a number',
+  int: 'a whole number',
+  boolean: 'true or false',
+  array: 'a list',
+  object: 'an object',
+  record: 'an object',
+}
+
+/** The limit a zod "too small" or "too big" issue broke, worded as "0 or more" or "fewer than 3 items". */
+function limitOf(issue: z.core.$ZodIssueTooSmall | z.core.$ZodIssueTooBig): string {
+  const small = issue.code === 'too_small'
+  const limit = Number(small ? issue.minimum : issue.maximum)
+  const exclusive = !issue.inclusive
+  const unit = issue.origin === 'string' ? ' characters' : issue.origin === 'array' ? ' items' : ''
+  if (issue.origin === 'number' || issue.origin === 'int') {
+    if (exclusive) return small ? `more than ${limit}` : `less than ${limit}`
+    return small ? `${limit} or more` : `${limit} or less`
+  }
+  if (exclusive) return small ? `more than ${limit}${unit}` : `fewer than ${limit}${unit}`
+  return small ? `${limit} or more${unit}` : `${limit} or fewer${unit}`
+}
+
+/**
+ * The studio's own sentence for one of zod's stock complaints (wrong size, wrong type, missing),
+ * leading with the JSON path. A message the schema wrote itself is returned as it is.
+ */
+function plainMessage(issue: z.core.$ZodIssue, path: string): string {
+  const subject = path === '' ? 'the file' : path
+  if (issue.code === 'too_small' || issue.code === 'too_big') {
+    if (!/^Too (small|big):/.test(issue.message)) return issue.message
+    return `${subject} must be ${limitOf(issue)}`
+  }
+  if (issue.code === 'invalid_type' && issue.message.startsWith('Invalid input:')) {
+    if (issue.message.endsWith('received undefined')) return `${subject} is missing`
+    const got = /received (\w+)$/.exec(issue.message)?.[1]
+    const gotText =
+      got === undefined || issue.expected === 'int' ? '' : ` (it is ${typeNames[got] ?? got})`
+    return `${subject} must be ${typeNames[issue.expected] ?? issue.expected}${gotText}`
+  }
+  if (issue.code === 'invalid_value' && /^Invalid (option|input):/.test(issue.message)) {
+    const values = issue.values.map((v) => JSON.stringify(v)).join(', ')
+    return issue.values.length === 1
+      ? `${subject} must be ${values}`
+      : `${subject} must be one of ${values}`
+  }
+  return issue.message
 }
 
 function formatPath(path: readonly PropertyKey[]): string {

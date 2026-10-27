@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { z } from 'zod'
 import { projectJson } from '../../test/helpers'
 import { ProjectSchema, partPathFor, problemsFrom } from './project'
 
@@ -368,5 +369,54 @@ describe('narration.sceneCueSpeakers', () => {
     const base = projectJson().narration as Record<string, unknown>
     const named = projectJson({ narration: { ...base, sceneCueSpeakers: ['narrator', 'mira'] } })
     expect(parse(named).data!.narration.sceneCueSpeakers).toEqual(['narrator', 'mira'])
+  })
+})
+
+describe('problemsFrom wording', () => {
+  const base = projectJson()
+  const messages = (value: unknown) => problems(value).map((p) => p.message)
+
+  it('says a number that is too small in plain words', () => {
+    expect(messages({ ...base, takeFade: -1 })).toEqual(['takeFade must be 0 or more'])
+  })
+
+  it('says a wrong type in plain words', () => {
+    expect(messages({ ...base, takeFade: 'long' })).toEqual([
+      'takeFade must be a number (it is text)',
+    ])
+  })
+
+  it('says a missing key in plain words', () => {
+    const { narration: _omitted, ...rest } = base
+    expect(messages(rest)).toEqual(['narration is missing'])
+  })
+
+  it('says a text or list that is too short in plain words', () => {
+    const narration = base.narration as Record<string, unknown>
+    const all = messages({ ...base, narration: { ...narration, languages: [] } })
+    expect(all).toEqual(['narration.languages must be 1 or more items'])
+  })
+
+  it('says too big, exclusive bounds, whole numbers and choices in plain words', () => {
+    const wording = (schema: z.ZodType, value: unknown) => {
+      const r = schema.safeParse(value)
+      if (r.success) throw new Error('expected a problem')
+      return problemsFrom('f.json', r.error).map((p) => p.message)
+    }
+    const at = (schema: z.ZodType) => z.object({ k: schema })
+    expect(wording(at(z.number().max(2)), { k: 3 })).toEqual(['k must be 2 or less'])
+    expect(wording(at(z.number().positive()), { k: 0 })).toEqual(['k must be more than 0'])
+    expect(wording(at(z.string().max(2)), { k: 'abc' })).toEqual([
+      'k must be 2 or fewer characters',
+    ])
+    expect(wording(at(z.number().int()), { k: 1.5 })).toEqual(['k must be a whole number'])
+    expect(wording(at(z.enum(['x', 'y'])), { k: 'z' })).toEqual(['k must be one of "x", "y"'])
+    expect(wording(at(z.literal('mp3')), { k: 'ogg' })).toEqual(['k must be "mp3"'])
+  })
+
+  it('leaves a size message the schema wrote itself alone', () => {
+    const r = z.object({ k: z.number().max(2, { error: 'k is too loud' }) }).safeParse({ k: 3 })
+    if (r.success) throw new Error('expected a problem')
+    expect(problemsFrom('f.json', r.error).map((p) => p.message)).toEqual(['k is too loud'])
   })
 })
