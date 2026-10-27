@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import type { LineState } from './planner'
 import { planGeneration, costCeiling, creditCeiling } from './generation'
+import { sentPieces } from './spoken'
 
 /** A fixed moment to price plans at: no promotion runs then for the models tested. */
 const AT = new Date('2026-10-24T12:00:00Z')
@@ -341,5 +342,23 @@ describe('planGeneration, lines with ElevenLabs voices', () => {
       narrated.reduce((sum, l) => sum + [...l.text].length, 0) * 3,
     )
     expect(creditCeiling(state, fishOnly, { elevenModelOf })).toBe(0)
+  })
+})
+
+describe('planGeneration, priced as each line is sent on its model', () => {
+  it('counts no cues for a line on an ElevenLabs model that would speak them', () => {
+    const cued = {
+      lines: [{ ...line('m1', 'narrator', 'missing', [], 'Come in.'), cue: '[soft]' }],
+      orphans: [],
+    }
+    const priced = (model: string) =>
+      planGeneration(cued, {
+        at: AT,
+        model: 's2-pro',
+        elevenModelOf: () => model,
+        sent: (l) => sentPieces(l, model, {}, 300),
+      }).eleven!.characters
+    expect(priced('eleven_v3')).toBe('[soft] Come in.'.length)
+    expect(priced('eleven_multilingual_v2')).toBe('Come in.'.length)
   })
 })

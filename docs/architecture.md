@@ -1629,9 +1629,13 @@ Small, independently useful increments:
        aloud; the page still shows them. Nothing changes on screen yet: no such model can be
        chosen.
     9. **Choose ElevenLabs' models and settings**: `narration.elevenlabs` saved from the Models
-       panel's ElevenLabs rows, and the cue editor saying a model reads no cues; the consumer rules
-       in CLAUDE.md name the new saved keys.
-    10. **Page takes, tries and auditions with an ElevenLabs voice**, budgeted in characters.
+       panel's ElevenLabs rows (only models in ElevenLabs' table, so `readsCues` knows each), and
+       the cue editor saying a model reads no cues; a line recorded with cues and now on such a
+       model is stale for its model and its cue, which the page words; the consumer rules in
+       CLAUDE.md name the new saved keys.
+    10. **Page takes, tries and auditions with an ElevenLabs voice**, budgeted in characters; a try
+        on a model that reads no cues says so rather than sending the line's cues or dropping
+        them unseen (its cues from `cueInputs`).
     11. **Find a voice in ElevenLabs' library**: the provider switch on the audition board, library
         cards and previews, adding a voice on its first take, voice slots shown and freed.
     12. **Design a voice with ElevenLabs**: previews kept as design takes, saved as a voice when

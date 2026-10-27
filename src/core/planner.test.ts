@@ -728,6 +728,8 @@ describe('a line on an ElevenLabs model that reads no cues', () => {
   it('is made without its cues, and a cue edited leaves its fingerprint as it is', () => {
     const inputs = clipInputs(line, voice, cues, {}, narration, 'eleven_multilingual_v2')!
     expect([inputs.cue, inputs.inside]).toEqual(['', []])
+    // Nor its scene's cue or its character's style.
+    expect(clipInputs(line, voice, {}, {}, narration, 'eleven_multilingual_v2')!.cue).toBe('')
     const edited = clipInputs(
       line,
       voice,

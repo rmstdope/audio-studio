@@ -30,7 +30,7 @@ import {
 } from '../core/resources'
 import { FREE_MODELS } from '../core/project'
 import { createBudget, type Budget } from '../core/spend'
-import { spokenPieces } from '../core/spoken'
+import { sentPieces } from '../core/spoken'
 import { joinWavs } from '../core/wav'
 import type { FishFactory } from './auditions'
 import { decodeClip, ffmpegEncoder, type Encoder } from './audio'
@@ -404,7 +404,8 @@ export function finalFingerprint(
 }
 
 /**
- * Has Fish speak a line once: each sentence-sized piece in the speaker's voice with the cue, at the
+ * Has the voice's provider speak a line once: each sentence-sized piece in the speaker's voice,
+ * with the cue when the model reads cues (`sentPieces`), at the
  * character's settings, charged to the budget before it is sent, holding a slot of its provider
  * (`limiter`, under `limiterKey`; ElevenLabs' at most two at once) only while speaking; the pieces
  * joined with a short pause.
@@ -433,12 +434,12 @@ export async function speakLine({
     const atOnce = requestsAtOnce(narration.quality.parallel, inputs.voice)
     pieces = await limiter.run(limiterKey, atOnce, async () => {
       const spoken: Uint8Array[] = []
-      const texts = spokenPieces(
-        line.text,
-        inputs.cue,
+      // As a plan prices it: with the cues the model reads, none for one that would speak them.
+      const texts = sentPieces(
+        { text: line.text, cue: inputs.cue, inside: inputs.inside },
+        inputs.model,
         cast.pronounce,
         narration.quality.chunkLimit,
-        inputs.inside,
       )
       for (const text of texts) {
         // Charged before it is sent: nothing beyond what was confirmed reaches the provider.
