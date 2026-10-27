@@ -17,7 +17,7 @@ import { BriefChangeBody } from '../core/music'
 import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
-import { VOICE_ID } from '../core/voices'
+import { FISH_VOICE_ID, VOICE_ID } from '../core/voices'
 import type { ElevenAnswer } from '../core/setup'
 import { accountOf, createElevenLabsClient, type ElevenLabsClient } from '../services/elevenlabs'
 import { createElevenMusic } from '../services/elevenMusic'
@@ -264,12 +264,14 @@ const RecordBody = z
   })
   .strict()
 
+// Moving, taking, adding and casting a voice reach Fish or the cast, so they take Fish's voices
+// only until a line can be spoken with an ElevenLabs one (§12 step 14.7).
 const MoveBody = z.object({
-  voice: z.string().regex(VOICE_ID),
+  voice: z.string().regex(FISH_VOICE_ID),
   move: z.enum(['shortlist', 'unlist', 'drop']),
 })
 
-const TakeBody = z.object({ voice: z.string().regex(VOICE_ID) })
+const TakeBody = z.object({ voice: z.string().regex(FISH_VOICE_ID) })
 
 /** A take to record: for the board (the audition model, paid from the sitting) or the cast voice's page (free). */
 const AuditionTakeBody = TakeBody.extend({ board: z.boolean().default(false) })
@@ -284,7 +286,10 @@ const DesignBody = z
   .object({ description: z.string(), spendUpTo: z.number().positive().max(10_000).optional() })
   .strict()
 /** What casting a voice made from recordings sends: the voice and the name to cast it under. */
-const CastOwnBody = z.object({ voice: z.string().regex(VOICE_ID), name: z.string().trim().min(1) })
+const CastOwnBody = z.object({
+  voice: z.string().regex(FISH_VOICE_ID),
+  name: z.string().trim().min(1),
+})
 
 /** The `?language=` a request names, if any: the services fall back to the source language. */
 const languageOf = (request: Request) =>

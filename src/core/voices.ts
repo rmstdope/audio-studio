@@ -4,11 +4,11 @@ export type VoiceProvider = 'fish' | 'elevenlabs'
 /** What an ElevenLabs voice's id begins with, in the cast and every file that names a voice. */
 const ELEVENLABS_PREFIX = 'eleven:'
 
-/**
- * What a voice id may look like: Fish's (letters, digits, `_` and `-`), or the same after
- * `eleven:` for an ElevenLabs voice.
- */
-export const VOICE_ID = /^(eleven:)?[\w-]{1,64}$/
+/** What a Fish voice id looks like: letters, digits, `_` and `-`. */
+export const FISH_VOICE_ID = /^[\w-]{1,64}$/
+
+/** What any voice id may look like: Fish's, or the same after `eleven:` for an ElevenLabs voice. */
+export const VOICE_ID = new RegExp(`^(${ELEVENLABS_PREFIX})?${FISH_VOICE_ID.source.slice(1)}`)
 
 /** Whose a voice is: ElevenLabs' for an `eleven:` id, else Fish's, as every voice was before. */
 export function providerOf(voice: string): VoiceProvider {

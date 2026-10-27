@@ -1564,8 +1564,11 @@ Small, independently useful increments:
     5. **What music costs** (built): the price on the menus, More takes and Make 2 takes, and Stop's
        warning. Music rows in the spending log go with its version 2, in 14.7.
     6. **A voice says whose it is** (built): `eleven:` voice ids (`core/voices.ts`: `providerOf`,
-       `providerId`, `elevenVoice`), the server's voice-id check, and no Fish page linked for an
-       ElevenLabs voice. No behaviour changes. The speaking seam moves to 14.7, which first needs it.
+       `providerId`, `elevenVoice`, `FISH_VOICE_ID` and `VOICE_ID`), and no Fish page linked for an
+       ElevenLabs voice. The routes that would reach Fish or the cast (a take, adding, moving and
+       casting a voice) still take Fish's ids only, until 14.7 can speak with an ElevenLabs one;
+       allowing a ruled-out voice again takes either. No behaviour changes. The speaking seam moves
+       to 14.7, which first needs it.
     7. **Record lines with an ElevenLabs voice**: a seam that speaks a line with its voice's
        provider (Fish behind it as today), Add by id with the provider chosen, Eleven v3 with the
        default settings, the speed check, characters in the confirm and admission, ElevenLabs rows

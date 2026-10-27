@@ -428,6 +428,25 @@ describe('server', () => {
     expect((await fetch(url(`/api/takes/${body.key}`))).status).toBe(404)
   })
 
+  it('refuses an ElevenLabs voice where it would reach Fish or the cast, until it can speak', async () => {
+    const send = (path: string, body: unknown) =>
+      fetch(url(path), {
+        method: 'POST',
+        headers: { origin: server.url.origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    const voice = 'eleven:abc'
+    for (const [path, body] of [
+      ['/api/characters/narrator/takes', { voice, board: true }],
+      ['/api/auditions/narrator/add', { voice }],
+      ['/api/auditions/narrator/move', { voice, move: 'shortlist' }],
+      ['/api/auditions/narrator/cast', { voice }],
+      ['/api/characters/narrator/cast-voice', { voice, name: 'Mine' }],
+    ] as const) {
+      expect([path, (await send(path, body)).status]).toEqual([path, 400])
+    }
+  })
+
   it('rules out a dropped voice, lists it, and allows one or all again', async () => {
     const send = (method: string, path: string, body?: unknown) =>
       fetch(url(path), {

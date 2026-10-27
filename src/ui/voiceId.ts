@@ -1,7 +1,4 @@
-import { providerOf } from '../core/voices'
-
-/** What a Fish voice id looks like. */
-const VOICE_ID = /^[\w-]{1,64}$/
+import { FISH_VOICE_ID, providerOf } from '../core/voices'
 
 /**
  * The Fish voice id in what the user typed: a bare id, or a voice's URL, with or without its
@@ -11,12 +8,12 @@ const VOICE_ID = /^[\w-]{1,64}$/
 export function voiceIdFrom(input: string): string | null {
   let text = input.trim()
   if (!/^https?:\/\//i.test(text) && /^[\w-]+(\.[\w-]+)+\//.test(text)) text = `https://${text}`
-  if (!/^https?:\/\//i.test(text)) return VOICE_ID.test(text) ? text : null
+  if (!/^https?:\/\//i.test(text)) return FISH_VOICE_ID.test(text) ? text : null
   try {
     const parts = new URL(text).pathname.split('/').filter(Boolean)
     const after = parts.indexOf('m')
     const id = after >= 0 ? parts[after + 1] : parts.at(-1)
-    return id && VOICE_ID.test(id) ? id : null
+    return id && FISH_VOICE_ID.test(id) ? id : null
   } catch {
     return null
   }
