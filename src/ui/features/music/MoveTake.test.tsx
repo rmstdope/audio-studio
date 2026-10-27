@@ -277,6 +277,18 @@ describe('the Move dialog', () => {
     expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
   })
 
+  it('keeps the keyboard in the dialog when the pick is dropped, so Esc still closes it', async () => {
+    const page = render(village, view([take(3)]))
+    await click(page.buttons('Move…')[0])
+    await click(option("Witch's hut"))
+    ;(page.buttons('Move take 3')[0] as HTMLButtonElement).focus()
+    page.rerender([lists[0]!, list('act2', 'act', 'Act 2: The Wood', []), lists[2]!, lists[3]!])
+    expect(document.activeElement).toBe(document.querySelector('input.filter'))
+    page.key(document.activeElement!, 'Escape')
+    await act(async () => {})
+    expect(dialog()).toBeNull()
+  })
+
   it('moves with Up, Down and Enter, and closes with Esc, focus back on Move…', async () => {
     const page = render(village, view([take(3)]))
     const opener = page.buttons('Move…')[0]!

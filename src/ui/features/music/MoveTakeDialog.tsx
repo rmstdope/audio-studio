@@ -53,20 +53,26 @@ export function MoveTakeDialog({
   const loops = kind === 'loop'
   const pending = move.isPending
 
-  // A pick whose row has left the game's list is dropped, so Move is greyed until another is picked.
-  useEffect(() => {
-    if (selected && !all.some((group) => group.tracks.some((t) => t.id === selected)))
-      setSelected(null)
-  }, [all, selected])
-
-  // Focus starts in the search box, or on the first row for stingers.
-  useEffect(() => {
+  /** Focus goes to the search box, or to the first row that can be picked for stingers. */
+  function focusStart() {
     if (loops) search.current?.focus()
     else
       root.current
         ?.querySelector<HTMLButtonElement>('button[role="option"]:not([disabled])')
         ?.focus()
-  }, [loops])
+  }
+
+  // A pick whose row has left the game's list is dropped, so Move is greyed until another is
+  // picked; focus comes back into the dialog, or Esc and the arrows would stop working.
+  useEffect(() => {
+    if (selected && !all.some((group) => group.tracks.some((t) => t.id === selected))) {
+      setSelected(null)
+      focusStart()
+    }
+  }, [all, selected])
+
+  // Focus starts at the same place when the dialog opens.
+  useEffect(focusStart, [loops])
 
   async function submit() {
     if (!selected || pending) return
