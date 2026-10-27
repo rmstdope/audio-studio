@@ -1,6 +1,7 @@
 import { modelForStage } from './elevenSpeech'
 import {
   clipInputs,
+  cueInputs,
   sceneCueFor,
   fingerprint,
   fingerprintMatches,
@@ -249,13 +250,17 @@ export function planPart(input: PlanInput): PartState {
       speaker: line.speaker,
       text: line.text,
       english,
-      cue:
-        inputs?.cue ??
-        openingFor(cues, line.key, line.text) ??
-        sceneCueFor(line, cues, narration) ??
-        character?.style ??
-        '',
-      inside: inputs?.inside ?? parseCued(cueFor(cues, line.key) ?? '', line.text).inside,
+      // What the line is delivered with, shown whatever model speaks it (one may be sent none).
+      ...(character?.voice
+        ? cueInputs(line, character, cues, narration)
+        : {
+            cue:
+              openingFor(cues, line.key, line.text) ??
+              sceneCueFor(line, cues, narration) ??
+              character?.style ??
+              '',
+            inside: parseCued(cueFor(cues, line.key) ?? '', line.text).inside,
+          }),
       insideStale: parseCued(cueFor(own, line.key) ?? '', line.text).stale,
       sourceInside: Object.hasOwn(input.sourceInside ?? {}, line.key)
         ? input.sourceInside![line.key]!

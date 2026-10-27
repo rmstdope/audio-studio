@@ -41,7 +41,7 @@ import {
 } from '../core/spend'
 import { planPart } from '../core/planner'
 import { SPEED } from '../core/resources'
-import { spokenPieces } from '../core/spoken'
+import { sentPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
 import { appendMusic, createSpendLog, readSpending } from '../services/spending'
 import { outcomeOf, summariseSpending } from '../core/spending'
@@ -709,18 +709,25 @@ export function startServer({
       asked === 'final' && narration.models.final !== narration.models.draft ? 'final' : 'draft'
     const { pronounce, speakers } = read.input.cast
     const state = planPart(read.input)
+    // A line with an ElevenLabs voice is recorded, and priced, by ElevenLabs.
+    const elevenModelOf = (line: { speaker: string }) => {
+      const voice = speakers[line.speaker]?.voice ?? ''
+      return providerOf(voice) === 'elevenlabs' ? modelForStage(narration, voice, stage) : null
+    }
     const pricing = {
       at: new Date(),
       model: narration.models[stage],
-      // What is sent: each piece of a line with its cue and the cast's pronunciations.
+      // What is sent: each piece of a line with its cue (for a model that reads cues) and the
+      // cast's pronunciations.
       sent: (line: LineState) =>
-        spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit, line.inside),
+        sentPieces(
+          line,
+          elevenModelOf(line) ?? narration.models[stage],
+          pronounce,
+          narration.quality.chunkLimit,
+        ),
       takes: narration.quality.transcriber === 'none' ? 1 : narration.quality.takes,
-      // A line with an ElevenLabs voice is recorded, and priced, by ElevenLabs.
-      elevenModelOf: (line: { speaker: string }) => {
-        const voice = speakers[line.speaker]?.voice ?? ''
-        return providerOf(voice) === 'elevenlabs' ? modelForStage(narration, voice, stage) : null
-      },
+      elevenModelOf,
     }
     const plan = planGeneration(state, {
       ...pricing,

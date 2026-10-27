@@ -1117,10 +1117,12 @@ only, the fingerprint needs no provider of its own.
   `narration.tts.speed`) is sent as `speed`; ElevenLabs takes 0.7–1.2, so a character with an
   ElevenLabs voice whose speed in use lies outside it has each of its lines refused when recorded,
   with the reason, and its page says why under its speed. Nothing is clamped.
-- **Cues.** Eleven v3 reads `[bracket]` tags as directions, as Fish does, so cues are sent as they
-  are. Multilingual v2 and Flash would speak them, so with those models cues are left out of the
-  text and out of the fingerprint (`cue` and `inside` empty), so editing a cue never re-records
-  audio that would not change, and the cue editor says so. The text is chunked at
+- **Cues** (built in 14.8). Eleven v3 reads `[bracket]` tags as directions, as Fish does, so cues
+  are sent as they are. Multilingual v2 and Flash would speak them (`readsCues`), so with those
+  models cues are left out of the text and out of the fingerprint (`clipInputs` gives `cue` and
+  `inside` empty), so editing a cue never re-records audio that would not change, and out of what a
+  plan counts (`sentPieces`). The page still shows a line's cues (`cueInputs`), and from 14.9, when
+  such a model can be chosen, the cue editor says they are not spoken. The text is chunked at
   `quality.chunkLimit` as for Fish.
 - **Languages.** Each language's voice may be either provider's; `language_code` is sent with models
   that take it.
@@ -1622,10 +1624,13 @@ Small, independently useful increments:
           speed refusal on the character's page (under its speed).
        4. **The spending log's version 2** (built): a recording's ElevenLabs credits, a row for
           each paid music take, and the Spending page's totals in dollars and credits apart.
-    8. **Cues by model**: cues left out of the text and the fingerprint for models that would speak
-       them, so that choosing such a model (next) never reads a cue aloud.
+    8. **Cues by model** (built): cues left out of the text, the fingerprint and the plan's count
+       for models that would speak them, so that choosing such a model (next) never reads a cue
+       aloud; the page still shows them. Nothing changes on screen yet: no such model can be
+       chosen.
     9. **Choose ElevenLabs' models and settings**: `narration.elevenlabs` saved from the Models
-       panel's ElevenLabs rows; the consumer rules in CLAUDE.md name the new saved keys.
+       panel's ElevenLabs rows, and the cue editor saying a model reads no cues; the consumer rules
+       in CLAUDE.md name the new saved keys.
     10. **Page takes, tries and auditions with an ElevenLabs voice**, budgeted in characters.
     11. **Find a voice in ElevenLabs' library**: the provider switch on the audition board, library
         cards and previews, adding a voice on its first take, voice slots shown and freed.

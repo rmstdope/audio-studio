@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { projectJson } from '../../test/helpers'
-import { clipInputs, fingerprint } from './fingerprint'
+import { clipInputs, cueInputs, fingerprint } from './fingerprint'
 import { mergeCues } from './cued'
 import { adoptUntracked, planPart, type PlanInput } from './planner'
 import { ProjectSchema } from './project'
@@ -717,6 +717,43 @@ describe('a line with an ElevenLabs voice', () => {
     const state = planPart(input({ cast: elevenCast, lock }))
     expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'stale' })
     expect(state.lines.find((l) => l.key === 'm1')!.reasons).toContain('voice')
+  })
+})
+
+describe('a line on an ElevenLabs model that reads no cues', () => {
+  const voice = { voice: 'eleven:abc', style: '[low, calm]' }
+  const line = { key: 'm1', speaker: 'mira', text: 'Welcome, child, come in.' }
+  const cues = { m1: '[soft] Welcome, child, [whispers] come in.' }
+
+  it('is made without its cues, and a cue edited leaves its fingerprint as it is', () => {
+    const inputs = clipInputs(line, voice, cues, {}, narration, 'eleven_multilingual_v2')!
+    expect([inputs.cue, inputs.inside]).toEqual(['', []])
+    const edited = clipInputs(
+      line,
+      voice,
+      { m1: '[loud] Welcome' },
+      {},
+      narration,
+      'eleven_flash_v2_5',
+    )!
+    expect(edited.cue).toBe('')
+    expect(
+      fingerprint(clipInputs(line, voice, {}, {}, narration, 'eleven_multilingual_v2')!).fp,
+    ).toBe(fingerprint(inputs).fp)
+  })
+
+  it('still shows its cues, whatever model speaks it', () => {
+    expect(cueInputs(line, voice, cues, narration)).toEqual({
+      cue: '[soft]',
+      inside: [{ at: 2, cue: '[whispers]' }],
+    })
+    expect(cueInputs(line, voice, {}, narration)).toEqual({ cue: '[low, calm]', inside: [] })
+  })
+
+  it('keeps its cues on Eleven v3, which reads them as directions, as Fish’s models do', () => {
+    const inputs = clipInputs(line, voice, cues, {}, narration, 'eleven_v3')!
+    expect(inputs.cue).toBe('[soft]')
+    expect(inputs.inside).toHaveLength(1)
   })
 })
 

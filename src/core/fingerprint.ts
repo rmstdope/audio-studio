@@ -1,4 +1,4 @@
-import { ELEVEN_TTS, modelForStage } from './elevenSpeech'
+import { ELEVEN_TTS, modelForStage, readsCues } from './elevenSpeech'
 import { providerOf } from './voices'
 import { createHash } from 'node:crypto'
 import type { Project } from './project'
@@ -56,6 +56,22 @@ export function sceneCueFor(
 const NONE = { opening: '', inside: [] as InsideCue[] }
 
 /**
+ * The cue a line is delivered with and the cues placed inside it, whatever model speaks it: its
+ * own opening cue, else its scene's, else its character's style. What the page shows; a model
+ * that would speak cues is sent none (`clipInputs`).
+ */
+export function cueInputs(
+  line: CueLine & { text: string },
+  character: Character,
+  cues: Record<string, string>,
+  narration: Project['narration'],
+): { cue: string; inside: InsideCue[] } {
+  const entry = cueFor(cues, line.key)
+  const { opening, inside } = entry === undefined ? NONE : parseCued(entry, line.text)
+  return { cue: opening || (sceneCueFor(line, cues, narration) ?? character.style ?? ''), inside }
+}
+
+/**
  * The inputs of a line's clip, or null when its speaker has no voice yet. The model is the draft
  * stage's of the voice's provider: everyday generation uses it. An ElevenLabs voice is spoken
  * with ElevenLabs' voice settings in place of Fish's temperature and top-p.
@@ -76,12 +92,15 @@ export function clipInputs(
     providerOf(voice) === 'elevenlabs'
       ? [ELEVEN_TTS.stability, ELEVEN_TTS.similarityBoost, ELEVEN_TTS.style, tts.speed]
       : [tts.temperature, tts.topP, tts.speed]
-  const entry = cueFor(cues, line.key)
-  const { opening, inside } = entry === undefined ? NONE : parseCued(entry, line.text)
+  const made = model ?? modelForStage(narration, voice, 'draft')
+  // A model that would speak a cue is sent none: editing one then changes nothing it makes.
+  const { cue, inside } = readsCues(made)
+    ? cueInputs(line, character, cues, narration)
+    : { cue: '', inside: [] }
   return {
-    model: model ?? modelForStage(narration, voice, 'draft'),
+    model: made,
     voice,
-    cue: opening || (sceneCueFor(line, cues, narration) ?? character.style ?? ''),
+    cue,
     inside,
     text: line.text,
     said: saidText(line.text, pronounce),

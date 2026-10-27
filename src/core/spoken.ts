@@ -1,4 +1,5 @@
 import { piecesOf, wordsOf, type InsideCue } from './cued'
+import { readsCues } from './elevenSpeech'
 
 /**
  * The text sent to Fish for a line: the delivery cue, then the line with words said as the cast
@@ -67,4 +68,19 @@ export function spokenPieces(
     }
     return [piece.cue, ...parts].filter(Boolean).join(' ')
   })
+}
+
+/**
+ * What a line is sent as on `model`: its pieces with its cue and the cues inside (`spokenPieces`),
+ * or without any cue for a model that would speak them aloud. Used to record and to price a plan.
+ */
+export function sentPieces(
+  line: { text: string; cue: string; inside: InsideCue[] },
+  model: string,
+  pronounce: Record<string, string>,
+  chunkLimit: number,
+): string[] {
+  return readsCues(model)
+    ? spokenPieces(line.text, line.cue, pronounce, chunkLimit, line.inside)
+    : spokenPieces(line.text, '', pronounce, chunkLimit)
 }

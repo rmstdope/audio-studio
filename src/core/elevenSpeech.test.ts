@@ -3,6 +3,7 @@ import { ProjectSchema } from './project'
 import { projectJson } from '../../test/helpers'
 import {
   DEFAULT_ELEVEN_MODEL,
+  readsCues,
   requestsAtOnce,
   ELEVEN_TTS,
   elevenCredits,
@@ -65,5 +66,14 @@ describe('requestsAtOnce', () => {
     expect(requestsAtOnce(4, 'abc')).toBe(4)
     expect(requestsAtOnce(4, 'eleven:abc')).toBe(2)
     expect(requestsAtOnce(1, 'eleven:abc')).toBe(1)
+  })
+})
+
+describe('readsCues', () => {
+  it('is true for Fish’s models and Eleven v3, false for the ElevenLabs models that speak them', () => {
+    expect(readsCues('s2-pro')).toBe(true)
+    expect(readsCues('eleven_v3')).toBe(true)
+    expect(readsCues('eleven_multilingual_v2')).toBe(false)
+    expect(readsCues('eleven_flash_v2_5')).toBe(false)
   })
 })
