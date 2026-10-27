@@ -273,7 +273,11 @@ describe('the model menu on a track’s Takes panel', () => {
 
   it('tries a failed take again without a model, so it keeps its own', async () => {
     const page = render(
-      view({ failed: [{ n: 2, message: 'out of memory', model: 'Careful · XL sft · 4B' }] }),
+      view({
+        failed: [
+          { n: 2, message: 'out of memory', model: 'Careful · XL sft · 4B', modelId: 'careful' },
+        ],
+      }),
     )
     await click(page.button('Try again'))
     expect(posted).toEqual([{ retry: 2 }])
@@ -464,24 +468,38 @@ describe('the banner when no music can be made', () => {
 describe('what Eleven Music takes cost, on the panel', () => {
   it('puts the price of the two takes on More takes and Make 2 takes, and none on a free model', () => {
     const paid = render(view({ defaultModel: 'eleven' }))
-    expect(paid.button('More takes · $0.25')).toBeDefined()
+    expect(paid.button('More takes · $0.26')).toBeDefined()
     const empty = render(view({ defaultModel: 'eleven', takes: [] }))
-    expect(empty.button('Make 2 takes · $0.25')).toBeDefined()
+    expect(empty.button('Make 2 takes · $0.26')).toBeDefined()
     expect(render(view()).button('More takes')).toBeDefined()
   })
 
-  it('warns on Stop that a take stopped in the cloud may still be billed', () => {
-    const making = (paid: boolean) =>
+  it('warns on Stop that a take stopped in the cloud may still be billed, only while one is made', () => {
+    const making = (paid: boolean, state: 'making' | 'waiting' = 'making') =>
       render(
         view({
-          making: [
-            { n: 2, state: 'making', elapsed: 3, model: 'Eleven Music', expected: 60, paid },
-          ],
+          making: [{ n: 2, state, elapsed: 3, model: 'Eleven Music', expected: 60, paid }],
         }),
       ).button('Stop')
     expect(making(true).title).toBe(
       'ElevenLabs may still bill a take that is stopped while it is being made.',
     )
     expect(making(false).title).toBe('')
+    expect(making(true, 'waiting').title).toBe('')
+  })
+
+  it('puts the price of the take on Try again when it failed on a paid model', () => {
+    const failed = (modelId: 'eleven' | 'careful') =>
+      render(view({ failed: [{ n: 2, message: 'timed out', model: 'a model', modelId }] }))
+        .container
+    const tryAgain = (c: HTMLElement) =>
+      [...c.querySelectorAll('.errbox button')].map((b) => b.textContent)
+    expect(tryAgain(failed('eleven'))).toEqual(['Try again · $0.13'])
+    expect(tryAgain(failed('careful'))).toEqual(['Try again'])
+  })
+
+  it('prices two takes as twice the price of one, as the menu shows it', () => {
+    const page = render(view({ defaultModel: 'eleven' }))
+    expect(page.button('More takes · $0.26')).toBeDefined()
   })
 })

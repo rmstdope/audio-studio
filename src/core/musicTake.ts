@@ -194,6 +194,8 @@ export interface FailedView {
   message: string
   /** The music model it was asked with, as a line. */
   model: string
+  /** That model's id, which Try again makes the take with again. */
+  modelId: MusicModelId
 }
 
 /** A track's takes as its page shows them. */

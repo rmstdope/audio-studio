@@ -1178,9 +1178,10 @@ read by an older studio.
   price; null for the free ones), and a take costs it for the whole take, the 20 seconds a loop is
   made longer included (`takePrice`). A track's menu entry says "about 1 min and $0.28 a take",
   Setup's menu "about 1 min a take, $0.15 a minute of music" with "$0.15 a minute" beside it, and
-  More takes and Make 2 takes the price of both ("More takes · $0.55"). Takes are not confirmed;
-  each is logged with step 14.7. Stop aborts the request; ElevenLabs may still bill a take stopped
-  while being made, which Stop's title says while a paid take is being made.
+  More takes and Make 2 takes the price of both, twice a take's as the menu shows it ("More takes ·
+  $0.56"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed; each
+  is logged with step 14.7. Stop aborts the request; ElevenLabs may still bill a take stopped while
+  being made, which Stop's title says while a paid take is being made.
 
 **Testing.** Every test uses a fake `ElevenLabsClient`. Opt-in live tests
 (`AUDIO_STUDIO_LIVE_ELEVENLABS=1`, with a key; §11 says so when they come) speak one short line,

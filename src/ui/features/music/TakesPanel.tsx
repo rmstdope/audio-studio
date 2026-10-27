@@ -181,7 +181,7 @@ export function TakesPanel({
             disabled={make.isPending || !generator.ok}
             onClick={() => make.mutate({ retry: failed.n })}
           >
-            Try again
+            {takesButton('Try again', failed.modelId, length, 1)}
           </button>
         </div>
       ))}
@@ -206,7 +206,7 @@ export function TakesPanel({
                   className="btn btn-ghost"
                   disabled={stop.isPending}
                   title={
-                    view.making.some((m) => m.paid)
+                    view.making.some((m) => m.paid && m.state === 'making')
                       ? 'ElevenLabs may still bill a take that is stopped while it is being made.'
                       : undefined
                   }

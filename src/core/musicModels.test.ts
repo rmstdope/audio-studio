@@ -223,8 +223,8 @@ describe('what a take costs', () => {
     )
   })
   test('a button that makes takes says what they cost, and a free one does not', () => {
-    expect(takesButton('More takes', 'eleven', loop90, 2)).toBe('More takes · $0.55')
-    expect(takesButton('Make 2 takes', 'eleven', stinger, 2)).toBe('Make 2 takes · $0.05')
+    expect(takesButton('More takes', 'eleven', loop90, 2)).toBe('More takes · $0.56')
+    expect(takesButton('Make 2 takes', 'eleven', stinger, 2)).toBe('Make 2 takes · $0.06')
     expect(takesButton('More takes', 'balanced', loop90, 2)).toBe('More takes')
   })
 })

@@ -220,7 +220,10 @@ export function perMinuteWords(id: MusicModelId): string | null {
   return perMinute === null ? null : `${cents(perMinute)} a minute`
 }
 
-/** A button that makes `count` takes, with what they cost when the model is paid: "More takes · $0.55". */
+/**
+ * A button that makes `count` takes, with what they cost when the model is paid: "More takes ·
+ * $0.56", the price of one take as the menu shows it, times `count`, so the two always agree.
+ */
 export function takesButton(
   words: string,
   id: MusicModelId,
@@ -228,7 +231,7 @@ export function takesButton(
   count: number,
 ): string {
   const price = takePrice(id, track)
-  return price === null ? words : `${words} · ${cents(price * count)}`
+  return price === null ? words : `${words} · ${cents((Math.round(price * 100) / 100) * count)}`
 }
 
 /** How long a take takes, and for a paid model what it costs: "about 1 min and $0.28 a take". */

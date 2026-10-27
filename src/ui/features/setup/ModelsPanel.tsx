@@ -166,7 +166,7 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
           {onThisComputer(shown) ? (
             <span className="free">Free</span>
           ) : (
-            <span className="price">{perMinuteWords(shown)}</span>
+            <span className="price">{perMinuteWords(shown) ?? 'Paid'}</span>
           )}
           {!here && <span className="warnline">{lacking(shown)}</span>}
           {pending && <span className="muted">Saving…</span>}

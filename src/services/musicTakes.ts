@@ -374,6 +374,7 @@ export function createMusicTakes({
           n: entry.n,
           message: entry.message,
           model: lineOf(entry.model),
+          modelId: entry.model,
         }))
       const models = await Promise.all(
         MUSIC_MODELS.map(async ({ id }) => ({ id, installed: await generator.installed(id) })),
