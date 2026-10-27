@@ -2105,6 +2105,13 @@ button.cue-chip[aria-expanded='true'] {
   border: 1px solid var(--line);
   width: fit-content;
 }
+.setup-notes {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .setup-steps {
   margin: 0;
   padding-left: 20px;

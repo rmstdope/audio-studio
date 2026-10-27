@@ -13,7 +13,8 @@ const STATE: Record<SetupCheck['state'], string> = {
 
 /**
  * What the studio needs on this machine and in the project, each checked with what to do about
- * it: ffmpeg, uv for Whisper, the Fish key, whether Fish answers, the refresh command.
+ * it: ffmpeg, uv for Whisper, the Fish key, whether Fish answers, the refresh command, the music
+ * generators, and the optional ElevenLabs key and account.
  */
 export function SetupView() {
   const setup = useSetup(true)
@@ -61,7 +62,10 @@ export function SetupView() {
   )
 }
 
-/** One row of the checklist: its state, what was found, a menu or a command, and numbered steps. */
+/**
+ * One row of the checklist: its state, what was found, further notes, a menu or a command, and
+ * numbered steps.
+ */
 export function SetupCheckRow({ check }: { check: SetupCheck }) {
   return (
     <li className="panel setup-check">
@@ -75,6 +79,13 @@ export function SetupCheckRow({ check }: { check: SetupCheck }) {
           {check.detail}
           {check.credit !== undefined && ` ${dollars(check.credit)}`}
         </span>
+        {check.notes && (
+          <ul className="setup-notes small muted">
+            {check.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        )}
         {check.tier && <TierMenu chosen={check.tier.chosen} />}
         {check.fix && <code className="setup-fix mono">{check.fix}</code>}
         {check.steps && (

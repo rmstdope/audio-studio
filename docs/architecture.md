@@ -144,7 +144,8 @@ audio-studio/
 │   │   ├── lineTakes.ts         a line's extra takes, as saved, and as listed
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
-│   │   ├── env.ts               the Fish API key, from the environment or the env file
+│   │   ├── env.ts               the Fish and ElevenLabs API keys, from the environment or the env file
+│   │   ├── elevenlabs.ts        ElevenLabsClient (subscription; more with step 14)
 │   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice, designVoice)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
@@ -1300,7 +1301,10 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   the project's model is a Stable Audio one, only the machine and uv) and, in a row of its own, the
   optional Stable Audio Open models in `~/.cache/stable-audio` ("Not set up" until they are there,
   "Needs attention" only when the project's music model is one that is missing, with three numbered
-  steps: accept the licence, make a read token, download), each with what to do about it.
+  steps: accept the licence, make a read token, download), and two optional ElevenLabs rows (§8.6):
+  its key ("Not set up" until there is one, saying where it goes) and its account (asked only with a
+  key: the plan, the characters left of its allowance and when they renew, what may be billed
+  beyond them, the voice slots used, and what the plan allows), each with what to do about it.
   Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
   the problems from a check at most five minutes old and never on a window focus, so the studio
   does not ask Fish more than it did. The CLI still warns about ffmpeg, and recording says so.
@@ -1532,8 +1536,8 @@ Small, independently useful increments:
        per language; the overview, All characters and the cards follow the language switch.
 14. **ElevenLabs** (§8.6), in small pull requests, each verified by hand by the user (no key in CI):
     1. **The plan**: §8.6, this step and decision 7.
-    2. **Key and account**: `ELEVENLABS_API_KEY`, the client with `subscription` only, Setup's two
-       optional rows. The user checks what the account draws on (allowance or dollars, and whether
+    2. **Key and account** (built): `ELEVENLABS_API_KEY`, the client with `subscription` only,
+       Setup's two optional rows. The user checks what the account draws on (allowance or dollars, and whether
        music and speech share it) and its concurrency, and the plan follows.
     3. **Ready for a second provider**: models and prices per provider with their unit (each stage
        validated and listed against its own provider), an optional music seed, the take queue by

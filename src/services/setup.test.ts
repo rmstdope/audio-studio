@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import type { ElevenAnswer } from '../core/setup'
 import type { CreditResult } from './fish'
 import { checkSetup, type Machine } from './setup'
 
@@ -21,6 +22,51 @@ const byId = (checks: { id: string; state: string }[]) =>
   Object.fromEntries(checks.map((c) => [c.id, c.state]))
 
 describe('checkSetup', () => {
+  it('asks ElevenLabs for the account only when its key is set', async () => {
+    let asked = 0
+    const account = async (): Promise<ElevenAnswer> => {
+      asked++
+      return {
+        ok: true,
+        account: {
+          tier: 'starter',
+          charactersUsed: 0,
+          characterLimit: 30000,
+          renewsAt: null,
+          overage: 0,
+          voiceSlots: { used: 0, limit: 10 },
+        },
+      }
+    }
+    const without = tempRepo({ 'audio-studio.json': projectJson() })
+    const none = await checkSetup(
+      join(without, 'audio-studio.json'),
+      credit,
+      mac,
+      {},
+      undefined,
+      account,
+    )
+    if (!none.ok) throw new Error('expected checks')
+    expect(asked).toBe(0)
+    expect(byId(none.checks)).toMatchObject({ elevenlabsKey: 'off', elevenlabs: 'off' })
+    const withKey = tempRepo({
+      'audio-studio.json': projectJson(),
+      '.env': 'ELEVENLABS_API_KEY=k\n',
+    })
+    const some = await checkSetup(
+      join(withKey, 'audio-studio.json'),
+      credit,
+      mac,
+      {},
+      undefined,
+      account,
+    )
+    if (!some.ok) throw new Error('expected checks')
+    expect(asked).toBe(1)
+    expect(byId(some.checks)).toMatchObject({ elevenlabsKey: 'ok', elevenlabs: 'ok' })
+  })
+
   it('finds the tools, the key in the env file, and asks Fish', async () => {
     const root = tempRepo({ 'audio-studio.json': projectJson(), '.env': 'FISH_AUDIO_API_KEY=k\n' })
     const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {})
@@ -35,6 +81,8 @@ describe('checkSetup', () => {
       refresh: 'off',
       music: 'off',
       stableAudio: 'off',
+      elevenlabsKey: 'off',
+      elevenlabs: 'off',
     })
   })
 
@@ -61,6 +109,8 @@ describe('checkSetup', () => {
       refresh: 'off',
       music: 'off',
       stableAudio: 'off',
+      elevenlabsKey: 'off',
+      elevenlabs: 'off',
     })
     expect(asked).toBe(0)
   })

@@ -1,6 +1,6 @@
 import { dirname } from 'node:path'
-import { setupChecks, type SetupCheck, type SetupFacts } from '../core/setup'
-import { fishApiKey } from './env'
+import { setupChecks, type ElevenAnswer, type SetupCheck, type SetupFacts } from '../core/setup'
+import { elevenLabsApiKey, fishApiKey } from './env'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS } from '../core/musicModels'
 import { missingStableAudio, STABLE_AUDIO_DIR } from './stableAudio'
 import { aceStepCheckpoints, aceStepReady } from './music'
@@ -26,8 +26,10 @@ const thisMachine: Machine = {
 
 /**
  * Checks what the studio needs on this machine and in the project (ffmpeg, uv for Whisper, the
- * music generator's models, the Fish key and whether Fish answers, the refresh command), each with a fix. `credit` is the
- * server's lookup of the account's credit (which asks Fish); it is called only when there is a key.
+ * music generator's models, the Fish key and whether Fish answers, the refresh command, and the
+ * optional ElevenLabs key and account), each with a fix. `credit` is the server's lookup of the
+ * Fish account's credit and `account` its lookup of the ElevenLabs account; each is called only
+ * when there is its key.
  */
 export async function checkSetup(
   projectFile: string,
@@ -35,6 +37,11 @@ export async function checkSetup(
   machine: Machine = thisMachine,
   environment: Record<string, string | undefined> = process.env,
   stableAudioDir: string = STABLE_AUDIO_DIR,
+  account: () => Promise<ElevenAnswer> = async () => ({
+    ok: false,
+    reason: 'no-key',
+    message: 'no key',
+  }),
 ): Promise<SetupResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -43,6 +50,7 @@ export async function checkSetup(
   const { narration } = project
   const checkpoints = aceStepCheckpoints(environment)
   const key = (await fishApiKey(root, project.env, environment)) !== null
+  const elevenKey = (await elevenLabsApiKey(root, project.env, environment)) !== null
   const facts: SetupFacts = {
     ffmpeg: machine.which('ffmpeg'),
     uv: machine.which('uv'),
@@ -66,6 +74,7 @@ export async function checkSetup(
           ).map(({ id }) => id),
         }
       : null,
+    elevenlabs: elevenKey ? await account() : { ok: false, reason: 'no-key', message: 'no key' },
   }
   return { ok: true, checks: setupChecks(facts) }
 }
