@@ -48,9 +48,10 @@ export interface PlayerState {
  * play replaced meanwhile is let be. `onChange` hears every change of state, `onFailed` the id of
  * each clip that failed; `dispose` ends it.
  *
- * With `options.fadeSeconds` every clip fades in, fades out before its natural end, and a stop
- * (or another clip started) fades it out before the element pauses; the state still changes at
- * once. Without it the element's volume is never touched.
+ * With `options.fadeSeconds`, a clip played with `fade: true` fades in, fades out before its
+ * natural end, and a stop (or another clip started) fades it out before the element pauses; the
+ * state still changes at once. A clip without the flag plays as it is and is cut on stop; with no
+ * `fadeSeconds` the element's volume is never touched.
  */
 export function createPlayer(
   element: AudioLike,
