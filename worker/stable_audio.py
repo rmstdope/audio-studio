@@ -1,6 +1,8 @@
 # /// script
 # requires-python = ">=3.10,<3.11"
 # dependencies = ["stable-audio-tools==0.0.20", "pytorch-lightning==2.5.5", "numpy<2", "soundfile"]
+# [tool.uv]
+# exclude-newer = "2026-10-27T00:00:00Z"
 # ///
 """Audio Studio's Stable Audio Open worker: makes one take of a track, the model loaded once.
 

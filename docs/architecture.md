@@ -1017,11 +1017,14 @@ says how many of the project's loops (`modelsView`'s `loops`) are longer. The me
 token is read) loads a model from its own folder in `~/.cache/stable-audio` (fixed, one named folder
 per model, downloaded by the user after accepting Stability AI's Community Licence); `createMusicRouter`
 sends each model to its family's worker and stops the other worker when the family changes, so only
-one holds memory. The worker pins its libraries: stable-audio-tools 0.0.20, with
-pytorch-lightning 2.5.5 (0.0.20 imports it without declaring it) and numpy below 2 (its PyWavelets
-1.4.1 is built for numpy 1); and it guides with plain classifier-free guidance (`apg_scale=0.0`),
-since 0.0.20's default APG needs float64, which the Mac's GPU lacks. Takes are shaped as ACE-Step's are and record the recipe `stable-audio-open-1.0` or
-`-small`. The times per take (40 s and 10 s) are estimates until measured on real takes. ACE-Step and Whisper share the one GPU
+one holds memory. The worker pins its libraries: stable-audio-tools 0.0.20, with pytorch-lightning
+2.5.5 (0.0.20 imports it without declaring it) and numpy below 2 (its PyWavelets 1.4.1 is built for
+numpy 1), and uv's `exclude-newer` holds the rest to the date they were last tried together, so a
+fresh install gets the libraries that made takes; `musicLive.test.ts` makes one take per downloaded
+model, opt-in. It guides with plain classifier-free guidance (`apg_scale=0.0`), since 0.0.20's
+default APG needs float64, which the Mac's GPU lacks. Takes are shaped as ACE-Step's are and record
+the recipe `stable-audio-open-1.0` or `-small`. The times per take (40 s and 10 s) are estimates
+until measured on real takes. ACE-Step and Whisper share the one GPU
 and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`, a process-wide
 `createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a Whisper check at a
 time. In the spike, with both loaded and running together, 42 of the 48 GB were in use (20 GB of it
