@@ -15,7 +15,8 @@ import { useMoveTake } from '../../api'
 /**
  * The dialog that moves a take to another track of the same kind: a search box (loops only), the
  * tracks of the game to pick from, and the move. It stays open with the reason when the move is
- * refused. Esc and Cancel close it with nothing changed; `onMoved` hears the answer of a move done.
+ * refused. Tab stays inside it; Esc and Cancel close it with nothing changed; `onMoved` hears the
+ * answer of a move done.
  */
 export function MoveTakeDialog({
   trackId,
@@ -78,6 +79,17 @@ export function MoveTakeDialog({
   // Focus starts at the same place when the dialog opens.
   useEffect(focusStart, [loops])
 
+  // A refused move leaves the dialog open, but the control pressed was greyed while it ran and
+  // lost the focus: it goes back to the pick, or Esc and Tab would stop working.
+  useEffect(() => {
+    if (!failure || pending) return
+    const pick = selected
+      ? root.current?.querySelector<HTMLElement>(`button[data-track="${CSS.escape(selected)}"]`)
+      : null
+    if (pick) pick.focus()
+    else focusStart()
+  }, [failure, pending])
+
   async function submit() {
     if (!selected || pending) return
     setFailure(null)
@@ -111,6 +123,29 @@ export function MoveTakeDialog({
       return
     }
     const target = event.target as HTMLElement
+    if (event.key === 'Tab') {
+      // Tab and Shift+Tab wrap at the dialog's edges, so the keyboard never leaves it for the page
+      // behind, where Esc would no longer close it. The dialog holds only inputs and buttons; a
+      // link or a `[tabindex]` added to it must join this list.
+      const controls = [
+        ...(root.current?.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button') ??
+          []),
+      ].filter((c) => !c.disabled)
+      const first = controls[0]
+      const last = controls.at(-1)
+      const outside = !controls.includes(target as HTMLInputElement | HTMLButtonElement)
+      const wrapTo = event.shiftKey
+        ? outside || target === first
+          ? last
+          : null
+        : outside || target === last
+          ? first
+          : null
+      // While a move is under way every control is greyed: Tab then goes nowhere.
+      if (wrapTo !== null) event.preventDefault()
+      wrapTo?.focus()
+      return
+    }
     const onRow = target.getAttribute('role') === 'option'
     if (event.key === 'Enter' && (onRow || target === search.current)) {
       event.preventDefault()
