@@ -105,19 +105,21 @@ function render(data: MusicTakesView, row: TrackRow = track) {
     [...container.querySelectorAll<HTMLButtonElement>('button')].find(
       (b) => b.textContent === name,
     )!
-  return { container, menu, button }
+  const count = () =>
+    container.querySelector<HTMLSelectElement>('select[aria-label="Number of new takes"]')!
+  return { container, menu, count, button }
 }
 
 describe('the Takes panel while the music lock cannot be read', () => {
   const why =
     'Choosing, dropping and moving wait until the music lock can be read. You can still listen and make more takes.'
 
-  it('says why above the cards and greys out Choose and Drop, leaving More takes alone', () => {
+  it('says why above the cards and greys out Choose and Drop, leaving Make 2 more takes alone', () => {
     const page = render(view({ lockUnread: true }))
     expect(page.container.textContent).toContain(why)
     expect(page.button('Choose').disabled).toBe(true)
     expect(page.button('Drop').disabled).toBe(true)
-    expect(page.button('More takes').disabled).toBe(false)
+    expect(page.button('Make 2 more takes').disabled).toBe(false)
   })
 
   it('says why as soon as the first take is being made', () => {
@@ -144,11 +146,12 @@ describe('the Takes panel while the music lock cannot be read', () => {
 })
 
 describe('the model menu on a track’s Takes panel', () => {
-  it('sits just before More takes, starting on the project’s model', () => {
+  it('sits just before Make 2 more takes, starting on the project’s model', () => {
     const page = render(view())
     const menu = page.menu()
     expect(menu.value).toBe('balanced')
-    expect(menu.nextElementSibling).toBe(page.button('More takes'))
+    expect(menu.nextElementSibling).toBe(page.count())
+    expect(page.count().nextElementSibling).toBe(page.button('Make 2 more takes'))
     expect([...menu.options].map((o) => o.textContent)).toEqual([
       'Balanced · XL turbo · 4B — about 3 min a take',
       'Quick · XL turbo · 1.7B — about 1¼ min a take',
@@ -160,11 +163,11 @@ describe('the model menu on a track’s Takes panel', () => {
     ])
   })
 
-  it('keeps the menu and More takes in one group apart from the heading, so they wrap together', () => {
+  it('keeps the menu and Make 2 more takes in one group apart from the heading, so they wrap together', () => {
     const page = render(view())
     const group = page.menu().parentElement!
     expect(group.className).toBe('takes-controls')
-    expect(group).toBe(page.button('More takes').parentElement!)
+    expect(group).toBe(page.button('Make 2 more takes').parentElement!)
     const heading = page.container.querySelector('h2')!
     expect(group.contains(heading)).toBe(false)
     expect(group.parentElement).toBe(heading.parentElement)
@@ -177,13 +180,14 @@ describe('the model menu on a track’s Takes panel', () => {
       page.menu().dispatchEvent(new Event('change', { bubbles: true }))
     })
     expect(posted).toEqual([])
-    await click(page.button('More takes'))
+    await click(page.button('Make 2 more takes'))
     expect(posted).toEqual([{ count: 2, model: 'quick' }])
   })
 
   it('is beside Make 2 takes when there are none, and the time follows the pick', async () => {
     const page = render(view({ takes: [] }))
-    expect(page.menu().nextElementSibling).toBe(page.button('Make 2 takes'))
+    expect(page.menu().nextElementSibling).toBe(page.count())
+    expect(page.count().nextElementSibling).toBe(page.button('Make 2 takes'))
     expect(page.container.textContent).toContain(
       'Each take is new music made from the brief, about 3 minutes each.',
     )
@@ -211,12 +215,12 @@ describe('the model menu on a track’s Takes panel', () => {
     expect(page.container.textContent).toContain(
       "Careful isn't on this computer. Pick another model for these takes, or see Setup for how to download it.",
     )
-    expect(page.button('More takes').disabled).toBe(true)
+    expect(page.button('Make 2 more takes').disabled).toBe(true)
     act(() => {
       page.menu().value = 'quick'
       page.menu().dispatchEvent(new Event('change', { bubbles: true }))
     })
-    expect(page.button('More takes').disabled).toBe(false)
+    expect(page.button('Make 2 more takes').disabled).toBe(false)
     expect(page.container.textContent).not.toContain("Careful isn't on this computer")
   })
 
@@ -244,7 +248,7 @@ describe('the model menu on a track’s Takes panel', () => {
       }),
     )
     expect(page.menu().disabled).toBe(true)
-    expect(page.button('More takes').disabled).toBe(true)
+    expect(page.button('Make 2 more takes').disabled).toBe(true)
     const cards = [...page.container.querySelectorAll('.take')].map((c) => c.textContent!)
     expect(cards).toHaveLength(3)
     expect(cards[0]).toContain('Balanced · XL turbo · 4B')
@@ -256,7 +260,7 @@ describe('the model menu on a track’s Takes panel', () => {
   it('stays disabled for making when the generator is not installed at all, but is shown', () => {
     const page = render(view({ generator: { ok: false, message: 'none' } }))
     expect(page.menu()).not.toBeNull()
-    expect(page.button('More takes').disabled).toBe(true)
+    expect(page.button('Make 2 more takes').disabled).toBe(true)
     expect(page.container.textContent).not.toContain("isn't on this computer. Pick another")
   })
 
@@ -335,13 +339,13 @@ describe('the Stable Audio models in a track’s menu', () => {
     expect(page.container.querySelector('.takes-missing')!.textContent).toBe(
       'Short makes loops up to 27 s, and this one is 0:30. Pick another model for these takes.',
     )
-    expect(page.button('More takes').disabled).toBe(true)
+    expect(page.button('Make 2 more takes').disabled).toBe(true)
     act(() => {
       page.menu().value = 'quick'
       page.menu().dispatchEvent(new Event('change', { bubbles: true }))
     })
     expect(page.container.querySelector('.takes-missing')).toBeNull()
-    expect(page.button('More takes').disabled).toBe(false)
+    expect(page.button('Make 2 more takes').disabled).toBe(false)
   })
 
   it('disables Make 2 takes the same way when there are no takes', () => {
@@ -354,7 +358,7 @@ describe('the Stable Audio models in a track’s menu', () => {
 
   it('follows a length changed on the page: the pick stays and the line appears', () => {
     const page = render(view({ defaultModel: 'short' }), shortLoop)
-    expect(page.button('More takes').disabled).toBe(false)
+    expect(page.button('Make 2 more takes').disabled).toBe(false)
     expect(page.container.querySelector('.takes-missing')).toBeNull()
   })
 
@@ -366,7 +370,7 @@ describe('the Stable Audio models in a track’s menu', () => {
     expect(page.container.querySelector('.takes-missing')!.textContent).toBe(
       "Short isn't on this computer. Pick another model for these takes, or see Setup for how to download it.",
     )
-    expect(page.button('More takes').disabled).toBe(true)
+    expect(page.button('Make 2 more takes').disabled).toBe(true)
   })
 })
 
@@ -465,13 +469,144 @@ describe('the banner when no music can be made', () => {
   })
 })
 
+/** Picks an entry of a menu, as a person does. */
+function pick(menu: HTMLSelectElement, value: string) {
+  act(() => {
+    menu.value = value
+    menu.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+}
+
+describe('the count menu on a track’s Takes panel', () => {
+  const entries = (menu: HTMLSelectElement) => [...menu.options].map((o) => o.textContent)
+
+  it('lists 1 take to 6 takes, starting at 2, with no price on a free model', () => {
+    const page = render(view())
+    expect(entries(page.count())).toEqual([
+      '1 take',
+      '2 takes',
+      '3 takes',
+      '4 takes',
+      '5 takes',
+      '6 takes',
+    ])
+    expect(page.count().value).toBe('2')
+  })
+
+  it('shows every total on a paid model, and only the count when closed', () => {
+    const page = render(view({ defaultModel: 'eleven' }))
+    expect(entries(page.count())).toEqual([
+      '1 take · $0.13',
+      '2 takes · $0.26',
+      '3 takes · $0.39',
+      '4 takes · $0.52',
+      '5 takes · $0.65',
+      '6 takes · $0.78',
+    ])
+    // The closed menu shows the chosen entry's count; the list, once open, shows every total.
+    expect([...page.count().options].map((o) => o.getAttribute('label'))).toEqual([
+      null,
+      '2 takes',
+      null,
+      null,
+      null,
+      null,
+    ])
+    act(() => {
+      page.count().dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    })
+    expect(page.count().selectedOptions[0]!.getAttribute('label')).toBeNull()
+  })
+
+  it('names the count on the button, and the total on a paid model, later or first batch', () => {
+    const later = render(view({ defaultModel: 'eleven' }))
+    pick(later.count(), '3')
+    expect(later.button('Make 3 more takes · $0.39')).toBeDefined()
+    pick(later.count(), '1')
+    expect(later.button('Make 1 more take · $0.13')).toBeDefined()
+    const first = render(view({ takes: [] }))
+    pick(first.count(), '3')
+    expect(first.button('Make 3 takes')).toBeDefined()
+    pick(first.count(), '1')
+    expect(first.button('Make 1 take')).toBeDefined()
+  })
+
+  it('asks for exactly that many takes, later or first batch, then goes back to 2', async () => {
+    const later = render(view())
+    pick(later.count(), '5')
+    await click(later.button('Make 5 more takes'))
+    expect(posted).toEqual([{ count: 5, model: 'balanced' }])
+    expect(later.count().value).toBe('2')
+    posted.length = 0
+    const first = render(view({ takes: [] }))
+    pick(first.count(), '6')
+    await click(first.button('Make 6 takes'))
+    expect(posted).toEqual([{ count: 6, model: 'balanced' }])
+    expect(first.count().value).toBe('2')
+  })
+
+  it('is greyed from the press until the answer, so no pick can outlive the reset', async () => {
+    let answer: (response: Response) => void = () => {}
+    globalThis.fetch = (() =>
+      new Promise<Response>((resolve) => (answer = resolve))) as unknown as typeof fetch
+    const page = render(view())
+    await act(async () => {
+      page.button('Make 2 more takes').click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(page.count().disabled).toBe(true)
+    await act(async () => answer(new Response(JSON.stringify({ ok: true }))))
+  })
+
+  it('keeps the count when the model changes, and the prices follow', () => {
+    const page = render(view())
+    pick(page.count(), '4')
+    pick(page.menu(), 'eleven')
+    expect(page.count().value).toBe('4')
+    expect(page.button('Make 4 more takes · $0.52')).toBeDefined()
+  })
+
+  it('starts at 2 again on a fresh page', () => {
+    const first = render(view())
+    pick(first.count(), '6')
+    expect(render(view()).count().value).toBe('2')
+  })
+
+  it('is greyed while takes are being made, and usable when the model cannot make the track', () => {
+    const making = [
+      { n: 2, state: 'making' as const, elapsed: 5, model: 'Balanced', expected: 75, paid: false },
+    ]
+    expect(render(view({ making })).count().disabled).toBe(true)
+    const short = render(view({ defaultModel: 'short' }))
+    expect(short.button('Make 2 more takes').disabled).toBe(true)
+    expect(short.count().disabled).toBe(false)
+  })
+
+  it('has a name for a screen reader, and leaves Try again as one take', () => {
+    const page = render(
+      view({ failed: [{ n: 2, message: 'x', model: 'm', modelId: 'balanced' as const }] }),
+    )
+    expect(page.count().getAttribute('aria-label')).toBe('Number of new takes')
+    expect(
+      [...page.container.querySelectorAll('.errbox button')].map((b) => b.textContent),
+    ).toEqual(['Try again'])
+  })
+
+  it('says to make more takes to hear a changed brief', () => {
+    const page = render(view(), { ...track, status: 'changed', changed: ['brief'] } as TrackRow)
+    expect(page.container.textContent).toContain(
+      'The game plays the chosen take until you choose another. Make more takes to hear the new brief.',
+    )
+  })
+})
+
 describe('what Eleven Music takes cost, on the panel', () => {
-  it('puts the price of the two takes on More takes and Make 2 takes, and none on a free model', () => {
+  it('puts the price of the two takes on Make 2 more takes and Make 2 takes, and none on a free model', () => {
     const paid = render(view({ defaultModel: 'eleven' }))
-    expect(paid.button('More takes · $0.26')).toBeDefined()
+    expect(paid.button('Make 2 more takes · $0.26')).toBeDefined()
     const empty = render(view({ defaultModel: 'eleven', takes: [] }))
     expect(empty.button('Make 2 takes · $0.26')).toBeDefined()
-    expect(render(view()).button('More takes')).toBeDefined()
+    expect(render(view()).button('Make 2 more takes')).toBeDefined()
   })
 
   it('warns on Stop that a take stopped in the cloud may still be billed, only while one is made', () => {
@@ -500,6 +635,6 @@ describe('what Eleven Music takes cost, on the panel', () => {
 
   it('prices two takes as twice the price of one, as the menu shows it', () => {
     const page = render(view({ defaultModel: 'eleven' }))
-    expect(page.button('More takes · $0.26')).toBeDefined()
+    expect(page.button('Make 2 more takes · $0.26')).toBeDefined()
   })
 })

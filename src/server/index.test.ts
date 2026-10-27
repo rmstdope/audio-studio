@@ -3320,6 +3320,7 @@ describe('server, a track’s takes', () => {
   it('makes takes from the studio’s own page only, and refuses a body that is not a request', async () => {
     expect((await make({ count: 2 }, 'https://evil.example')).status).toBe(403)
     expect((await make({ count: 0 })).status).toBe(400)
+    expect((await make({ count: 7 })).status).toBe(400)
     expect((await make({ count: 50 })).status).toBe(400)
     expect((await make('two')).status).toBe(400)
   })

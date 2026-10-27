@@ -17,6 +17,8 @@ import {
   modelOfRecipe,
   musicModel,
   takePrice,
+  makeTakesWords,
+  takeCountEntry,
   takesButton,
   perMinuteWords,
 } from './musicModels'
@@ -226,6 +228,26 @@ describe('what a take costs', () => {
     expect(takesButton('More takes', 'eleven', loop90, 2)).toBe('More takes · $0.56')
     expect(takesButton('Make 2 takes', 'eleven', stinger, 2)).toBe('Make 2 takes · $0.06')
     expect(takesButton('More takes', 'balanced', loop90, 2)).toBe('More takes')
+  })
+})
+
+describe('the count menu and the make button', () => {
+  const loop90 = { kind: 'loop', seconds: 90 } as const
+  test('a count entry says the count, singular for one, and the total on a paid model', () => {
+    expect(takeCountEntry(1, 'balanced', loop90)).toBe('1 take')
+    expect(takeCountEntry(6, 'balanced', loop90)).toBe('6 takes')
+    expect(takeCountEntry(1, 'eleven', loop90)).toBe('1 take · $0.28')
+    expect(takeCountEntry(3, 'eleven', loop90)).toBe('3 takes · $0.84')
+    expect(takeCountEntry(6, 'eleven', loop90)).toBe('6 takes · $1.68')
+  })
+  test('the make button names the count, first batch or later', () => {
+    expect(makeTakesWords(3, false)).toBe('Make 3 takes')
+    expect(makeTakesWords(1, false)).toBe('Make 1 take')
+    expect(makeTakesWords(3, true)).toBe('Make 3 more takes')
+    expect(makeTakesWords(1, true)).toBe('Make 1 more take')
+    expect(takesButton(makeTakesWords(3, true), 'eleven', loop90, 3)).toBe(
+      'Make 3 more takes · $0.84',
+    )
   })
 })
 

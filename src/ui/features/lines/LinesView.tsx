@@ -32,7 +32,7 @@ import { longTitle, plural, shortTitle } from '../../format'
 import { cueButtonTitle, cueHint, cueNote, noDialogPanel } from '../../languages'
 import { bandsBefore, sceneCueWithoutOwn, tableRows } from '../../sceneBands'
 import { SceneBand } from './SceneBand'
-import { partOnlyProblems } from '../../problems'
+import { notShown } from '../../problems'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
@@ -330,7 +330,7 @@ export function LinesView({
     { id: 'all', label: 'All', count: loaded.lines.length },
   ]
   const speakers = [...new Set(loaded.lines.map((l) => l.speaker))].sort()
-  const ownProblems = partOnlyProblems(loaded.problems, summary.problems)
+  const ownProblems = notShown(loaded.problems, summary.problems)
 
   return (
     <>
@@ -398,6 +398,7 @@ export function LinesView({
         language={several ? active : null}
         speaker={speaker || null}
         models={loaded.stages}
+        shown={[...summary.problems, ...ownProblems]}
       />
 
       {filter === 'orphans' ? (

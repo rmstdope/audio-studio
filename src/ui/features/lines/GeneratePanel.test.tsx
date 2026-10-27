@@ -1,6 +1,7 @@
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { GenerationPlan } from '../../../core/generation'
+import type { Problem } from '../../../core/project'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -89,6 +90,7 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
               finalStep: false,
               both: false,
             },
+            shown: [],
           }),
         ),
       ),
@@ -133,6 +135,7 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
               finalStep: true,
               both: true,
             },
+            shown: [],
           }),
         ),
       ),
@@ -147,6 +150,73 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
     expect(container.textContent).toContain(
       'The final recording records every line whose clip was not made with its voice’s final model yet; draft plans leave final clips alone.',
     )
+    await act(() => page.unmount())
+  })
+})
+
+describe('GeneratePanel, when generation cannot be planned', () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+    document.body.innerHTML = ''
+  })
+
+  const cast = {
+    file: 'tts/cast.json',
+    path: 'speakers.narrator.voice',
+    message: 'speakers.narrator.voice must be text (it is a number)',
+  }
+  const cues = { file: 'tts/act1/en/cues.json', path: '', message: 'is not JSON' }
+
+  /** Renders the panel over a plan that fails with `problems`, the page having shown `shown`. */
+  async function failedPlan(problems: Problem[], shown: Problem[]) {
+    globalThis.fetch = (async (path: string) =>
+      path.startsWith('/api/parts/act1/plan')
+        ? Response.json({ ok: false, problems })
+        : new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(GeneratePanel, {
+            partId: 'act1',
+            language: null,
+            speaker: null,
+            models: {
+              draft: 's2.1-pro-free',
+              final: 's2.1-pro-free',
+              finalStep: false,
+              both: false,
+            },
+            shown,
+          }),
+        ),
+      ),
+    )
+    await until(() => !(container.textContent ?? '').includes('Planning'))
+    return { container, page }
+  }
+
+  it('does not repeat a problem the page already shows above it', async () => {
+    const { container, page } = await failedPlan([cast, cues], [cast, cues])
+    expect(container.textContent).not.toContain(cast.message)
+    expect(container.textContent).not.toContain(cues.message)
+    expect(container.textContent).toContain(
+      'Generation cannot be planned until the problems above are fixed.',
+    )
+    await act(() => page.unmount())
+  })
+
+  it('still lists a problem the page does not show', async () => {
+    const { container, page } = await failedPlan([cast, cues], [cast])
+    expect(container.textContent).toContain('Generation cannot be planned')
+    expect(container.textContent).toContain(cues.message)
+    expect(container.textContent).not.toContain(cast.message)
+    expect(container.textContent).not.toContain('until the problems above are fixed')
     await act(() => page.unmount())
   })
 })

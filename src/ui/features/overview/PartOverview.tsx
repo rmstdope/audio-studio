@@ -14,7 +14,7 @@ import { StatusBar, StatusDot } from '../../components/StatusBar'
 import { longTitle, plural, shortTitle } from '../../format'
 import { sceneOfKey } from '../../../core/resources'
 import { cueTargets, type CueTarget } from '../../cueTargets'
-import { partOnlyProblems } from '../../problems'
+import { notShown } from '../../problems'
 import { routeHref } from '../../route'
 import { REASON, STATUS, reasonCounts } from '../../status'
 
@@ -35,7 +35,7 @@ export function PartOverview({
   const hasDialog = part.dialog === 'ok'
   const detail = usePart(part.id, hasDialog || several, asked)
   const loaded = detail.data?.ok ? detail.data.part : null
-  const ownProblems = loaded ? partOnlyProblems(loaded.problems, summary.problems) : []
+  const ownProblems = loaded ? notShown(loaded.problems, summary.problems) : []
   const toRecord = loaded ? loaded.counts.missing + loaded.counts.stale : 0
   const refresh = useRefreshDialog(part.id)
   // Another language than the source may have no dialog yet, whatever the source has.
