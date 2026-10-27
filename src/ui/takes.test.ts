@@ -116,7 +116,25 @@ describe('extraTakeWords', () => {
 describe('takeAnswerState', () => {
   it('asks to pay the ceiling rounded up to the cent', () => {
     const asked = { ok: false as const, reason: 'confirm' as const, ceiling: 0.0151, message: 'm' }
-    expect(takeAnswerState(asked)).toEqual({ toConfirm: 0.02, refusal: null })
+    expect(takeAnswerState(asked)).toEqual({
+      toConfirm: { unit: 'usd', amount: 0.02 },
+      refusal: null,
+    })
+  })
+
+  it('asks to use the credits of a take with an ElevenLabs voice, and shows the plan’s refusal', () => {
+    const asked = {
+      ok: false as const,
+      reason: 'confirm-credits' as const,
+      ceiling: 5,
+      message: 'm',
+    }
+    expect(takeAnswerState(asked)).toEqual({
+      toConfirm: { unit: 'credits', amount: 5 },
+      refusal: null,
+    })
+    const short = { ok: false as const, reason: 'credits' as const, message: 'Not enough left.' }
+    expect(takeAnswerState(short)).toEqual({ toConfirm: null, refusal: 'Not enough left.' })
   })
 
   it('shows a refusal to spend, and asks nothing', () => {

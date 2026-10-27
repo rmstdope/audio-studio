@@ -1,7 +1,7 @@
 import { FREE_MODELS } from '../core/project'
 import { providerOf } from '../core/voices'
 import type { TakeLineResult } from '../services/lineTakes'
-import { centsUp } from './format'
+import { agreedOf, type Agreed } from './agreed'
 
 /** The part of an answer about the board that takes belong to. */
 interface WithTakes {
@@ -98,17 +98,19 @@ export function extraTakeWords(model: string): { empty: string; hover: string } 
 }
 
 /**
- * What the page does with the server's answer to Another take: the amount to ask the user to pay
- * (rounded up to the cent, as Record's is), or the refusal to spend to show under the button.
+ * What the page does with the server's answer to Another take: the amount to ask the user to agree
+ * to (dollars rounded up to the cent, as Record's are, or ElevenLabs credits), or the refusal to
+ * spend to show under the button.
  * Any other failure is shown by the takes list itself.
  */
 export function takeAnswerState(answer: NonNullable<TakeLineResult>): {
-  toConfirm: number | null
+  toConfirm: Agreed | null
   refusal: string | null
 } {
   if (answer.ok || !('reason' in answer)) return { toConfirm: null, refusal: null }
-  if (answer.reason === 'confirm') return { toConfirm: centsUp(answer.ceiling), refusal: null }
-  if (answer.reason === 'credit' || answer.reason === 'price') {
+  const toConfirm = agreedOf(answer)
+  if (toConfirm) return { toConfirm, refusal: null }
+  if (answer.reason === 'credit' || answer.reason === 'credits' || answer.reason === 'price') {
     return { toConfirm: null, refusal: answer.message }
   }
   return { toConfirm: null, refusal: null }

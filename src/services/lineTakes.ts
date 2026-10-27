@@ -6,7 +6,7 @@ import { LineTakeSchema, takesView, type LineTake, type LineTakeView } from '../
 import { resolveInRoot } from '../core/paths'
 import { partCacheName, type Problem } from '../core/project'
 import type { Line } from '../core/resources'
-import type { Budget, SpendProblem } from '../core/spend'
+import { createBudget, type Budget, type SpendProblem } from '../core/spend'
 import type { FishFactory } from './auditions'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { characterFile, listFiles, readJson, writeAtomic } from './files'
@@ -21,7 +21,12 @@ import {
 } from './narration'
 import type { ElevenLabsFactory } from './elevenlabs'
 import type { Transcriber } from './transcriber'
+import { DEFAULT_ELEVEN_MODEL } from '../core/elevenSpeech'
+import { providerOf } from '../core/voices'
 import { openProject, readPart, type PartRead, type ProjectFailure } from './workspace'
+
+/** The ElevenLabs budget of a take given none: nothing may be spent. */
+const NO_CREDITS = createBudget({ model: DEFAULT_ELEVEN_MODEL, dollars: 0 })
 
 /** Where a line's extra takes are kept, in the project's tool cache: a folder per part and line. */
 const LINE_TAKES_DIR = '.audio-studio/line-takes'
@@ -65,7 +70,8 @@ export async function listLineTakes(
 
 /**
  * Records one more take of a line into the tool cache, with the draft model, charged to `budget`
- * (a zero one for the free model; a paid model's is what the user confirmed), checked by Whisper
+ * (a zero one for the free model; a paid model's is what the user confirmed), or to `credits` for
+ * a line with an ElevenLabs voice, checked by Whisper
  * when the project checks takes. The take is kept as a WAV beside what was made of it; nothing
  * of the game's is written
  * until the user chooses it (`useLineTake`).
@@ -77,14 +83,21 @@ export async function takeLine(
   fishFor: FishFactory,
   {
     limiter,
+    elevenLimiter = limiter,
     transcriber = null,
     budget,
+    credits = NO_CREDITS,
     language,
     elevenlabs,
   }: {
+    /** Fish's limiter, and ElevenLabs' (Fish's when absent): a take waits for its provider's. */
     limiter: Limiter
+    elevenLimiter?: Limiter
     transcriber?: Transcriber | null
+    /** What a Fish line's take may spend, in dollars. */
     budget: Budget
+    /** What an ElevenLabs line's take may spend, in credits; none when absent. */
+    credits?: Budget
     language?: string
     /** The ElevenLabs client, for a line with an ElevenLabs voice. */
     elevenlabs?: ElevenLabsFactory
@@ -114,14 +127,15 @@ export async function takeLine(
   })
   if (!speaker.ok) return speaker
   const id = randomBytes(8).toString('hex')
+  const eleven = providerOf(inputs.voice) === 'elevenlabs'
   const spoken = await speakLine({
     speak: speaker.speak,
     line,
     inputs,
     cast: read.input.cast,
     narration,
-    budget,
-    limiter,
+    budget: eleven ? credits : budget,
+    limiter: eleven ? elevenLimiter : limiter,
     limiterKey: `line-take\n${projectFile}\n${partId}\n${read.language}\n${key}\n${id}`,
   })
   if (!spoken.ok) return spoken

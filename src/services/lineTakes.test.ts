@@ -10,7 +10,7 @@ import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import type { ElevenLabsClient } from './elevenlabs'
 import type { FishClient, TtsRequest } from './fish'
-import { createLimiter } from './limit'
+import { createLimiter, type Limiter } from './limit'
 import { dropLineTake, lineTakeFile, listLineTakes, takeLine, useLineTake } from './lineTakes'
 import type { Transcriber } from './transcriber'
 import { loadPart } from './workspace'
@@ -404,7 +404,8 @@ describe('takeLine, with an ElevenLabs voice', () => {
     const run = (root: string, client: ElevenLabsClient | null) =>
       takeLine(projectFileOf(root), 'act1', 'k1', async () => fakeFish().fish, {
         limiter: createLimiter(),
-        budget: createBudget({ model: 'eleven_v3', dollars: 100 }),
+        budget: createBudget({ model: 's2.1-pro-free', dollars: 0 }),
+        credits: createBudget({ model: 'eleven_v3', dollars: 100 }),
         elevenlabs: async () => client,
       })
     expect(await run(tempRepo(elevenFiles), eleven)).toMatchObject({ ok: false, reason: 'speed' })
@@ -415,5 +416,35 @@ describe('takeLine, with an ElevenLabs voice', () => {
     expect(await run(calm, null)).toMatchObject({ ok: false, reason: 'no-key' })
     expect(await run(calm, eleven)).toMatchObject({ ok: true })
     expect(asked).toEqual(['abc'])
+  })
+})
+
+describe('takeLine, its provider’s budget and slots', () => {
+  it('charges an ElevenLabs line to the credits and waits for ElevenLabs’ slots, never Fish’s', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:abc' } }, pronounce: {} },
+    })
+    const used: string[] = []
+    const watched = (name: string): Limiter => ({
+      run: (_key, _limit, job) => (used.push(name), job()),
+    })
+    const eleven: ElevenLabsClient = {
+      subscription: () => Promise.reject(new Error('not used')),
+      music: () => Promise.reject(new Error('not used')),
+      voice: () => Promise.reject(new Error('not used')),
+      tts: async () => silence(1),
+    }
+    const credits = createBudget({ model: 'eleven_v3', dollars: 100 })
+    const result = await takeLine(projectFileOf(root), 'act1', 'k1', async () => fakeFish().fish, {
+      limiter: watched('fish'),
+      elevenLimiter: watched('elevenlabs'),
+      budget: createBudget({ model: 's2-pro', dollars: 5 }),
+      credits,
+      elevenlabs: async () => eleven,
+    })
+    expect(result).toMatchObject({ ok: true })
+    expect(used).toEqual(['elevenlabs'])
+    expect(credits.left).toBeLessThan(100)
   })
 })

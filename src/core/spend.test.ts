@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { createBudget, spendProblem } from './spend'
+import { createBudget, creditProblem, creditsLeft, spendProblem } from './spend'
 
 describe('spendProblem', () => {
   it('lets a free job go without anything confirmed', () => {
@@ -168,5 +168,53 @@ describe('what a budget is counted in', () => {
         at,
       ),
     ).toBe('this would go past the confirmed budget (2.5 credits left); plan again')
+  })
+})
+
+describe('creditProblem', () => {
+  it('lets a job that takes no credits go', () => {
+    expect(creditProblem({ ceiling: 0 })).toBeNull()
+  })
+
+  it('asks to confirm the credits, and lets them go once confirmed and covered by the plan', () => {
+    expect(creditProblem({ ceiling: 1200, left: 5000 })).toEqual({
+      reason: 'confirm-credits',
+      ceiling: 1200,
+      message: 'This takes up to 1200 credits of your ElevenLabs plan; confirm it to go ahead.',
+    })
+    expect(creditProblem({ ceiling: 1200, confirmed: 1199, left: 5000 })).toMatchObject({
+      reason: 'confirm-credits',
+    })
+    expect(creditProblem({ ceiling: 1200, confirmed: 1200, left: 5000 })).toBeNull()
+    expect(creditProblem({ ceiling: 1200, confirmed: 1200, left: Infinity })).toBeNull()
+  })
+
+  it('refuses what the plan does not cover, or when what is left is unknown', () => {
+    expect(creditProblem({ ceiling: 1200, confirmed: 1200, left: 800 })).toEqual({
+      reason: 'credits',
+      message:
+        'This takes up to 1200 credits, more than the 800 credits left on your ElevenLabs plan.',
+    })
+    expect(creditProblem({ ceiling: 1200, confirmed: 1200, left: null })).toEqual({
+      reason: 'credits',
+      message: 'What is left of your ElevenLabs plan is unknown, so nothing is recorded.',
+    })
+  })
+})
+
+describe('creditsLeft', () => {
+  const account = {
+    tier: 'starter',
+    charactersUsed: 2550,
+    characterLimit: 30000,
+    renewsAt: null,
+    overage: 0,
+    voiceSlots: { used: 0, limit: 10 },
+  } as const
+  it('is what the plan includes and has not used, and the overage allowed beyond it', () => {
+    expect(creditsLeft(account)).toBe(27450)
+    expect(creditsLeft({ ...account, overage: 1000 })).toBe(28450)
+    expect(creditsLeft({ ...account, overage: 'unlimited' })).toBe(Infinity)
+    expect(creditsLeft({ ...account, charactersUsed: 31000 })).toBe(0)
   })
 })

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { payWords } from '../../agreed'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary, ProjectSummary } from '../../../core/summary'
 import {
@@ -26,7 +27,7 @@ import { LineTakes } from './LineTakes'
 import { canCompare } from '../../heard'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { displayName } from '../../../core/summary'
-import { dollars, longTitle, plural, shortTitle } from '../../format'
+import { longTitle, plural, shortTitle } from '../../format'
 import { cueButtonTitle, cueHint, cueNote, noDialogPanel } from '../../languages'
 import { bandsBefore, sceneCueWithoutOwn, tableRows } from '../../sceneBands'
 import { SceneBand } from './SceneBand'
@@ -567,7 +568,11 @@ export function LinesView({
                               <button
                                 type="button"
                                 className="btn btn-primary row-record"
-                                title="The most this line can cost on your Fish account (every take)"
+                                title={
+                                  recorder.toConfirm[line.key]!.unit === 'usd'
+                                    ? 'The most this line can cost on your Fish account (every take)'
+                                    : 'The most this line can take of your ElevenLabs plan (every take)'
+                                }
                                 onClick={() =>
                                   void recorder.record(
                                     line.key,
@@ -576,7 +581,7 @@ export function LinesView({
                                   )
                                 }
                               >
-                                Pay up to {dollars(recorder.toConfirm[line.key]!)}
+                                {payWords(recorder.toConfirm[line.key]!)}
                               </button>
                               <button
                                 type="button"

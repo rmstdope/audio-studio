@@ -2,7 +2,8 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Voice } from '../src/core/voiceSearch'
-import type { ElevenLabsClient } from '../src/services/elevenlabs'
+import type { ElevenAccount } from '../src/core/setup'
+import type { ElevenLabsClient, SpeechRequest } from '../src/services/elevenlabs'
 
 /** A minimal valid project file; override any top-level key. */
 export function projectJson(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -40,19 +41,24 @@ export function tempRepo(files: Record<string, unknown>): string {
 }
 
 /**
- * An ElevenLabs client that knows `voices` (by ElevenLabs' own id) and nothing else: anything
- * else it is asked rejects. `asked` lists the voices looked up.
+ * An ElevenLabs client that knows `voices` (by ElevenLabs' own id), speaks with `speak` and has
+ * `account`, when given; anything else it is asked rejects. `asked` lists the voices looked up,
+ * `spoken` the speech asked for.
  */
-export function fakeEleven(voices: Record<string, Voice> = {}): {
-  client: ElevenLabsClient
-  asked: string[]
-} {
+export function fakeEleven(
+  voices: Record<string, Voice> = {},
+  {
+    speak,
+    account,
+  }: { speak?: () => Uint8Array | Promise<Uint8Array>; account?: ElevenAccount } = {},
+): { client: ElevenLabsClient; asked: string[]; spoken: SpeechRequest[] } {
   const asked: string[] = []
+  const spoken: SpeechRequest[] = []
   const unused = () => Promise.reject(new Error('not used'))
   const client: ElevenLabsClient = {
-    subscription: unused,
+    subscription: account ? async () => account : unused,
     music: unused,
-    tts: unused,
+    tts: speak ? async (request) => (spoken.push(request), await speak()) : unused,
     async voice(id) {
       asked.push(id)
       const found = voices[id]
@@ -61,7 +67,7 @@ export function fakeEleven(voices: Record<string, Voice> = {}): {
       return found
     },
   }
-  return { client, asked }
+  return { client, asked, spoken }
 }
 
 /** An ElevenLabs voice as the client gives it: George, with a preview. */

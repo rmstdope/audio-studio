@@ -3873,3 +3873,273 @@ describe('casting an ElevenLabs voice', () => {
     })
   })
 })
+
+describe('recording an ElevenLabs voice’s lines', () => {
+  const account = {
+    tier: 'starter',
+    charactersUsed: 29_000,
+    characterLimit: 30_000,
+    renewsAt: null,
+    overage: 0,
+    voiceSlots: { used: 1, limit: 10 },
+  }
+  /** A part with the narrator on ElevenLabs and Mira on Fish, and a server for it. */
+  function studio(
+    left = account,
+    { gate, fishCredit, draft }: { gate?: Promise<void>; fishCredit?: number; draft?: string } = {},
+  ) {
+    const where = tempRepo({
+      'audio-studio.json': draft
+        ? projectJson({
+            narration: {
+              ...(projectJson().narration as object),
+              models: { audition: 's2.1-pro-free', draft, final: draft },
+            },
+          })
+        : projectJson(),
+      'tts/cast.json': {
+        speakers: { narrator: { voice: 'eleven:g1' }, mira: { voice: 'w1' } },
+        pronounce: {},
+      },
+      'tts/act1/script.json': [
+        { key: 'a', speaker: 'narrator', text: 'Once.' },
+        { key: 'b', speaker: 'mira', text: 'Twice.' },
+      ],
+    })
+    let spokenSoFar = 0
+    const eleven = fakeEleven(
+      {},
+      {
+        account: left,
+        // Only the first speech waits for the gate, so later ones can run while it holds.
+        speak: async () => {
+          if (spokenSoFar++ === 0) await gate
+          return writeWav({
+            format: { channels: 1, sampleRate: 1000, bitsPerSample: 16 },
+            data: new Uint8Array(2000),
+          })
+        },
+      },
+    )
+    const fishAsked: string[] = []
+    const watching: FishClient = {
+      ...fish,
+      tts: (request) => (fishAsked.push(request.voice), fish.tts(request)),
+      ...(fishCredit === undefined ? {} : { credit: async () => fishCredit }),
+    }
+    let accountAsked = 0
+    const counted: ElevenLabsClient = {
+      ...eleven.client,
+      subscription: () => (accountAsked++, eleven.client.subscription()),
+    }
+    const running = startServer({
+      projectFile: join(where, 'audio-studio.json'),
+      port: 0,
+      fish: watching,
+      encode,
+      transcriber: null,
+      elevenlabs: counted,
+    })
+    const post = (path: string, body: unknown = {}) =>
+      fetch(new URL(path, running.url), {
+        method: 'POST',
+        headers: { origin: running.url.origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    const get = async (path: string) => (await fetch(new URL(path, running.url))).json()
+    return { running, post, get, eleven, fishAsked, accountAsked: () => accountAsked }
+  }
+
+  it('plans the ElevenLabs lines in credits, with what is left of the plan', async () => {
+    const { running, get } = studio()
+    try {
+      const planned = await get('/api/parts/act1/plan')
+      // "Once." is five characters, a credit each, up to three takes.
+      expect(planned.plan.eleven).toEqual({
+        keys: ['a'],
+        model: 'eleven_v3',
+        characters: 5,
+        credits: 5,
+        ceiling: 15,
+      })
+      expect(planned.plan.keys).toEqual(['a', 'b'])
+      expect(planned.elevenAccount).toEqual({ ok: true, account })
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('records a line only with its credits confirmed and covered, by ElevenLabs alone', async () => {
+    const { running, post, eleven, fishAsked } = studio()
+    try {
+      const unconfirmed = await post('/api/parts/act1/lines/a/record')
+      expect(unconfirmed.status).toBe(409)
+      expect(await unconfirmed.json()).toMatchObject({ reason: 'confirm-credits', ceiling: 15 })
+      const recorded = await post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+      expect(await recorded.json()).toMatchObject({ ok: true, key: 'a' })
+      expect(eleven.spoken.map((r) => [r.voice, r.text])).toEqual([['g1', 'Once.']])
+      expect(fishAsked).toEqual([])
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('refuses credits the plan has not got left', async () => {
+    const { running, post, eleven } = studio({ ...account, charactersUsed: 29_990 })
+    try {
+      const refused = await post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+      expect(refused.status).toBe(409)
+      expect(await refused.json()).toMatchObject({
+        reason: 'credits',
+        message:
+          'This takes up to 15 credits, more than the 10 credits left on your ElevenLabs plan.',
+      })
+      expect(eleven.spoken).toEqual([])
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('records a part with both providers, each confirmed in its own unit', async () => {
+    const { running, post, get, eleven, fishAsked } = studio()
+    try {
+      const body = { kind: 'record', speaker: null, keys: ['a', 'b'], orphans: [] }
+      const unconfirmed = await post('/api/parts/act1/jobs', body)
+      expect(unconfirmed.status).toBe(409)
+      const started = await post('/api/parts/act1/jobs', { ...body, confirmedCredits: 15 })
+      expect(started.status).toBe(200)
+      const { id } = await started.json()
+      let job = await get(`/api/jobs/${id}`)
+      for (let i = 0; i < 100 && job.status === 'running'; i++) {
+        await Bun.sleep(20)
+        job = await get(`/api/jobs/${id}`)
+      }
+      expect(job).toMatchObject({ status: 'done', failed: [] })
+      expect(eleven.spoken.map((r) => r.text)).toEqual(['Once.'])
+      expect(fishAsked).toEqual(['w1'])
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('takes a line again with its credits confirmed', async () => {
+    const { running, post, eleven } = studio()
+    try {
+      const unconfirmed = await post('/api/parts/act1/lines/a/takes')
+      expect(await unconfirmed.json()).toMatchObject({ reason: 'confirm-credits', ceiling: 5 })
+      const taken = await post('/api/parts/act1/lines/a/takes', { confirmedCredits: 5 })
+      expect(await taken.json()).toMatchObject({ ok: true })
+      expect(eleven.spoken).toHaveLength(1)
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('reads the account for the plan at most every half minute, and shows what recordings hold', async () => {
+    let open = () => {}
+    const gate = new Promise<void>((resolve) => (open = resolve))
+    const { running, post, get, accountAsked } = studio({ ...account, charactersUsed: 0 }, { gate })
+    try {
+      await get('/api/parts/act1/plan')
+      const recording = post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+      await Bun.sleep(50)
+      const planned = await get('/api/parts/act1/plan')
+      expect(accountAsked()).toBe(2) // the plans' one, and the recording's own
+      expect(planned.elevenHeld).toBe(15)
+      open()
+      expect(await (await recording).json()).toMatchObject({ ok: true })
+      expect((await get('/api/parts/act1/plan')).elevenHeld ?? 0).toBe(0)
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('gives the credits back when a recording, a take or a job ends', async () => {
+    // Twenty credits left: room for one line's fifteen at a time, never two.
+    const { running, post, get } = studio({ ...account, charactersUsed: 29_980 })
+    try {
+      const body = { kind: 'record', speaker: 'narrator', keys: ['a'], orphans: [] }
+      const started = await post('/api/parts/act1/jobs', { ...body, confirmedCredits: 15 })
+      expect(started.status).toBe(200)
+      const { id } = await started.json()
+      let job = await get(`/api/jobs/${id}`)
+      for (let i = 0; i < 100 && job.status === 'running'; i++) {
+        await Bun.sleep(20)
+        job = await get(`/api/jobs/${id}`)
+      }
+      expect(job).toMatchObject({ status: 'done', failed: [] })
+      for (let i = 0; i < 2; i++) {
+        const recorded = await post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+        expect(await recorded.json()).toMatchObject({ ok: true })
+        const taken = await post('/api/parts/act1/lines/a/takes', { confirmedCredits: 5 })
+        expect(await taken.json()).toMatchObject({ ok: true })
+      }
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('gives the credits back when a job cannot start, another running for the part', async () => {
+    let open = () => {}
+    const gate = new Promise<void>((resolve) => (open = resolve))
+    // Forty left: the running job's fifteen, and room for one more fifteen, not two.
+    const { running, post } = studio({ ...account, charactersUsed: 29_960 }, { gate })
+    try {
+      const body = { kind: 'record', speaker: 'narrator', keys: ['a'], orphans: [] }
+      const first = await post('/api/parts/act1/jobs', { ...body, confirmedCredits: 15 })
+      expect(first.status).toBe(200)
+      const second = await post('/api/parts/act1/jobs', { ...body, confirmedCredits: 15 })
+      expect(second.status).toBe(409)
+      const recording = post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+      await Bun.sleep(50)
+      open()
+      expect(await (await recording).json()).toMatchObject({ ok: true })
+    } finally {
+      open()
+      running.stop(true)
+    }
+  })
+
+  it('never lets two recordings count on the same credits', async () => {
+    let open = () => {}
+    const gate = new Promise<void>((resolve) => (open = resolve))
+    const { running, post } = studio({ ...account, charactersUsed: 29_980 }, { gate })
+    try {
+      const first = post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+      await Bun.sleep(50)
+      // The first holds 15 of the 20: another 15 is refused, while 5 still fits.
+      const second = await post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+      expect(await second.json()).toMatchObject({ reason: 'credits' })
+      const third = await post('/api/parts/act1/lines/a/takes', { confirmedCredits: 5 })
+      expect(await third.json()).toMatchObject({ ok: true })
+      open()
+      expect(await (await first).json()).toMatchObject({ ok: true })
+    } finally {
+      open()
+      running.stop(true)
+    }
+  })
+
+  it('gives the Fish dollars back when the credits are refused', async () => {
+    // Fish's credit covers one admission of Mira's line on s2-pro, never two held at once.
+    const { running, post, get } = studio(
+      { ...account, charactersUsed: 30_000 },
+      { fishCredit: 0.0004, draft: 's2-pro' },
+    )
+    try {
+      const planned = await get('/api/parts/act1/plan')
+      const dollars = planned.plan.ceiling
+      const body = { kind: 'record', speaker: null, keys: ['a', 'b'], orphans: [] }
+      const refused = await post('/api/parts/act1/jobs', {
+        ...body,
+        confirmedCost: dollars,
+        confirmedCredits: 15,
+      })
+      expect(await refused.json()).toMatchObject({ reason: 'credits' })
+      const fishOnly = await post('/api/parts/act1/lines/b/record', { confirmedCost: dollars })
+      expect(await fishOnly.json()).toMatchObject({ ok: true, key: 'b' })
+    } finally {
+      running.stop(true)
+    }
+  })
+})

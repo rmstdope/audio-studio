@@ -1083,8 +1083,9 @@ with a 10-second limit, since Setup waits for it beside Fish.
 tests as `FishClient` is: `subscription`, `tts`, `voice` (one of the account's voices by id, as
 the studio's `Voice`), `sharedVoices`, `addSharedVoice`, `deleteVoice`, `designVoice`, `saveDesign`
 and `music`. It retries a 429 as Fish's client does. Its work runs in
-its own limiter (`elevenWork`), so neither provider waits for the other, at the plan's concurrency
-(from `tier`; the table is settled in 14.2) and never more than `quality.parallel`. Speech is asked
+its own limiter (`elevenWork`), so neither provider waits for the other, at most two requests at
+once (the Free plan's limit, which every plan allows; higher plans allow more, which the studio does
+not use until it is measured) and never more than `quality.parallel` (`requestsAtOnce`). Speech is asked
 for as `wav_24000` (every plan may ask for it; 44.1 kHz needs Pro), so lines join, are checked and
 encoded as Fish's are. Music is asked for as `mp3_44100_128` (every plan; the default 192 kbps needs
 Creator) and decoded with ffmpeg to 16-bit WAV before it is shaped; it is encoded at 160 kbps when
@@ -1112,8 +1113,8 @@ only, the fingerprint needs no provider of its own.
   `similarityBoost`, `style`; defaults 0.5, 0.75, 0), stand in for temperature and top-p in an
   ElevenLabs line's fingerprint and take key. The speed in use (the character's, else the project's
   `narration.tts.speed`) is sent as `speed`; ElevenLabs takes 0.7–1.2, so a character with an
-  ElevenLabs voice whose speed in use lies outside it is refused for recording, as an uncast one is,
-  and its page says why. Nothing is clamped.
+  ElevenLabs voice whose speed in use lies outside it has each of its lines refused when recorded,
+  with the reason, and its page says why under its speed. Nothing is clamped.
 - **Cues.** Eleven v3 reads `[bracket]` tags as directions, as Fish does, so cues are sent as they
   are. Multilingual v2 and Flash would speak them, so with those models cues are left out of the
   text and out of the fingerprint (`cue` and `inside` empty), so editing a cue never re-records
@@ -1121,14 +1122,22 @@ only, the fingerprint needs no provider of its own.
   `quality.chunkLimit` as for Fish.
 - **Languages.** Each language's voice may be either provider's; `language_code` is sent with models
   that take it.
-- **Characters, confirmed.** A paid recording is confirmed as today. One that includes ElevenLabs
-  voices states the most characters it can use (every line, every take), what is left of the plan's
-  allowance, and the dollars of any part beyond it, beside the dollars of its Fish lines (one
-  confirmation, a budget per provider); the server admits it only when the allowance, plus the
-  allowed overage (none, a number, or without limit), covers what all running ElevenLabs recordings
-  and audition sittings were given, and running music takes too if 14.2 finds that music draws on
-  the same allowance. If ElevenLabs refuses a request for quota partway, that line fails with
-  ElevenLabs' words, and the recording records no further ElevenLabs lines.
+- **Credits, confirmed** (built in 14.7c). A part's plan prices each line by its voice's provider
+  (`elevenModelOf`): Fish's lines in dollars as before (`bytes`, `cost`, `ceiling`), and the lines
+  with ElevenLabs voices in credits (`plan.eleven`: their keys, the model, the characters sent, the
+  credits of one take each and at most, every take). The plan's answer carries the account
+  (`elevenAccount`, read at most every half minute, since a part's plan is asked for again after
+  every line) and the credits running recordings hold (`elevenHeld`), so the panel says what the
+  plan has left besides them ("27,450 credits left on your plan", "only …" when it falls short). One confirmation agrees to both ("Pay up to $0.42 and 1,200
+  credits", or "Use up to 1,200 credits" with only ElevenLabs lines paid), sent as `confirmedCost`
+  and `confirmedCredits`; a line's Record and Another take ask in the unit of its voice's provider.
+  The server admits each in its own unit (`admitBoth`): the dollars against Fish's credit as
+  before, the credits against what the plan has left (`creditsLeft`: what it includes and has not
+  used, plus the allowed overage: none, a number, or without limit) less what running ElevenLabs
+  recordings were given, all of which is held back until they end. Each line is charged to its
+  provider's budget before it is sent. Whether running music takes draw on the same allowance is
+  checked by hand (step 14's test script); they are not counted yet. If ElevenLabs refuses a
+  request (its quota among the reasons), that line fails with ElevenLabs' words.
 - **Page takes and tries.** Fish's are made with its free model. ElevenLabs has none, so a page take
   or a cue try with an ElevenLabs voice uses `narration.elevenlabs.models.audition`, shows its
   characters, is not confirmed (a try is a few hundred characters) and is logged. An audition
@@ -1596,11 +1605,12 @@ Small, independently useful increments:
           page), and a take or a cue try with it is refused, saying so; Fish is asked nothing
           about it. Its lines are not recorded yet: without the server's ElevenLabs client for
           recording, a line is refused as without a key.
-       3. **Record an ElevenLabs voice's lines**: the server's ElevenLabs client for recording, its
-          own limiter, a part's plan split by provider, characters in the confirm and admission
-          against the plan, ElevenLabs rows in the spending log (its version 2), and the speed
-          refusal on the character's page.
-       4. **Music in the spending log**: a row for each Eleven Music take.
+       3. **Record an ElevenLabs voice's lines** (built): the server's ElevenLabs client for
+          recording and extra takes, its own limiter (two at once), a part's plan split by
+          provider, credits in the confirm and admission against what the plan has left, and the
+          speed refusal on the character's page (under its speed).
+       4. **The spending log's version 2**: ElevenLabs rows for recordings (their credits) and a
+          row for each Eleven Music take.
     8. **Cues by model**: cues left out of the text and the fingerprint for models that would speak
        them, so that choosing such a model (next) never reads a cue aloud.
     9. **Choose ElevenLabs' models and settings**: `narration.elevenlabs` saved from the Models

@@ -9,7 +9,7 @@ import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import type { ElevenLabsClient, SpeechRequest } from './elevenlabs'
 import type { FishClient, TtsRequest } from './fish'
-import { createLimiter } from './limit'
+import { createLimiter, type Limiter } from './limit'
 import type { Transcriber } from './transcriber'
 import { acceptLine, measureLine, recordLine, removeOrphans } from './narration'
 import { inPartTurn } from './partFiles'
@@ -1321,8 +1321,12 @@ describe('recordLine with an ElevenLabs voice', () => {
       encode: keepWav,
       limiter: createLimiter(),
       elevenlabs: async () => eleven,
-      budget: createBudget({ model: 'eleven_v3', dollars: credits }),
+      credits: createBudget({ model: 'eleven_v3', dollars: credits }),
     })
+  /** A limiter that runs every job at once, noting the limit it was asked for under `name`. */
+  const watched = (name: string, used: [string, number][]): Limiter => ({
+    run: (_key, limit, job) => (used.push([name, limit]), job()),
+  })
 
   it('speaks the line with ElevenLabs, in its voice, model, settings and speed, and Fish not at all', async () => {
     const root = elevenRoot()
@@ -1351,6 +1355,46 @@ describe('recordLine with an ElevenLabs voice', () => {
       reason: 'spend',
       message: 'this would go past the confirmed budget (3 credits left); plan again',
     })
+  })
+
+  it('is never charged to the Fish budget, whatever it holds', async () => {
+    const result = await recordLine(
+      join(elevenRoot(), 'audio-studio.json'),
+      'act1',
+      'k4',
+      async () => fakeFish().fish,
+      {
+        encode: keepWav,
+        limiter: createLimiter(),
+        elevenlabs: async () => fakeEleven().client,
+        budget: createBudget({ model: 'eleven_v3', dollars: 100 }),
+      },
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'spend' })
+  })
+
+  it('waits for ElevenLabs’ own slots, at most two at once, and Fish’s line for Fish’s', async () => {
+    const used: [string, number][] = []
+    const root = elevenRoot()
+    const options = {
+      encode: keepWav,
+      limiter: watched('fish', used),
+      elevenLimiter: watched('elevenlabs', used),
+      elevenlabs: async () => fakeEleven().client,
+      credits: createBudget({ model: 'eleven_v3', dollars: 100 }),
+    }
+    const projectFile = join(root, 'audio-studio.json')
+    expect(
+      await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, options),
+    ).toMatchObject({ ok: true })
+    expect(
+      await recordLine(projectFile, 'act1', 'k1', async () => fakeFish().fish, options),
+    ).toMatchObject({ ok: true })
+    // The project allows four at once; ElevenLabs takes at most two.
+    expect(used).toEqual([
+      ['elevenlabs', 2],
+      ['fish', 4],
+    ])
   })
 
   it('refuses without an ElevenLabs key, and at a speed ElevenLabs does not take', async () => {

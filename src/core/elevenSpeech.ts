@@ -59,3 +59,14 @@ export function speedProblem(speed: number): string | null {
   if (speed >= ELEVEN_SPEED.min && speed <= ELEVEN_SPEED.max) return null
   return `ElevenLabs speaks at ${ELEVEN_SPEED.min} to ${ELEVEN_SPEED.max} times its pace, and this voice is set to ${speed}; change its speed to record it.`
 }
+
+/**
+ * How many requests ElevenLabs takes at once from the studio: two, the Free plan's limit, which
+ * every plan allows. Higher plans allow more; the studio does not ask until that is measured.
+ */
+const ELEVEN_AT_ONCE = 2
+
+/** How many requests for a voice's lines are sent at once: the project's, ElevenLabs' at most two. */
+export function requestsAtOnce(parallel: number, voice: string): number {
+  return providerOf(voice) === 'elevenlabs' ? Math.min(parallel, ELEVEN_AT_ONCE) : parallel
+}

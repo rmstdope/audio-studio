@@ -11,25 +11,34 @@ import {
 } from '../services/auditions'
 import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
-import { costCeiling, planGeneration } from '../core/generation'
+import { costCeiling, creditCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
 import { BriefChangeBody } from '../core/music'
 import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
-import { FISH_VOICE_ID, VOICE_ID } from '../core/voices'
+import { FISH_VOICE_ID, providerOf, VOICE_ID } from '../core/voices'
+import { DEFAULT_ELEVEN_MODEL, modelForStage } from '../core/elevenSpeech'
 import type { ElevenAnswer } from '../core/setup'
 import {
   accountOf,
   createElevenLabsClient,
   elevenFromEnv,
+  NO_ELEVENLABS_KEY,
   type ElevenLabsClient,
   type ElevenLabsFactory,
 } from '../services/elevenlabs'
 import { createElevenMusic } from '../services/elevenMusic'
 import { elevenLabsApiKey } from '../services/env'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
-import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
+import {
+  createBudget,
+  creditProblem,
+  creditsLeft,
+  spendProblem,
+  type Budget,
+  type SpendProblem,
+} from '../core/spend'
 import { planPart } from '../core/planner'
 import { SPEED } from '../core/resources'
 import { spokenPieces } from '../core/spoken'
@@ -246,6 +255,8 @@ const JobBody = z
     orphans: z.array(z.string()).max(100_000),
     /** The most the user agreed to spend, in dollars, for a paid model. */
     confirmedCost: z.number().nonnegative().optional(),
+    /** The most ElevenLabs credits the user agreed to, for lines with ElevenLabs voices. */
+    confirmedCredits: z.number().nonnegative().optional(),
   })
   .strict()
 
@@ -258,13 +269,22 @@ function parseOrNull(text: string): unknown {
   }
 }
 
-/** Taking a line again: the most the user agreed to spend on the take, for a paid draft model. */
-const TakeLineBody = z.object({ confirmedCost: z.number().nonnegative().optional() }).strict()
+/**
+ * Taking a line again: the most the user agreed to spend on the take, for a paid draft model, or
+ * the ElevenLabs credits, for a line with an ElevenLabs voice.
+ */
+const TakeLineBody = z
+  .object({
+    confirmedCost: z.number().nonnegative().optional(),
+    confirmedCredits: z.number().nonnegative().optional(),
+  })
+  .strict()
 
-/** Recording one line: the most the user agreed to spend on it, for a paid model. */
+/** Recording one line: the most the user agreed to spend on it, for a paid model, or in credits. */
 const RecordBody = z
   .object({
     confirmedCost: z.number().nonnegative().optional(),
+    confirmedCredits: z.number().nonnegative().optional(),
     /** Record with the final model (a final clip recorded again), or the draft one (default). */
     stage: z.enum(['draft', 'final']).default('draft'),
   })
@@ -298,6 +318,9 @@ const CastOwnBody = z.object({
   voice: z.string().regex(FISH_VOICE_ID),
   name: z.string().trim().min(1),
 })
+
+/** How long a plan shows the ElevenLabs account it read before reading it again. */
+const SHOWN_ACCOUNT_MS = 30_000
 
 /** The `?language=` a request names, if any: the services fall back to the source language. */
 const languageOf = (request: Request) =>
@@ -376,6 +399,8 @@ export function startServer({
 
   /** Fish TTS requests (audition takes and lines alike): `quality.parallel` at a time, each once. */
   const fishWork = createLimiter()
+  /** ElevenLabs' requests wait for each other only, never for Fish's. */
+  const elevenWork = createLimiter()
   /** Generation jobs, one per part at a time. */
   const jobs = createJobs()
 
@@ -481,6 +506,97 @@ export function startServer({
   }
 
   /**
+   * Admits a recording on ElevenLabs' `model` taking at most `ceiling` credits: a budget for it
+   * (the confirmed credits, held back from what the plan has left while it runs; release it with
+   * `held.delete`), or why not. The account is asked only once the credits are confirmed.
+   */
+  async function admitCredits(
+    model: string,
+    ceiling: number,
+    confirmed?: number,
+  ): Promise<{ budget: Budget } | { problem: SpendProblem }> {
+    const asked = creditProblem({ ceiling, confirmed, left: Infinity })
+    if (asked) return { problem: asked }
+    if (!ceiling) return { budget: createBudget({ model, dollars: 0 }) }
+    // The confirmation covers the ceiling; what is held is the ceiling up to the whole credit.
+    const credits = Math.ceil(ceiling)
+    const opened = await openProject(projectFile)
+    const client = opened.ok ? await elevenFor(dirname(projectFile), opened.project) : null
+    if (!client) return { problem: { reason: 'credits', message: NO_ELEVENLABS_KEY } }
+    // As with Fish's credit: what was held back when the account was asked is still counted.
+    const heldWhenAsked = new Set(creditBudgets)
+    const answer = await accountOf(client)
+    // From here to adding the budget nothing awaits, so two recordings cannot count on the same credits.
+    const holding = [...new Set([...creditBudgets, ...heldWhenAsked])]
+    const left = answer.ok
+      ? creditsLeft(answer.account) - holding.reduce((sum, b) => sum + b.dollars, 0)
+      : null
+    const problem = creditProblem({ ceiling: credits, confirmed: credits, left })
+    if (problem) return { problem }
+    const budget = createBudget({ model, dollars: credits })
+    creditBudgets.add(budget)
+    return { budget }
+  }
+
+  /**
+   * The ElevenLabs account as plans show it: asked at most every half minute, since a part's plan
+   * is asked for again after every line recorded. Admission always asks afresh.
+   */
+  let shown: { at: number; answer: Promise<ElevenAnswer> } | null = null
+  async function shownAccount(): Promise<ElevenAnswer> {
+    if (shown && Date.now() - shown.at < SHOWN_ACCOUNT_MS) return shown.answer
+    const opened = await openProject(projectFile)
+    const client = opened.ok ? await elevenFor(dirname(projectFile), opened.project) : null
+    const answer: Promise<ElevenAnswer> = client
+      ? accountOf(client)
+      : Promise.resolve({ ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY })
+    shown = { at: Date.now(), answer }
+    return answer
+  }
+
+  /**
+   * The ElevenLabs budgets of the recordings running now: all they were given is held back from
+   * what the plan has left until they end.
+   */
+  const creditBudgets = new Set<Budget>()
+
+  /**
+   * Admits recording `keys` of a planned part: a Fish budget in dollars and an ElevenLabs one in
+   * credits, each confirmed in its own unit, or the first problem. `release` gives both back.
+   */
+  async function admitBoth(
+    planned: {
+      model: string
+      elevenModel: string
+      ceilingOf: (keys: string[], takes?: number) => number | null
+      creditsOf: (keys: string[], takes?: number) => number
+    },
+    keys: string[],
+    confirmed: { confirmedCost?: number; confirmedCredits?: number },
+    takes?: number,
+  ): Promise<{ budget: Budget; credits: Budget; release: () => void } | { problem: SpendProblem }> {
+    const fish = await admit(planned.model, planned.ceilingOf(keys, takes), confirmed.confirmedCost)
+    if ('problem' in fish) return fish
+    const eleven = await admitCredits(
+      planned.elevenModel,
+      planned.creditsOf(keys, takes),
+      confirmed.confirmedCredits,
+    )
+    if ('problem' in eleven) {
+      budgets.delete(fish.budget)
+      return eleven
+    }
+    return {
+      budget: fish.budget,
+      credits: eleven.budget,
+      release: () => {
+        budgets.delete(fish.budget)
+        creditBudgets.delete(eleven.budget)
+      },
+    }
+  }
+
+  /**
    * The budgets of the recordings running now. All they were given is held back from the credit
    * until they end: Fish may bill a request some time after it was charged to its budget.
    */
@@ -581,7 +697,7 @@ export function startServer({
     // With one model for both, there is no final step: the final plan is the draft one.
     const stage: 'draft' | 'final' =
       asked === 'final' && narration.models.final !== narration.models.draft ? 'final' : 'draft'
-    const { pronounce } = read.input.cast
+    const { pronounce, speakers } = read.input.cast
     const state = planPart(read.input)
     const pricing = {
       at: new Date(),
@@ -590,6 +706,11 @@ export function startServer({
       sent: (line: LineState) =>
         spokenPieces(line.text, line.cue, pronounce, narration.quality.chunkLimit, line.inside),
       takes: narration.quality.transcriber === 'none' ? 1 : narration.quality.takes,
+      // A line with an ElevenLabs voice is recorded, and priced, by ElevenLabs.
+      elevenModelOf: (line: { speaker: string }) => {
+        const voice = speakers[line.speaker]?.voice ?? ''
+        return providerOf(voice) === 'elevenlabs' ? modelForStage(narration, voice, stage) : null
+      },
     }
     const plan = planGeneration(state, {
       ...pricing,
@@ -598,14 +719,19 @@ export function startServer({
       includeWeak,
       final: stage === 'final',
     })
-    // The most recording these lines can cost, priced as the plan was.
+    // The most recording these lines can cost, priced as the plan was: Fish's in dollars,
+    // ElevenLabs' in credits.
     const ceilingOf = (keys: string[], takes = pricing.takes) =>
       costCeiling(state, keys, { ...pricing, takes })
+    const creditsOf = (keys: string[], takes = pricing.takes) =>
+      creditCeiling(state, keys, { ...pricing, takes })
     return {
       ok: true as const,
       plan,
       model: pricing.model,
+      elevenModel: plan.eleven?.model ?? DEFAULT_ELEVEN_MODEL,
       ceilingOf,
+      creditsOf,
       parallel: narration.quality.parallel,
       stage,
       // Recording is in the source language.
@@ -751,11 +877,7 @@ export function startServer({
           const planned = await planFor(part, undefined, true, body.data.stage, languageOf(request))
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
-          const admitted = await admit(
-            planned.model,
-            planned.ceilingOf([key]),
-            body.data.confirmedCost,
-          )
+          const admitted = await admitBoth(planned, [key], body.data)
           if ('problem' in admitted) {
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
@@ -765,9 +887,12 @@ export function startServer({
                 recordLine(projectFile, part, key, fishFor, {
                   encode,
                   limiter: fishWork,
+                  elevenLimiter: elevenWork,
+                  elevenlabs: elevenFor,
                   transcriber: await transcriberFor(),
                   stage: body.data.stage,
                   budget: admitted.budget,
+                  credits: admitted.credits,
                   language: languageOf(request),
                 }),
               ),
@@ -775,7 +900,7 @@ export function startServer({
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
           } finally {
-            budgets.delete(admitted.budget)
+            admitted.release()
           }
         }),
       },
@@ -791,7 +916,11 @@ export function startServer({
             stage,
             languageOf(request),
           )
-          return plan ? Response.json(plan) : notFound()
+          if (!plan) return notFound()
+          if (!plan.ok || !plan.plan.eleven) return Response.json(plan)
+          // What the plan has left, beside what its ElevenLabs lines take and running recordings hold.
+          const elevenHeld = [...creditBudgets].reduce((sum, budget) => sum + budget.dollars, 0)
+          return Response.json({ ...plan, elevenAccount: await shownAccount(), elevenHeld })
         }),
       },
       '/api/parts/:part/jobs': {
@@ -801,7 +930,7 @@ export function startServer({
             return Response.json(
               {
                 error:
-                  'expected { kind, stage, speaker, keys, orphans, retakeWeak, confirmedCost }',
+                  'expected { kind, stage, speaker, keys, orphans, retakeWeak, confirmedCost, confirmedCredits }',
               },
               { status: 400 },
             )
@@ -832,16 +961,20 @@ export function startServer({
             return Response.json({ error: 'There is nothing to do.' }, { status: 409 })
           }
           const admitted = measuring
-            ? { budget: createBudget({ model: planned.model, dollars: 0 }) }
-            : await admit(planned.model, planned.ceilingOf(keys), body.data.confirmedCost)
+            ? {
+                budget: createBudget({ model: planned.model, dollars: 0 }),
+                credits: createBudget({ model: planned.elevenModel, dollars: 0 }),
+                release: () => undefined,
+              }
+            : await admitBoth(planned, keys, body.data)
           if ('problem' in admitted) {
             const { problem } = admitted
             return Response.json({ error: problem.message, ...problem }, { status: 409 })
           }
-          const { budget } = admitted
+          const { budget, credits, release } = admitted
           // Checked with no await before the job starts, so a refresh cannot slip in between.
           if (isRefreshing(projectFile, part)) {
-            budgets.delete(budget)
+            release()
             return Response.json(
               { error: 'The dialog is being refreshed; generate when it is done.' },
               { status: 409 },
@@ -881,16 +1014,19 @@ export function startServer({
                 : recordLine(projectFile, part, key, fishFor, {
                     encode,
                     limiter: fishWork,
+                    elevenLimiter: elevenWork,
+                    elevenlabs: elevenFor,
                     onlyIfNeeded: true,
                     retakeWeak,
                     stage,
                     budget,
+                    credits,
                     transcriber: await transcriberFor(),
                     language,
                   }),
             removeOrphans: (keys) => removeOrphans(projectFile, part, keys, language),
             onEnd: () => {
-              budgets.delete(budget)
+              release()
               const state = jobs.get(jobId)
               if (!followed || !state || state.status === 'running') return
               void followed.end({
@@ -904,7 +1040,7 @@ export function startServer({
           })
           // Not started (another job runs for the part): nothing is held back for it.
           if ('error' in job) {
-            budgets.delete(budget)
+            release()
             void followed?.end({ lines: 0, outcome: 'error' })
           } else jobId = job.id
           return Response.json(job, { status: 'error' in job ? 409 : 200 })
@@ -1257,11 +1393,7 @@ export function startServer({
           const planned = await planFor(part, undefined, false, 'draft', languageOf(request))
           if (!planned) return notFound()
           if (!planned.ok) return Response.json(planned, { status: 409 })
-          const admitted = await admit(
-            planned.model,
-            planned.ceilingOf([key], 1),
-            body.data.confirmedCost,
-          )
+          const admitted = await admitBoth(planned, [key], body.data, 1)
           if ('problem' in admitted) {
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
@@ -1270,16 +1402,19 @@ export function startServer({
               loggedOne(planned, part, admitted.budget, async () =>
                 takeLine(projectFile, part, key, fishFor, {
                   limiter: fishWork,
+                  elevenLimiter: elevenWork,
                   transcriber: await transcriberFor(),
                   budget: admitted.budget,
+                  credits: admitted.credits,
                   language: languageOf(request),
+                  elevenlabs: elevenFor,
                 }),
               ),
             )
             if (!result) return notFound()
             return Response.json(result, { status: result.ok ? 200 : 409 })
           } finally {
-            budgets.delete(admitted.budget)
+            admitted.release()
           }
         }),
       },
