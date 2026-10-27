@@ -128,12 +128,19 @@ function render(
     [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
       (b) => b.textContent === name,
     )
-  const key = (target: Element, name: string, shiftKey = false) =>
-    act(() => {
-      target.dispatchEvent(
-        new KeyboardEvent('keydown', { key: name, shiftKey, bubbles: true, cancelable: true }),
-      )
+  /** Sends a keydown and gives back the event, to tell whether the dialog took it. */
+  const key = (target: Element, name: string, shiftKey = false) => {
+    const event = new KeyboardEvent('keydown', {
+      key: name,
+      shiftKey,
+      bubbles: true,
+      cancelable: true,
     })
+    act(() => {
+      target.dispatchEvent(event)
+    })
+    return event
+  }
   return { client, buttons, key, rerender: show }
 }
 
@@ -338,6 +345,10 @@ describe('the Move dialog', () => {
     expect(document.activeElement).toBe(input)
     page.key(input, 'Tab', true)
     expect(document.activeElement).toBe(cancel)
+    // Between the edges Tab is left to the browser.
+    input.focus()
+    expect(page.key(input, 'Tab').defaultPrevented).toBe(false)
+    expect(document.activeElement).toBe(input)
     page.key(document.activeElement!, 'Escape')
     await act(async () => {})
     expect(dialog()).toBeNull()
@@ -354,6 +365,28 @@ describe('the Move dialog', () => {
     expect(document.activeElement).toBe(option('Game over'))
     page.key(option('Game over'), 'Tab', true)
     expect(document.activeElement).toBe(moveButton)
+  })
+
+  it('keeps Tab in the dialog while the move is under way, when every control is greyed', async () => {
+    globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch
+    const page = render(village, view([take(3)]))
+    await click(page.buttons('Move…')[0])
+    await click(option("Witch's hut"))
+    await click(page.buttons('Move take 3')[0])
+    expect(page.key(page.buttons('Moving…')[0]!, 'Tab').defaultPrevented).toBe(true)
+    expect(page.key(page.buttons('Moving…')[0]!, 'Tab', true).defaultPrevented).toBe(true)
+  })
+
+  it('puts the focus back on the pick when the move is refused, so Esc still closes it', async () => {
+    answer = { ok: false, message: "Witch's hut is being refreshed from the game." }
+    const page = render(village, view([take(3)]))
+    await click(page.buttons('Move…')[0])
+    await click(option("Witch's hut"))
+    await click(page.buttons('Move take 3')[0])
+    expect(document.activeElement).toBe(option("Witch's hut"))
+    page.key(document.activeElement!, 'Escape')
+    await act(async () => {})
+    expect(dialog()).toBeNull()
   })
 
   it('moves with Up, Down and Enter, and closes with Esc, focus back on Move…', async () => {
