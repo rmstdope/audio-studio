@@ -48,9 +48,9 @@ export interface PlayerState {
  * play replaced meanwhile is let be. `onChange` hears every change of state, `onFailed` the id of
  * each clip that failed; `dispose` ends it.
  *
- * With `options.fadeSeconds`, a clip played with `fade: true` fades in (from when the element says it
- * plays, `playing()`, since a start can lag), fades out before its natural end, and a stop (or another clip started) fades it out before the element pauses; the
- * state still changes at once. A clip without the flag plays as it is and is cut on stop; with no
+ * With `options.fadeSeconds`, a clip played with `fade: true` fades in (from when the element says
+ * it plays, `playing()`, since a start can lag), fades out before its natural end, and a stop (or
+ * another clip started) fades it out before the element pauses; the state still changes at once. A clip without the flag plays as it is and is cut on stop; with no
  * `fadeSeconds` the element's volume is never touched.
  */
 export function createPlayer(
@@ -61,8 +61,9 @@ export function createPlayer(
 ) {
   const fadeMs = (options.fadeSeconds ?? 0) * 1000
   const clock = options.clock ?? browserClock
-  // Fade state: when the clip began to sound (null until the element says it plays), when its fade-out began (null: not stopping), the clip to
-  // start once that fade-out is over, whether the element is making sound, and the ticker's end.
+  // Fade state: when the clip began to sound (null until the element says it plays), when its
+  // fade-out began (null: not stopping), the clip to start once that fade-out is over, whether the
+  // element is making sound, and the ticker's end.
   let startedAt: number | null = null
   let outSince: number | null = null
   let outFrom = 1
@@ -204,7 +205,7 @@ export function createPlayer(
     stop,
     /** The element is playing: a take's fade-in starts now, not when play was asked. */
     playing() {
-      if (audible && startedAt === null && outSince === null) startedAt = clock.now()
+      if (startedAt === null) startedAt = clock.now()
     },
     /** The clip playing has ended. */
     ended() {

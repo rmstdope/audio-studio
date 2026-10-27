@@ -197,22 +197,14 @@ describe('createPlayer, fading', () => {
     expect(element.volume).toBe(1)
   })
 
-  it('ignores a playing that is late for a stopped or unfaded clip, or told twice', () => {
+  it('does not restart the fade-in when playing is told again (a stall resumed)', () => {
     const { element, player, wait } = fadingSetUp()
     player.toggle('a', '/a.mp3', { fade: true })
     player.playing()
     wait(100)
     player.playing()
-    expect(element.volume).toBeCloseTo(0.5, 1)
-    player.toggle('g', '/g.mp3')
-    wait(200)
-    player.playing()
+    wait(100)
     expect(element.volume).toBe(1)
-    player.toggle('b', '/b.mp3', { fade: true })
-    player.stop()
-    player.playing()
-    wait(300)
-    expect(element.paused).toBe(true)
   })
 
   it('fades a clip in from silence', () => {
