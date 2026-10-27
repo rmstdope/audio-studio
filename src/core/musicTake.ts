@@ -161,8 +161,8 @@ export interface TakeView {
   /** The file name to ask for under the track's takes. */
   file: string
   seconds: number
-  /** The seed the take was made from. */
-  seed: number
+  /** The seed the take was made from; absent when its model takes none. */
+  seed?: number
   /** The waveform's bars, 0 to 1. */
   peaks: number[]
   /** Made from a brief, length, tempo or key the track no longer has. */
@@ -229,7 +229,8 @@ export const BoardTakeSchema = z.object({
   n: z.number().int().positive(),
   /** The hash of its inputs, which with `n` names its WAV. */
   hash: z.string().regex(/^[0-9a-f]{16}$/),
-  seed: z.number(),
+  /** The seed it was made from; absent when its model takes none. */
+  seed: z.number().optional(),
   /** The music model that made it; absent on a take made before this was kept (the current one). */
   model: z.string().optional(),
   seconds: z.number(),

@@ -297,7 +297,7 @@ export function createMusicTakes({
       const made: BoardTake = {
         n: entry.n,
         hash: entry.hash,
-        seed: take.seed,
+        ...(take.seed !== undefined && { seed: take.seed }),
         model: musicModel(entry.model).recipe,
         seconds: wavSeconds(wav),
         peaks: peaks(wav, WAVEFORM_BARS),
@@ -346,7 +346,7 @@ export function createMusicTakes({
           n: take.n,
           file: fileOf(take),
           seconds: take.seconds,
-          seed: take.seed,
+          ...(take.seed !== undefined && { seed: take.seed }),
           peaks: take.peaks,
           earlier: take.hash !== hash,
           chosen: chosen?.take === take.n && chosen.fp === take.hash,

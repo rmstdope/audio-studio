@@ -33,12 +33,16 @@ const music = {
   },
 }
 
-/** A generator that makes a tone as long as asked (at 1000 Hz), and fails for a brief saying "fail". */
+/**
+ * A generator that makes a tone as long as asked (at 1000 Hz), and fails for a brief saying "fail".
+ * A `seedless` one answers without a seed, as a generator that takes none does.
+ */
 function fakeGenerator(
   ready: MusicReady = { ok: true },
   failOn: number[] = [],
   gate?: Promise<void>,
   missing: string[] = [],
+  seedless = false,
 ) {
   const requests: MusicRequest[] = []
   const generator: MusicGenerator = {
@@ -52,7 +56,8 @@ function fakeGenerator(
       const samples = new Int16Array(request.seconds * 1000)
       samples.forEach((_, i) => (samples[i] = Math.round(8000 * Math.sin(i / 20))))
       const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
-      return { wav: writeWav({ format, data: new Uint8Array(samples.buffer) }), seed: request.seed }
+      const wav = writeWav({ format, data: new Uint8Array(samples.buffer) })
+      return seedless ? { wav } : { wav, seed: request.seed }
     },
     close() {},
   }
@@ -65,6 +70,7 @@ function setup(
   failOn: number[] = [],
   gate?: Promise<void>,
   missing: string[] = [],
+  seedless = false,
 ) {
   const root = tempRepo({
     'audio-studio.json': projectJson({ music }),
@@ -73,7 +79,7 @@ function setup(
     ...extra,
   })
   const file = join(root, 'audio-studio.json')
-  const { generator, requests } = fakeGenerator(ready, failOn, gate, missing)
+  const { generator, requests } = fakeGenerator(ready, failOn, gate, missing, seedless)
   let seed = 100
   const encode: Encoder = async (_wav, out) => {
     mkdirSync(dirname(out), { recursive: true })
@@ -633,6 +639,23 @@ describe('choosing a take', () => {
   }
   const lockOf = (root: string) =>
     JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8'))
+
+  it('keeps and chooses a take made without a seed, with none recorded', async () => {
+    const { root, file, takes, settled } = setup(undefined, {}, [], undefined, [], true)
+    await takes.make(file, 'hall', { count: 1 })
+    const view = await settled('hall')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    expect(view.takes).toHaveLength(1)
+    expect(view.takes[0]).not.toHaveProperty('seed')
+    const board = JSON.parse(readFileSync(join(root, '.audio-studio/music/hall.json'), 'utf8'))
+    expect(board.takes[0]).not.toHaveProperty('seed')
+    expect(await takes.choose(file, 'hall', view.takes[0]!.file)).toEqual({ ok: true })
+    expect(lockOf(root).hall).toMatchObject({ take: 1, list: 'act1' })
+    expect(lockOf(root).hall).not.toHaveProperty('seed')
+    const after = await takes.view(file, 'hall')
+    if (!after || !('ok' in after) || !after.ok) throw new Error('expected a view')
+    expect(after.takes.map((t) => t.chosen)).toEqual([true])
+  })
 
   it('writes the take as the track’s music, and the view marks it chosen', async () => {
     const { root, file, takes, settled } = await twoTakes()

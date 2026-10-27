@@ -7,7 +7,8 @@ export const LockEntrySchema = z.object({
   /** A hash of what went into the take (brief, kind, seconds, bpm, key). */
   fp: z.string(),
   model: z.string(),
-  seed: z.number(),
+  /** The seed the take was made from; absent when its model takes none. */
+  seed: z.number().optional(),
   /** Which list the track came from: an act's id, or `stingers`. */
   list: z.string(),
   /** The number of the take on the track's board. */

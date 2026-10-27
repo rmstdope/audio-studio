@@ -125,7 +125,7 @@ export async function commitChoice({
       const entry: LockEntry = {
         fp: take.hash,
         model: take.model ?? MUSIC_MODEL,
-        seed: take.seed,
+        ...(take.seed !== undefined && { seed: take.seed }),
         list: listId,
         take: take.n,
         inputs: take.inputs,

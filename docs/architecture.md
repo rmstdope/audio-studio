@@ -909,7 +909,8 @@ The numbers are fixed in `core/musicTake.ts` and its tests (built, 12.4). A take
 `.audio-studio/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (brief, kind,
 seconds, bpm, key; the hash still begins with Balanced's recipe, so choosing a model never changes it) and a take number counted from 1 per hash, with `<hash>.<n>.json` beside it
 (seed, length, waveform bars). The same seed does not make the same take again on the Mac, so the cache keeps the take
-itself; the seed is kept with it, in the board and the lock, to say where it came from. The brief a
+itself; the seed is kept with it, in the board and the lock, to say where it came from (absent from
+a take whose model takes none, as ElevenLabs' will not, §8.6). The brief a
 take is made from is the game's with the studio's changes over it. What is built is the Takes panel on a track's page: "Make 2 takes" (when there are none) queues two,
 made one at a time on the GPU queue, each a dashed card with a progress bar (about 3 minutes
 expected, a guess) and its time left, then a card with play, its waveform (a loop's seam marked),
@@ -1077,9 +1078,10 @@ encoded as Fish's are. Music is asked for as `mp3_44100_128` (every plan; the de
 Creator) and decoded with ffmpeg to 16-bit WAV before it is shaped; it is encoded at 160 kbps when
 chosen, as every take is.
 
-**Models, per provider.** `core/prices.ts` gives each model its provider and unit: Fish's in dollars
-per million bytes, ElevenLabs' speech models in dollars per 1,000 characters, Eleven Music in
-dollars per minute. A stage accepts only its own provider's models: `narration.models` (Fish's, as
+**Models, per provider.** Each provider's prices are a table of their own, in their own unit: Fish's
+stay `core/prices.ts` (dollars per million bytes), ElevenLabs' speech models get a table beside it
+(dollars per 1,000 characters, in 14.7), and Eleven Music's price per minute is on its music model
+(14.5). A stage accepts only its own provider's models: `narration.models` (Fish's, as
 today) and `narration.elevenlabs.models` (`audition`, `draft`, `final`; default `eleven_v3`) are
 validated and listed each against its own provider's list, so Fish is never sent an ElevenLabs
 model.
@@ -1541,11 +1543,11 @@ Small, independently useful increments:
     2. **Key and account** (built): `ELEVENLABS_API_KEY`, the client with `subscription` only,
        Setup's two optional rows. The user checks what the account draws on (allowance or dollars, and whether
        music and speech share it) and its concurrency, and the plan follows.
-    3. **Ready for a second provider**: models and prices per provider with their unit (each stage
-       validated and listed against its own provider), an optional music seed, the take queue by
-       family, the music router as a table. No behaviour changes.
+    3. **Music, ready for a second provider** (built): an optional seed (board, view, move,
+       lock), the music router as a table from family to generator. No behaviour changes. Each
+       provider's prices stay in tables of their own, so nothing needed splitting.
     4. **Eleven Music takes**: the family and model in every music menu, takes made, decoded and
-       shaped, ready by key, Setup's Music row.
+       shaped, outside the GPU queue (the take queue by family), ready by key, Setup's Music row.
     5. **What music costs**: the price on the menus and More takes, and music rows in the spending
        log (its version 2).
     6. **A voice says whose it is**: `eleven:` voice ids (`core/voices.ts`, the server's voice-id

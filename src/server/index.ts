@@ -133,7 +133,7 @@ function sharedMusic(): MusicGenerator {
       ? createFakeMusic()
       : createMusicRouter({
           acestep: createAceStepWorker(),
-          stableAudio: createStableAudioWorker(),
+          'stable-audio': createStableAudioWorker(),
         })
   return state.audioStudioMusic
 }
