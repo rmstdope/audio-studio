@@ -16,9 +16,9 @@ import type { LineState } from '../core/planner'
 import { BriefChangeBody } from '../core/music'
 import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
-import { FishTierSchema, type Project } from '../core/project'
+import { FishTierSchema } from '../core/project'
 import type { ElevenAnswer } from '../core/setup'
-import { elevenLabsFromEnv, NO_ELEVENLABS_KEY, type ElevenLabsClient } from '../services/elevenlabs'
+import { accountOf, createElevenLabsClient, type ElevenLabsClient } from '../services/elevenlabs'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
@@ -322,9 +322,6 @@ export function startServer({
   })
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
-  /** The ElevenLabs client: the one given (tests), else made from the project's API key on every use. */
-  const elevenLabsFor = (root: string, project: Project) =>
-    elevenlabs !== undefined ? Promise.resolve(elevenlabs) : elevenLabsFromEnv(root, project)
   /** A character's ruled-out voices as an answer: 404 for an unknown character, 409 for a broken project. */
   async function ruledOut(pending: Promise<RuledOutResult>): Promise<Response> {
     const result = await pending
@@ -416,22 +413,15 @@ export function startServer({
     }
   }
 
-  /** The ElevenLabs account, or why it cannot be read. */
-  async function elevenAccountOf(): Promise<ElevenAnswer> {
-    const opened = await openProject(projectFile)
-    if (!opened.ok)
-      return { ok: false, reason: 'project', message: 'The project file cannot be read.' }
-    const client = await elevenLabsFor(dirname(projectFile), opened.project)
-    if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
-    try {
-      return { ok: true, account: await client.subscription() }
-    } catch (error) {
-      return {
-        ok: false,
-        reason: 'elevenlabs',
-        message: error instanceof Error ? error.message : String(error),
-      }
-    }
+  /**
+   * The ElevenLabs account, asked with the key Setup found: through the client given (tests; null
+   * is none, so nothing is asked), else one made from that key.
+   */
+  async function elevenAccountOf(apiKey: string): Promise<ElevenAnswer> {
+    const client = elevenlabs !== undefined ? elevenlabs : createElevenLabsClient(apiKey)
+    return client
+      ? accountOf(client)
+      : { ok: false, reason: 'no-key', message: 'No ElevenLabs client.' }
   }
 
   /**

@@ -1061,8 +1061,10 @@ billed (`max_credit_limit_extension`: 0 is no, a number is up to that many, `"un
 limit), the voice slots used, and what the plan allows: on Free, no music through the API and no
 commercial use; on every self-serve plan, music in a game only while the game has earned under
 $500,000 and its developer under $1,000,000 a year from games (ElevenLabs' music terms of 9 October
-2026), beyond which ElevenLabs' Enterprise Music plan is needed. The subscription is read for Setup,
-for a confirmation and for admission, never on every page.
+2026), beyond which ElevenLabs' Enterprise Music plan is needed. The subscription is read for Setup
+(and so for the sidebar's count of Setup's problems, from a check at most five minutes old, as
+Fish's credit is; a key ElevenLabs refuses counts as one), for a confirmation and for admission,
+with a 10-second limit, since Setup waits for it beside Fish.
 
 **One client.** `services/elevenlabs.ts` is the only code that calls ElevenLabs
 (`https://api.elevenlabs.io`, header `xi-api-key`), behind an `ElevenLabsClient` interface faked in
@@ -1303,7 +1305,7 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   "Needs attention" only when the project's music model is one that is missing, with three numbered
   steps: accept the licence, make a read token, download), and two optional ElevenLabs rows (§8.6):
   its key ("Not set up" until there is one, saying where it goes) and its account (asked only with a
-  key: the plan, the characters left of its allowance and when they renew, what may be billed
+  key: the plan, the credits left of its allowance and when they renew, what may be billed
   beyond them, the voice slots used, and what the plan allows), each with what to do about it.
   Checked afresh each time the page opens and on Check again; the sidebar, on every page, counts
   the problems from a check at most five minutes old and never on a window focus, so the studio

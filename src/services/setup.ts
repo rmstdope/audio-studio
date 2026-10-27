@@ -4,11 +4,15 @@ import { elevenLabsApiKey, fishApiKey } from './env'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS } from '../core/musicModels'
 import { missingStableAudio, STABLE_AUDIO_DIR } from './stableAudio'
 import { aceStepCheckpoints, aceStepReady } from './music'
+import { accountOf, createElevenLabsClient } from './elevenlabs'
 import type { CreditResult } from './fish'
 import { openProject, type ProjectFailure } from './workspace'
 
 /** The setup as checked, or why the project file could not be read. */
 export type SetupResult = { ok: true; checks: SetupCheck[] } | ProjectFailure
+
+/** What a lookup without its key gives: not asked. */
+const NO_KEY = { ok: false, reason: 'no-key', message: 'no key' } as const
 
 /** What the setup check asks the machine; replaced in tests. */
 export interface Machine {
@@ -28,8 +32,8 @@ const thisMachine: Machine = {
  * Checks what the studio needs on this machine and in the project (ffmpeg, uv for Whisper, the
  * music generator's models, the Fish key and whether Fish answers, the refresh command, and the
  * optional ElevenLabs key and account), each with a fix. `credit` is the server's lookup of the
- * Fish account's credit and `account` its lookup of the ElevenLabs account; each is called only
- * when there is its key.
+ * Fish account's credit and `account` the lookup of the ElevenLabs account with the key found;
+ * each is called only when there is its key, and the two are asked at the same time.
  */
 export async function checkSetup(
   projectFile: string,
@@ -37,11 +41,8 @@ export async function checkSetup(
   machine: Machine = thisMachine,
   environment: Record<string, string | undefined> = process.env,
   stableAudioDir: string = STABLE_AUDIO_DIR,
-  account: () => Promise<ElevenAnswer> = async () => ({
-    ok: false,
-    reason: 'no-key',
-    message: 'no key',
-  }),
+  account: (apiKey: string) => Promise<ElevenAnswer> = (apiKey) =>
+    accountOf(createElevenLabsClient(apiKey)),
 ): Promise<SetupResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -50,7 +51,11 @@ export async function checkSetup(
   const { narration } = project
   const checkpoints = aceStepCheckpoints(environment)
   const key = (await fishApiKey(root, project.env, environment)) !== null
-  const elevenKey = (await elevenLabsApiKey(root, project.env, environment)) !== null
+  const elevenKey = await elevenLabsApiKey(root, project.env, environment)
+  const [fishAnswer, elevenAnswer] = await Promise.all([
+    key ? credit() : NO_KEY,
+    elevenKey ? account(elevenKey) : NO_KEY,
+  ])
   const facts: SetupFacts = {
     ffmpeg: machine.which('ffmpeg'),
     uv: machine.which('uv'),
@@ -59,7 +64,7 @@ export async function checkSetup(
     whisperModel: narration.quality.whisperModel,
     envPath: project.env,
     key,
-    fish: key ? await credit() : { ok: false, reason: 'no-key', message: 'no key' },
+    fish: fishAnswer,
     refreshDialog: Boolean(narration.refreshDialog),
     parallel: narration.quality.parallel,
     fishTier: narration.quality.fishTier ?? null,
@@ -74,7 +79,7 @@ export async function checkSetup(
           ).map(({ id }) => id),
         }
       : null,
-    elevenlabs: elevenKey ? await account() : { ok: false, reason: 'no-key', message: 'no key' },
+    elevenlabs: elevenAnswer,
   }
   return { ok: true, checks: setupChecks(facts) }
 }

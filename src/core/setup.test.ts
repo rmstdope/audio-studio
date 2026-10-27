@@ -318,7 +318,7 @@ describe('the ElevenLabs rows', () => {
     expect(key).toMatchObject({ state: 'ok', detail: 'Found.' })
     expect(account).toMatchObject({
       state: 'ok',
-      detail: 'Answers. Starter plan: 27,450 of 30,000 characters left, renewing 12 November 2026.',
+      detail: 'Answers. Starter plan: 27,450 of 30,000 credits left, renewing 12 November 2026.',
       notes: [
         'Nothing is billed beyond them: ElevenLabs work stops when they run out.',
         'Voice slots: 3 of 10 used.',
@@ -345,7 +345,7 @@ describe('the ElevenLabs rows', () => {
         renewsAt: null,
       },
     })
-    expect(account.detail).toBe('Answers. Free plan: 10,000 of 10,000 characters left.')
+    expect(account.detail).toBe('Answers. Free plan: 10,000 of 10,000 credits left.')
     expect(account.notes).toContain(
       'On the Free plan ElevenLabs makes no music through the API, and nothing it makes may be used commercially.',
     )

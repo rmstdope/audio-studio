@@ -22,10 +22,36 @@ const byId = (checks: { id: string; state: string }[]) =>
   Object.fromEntries(checks.map((c) => [c.id, c.state]))
 
 describe('checkSetup', () => {
+  it('asks Fish and ElevenLabs at the same time', async () => {
+    let accountAsked!: () => void
+    const asking = new Promise<void>((resolve) => (accountAsked = resolve))
+    const root = tempRepo({
+      'audio-studio.json': projectJson(),
+      '.env': 'FISH_AUDIO_API_KEY=f\nELEVENLABS_API_KEY=k\n',
+    })
+    // Fish answers only once ElevenLabs has been asked: one after the other would never finish.
+    const result = await checkSetup(
+      join(root, 'audio-studio.json'),
+      async () => {
+        await asking
+        return { ok: true, credit: 3 }
+      },
+      mac,
+      {},
+      undefined,
+      async () => {
+        accountAsked()
+        return { ok: false, reason: 'elevenlabs', message: 'down' }
+      },
+    )
+    if (!result.ok) throw new Error('expected checks')
+    expect(byId(result.checks)).toMatchObject({ fish: 'ok', elevenlabs: 'problem' })
+  }, 2000)
+
   it('asks ElevenLabs for the account only when its key is set', async () => {
-    let asked = 0
-    const account = async (): Promise<ElevenAnswer> => {
-      asked++
+    const asked: string[] = []
+    const account = async (key: string): Promise<ElevenAnswer> => {
+      asked.push(key)
       return {
         ok: true,
         account: {
@@ -48,7 +74,7 @@ describe('checkSetup', () => {
       account,
     )
     if (!none.ok) throw new Error('expected checks')
-    expect(asked).toBe(0)
+    expect(asked).toEqual([])
     expect(byId(none.checks)).toMatchObject({ elevenlabsKey: 'off', elevenlabs: 'off' })
     const withKey = tempRepo({
       'audio-studio.json': projectJson(),
@@ -63,7 +89,7 @@ describe('checkSetup', () => {
       account,
     )
     if (!some.ok) throw new Error('expected checks')
-    expect(asked).toBe(1)
+    expect(asked).toEqual(['k'])
     expect(byId(some.checks)).toMatchObject({ elevenlabsKey: 'ok', elevenlabs: 'ok' })
   })
 

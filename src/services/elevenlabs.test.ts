@@ -68,6 +68,28 @@ describe('createElevenLabsClient', () => {
     await expect(refused).rejects.toThrow('ElevenLabs answered 401: Invalid API key')
   })
 
+  it('says so when the answer is not one the studio reads', async () => {
+    for (const [body, status] of [
+      ['<html>Sign in to the network</html>', 200],
+      [{ character_count: 1 }, 200],
+    ] as const) {
+      const { fetch } = fakeFetch(body, status)
+      await expect(createElevenLabsClient('k', { fetch }).subscription()).rejects.toThrow(
+        'ElevenLabs answered in a form the studio does not read',
+      )
+    }
+  })
+
+  it('gives up on the account after 10 seconds, whatever longer wait takes are given', async () => {
+    let signal: AbortSignal | undefined
+    const fetch = (async (_: unknown, init?: RequestInit) => {
+      signal = init?.signal ?? undefined
+      return new Response(JSON.stringify(subscription))
+    }) as unknown as typeof globalThis.fetch
+    await createElevenLabsClient('k', { fetch, timeoutMs: 120_000 }).subscription()
+    expect(signal).toBeDefined()
+  })
+
   it('says so when ElevenLabs does not answer in time', async () => {
     const fetch = (async () => {
       throw Object.assign(new Error('timed out'), { name: 'TimeoutError' })
@@ -75,5 +97,8 @@ describe('createElevenLabsClient', () => {
     await expect(
       createElevenLabsClient('k', { fetch, timeoutMs: 5000 }).subscription(),
     ).rejects.toThrow('ElevenLabs did not answer within 5 s')
+    await expect(createElevenLabsClient('k', { fetch }).subscription()).rejects.toThrow(
+      'ElevenLabs did not answer within 10 s',
+    )
   })
 })

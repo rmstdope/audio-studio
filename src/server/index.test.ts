@@ -65,6 +65,8 @@ const server = startServer({
   fish,
   encode,
   transcriber: null,
+  // No ElevenLabs, so Setup never asks it, even with ELEVENLABS_API_KEY exported.
+  elevenlabs: null,
 })
 afterAll(() => server.stop(true))
 
@@ -999,6 +1001,7 @@ describe('server, the Fish tier', () => {
     fish,
     encode,
     transcriber: null,
+    elevenlabs: null,
   })
   afterAll(() => server.stop(true))
   const patch = (body: unknown, origin: string | null = server.url.origin) =>
@@ -3751,8 +3754,25 @@ describe('the ElevenLabs account on Setup', () => {
   it('shows the plan and the characters left', async () => {
     expect(await setupOf({ subscription: async () => starter })).toMatchObject({
       state: 'ok',
-      detail: 'Answers. Starter plan: 27,450 of 30,000 characters left.',
+      detail: 'Answers. Starter plan: 27,450 of 30,000 credits left.',
     })
+  })
+
+  it('treats no ElevenLabs client as no key, and asks nothing', async () => {
+    const server = startServer({
+      projectFile: join(elevenRoot, 'audio-studio.json'),
+      port: 0,
+      fish,
+      elevenlabs: null,
+    })
+    try {
+      const body = await (await fetch(new URL('/api/setup', server.url))).json()
+      expect(body.checks.find((c: { id: string }) => c.id === 'elevenlabs')).toMatchObject({
+        state: 'off',
+      })
+    } finally {
+      server.stop(true)
+    }
   })
 
   it('says why when ElevenLabs does not answer', async () => {

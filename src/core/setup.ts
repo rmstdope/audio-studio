@@ -12,21 +12,22 @@ const ELEVENLABS_KEY = 'ELEVENLABS_API_KEY'
 export interface ElevenAccount {
   /** The plan, as ElevenLabs names it (`free`, `starter`, `creator`, …). */
   tier: string
-  /** Characters used this period. */
+  /** Credits used this period (`character_count`: a character costs a credit or less). */
   charactersUsed: number
-  /** Characters the plan includes this period. */
+  /** Credits the plan includes this period (`character_limit`). */
   characterLimit: number
   /** When the characters renew (Unix seconds), if ElevenLabs says. */
   renewsAt: number | null
   /** Credits that may be used beyond the plan, billed in dollars: 0 is none. */
   overage: number | 'unlimited'
+  /** The plan's voice slots: how many are in use, and how many it has. */
   voiceSlots: { used: number; limit: number }
 }
 
 /** What asking ElevenLabs for the account gave. */
 export type ElevenAnswer =
   | { ok: true; account: ElevenAccount }
-  | { ok: false; reason: 'no-key' | 'elevenlabs' | 'project'; message: string }
+  | { ok: false; reason: 'no-key' | 'elevenlabs'; message: string }
 
 /** What asking Fish for the account's credit gave: the shape of `services/fish.ts`'s `CreditResult`. */
 export type FishAnswer =
@@ -449,7 +450,7 @@ function elevenlabs(facts: SetupFacts): SetupCheck {
     id: 'elevenlabs',
     title,
     state: 'ok',
-    detail: `Answers. ${planName(account.tier)} plan: ${count(left)} of ${count(account.characterLimit)} characters left${renews}.`,
+    detail: `Answers. ${planName(account.tier)} plan: ${count(left)} of ${count(account.characterLimit)} credits left${renews}.`,
     notes: [
       overageNote(account.overage),
       `Voice slots: ${account.voiceSlots.used} of ${account.voiceSlots.limit} used.`,

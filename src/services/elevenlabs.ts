@@ -1,17 +1,11 @@
 import { z } from 'zod'
-import type { Project } from '../core/project'
-import type { ElevenAccount } from '../core/setup'
-import { elevenLabsApiKey } from './env'
+import type { ElevenAccount, ElevenAnswer } from '../core/setup'
 
 /** What the studio needs from ElevenLabs. Behind an interface, so tests use a fake. */
 export interface ElevenLabsClient {
-  /** The account's plan, its characters this period, what may be billed beyond them, and its voice slots. */
+  /** The account's plan, its credits this period, what may be billed beyond them, and its voice slots. */
   subscription(): Promise<ElevenAccount>
 }
-
-/** What the studio says when there is no ElevenLabs API key. */
-export const NO_ELEVENLABS_KEY =
-  'Set ELEVENLABS_API_KEY in the project’s env file, or in the environment.'
 
 /** ElevenLabs answered with an error. */
 export class ElevenLabsError extends Error {
@@ -36,9 +30,15 @@ const ApiSubscriptionSchema = z.looseObject({
   voice_slots_used: z.number().default(0),
 })
 
+/** How long asking for the account may take: it holds up Setup, so not as long as other work. */
+const ACCOUNT_TIMEOUT_MS = 10_000
+
+/** What the studio says of an answer it cannot read: not JSON, or not the shape it expects. */
+const UNREADABLE = 'ElevenLabs answered in a form the studio does not read'
+
 /**
  * A client for ElevenLabs' REST API (https://elevenlabs.io/docs/api-reference). `fetch` and the
- * base URL can be replaced, for tests.
+ * base URL can be replaced, for tests; `timeoutMs` is the longest any request may take.
  */
 export function createElevenLabsClient(
   apiKey: string,
@@ -48,21 +48,26 @@ export function createElevenLabsClient(
     timeoutMs = 120_000,
   }: { fetch?: typeof globalThis.fetch; baseUrl?: string; timeoutMs?: number } = {},
 ): ElevenLabsClient {
-  /** A GET whose whole answer, the body included, gives up after `timeoutMs`, saying so. */
-  async function get(path: string): Promise<unknown> {
+  /** A GET whose whole answer, the body included, gives up after `waitMs`, saying so. */
+  async function get(path: string, waitMs: number): Promise<unknown> {
     try {
       const response = await fetch(new URL(path, baseUrl), {
         headers: { 'xi-api-key': apiKey },
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(waitMs),
       })
       if (!response.ok) throw new ElevenLabsError(response.status, await errorMessage(response))
-      return (await response.json()) as unknown
+      const text = await response.text()
+      try {
+        return JSON.parse(text) as unknown
+      } catch {
+        throw new Error(UNREADABLE)
+      }
     } catch (error) {
       if (
         error instanceof Error &&
         (error.name === 'TimeoutError' || error.name === 'AbortError')
       ) {
-        throw new Error(`ElevenLabs did not answer within ${timeoutMs / 1000} s`)
+        throw new Error(`ElevenLabs did not answer within ${waitMs / 1000} s`)
       }
       throw error
     }
@@ -70,7 +75,11 @@ export function createElevenLabsClient(
 
   return {
     async subscription() {
-      const api = ApiSubscriptionSchema.parse(await get('/v1/user/subscription'))
+      const parsed = ApiSubscriptionSchema.safeParse(
+        await get('/v1/user/subscription', Math.min(timeoutMs, ACCOUNT_TIMEOUT_MS)),
+      )
+      if (!parsed.success) throw new Error(UNREADABLE)
+      const api = parsed.data
       return {
         tier: api.tier,
         charactersUsed: api.character_count,
@@ -83,17 +92,17 @@ export function createElevenLabsClient(
   }
 }
 
-/**
- * The ElevenLabs client for a project, made from its API key (environment, else the project's env
- * file), or null when there is none. Read on every call, so a key added later is picked up.
- */
-export async function elevenLabsFromEnv(
-  root: string,
-  project: Project,
-  environment: Record<string, string | undefined> = process.env,
-): Promise<ElevenLabsClient | null> {
-  const key = await elevenLabsApiKey(root, project.env, environment)
-  return key ? createElevenLabsClient(key) : null
+/** The account as Setup shows it: what `subscription` gave, or why it could not be read. */
+export async function accountOf(client: ElevenLabsClient): Promise<ElevenAnswer> {
+  try {
+    return { ok: true, account: await client.subscription() }
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'elevenlabs',
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
 }
 
 /** ElevenLabs' message from an error answer: `detail.message`, `detail` or `message`, else the text. */
