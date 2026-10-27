@@ -370,3 +370,33 @@ describe('narration.sceneCueSpeakers', () => {
     expect(parse(named).data!.narration.sceneCueSpeakers).toEqual(['narrator', 'mira'])
   })
 })
+
+describe('problemsFrom wording', () => {
+  const base = projectJson()
+  const messages = (value: unknown) => problems(value).map((p) => p.message)
+
+  it('says a number that is too small in plain words', () => {
+    expect(messages({ ...base, takeFade: -1 })).toEqual(['takeFade must be 0 or more'])
+  })
+
+  it('says a wrong type in plain words', () => {
+    expect(messages({ ...base, takeFade: 'long' })).toEqual(['takeFade must be a number'])
+  })
+
+  it('says a missing key in plain words', () => {
+    const { narration: _omitted, ...rest } = base
+    expect(messages(rest)).toEqual(['narration is missing'])
+  })
+
+  it('says a text or list that is too short in plain words', () => {
+    const narration = base.narration as Record<string, unknown>
+    const all = messages({ ...base, narration: { ...narration, languages: [] } })
+    expect(all).toEqual(['narration.languages must be 1 or more items'])
+  })
+
+  it('leaves messages the schema wrote itself alone', () => {
+    const narration = base.narration as Record<string, unknown>
+    const bad = { ...narration, models: { audition: 'nonesuch' } }
+    for (const m of messages({ ...base, narration: bad })) expect(m).not.toContain('Invalid input')
+  })
+})
