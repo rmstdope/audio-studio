@@ -16,6 +16,7 @@ import {
   lacking,
   menuEntry,
   onThisComputer,
+  perMinuteWords,
   setupShortLine,
   musicModel,
   saveFailureHeading,
@@ -165,7 +166,7 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
           {onThisComputer(shown) ? (
             <span className="free">Free</span>
           ) : (
-            <span className="price">Paid</span>
+            <span className="price">{perMinuteWords(shown)}</span>
           )}
           {!here && <span className="warnline">{lacking(shown)}</span>}
           {pending && <span className="muted">Saving…</span>}

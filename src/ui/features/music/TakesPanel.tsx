@@ -17,6 +17,7 @@ import {
   menuEntry,
   missingOnTrack,
   shortMenuLabel,
+  takesButton,
   tooLongOnTrack,
   type MusicModelId,
 } from '../../../core/musicModels'
@@ -204,6 +205,11 @@ export function TakesPanel({
                   type="button"
                   className="btn btn-ghost"
                   disabled={stop.isPending}
+                  title={
+                    view.making.some((m) => m.paid)
+                      ? 'ElevenLabs may still bill a take that is stopped while it is being made.'
+                      : undefined
+                  }
                   onClick={() => stop.mutate()}
                 >
                   Stop
@@ -216,7 +222,7 @@ export function TakesPanel({
                 disabled={!canMake || make.isPending || view.making.length > 0}
                 onClick={() => make.mutate({ count: 2, model })}
               >
-                More takes
+                {takesButton('More takes', model, length, 2)}
               </button>
             </div>
           )}
@@ -280,7 +286,7 @@ export function TakesPanel({
                 disabled={!canMake || make.isPending}
                 onClick={() => make.mutate({ count: 2, model })}
               >
-                Make 2 takes
+                {takesButton('Make 2 takes', model, length, 2)}
               </button>
             </div>
             {missing}

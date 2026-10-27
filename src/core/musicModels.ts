@@ -15,6 +15,14 @@ export type MusicModelId = (typeof MUSIC_MODEL_IDS)[number]
 /** How much longer than it plays a loop is generated, since every take closes as a song does. */
 export const LOOP_EXTRA_SECONDS = 20
 
+/** ACE-Step's shortest take, which every stinger is generated at. */
+export const STINGER_GENERATED_SECONDS = 10
+
+/** The length a model is asked for, for a track of this kind that should play `seconds`. */
+export function generatedSeconds(kind: 'loop' | 'stinger', seconds: number): number {
+  return kind === 'loop' ? seconds + LOOP_EXTRA_SECONDS : STINGER_GENERATED_SECONDS
+}
+
 /** The generators the models run on. */
 export type MusicFamily = 'acestep' | 'stable-audio' | 'elevenlabs'
 
@@ -45,6 +53,8 @@ export interface MusicModel {
   minutes: string
   /** About how much the folders download, when it has been measured. */
   download: string | null
+  /** What a minute of the music it makes costs, in US dollars; null when it is free. */
+  perMinute: number | null
 }
 
 /** The models, in the order the menus list them. */
@@ -60,6 +70,7 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     seconds: 180,
     minutes: '3 min',
     download: 'about 28 GB',
+    perMinute: null,
   },
   {
     id: 'quick',
@@ -72,6 +83,7 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     seconds: 75,
     minutes: '1¼ min',
     download: null,
+    perMinute: null,
   },
   {
     id: 'quickest',
@@ -84,6 +96,7 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     seconds: 60,
     minutes: '1 min',
     download: null,
+    perMinute: null,
   },
   {
     id: 'careful',
@@ -96,6 +109,7 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     seconds: 420,
     minutes: '7 min',
     download: null,
+    perMinute: null,
   },
   {
     id: 'short',
@@ -108,6 +122,7 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     seconds: 40,
     minutes: '40 s',
     download: null,
+    perMinute: null,
   },
   {
     id: 'shortest',
@@ -120,6 +135,7 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     seconds: 10,
     minutes: '10 s',
     download: null,
+    perMinute: null,
   },
   {
     id: 'eleven',
@@ -134,6 +150,8 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     seconds: 60,
     minutes: '1 min',
     download: null,
+    // ElevenLabs' API price for Eleven Music (October 2026).
+    perMinute: 0.15,
   },
 ]
 
@@ -181,6 +199,47 @@ export interface TrackLength {
   seconds: number
 }
 
+/** An amount in US dollars, to the cent. */
+function cents(amount: number): string {
+  return `$${(Math.round(amount * 100) / 100).toFixed(2)}`
+}
+
+/**
+ * What one take of this track costs with the model, in US dollars: everything it is asked to make
+ * (a loop's 20 seconds more included), at its price a minute; null for a free model.
+ */
+export function takePrice(id: MusicModelId, track: TrackLength): number | null {
+  const { perMinute } = musicModel(id)
+  if (perMinute === null) return null
+  return (perMinute * generatedSeconds(track.kind, track.seconds)) / 60
+}
+
+/** A paid model's price a minute, as Setup shows it: "$0.15 a minute"; null for a free model. */
+export function perMinuteWords(id: MusicModelId): string | null {
+  const { perMinute } = musicModel(id)
+  return perMinute === null ? null : `${cents(perMinute)} a minute`
+}
+
+/** A button that makes `count` takes, with what they cost when the model is paid: "More takes · $0.55". */
+export function takesButton(
+  words: string,
+  id: MusicModelId,
+  track: TrackLength,
+  count: number,
+): string {
+  const price = takePrice(id, track)
+  return price === null ? words : `${words} · ${cents(price * count)}`
+}
+
+/** How long a take takes, and for a paid model what it costs: "about 1 min and $0.28 a take". */
+function perTake(id: MusicModelId, track?: TrackLength): string {
+  const { minutes } = musicModel(id)
+  const price = track ? takePrice(id, track) : null
+  if (price !== null) return `about ${minutes} and ${cents(price)} a take`
+  const perMinute = perMinuteWords(id)
+  return perMinute ? `about ${minutes} a take, ${perMinute} of music` : `about ${minutes} a take`
+}
+
 /** A length as m:ss. */
 function clock(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
@@ -225,7 +284,7 @@ export function menuEntry(id: MusicModelId, installed: boolean, track?: TrackLen
   const heading = `${model.name} · ${model.generator}`
   const reason = track ? lengthReason(id, track.kind, track.seconds) : null
   if (reason) return `${heading} — ${reason}`
-  const base = `${heading} — about ${model.minutes} a take`
+  const base = `${heading} — ${perTake(id, track)}`
   return installed ? base : `${base} — ${lacking(id)}`
 }
 
@@ -234,9 +293,9 @@ export function menuEntry(id: MusicModelId, installed: boolean, track?: TrackLen
  * used (too short for the track wins over missing); the generator's names stay in the opened list.
  */
 export function shortMenuLabel(id: MusicModelId, installed: boolean, track?: TrackLength): string {
-  const { name, minutes } = musicModel(id)
+  const { name } = musicModel(id)
   if (track && !canMake(id, track.kind, track.seconds)) return `${name} — ${makes(id)}`
-  return installed ? `${name} — about ${minutes} a take` : `${name} — ${lacking(id)}`
+  return installed ? `${name} — ${perTake(id, track)}` : `${name} — ${lacking(id)}`
 }
 
 /** What an empty track says a take takes with this model: "about 3 minutes each". */

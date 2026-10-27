@@ -128,6 +128,7 @@ describe('the Takes panel while the music lock cannot be read', () => {
         elapsed: 5,
         model: 'Quick · XL turbo · 1.7B',
         expected: 75,
+        paid: false,
       },
     ]
     const page = render(view({ lockUnread: true, takes: [], making }))
@@ -155,7 +156,7 @@ describe('the model menu on a track’s Takes panel', () => {
       'Careful · XL sft · 4B — about 7 min a take',
       'Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 0:30',
       'Shortest · Stable Audio Open Small — makes no loops · this one is 0:30',
-      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take',
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min and $0.13 a take',
     ])
   })
 
@@ -223,8 +224,22 @@ describe('the model menu on a track’s Takes panel', () => {
     const page = render(
       view({
         making: [
-          { n: 2, state: 'making', elapsed: 30, model: 'Quick · XL turbo · 1.7B', expected: 75 },
-          { n: 3, state: 'waiting', elapsed: 0, model: 'Quick · XL turbo · 1.7B', expected: 75 },
+          {
+            n: 2,
+            state: 'making',
+            elapsed: 30,
+            model: 'Quick · XL turbo · 1.7B',
+            expected: 75,
+            paid: false,
+          },
+          {
+            n: 3,
+            state: 'waiting',
+            elapsed: 0,
+            model: 'Quick · XL turbo · 1.7B',
+            expected: 75,
+            paid: false,
+          },
         ],
       }),
     )
@@ -412,7 +427,9 @@ describe('the closed model menu’s short label', () => {
   })
 
   it('keeps the short label while takes are being made', () => {
-    const making = [{ n: 1, state: 'making' as const, elapsed: 5, model: 'Balanced', expected: 75 }]
+    const making = [
+      { n: 1, state: 'making' as const, elapsed: 5, model: 'Balanced', expected: 75, paid: false },
+    ]
     const menu = render(view({ making })).menu()
     expect(menu.disabled).toBe(true)
     expect(labels(menu)[0]).toBe('Balanced — about 3 min a take')
@@ -441,5 +458,30 @@ describe('the banner when no music can be made', () => {
       'There is no ElevenLabs key. Setup says what is missing.',
     )
     expect(banner.querySelector('a')!.textContent).toBe('Open Setup')
+  })
+})
+
+describe('what Eleven Music takes cost, on the panel', () => {
+  it('puts the price of the two takes on More takes and Make 2 takes, and none on a free model', () => {
+    const paid = render(view({ defaultModel: 'eleven' }))
+    expect(paid.button('More takes · $0.25')).toBeDefined()
+    const empty = render(view({ defaultModel: 'eleven', takes: [] }))
+    expect(empty.button('Make 2 takes · $0.25')).toBeDefined()
+    expect(render(view()).button('More takes')).toBeDefined()
+  })
+
+  it('warns on Stop that a take stopped in the cloud may still be billed', () => {
+    const making = (paid: boolean) =>
+      render(
+        view({
+          making: [
+            { n: 2, state: 'making', elapsed: 3, model: 'Eleven Music', expected: 60, paid },
+          ],
+        }),
+      ).button('Stop')
+    expect(making(true).title).toBe(
+      'ElevenLabs may still bill a take that is stopped while it is being made.',
+    )
+    expect(making(false).title).toBe('')
   })
 })

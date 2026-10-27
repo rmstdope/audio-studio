@@ -16,6 +16,9 @@ import {
   modelLine,
   modelOfRecipe,
   musicModel,
+  takePrice,
+  takesButton,
+  perMinuteWords,
 } from './musicModels'
 import { ProjectSchema } from './project'
 import { projectJson } from '../../test/helpers'
@@ -163,11 +166,8 @@ describe('Eleven Music', () => {
     })
   })
   test('needs a key where a local model needs its files', () => {
-    expect(menuEntry('eleven', true)).toBe(
-      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take',
-    )
     expect(menuEntry('eleven', false)).toBe(
-      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take — needs an ElevenLabs key',
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take, $0.15 a minute of music — needs an ElevenLabs key',
     )
     expect(shortMenuLabel('eleven', false)).toBe('Eleven Music — needs an ElevenLabs key')
     expect(missingOnTrack('eleven')).toBe(
@@ -192,6 +192,40 @@ describe('Eleven Music', () => {
         }),
       ).success,
     ).toBe(true)
+  })
+})
+
+describe('what a take costs', () => {
+  const loop90 = { kind: 'loop', seconds: 90 } as const
+  const stinger = { kind: 'stinger', seconds: 6 } as const
+  test('Eleven Music charges by the minute for all it makes: a loop’s extra 20 s too', () => {
+    expect(takePrice('eleven', loop90)).toBeCloseTo(0.275)
+    expect(takePrice('eleven', stinger)).toBeCloseTo(0.025)
+    expect(takePrice('balanced', loop90)).toBeNull()
+    expect(perMinuteWords('eleven')).toBe('$0.15 a minute')
+    expect(perMinuteWords('short')).toBeNull()
+  })
+  test('the menus give a paid model’s price beside its time', () => {
+    expect(menuEntry('eleven', true, loop90)).toBe(
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min and $0.28 a take',
+    )
+    expect(menuEntry('eleven', true)).toBe(
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take, $0.15 a minute of music',
+    )
+    expect(menuEntry('eleven', false, stinger)).toBe(
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min and $0.03 a take — needs an ElevenLabs key',
+    )
+    expect(shortMenuLabel('eleven', true, loop90)).toBe(
+      'Eleven Music — about 1 min and $0.28 a take',
+    )
+    expect(menuEntry('balanced', true, loop90)).toBe(
+      'Balanced · XL turbo · 4B — about 3 min a take',
+    )
+  })
+  test('a button that makes takes says what they cost, and a free one does not', () => {
+    expect(takesButton('More takes', 'eleven', loop90, 2)).toBe('More takes · $0.55')
+    expect(takesButton('Make 2 takes', 'eleven', stinger, 2)).toBe('Make 2 takes · $0.05')
+    expect(takesButton('More takes', 'balanced', loop90, 2)).toBe('More takes')
   })
 })
 

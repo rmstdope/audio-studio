@@ -162,7 +162,7 @@ describe('Move… on a take card', () => {
     const page = render(
       village,
       view([take(1), take(2, { chosen: true })], {
-        making: [{ n: 3, state: 'making', elapsed: 1, model: 'm', expected: 100 }],
+        making: [{ n: 3, state: 'making', elapsed: 1, model: 'm', expected: 100, paid: false }],
       }),
     )
     expect(page.buttons('Move…')).toHaveLength(1)

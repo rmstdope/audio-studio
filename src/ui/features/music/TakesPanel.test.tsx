@@ -69,15 +69,36 @@ describe('the Takes panel’s Stop', () => {
   it('can stop the last take while it is being made, with none waiting', () => {
     expect(
       stopButton([
-        { n: 1, state: 'making', elapsed: 20, model: 'Balanced · XL turbo · 4B', expected: 180 },
+        {
+          n: 1,
+          state: 'making',
+          elapsed: 20,
+          model: 'Balanced · XL turbo · 4B',
+          expected: 180,
+          paid: false,
+        },
       ])?.disabled,
     ).toBe(false)
   })
 
   it('can stop takes waiting behind the one being made', () => {
     const making: MakingView[] = [
-      { n: 1, state: 'making', elapsed: 20, model: 'Balanced · XL turbo · 4B', expected: 180 },
-      { n: 2, state: 'waiting', elapsed: 0, model: 'Balanced · XL turbo · 4B', expected: 180 },
+      {
+        n: 1,
+        state: 'making',
+        elapsed: 20,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+        paid: false,
+      },
+      {
+        n: 2,
+        state: 'waiting',
+        elapsed: 0,
+        model: 'Balanced · XL turbo · 4B',
+        expected: 180,
+        paid: false,
+      },
     ]
     expect(stopButton(making)?.disabled).toBe(false)
   })

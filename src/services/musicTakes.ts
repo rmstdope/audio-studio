@@ -366,6 +366,7 @@ export function createMusicTakes({
           elapsed: entry.state === 'making' ? Math.max(0, (now() - entry.startedAt) / 1000) : 0,
           model: lineOf(entry.model),
           expected: musicModel(entry.model).seconds,
+          paid: musicModel(entry.model).perMinute !== null,
         }))
       const failed: FailedView[] = entries
         .filter((entry) => entry.state === 'failed' && entry.hash === hash)

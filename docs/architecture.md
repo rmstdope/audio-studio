@@ -1152,13 +1152,13 @@ kept as design takes with their `generated_voice_id` and audio; casting one save
 kept preview's id in a later session, its card says so and offers to design again. A design's price,
 unknown today, is settled in 14.12 and confirmed as Fish's is. Cloning stays Fish's.
 
-**Music** (built in 14.4 but for the price, 14.5). One more family, `elevenlabs`, with one model,
-_Eleven Music_ (id `eleven`, recipe
-`eleven-music-v2.5`, `longest` 600 s, so loops up to 580 s, no folders, no download, about a minute
-a take until measured), in its own menu group, "ElevenLabs · in the cloud, paid". A take is `POST
-/v1/music` with `model_id` `music_v2_5`, the brief (with the tempo and key added as `, 84 BPM, D
-major`) as `prompt`, `music_length_ms` from `generatedSeconds`, and `force_instrumental`. A project
-naming `eleven` as `music.model` cannot be read by an older studio.
+**Music** (built in 14.4 and 14.5, but for the spending log, 14.7). One more family, `elevenlabs`,
+with one model, _Eleven Music_ (id `eleven`, recipe `eleven-music-v2.5`, `longest` 600 s, so loops
+up to 580 s, no folders, no download, about a minute a take until measured), in its own menu group,
+"ElevenLabs · in the cloud, paid". A take is `POST /v1/music` with `model_id` `music_v2_5`, the
+brief (with the tempo and key added as `, 84 BPM, D major`) as `prompt`, `music_length_ms` from
+`generatedSeconds`, and `force_instrumental`. A project naming `eleven` as `music.model` cannot be
+read by an older studio.
 
 - **No seed.** ElevenLabs takes no seed with a prompt, so a take's `seed` becomes optional (absent,
   not null) in the generator's answer, the board, the view, a move and the music lock; local takes
@@ -1171,12 +1171,16 @@ naming `eleven` as `music.model` cannot be read by an older studio.
   on any computer, not only Apple silicon; Setup's Music row is off while the project's model is
   Eleven Music, and the Models panel's Music row says it is made in the cloud and is Paid.
 - **No GPU.** The take queue chooses by family: local takes wait for the GPU as before
-  (`musicTakes`, `queue.run(GPU, …)`), Eleven Music takes for each other only (a queue of their
-  own, one at a time), beside local takes and Whisper. The router is a table from family to generator
+  (`musicTakes`, `queue.run(GPU, …)`), Eleven Music takes for each other only (a queue of their own,
+  one at a time), beside local takes and Whisper. The router is a table from family to generator
   (built, 14.3), and a take made in the cloud stops no local worker.
-- **Price.** The price of a take (the whole take, the 20 seconds a loop is made longer included) is
-  on the menu entry and on More takes; takes are not confirmed, and each is logged. Stop aborts the
-  request; ElevenLabs may still bill a take stopped while being made, which Stop's title says.
+- **Price.** A music model has a price a minute (`perMinute`: Eleven Music $0.15, ElevenLabs' API
+  price; null for the free ones), and a take costs it for the whole take, the 20 seconds a loop is
+  made longer included (`takePrice`). A track's menu entry says "about 1 min and $0.28 a take",
+  Setup's menu "about 1 min a take, $0.15 a minute of music" with "$0.15 a minute" beside it, and
+  More takes and Make 2 takes the price of both ("More takes · $0.55"). Takes are not confirmed;
+  each is logged with step 14.7. Stop aborts the request; ElevenLabs may still bill a take stopped
+  while being made, which Stop's title says while a paid take is being made.
 
 **Testing.** Every test uses a fake `ElevenLabsClient`. Opt-in live tests
 (`AUDIO_STUDIO_LIVE_ELEVENLABS=1`, with a key; §11 says so when they come) speak one short line,
@@ -1547,22 +1551,22 @@ Small, independently useful increments:
 14. **ElevenLabs** (§8.6), in small pull requests, each verified by hand by the user (no key in CI):
     1. **The plan**: §8.6, this step and decision 7.
     2. **Key and account** (built): `ELEVENLABS_API_KEY`, the client with `subscription` only,
-       Setup's two optional rows. The user checks what the account draws on (allowance or dollars, and whether
-       music and speech share it) and its concurrency, and the plan follows.
-    3. **Music, ready for a second provider** (built): an optional seed (board, view, move,
-       lock), the music router as a table from family to generator. No behaviour changes. Each
-       provider's prices stay in tables of their own, so nothing needed splitting.
-    4. **Eleven Music takes** (built): the family and model in every music menu, takes made,
-       decoded and shaped, outside the GPU queue (the take queue by family), ready by key, Setup's
-       Music row, an opt-in live take.
-    5. **What music costs**: the price on the menus and More takes, and music rows in the spending
-       log (its version 2).
+       Setup's two optional rows. The user checks what the account draws on (allowance or dollars,
+       and whether music and speech share it) and its concurrency, and the plan follows.
+    3. **Music, ready for a second provider** (built): an optional seed (board, view, move, lock),
+       the music router as a table from family to generator. No behaviour changes. Each provider's
+       prices stay in tables of their own, so nothing needed splitting.
+    4. **Eleven Music takes** (built): the family and model in every music menu, takes made, decoded
+       and shaped, outside the GPU queue (the take queue by family), ready by key, Setup's Music
+       row, an opt-in live take.
+    5. **What music costs** (built): the price on the menus, More takes and Make 2 takes, and Stop's
+       warning. Music rows in the spending log go with its version 2, in 14.7.
     6. **A voice says whose it is**: `eleven:` voice ids (`core/voices.ts`, the server's voice-id
        check), a `SpeechClient` seam with Fish behind it. No behaviour changes.
     7. **Record lines with an ElevenLabs voice**: Add by id with the provider chosen, Eleven v3 with
        the default settings, the speed check, characters in the confirm and admission, ElevenLabs
-       rows in the spending log. Page takes and cue tries are not offered for an ElevenLabs voice
-       yet, and nothing of Fish's is asked about one.
+       rows and music rows in the spending log (its version 2). Page takes and cue tries are not
+       offered for an ElevenLabs voice yet, and nothing of Fish's is asked about one.
     8. **Cues by model**: cues left out of the text and the fingerprint for models that would speak
        them, so that choosing such a model (next) never reads a cue aloud.
     9. **Choose ElevenLabs' models and settings**: `narration.elevenlabs` saved from the Models
