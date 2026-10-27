@@ -132,6 +132,7 @@ audio-studio/
 │   │   ├── planner.ts           script × lock × disk → status per line, generation plan
 │   │   ├── summary.ts           parts and characters as the UI shows them
 │   │   ├── voiceSearch.ts       search terms from keywords; ranking of found voices
+│   │   ├── voices.ts            whose a voice is: `eleven:` ids for ElevenLabs, bare ones Fish's
 │   │   ├── castFormat.ts        the cast as text, in its own layout (one line per character)
 │   │   ├── align.ts             Whisper words → word timings, heard ratio (narrate.py's, + names)
 │   │   ├── numbers.ts           the numbers 0–99 in words, per language, matched to digits
@@ -1562,12 +1563,17 @@ Small, independently useful increments:
        row, an opt-in live take.
     5. **What music costs** (built): the price on the menus, More takes and Make 2 takes, and Stop's
        warning. Music rows in the spending log go with its version 2, in 14.7.
-    6. **A voice says whose it is**: `eleven:` voice ids (`core/voices.ts`, the server's voice-id
-       check), a `SpeechClient` seam with Fish behind it. No behaviour changes.
-    7. **Record lines with an ElevenLabs voice**: Add by id with the provider chosen, Eleven v3 with
-       the default settings, the speed check, characters in the confirm and admission, ElevenLabs
-       rows and music rows in the spending log (its version 2). Page takes and cue tries are not
-       offered for an ElevenLabs voice yet, and nothing of Fish's is asked about one.
+    6. **A voice says whose it is** (built): `eleven:` voice ids (`core/voices.ts`: `providerOf`,
+       `providerId`, `elevenVoice`, `FISH_VOICE_ID` and `VOICE_ID`), and no Fish page linked for an
+       ElevenLabs voice. The routes that would reach Fish or the cast (a take, adding, moving and
+       casting a voice) still take Fish's ids only, until 14.7 can speak with an ElevenLabs one;
+       allowing a ruled-out voice again takes either. No behaviour changes. The speaking seam moves
+       to 14.7, which first needs it.
+    7. **Record lines with an ElevenLabs voice**: a seam that speaks a line with its voice's
+       provider (Fish behind it as today), Add by id with the provider chosen, Eleven v3 with the
+       default settings, the speed check, characters in the confirm and admission, ElevenLabs rows
+       and music rows in the spending log (its version 2). Page takes and cue tries are not offered
+       for an ElevenLabs voice yet, and nothing of Fish's is asked about one.
     8. **Cues by model**: cues left out of the text and the fingerprint for models that would speak
        them, so that choosing such a model (next) never reads a cue aloud.
     9. **Choose ElevenLabs' models and settings**: `narration.elevenlabs` saved from the Models

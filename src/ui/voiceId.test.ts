@@ -36,6 +36,10 @@ describe('voiceIdFrom', () => {
 describe('voiceUrl', () => {
   it('gives the voice’s page on Fish Audio, which reads back as its id', () => {
     expect(voiceUrl('e48a228e21a4')).toBe('https://fish.audio/m/e48a228e21a4/')
-    expect(voiceIdFrom(voiceUrl('e48a228e21a4'))).toBe('e48a228e21a4')
+    expect(voiceIdFrom(voiceUrl('e48a228e21a4')!)).toBe('e48a228e21a4')
+  })
+
+  it('is none for an ElevenLabs voice, which has no public page', () => {
+    expect(voiceUrl('eleven:21m00Tcm4TlvDq8ikWAM')).toBeNull()
   })
 })
