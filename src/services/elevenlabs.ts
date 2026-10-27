@@ -5,6 +5,18 @@ import type { ElevenAccount, ElevenAnswer } from '../core/setup'
 export interface ElevenLabsClient {
   /** The account's plan, its credits this period, what may be billed beyond them, and its voice slots. */
   subscription(): Promise<ElevenAccount>
+  /**
+   * An instrumental piece of music from a prompt, as MP3 (Eleven Music v2.5; ElevenLabs takes no
+   * seed with a prompt). Aborting `signal` ends it at once, and it rejects.
+   */
+  music(request: MusicPieceRequest, signal?: AbortSignal): Promise<Uint8Array>
+}
+
+/** A piece of music to make: what it should sound like, and how long it is. */
+export interface MusicPieceRequest {
+  prompt: string
+  /** Its length in milliseconds (ElevenLabs takes 3 s to 10 minutes). */
+  lengthMs: number
 }
 
 /** ElevenLabs answered with an error. */
@@ -32,6 +44,9 @@ const ApiSubscriptionSchema = z.looseObject({
 
 /** How long asking for the account may take: it holds up Setup, so not as long as other work. */
 const ACCOUNT_TIMEOUT_MS = 10_000
+
+/** How long making a piece may take: up to ten minutes of music, made in the cloud. */
+const MUSIC_TIMEOUT_MS = 10 * 60_000
 
 /** What the studio says of an answer it cannot read: not JSON, or not the shape it expects. */
 const UNREADABLE = 'ElevenLabs answered in a form the studio does not read'
@@ -74,6 +89,31 @@ export function createElevenLabsClient(
   }
 
   return {
+    async music({ prompt, lengthMs }, signal) {
+      const timeout = AbortSignal.timeout(MUSIC_TIMEOUT_MS)
+      try {
+        const response = await fetch(new URL('/v1/music?output_format=mp3_44100_128', baseUrl), {
+          method: 'POST',
+          headers: { 'xi-api-key': apiKey, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            music_length_ms: lengthMs,
+            model_id: 'music_v2_5',
+            force_instrumental: true,
+          }),
+          signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+        })
+        if (!response.ok) throw new ElevenLabsError(response.status, await errorMessage(response))
+        return new Uint8Array(await response.arrayBuffer())
+      } catch (error) {
+        if (signal?.aborted) throw new Error('The music generator was stopped.')
+        if (timeout.aborted) {
+          throw new Error(`ElevenLabs did not answer within ${MUSIC_TIMEOUT_MS / 60_000} minutes`)
+        }
+        throw error
+      }
+    },
+
     async subscription() {
       const parsed = ApiSubscriptionSchema.safeParse(
         await get('/v1/user/subscription', Math.min(timeoutMs, ACCOUNT_TIMEOUT_MS)),

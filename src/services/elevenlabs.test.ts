@@ -102,3 +102,55 @@ describe('createElevenLabsClient', () => {
     )
   })
 })
+
+describe('making music', () => {
+  /** A fetch that answers with MP3 bytes and records the request. */
+  function musicFetch(status = 200, answer: BodyInit = new Uint8Array([0x49, 0x44, 0x33])) {
+    const asked: { url: string; init: RequestInit }[] = []
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      asked.push({ url: String(input), init: init ?? {} })
+      return new Response(answer, { status })
+    }) as typeof globalThis.fetch
+    return { fetch, asked }
+  }
+
+  it('asks for an instrumental piece of the length given, as 128 kbps MP3, with Music v2.5', async () => {
+    const { fetch, asked } = musicFetch()
+    const mp3 = await createElevenLabsClient('k', { fetch }).music({
+      prompt: 'warm lute, 84 BPM, D major',
+      lengthMs: 50_000,
+    })
+    expect([...mp3]).toEqual([0x49, 0x44, 0x33])
+    expect(asked[0]!.url).toBe('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128')
+    expect(asked[0]!.init.method).toBe('POST')
+    expect(new Headers(asked[0]!.init.headers).get('xi-api-key')).toBe('k')
+    expect(JSON.parse(String(asked[0]!.init.body))).toEqual({
+      prompt: 'warm lute, 84 BPM, D major',
+      music_length_ms: 50_000,
+      model_id: 'music_v2_5',
+      force_instrumental: true,
+    })
+  })
+
+  it("throws ElevenLabs' own message when it refuses", async () => {
+    const { fetch } = musicFetch(
+      402,
+      JSON.stringify({ detail: { message: 'Music requires a paid plan' } }),
+    )
+    await expect(
+      createElevenLabsClient('k', { fetch }).music({ prompt: 'a', lengthMs: 10_000 }),
+    ).rejects.toThrow('ElevenLabs answered 402: Music requires a paid plan')
+  })
+
+  it('stops when asked to, saying so', async () => {
+    const fetch = (async (_: unknown, init?: RequestInit) => {
+      if (init?.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' })
+      return new Response(new Uint8Array())
+    }) as unknown as typeof globalThis.fetch
+    const stop = new AbortController()
+    stop.abort()
+    await expect(
+      createElevenLabsClient('k', { fetch }).music({ prompt: 'a', lengthMs: 10_000 }, stop.signal),
+    ).rejects.toThrow('The music generator was stopped.')
+  })
+})

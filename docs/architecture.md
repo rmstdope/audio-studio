@@ -145,7 +145,8 @@ audio-studio/
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish and ElevenLabs API keys, from the environment or the env file
-│   │   ├── elevenlabs.ts        ElevenLabsClient (subscription; more with step 14)
+│   │   ├── elevenlabs.ts        ElevenLabsClient (subscription, music; more with step 14)
+│   │   ├── elevenMusic.ts       Eleven Music as a MusicGenerator: the brief, the key, the MP3 decoded
 │   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice, designVoice)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
@@ -1021,7 +1022,8 @@ to 27 s · this one is 1:30", which wins over "not on this computer"), the track
 picked model, Setup's included, cannot make it and More takes is disabled until another is picked, and
 `make` refuses it too. Setup's menu greys nothing and, while a Stable Audio model is the default,
 says how many of the project's loops (`modelsView`'s `loops`) are longer. The menus are two groups,
-"ACE-Step · any length" and "Stable Audio · short music only". A second worker
+"ACE-Step · any length", "Stable Audio · short music only" and "ElevenLabs · in the cloud,
+paid" (§8.6). A second worker
 (`worker/stable_audio.py`, `services/stableAudio.ts`, stable-audio-tools through uv, offline: no
 token is read) loads a model from its own folder in `~/.cache/stable-audio` (fixed, one named folder
 per model, downloaded by the user after accepting Stability AI's Community Licence); `createMusicRouter`
@@ -1150,7 +1152,8 @@ kept as design takes with their `generated_voice_id` and audio; casting one save
 kept preview's id in a later session, its card says so and offers to design again. A design's price,
 unknown today, is settled in 14.12 and confirmed as Fish's is. Cloning stays Fish's.
 
-**Music.** One more family, `elevenlabs`, with one model, _Eleven Music_ (id `eleven`, recipe
+**Music** (built in 14.4 but for the price, 14.5). One more family, `elevenlabs`, with one model,
+_Eleven Music_ (id `eleven`, recipe
 `eleven-music-v2.5`, `longest` 600 s, so loops up to 580 s, no folders, no download, about a minute
 a take until measured), in its own menu group, "ElevenLabs · in the cloud, paid". A take is `POST
 /v1/music` with `model_id` `music_v2_5`, the brief (with the tempo and key added as `, 84 BPM, D
@@ -1160,15 +1163,17 @@ naming `eleven` as `music.model` cannot be read by an older studio.
 - **No seed.** ElevenLabs takes no seed with a prompt, so a take's `seed` becomes optional (absent,
   not null) in the generator's answer, the board, the view, a move and the music lock; local takes
   keep theirs. A lock holding a take without one cannot be read by an older studio.
-- **Ready.** `ready` and `installed` take the project's key state, read once per view: the model is
+- **Ready.** `ready` and `installed` may answer later (a promise); the local generators answer at
+  once, and Eleven Music (`services/elevenMusic.ts`) reads the project's key each time: the model is
   installed when the key is set, and ready then too; the account's state is Setup's, and a take that
-  fails says why. Its menu entry says "needs an ElevenLabs key" instead of "not on this computer",
-  and on a Free plan the failed take says the plan has no music. It runs on any computer, not only
-  Apple silicon; Setup's Music row says which generator the project's model uses.
-- **No GPU.** The take queue chooses by family: local takes wait for the GPU as today (`musicTakes`,
-  `queue.run(GPU, …)`), ElevenLabs takes run in `elevenWork` beside them and Whisper; "waiting" on a
-  card means waiting for a free request. The router is a table from family to generator (built, 14.3),
-  and switching to or from ElevenLabs closes no local worker.
+  fails says why in ElevenLabs' own words (a Free plan's refusal among them). Its menu entry says
+  "needs an ElevenLabs key" instead of "not on this computer", as does a refused More takes. It runs
+  on any computer, not only Apple silicon; Setup's Music row is off while the project's model is
+  Eleven Music, and the Models panel's Music row says it is made in the cloud and is Paid.
+- **No GPU.** The take queue chooses by family: local takes wait for the GPU as before
+  (`musicTakes`, `queue.run(GPU, …)`), Eleven Music takes for each other only (a queue of their
+  own, one at a time), beside local takes and Whisper. The router is a table from family to generator
+  (built, 14.3), and a take made in the cloud stops no local worker.
 - **Price.** The price of a take (the whole take, the 20 seconds a loop is made longer included) is
   on the menu entry and on More takes; takes are not confirmed, and each is logged. Stop aborts the
   request; ElevenLabs may still bill a take stopped while being made, which Stop's title says.
@@ -1331,7 +1336,8 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   spoken-text building, chunking, alignment (ported from `test_narrate.py`), audition state
   transitions.
 - `services/` are tested against fakes (a fake `FishClient` and `Transcriber`), plus a few opt-in
-  live tests behind an env flag.
+  live tests behind an env flag: `AUDIO_STUDIO_LIVE_MUSIC=1` for the local music models, and
+  `AUDIO_STUDIO_LIVE_ELEVENLABS=1` with `ELEVENLABS_API_KEY` for a paid Eleven Music take.
 - The server API is tested with an in-memory project fixture (a small consumer repo in
   `test/fixtures/`).
 - UI: component tests for the audition and line table; one Playwright smoke test over the fixture.
@@ -1546,8 +1552,9 @@ Small, independently useful increments:
     3. **Music, ready for a second provider** (built): an optional seed (board, view, move,
        lock), the music router as a table from family to generator. No behaviour changes. Each
        provider's prices stay in tables of their own, so nothing needed splitting.
-    4. **Eleven Music takes**: the family and model in every music menu, takes made, decoded and
-       shaped, outside the GPU queue (the take queue by family), ready by key, Setup's Music row.
+    4. **Eleven Music takes** (built): the family and model in every music menu, takes made,
+       decoded and shaped, outside the GPU queue (the take queue by family), ready by key, Setup's
+       Music row, an opt-in live take.
     5. **What music costs**: the price on the menus and More takes, and music rows in the spending
        log (its version 2).
     6. **A voice says whose it is**: `eleven:` voice ids (`core/voices.ts`, the server's voice-id

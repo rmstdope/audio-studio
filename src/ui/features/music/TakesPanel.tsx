@@ -40,7 +40,7 @@ import { MoveTakeDialog } from './MoveTakeDialog'
 /**
  * A track's Takes panel: the takes made, played from the start and, for a loop, around their
  * seam; the ones being made; and "Make 2 takes" when there are none yet. A take that failed says
- * why, with Try again; without the music generator on this computer, it says so and links Setup.
+ * why, with Try again; when no music can be made, it says why and links Setup.
  */
 export function TakesPanel({
   track,
@@ -158,10 +158,8 @@ export function TakesPanel({
       {!generator.ok && (
         <div className="errbox" role="alert">
           <div className="errbox-text">
-            <strong>Music can't be made on this computer yet.</strong>
-            <span className="muted small">
-              The music generator or its models aren't installed. Setup says what is missing.
-            </span>
+            <strong>Music can't be made yet.</strong>
+            <span className="muted small">{`${generator.message} Setup says what is missing.`}</span>
           </div>
           <a className="btn" href={routeHref({ view: 'setup' })}>
             Open Setup

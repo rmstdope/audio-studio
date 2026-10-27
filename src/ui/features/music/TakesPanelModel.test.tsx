@@ -35,10 +35,12 @@ const track: TrackRow = {
 }
 
 const everyModel = (missing: string[] = []) =>
-  (['balanced', 'quick', 'quickest', 'careful', 'short', 'shortest'] as const).map((id) => ({
-    id,
-    installed: !missing.includes(id),
-  }))
+  (['balanced', 'quick', 'quickest', 'careful', 'short', 'shortest', 'eleven'] as const).map(
+    (id) => ({
+      id,
+      installed: !missing.includes(id),
+    }),
+  )
 
 const view = (over: Partial<MusicTakesView> = {}): MusicTakesView => ({
   ok: true,
@@ -153,6 +155,7 @@ describe('the model menu on a track’s Takes panel', () => {
       'Careful · XL sft · 4B — about 7 min a take',
       'Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 0:30',
       'Shortest · Stable Audio Open Small — makes no loops · this one is 0:30',
+      'Eleven Music · ElevenLabs, in the cloud — about 1 min a take',
     ])
   })
 
@@ -267,18 +270,19 @@ describe('the Stable Audio models in a track’s menu', () => {
   const shortLoop = { ...track, seconds: 20 }
   const stingerView = (over: Partial<MusicTakesView> = {}) => view({ kind: 'stinger', ...over })
 
-  it('is two groups under headings', () => {
+  it('is three groups under headings', () => {
     const page = render(view())
     expect([...page.menu().querySelectorAll('optgroup')].map((g) => g.label)).toEqual([
       'ACE-Step · any length',
       'Stable Audio · short music only',
+      'ElevenLabs · in the cloud, paid',
     ])
   })
 
   it('greys a model that cannot make a long loop, saying why, and can pick the rest', () => {
     const page = render(view())
     const options = [...page.menu().options]
-    expect(options.map((o) => o.disabled)).toEqual([false, false, false, false, true, true])
+    expect(options.map((o) => o.disabled)).toEqual([false, false, false, false, true, true, false])
   })
 
   it('lets a short loop be made by Short, but not Shortest', () => {
@@ -353,7 +357,15 @@ describe('the closed model menu’s short label', () => {
 
   it('labels only the chosen entry, and leaves every entry’s text whole', () => {
     const menu = render(view()).menu()
-    expect(labels(menu)).toEqual(['Balanced — about 3 min a take', null, null, null, null, null])
+    expect(labels(menu)).toEqual([
+      'Balanced — about 3 min a take',
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ])
     expect(menu.options[0]!.textContent).toBe('Balanced · XL turbo · 4B — about 3 min a take')
   })
 
@@ -404,5 +416,30 @@ describe('the closed model menu’s short label', () => {
     const menu = render(view({ making })).menu()
     expect(menu.disabled).toBe(true)
     expect(labels(menu)[0]).toBe('Balanced — about 3 min a take')
+  })
+})
+
+describe('the banner when no music can be made', () => {
+  it('says why, in the generator’s own words, and sends to Setup', () => {
+    const page = render(
+      view({
+        generator: { ok: false, message: 'There is no ElevenLabs key.' },
+        models: everyModel([
+          'balanced',
+          'quick',
+          'quickest',
+          'careful',
+          'short',
+          'shortest',
+          'eleven',
+        ]),
+      }),
+    )
+    const banner = page.container.querySelector('.errbox')!
+    expect(banner.querySelector('strong')!.textContent).toBe("Music can't be made yet.")
+    expect(banner.querySelector('.muted')!.textContent).toBe(
+      'There is no ElevenLabs key. Setup says what is missing.',
+    )
+    expect(banner.querySelector('a')!.textContent).toBe('Open Setup')
   })
 })

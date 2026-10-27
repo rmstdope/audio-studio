@@ -176,7 +176,11 @@ describe('createMusicRouter', () => {
 
   it('sends each model to its own generator, and closes the other when the family changes', async () => {
     const log: string[] = []
-    const router = createMusicRouter({ acestep: make('ace', log), 'stable-audio': make('sa', log) })
+    const router = createMusicRouter({
+      acestep: make('ace', log),
+      'stable-audio': make('sa', log),
+      elevenlabs: make('el', log),
+    })
     const base = { brief: 'a', kind: 'loop', seconds: 3, bpm: null, key: null, seed: 1 } as const
     await router.generate({ ...base, model: 'balanced' })
     await router.generate({ ...base, model: 'quick' })
@@ -194,17 +198,46 @@ describe('createMusicRouter', () => {
     ])
   })
 
-  it('asks the generator of the model’s family whether it is ready and installed', () => {
-    const router = createMusicRouter({ acestep: make('ace', []), 'stable-audio': make('sa', []) })
+  it('stops no local worker for a take made in the cloud', async () => {
+    const log: string[] = []
+    const router = createMusicRouter({
+      acestep: make('ace', log),
+      'stable-audio': make('sa', log),
+      elevenlabs: make('el', log),
+    })
+    const base = { brief: 'a', kind: 'loop', seconds: 3, bpm: null, key: null, seed: 1 } as const
+    await router.generate({ ...base, model: 'balanced' })
+    await router.generate({ ...base, model: 'eleven' })
+    await router.generate({ ...base, model: 'balanced' })
+    await router.generate({ ...base, model: 'short' })
+    expect(log).toEqual([
+      'ace:generate:balanced',
+      'el:generate:eleven',
+      'ace:generate:balanced',
+      'ace:close',
+      'sa:generate:short',
+    ])
+  })
+
+  it('asks the generator of the model’s family whether it is ready and installed', async () => {
+    const router = createMusicRouter({
+      acestep: make('ace', []),
+      'stable-audio': make('sa', []),
+      elevenlabs: make('el', []),
+    })
     expect(router.installed('quick')).toBe(false)
     expect(router.installed('short')).toBe(true)
-    expect(router.ready('careful').ok).toBe(false)
+    expect((await router.ready('careful')).ok).toBe(false)
     expect(router.ready('short')).toMatchObject({ ok: true })
   })
 
-  it('stops both', () => {
+  it('stops every family', () => {
     const log: string[] = []
-    createMusicRouter({ acestep: make('ace', log), 'stable-audio': make('sa', log) }).close()
-    expect(log.sort()).toEqual(['ace:close', 'sa:close'])
+    createMusicRouter({
+      acestep: make('ace', log),
+      'stable-audio': make('sa', log),
+      elevenlabs: make('el', log),
+    }).close()
+    expect(log.sort()).toEqual(['ace:close', 'el:close', 'sa:close'])
   })
 })

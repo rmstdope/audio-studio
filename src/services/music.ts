@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import {
   DEFAULT_MUSIC_MODEL,
   musicModel,
+  onThisComputer,
   type MusicFamily,
   type MusicModelId,
 } from '../core/musicModels'
@@ -35,10 +36,13 @@ export type MusicReady = { ok: true } | { ok: false; message: string; fix: strin
 
 /** Makes music from a brief. Behind an interface, so tests use a fake. */
 export interface MusicGenerator {
-  /** Whether a take can be made now with this model: the machine, uv and its folders are there. */
-  ready(model: MusicModelId): MusicReady
-  /** Whether this model's folders are on this computer. */
-  installed(model: MusicModelId): boolean
+  /**
+   * Whether a take can be made now with this model: the machine, uv and its folders are there, or
+   * for a model in the cloud its key. A cloud model may answer later.
+   */
+  ready(model: MusicModelId): MusicReady | Promise<MusicReady>
+  /** Whether this model's folders are on this computer, or for a model in the cloud its key is set. */
+  installed(model: MusicModelId): boolean | Promise<boolean>
   /**
    * One take of the brief; slow (minutes), and the first one loads the models. Aborting `signal`
    * ends it at once (Stop), and it rejects.
@@ -106,7 +110,8 @@ export function aceStepReady(
 
 /**
  * The generators of every family as one: each model goes to its own family's, and when a take needs
- * another family the last one used is stopped, so its models leave memory (one GPU, one at a time).
+ * another family on this computer the last one used here is stopped, so its models leave memory
+ * (one GPU, one at a time). A family in the cloud stops nothing.
  */
 export function createMusicRouter(generators: Record<MusicFamily, MusicGenerator>): MusicGenerator {
   const of = (model: MusicModelId) => generators[musicModel(model).family]
@@ -116,8 +121,10 @@ export function createMusicRouter(generators: Record<MusicFamily, MusicGenerator
     installed: (model) => of(model).installed(model),
     generate(request, signal) {
       const generator = of(request.model)
-      if (last && last !== generator) last.close()
-      last = generator
+      if (onThisComputer(request.model)) {
+        if (last && last !== generator) last.close()
+        last = generator
+      }
       return generator.generate(request, signal)
     },
     close() {

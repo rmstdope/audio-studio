@@ -292,6 +292,15 @@ function music(facts: SetupFacts): SetupCheck {
   if (!facts.music) {
     return { id: 'music', title, state: 'off', detail: 'The project has no music section.' }
   }
+  if (musicModel(facts.music.model).family === 'elevenlabs') {
+    return {
+      id: 'music',
+      title,
+      state: 'off',
+      detail:
+        "Not needed while the project's music model is Eleven Music, made by ElevenLabs in the cloud (its rows are below).",
+    }
+  }
   if (facts.music.ready.ok && musicModel(facts.music.model).family !== 'acestep') {
     return {
       id: 'music',

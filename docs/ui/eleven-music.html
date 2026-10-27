@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Eleven Music in the menus</title>
+    <style>
+      :root {
+        --panel: #12141a;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px;
+      }
+      .intro,
+      .note,
+      .panel {
+        max-width: 860px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .intro {
+        color: var(--muted);
+        margin-bottom: 18px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 22px;
+        margin-bottom: 8px;
+        color: var(--muted);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .name {
+        width: 90px;
+        font-weight: 600;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .menu {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .list {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 6px 0;
+        width: 100%;
+        max-width: 560px;
+        font-size: 13px;
+      }
+      .list .g {
+        color: var(--faint);
+        font-size: 12px;
+        padding: 4px 10px;
+      }
+      .list .o {
+        padding: 3px 22px;
+      }
+      .list .o.dim {
+        color: var(--faint);
+      }
+      .list .o.on {
+        background: #20242e;
+      }
+      .chip {
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 12px;
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .warn {
+        color: var(--warn);
+        font-size: 12.5px;
+      }
+      .btn {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border: 0;
+        border-radius: 9px;
+        padding: 7px 12px;
+        font-weight: 600;
+      }
+      .card {
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: var(--danger-bg);
+        max-width: 420px;
+      }
+      .card strong {
+        color: var(--danger-ink);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Eleven Music in the menus</h1>
+      Eleven Music is a third group in every music menu: Setup's Models panel and each track's Takes
+      panel. The words below are those that ship. Its price per take comes in the next step (14.5);
+      here it is only "Paid".
+    </div>
+
+    <p class="note">
+      <b>1 — A menu, opened</b> (a 90-second loop: Stable Audio is greyed, Eleven Music is not)
+    </p>
+    <div class="panel">
+      <div class="list">
+        <div class="g">ACE-Step · any length</div>
+        <div class="o">Balanced · XL turbo · 4B — about 3 min a take</div>
+        <div class="o">Quick · XL turbo · 1.7B — about 1¼ min a take</div>
+        <div class="o">Quickest · Turbo · 1.7B — about 1 min a take</div>
+        <div class="o">Careful · XL sft · 4B — about 7 min a take</div>
+        <div class="g">Stable Audio · short music only</div>
+        <div class="o dim">
+          Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 1:30
+        </div>
+        <div class="o dim">
+          Shortest · Stable Audio Open Small — makes no loops · this one is 1:30
+        </div>
+        <div class="g">ElevenLabs · in the cloud, paid</div>
+        <div class="o on">Eleven Music · ElevenLabs, in the cloud — about 1 min a take</div>
+      </div>
+      <p class="faint small">
+        Without an ElevenLabs key, its entry ends "— needs an ElevenLabs key", and the closed menu
+        reads "Eleven Music — needs an ElevenLabs key".
+      </p>
+    </div>
+
+    <p class="note">
+      <b>2 — Setup, Models panel, Music row</b> with Eleven Music as the project's model
+    </p>
+    <div class="panel">
+      <div class="row">
+        <div class="name">Music</div>
+        <div class="col">
+          <span class="muted"
+            >Loops and stingers, made by ElevenLabs in the cloud. A track's takes can use
+            another.</span
+          >
+          <div class="menu">
+            <span class="list" style="width: auto; padding: 5px 10px"
+              >Eleven Music · ElevenLabs, in the cloud — about 1 min a take ▾</span
+            ><span class="chip">Paid</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">
+      Without a key, beside the chip: <span class="warn">needs an ElevenLabs key</span>. Setup's
+      checklist row "Music generator (ACE-Step)" reads "Not used — Not needed while the project's
+      music model is Eleven Music, made by ElevenLabs in the cloud (its rows are below)."
+    </p>
+
+    <p class="note"><b>3 — More takes without a key</b>, and a take ElevenLabs refused</p>
+    <div class="panel">
+      <div class="menu">
+        <span class="list" style="width: auto; padding: 5px 10px"
+          >Eleven Music — needs an ElevenLabs key ▾</span
+        ><button class="btn">More takes</button
+        ><span class="warn">Eleven Music needs an ElevenLabs key.</span>
+      </div>
+      <p></p>
+      <div class="card">
+        <strong>Take 3 could not be made.</strong>
+        <div class="muted small">
+          ElevenLabs answered 402: (ElevenLabs' own words, e.g. a Free plan's refusal). Your other
+          takes are kept.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

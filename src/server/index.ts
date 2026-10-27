@@ -19,6 +19,8 @@ import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import type { ElevenAnswer } from '../core/setup'
 import { accountOf, createElevenLabsClient, type ElevenLabsClient } from '../services/elevenlabs'
+import { createElevenMusic } from '../services/elevenMusic'
+import { elevenLabsApiKey } from '../services/env'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
@@ -122,11 +124,12 @@ function sharedWhisper(): Transcriber {
 }
 
 /**
- * The process's one ACE-Step worker, kept across `--dev` reloads like Whisper's. It starts with
- * the first take and exits when the studio does. `AUDIO_STUDIO_FAKE_MUSIC=1` swaps it for a
- * stand-in that makes tones, for working on the pages.
+ * The process's music generators as one, kept across `--dev` reloads like Whisper's: the ACE-Step
+ * and Stable Audio workers, each started with its first take and ended with the studio, and Eleven
+ * Music, with the project's ElevenLabs key read on every use. `AUDIO_STUDIO_FAKE_MUSIC=1` swaps
+ * them for a stand-in that makes tones, for working on the pages.
  */
-function sharedMusic(): MusicGenerator {
+function sharedMusic(projectFile: string): MusicGenerator {
   const state = globalThis as { audioStudioMusic?: MusicGenerator }
   state.audioStudioMusic ??=
     process.env.AUDIO_STUDIO_FAKE_MUSIC === '1'
@@ -134,6 +137,12 @@ function sharedMusic(): MusicGenerator {
       : createMusicRouter({
           acestep: createAceStepWorker(),
           'stable-audio': createStableAudioWorker(),
+          elevenlabs: createElevenMusic({
+            apiKey: async () => {
+              const opened = await openProject(projectFile)
+              return opened.ok ? elevenLabsApiKey(dirname(projectFile), opened.project.env) : null
+            },
+          }),
         })
   return state.audioStudioMusic
 }
@@ -315,7 +324,7 @@ export function startServer({
   music,
   elevenlabs,
 }: ServerOptions) {
-  const musicGenerator = music ?? sharedMusic()
+  const musicGenerator = music ?? sharedMusic(projectFile)
   const musicTakes = createMusicTakes({
     generator: musicGenerator,
     ...(encode ? { encode } : {}),

@@ -36,7 +36,7 @@ const encoder = new TextEncoder()
  */
 export async function modelsView(
   projectFile: string,
-  installed: (model: MusicModelId) => boolean = () => true,
+  installed: (model: MusicModelId) => boolean | Promise<boolean> = () => true,
 ): Promise<ModelsView> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -82,7 +82,7 @@ export async function modelsView(
             .flatMap((list) => list.tracks.map((track) => track.seconds)),
           model: project.music.model ?? DEFAULT_MUSIC_MODEL,
           installed: Object.fromEntries(
-            MUSIC_MODELS.map(({ id }) => [id, installed(id)]),
+            await Promise.all(MUSIC_MODELS.map(async ({ id }) => [id, await installed(id)])),
           ) as Record<MusicModelId, boolean>,
         }
       : null,
