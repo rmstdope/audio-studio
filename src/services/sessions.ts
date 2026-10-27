@@ -23,9 +23,11 @@ import { declaredLanguage, type Problem } from '../core/project'
 import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import type { Candidate, Voice } from '../core/voiceSearch'
+import { providerId, providerOf } from '../core/voices'
 import { findCandidates, setVoice, type FishFactory } from './auditions'
 import { designTakes, readDesigns } from './designStore'
 import { characterFile, readJson, writeAtomic } from './files'
+import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
 import { NO_KEY } from './fish'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
@@ -46,7 +48,7 @@ export const SESSIONS_DIR = '.audio-studio/auditions'
 export type SessionFailure =
   | {
       ok: false
-      reason: 'no-session' | 'no-key' | 'fish' | 'seen' | 'exhausted' | 'no-phrase'
+      reason: 'no-session' | 'no-key' | 'fish' | 'elevenlabs' | 'seen' | 'exhausted' | 'no-phrase'
       message: string
     }
   | { ok: false; problems: Problem[] }
@@ -307,8 +309,9 @@ export async function moreVoices(
 }
 
 /**
- * Brings a voice in to hear by its Fish id, also one dropped or ruled out before (it is then no
- * longer ruled out); says so if it is on the board already.
+ * Brings a voice in to hear by its id, also one dropped or ruled out before (it is then no
+ * longer ruled out); says so if it is on the board already. A Fish voice is looked up on Fish, an
+ * ElevenLabs one on ElevenLabs (with `elevenFor`; none means no key).
  */
 export async function addVoiceById(
   projectFile: string,
@@ -316,9 +319,11 @@ export async function addVoiceById(
   voiceId: string,
   fishFor: FishFactory,
   language?: string,
+  elevenFor: ElevenLabsFactory = async () => null,
 ): Promise<SessionResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
+  const root = dirname(projectFile)
   return changeSession(
     projectFile,
     characterId,
@@ -326,10 +331,20 @@ export async function addVoiceById(
       if (placeOf(session, voiceId)) {
         return { ok: false, reason: 'seen', message: 'That voice is in this audition already.' }
       }
-      // A voice the audition knows (queued or dropped) needs no asking Fish.
+      // A voice the audition knows (queued or dropped) needs no asking.
       const known = session.voices[voiceId]
       if (known) return addVoice(session, known)
-      const fish = await fishFor(dirname(projectFile), opened.project)
+      if (providerOf(voiceId) === 'elevenlabs') {
+        const eleven = await elevenFor(root, opened.project)
+        if (!eleven) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+        try {
+          return addVoice(session, await eleven.voice(providerId(voiceId)))
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          return { ok: false, reason: 'elevenlabs', message }
+        }
+      }
+      const fish = await fishFor(root, opened.project)
       if (!fish) {
         return { ok: false, reason: 'no-key', message: 'Set FISH_AUDIO_API_KEY to look voices up.' }
       }

@@ -395,6 +395,7 @@ describe('takeLine, with an ElevenLabs voice', () => {
     const eleven: ElevenLabsClient = {
       subscription: () => Promise.reject(new Error('not used')),
       music: () => Promise.reject(new Error('not used')),
+      voice: () => Promise.reject(new Error('not used')),
       async tts(request) {
         asked.push(request.voice)
         return silence(1)

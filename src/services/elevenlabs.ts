@@ -1,5 +1,9 @@
 import { z } from 'zod'
 import type { ElevenAccount, ElevenAnswer } from '../core/setup'
+import type { Voice } from '../core/voiceSearch'
+import type { Project } from '../core/project'
+import { elevenVoice } from '../core/voices'
+import { elevenLabsApiKey } from './env'
 
 /** What the studio needs from ElevenLabs. Behind an interface, so tests use a fake. */
 export interface ElevenLabsClient {
@@ -12,6 +16,32 @@ export interface ElevenLabsClient {
   music(request: MusicPieceRequest, signal?: AbortSignal): Promise<Uint8Array>
   /** The text spoken in a voice of the user's own, as 16-bit WAV at 24 kHz (every plan may ask for it). */
   tts(request: SpeechRequest): Promise<Uint8Array>
+  /**
+   * A voice the account can speak with, by ElevenLabs' id (one of the user's own, or one of
+   * ElevenLabs' premade voices), as the studio shows voices: its id marked as ElevenLabs', its
+   * preview as its sample.
+   */
+  voice(id: string): Promise<Voice>
+}
+
+/** The ElevenLabs client for a project, or null when it has no key. Replaced in tests. */
+export type ElevenLabsFactory = (root: string, project: Project) => Promise<ElevenLabsClient | null>
+
+/** What the studio says when something needs ElevenLabs and there is no key. */
+export const NO_ELEVENLABS_KEY =
+  'Set ELEVENLABS_API_KEY in the project’s env file, or in the environment.'
+
+/**
+ * A client made from the project's ElevenLabs key (the environment, else the project's env
+ * file), or null when there is none. Read on every call, so a key added later is picked up.
+ */
+export async function elevenFromEnv(
+  root: string,
+  project: Project,
+  environment: Record<string, string | undefined> = process.env,
+): Promise<ElevenLabsClient | null> {
+  const key = await elevenLabsApiKey(root, project.env, environment)
+  return key ? createElevenLabsClient(key) : null
 }
 
 /** Text to speak: the voice as ElevenLabs knows it, the model, its settings and the language. */
@@ -53,6 +83,16 @@ const ApiSubscriptionSchema = z.looseObject({
   max_credit_limit_extension: z.union([z.number(), z.literal('unlimited')]).nullish(),
   voice_limit: z.number().default(0),
   voice_slots_used: z.number().default(0),
+})
+
+/** A voice as ElevenLabs' API returns it: only what the studio reads. */
+const ApiVoiceSchema = z.looseObject({
+  voice_id: z.string(),
+  name: z.string(),
+  description: z.string().nullish(),
+  labels: z.record(z.string(), z.string()).nullish(),
+  preview_url: z.string().nullish(),
+  verified_languages: z.array(z.looseObject({ language: z.string() })).nullish(),
 })
 
 /** How long asking for the account may take: it holds up Setup, so not as long as other work. */
@@ -159,6 +199,26 @@ export function createElevenLabsClient(
           throw new Error(`ElevenLabs did not answer within ${MUSIC_TIMEOUT_MS / 60_000} minutes`)
         }
         throw error
+      }
+    },
+
+    async voice(id) {
+      const parsed = ApiVoiceSchema.safeParse(
+        await get(`/v1/voices/${encodeURIComponent(id)}`, timeoutMs),
+      )
+      if (!parsed.success) throw new Error(UNREADABLE)
+      const api = parsed.data
+      return {
+        id: elevenVoice(api.voice_id),
+        title: api.name,
+        description: api.description ?? '',
+        tags: Object.values(api.labels ?? {}),
+        languages: [...new Set((api.verified_languages ?? []).map((l) => l.language))],
+        // ElevenLabs says nothing of how often a voice of the account's own was used.
+        uses: 0,
+        likes: 0,
+        author: '',
+        sample: api.preview_url ? { text: '', audio: api.preview_url } : null,
       }
     },
 

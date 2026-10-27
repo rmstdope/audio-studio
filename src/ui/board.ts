@@ -1,5 +1,6 @@
 import type { AuditionSession } from '../core/audition'
 import type { Appearance } from '../core/summary'
+import { providerOf } from '../core/voices'
 import { plural } from './format'
 
 /**
@@ -41,7 +42,7 @@ export function saveFailedLine(reason: string): string {
 /** The voices of the board that get a take recorded; a designed voice already has its preview. */
 export function recordable(session: AuditionSession): string[] {
   return [...session.shortlist, ...session.yours, ...session.toHear].filter(
-    (id) => !session.voices[id]?.design,
+    (id) => !session.voices[id]?.design && providerOf(id) === 'fish',
   )
 }
 

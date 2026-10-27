@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { designGroups, quoted } from '../../../core/design'
 import type { AuditionSession } from '../../../core/audition'
 import type { CharacterSummary } from '../../../core/summary'
+import type { VoiceProvider } from '../../../core/voices'
 import type { SessionView } from '../../../services/sessions'
 import { castInLanguage, shortlistNote, type Language } from '../../castLanguages'
 import {
@@ -98,6 +99,8 @@ export function ShortlistBoard({
   // The voice this page dropped last; its drop can be undone while it is the last one.
   const [droppedHere, setDroppedHere] = useState<string | null>(null)
   const [voiceId, setVoiceId] = useState('')
+  // Whose voice the id is: Fish's ids and ElevenLabs' look alike, so the user says.
+  const [provider, setProvider] = useState<VoiceProvider>('fish')
   const [idError, setIdError] = useState<string | null>(null)
   const [designing, setDesigning] = useState(false)
   const designButton = useRef<HTMLButtonElement>(null)
@@ -157,8 +160,14 @@ export function ShortlistBoard({
 
   const addById = (event: FormEvent) => {
     event.preventDefault()
-    const id = voiceIdFrom(voiceId)
-    if (!id) return setIdError('That is not a Fish voice id or voice URL.')
+    const id = voiceIdFrom(voiceId, provider)
+    if (!id) {
+      return setIdError(
+        provider === 'fish'
+          ? 'That is not a Fish voice id or voice URL.'
+          : 'That is not an ElevenLabs voice id.',
+      )
+    }
     setIdError(null)
     run({ action: 'add', body: { voice: id } }, () => {
       setDroppedHere(null)
@@ -520,10 +529,21 @@ export function ShortlistBoard({
           <label htmlFor="voice-id" className="muted">
             Bring in a specific voice
           </label>
+          <select
+            aria-label="Whose voice"
+            value={provider}
+            onChange={(e) => {
+              setProvider(e.target.value as VoiceProvider)
+              setIdError(null)
+            }}
+          >
+            <option value="fish">Fish Audio</option>
+            <option value="elevenlabs">ElevenLabs</option>
+          </select>
           <input
             id="voice-id"
             className="search"
-            placeholder="Fish voice id or URL"
+            placeholder={provider === 'fish' ? 'Fish voice id or URL' : 'ElevenLabs voice id'}
             value={voiceId}
             onChange={(e) => {
               setVoiceId(e.target.value)

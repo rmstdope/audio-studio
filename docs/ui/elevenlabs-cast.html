@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Casting an ElevenLabs voice</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --ok: #3ddc97;
+        --warn: #ffc24b;
+        --bad: #ff6b6b;
+        --accent: #7aa2ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px;
+      }
+      section {
+        max-width: 860px;
+        margin: 0 auto 28px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 0 0 8px;
+      }
+      .intro,
+      .note {
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+      .btn,
+      select,
+      input {
+        background: var(--inset);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #0b0c10;
+        border-color: var(--accent);
+      }
+      input {
+        width: 220px;
+      }
+      .error {
+        color: var(--bad);
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 380px;
+      }
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--inset);
+        color: var(--text);
+      }
+      .new {
+        outline: 2px dashed var(--warn);
+        outline-offset: 3px;
+        border-radius: 8px;
+      }
+      .legend {
+        color: var(--warn);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>Casting an ElevenLabs voice</h1>
+      <p class="intro">
+        Step 14.7b. A voice from the user's own ElevenLabs voices is brought in by its id, heard by
+        its preview, shortlisted and cast like any other. Its lines are recorded from step 14.7c;
+        takes and cue tries with it come in 14.10. <span class="legend">Dashed: new.</span>
+      </p>
+    </section>
+
+    <section>
+      <h2>1 · The audition board: Bring in a specific voice</h2>
+      <p class="note">
+        The menu says whose the id is (Fish's and ElevenLabs' ids look alike). Fish Audio is chosen
+        first.
+      </p>
+      <div class="panel">
+        <div class="row">
+          <span class="muted">Bring in a specific voice</span>
+          <select class="new" aria-label="Whose voice">
+            <option>Fish Audio</option>
+            <option selected>ElevenLabs</option>
+          </select>
+          <input placeholder="ElevenLabs voice id" value="JBFqnCBsd6RMkjVDRZzb" />
+          <button class="btn">Bring in</button>
+        </div>
+      </div>
+      <p class="note">Not an id (a URL, spaces):</p>
+      <div class="panel">
+        <div class="row">
+          <span class="muted">Bring in a specific voice</span>
+          <select>
+            <option>ElevenLabs</option>
+          </select>
+          <input value="https://elevenlabs.io/app/voice-lab" />
+          <button class="btn">Bring in</button>
+        </div>
+        <p class="error">That is not an ElevenLabs voice id.</p>
+      </div>
+      <p class="note">No key, or ElevenLabs refuses (under "The audition could not go on"):</p>
+      <div class="panel">
+        <p class="error">
+          Set ELEVENLABS_API_KEY in the project’s env file, or in the environment.
+        </p>
+        <p class="error">ElevenLabs answered 404: A voice with the voice_id … was not found.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>2 · Its card, to hear</h2>
+      <p class="note">
+        No take is recorded by itself, and there is no Record take: its preview is how it is heard.
+      </p>
+      <article class="card">
+        <div>
+          <strong>George</strong><br />
+          <span class="muted new">ElevenLabs voice</span>
+        </div>
+        <p>Warm, captivating storyteller</p>
+        <div class="row">
+          <span class="chip">british</span><span class="chip">middle aged</span
+          ><span class="chip">male</span><span class="chip">narration</span>
+        </div>
+        <span class="muted new">No takes with ElevenLabs voices yet: hear its preview.</span>
+        <div class="row">
+          <button class="play" aria-label="Play ElevenLabs’ preview of George">▶</button>
+          <span class="muted new">ElevenLabs preview</span>
+        </div>
+        <div class="row">
+          <button class="btn">✕ Drop</button>
+          <button class="btn">✓ Shortlist</button>
+        </div>
+        <span class="mono faint">eleven:JBFqnCBsd6RMkjVDRZzb</span>
+      </article>
+    </section>
+
+    <section>
+      <h2>3 · The character's page, cast</h2>
+      <div class="panel">
+        <div class="row" style="justify-content: space-between">
+          <span class="muted">Voice</span><span class="chip" style="color: var(--ok)">Cast</span>
+        </div>
+        <p><strong>George</strong> <span class="muted new">ElevenLabs voice</span></p>
+        <p>Warm, captivating storyteller</p>
+        <div class="row" style="gap: 24px">
+          <span class="muted new">No takes with ElevenLabs voices yet: hear its preview.</span>
+          <span class="row">
+            <button class="play">▶</button>
+            <span
+              ><strong class="new">ElevenLabs preview</strong><br /><span class="muted"
+                >ElevenLabs’ own clip</span
+              ></span
+            >
+          </span>
+        </div>
+        <p class="mono faint">eleven:JBFqnCBsd6RMkjVDRZzb</p>
+        <p class="faint">No “Open on Fish Audio”: an ElevenLabs voice has no public page.</p>
+      </div>
+      <p class="note">
+        When ElevenLabs does not answer, the page still shows the voice by its cast name:
+      </p>
+      <div class="panel">
+        <p><strong>George</strong></p>
+        <p class="muted">
+          ElevenLabs could not give this voice’s details: ElevenLabs answered 401: Invalid API key
+        </p>
+      </div>
+    </section>
+  </body>
+</html>

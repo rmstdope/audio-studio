@@ -428,7 +428,7 @@ describe('server', () => {
     expect((await fetch(url(`/api/takes/${body.key}`))).status).toBe(404)
   })
 
-  it('refuses an ElevenLabs voice where it would reach Fish or the cast, until it can speak', async () => {
+  it('refuses an ElevenLabs voice for a take, and for casting a voice made from recordings', async () => {
     const send = (path: string, body: unknown) =>
       fetch(url(path), {
         method: 'POST',
@@ -438,9 +438,6 @@ describe('server', () => {
     const voice = 'eleven:abc'
     for (const [path, body] of [
       ['/api/characters/narrator/takes', { voice, board: true }],
-      ['/api/auditions/narrator/add', { voice }],
-      ['/api/auditions/narrator/move', { voice, move: 'shortlist' }],
-      ['/api/auditions/narrator/cast', { voice }],
       ['/api/characters/narrator/cast-voice', { voice, name: 'Mine' }],
     ] as const) {
       expect([path, (await send(path, body)).status]).toEqual([path, 400])
@@ -3760,7 +3757,7 @@ describe('the ElevenLabs account on Setup', () => {
     overage: 0,
     voiceSlots: { used: 3, limit: 10 },
   }
-  const unused = async (): Promise<Uint8Array> => {
+  const unused = async (): Promise<never> => {
     throw new Error('not used')
   }
   const setupOf = async (elevenlabs: ElevenLabsClient) => {
@@ -3780,7 +3777,12 @@ describe('the ElevenLabs account on Setup', () => {
 
   it('shows the plan and the characters left', async () => {
     expect(
-      await setupOf({ subscription: async () => starter, music: unused, tts: unused }),
+      await setupOf({
+        subscription: async () => starter,
+        music: unused,
+        tts: unused,
+        voice: unused,
+      }),
     ).toMatchObject({
       state: 'ok',
       detail: 'Answers. Starter plan: 27,450 of 30,000 credits left.',
@@ -3811,10 +3813,82 @@ describe('the ElevenLabs account on Setup', () => {
       },
       music: unused,
       tts: unused,
+      voice: unused,
     })
     expect(check).toMatchObject({
       state: 'problem',
       detail: 'Did not answer: ElevenLabs answered 401: Invalid API key',
+    })
+  })
+})
+
+describe('casting an ElevenLabs voice', () => {
+  const elevenRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const asked: string[] = []
+  const eleven: ElevenLabsClient = {
+    subscription: () => Promise.reject(new Error('not used')),
+    music: () => Promise.reject(new Error('not used')),
+    tts: () => Promise.reject(new Error('not used')),
+    async voice(id) {
+      asked.push(id)
+      return {
+        id: `eleven:${id}`,
+        title: 'George',
+        description: 'Warm storyteller',
+        tags: [],
+        languages: ['en'],
+        uses: 0,
+        likes: 0,
+        author: '',
+        sample: { text: '', audio: 'https://example.com/george.mp3' },
+      }
+    },
+  }
+  const elevenServer = startServer({
+    projectFile: join(elevenRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    elevenlabs: eleven,
+  })
+  afterAll(() => elevenServer.stop(true))
+  const send = (path: string, body?: unknown) =>
+    fetch(new URL(path, elevenServer.url), {
+      method: 'POST',
+      headers: { origin: elevenServer.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('brings one in by id, shortlists and casts it, and shows it as ElevenLabs knows it', async () => {
+    expect((await send('/api/auditions/narrator/start')).status).toBe(200)
+    const added = await (await send('/api/auditions/narrator/add', { voice: 'eleven:g1' })).json()
+    expect(added).toMatchObject({ ok: true, session: { toHear: ['eleven:g1'] } })
+    expect(asked).toEqual(['g1'])
+    const moved = await send('/api/auditions/narrator/move', {
+      voice: 'eleven:g1',
+      move: 'shortlist',
+    })
+    expect(moved.status).toBe(200)
+    const cast = await send('/api/auditions/narrator/cast', { voice: 'eleven:g1' })
+    expect(await cast.json()).toMatchObject({
+      ok: true,
+      voice: { id: 'eleven:g1', name: 'George' },
+    })
+    const file = JSON.parse(readFileSync(join(elevenRoot, 'tts/cast.json'), 'utf8'))
+    expect(file.speakers.narrator.voice).toBe('eleven:g1')
+    const page = await (
+      await fetch(new URL('/api/characters/narrator/voice', elevenServer.url))
+    ).json()
+    expect(page).toMatchObject({
+      ok: true,
+      id: 'eleven:g1',
+      voice: { title: 'George' },
+      lookup: null,
     })
   })
 })

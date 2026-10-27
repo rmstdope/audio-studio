@@ -20,6 +20,8 @@ import { CastSchema, pronounceOf, type Cast, type Character } from '../core/reso
 import type { CharacterSummary } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
+import { providerId, providerOf } from '../core/voices'
+import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
 import { NO_KEY, type FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
 import { ruledOutIds } from './ruledOut'
@@ -177,10 +179,10 @@ export type CharacterVoiceResult =
       ok: true
       /** The cast voice's id; null when the character is not cast. */
       id: string | null
-      /** The cast voice as Fish knows it; null when uncast, or when Fish did not say (`lookup`). */
+      /** The cast voice as its provider knows it; null when uncast, or when it did not say (`lookup`). */
       voice: Voice | null
-      /** Why Fish's details of the cast voice are missing, or null. */
-      lookup: { reason: 'no-key' | 'fish'; message: string } | null
+      /** Why the provider's details of the cast voice are missing, or null. */
+      lookup: { reason: 'no-key' | 'fish' | 'elevenlabs'; message: string } | null
       /** The key of the cast voice's take of the audition phrase, if recorded. */
       take: string | null
       /** What the character says in a take. */
@@ -193,15 +195,17 @@ export type CharacterVoiceResult =
   | null
 
 /**
- * A character's cast voice, for its page: Fish's details of it (one lookup, no search), its take
- * of the audition phrase, and the phrase itself. Without a key, or when Fish fails, says why the
- * details are missing; the page still shows the voice by its id and cast name.
+ * A character's cast voice, for its page: its provider's details of it (one lookup, no search;
+ * Fish's, or ElevenLabs' with `elevenFor`), its take of the audition phrase, and the phrase
+ * itself. Without a key, or when the provider fails, says why the details are missing; the page
+ * still shows the voice by its id and cast name.
  */
 export async function characterVoice(
   projectFile: string,
   characterId: string,
   fishFor: FishFactory,
   asked?: string,
+  elevenFor: ElevenLabsFactory = async () => null,
 ): Promise<CharacterVoiceResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -233,6 +237,18 @@ export async function characterVoice(
       [id],
       FREE_MODELS[0],
     )[id] ?? null
+  if (providerOf(id) === 'elevenlabs') {
+    const eleven = await elevenFor(dirname(projectFile), project)
+    if (!eleven) {
+      return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_ELEVENLABS_KEY } }
+    }
+    try {
+      return { ...answer, take, voice: await eleven.voice(providerId(id)) }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { ...answer, take, lookup: { reason: 'elevenlabs' as const, message } }
+    }
+  }
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_KEY } }
   try {

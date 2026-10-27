@@ -19,7 +19,13 @@ import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import { FISH_VOICE_ID, VOICE_ID } from '../core/voices'
 import type { ElevenAnswer } from '../core/setup'
-import { accountOf, createElevenLabsClient, type ElevenLabsClient } from '../services/elevenlabs'
+import {
+  accountOf,
+  createElevenLabsClient,
+  elevenFromEnv,
+  type ElevenLabsClient,
+  type ElevenLabsFactory,
+} from '../services/elevenlabs'
 import { createElevenMusic } from '../services/elevenMusic'
 import { elevenLabsApiKey } from '../services/env'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
@@ -264,17 +270,22 @@ const RecordBody = z
   })
   .strict()
 
-// Moving, taking, adding and casting a voice reach Fish or the cast, so they take Fish's voices
-// only until a line can be spoken with an ElevenLabs one (§12 step 14.7).
 const MoveBody = z.object({
-  voice: z.string().regex(FISH_VOICE_ID),
+  voice: z.string().regex(VOICE_ID),
   move: z.enum(['shortlist', 'unlist', 'drop']),
 })
 
-const TakeBody = z.object({ voice: z.string().regex(FISH_VOICE_ID) })
+/** A voice to bring in or cast: either provider's. */
+const VoiceBody = z.object({ voice: z.string().regex(VOICE_ID) })
 
-/** A take to record: for the board (the audition model, paid from the sitting) or the cast voice's page (free). */
-const AuditionTakeBody = TakeBody.extend({ board: z.boolean().default(false) })
+/**
+ * A take to record: for the board (the audition model, paid from the sitting) or the cast voice's
+ * page (free). Fish's voices only, until takes are made with ElevenLabs ones (§12 step 14.10).
+ */
+const AuditionTakeBody = z.object({
+  voice: z.string().regex(FISH_VOICE_ID),
+  board: z.boolean().default(false),
+})
 
 /** What a sitting may spend: dollars, from the box. */
 const AmountBody = z.object({ amount: z.number().positive().max(10_000) }).strict()
@@ -334,6 +345,9 @@ export function startServer({
   })
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
+  /** The ElevenLabs client: the one given (tests; null for none), else made from the project's key on every use. */
+  const elevenFor: ElevenLabsFactory =
+    elevenlabs !== undefined ? async () => elevenlabs : elevenFromEnv
   /** A character's ruled-out voices as an answer: 404 for an unknown character, 409 for a broken project. */
   async function ruledOut(pending: Promise<RuledOutResult>): Promise<Response> {
     const result = await pending
@@ -1575,14 +1589,14 @@ export function startServer({
       },
       '/api/auditions/:id/add': {
         POST: fromOwnPage(async (request) => {
-          const body = TakeBody.safeParse(await request.json().catch(() => null))
+          const body = VoiceBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { id } = request.params
           const language = languageOf(request)
           return answer(
             id,
             whileGoing('character', id, () =>
-              addVoiceById(projectFile, id, body.data.voice, fishFor, language),
+              addVoiceById(projectFile, id, body.data.voice, fishFor, language, elevenFor),
             ),
             {
               language,
@@ -1667,7 +1681,7 @@ export function startServer({
       },
       '/api/auditions/:id/cast': {
         POST: fromOwnPage(async (request) => {
-          const body = TakeBody.safeParse(await request.json().catch(() => null))
+          const body = VoiceBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voice }' }, { status: 400 })
           const { voice } = body.data
           const language = languageOf(request)
@@ -1710,6 +1724,7 @@ export function startServer({
             request.params.id,
             fishFor,
             languageOf(request),
+            elevenFor,
           )
           return result ? Response.json(result) : notFound()
         }),

@@ -1,4 +1,5 @@
 import { FREE_MODELS } from '../core/project'
+import { providerOf } from '../core/voices'
 import type { TakeLineResult } from '../services/lineTakes'
 import { centsUp } from './format'
 
@@ -60,10 +61,17 @@ export function withVoiceTake<T extends VoiceTake>(
 /**
  * What the character page asks to record by itself: the cast voice's take of the phrase shown,
  * when there is none, as a key to ask for it once by (phrase and voice). Nothing for an answer
- * about another voice than `castId` (an older one), or without an API key.
+ * about another voice than `castId` (an older one), without an API key, or for an ElevenLabs
+ * voice (no takes with one until §12 step 14.10).
  */
 export function takeToRecord(answer: VoiceTake, castId: string | null): string | null {
-  if (!castId || answer.id !== castId || answer.take || answer.lookup?.reason === 'no-key') {
+  if (
+    !castId ||
+    answer.id !== castId ||
+    answer.take ||
+    answer.lookup?.reason === 'no-key' ||
+    providerOf(castId) !== 'fish'
+  ) {
     return null
   }
   return `${answer.audition.spoken}\n${castId}`

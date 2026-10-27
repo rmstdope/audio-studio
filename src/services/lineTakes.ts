@@ -17,9 +17,9 @@ import {
   finalFingerprint,
   speakLine,
   speakerFor,
-  type ElevenLabsFactory,
   type RecordResult,
 } from './narration'
+import type { ElevenLabsFactory } from './elevenlabs'
 import type { Transcriber } from './transcriber'
 import { openProject, readPart, type PartRead, type ProjectFailure } from './workspace'
 

@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
+import { NO_ELEVENLABS_KEY, type ElevenLabsClient } from './elevenlabs'
 import type { FishClient } from './fish'
 import {
   addVoiceById,
@@ -273,6 +274,62 @@ describe('addVoiceById', () => {
       ok: false,
       reason: 'fish',
       message: 'no such voice',
+    })
+  })
+})
+
+describe('addVoiceById, an ElevenLabs voice', () => {
+  /** An ElevenLabs client that knows one voice, `g1`, and records what it was asked. */
+  function fakeEleven() {
+    const asked: string[] = []
+    const client: ElevenLabsClient = {
+      subscription: () => Promise.reject(new Error('not used')),
+      music: () => Promise.reject(new Error('not used')),
+      tts: () => Promise.reject(new Error('not used')),
+      async voice(id) {
+        asked.push(id)
+        if (id !== 'g1')
+          throw new Error('ElevenLabs answered 404: A voice with the voice_id was not found.')
+        return voice('eleven:g1', 'George')
+      },
+    }
+    return { client, asked }
+  }
+  const noFish = async () => {
+    throw new Error('Fish is not asked about an ElevenLabs voice')
+  }
+
+  it('looks it up on ElevenLabs by its own id, and asks Fish nothing', async () => {
+    const { projectFile } = await started()
+    const { client, asked } = fakeEleven()
+    const result = await addVoiceById(
+      projectFile,
+      'mira',
+      'eleven:g1',
+      noFish,
+      undefined,
+      async () => client,
+    )
+    expect(result?.ok && result.session.toHear[0]).toBe('eleven:g1')
+    expect(result?.ok && result.session.voices['eleven:g1']?.title).toBe('George')
+    expect(asked).toEqual(['g1'])
+  })
+
+  it('says to set the key when there is none, and what ElevenLabs said when it refuses', async () => {
+    const { projectFile } = await started()
+    expect(
+      await addVoiceById(projectFile, 'mira', 'eleven:g1', noFish, undefined, async () => null),
+    ).toEqual({ ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY })
+    expect(await addVoiceById(projectFile, 'mira', 'eleven:g1', noFish)).toMatchObject({
+      reason: 'no-key',
+    })
+    const { client } = fakeEleven()
+    expect(
+      await addVoiceById(projectFile, 'mira', 'eleven:nope', noFish, undefined, async () => client),
+    ).toEqual({
+      ok: false,
+      reason: 'elevenlabs',
+      message: 'ElevenLabs answered 404: A voice with the voice_id was not found.',
     })
   })
 })

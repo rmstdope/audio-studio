@@ -456,6 +456,31 @@ describe('tryLine', () => {
   })
 })
 
+describe('tryLine with an ElevenLabs voice', () => {
+  it('makes no try, and asks Fish nothing', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { grandmother: { voice: 'eleven:g1' } }, pronounce: {} },
+      'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+    })
+    const { fish, requests } = fakeFish()
+    const result = await tryLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'a',
+      '[soft]',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(result).toEqual({
+      ok: false,
+      reason: 'elevenlabs',
+      message: 'Takes and tries are not made with ElevenLabs voices yet.',
+    })
+    expect(requests).toEqual([])
+  })
+})
+
 describe('tryLine in a language besides the source', () => {
   const several = projectJson()
   const narration = several.narration as Record<string, unknown>

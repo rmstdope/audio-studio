@@ -41,7 +41,7 @@ import { keepHeard } from './heard'
 import { inPartTurn } from './partFiles'
 import { readPart, type Ears, type ProjectFailure } from './workspace'
 import { NO_KEY } from './fish'
-import type { ElevenLabsClient } from './elevenlabs'
+import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
 import { ELEVEN_TTS, modelForStage, speedProblem, takesLanguage } from '../core/elevenSpeech'
 import { providerId, providerOf } from '../core/voices'
 
@@ -111,13 +111,6 @@ export interface RecordOptions {
   /** The ElevenLabs client for a line with an ElevenLabs voice: none, and such a line is refused. */
   elevenlabs?: ElevenLabsFactory
 }
-
-/** The ElevenLabs client for a project, or null when it has no key. Replaced in tests. */
-export type ElevenLabsFactory = (root: string, project: Project) => Promise<ElevenLabsClient | null>
-
-/** What the studio says when a line needs ElevenLabs and there is no key. */
-export const NO_ELEVENLABS_KEY =
-  'Set ELEVENLABS_API_KEY in the project’s env file, or in the environment.'
 
 /** Speaks one piece of a line's text in its voice: its audio as WAV. */
 export type Speak = (text: string) => Promise<Uint8Array>
