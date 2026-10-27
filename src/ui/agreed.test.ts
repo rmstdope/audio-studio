@@ -51,7 +51,13 @@ describe('elevenPlanFacts', () => {
   }
   it('says what the ElevenLabs lines take and what the plan has left', () => {
     expect(elevenPlanFacts(eleven, { ok: true, account })).toBe(
-      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 · 27,450 credits left on your plan',
+      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 credits · 27,450 credits left on your plan',
+    )
+  })
+
+  it('leaves out what running recordings hold', () => {
+    expect(elevenPlanFacts(eleven, { ok: true, account }, 25000)).toBe(
+      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 credits · only 2,450 credits left on your plan, besides what recordings running now hold',
     )
   })
 
@@ -59,10 +65,10 @@ describe('elevenPlanFacts', () => {
     expect(
       elevenPlanFacts(eleven, { ok: true, account: { ...account, charactersUsed: 28000 } }),
     ).toBe(
-      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 · only 2,000 credits left on your plan',
+      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 credits · only 2,000 credits left on your plan',
     )
     expect(elevenPlanFacts(eleven, { ok: false, reason: 'no-key', message: 'Set the key.' })).toBe(
-      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 · what is left on your plan is unknown: Set the key.',
+      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 credits · what is left on your plan is unknown: Set the key.',
     )
   })
 })

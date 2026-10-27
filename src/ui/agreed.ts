@@ -57,12 +57,18 @@ export function planPayWords(usd: number, credit: number): string {
 
 /**
  * The facts of a plan's lines with ElevenLabs voices: the model, the text, the credits they take
- * (one take of each, and at most), and what the plan has left, or why that is unknown.
+ * (one take of each, and at most), and what the plan has left besides what running recordings
+ * hold (`held`), or why that is unknown.
  */
-export function elevenPlanFacts(eleven: ElevenPlan, account: ElevenAnswer | undefined): string {
-  const taken = `ElevenLabs · ${eleven.model} · ${eleven.characters.toLocaleString('en-US')} characters of text · about ${credits(eleven.credits)}, at most ${eleven.ceiling.toLocaleString('en-US')}`
+export function elevenPlanFacts(
+  eleven: ElevenPlan,
+  account: ElevenAnswer | undefined,
+  held = 0,
+): string {
+  const taken = `ElevenLabs · ${eleven.model} · ${eleven.characters.toLocaleString('en-US')} characters of text · about ${credits(eleven.credits)}, at most ${credits(eleven.ceiling)}`
   if (!account) return taken
   if (!account.ok) return `${taken} · what is left on your plan is unknown: ${account.message}`
-  const left = creditsLeft(account.account)
-  return `${taken} · ${left < eleven.ceiling ? 'only ' : ''}${credits(left)} left on your plan`
+  const left = Math.max(creditsLeft(account.account) - held, 0)
+  const besides = held ? ', besides what recordings running now hold' : ''
+  return `${taken} · ${left < eleven.ceiling ? 'only ' : ''}${credits(left)} left on your plan${besides}`
 }

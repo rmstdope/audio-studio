@@ -90,7 +90,7 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
     )
     await until(() => (container.textContent ?? '').includes('ElevenLabs · eleven_v3'))
     expect(container.textContent).toContain(
-      'ElevenLabs · eleven_v3 · 5 characters of text · about 5 credits, at most 15 · 27,450 credits left on your plan',
+      'ElevenLabs · eleven_v3 · 5 characters of text · about 5 credits, at most 15 credits · 27,450 credits left on your plan',
     )
     const button = (label: string) =>
       [...container.querySelectorAll('button')].find((b) => b.textContent === label)

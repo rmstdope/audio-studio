@@ -1126,8 +1126,9 @@ only, the fingerprint needs no provider of its own.
   (`elevenModelOf`): Fish's lines in dollars as before (`bytes`, `cost`, `ceiling`), and the lines
   with ElevenLabs voices in credits (`plan.eleven`: their keys, the model, the characters sent, the
   credits of one take each and at most, every take). The plan's answer carries the account
-  (`elevenAccount`), so the panel says what the plan has left ("27,450 credits left on your plan",
-  "only …" when it falls short). One confirmation agrees to both ("Pay up to $0.42 and 1,200
+  (`elevenAccount`, read at most every half minute, since a part's plan is asked for again after
+  every line) and the credits running recordings hold (`elevenHeld`), so the panel says what the
+  plan has left besides them ("27,450 credits left on your plan", "only …" when it falls short). One confirmation agrees to both ("Pay up to $0.42 and 1,200
   credits", or "Use up to 1,200 credits" with only ElevenLabs lines paid), sent as `confirmedCost`
   and `confirmedCredits`; a line's Record and Another take ask in the unit of its voice's provider.
   The server admits each in its own unit (`admitBoth`): the dollars against Fish's credit as

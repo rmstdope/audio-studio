@@ -319,6 +319,9 @@ const CastOwnBody = z.object({
   name: z.string().trim().min(1),
 })
 
+/** How long a plan shows the ElevenLabs account it read before reading it again. */
+const SHOWN_ACCOUNT_MS = 30_000
+
 /** The `?language=` a request names, if any: the services fall back to the source language. */
 const languageOf = (request: Request) =>
   new URL(request.url).searchParams.get('language') ?? undefined
@@ -515,7 +518,8 @@ export function startServer({
     const asked = creditProblem({ ceiling, confirmed, left: Infinity })
     if (asked) return { problem: asked }
     if (!ceiling) return { budget: createBudget({ model, dollars: 0 }) }
-    const credits = Math.ceil(Math.min(confirmed ?? ceiling, ceiling + 1))
+    // The confirmation covers the ceiling; what is held is the ceiling up to the whole credit.
+    const credits = Math.ceil(ceiling)
     const opened = await openProject(projectFile)
     const client = opened.ok ? await elevenFor(dirname(projectFile), opened.project) : null
     if (!client) return { problem: { reason: 'credits', message: NO_ELEVENLABS_KEY } }
@@ -532,6 +536,22 @@ export function startServer({
     const budget = createBudget({ model, dollars: credits })
     creditBudgets.add(budget)
     return { budget }
+  }
+
+  /**
+   * The ElevenLabs account as plans show it: asked at most every half minute, since a part's plan
+   * is asked for again after every line recorded. Admission always asks afresh.
+   */
+  let shown: { at: number; answer: Promise<ElevenAnswer> } | null = null
+  async function shownAccount(): Promise<ElevenAnswer> {
+    if (shown && Date.now() - shown.at < SHOWN_ACCOUNT_MS) return shown.answer
+    const opened = await openProject(projectFile)
+    const client = opened.ok ? await elevenFor(dirname(projectFile), opened.project) : null
+    const answer: Promise<ElevenAnswer> = client
+      ? accountOf(client)
+      : Promise.resolve({ ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY })
+    shown = { at: Date.now(), answer }
+    return answer
   }
 
   /**
@@ -898,13 +918,9 @@ export function startServer({
           )
           if (!plan) return notFound()
           if (!plan.ok || !plan.plan.eleven) return Response.json(plan)
-          // What the plan has left, beside what its ElevenLabs lines take.
-          const opened = await openProject(projectFile)
-          const client = opened.ok ? await elevenFor(dirname(projectFile), opened.project) : null
-          const elevenAccount: ElevenAnswer = client
-            ? await accountOf(client)
-            : { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
-          return Response.json({ ...plan, elevenAccount })
+          // What the plan has left, beside what its ElevenLabs lines take and running recordings hold.
+          const elevenHeld = [...creditBudgets].reduce((sum, budget) => sum + budget.dollars, 0)
+          return Response.json({ ...plan, elevenAccount: await shownAccount(), elevenHeld })
         }),
       },
       '/api/parts/:part/jobs': {
@@ -914,7 +930,7 @@ export function startServer({
             return Response.json(
               {
                 error:
-                  'expected { kind, stage, speaker, keys, orphans, retakeWeak, confirmedCost }',
+                  'expected { kind, stage, speaker, keys, orphans, retakeWeak, confirmedCost, confirmedCredits }',
               },
               { status: 400 },
             )
@@ -1381,15 +1397,15 @@ export function startServer({
           if ('problem' in admitted) {
             return Response.json({ ok: false, ...admitted.problem }, { status: 409 })
           }
-          // One line: its voice's provider's budget and slots.
-          const eleven = planned.creditsOf([key], 1) > 0
           try {
             const result = await whileGoing('part', part, () =>
               loggedOne(planned, part, admitted.budget, async () =>
                 takeLine(projectFile, part, key, fishFor, {
-                  limiter: eleven ? elevenWork : fishWork,
+                  limiter: fishWork,
+                  elevenLimiter: elevenWork,
                   transcriber: await transcriberFor(),
-                  budget: eleven ? admitted.credits : admitted.budget,
+                  budget: admitted.budget,
+                  credits: admitted.credits,
                   language: languageOf(request),
                   elevenlabs: elevenFor,
                 }),

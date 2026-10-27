@@ -333,7 +333,9 @@ export function GeneratePanel({
         </label>
       )}
       {p.eleven && (
-        <span className="muted plan-facts">{elevenPlanFacts(p.eleven, answer.elevenAccount)}</span>
+        <span className="muted plan-facts">
+          {elevenPlanFacts(p.eleven, answer.elevenAccount, answer.elevenHeld)}
+        </span>
       )}
       <span className="muted plan-facts">
         {fishLines && (

@@ -47,7 +47,10 @@ export function tempRepo(files: Record<string, unknown>): string {
  */
 export function fakeEleven(
   voices: Record<string, Voice> = {},
-  { speak, account }: { speak?: () => Uint8Array; account?: ElevenAccount } = {},
+  {
+    speak,
+    account,
+  }: { speak?: () => Uint8Array | Promise<Uint8Array>; account?: ElevenAccount } = {},
 ): { client: ElevenLabsClient; asked: string[]; spoken: SpeechRequest[] } {
   const asked: string[] = []
   const spoken: SpeechRequest[] = []
@@ -55,7 +58,7 @@ export function fakeEleven(
   const client: ElevenLabsClient = {
     subscription: account ? async () => account : unused,
     music: unused,
-    tts: speak ? async (request) => (spoken.push(request), speak()) : unused,
+    tts: speak ? async (request) => (spoken.push(request), await speak()) : unused,
     async voice(id) {
       asked.push(id)
       const found = voices[id]
