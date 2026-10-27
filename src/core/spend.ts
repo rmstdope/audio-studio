@@ -1,4 +1,7 @@
+import { elevenCredits, isElevenModel } from './elevenSpeech'
 import { priceOf } from './prices'
+
+const utf8 = new TextEncoder()
 
 /** Why a paid job may not start yet: what the page must do about it. */
 export type SpendProblem =
@@ -8,6 +11,12 @@ export type SpendProblem =
 
 /** Below this, a difference in dollars is rounding, not money (sums of per-piece prices). */
 const ROUNDING = 1e-9
+
+/** An amount of ElevenLabs credits, as messages write it: "1 credit", "2.5 credits". */
+function creditWords(amount: number): string {
+  const shown = Math.floor(amount * 10) / 10
+  return `${shown} ${shown === 1 ? 'credit' : 'credits'}`
+}
 
 /** An amount in dollars, as messages and the page write it. */
 export function usd(amount: number): string {
@@ -59,6 +68,11 @@ export function spendProblem({
  */
 export interface Budget {
   readonly model: string
+  /**
+   * What its amounts are counted in: US dollars for a Fish model, ElevenLabs credits for an
+   * ElevenLabs one. `dollars`, `left` and `spent` are in it.
+   */
+  readonly unit: 'usd' | 'credits'
   /** The dollars it was given. */
   readonly dollars: number
   /** Dollars left to spend. */
@@ -66,22 +80,28 @@ export interface Budget {
   /** Dollars charged so far, less refunds: what was given less what is left. */
   readonly spent: number
   /**
-   * Takes `bytes` of text on `model` at `at` out of the budget: null if it fits, else why not (and
-   * nothing is taken).
+   * Takes speaking `text` on `model` at `at` out of the budget, in the model's own unit (Fish's
+   * dollars for its bytes, ElevenLabs' credits for its characters): null if it fits, else why not
+   * (and nothing is taken).
    */
-  spend(model: string, bytes: number, at: Date): string | null
+  spend(model: string, text: string, at: Date): string | null
   /** Adds `dollars` to what it was given and to what is left (a top-up). */
   add(dollars: number): void
   /** Gives back `dollars` of what a request cost that was not billed; what it was given stays. */
   refund(dollars: number): void
 }
 
-/** A budget for `model` with `dollars` to spend (none, for the free model). */
+/**
+ * A budget for `model` with `dollars` to spend (none, for the free model): dollars for a Fish
+ * model, credits for an ElevenLabs one.
+ */
 export function createBudget({ model, dollars }: { model: string; dollars: number }): Budget {
   let left = dollars
   let given = dollars
+  const unit = isElevenModel(model) ? 'credits' : 'usd'
   return {
     model,
+    unit,
     get dollars() {
       return given
     },
@@ -92,15 +112,22 @@ export function createBudget({ model, dollars }: { model: string; dollars: numbe
       // Rounded to a billionth of a dollar: a spend and its refund leave float dust, not money.
       return Math.max(0, Math.round((given - left) * 1e9) / 1e9)
     },
-    spend(asked, bytes, at) {
+    spend(asked, text, at) {
       if (asked !== model) {
         return `the project now names ${asked}, but ${model} was confirmed; plan again`
       }
-      const price = priceOf(asked, at)
-      if (price === undefined) return `the price of ${asked} is unknown`
-      const cost = (bytes / 1_000_000) * price
+      const price = unit === 'credits' ? undefined : priceOf(asked, at)
+      const cost =
+        unit === 'credits'
+          ? elevenCredits(asked, text)
+          : price === undefined
+            ? undefined
+            : (utf8.encode(text).length / 1_000_000) * price
+      if (cost === undefined) return `the price of ${asked} is unknown`
       if (cost > left + ROUNDING) {
-        return `this would go past the confirmed budget (${usd(Math.max(left, 0))} left); plan again`
+        const rest = Math.max(left, 0)
+        const shown = unit === 'credits' ? creditWords(rest) : usd(rest)
+        return `this would go past the confirmed budget (${shown} left); plan again`
       }
       left -= cost
       return null

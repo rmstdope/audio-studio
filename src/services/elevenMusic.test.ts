@@ -25,6 +25,9 @@ function fakeClient() {
       asked.push(request)
       return new Uint8Array([1, 2, 3])
     },
+    tts: async () => {
+      throw new Error('not used')
+    },
   }
   return { client, asked }
 }

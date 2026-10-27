@@ -680,3 +680,71 @@ describe('mergeCues', () => {
     expect(merged.cues).toEqual({ n1: '[worried] Elior [low] sover.' })
   })
 })
+
+describe('a line with an ElevenLabs voice', () => {
+  const elevenCast: Cast = {
+    speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]', speed: 1.1 } },
+    pronounce: {},
+  }
+  const m1 = lines[1]!
+
+  it('is made with ElevenLabs’ model and its settings, not Fish’s temperature', () => {
+    const inputs = clipInputs(m1, elevenCast.speakers.mira, {}, {}, narration)!
+    expect(inputs.model).toBe('eleven_v3')
+    expect(inputs.voice).toBe('eleven:abc')
+    const { output, quality } = narration
+    expect(JSON.parse(inputs.settings)).toEqual([
+      0.5,
+      0.75,
+      0,
+      1.1,
+      quality.chunkLimit,
+      output.codec,
+      output.bitrate,
+      output.channels,
+    ])
+  })
+
+  it('is up to date as made, while Fish’s stages differ', () => {
+    const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    const lock = { m1: entryFor(m1, elevenCast) }
+    const state = planPart(input({ cast: elevenCast, lock, narration: withFinal }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'ok' })
+  })
+
+  it('goes stale for its voice when its character is recast from Fish', () => {
+    const lock = { m1: entryFor(m1) }
+    const state = planPart(input({ cast: elevenCast, lock }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'stale' })
+    expect(state.lines.find((l) => l.key === 'm1')!.reasons).toContain('voice')
+  })
+})
+
+describe('a Fish voice’s fingerprint', () => {
+  it('is what it was before ElevenLabs, so no consumer’s clip goes stale', () => {
+    const inputs = clipInputs(
+      { key: 'm1', speaker: 'mira', text: 'Welcome, child.' },
+      { voice: 'v-mira', style: '[low, calm]', speed: 1.1 },
+      {},
+      {},
+      narration,
+    )!
+    expect(fingerprint(inputs)).toEqual({
+      fp: '94f2174f922de996',
+      parts: { cue: '1e136cf1', text: '8cb63797', said: '8cb63797', settings: 'ab047dd6' },
+    })
+  })
+})
+
+describe('a final plan, with a line whose voice has no final step', () => {
+  it('counts an up-to-date ElevenLabs line as final, so a final recording leaves it alone', () => {
+    const elevenCast: Cast = {
+      speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]' } },
+      pronounce: {},
+    }
+    const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    const lock = { m1: entryFor(lines[1]!, elevenCast) }
+    const state = planPart(input({ cast: elevenCast, lock, narration: withFinal }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'ok', final: true })
+  })
+})

@@ -154,3 +154,63 @@ describe('making music', () => {
     ).rejects.toThrow('The music generator was stopped.')
   })
 })
+
+describe('speaking', () => {
+  function speechFetch(status = 200, answer: BodyInit = new Uint8Array([0x52, 0x49, 0x46, 0x46])) {
+    const asked: { url: string; init: RequestInit }[] = []
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      asked.push({ url: String(input), init: init ?? {} })
+      return new Response(answer, { status })
+    }) as typeof globalThis.fetch
+    return { fetch, asked }
+  }
+
+  it('asks for the text in the voice as 24 kHz WAV, with the model, settings and language', async () => {
+    const { fetch, asked } = speechFetch()
+    const wav = await createElevenLabsClient('k', { fetch }).tts({
+      text: '[whispers] Come in.',
+      voice: '21m00Tcm4TlvDq8ikWAM',
+      model: 'eleven_v3',
+      settings: { stability: 0.5, similarityBoost: 0.75, style: 0, speed: 1.1 },
+      language: 'sv',
+    })
+    expect([...wav]).toEqual([0x52, 0x49, 0x46, 0x46])
+    expect(asked[0]!.url).toBe(
+      'https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM?output_format=wav_24000',
+    )
+    expect(asked[0]!.init.method).toBe('POST')
+    expect(new Headers(asked[0]!.init.headers).get('xi-api-key')).toBe('k')
+    expect(JSON.parse(String(asked[0]!.init.body))).toEqual({
+      text: '[whispers] Come in.',
+      model_id: 'eleven_v3',
+      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0, speed: 1.1 },
+      language_code: 'sv',
+    })
+  })
+
+  it('sends no language when given none', async () => {
+    const { fetch, asked } = speechFetch()
+    await createElevenLabsClient('k', { fetch }).tts({
+      text: 'a',
+      voice: 'v',
+      model: 'eleven_multilingual_v2',
+      settings: { stability: 0.5, similarityBoost: 0.75, style: 0, speed: 1 },
+    })
+    expect(JSON.parse(String(asked[0]!.init.body))).not.toHaveProperty('language_code')
+  })
+
+  it("throws ElevenLabs' own message when it refuses", async () => {
+    const { fetch } = speechFetch(
+      401,
+      JSON.stringify({ detail: { message: 'You have run out of credits' } }),
+    )
+    await expect(
+      createElevenLabsClient('k', { fetch }).tts({
+        text: 'a',
+        voice: 'v',
+        model: 'eleven_v3',
+        settings: { stability: 0.5, similarityBoost: 0.75, style: 0, speed: 1 },
+      }),
+    ).rejects.toThrow('ElevenLabs answered 401: You have run out of credits')
+  })
+})

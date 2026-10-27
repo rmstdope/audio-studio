@@ -3779,7 +3779,9 @@ describe('the ElevenLabs account on Setup', () => {
   }
 
   it('shows the plan and the characters left', async () => {
-    expect(await setupOf({ subscription: async () => starter, music: unused })).toMatchObject({
+    expect(
+      await setupOf({ subscription: async () => starter, music: unused, tts: unused }),
+    ).toMatchObject({
       state: 'ok',
       detail: 'Answers. Starter plan: 27,450 of 30,000 credits left.',
     })
@@ -3808,6 +3810,7 @@ describe('the ElevenLabs account on Setup', () => {
         throw new Error('ElevenLabs answered 401: Invalid API key')
       },
       music: unused,
+      tts: unused,
     })
     expect(check).toMatchObject({
       state: 'problem',

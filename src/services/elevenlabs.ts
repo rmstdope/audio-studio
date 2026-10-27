@@ -10,6 +10,19 @@ export interface ElevenLabsClient {
    * seed with a prompt). Aborting `signal` ends it at once, and it rejects.
    */
   music(request: MusicPieceRequest, signal?: AbortSignal): Promise<Uint8Array>
+  /** The text spoken in a voice of the user's own, as 16-bit WAV at 24 kHz (every plan may ask for it). */
+  tts(request: SpeechRequest): Promise<Uint8Array>
+}
+
+/** Text to speak: the voice as ElevenLabs knows it, the model, its settings and the language. */
+export interface SpeechRequest {
+  text: string
+  /** ElevenLabs' id of the voice, without the studio's `eleven:`. */
+  voice: string
+  model: string
+  settings: { stability: number; similarityBoost: number; style: number; speed: number }
+  /** The language to speak, as an ISO 639-1 code, for a model that takes one. */
+  language?: string
 }
 
 /** A piece of music to make: what it should sound like, and how long it is. */
@@ -89,6 +102,41 @@ export function createElevenLabsClient(
   }
 
   return {
+    async tts({ text, voice, model, settings, language }) {
+      try {
+        const url = new URL(
+          `/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=wav_24000`,
+          baseUrl,
+        )
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'xi-api-key': apiKey, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            model_id: model,
+            voice_settings: {
+              stability: settings.stability,
+              similarity_boost: settings.similarityBoost,
+              style: settings.style,
+              speed: settings.speed,
+            },
+            ...(language && { language_code: language }),
+          }),
+          signal: AbortSignal.timeout(timeoutMs),
+        })
+        if (!response.ok) throw new ElevenLabsError(response.status, await errorMessage(response))
+        return new Uint8Array(await response.arrayBuffer())
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.name === 'TimeoutError' || error.name === 'AbortError')
+        ) {
+          throw new Error(`ElevenLabs did not answer within ${timeoutMs / 1000} s`)
+        }
+        throw error
+      }
+    },
+
     async music({ prompt, lengthMs }, signal) {
       const timeout = AbortSignal.timeout(MUSIC_TIMEOUT_MS)
       try {

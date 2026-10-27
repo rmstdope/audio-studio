@@ -1,3 +1,5 @@
+import { ELEVEN_TTS, modelForStage } from './elevenSpeech'
+import { providerOf } from './voices'
 import { createHash } from 'node:crypto'
 import type { Project } from './project'
 import { openingFor, parseCued, type InsideCue } from './cued'
@@ -55,7 +57,8 @@ const NONE = { opening: '', inside: [] as InsideCue[] }
 
 /**
  * The inputs of a line's clip, or null when its speaker has no voice yet. The model is the draft
- * stage's: everyday generation uses it.
+ * stage's of the voice's provider: everyday generation uses it. An ElevenLabs voice is spoken
+ * with ElevenLabs' voice settings in place of Fish's temperature and top-p.
  */
 export function clipInputs(
   line: CueLine & { text: string },
@@ -63,24 +66,27 @@ export function clipInputs(
   cues: Record<string, string>,
   pronounce: Record<string, string>,
   narration: Project['narration'],
-  model: string = narration.models.draft,
+  model?: string,
 ): ClipInputs | null {
   if (!character?.voice) return null
   const { output, quality } = narration
   const tts = ttsFor(narration.tts, character)
+  const voice = character.voice
+  const delivery =
+    providerOf(voice) === 'elevenlabs'
+      ? [ELEVEN_TTS.stability, ELEVEN_TTS.similarityBoost, ELEVEN_TTS.style, tts.speed]
+      : [tts.temperature, tts.topP, tts.speed]
   const entry = cueFor(cues, line.key)
   const { opening, inside } = entry === undefined ? NONE : parseCued(entry, line.text)
   return {
-    model,
-    voice: character.voice,
+    model: model ?? modelForStage(narration, voice, 'draft'),
+    voice,
     cue: opening || (sceneCueFor(line, cues, narration) ?? character.style ?? ''),
     inside,
     text: line.text,
     said: saidText(line.text, pronounce),
     settings: JSON.stringify([
-      tts.temperature,
-      tts.topP,
-      tts.speed,
+      ...delivery,
       quality.chunkLimit,
       output.codec,
       output.bitrate,
