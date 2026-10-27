@@ -1,0 +1,170 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>How many takes</title><style>
+      :root {
+        --panel: #12141a;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px;
+      }
+      .intro,
+      .note,
+      .panel {
+        max-width: 860px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .intro {
+        color: var(--muted);
+        margin-bottom: 18px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 22px;
+        margin-bottom: 8px;
+        color: var(--muted);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .name {
+        width: 90px;
+        font-weight: 600;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .menu {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .list {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 6px 0;
+        width: 100%;
+        max-width: 560px;
+        font-size: 13px;
+      }
+      .list .g {
+        color: var(--faint);
+        font-size: 12px;
+        padding: 4px 10px;
+      }
+      .list .o {
+        padding: 3px 22px;
+      }
+      .list .o.dim {
+        color: var(--faint);
+      }
+      .list .o.on {
+        background: #20242e;
+      }
+      .chip {
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 12px;
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .warn {
+        color: var(--warn);
+        font-size: 12.5px;
+      }
+      .btn {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border: 0;
+        border-radius: 9px;
+        padding: 7px 12px;
+        font-weight: 600;
+      }
+      .card {
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: var(--danger-bg);
+        max-width: 420px;
+      }
+      .card strong {
+        color: var(--danger-ink);
+      }
+    
+.panel{margin-bottom:6px}.head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.head h2{margin:0;font-size:16px}.ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sel{background:var(--inset);border:1px solid var(--line-strong);border-radius:8px;padding:6px 10px;color:var(--text);font-size:13px}
+.empty{text-align:center;padding:18px 8px;display:flex;flex-direction:column;gap:8px;align-items:center}
+.take{border:1px solid var(--line-strong);border-radius:10px;padding:8px 10px;margin-top:10px;color:var(--muted)}
+.step{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;align-items:center}
+.step span{padding:6px 10px;background:var(--inset)}.step span.n{min-width:34px;text-align:center;font-weight:600}
+.step span.off{color:#4a505c}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
+.seg span{padding:6px 10px;background:var(--inset);border-left:1px solid var(--line-strong)}.seg span:first-child{border-left:0}
+.seg span.on{background:#2a2e39;color:var(--text);font-weight:700;box-shadow:inset 0 -2px var(--accent)}
+.lbl{color:var(--muted);font-size:13px}
+.narrow{max-width:360px}
+.warnbox{border:1px solid #4a3a12;background:#241d0b;border-radius:12px;padding:10px 12px;max-width:860px;margin:0 auto 8px;display:flex;flex-direction:column;gap:2px}.warnbox strong{color:var(--warn)}
+</style></head><body>
+<div class="intro"><h1>How many takes to make</h1>A count menu sits between the model menu and the button on a track's Takes panel, for the first batch and every later one. It lists 1 take to 6 takes and starts at 2 takes every time the panel opens and after every batch. The button says the number and, on a paid model, the total price. Screen readers call the menu “Number of new takes”.</div>
+<p class="note"><b>1 — First takes on an empty track</b>, Eleven Music, a 90-second loop</p><div class="panel"><div class="head"><h2>Takes</h2></div><div class="empty"><strong>No takes yet</strong><span class="muted">Each take is new music made from the brief, about 1 min and $0.28 a take.<br>Make a few, listen, and choose the one the game plays.</span><div class="ctl"><span class="sel">Eleven Music · ElevenLabs ▾</span><span class="sel">2 takes ▾</span><span class="btn">Make 2 takes · $0.56</span></div></div></div>
+<p class="note"><b>2 — More takes</b>, Eleven Music, the count raised to 3</p><div class="panel"><div class="head"><h2>Takes</h2><div class="ctl"><span class="sel">Eleven Music · ElevenLabs ▾</span><span class="sel">3 takes ▾</span><span class="btn">Make 3 more takes · $0.84</span></div></div><div class="take">Take 1 · 1:30 · ▶ Play · Choose · Move… · Drop</div><div class="take">Take 2 · 1:30 · ▶ Play · Choose · Move… · Drop</div></div>
+<p class="note"><b>3 — One take</b>, the singular</p><div class="panel"><div class="head"><h2>Takes</h2><div class="ctl"><span class="sel">Eleven Music · ElevenLabs ▾</span><span class="sel">1 take ▾</span><span class="btn">Make 1 more take · $0.28</span></div></div><div class="take">Take 1 · 1:30 · ▶ Play · Choose · Move… · Drop</div><div class="take">Take 2 · 1:30 · ▶ Play · Choose · Move… · Drop</div></div>
+<p class="note"><b>4 — A local model</b>: no price on the button or in the menu</p><div class="panel"><div class="head"><h2>Takes</h2><div class="ctl"><span class="sel">Balanced · ACE-Step ▾</span><span class="sel">2 takes ▾</span><span class="btn">Make 2 more takes</span></div></div><div class="take">Take 1 · 1:30 · ▶ Play · Choose · Move… · Drop</div><div class="take">Take 2 · 1:30 · ▶ Play · Choose · Move… · Drop</div></div>
+<p class="note"><b>5 — The count menu, opened</b>: with Eleven Music (left), with a local model (right)</p>
+<div class="row" style="max-width:860px;margin:0 auto"><div class="panel"><div class="list" style="max-width:220px"><div class="o">1 take · $0.28</div><div class="o">2 takes · $0.56</div><div class="o on">3 takes · $0.84</div><div class="o">4 takes · $1.12</div><div class="o">5 takes · $1.40</div><div class="o">6 takes · $1.68</div></div></div><div class="panel"><div class="list" style="max-width:220px"><div class="o">1 take</div><div class="o on">2 takes</div><div class="o">3 takes</div><div class="o">4 takes</div><div class="o">5 takes</div><div class="o">6 takes</div></div></div></div>
+<p class="note"><b>6 — While takes are being made</b>: the model menu, the count menu and the button are greyed until they finish (or Stop)</p><div class="panel"><div class="head"><h2>Takes</h2><div class="ctl"><span class="sel" style="opacity:.6">Stop</span><span style="opacity:.45" class="ctl"><span class="sel">Eleven Music · ElevenLabs ▾</span><span class="sel">3 takes ▾</span><span class="btn">Make 3 more takes · $0.84</span></span></div></div><div class="take">Take 1 · 1:30 · ▶ Play · Choose · Move… · Drop</div><div class="take">Take 2 · 1:30 · ▶ Play · Choose · Move… · Drop</div></div>
+<p class="note"><b>7 — The brief changed since the take was chosen</b>: the amber box's new second sentence</p><div class="warnbox"><strong>The brief changed since this take was chosen.</strong><span class="muted small">The game plays the chosen take until you choose another. Make more takes to hear the new brief.</span></div><div class="panel"><div class="head"><h2>Takes</h2><div class="ctl"><span class="sel">Eleven Music · ElevenLabs ▾</span><span class="sel">2 takes ▾</span><span class="btn">Make 2 more takes · $0.56</span></div></div><div class="take">Take 1 · 1:30 · ▶ Play · Choose · Move… · Drop</div><div class="take">Take 2 · 1:30 · ▶ Play · Choose · Move… · Drop</div></div>
+<p class="note"><b>8 — A narrow window</b></p>
+<div class="panel narrow"><div class="head"><h2>Takes</h2></div><div class="ctl" style="margin-top:8px"><span class="sel">Eleven Music · ElevenLabs ▾</span><span class="sel">3 takes ▾</span><span class="btn">Make 3 more takes · $0.84</span></div><p class="faint small">The model menu, the count menu and the button wrap together, in that order, under the heading.</p></div>
+</body></html>
