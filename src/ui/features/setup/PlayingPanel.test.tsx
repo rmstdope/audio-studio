@@ -170,6 +170,17 @@ describe('the Playing takes panel', () => {
     }
   })
 
+  it('keeps the failure line while the next save runs, if it fails too', async () => {
+    const { container, pick, done } = await setUp(0.2, { failWith: 'no' })
+    try {
+      await pick('1')
+      await pick('2')
+      expect(container.querySelector('[role="alert"]')).not.toBeNull()
+    } finally {
+      done()
+    }
+  })
+
   it('drops the failure line when the next save succeeds', async () => {
     const { container, server, pick, settle, done } = await setUp(0.2, { failWith: 'no' })
     try {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { fadeEntries, fadeSaveFailure } from '../../../core/takeFade'
 import { useProject, useSetTakeFade } from '../../api'
 
@@ -10,6 +11,8 @@ import { useProject, useSetTakeFade } from '../../api'
 export function PlayingPanel() {
   const project = useProject()
   const save = useSetTakeFade()
+  // The last failure stays until a save succeeds, not just until the next one starts.
+  const [failure, setFailure] = useState<string | null>(null)
   if (!project.data?.ok) return null
   const { takeFade, projectFile } = project.data.summary
   const shown = save.isPending ? save.variables : takeFade
@@ -33,7 +36,12 @@ export function PlayingPanel() {
             <select
               aria-label="Fade in and out"
               value={shown}
-              onChange={(event) => save.mutate(Number(event.target.value))}
+              onChange={(event) =>
+                save.mutate(Number(event.target.value), {
+                  onSuccess: () => setFailure(null),
+                  onError: (error) => setFailure(error.message),
+                })
+              }
             >
               {fadeEntries(takeFade).map((entry) => (
                 <option key={entry.seconds} value={entry.seconds}>
@@ -42,9 +50,9 @@ export function PlayingPanel() {
               ))}
             </select>
           </div>
-          {save.isError && (
+          {failure !== null && (
             <span className="adopt-error setup-hint" role="alert">
-              {fadeSaveFailure(save.error.message, takeFade)}
+              {fadeSaveFailure(failure, takeFade)}
             </span>
           )}
         </div>

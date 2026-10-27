@@ -157,7 +157,7 @@ const SoundAlikeBody = z.object({ groups: Groups, was: Groups }).strict()
 const FishTierBody = z.object({ tier: FishTierSchema.nullable() }).strict()
 
 /** How long takes fade in the studio, in seconds. */
-const TakeFadeBody = z.object({ seconds: z.number().min(0).max(60) }).strict()
+const TakeFadeBody = z.object({ seconds: z.number().min(0) }).strict()
 
 /** The takes whose model the page offered to switch from s1. */
 const ModelsBody = z
