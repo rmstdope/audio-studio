@@ -189,6 +189,7 @@ describe('createPlayer, the length of the fade', () => {
     let seconds = 0.2
     const { element, player, wait } = fadingSetUp(10, () => seconds)
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     wait(200)
     seconds = 1
     // A take already playing keeps its 0.2 s: it is out in 0.2 s after a stop.
@@ -197,6 +198,7 @@ describe('createPlayer, the length of the fade', () => {
     expect([element.volume, element.paused]).toEqual([0, true])
     // The next take uses the new length.
     player.toggle('b', '/b.mp3', { fade: true })
+    player.playing()
     wait(500)
     expect(element.volume).toBeCloseTo(0.5, 1)
     wait(500)
@@ -206,6 +208,7 @@ describe('createPlayer, the length of the fade', () => {
   it('plays a take as it is, and cuts it on stop, with no fade', () => {
     const { element, player, wait, ticks } = fadingSetUp(10, 0)
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     expect([element.volume, ticks.size]).toEqual([1, 0])
     wait(50)
     player.stop()
@@ -216,12 +219,14 @@ describe('createPlayer, the length of the fade', () => {
     let seconds = 0.2
     const { element, player, wait } = fadingSetUp(10, () => seconds)
     player.toggle('a', '/a.mp3', { fade: true })
+    player.playing()
     wait(300)
     player.stop()
     wait(300)
     expect(element.volume).toBe(0)
     seconds = 0
     player.toggle('b', '/b.mp3', { fade: true })
+    player.playing()
     expect(element.volume).toBe(1)
   })
 })
