@@ -58,7 +58,9 @@ export function OrphansPanel({ orphans }: { orphans: OrphanRow[] }) {
                           : `Play ${row.title}: music file missing`
                       }
                       onClick={() =>
-                        player.toggle(row.id, `/api/music/clips/${encodeURIComponent(row.file)}`)
+                        player.toggle(row.id, `/api/music/clips/${encodeURIComponent(row.file)}`, {
+                          fade: true,
+                        })
                       }
                     >
                       {playing ? <PauseIcon /> : <PlayIcon />}

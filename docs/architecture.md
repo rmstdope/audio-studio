@@ -177,7 +177,7 @@ audio-studio/
 │       │   ├── audition/        the audition board, ruled-out voices
 │       │   ├── characters/      all characters, a character's page, the casting brief
 │       │   └── narration/       line table, plan, job progress, inspector
-│       ├── player.ts            plays clips one at a time, or a list in turn
+│       ├── player.ts            plays clips one at a time, or a list in turn; takes fade in and out, the game's file does not
 │       └── components/          buttons, chips, waveform, player, status pills
 ├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
 └── docs/
