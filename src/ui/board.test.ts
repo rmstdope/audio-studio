@@ -273,6 +273,17 @@ describe('recordable', () => {
     }
     expect(recordable(session as never)).toEqual(['s', 'y', 'h'])
   })
+
+  it('leaves out ElevenLabs voices, which make no takes yet', () => {
+    const session = {
+      shortlist: ['eleven:s'],
+      yours: [],
+      toHear: ['h', 'eleven:h'],
+      designed: [],
+      voices: {},
+    }
+    expect(recordable(session as never)).toEqual(['h'])
+  })
 })
 
 describe('castEffects for a designed voice', () => {

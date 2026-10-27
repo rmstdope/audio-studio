@@ -21,6 +21,7 @@ import type { FishFactory } from './auditions'
 import { writeAtomic } from './files'
 import type { Limiter } from './limit'
 import { loadWorkspace, readPart, type ProjectFailure } from './workspace'
+import { providerOf } from '../core/voices'
 import { NO_KEY } from './fish'
 
 /** Where audition takes are kept, in the project's tool cache (gitignored by the consumer). */
@@ -29,7 +30,11 @@ export const TAKES_DIR = '.audio-studio/takes'
 /** A recorded take (its key, and the text it is of), or why there is none. Null for an unknown character. */
 export type TakeResult =
   | { ok: true; key: string; spoken: string; cached: boolean }
-  | { ok: false; reason: 'no-key' | 'fish' | 'no-sitting' | 'waits' | 'no-phrase'; message: string }
+  | {
+      ok: false
+      reason: 'no-key' | 'fish' | 'not-yet' | 'no-sitting' | 'waits' | 'no-phrase'
+      message: string
+    }
   | { ok: false; problems: Problem[] }
   | null
 
@@ -209,6 +214,14 @@ async function speak(
   limiter: Limiter,
   options: TakeOptions = {},
 ): Promise<TakeResult> {
+  // Fish's free model makes takes; ElevenLabs has none, and its takes come with §12 step 14.10.
+  if (providerOf(voice) !== 'fish') {
+    return {
+      ok: false,
+      reason: 'not-yet',
+      message: 'Takes and tries are not made with ElevenLabs voices yet.',
+    }
+  }
   const { quality } = project.narration
   const key = takeKey({ model, voice, spoken, tts })
   const file = resolveInRoot(root, takePath(key))

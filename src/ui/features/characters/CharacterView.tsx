@@ -53,7 +53,8 @@ import type { Clip } from '../../player'
 import { partLinesSummary, speakerCounts, STATUS } from '../../status'
 import { isAbout, takeToRecord } from '../../takes'
 import { needsResumeBox } from '../../sitting'
-import { voiceUrl } from '../../voiceId'
+import { providerWords, voiceUrl } from '../../voiceId'
+import { providerOf } from '../../../core/voices'
 import { DesignVoice } from '../audition/DesignVoice'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
@@ -542,6 +543,9 @@ function VoicePanel({
   const sample = voice?.sample ?? null
   const take = answer?.take ?? null
   const page = voiceUrl(id)
+  // An ElevenLabs voice makes no takes yet (§12 step 14.10); ElevenLabs' preview is how it is heard.
+  const eleven = providerOf(id) === 'elevenlabs'
+  const words = providerWords(id)
   return (
     <section className="panel voice-panel" aria-label="Voice">
       <div className="section-head">
@@ -554,8 +558,14 @@ function VoicePanel({
         </strong>
         {voice && (
           <span className="muted">
-            {voice.author ? `by ${voice.author} · ` : ''}
-            {compact(voice.uses)} uses · {compact(voice.likes)} likes
+            {eleven ? (
+              'ElevenLabs voice'
+            ) : (
+              <>
+                {voice.author ? `by ${voice.author} · ` : ''}
+                {compact(voice.uses)} uses · {compact(voice.likes)} likes
+              </>
+            )}
           </span>
         )}
       </div>
@@ -571,7 +581,7 @@ function VoicePanel({
       )}
       {answer?.lookup && (
         <span className="muted">
-          Fish Audio could not give this voice’s details: {answer.lookup.message}
+          {words.name} could not give this voice’s details: {answer.lookup.message}
         </span>
       )}
       {sharedWith.length > 0 && (
@@ -598,57 +608,65 @@ function VoicePanel({
         </p>
       )}
       <div className="voice-listen">
-        <div className="listen-box">
-          {take ? (
-            <button
-              type="button"
-              className="icon-btn take-play"
-              aria-label={playing === takeClip(id) ? 'Stop' : 'Play the take'}
-              onClick={() => toggle(takeClip(id), takeUrl(take))}
-            >
-              {playing === takeClip(id) ? <PauseIcon /> : <PlayIcon />}
-            </button>
-          ) : (
-            <button
-              className="btn btn-small"
-              type="button"
-              disabled={recorder.recording.has(id) || !answer || answer.lookup?.reason === 'no-key'}
-              onClick={() => void record(id)}
-            >
-              {recorder.recording.has(id) ? 'Recording…' : 'Record'}
-            </button>
-          )}
-          <span>
-            <strong>Take {paidModel && <span className="chip">free model</span>}</strong>
-            <span className="muted">The audition phrase, in {character.name}’s style</span>
-            {paidModel && (
-              <span className="muted">
-                Recorded with {FREE_MODELS[0]}. Auditions use {paidModel}.
-              </span>
+        {eleven ? (
+          <div className="listen-box">
+            <span className="muted">No takes with ElevenLabs voices yet: hear its preview.</span>
+          </div>
+        ) : (
+          <div className="listen-box">
+            {take ? (
+              <button
+                type="button"
+                className="icon-btn take-play"
+                aria-label={playing === takeClip(id) ? 'Stop' : 'Play the take'}
+                onClick={() => toggle(takeClip(id), takeUrl(take))}
+              >
+                {playing === takeClip(id) ? <PauseIcon /> : <PlayIcon />}
+              </button>
+            ) : (
+              <button
+                className="btn btn-small"
+                type="button"
+                disabled={
+                  recorder.recording.has(id) || !answer || answer.lookup?.reason === 'no-key'
+                }
+                onClick={() => void record(id)}
+              >
+                {recorder.recording.has(id) ? 'Recording…' : 'Record'}
+              </button>
             )}
-          </span>
-        </div>
+            <span>
+              <strong>Take {paidModel && <span className="chip">free model</span>}</strong>
+              <span className="muted">The audition phrase, in {character.name}’s style</span>
+              {paidModel && (
+                <span className="muted">
+                  Recorded with {FREE_MODELS[0]}. Auditions use {paidModel}.
+                </span>
+              )}
+            </span>
+          </div>
+        )}
         <div className="listen-box">
           {sample && (
             <button
               type="button"
               className="icon-btn"
-              aria-label={playing === sampleClip(id) ? 'Stop' : 'Play Fish’s sample'}
+              aria-label={playing === sampleClip(id) ? 'Stop' : words.play}
               onClick={() => toggle(sampleClip(id), sample.audio)}
             >
               {playing === sampleClip(id) ? <PauseIcon /> : <PlayIcon />}
             </button>
           )}
           <span>
-            <strong>Fish sample</strong>
+            <strong>{words.sample}</strong>
             <span className="muted sample-text" title={sample?.text}>
               {!answer
                 ? '…'
                 : sample
                   ? sample.text
                     ? `“${sample.text}”`
-                    : 'Fish’s own clip'
-                  : 'None from Fish'}
+                    : words.ownClip
+                  : words.none}
             </span>
           </span>
         </div>

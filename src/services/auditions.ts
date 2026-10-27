@@ -20,6 +20,8 @@ import { CastSchema, pronounceOf, type Cast, type Character } from '../core/reso
 import type { CharacterSummary } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import { hasWords, type Candidate, type Voice } from '../core/voiceSearch'
+import { providerId, providerOf } from '../core/voices'
+import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
 import { NO_KEY, type FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
 import { ruledOutIds } from './ruledOut'
@@ -66,6 +68,8 @@ export interface SearchOptions {
   keywords?: string[]
   /** More voices to leave out (e.g. every voice an audition has already shown). */
   exclude?: Iterable<string>
+  /** Where the character's ElevenLabs voices are looked up; without it they are shown by id only. */
+  elevenFor?: ElevenLabsFactory
 }
 
 /**
@@ -98,9 +102,16 @@ export async function findCandidates(
   const language = searchLanguage(project, seen.language)
   const own = character.languages[seen.language]
   const keywords = options.keywords ?? character.keywords
+  const eleven = (await options.elevenFor?.(dirname(projectFile), project)) ?? null
+  // Each voice is asked of its own provider: Fish is never asked about an ElevenLabs one.
+  const lookUp = (id: string): Promise<Voice | null> =>
+    (providerOf(id) === 'elevenlabs'
+      ? (eleven?.voice(providerId(id)) ?? Promise.resolve(null))
+      : fish.getVoice(id)
+    ).catch(() => null)
   try {
-    const current = own?.voice ? await fish.getVoice(own.voice).catch(() => null) : null
-    const others = await otherVoices(fish, character, seen.language)
+    const current = own?.voice ? await lookUp(own.voice) : null
+    const others = await otherVoices(lookUp, character, seen.language)
     // Left out before the list is cut, so a later search reaches voices past the first ones.
     const exclude = new Set([
       ...(own?.voice ? [own.voice] : []),
@@ -153,12 +164,12 @@ function searchLanguage(project: Project, language: string): string {
 }
 
 /**
- * The character's voices in the languages other than `language`, as Fish knows them (a voice Fish
- * no longer has is left out), each once, in the project's order and without the voice cast in
- * `language` itself.
+ * The character's voices in the languages other than `language`, as their providers know them (a
+ * voice no longer there is left out), each once, in the project's order and without the voice cast
+ * in `language` itself.
  */
 async function otherVoices(
-  fish: FishClient,
+  lookUp: (id: string) => Promise<Voice | null>,
   character: CharacterSummary,
   language: string,
 ): Promise<Voice[]> {
@@ -167,7 +178,7 @@ async function otherVoices(
     .map(([, casting]) => casting.voice)
     .filter((id): id is string => id !== null && id !== character.languages[language]?.voice)
   const unique = [...new Set(ids)]
-  const found = await Promise.all(unique.map((id) => fish.getVoice(id).catch(() => null)))
+  const found = await Promise.all(unique.map(lookUp))
   return found.filter((voice): voice is Voice => voice !== null)
 }
 
@@ -177,10 +188,10 @@ export type CharacterVoiceResult =
       ok: true
       /** The cast voice's id; null when the character is not cast. */
       id: string | null
-      /** The cast voice as Fish knows it; null when uncast, or when Fish did not say (`lookup`). */
+      /** The cast voice as its provider knows it; null when uncast, or when it did not say (`lookup`). */
       voice: Voice | null
-      /** Why Fish's details of the cast voice are missing, or null. */
-      lookup: { reason: 'no-key' | 'fish'; message: string } | null
+      /** Why the provider's details of the cast voice are missing, or null. */
+      lookup: { reason: 'no-key' | 'fish' | 'elevenlabs'; message: string } | null
       /** The key of the cast voice's take of the audition phrase, if recorded. */
       take: string | null
       /** What the character says in a take. */
@@ -193,15 +204,17 @@ export type CharacterVoiceResult =
   | null
 
 /**
- * A character's cast voice, for its page: Fish's details of it (one lookup, no search), its take
- * of the audition phrase, and the phrase itself. Without a key, or when Fish fails, says why the
- * details are missing; the page still shows the voice by its id and cast name.
+ * A character's cast voice, for its page: its provider's details of it (one lookup, no search;
+ * Fish's, or ElevenLabs' with `elevenFor`), its take of the audition phrase, and the phrase
+ * itself. Without a key, or when the provider fails, says why the details are missing; the page
+ * still shows the voice by its id and cast name.
  */
 export async function characterVoice(
   projectFile: string,
   characterId: string,
   fishFor: FishFactory,
   asked?: string,
+  elevenFor: ElevenLabsFactory = async () => null,
 ): Promise<CharacterVoiceResult> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
@@ -233,6 +246,10 @@ export async function characterVoice(
       [id],
       FREE_MODELS[0],
     )[id] ?? null
+  if (providerOf(id) === 'elevenlabs') {
+    const found = await elevenVoiceFor(elevenFor, dirname(projectFile), project, id)
+    return found.ok ? { ...answer, take, voice: found.voice } : { ...answer, take, lookup: found }
+  }
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_KEY } }
   try {
@@ -240,6 +257,28 @@ export async function characterVoice(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return { ...answer, take, lookup: { reason: 'fish' as const, message } }
+  }
+}
+
+/**
+ * An ElevenLabs voice as ElevenLabs knows it, by the studio's id, or why not: no key (no client),
+ * or ElevenLabs' own words.
+ */
+export async function elevenVoiceFor(
+  elevenFor: ElevenLabsFactory,
+  root: string,
+  project: Project,
+  id: string,
+): Promise<
+  { ok: true; voice: Voice } | { ok: false; reason: 'no-key' | 'elevenlabs'; message: string }
+> {
+  const eleven = await elevenFor(root, project)
+  if (!eleven) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+  try {
+    return { ok: true, voice: await eleven.voice(providerId(id)) }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { ok: false, reason: 'elevenlabs', message }
   }
 }
 

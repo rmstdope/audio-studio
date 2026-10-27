@@ -1,6 +1,8 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import type { Voice } from '../src/core/voiceSearch'
+import type { ElevenLabsClient } from '../src/services/elevenlabs'
 
 /** A minimal valid project file; override any top-level key. */
 export function projectJson(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -35,4 +37,44 @@ export function tempRepo(files: Record<string, unknown>): string {
     writeFileSync(full, typeof content === 'string' ? content : JSON.stringify(content, null, 2))
   }
   return root
+}
+
+/**
+ * An ElevenLabs client that knows `voices` (by ElevenLabs' own id) and nothing else: anything
+ * else it is asked rejects. `asked` lists the voices looked up.
+ */
+export function fakeEleven(voices: Record<string, Voice> = {}): {
+  client: ElevenLabsClient
+  asked: string[]
+} {
+  const asked: string[] = []
+  const unused = () => Promise.reject(new Error('not used'))
+  const client: ElevenLabsClient = {
+    subscription: unused,
+    music: unused,
+    tts: unused,
+    async voice(id) {
+      asked.push(id)
+      const found = voices[id]
+      if (!found)
+        throw new Error('ElevenLabs answered 404: A voice with the voice_id was not found.')
+      return found
+    },
+  }
+  return { client, asked }
+}
+
+/** An ElevenLabs voice as the client gives it: George, with a preview. */
+export function elevenVoiceOf(id: string, title = 'George'): Voice {
+  return {
+    id: `eleven:${id}`,
+    title,
+    description: 'Warm storyteller',
+    tags: ['british'],
+    languages: ['en'],
+    uses: 0,
+    likes: 0,
+    author: '',
+    sample: { text: '', audio: `https://example.com/${id}.mp3` },
+  }
 }

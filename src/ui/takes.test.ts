@@ -79,6 +79,10 @@ describe('takeToRecord', () => {
     const keyless = { ...voiced, lookup: { reason: 'no-key' as const, message: 'Set the key.' } }
     expect(takeToRecord(keyless, 'v1')).toBeNull()
   })
+
+  it('asks nothing for an ElevenLabs voice, which makes no takes yet', () => {
+    expect(takeToRecord({ ...voiced, id: 'eleven:g1' }, 'eleven:g1')).toBeNull()
+  })
 })
 
 describe('isAbout', () => {

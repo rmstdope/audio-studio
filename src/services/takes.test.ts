@@ -46,6 +46,28 @@ function fakeFish() {
 }
 
 describe('recordTake', () => {
+  it('makes no take with an ElevenLabs voice, on the board or its page, and asks Fish nothing', async () => {
+    const root = tempRepo(files)
+    const { fish, requests } = fakeFish()
+    for (const board of [false, true]) {
+      expect(
+        await recordTake(
+          join(root, 'audio-studio.json'),
+          'grandmother',
+          'eleven:g1',
+          async () => fish,
+          createLimiter(),
+          { board },
+        ),
+      ).toEqual({
+        ok: false,
+        reason: 'not-yet',
+        message: 'Takes and tries are not made with ElevenLabs voices yet.',
+      })
+    }
+    expect(requests).toEqual([])
+  })
+
   it('has the voice say the character’s phrase in its style, and keeps the audio', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
@@ -453,6 +475,31 @@ describe('tryLine', () => {
     expect(
       await tryLine(projectFileOf(root), 'act1', 'a', '', async () => failing, limiter),
     ).toEqual({ ok: false, reason: 'fish', message: 'boom' })
+  })
+})
+
+describe('tryLine with an ElevenLabs voice', () => {
+  it('makes no try, and asks Fish nothing', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { grandmother: { voice: 'eleven:g1' } }, pronounce: {} },
+      'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+    })
+    const { fish, requests } = fakeFish()
+    const result = await tryLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'a',
+      '[soft]',
+      async () => fish,
+      createLimiter(),
+    )
+    expect(result).toEqual({
+      ok: false,
+      reason: 'not-yet',
+      message: 'Takes and tries are not made with ElevenLabs voices yet.',
+    })
+    expect(requests).toEqual([])
   })
 })
 

@@ -214,3 +214,68 @@ describe('speaking', () => {
     ).rejects.toThrow('ElevenLabs answered 401: You have run out of credits')
   })
 })
+
+describe('looking a voice up', () => {
+  /** A voice as ElevenLabs' API reference shows one, with fields the studio does not read. */
+  const apiVoice = {
+    voice_id: 'JBFqnCBsd6RMkjVDRZzb',
+    name: 'George',
+    category: 'premade',
+    description: 'Warm, captivating storyteller',
+    labels: { accent: 'british', age: 'middle aged', gender: 'male', use_case: 'narration' },
+    preview_url: 'https://storage.googleapis.com/eleven-public-prod/george.mp3',
+    verified_languages: [{ language: 'en' }, { language: 'sv' }, { language: 'en' }],
+    settings: null,
+  }
+
+  it('gives it as a voice of the studio, its id marked as ElevenLabs’, its preview as its sample', async () => {
+    const { fetch, asked } = fakeFetch(apiVoice)
+    expect(await createElevenLabsClient('k', { fetch }).voice('JBFqnCBsd6RMkjVDRZzb')).toEqual({
+      id: 'eleven:JBFqnCBsd6RMkjVDRZzb',
+      title: 'George',
+      description: 'Warm, captivating storyteller',
+      tags: ['british', 'middle aged', 'male', 'narration'],
+      languages: ['en', 'sv'],
+      uses: 0,
+      likes: 0,
+      author: '',
+      sample: {
+        text: '',
+        audio: 'https://storage.googleapis.com/eleven-public-prod/george.mp3',
+      },
+    })
+    expect(asked[0]!.url).toBe('https://api.elevenlabs.io/v1/voices/JBFqnCBsd6RMkjVDRZzb')
+    expect(asked[0]!.headers.get('xi-api-key')).toBe('k')
+  })
+
+  it('takes a voice without description, labels, preview or languages', async () => {
+    const { fetch } = fakeFetch({
+      voice_id: 'x1',
+      name: 'Mine',
+      description: null,
+      preview_url: null,
+    })
+    expect(await createElevenLabsClient('k', { fetch }).voice('x1')).toMatchObject({
+      id: 'eleven:x1',
+      description: '',
+      tags: [],
+      languages: [],
+      sample: null,
+    })
+  })
+
+  it("throws ElevenLabs' own message for a voice it does not have", async () => {
+    const { fetch } = fakeFetch(
+      {
+        detail: {
+          status: 'voice_not_found',
+          message: 'A voice with the voice_id x was not found.',
+        },
+      },
+      404,
+    )
+    await expect(createElevenLabsClient('k', { fetch }).voice('x')).rejects.toThrow(
+      'ElevenLabs answered 404: A voice with the voice_id x was not found.',
+    )
+  })
+})

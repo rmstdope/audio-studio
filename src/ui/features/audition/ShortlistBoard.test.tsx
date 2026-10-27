@@ -137,4 +137,61 @@ describe('ShortlistBoard', () => {
 
     await act(() => page.unmount())
   })
+
+  it('brings in an ElevenLabs voice by its id, with ElevenLabs chosen beside the field', async () => {
+    const posted: { path: string; body: unknown }[] = []
+    globalThis.fetch = (async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST') posted.push({ path, body: JSON.parse(String(init.body)) })
+      return new Response('', { status: 404 })
+    }) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board),
+        ),
+      ),
+    )
+    const field = container.querySelector<HTMLInputElement>('#voice-id')!
+    const type = (text: string) =>
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, text)
+        field.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+    const provider = container.querySelector<HTMLSelectElement>('[aria-label="Whose voice"]')!
+    expect([...provider.options].map((o) => o.text)).toEqual(['Fish Audio', 'ElevenLabs'])
+    await act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(
+        provider,
+        'elevenlabs',
+      )
+      provider.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(field.placeholder).toBe('ElevenLabs voice id')
+    const submit = () =>
+      act(() =>
+        container
+          .querySelector('form.add-voice')!
+          .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+      )
+
+    await type('https://elevenlabs.io/app/voice-lab')
+    await submit()
+    expect(container.textContent).toContain('That is not an ElevenLabs voice id.')
+    expect(posted).toEqual([])
+
+    await type('JBFqnCBsd6RMkjVDRZzb')
+    await submit()
+    await until(() => posted.length > 0)
+    expect(posted[0]).toMatchObject({
+      path: expect.stringContaining('/api/auditions/keeper/add'),
+      body: { voice: 'eleven:JBFqnCBsd6RMkjVDRZzb' },
+    })
+
+    await act(() => page.unmount())
+  })
 })

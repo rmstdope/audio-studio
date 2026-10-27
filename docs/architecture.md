@@ -147,7 +147,7 @@ audio-studio/
 │   │   └── wav.ts               read and join WAVs
 │   ├── services/                I/O behind interfaces (fakes in tests)
 │   │   ├── env.ts               the Fish and ElevenLabs API keys, from the environment or the env file
-│   │   ├── elevenlabs.ts        ElevenLabsClient (subscription, music, tts; more with step 14)
+│   │   ├── elevenlabs.ts        ElevenLabsClient (subscription, music, tts, voice; more with step 14)
 │   │   ├── elevenMusic.ts       Eleven Music as a MusicGenerator: the brief, the key, the MP3 decoded
 │   │   ├── fish.ts              FishClient (listVoices, getVoice, tts, credit, createVoice, designVoice)
 │   │   ├── voiceSearch.ts       searching Fish for every term, pooled and ranked
@@ -566,7 +566,8 @@ An audition is for a character, not for a part: the result applies to every part
 
 - **To hear** holds the candidates being listened to, best match first. **Bring in more** adds
   the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
-  **Bring in a specific voice** adds one by its Fish id or URL.
+  **Bring in a specific voice** adds one by its Fish id or URL, or, with ElevenLabs chosen in the
+  menu beside it, by the bare id of one of the user's ElevenLabs voices (§8.6), looked up there.
 - **Drop** takes a voice out of the audition at once and rules it out for the character: no later
   search for it shows that voice again. Its take or sample stops at once if it is playing (as
   does whatever plays when the board goes, on a stop or a cast). The last drop can be undone.
@@ -1079,8 +1080,9 @@ with a 10-second limit, since Setup waits for it beside Fish.
 
 **One client.** `services/elevenlabs.ts` is the only code that calls ElevenLabs
 (`https://api.elevenlabs.io`, header `xi-api-key`), behind an `ElevenLabsClient` interface faked in
-tests as `FishClient` is: `subscription`, `tts`, `sharedVoices`, `addSharedVoice`, `deleteVoice`,
-`designVoice`, `saveDesign` and `music`. It retries a 429 as Fish's client does. Its work runs in
+tests as `FishClient` is: `subscription`, `tts`, `voice` (one of the account's voices by id, as
+the studio's `Voice`), `sharedVoices`, `addSharedVoice`, `deleteVoice`, `designVoice`, `saveDesign`
+and `music`. It retries a 429 as Fish's client does. Its work runs in
 its own limiter (`elevenWork`), so neither provider waits for the other, at the plan's concurrency
 (from `tier`; the table is settled in 14.2) and never more than `quality.parallel`. Speech is asked
 for as `wav_24000` (every plan may ask for it; 44.1 kHz needs Pro), so lines join, are checked and
@@ -1090,7 +1092,7 @@ chosen, as every take is.
 
 **Models, per provider.** Each provider's prices are a table of their own, in their own unit: Fish's
 stay `core/prices.ts` (dollars per million bytes), ElevenLabs' speech models get a table beside it
-(dollars per 1,000 characters, in 14.7), and Eleven Music's price per minute is on its music model
+(credits per character, `core/elevenSpeech.ts`, built in 14.7a), and Eleven Music's price per minute is on its music model
 (14.5). A stage accepts only its own provider's models: `narration.models` (Fish's, as
 today) and `narration.elevenlabs.models` (`audition`, `draft`, `final`; default `eleven_v3`) are
 validated and listed each against its own provider's list, so Fish is never sent an ElevenLabs
@@ -1161,7 +1163,7 @@ kept as design takes with their `generated_voice_id` and audio; casting one save
 kept preview's id in a later session, its card says so and offers to design again. A design's price,
 unknown today, is settled in 14.12 and confirmed as Fish's is. Cloning stays Fish's.
 
-**Music** (built in 14.4 and 14.5, but for the spending log, 14.7). One more family, `elevenlabs`,
+**Music** (built in 14.4 and 14.5, but for the spending log, 14.7d). One more family, `elevenlabs`,
 with one model, _Eleven Music_ (id `eleven`, recipe `eleven-music-v2.5`, `longest` 600 s, so loops
 up to 580 s, no folders, no download, about a minute a take until measured), in its own menu group,
 "ElevenLabs · in the cloud, paid". A take is `POST /v1/music` with `model_id` `music_v2_5`, the
@@ -1189,7 +1191,7 @@ read by an older studio.
   Setup's menu "about 1 min a take, $0.15 a minute of music" with "$0.15 a minute" beside it, and
   More takes and Make 2 takes the price of both, twice a take's as the menu shows it ("More takes ·
   $0.56"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed; each
-  is logged with step 14.7. Stop aborts the request; ElevenLabs may still bill a take stopped while
+  is logged with step 14.7d. Stop aborts the request; ElevenLabs may still bill a take stopped while
   being made, which Stop's title says while a paid take is being made.
 
 **Testing.** Every test uses a fake `ElevenLabsClient`. Opt-in live tests
@@ -1570,14 +1572,14 @@ Small, independently useful increments:
        and shaped, outside the GPU queue (the take queue by family), ready by key, Setup's Music
        row, an opt-in live take.
     5. **What music costs** (built): the price on the menus, More takes and Make 2 takes, and Stop's
-       warning. Music rows in the spending log go with its version 2, in 14.7.
+       warning. Music rows in the spending log go with its version 2, in 14.7d.
     6. **A voice says whose it is** (built): `eleven:` voice ids (`core/voices.ts`: `providerOf`,
        `providerId`, `elevenVoice`, `FISH_VOICE_ID` and `VOICE_ID`), and no Fish page linked for an
        ElevenLabs voice. The routes that would reach Fish or the cast (a take, adding, moving and
        casting a voice) still take Fish's ids only, until 14.7 can speak with an ElevenLabs one;
        allowing a ruled-out voice again takes either. No behaviour changes. The speaking seam moves
        to 14.7, which first needs it.
-    7. **Record lines with an ElevenLabs voice**, in three pull requests:
+    7. **Record lines with an ElevenLabs voice**, in four pull requests:
        1. **Speak a line with ElevenLabs** (built): ElevenLabs' speech models and their credits a
           character (`core/elevenSpeech.ts`), a voice's stage model from its provider (Eleven v3
           for every stage until 14.9, so its lines have no final step), its settings in the
@@ -1586,13 +1588,19 @@ Small, independently useful increments:
           refused without its key or at a speed ElevenLabs does not take. Nothing makes an
           ElevenLabs voice yet, and the server gives recording no ElevenLabs client, so nothing
           can be spent.
-       2. **Cast an ElevenLabs voice and record its lines**: Add by id with the provider chosen,
-          the server's ElevenLabs client, its own limiter, a part's plan split by provider,
-          characters in the confirm and admission against the plan, ElevenLabs rows in the
-          spending log (its version 2), and the speed refusal on the character's page. Page takes
-          and cue tries are not offered for an ElevenLabs voice yet, and nothing of Fish's is asked
-          about one.
-       3. **Music in the spending log**: a row for each Eleven Music take.
+       2. **Cast an ElevenLabs voice** (built): Add by id with the provider chosen beside the
+          field (_Fish Audio_, _ElevenLabs_; an ElevenLabs id is a bare id), the voice looked up
+          with the client's `voice` (its preview as its sample, shown as "ElevenLabs preview"),
+          moved, shortlisted and cast as any other; the character's page shows it as ElevenLabs
+          gives it. It records no take by itself and offers no Record take (on the board or its
+          page), and a take or a cue try with it is refused, saying so; Fish is asked nothing
+          about it. Its lines are not recorded yet: without the server's ElevenLabs client for
+          recording, a line is refused as without a key.
+       3. **Record an ElevenLabs voice's lines**: the server's ElevenLabs client for recording, its
+          own limiter, a part's plan split by provider, characters in the confirm and admission
+          against the plan, ElevenLabs rows in the spending log (its version 2), and the speed
+          refusal on the character's page.
+       4. **Music in the spending log**: a row for each Eleven Music take.
     8. **Cues by model**: cues left out of the text and the fingerprint for models that would speak
        them, so that choosing such a model (next) never reads a cue aloud.
     9. **Choose ElevenLabs' models and settings**: `narration.elevenlabs` saved from the Models

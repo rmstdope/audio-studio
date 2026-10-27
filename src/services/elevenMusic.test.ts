@@ -28,6 +28,9 @@ function fakeClient() {
     tts: async () => {
       throw new Error('not used')
     },
+    voice: async () => {
+      throw new Error('not used')
+    },
   }
   return { client, asked }
 }

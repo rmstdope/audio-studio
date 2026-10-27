@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
 import {
   characterVoice,
@@ -16,6 +16,7 @@ import {
 import { createLimiter } from './limit'
 import { recordTake } from './takes'
 import type { FishClient } from './fish'
+import { NO_ELEVENLABS_KEY } from './elevenlabs'
 
 function voice(id: string, title: string, uses = 0): Voice {
   return {
@@ -204,6 +205,41 @@ describe('characterVoice', () => {
       voice: null,
       lookup: { reason: 'fish', message: 'busy' },
     })
+  })
+
+  it('gives an ElevenLabs voice as ElevenLabs knows it, and asks Fish nothing', async () => {
+    const root = tempRepo({
+      ...files,
+      'tts/cast.json': { speakers: { grandmother: { voice: 'eleven:g1' } }, pronounce: {} },
+    })
+    const projectFile = join(root, 'audio-studio.json')
+    const { client: eleven, asked } = fakeEleven({ g1: elevenVoiceOf('g1') })
+    const noFish = async () => {
+      throw new Error('Fish is not asked about an ElevenLabs voice')
+    }
+    const result = await characterVoice(
+      projectFile,
+      'grandmother',
+      noFish,
+      undefined,
+      async () => eleven,
+    )
+    expect(result).toMatchObject({
+      ok: true,
+      id: 'eleven:g1',
+      voice: { title: 'George' },
+      lookup: null,
+      take: null,
+    })
+    expect(asked).toEqual(['g1'])
+    expect(await characterVoice(projectFile, 'grandmother', noFish)).toMatchObject({
+      voice: null,
+      lookup: { reason: 'no-key', message: NO_ELEVENLABS_KEY },
+    })
+    const failing = { ...eleven, voice: () => Promise.reject(new Error('ElevenLabs answered 401')) }
+    expect(
+      await characterVoice(projectFile, 'grandmother', noFish, undefined, async () => failing),
+    ).toMatchObject({ lookup: { reason: 'elevenlabs', message: 'ElevenLabs answered 401' } })
   })
 
   it('reports a broken cast, and answers an unknown character with null', async () => {

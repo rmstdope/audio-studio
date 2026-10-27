@@ -109,4 +109,70 @@ describe('CharacterView', () => {
 
     await act(() => page.unmount())
   })
+
+  it('shows an ElevenLabs voice as ElevenLabs gives it, with its preview and no take', async () => {
+    const cast: CharacterLanguage = { ...uncast, voice: 'eleven:g1', voiceName: 'George' }
+    const castSummary: ProjectSummary = {
+      ...summary,
+      characters: summary.characters.map((c) => ({
+        ...c,
+        voice: 'eleven:g1',
+        voiceName: 'George',
+        languages: { en: cast },
+      })),
+    }
+    const posted: string[] = []
+    globalThis.fetch = (async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST') posted.push(path)
+      if (path.startsWith('/api/characters/keeper/voice')) {
+        return Response.json({
+          ok: true,
+          id: 'eleven:g1',
+          voice: {
+            id: 'eleven:g1',
+            title: 'George',
+            description: 'Warm storyteller',
+            tags: [],
+            languages: ['en'],
+            uses: 0,
+            likes: 0,
+            author: '',
+            sample: { text: '', audio: 'https://example.com/george.mp3' },
+          },
+          lookup: null,
+          take: null,
+          audition: { spoken: 'Come in.', phrase: 'Come in.', from: 'own', standard: false },
+          language: 'en',
+        })
+      }
+      return studio(path)
+    }) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(CharacterView, { summary: castSummary, characterId: 'keeper' }),
+        ),
+      ),
+    )
+    const panel = () => container.querySelector('[aria-label="Voice"]')?.textContent ?? ''
+    await until(() => panel().includes('Warm storyteller'))
+    expect(panel()).toContain('ElevenLabs voice')
+    expect(panel()).not.toContain('uses')
+    expect(panel()).toContain('No takes with ElevenLabs voices yet: hear its preview.')
+    expect(panel()).toContain('ElevenLabs preview')
+    expect(panel()).not.toContain('Open on Fish Audio')
+    const labels = [...container.querySelectorAll('[aria-label="Voice"] button')].map(
+      (b) => b.getAttribute('aria-label') ?? b.textContent,
+    )
+    expect(labels).toContain('Play ElevenLabs’ preview')
+    expect(labels).not.toContain('Record')
+    expect(posted.filter((p) => p.includes('/takes'))).toEqual([])
+
+    await act(() => page.unmount())
+  })
 })

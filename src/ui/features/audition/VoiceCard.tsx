@@ -1,14 +1,16 @@
 import type { ReactNode } from 'react'
 import type { Candidate, Voice } from '../../../core/voiceSearch'
+import { providerOf } from '../../../core/voices'
 import { takeUrl } from '../../api'
 import { sampleClip, takeClip } from '../../board'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { compact } from '../../format'
+import { providerWords } from '../../voiceId'
 
 /**
  * A voice in an audition: who made it and how popular it is, its take (the audition phrase in the
- * character's style) or a button to record one, Fish's own sample, and, on the board, what can be
- * done with it (`actions`).
+ * character's style) or a button to record one (none for an ElevenLabs voice yet), its provider's
+ * own sample, and, on the board, what can be done with it (`actions`).
  */
 export function VoiceCard({
   voice,
@@ -46,6 +48,9 @@ export function VoiceCard({
   const sample = voice.sample
   // Fish's design, not yet on the account: its preview is its take, and it has no sample or id.
   const designed = voice.design !== undefined
+  // An ElevenLabs voice makes no takes yet (§12 step 14.10); ElevenLabs' preview is how it is heard.
+  const eleven = providerOf(voice.id) === 'elevenlabs'
+  const words = providerWords(voice.id)
   return (
     <article
       className={`card voice-card${listed ? ' kept' : ''}${voice.own ? ' yours' : ''}${designed ? ' designed' : ''}`}
@@ -59,6 +64,8 @@ export function VoiceCard({
               'Designed · not saved'
             ) : voice.own ? (
               'Your voice · private'
+            ) : eleven ? (
+              'ElevenLabs voice'
             ) : (
               <>
                 {voice.author ? `by ${voice.author} · ` : ''}
@@ -110,6 +117,8 @@ export function VoiceCard({
           </>
         ) : designed ? (
           <span className="muted">The preview of this design is no longer kept.</span>
+        ) : eleven ? (
+          <span className="muted">No takes with ElevenLabs voices yet: hear its preview.</span>
         ) : waiting ? (
           <span className="muted take-waits">Take waits for more money</span>
         ) : (
@@ -127,18 +136,19 @@ export function VoiceCard({
                 type="button"
                 className="icon-btn"
                 aria-label={
-                  playing === sampleClip(voice.id) ? 'Stop' : `Play Fish’s sample of ${voice.title}`
+                  playing === sampleClip(voice.id) ? 'Stop' : `${words.play} of ${voice.title}`
                 }
                 onClick={() => toggle(sampleClip(voice.id), sample.audio)}
               >
                 {playing === sampleClip(voice.id) ? <PauseIcon /> : <PlayIcon />}
               </button>
               <span className="muted sample-text" title={sample.text}>
-                Fish sample{sample.text ? `: “${sample.text}”` : ''}
+                {words.sample}
+                {sample.text ? `: “${sample.text}”` : ''}
               </span>
             </>
           ) : (
-            <span className="muted">No sample from Fish</span>
+            <span className="muted">{words.noSample}</span>
           )}
         </div>
       )}
