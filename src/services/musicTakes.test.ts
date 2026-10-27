@@ -20,6 +20,7 @@ import { loadProject } from './workspace'
 import { boardQueue, createMusicTakes, musicTakeHash } from './musicTakes'
 import { GPU } from './gpu'
 import { refreshDialog, refreshShared, stopRefreshes } from './refresh'
+import type { MusicSpend } from '../core/spending'
 import { createHash } from 'node:crypto'
 
 const music = {
@@ -578,6 +579,64 @@ describe('createMusicTakes', () => {
     })
     release()
     await busy
+  })
+
+  it('says what a paid take cost once it is made, and nothing of a free one', async () => {
+    const { file } = setup()
+    const spent: { projectFile: string; take: MusicSpend }[] = []
+    const takes = createMusicTakes({
+      generator: fakeGenerator().generator,
+      queue: createSerial(),
+      newSeed: () => 1,
+      now: () => Date.parse('2026-10-27T12:00:00Z'),
+      spent: (projectFile, take) => void spent.push({ projectFile, take }),
+    })
+    await takes.make(file, 'hall', { count: 1, model: 'eleven' })
+    await takes.make(file, 'hall', { count: 1, model: 'balanced' })
+    for (let i = 0; i < 200 && spent.length === 0; i++) await Bun.sleep(5)
+    await Bun.sleep(20)
+    // A 30-second loop is made 50 seconds long, at $0.15 a minute.
+    expect(spent).toEqual([
+      {
+        projectFile: file,
+        take: {
+          id: expect.any(String),
+          at: '2026-10-27T12:00:00.000Z',
+          part: 'act1',
+          track: 'hall',
+          title: 'Hall',
+          model: 'eleven',
+          seconds: 50,
+          cost: 0.125,
+          outcome: 'done',
+        },
+      },
+    ])
+  })
+
+  it('says a paid take stopped while it was made may have cost its price', async () => {
+    const { file } = setup()
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const spent: MusicSpend[] = []
+    const takes = createMusicTakes({
+      generator: fakeGenerator(undefined, [], gate).generator,
+      queue: createSerial(),
+      newSeed: () => 1,
+      spent: (_file, take) => void spent.push(take),
+    })
+    await takes.make(file, 'victory', { count: 1, model: 'eleven' })
+    for (let i = 0; i < 200; i++) {
+      const view = await takes.view(file, 'victory')
+      if (view && 'ok' in view && view.ok && view.making[0]?.state === 'making') break
+      await Bun.sleep(5)
+    }
+    await takes.stop(file, 'victory')
+    release()
+    await Bun.sleep(20)
+    expect(spent).toMatchObject([
+      { part: 'stingers', track: 'victory', seconds: 10, cost: 0.025, outcome: 'stopped' },
+    ])
   })
 
   it('refuses a model that is not on this computer, and says which models are', async () => {

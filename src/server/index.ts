@@ -43,7 +43,7 @@ import { planPart } from '../core/planner'
 import { SPEED } from '../core/resources'
 import { spokenPieces } from '../core/spoken'
 import { createJobs } from '../services/jobs'
-import { createSpendLog, readSpending } from '../services/spending'
+import { appendMusic, createSpendLog, readSpending } from '../services/spending'
 import { outcomeOf, summariseSpending } from '../core/spending'
 import { moveCue, moveSceneCue, setCue, setInsideCue, setSceneCue } from '../services/cues'
 import { gitChanges } from '../services/git'
@@ -362,6 +362,15 @@ export function startServer({
   const musicTakes = createMusicTakes({
     generator: musicGenerator,
     ...(encode ? { encode } : {}),
+    // A paid take is a row of the spending record (its version 2).
+    spent: async (file, take) => {
+      const saved = await appendMusic(file, take)
+      if (!saved.ok) {
+        console.error(
+          'Audio Studio: a paid music take was not saved: the spending record is damaged.',
+        )
+      }
+    },
   })
   /** The Fish client: the one given (tests), else made from the project's API key on every use. */
   const fishFor: FishFactory = fish !== undefined ? async () => fish : fishFromEnv
@@ -749,7 +758,7 @@ export function startServer({
   async function loggedOne<T extends { ok: boolean } | null>(
     planned: { model: string; stage: 'draft' | 'final'; language: string },
     part: string,
-    budget: Budget,
+    { budget, credits }: { budget: Budget; credits?: Budget },
     run: () => Promise<T>,
   ): Promise<T> {
     const followed = spendLog.follow({
@@ -757,6 +766,7 @@ export function startServer({
       ...planned,
       planned: 1,
       budget,
+      credits,
       progress: () => ({ lines: 0 }),
     })
     let result: T | undefined
@@ -883,7 +893,7 @@ export function startServer({
           }
           try {
             const result = await whileGoing('part', part, () =>
-              loggedOne(planned, part, admitted.budget, async () =>
+              loggedOne(planned, part, admitted, async () =>
                 recordLine(projectFile, part, key, fishFor, {
                   encode,
                   limiter: fishWork,
@@ -993,6 +1003,7 @@ export function startServer({
                 ...planned,
                 planned: keys.length,
                 budget,
+                credits,
                 progress,
               })
           const job = jobs.start({
@@ -1237,12 +1248,16 @@ export function startServer({
             readSpending(projectFile),
           ])
           if (!saved.ok) return Response.json({ ok: false, problems: saved.problems })
+          // The acts, and the stingers when the project has music: a music take's list is one.
           const parts = project.ok
-            ? project.summary.parts.map((p) => ({ id: p.id, title: p.title }))
+            ? [
+                ...project.summary.parts.map((p) => ({ id: p.id, title: p.title })),
+                ...(project.summary.music ? [{ id: 'stingers', title: 'Stingers' }] : []),
+              ]
             : []
           return Response.json({
             ok: true,
-            ...summariseSpending(saved.recordings, spendLog.running(), parts),
+            ...summariseSpending(saved.recordings, spendLog.running(), parts, saved.music),
             languages: project.ok ? project.summary.languages.length : 1,
           })
         }),
@@ -1399,7 +1414,7 @@ export function startServer({
           }
           try {
             const result = await whileGoing('part', part, () =>
-              loggedOne(planned, part, admitted.budget, async () =>
+              loggedOne(planned, part, admitted, async () =>
                 takeLine(projectFile, part, key, fishFor, {
                   limiter: fishWork,
                   elevenLimiter: elevenWork,

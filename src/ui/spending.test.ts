@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'bun:test'
 import type { SpendingRow } from '../core/spending'
-import { actText, costText, languageText, linesText, totalsLabel, whenText } from './spending'
+import {
+  actText,
+  amountText,
+  costText,
+  languageText,
+  linesText,
+  modelText,
+  totalsLabel,
+  whenText,
+} from './spending'
 
 const row = (over: Partial<SpendingRow> = {}): SpendingRow => ({
   id: 'r',
+  kind: 'narration',
   at: '2026-10-25T14:02:00',
   part: 'act1',
   removed: false,
@@ -12,6 +22,7 @@ const row = (over: Partial<SpendingRow> = {}): SpendingRow => ({
   lines: 298,
   planned: 298,
   cost: 4.12,
+  credits: 0,
   state: 'done',
   ...over,
 })
@@ -58,7 +69,9 @@ describe('costText', () => {
 
 describe('actText', () => {
   it('is the full title, or the id of an act no longer in the project', () => {
-    const acts = [{ part: 'act1', title: 'Act I: The Lantern', total: 1, removed: false }]
+    const acts = [
+      { part: 'act1', title: 'Act I: The Lantern', total: 1, credits: 0, removed: false },
+    ]
     expect(actText(row(), acts)).toBe('Act I: The Lantern')
     expect(actText(row({ part: 'act9', removed: true }), acts)).toBe('act9')
   })
@@ -76,5 +89,40 @@ describe('languageText', () => {
   it('writes the language out in English', () => {
     expect(languageText('en')).toBe('English')
     expect(languageText('sv')).toBe('Swedish')
+  })
+})
+
+describe('the page’s words for credits and music takes', () => {
+  it('gives a recording’s dollars and credits, or the credits alone', () => {
+    expect(costText(row({ cost: 0.05, credits: 1200 }))).toBe('$0.05 · 1,200 credits')
+    expect(costText(row({ cost: 0, credits: 1200 }))).toBe('1,200 credits')
+    expect(costText(row({ cost: 0, credits: 40, state: 'running' }))).toBe('40 credits so far')
+  })
+
+  it('names a recording’s models, and a music take’s model by its name', () => {
+    expect(modelText(row())).toBe('drama-3')
+    expect(modelText(row({ elevenModel: 'eleven_v3' }))).toBe('drama-3 · eleven_v3')
+    expect(modelText(row({ kind: 'music', model: 'eleven' }))).toBe('Eleven Music')
+  })
+
+  it('says what a music take was, in the Lines column', () => {
+    const take = row({ kind: 'music', track: 'The cave', seconds: 110 })
+    expect(linesText(take)).toEqual({ count: 'Music take · The cave', note: '1:50 made' })
+    expect(linesText({ ...take, state: 'stopped' })).toEqual({
+      count: 'Music take · The cave',
+      note: 'stopped while made, may be billed',
+    })
+  })
+
+  it('totals a tile’s dollars and credits, each when there is any', () => {
+    expect(amountText(0.78, 1200)).toBe('$0.78 · 1,200 credits')
+    expect(amountText(0, 1200)).toBe('1,200 credits')
+    expect(amountText(0.78, 0)).toBe('$0.78')
+    expect(amountText(0, 0)).toBe('$0.00')
+  })
+
+  it('counts music takes beside the recordings', () => {
+    expect(totalsLabel(9, 'Act', 2)).toBe('All acts · 9 recordings · 2 music takes')
+    expect(totalsLabel(0, 'Act', 1)).toBe('All acts · 1 music take')
   })
 })

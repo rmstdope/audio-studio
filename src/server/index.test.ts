@@ -3169,6 +3169,71 @@ describe('server, the music pages', () => {
   })
 })
 
+describe('server, what music takes cost', () => {
+  const musicRoot = tempRepo({
+    'audio-studio.json': projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+  })
+  const studio = startServer({
+    projectFile: join(musicRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    music: {
+      ready: () => ({ ok: true }),
+      installed: () => true,
+      async generate(request) {
+        const samples = new Int16Array(request.seconds * 1000).fill(4000)
+        const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
+        return { wav: writeWav({ format, data: new Uint8Array(samples.buffer) }) }
+      },
+      close() {},
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const takes = () => new URL('/api/music/tracks/hall/takes', studio.url)
+  const make = (body: unknown) =>
+    fetch(takes(), {
+      method: 'POST',
+      headers: { origin: studio.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('lists a paid take on the Spending page, in its act, and a free one not', async () => {
+    const after = async () => {
+      for (let i = 0; i < 200; i++) {
+        const view = await (await fetch(takes())).json()
+        if (!view.making.length) return
+        await Bun.sleep(5)
+      }
+    }
+    expect((await make({ count: 1, model: 'balanced' })).status).toBe(200)
+    await after()
+    expect((await make({ count: 1, model: 'eleven' })).status).toBe(200)
+    await after()
+    await Bun.sleep(20)
+    const spending = await (await fetch(new URL('/api/spending', studio.url))).json()
+    expect(spending).toMatchObject({ ok: true, takes: 1, count: 0 })
+    expect(spending.rows).toMatchObject([
+      { kind: 'music', part: 'act1', track: 'Hall', model: 'eleven', seconds: 25, state: 'done' },
+    ])
+    expect(spending.acts.map((a: { part: string }) => a.part)).toContain('stingers')
+  })
+})
+
 describe('server, a track’s takes', () => {
   const musicRoot = tempRepo({
     'audio-studio.json': projectJson({
