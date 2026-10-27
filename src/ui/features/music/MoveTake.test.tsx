@@ -128,9 +128,11 @@ function render(
     [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
       (b) => b.textContent === name,
     )
-  const key = (target: Element, name: string) =>
+  const key = (target: Element, name: string, shiftKey = false) =>
     act(() => {
-      target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }))
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', { key: name, shiftKey, bubbles: true, cancelable: true }),
+      )
     })
   return { client, buttons, key, rerender: show }
 }
@@ -323,6 +325,35 @@ describe('the Move dialog', () => {
     page.key(document.activeElement!, 'Escape')
     await act(async () => {})
     expect(dialog()).toBeNull()
+  })
+
+  it('keeps Tab and Shift+Tab inside the dialog while Move is greyed, and Esc still closes it', async () => {
+    const page = render(village, view([take(3)]))
+    await click(page.buttons('Move…')[0])
+    const input = document.querySelector('input.filter')!
+    const cancel = page.buttons('Cancel')[0]!
+    expect(page.buttons('Move take 3')[0]!.disabled).toBe(true)
+    cancel.focus()
+    page.key(cancel, 'Tab')
+    expect(document.activeElement).toBe(input)
+    page.key(input, 'Tab', true)
+    expect(document.activeElement).toBe(cancel)
+    page.key(document.activeElement!, 'Escape')
+    await act(async () => {})
+    expect(dialog()).toBeNull()
+  })
+
+  it('wraps Tab from Move to the first control and Shift+Tab back, in a stinger dialog too', async () => {
+    const page = render(row('win', 'Victory'), view([take(1)], { kind: 'stinger' }))
+    await click(page.buttons('Move…')[0])
+    await click(option('Game over'))
+    const moveButton = page.buttons('Move take 1')[0]!
+    expect(moveButton.disabled).toBe(false)
+    moveButton.focus()
+    page.key(moveButton, 'Tab')
+    expect(document.activeElement).toBe(option('Game over'))
+    page.key(option('Game over'), 'Tab', true)
+    expect(document.activeElement).toBe(moveButton)
   })
 
   it('moves with Up, Down and Enter, and closes with Esc, focus back on Move…', async () => {

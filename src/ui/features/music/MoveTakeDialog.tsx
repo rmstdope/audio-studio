@@ -15,7 +15,8 @@ import { useMoveTake } from '../../api'
 /**
  * The dialog that moves a take to another track of the same kind: a search box (loops only), the
  * tracks of the game to pick from, and the move. It stays open with the reason when the move is
- * refused. Esc and Cancel close it with nothing changed; `onMoved` hears the answer of a move done.
+ * refused. Tab stays inside it; Esc and Cancel close it with nothing changed; `onMoved` hears the
+ * answer of a move done.
  */
 export function MoveTakeDialog({
   trackId,
@@ -111,6 +112,27 @@ export function MoveTakeDialog({
       return
     }
     const target = event.target as HTMLElement
+    if (event.key === 'Tab') {
+      // Tab and Shift+Tab wrap at the dialog's edges, so the keyboard never leaves it for the page
+      // behind, where Esc would no longer close it.
+      const controls = [
+        ...(root.current?.querySelectorAll<HTMLElement>('input, button') ?? []),
+      ].filter((c) => !(c as HTMLInputElement | HTMLButtonElement).disabled)
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      const wrapTo = event.shiftKey
+        ? target === first || !controls.includes(target)
+          ? last
+          : null
+        : target === last || !controls.includes(target)
+          ? first
+          : null
+      if (wrapTo) {
+        event.preventDefault()
+        wrapTo.focus()
+      }
+      return
+    }
     const onRow = target.getAttribute('role') === 'option'
     if (event.key === 'Enter' && (onRow || target === search.current)) {
       event.preventDefault()
