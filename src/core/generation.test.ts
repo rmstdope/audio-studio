@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { LineState } from './planner'
-import { planGeneration, costCeiling } from './generation'
+import { planGeneration, costCeiling, creditCeiling } from './generation'
 
 /** A fixed moment to price plans at: no promotion runs then for the models tested. */
 const AT = new Date('2026-10-24T12:00:00Z')
@@ -292,5 +292,54 @@ describe('planGeneration, drafted lines', () => {
     expect(
       planGeneration({ lines, orphans: [] }, { at: AT, model: 'x', includeWeak: true }).drafted,
     ).toBe(0)
+  })
+})
+
+describe('planGeneration, lines with ElevenLabs voices', () => {
+  // The narrator speaks with an ElevenLabs voice, on Eleven v3; everyone else with Fish.
+  const elevenModelOf = (line: LineState) => (line.speaker === 'narrator' ? 'eleven_v3' : null)
+
+  it('prices Fish’s lines in dollars and ElevenLabs’ in credits, a character a credit', () => {
+    const all = planGeneration(state, { at: AT, model: 's2-pro', takes: 2 })
+    const plan = planGeneration(state, { at: AT, model: 's2-pro', takes: 2, elevenModelOf })
+    const narrated = state.lines.filter(
+      (l) => plan.keys.includes(l.key) && l.speaker === 'narrator',
+    )
+    const characters = narrated.reduce((sum, l) => sum + [...l.text].length, 0)
+    expect(plan.keys).toEqual(all.keys)
+    expect(plan.eleven).toEqual({
+      keys: narrated.map((l) => l.key),
+      model: 'eleven_v3',
+      characters,
+      credits: characters,
+      ceiling: characters * 2,
+    })
+    const fishBytes = state.lines
+      .filter((l) => plan.keys.includes(l.key) && l.speaker !== 'narrator')
+      .reduce((sum, l) => sum + new TextEncoder().encode(l.text).length, 0)
+    expect(plan.bytes).toBe(fishBytes)
+    expect(plan.cost).toBeCloseTo((fishBytes / 1_000_000) * 15, 12)
+    expect(plan.ceiling).toBeCloseTo((fishBytes / 1_000_000) * 15 * 2, 12)
+  })
+
+  it('has no ElevenLabs part when no line in it has an ElevenLabs voice', () => {
+    expect(planGeneration(state, { at: AT, model: 's2-pro' }).eleven).toBeNull()
+    expect(
+      planGeneration(state, { at: AT, model: 's2-pro', elevenModelOf: () => null }).eleven,
+    ).toBeNull()
+  })
+
+  it('leaves ElevenLabs’ lines out of the dollars, and counts them in credits, for some lines', () => {
+    const keys = state.lines.map((l) => l.key)
+    const fishOnly = state.lines.filter((l) => l.speaker !== 'narrator').map((l) => l.key)
+    expect(costCeiling(state, keys, { at: AT, model: 's2-pro', elevenModelOf })).toBeCloseTo(
+      costCeiling(state, fishOnly, { at: AT, model: 's2-pro' })!,
+      12,
+    )
+    const narrated = state.lines.filter((l) => l.speaker === 'narrator')
+    expect(creditCeiling(state, keys, { elevenModelOf, takes: 3 })).toBe(
+      narrated.reduce((sum, l) => sum + [...l.text].length, 0) * 3,
+    )
+    expect(creditCeiling(state, fishOnly, { elevenModelOf })).toBe(0)
   })
 })

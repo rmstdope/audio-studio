@@ -9,6 +9,7 @@ import {
   type MutationState,
   type QueryClient,
 } from '@tanstack/react-query'
+import { agreedBody, agreedOf, type Agreed } from './agreed'
 import { DESIGN_PRICE } from '../core/design'
 import type { Pronunciation } from '../core/pronounce'
 import type { CueChange } from '../services/cues'
@@ -38,7 +39,7 @@ import type { HeardResult } from '../services/heard'
 import type { AcceptResult, MeasureResult, RecordResult } from '../services/narration'
 import type { RuledOutResult } from '../services/ruledOut'
 import type { Take } from '../core/retirement'
-import type { FishTier } from '../core/setup'
+import type { ElevenAnswer, FishTier } from '../core/setup'
 import type { ModelsChange } from '../services/models'
 import type { ModelsView } from '../services/modelsView'
 import type { Busy, Stage } from '../core/models'
@@ -56,7 +57,6 @@ import type { AuditionText } from '../core/takes'
 import type { SittingView } from '../core/sitting'
 import { takeCaches, waitingAfter } from './sitting'
 import { voiceTitleOf } from './castLanguages'
-import { centsUp } from './format'
 import { isAbout, takeAnswerState, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
@@ -1581,14 +1581,14 @@ export function useLineTakeActions(partId: string, key: string, language?: strin
     what: string
     answer: NonNullable<TakeLineResult> | NonNullable<UseTakeResult>
   } | null>(null)
-  const [toConfirm, setToConfirm] = useState<number | null>(null)
+  const [toConfirm, setToConfirm] = useState<Agreed | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
   const take = useMutation({
-    mutationFn: async (confirmedCost?: number) => {
+    mutationFn: async (agreed?: Agreed) => {
       const response = await fetch(inLanguage(base, language), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(confirmedCost === undefined ? {} : { confirmedCost }),
+        body: JSON.stringify(agreed ? agreedBody(agreed) : {}),
       })
       if (!response.ok && response.status !== 409) {
         throw new Error(`${base} answered ${response.status}`)
@@ -1713,11 +1713,11 @@ export function useRecordLines(partId: string, language?: string) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [toConfirm, setToConfirm] = useState<Record<string, number>>({})
+  const [toConfirm, setToConfirm] = useState<Record<string, Agreed>>({})
   const forget = (key: string) => setToConfirm(({ [key]: _gone, ...rest }) => rest)
 
   const record = useCallback(
-    async (key: string, confirmedCost?: number, stage: 'draft' | 'final' = 'draft') => {
+    async (key: string, agreed?: Agreed, stage: 'draft' | 'final' = 'draft') => {
       setRecording((now) => new Set(now).add(key))
       setErrors(({ [key]: _gone, ...rest }) => rest)
       forget(key)
@@ -1729,18 +1729,16 @@ export function useRecordLines(partId: string, language?: string) {
         const response = await fetch(path, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            stage,
-            ...(confirmedCost === undefined ? {} : { confirmedCost }),
-          }),
+          body: JSON.stringify({ stage, ...(agreed ? agreedBody(agreed) : {}) }),
         })
         if (!response.ok && response.status !== 409) {
           throw new Error(`recording answered ${response.status}`)
         }
         const result = (await response.json()) as NonNullable<RecordResult> | SpendAnswer
-        if (!result.ok && 'ceiling' in result) {
-          // Shown and sent rounded up to the cent, so the amount agreed covers the cost.
-          setToConfirm((now) => ({ ...now, [key]: centsUp(result.ceiling) }))
+        const asked = !result.ok && 'reason' in result ? agreedOf(result) : null
+        if (asked) {
+          // Shown and sent rounded up (to the cent, or the credit), so the amount agreed covers it.
+          setToConfirm((now) => ({ ...now, [key]: asked }))
         } else if (!result.ok) {
           const message = 'message' in result ? result.message : 'the part’s files need fixing'
           setErrors((now) => ({ ...now, [key]: message }))
@@ -1769,17 +1767,23 @@ export function useRecordLines(partId: string, language?: string) {
   return { record, recording, errors, toConfirm, cancel: forget }
 }
 
-/** The server asking to confirm a paid recording: the most it can cost, in dollars. */
+/** The server asking to confirm a paid recording: the most it can cost, in dollars or credits. */
 export interface SpendAnswer {
   ok: false
-  reason: 'confirm'
+  reason: 'confirm' | 'confirm-credits'
   ceiling: number
   message: string
 }
 
 /** What generating a part (or one speaker in it) would do, or why it cannot be planned. */
 export type PlanAnswer =
-  | { ok: true; plan: GenerationPlan; parallel: number }
+  | {
+      ok: true
+      plan: GenerationPlan
+      parallel: number
+      /** The ElevenLabs account, when the plan has lines with ElevenLabs voices. */
+      elevenAccount?: ElevenAnswer
+    }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
 
@@ -1858,6 +1862,8 @@ export function useJobActions(partId: string, language?: string) {
       retakeWeak?: boolean
       /** The most the user agreed to spend, for a paid model. */
       confirmedCost?: number
+      /** The most ElevenLabs credits the user agreed to, for lines with ElevenLabs voices. */
+      confirmedCredits?: number
       speaker: string | null
       keys: string[]
       orphans: string[]

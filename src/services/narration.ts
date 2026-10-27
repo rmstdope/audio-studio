@@ -42,7 +42,14 @@ import { inPartTurn } from './partFiles'
 import { readPart, type Ears, type ProjectFailure } from './workspace'
 import { NO_KEY } from './fish'
 import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
-import { ELEVEN_TTS, modelForStage, speedProblem, takesLanguage } from '../core/elevenSpeech'
+import {
+  DEFAULT_ELEVEN_MODEL,
+  ELEVEN_TTS,
+  modelForStage,
+  requestsAtOnce,
+  speedProblem,
+  takesLanguage,
+} from '../core/elevenSpeech'
 import { providerId, providerOf } from '../core/voices'
 
 /** Seconds of silence between the pieces of a long line (as in RetroQuest's narrate.py). */
@@ -76,6 +83,9 @@ export type RecordResult =
 /** The budget of a recording given none: the free model only. */
 const FREE_ONLY = createBudget({ model: FREE_MODELS[0], dollars: 0 })
 
+/** The ElevenLabs budget of a recording given none: nothing may be spent. */
+const NO_CREDITS = createBudget({ model: DEFAULT_ELEVEN_MODEL, dollars: 0 })
+
 /** A request to Fish refused by the recording's budget. */
 class SpendRefused extends Error {}
 
@@ -100,10 +110,17 @@ export interface RecordOptions {
    */
   stage?: 'draft' | 'final'
   /**
-   * What the recording may spend: the confirmed model and dollars, charged before every request
-   * to Fish at that moment's price. Without it only the free model can be used.
+   * What the recording may spend on Fish: the confirmed model and dollars, charged before every
+   * request to Fish at that moment's price. Without it only the free model can be used.
    */
   budget?: Budget
+  /**
+   * What the recording may spend on ElevenLabs: the confirmed model and credits, charged before
+   * every request for a line with an ElevenLabs voice. Without it such a line is refused.
+   */
+  credits?: Budget
+  /** The limiter ElevenLabs' requests wait in (the Fish one, `limiter`, when absent). */
+  elevenLimiter?: Limiter
   /** Checks each take (unless the project's `quality.transcriber` is "none"); none: unchecked. */
   transcriber?: Transcriber | null
   /** The language to record (the source language when absent or not declared). */
@@ -203,6 +220,8 @@ export async function recordLine(
     retakeWeak = false,
     transcriber = null,
     budget = FREE_ONLY,
+    credits = NO_CREDITS,
+    elevenLimiter = limiter,
     stage = 'draft',
     language,
     elevenlabs,
@@ -277,14 +296,15 @@ export async function recordLine(
     if (!inputs || !line) {
       return { ok: false, reason: 'fish', message: 'nothing to speak' }
     }
+    const eleven = providerOf(inputs.voice) === 'elevenlabs'
     return speakLine({
       speak,
       line,
       inputs,
       cast,
       narration,
-      budget,
-      limiter,
+      budget: eleven ? credits : budget,
+      limiter: eleven ? elevenLimiter : limiter,
       limiterKey: `line\n${id}\n${take}`,
     })
   }
@@ -385,8 +405,9 @@ export function finalFingerprint(
 
 /**
  * Has Fish speak a line once: each sentence-sized piece in the speaker's voice with the cue, at the
- * character's settings, charged to the budget before it is sent, holding a Fish slot (`limiter`,
- * under `limiterKey`) only while speaking; the pieces joined with a short pause.
+ * character's settings, charged to the budget before it is sent, holding a slot of its provider
+ * (`limiter`, under `limiterKey`; ElevenLabs' at most two at once) only while speaking; the pieces
+ * joined with a short pause.
  */
 export async function speakLine({
   speak,
@@ -409,7 +430,8 @@ export async function speakLine({
 }): Promise<Spoken> {
   let pieces: Uint8Array[]
   try {
-    pieces = await limiter.run(limiterKey, narration.quality.parallel, async () => {
+    const atOnce = requestsAtOnce(narration.quality.parallel, inputs.voice)
+    pieces = await limiter.run(limiterKey, atOnce, async () => {
       const spoken: Uint8Array[] = []
       const texts = spokenPieces(
         line.text,

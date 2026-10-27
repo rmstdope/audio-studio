@@ -3873,3 +3873,145 @@ describe('casting an ElevenLabs voice', () => {
     })
   })
 })
+
+describe('recording an ElevenLabs voice’s lines', () => {
+  const account = {
+    tier: 'starter',
+    charactersUsed: 29_000,
+    characterLimit: 30_000,
+    renewsAt: null,
+    overage: 0,
+    voiceSlots: { used: 1, limit: 10 },
+  }
+  /** A part with the narrator on ElevenLabs and Mira on Fish, and a server for it. */
+  function studio(left = account) {
+    const where = tempRepo({
+      'audio-studio.json': projectJson(),
+      'tts/cast.json': {
+        speakers: { narrator: { voice: 'eleven:g1' }, mira: { voice: 'w1' } },
+        pronounce: {},
+      },
+      'tts/act1/script.json': [
+        { key: 'a', speaker: 'narrator', text: 'Once.' },
+        { key: 'b', speaker: 'mira', text: 'Twice.' },
+      ],
+    })
+    const eleven = fakeEleven(
+      {},
+      {
+        account: left,
+        speak: () =>
+          writeWav({
+            format: { channels: 1, sampleRate: 1000, bitsPerSample: 16 },
+            data: new Uint8Array(2000),
+          }),
+      },
+    )
+    const fishAsked: string[] = []
+    const watching: FishClient = {
+      ...fish,
+      tts: (request) => (fishAsked.push(request.voice), fish.tts(request)),
+    }
+    const running = startServer({
+      projectFile: join(where, 'audio-studio.json'),
+      port: 0,
+      fish: watching,
+      encode,
+      transcriber: null,
+      elevenlabs: eleven.client,
+    })
+    const post = (path: string, body: unknown = {}) =>
+      fetch(new URL(path, running.url), {
+        method: 'POST',
+        headers: { origin: running.url.origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    const get = async (path: string) => (await fetch(new URL(path, running.url))).json()
+    return { running, post, get, eleven, fishAsked }
+  }
+
+  it('plans the ElevenLabs lines in credits, with what is left of the plan', async () => {
+    const { running, get } = studio()
+    try {
+      const planned = await get('/api/parts/act1/plan')
+      // "Once." is five characters, a credit each, up to three takes.
+      expect(planned.plan.eleven).toEqual({
+        keys: ['a'],
+        model: 'eleven_v3',
+        characters: 5,
+        credits: 5,
+        ceiling: 15,
+      })
+      expect(planned.plan.keys).toEqual(['a', 'b'])
+      expect(planned.elevenAccount).toEqual({ ok: true, account })
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('records a line only with its credits confirmed and covered, by ElevenLabs alone', async () => {
+    const { running, post, eleven, fishAsked } = studio()
+    try {
+      const unconfirmed = await post('/api/parts/act1/lines/a/record')
+      expect(unconfirmed.status).toBe(409)
+      expect(await unconfirmed.json()).toMatchObject({ reason: 'confirm-credits', ceiling: 15 })
+      const recorded = await post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+      expect(await recorded.json()).toMatchObject({ ok: true, key: 'a' })
+      expect(eleven.spoken.map((r) => [r.voice, r.text])).toEqual([['g1', 'Once.']])
+      expect(fishAsked).toEqual([])
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('refuses credits the plan has not got left', async () => {
+    const { running, post, eleven } = studio({ ...account, charactersUsed: 29_990 })
+    try {
+      const refused = await post('/api/parts/act1/lines/a/record', { confirmedCredits: 15 })
+      expect(refused.status).toBe(409)
+      expect(await refused.json()).toMatchObject({
+        reason: 'credits',
+        message:
+          'This takes up to 15 credits, more than the 10 credits left on your ElevenLabs plan.',
+      })
+      expect(eleven.spoken).toEqual([])
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('records a part with both providers, each confirmed in its own unit', async () => {
+    const { running, post, get, eleven, fishAsked } = studio()
+    try {
+      const body = { kind: 'record', speaker: null, keys: ['a', 'b'], orphans: [] }
+      const unconfirmed = await post('/api/parts/act1/jobs', body)
+      expect(unconfirmed.status).toBe(409)
+      const started = await post('/api/parts/act1/jobs', { ...body, confirmedCredits: 15 })
+      expect(started.status).toBe(200)
+      const { id } = await started.json()
+      let job = await get(`/api/jobs/${id}`)
+      for (let i = 0; i < 100 && job.status === 'running'; i++) {
+        await Bun.sleep(20)
+        job = await get(`/api/jobs/${id}`)
+      }
+      expect(job).toMatchObject({ status: 'done', failed: [] })
+      expect(eleven.spoken.map((r) => r.text)).toEqual(['Once.'])
+      expect(fishAsked).toEqual(['w1'])
+    } finally {
+      running.stop(true)
+    }
+  })
+
+  it('takes a line again with its credits confirmed', async () => {
+    const { running, post, eleven } = studio()
+    try {
+      const unconfirmed = await post('/api/parts/act1/lines/a/takes')
+      expect(await unconfirmed.json()).toMatchObject({ reason: 'confirm-credits', ceiling: 5 })
+      const taken = await post('/api/parts/act1/lines/a/takes', { confirmedCredits: 5 })
+      expect(await taken.json()).toMatchObject({ ok: true })
+      expect(eleven.spoken).toHaveLength(1)
+    } finally {
+      running.stop(true)
+    }
+  })
+})

@@ -55,6 +55,7 @@ import { isAbout, takeToRecord } from '../../takes'
 import { needsResumeBox } from '../../sitting'
 import { providerWords, voiceUrl } from '../../voiceId'
 import { providerOf } from '../../../core/voices'
+import { speedProblem } from '../../../core/elevenSpeech'
 import { DesignVoice } from '../audition/DesignVoice'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
@@ -403,6 +404,23 @@ export function CharacterView({
                   label={inLanguage ? speed.label : undefined}
                   beneath={inLanguage ? speed.others : undefined}
                 />
+              )
+            })()}
+            {(() => {
+              // ElevenLabs takes a narrower range of speeds than the editor allows: say so.
+              const voice = casting?.voice ?? null
+              const own = inLanguage ? (casting?.speed ?? null) : character.speed
+              const slow =
+                voice && providerOf(voice) === 'elevenlabs'
+                  ? speedProblem(own ?? summary.speed)
+                  : null
+              return (
+                slow && (
+                  <p className="status-note">
+                    <AlertIcon />
+                    <span>{slow}</span>
+                  </p>
+                )
               )
             })()}
           </section>

@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
+import { payWords } from '../../agreed'
 import { lineTakeUrl, useLineTakeActions, useLineTakes } from '../../api'
 import { PauseIcon, PlayIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
-import { dollars } from '../../format'
 import { percent, seconds } from '../../status'
 import { extraTakeWords } from '../../takes'
 
@@ -125,10 +125,14 @@ export function LineTakes({
               ref={pay}
               type="button"
               className="btn btn-primary"
-              title="The most this take can cost on your Fish account"
+              title={
+                toConfirm.unit === 'usd'
+                  ? 'The most this take can cost on your Fish account'
+                  : 'The most this take can take of your ElevenLabs plan'
+              }
               onClick={() => take.mutate(toConfirm)}
             >
-              Pay up to {dollars(toConfirm)}
+              {payWords(toConfirm)}
             </button>
             <button type="button" className="btn" onClick={back}>
               Cancel

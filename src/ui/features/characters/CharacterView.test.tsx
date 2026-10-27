@@ -175,4 +175,43 @@ describe('CharacterView', () => {
 
     await act(() => page.unmount())
   })
+
+  it('says why an ElevenLabs voice set to a speed ElevenLabs does not take is not recorded', async () => {
+    const fast: CharacterLanguage = {
+      ...uncast,
+      voice: 'eleven:g1',
+      voiceName: 'George',
+      speed: 1.5,
+    }
+    const fastSummary: ProjectSummary = {
+      ...summary,
+      characters: summary.characters.map((c) => ({
+        ...c,
+        voice: 'eleven:g1',
+        voiceName: 'George',
+        speed: 1.5,
+        languages: { en: fast },
+      })),
+    }
+    globalThis.fetch = studio
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(CharacterView, { summary: fastSummary, characterId: 'keeper' }),
+        ),
+      ),
+    )
+    const delivery = () => container.querySelector('[aria-label="Delivery"]')?.textContent ?? ''
+    await until(() => delivery() !== '')
+    expect(delivery()).toContain(
+      'ElevenLabs speaks at 0.7 to 1.2 times its pace, and this voice is set to 1.5; change its speed to record it.',
+    )
+
+    await act(() => page.unmount())
+  })
 })

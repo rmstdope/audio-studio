@@ -1,6 +1,7 @@
 import { spokenPieces } from './spoken'
 import type { StaleReason } from './fingerprint'
 import type { LineState, Orphan } from './planner'
+import { elevenCredits } from './elevenSpeech'
 import { priceOf } from './prices'
 
 /** What generating a part (or one character in it) would do. */
@@ -34,12 +35,17 @@ export interface GenerationPlan {
   orphans: string[]
   /** UTF-8 bytes of text sent to Fish (cues included), which paid models charge for. */
   bytes: number
+  /** The Fish model the plan records with. */
   model: string
-  /** Estimated cost in US dollars, for one take of each line; 0 on the free model; null for a
-   * model whose price is unknown. */
+  /**
+   * Estimated cost of the Fish lines in US dollars, for one take of each line; 0 on the free
+   * model; null for a model whose price is unknown.
+   */
   cost: number | null
-  /** The most the plan can cost: every line needing every take (null for an unknown price). */
+  /** The most the Fish lines can cost: every line needing every take (null for an unknown price). */
   ceiling: number | null
+  /** The lines recorded by ElevenLabs voices and what they take of the plan, or null for none. */
+  eleven: ElevenPlan | null
   /** Takes a line may need at most (when a take is not heard well enough). */
   takes: number
   /** Whether this is the final recording (every line not final yet, with the final model). */
@@ -48,7 +54,31 @@ export interface GenerationPlan {
   checked: boolean
 }
 
+/** What the lines with ElevenLabs voices in a plan take, in ElevenLabs credits. */
+export interface ElevenPlan {
+  keys: string[]
+  /** The ElevenLabs model they are recorded with. */
+  model: string
+  /** Characters of text sent to ElevenLabs (cues included). */
+  characters: number
+  /** The credits one take of each line takes. */
+  credits: number
+  /** The most credits they can take: every line needing every take. */
+  ceiling: number
+}
+
+/**
+ * The ElevenLabs model a line is spoken with, when its voice is an ElevenLabs one; null for a
+ * Fish voice, whose lines go with the plan's own model.
+ */
+export type ElevenModelOf = (line: LineState) => string | null
+
 const encoder = new TextEncoder()
+
+/** The credits one take of `line` takes on `model`: the characters of each piece sent. */
+function lineCredits(line: LineState, model: string, sent: (line: LineState) => string[]): number {
+  return sent(line).reduce((sum, text) => sum + (elevenCredits(model, text) ?? 0), 0)
+}
 
 /**
  * What generating would do, for the whole part or one speaker in it: record every missing and
@@ -65,6 +95,7 @@ export function planGeneration(
     checked = false,
     includeWeak = false,
     final = false,
+    elevenModelOf = () => null,
     at,
   }: {
     model: string
@@ -82,6 +113,8 @@ export function planGeneration(
      * one), whatever its status.
      */
     final?: boolean
+    /** Which lines ElevenLabs speaks, and with which model; by default none. */
+    elevenModelOf?: ElevenModelOf
     /** When the plan is priced: prices change, promotions end. */
     at: Date
   },
@@ -102,11 +135,17 @@ export function planGeneration(
   for (const line of toRecord) {
     for (const reason of line.reasons) stale[reason] = (stale[reason] ?? 0) + 1
   }
-  const bytes = toRecord.reduce(
+  const byFish = toRecord.filter((line) => elevenModelOf(line) === null)
+  const byEleven = toRecord.filter((line) => elevenModelOf(line) !== null)
+  const bytes = byFish.reduce(
     (sum, line) => sum + sent(line).reduce((s, text) => s + encoder.encode(text).length, 0),
     0,
   )
   const price = priceOf(model, at)
+  const credits = byEleven.reduce(
+    (sum, line) => sum + lineCredits(line, elevenModelOf(line)!, sent),
+    0,
+  )
   return {
     keys: toRecord.map((line) => line.key),
     // The weak lines a retake would add: not final ones in a draft plan (never taken back to the
@@ -134,10 +173,22 @@ export function planGeneration(
     model,
     cost: price === undefined ? null : (bytes / 1_000_000) * price,
     ceiling: costCeiling(
-      { lines: toRecord },
-      toRecord.map((line) => line.key),
+      { lines: byFish },
+      byFish.map((line) => line.key),
       { model, sent, takes, at },
     ),
+    eleven: byEleven.length
+      ? {
+          keys: byEleven.map((line) => line.key),
+          model: elevenModelOf(byEleven[0]!)!,
+          characters: byEleven.reduce(
+            (sum, line) => sum + sent(line).reduce((s, text) => s + [...text].length, 0),
+            0,
+          ),
+          credits,
+          ceiling: credits * takes,
+        }
+      : null,
     takes,
     checked,
     final,
@@ -146,7 +197,8 @@ export function planGeneration(
 
 /**
  * The most recording `keys` can cost in dollars: the bytes sent for those lines at the model's
- * price at `at`, times every take; null for a model whose price is unknown.
+ * price at `at`, times every take; null for a model whose price is unknown. Lines ElevenLabs
+ * speaks (`elevenModelOf`) cost credits instead, so they are not counted here (`creditCeiling`).
  */
 export function costCeiling(
   state: { lines: LineState[] },
@@ -155,17 +207,47 @@ export function costCeiling(
     model,
     sent = (line) => spokenPieces(line.text, line.cue, {}, Infinity, line.inside),
     takes = 1,
+    elevenModelOf = () => null,
     at,
-  }: { model: string; sent?: (line: LineState) => string[]; takes?: number; at: Date },
+  }: {
+    model: string
+    sent?: (line: LineState) => string[]
+    takes?: number
+    elevenModelOf?: ElevenModelOf
+    at: Date
+  },
 ): number | null {
-  const price = priceOf(model, at)
-  if (price === undefined) return null
   const wanted = new Set(keys)
-  const bytes = state.lines
-    .filter((line) => wanted.has(line.key))
-    .reduce(
-      (sum, line) => sum + sent(line).reduce((s, text) => s + encoder.encode(text).length, 0),
-      0,
-    )
+  const lines = state.lines.filter((line) => wanted.has(line.key) && elevenModelOf(line) === null)
+  const price = priceOf(model, at)
+  if (price === undefined) return lines.length ? null : 0
+  const bytes = lines.reduce(
+    (sum, line) => sum + sent(line).reduce((s, text) => s + encoder.encode(text).length, 0),
+    0,
+  )
   return (bytes / 1_000_000) * price * takes
+}
+
+/**
+ * The most credits recording `keys` can take: each line ElevenLabs speaks (`elevenModelOf`), its
+ * characters sent at its model's credits, times every take. Fish's lines take none.
+ */
+export function creditCeiling(
+  state: { lines: LineState[] },
+  keys: string[],
+  {
+    elevenModelOf,
+    sent = (line) => spokenPieces(line.text, line.cue, {}, Infinity, line.inside),
+    takes = 1,
+  }: { elevenModelOf: ElevenModelOf; sent?: (line: LineState) => string[]; takes?: number },
+): number {
+  const wanted = new Set(keys)
+  return (
+    state.lines
+      .filter((line) => wanted.has(line.key))
+      .reduce((sum, line) => {
+        const model = elevenModelOf(line)
+        return model === null ? sum : sum + lineCredits(line, model, sent)
+      }, 0) * takes
+  )
 }

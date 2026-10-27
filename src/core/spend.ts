@@ -1,5 +1,6 @@
 import { elevenCredits, isElevenModel } from './elevenSpeech'
 import { priceOf } from './prices'
+import type { ElevenAccount } from './setup'
 
 const utf8 = new TextEncoder()
 
@@ -8,6 +9,8 @@ export type SpendProblem =
   | { reason: 'confirm'; ceiling: number; message: string }
   | { reason: 'credit'; message: string }
   | { reason: 'price'; message: string }
+  | { reason: 'confirm-credits'; ceiling: number; message: string }
+  | { reason: 'credits'; message: string }
 
 /** Below this, a difference in dollars is rounding, not money (sums of per-piece prices). */
 const ROUNDING = 1e-9
@@ -59,6 +62,52 @@ export function spendProblem({
     }
   }
   return null
+}
+
+/**
+ * Whether a job taking at most `ceiling` ElevenLabs credits may start (null) or not: one taking
+ * none always may; else the user must have confirmed at least its ceiling, and `left` (what the
+ * plan has left, beyond what running jobs hold) must cover it. Unknown, it does not start.
+ */
+export function creditProblem({
+  ceiling,
+  confirmed,
+  left,
+}: {
+  ceiling: number
+  confirmed?: number
+  left?: number | null
+}): SpendProblem | null {
+  if (ceiling === 0) return null
+  if (confirmed === undefined || confirmed < ceiling) {
+    return {
+      reason: 'confirm-credits',
+      ceiling,
+      message: `This takes up to ${creditWords(ceiling)} of your ElevenLabs plan; confirm it to go ahead.`,
+    }
+  }
+  if (left === undefined || left === null) {
+    return {
+      reason: 'credits',
+      message: 'What is left of your ElevenLabs plan is unknown, so nothing is recorded.',
+    }
+  }
+  if (left < ceiling) {
+    return {
+      reason: 'credits',
+      message: `This takes up to ${creditWords(ceiling)}, more than the ${creditWords(left)} left on your ElevenLabs plan.`,
+    }
+  }
+  return null
+}
+
+/**
+ * The credits an ElevenLabs account may still use this period: what its plan includes and has not
+ * used, and the overage allowed beyond it (billed in dollars; without limit, without end).
+ */
+export function creditsLeft(account: ElevenAccount): number {
+  const overage = account.overage === 'unlimited' ? Infinity : account.overage
+  return Math.max(account.characterLimit - account.charactersUsed, 0) + overage
 }
 
 /**

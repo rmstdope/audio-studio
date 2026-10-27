@@ -3,6 +3,7 @@ import { ProjectSchema } from './project'
 import { projectJson } from '../../test/helpers'
 import {
   DEFAULT_ELEVEN_MODEL,
+  requestsAtOnce,
   ELEVEN_TTS,
   elevenCredits,
   isElevenModel,
@@ -56,5 +57,13 @@ describe('the language sent', () => {
     expect(takesLanguage('eleven_v3')).toBe(true)
     expect(takesLanguage('eleven_flash_v2_5')).toBe(true)
     expect(takesLanguage('eleven_multilingual_v2')).toBe(false)
+  })
+})
+
+describe('requestsAtOnce', () => {
+  it('is the project’s for a Fish voice, and at most two for an ElevenLabs one', () => {
+    expect(requestsAtOnce(4, 'abc')).toBe(4)
+    expect(requestsAtOnce(4, 'eleven:abc')).toBe(2)
+    expect(requestsAtOnce(1, 'eleven:abc')).toBe(1)
   })
 })

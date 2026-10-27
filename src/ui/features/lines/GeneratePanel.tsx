@@ -4,7 +4,8 @@ import { displayName } from '../../../core/summary'
 import type { JobKind } from '../../../services/jobs'
 import { useJob, useJobActions, usePlan } from '../../api'
 import { Problems } from '../../components/Problems'
-import { aboutDollars, centsUp, dollars, plural } from '../../format'
+import { elevenPlanFacts, planPayWords } from '../../agreed'
+import { aboutDollars, centsUp, plural } from '../../format'
 import { castNote, generateLabel, planHeadline, translatedNote } from '../../languages'
 import { REASON } from '../../status'
 
@@ -59,7 +60,8 @@ export function GeneratePanel({
   // The orphan box only ever confirms the orphans shown: a different set clears it.
   const orphanSet = plan.data?.ok ? plan.data.plan.orphans.join('\n') : ''
   const ceilingShown = plan.data?.ok ? plan.data.plan.ceiling : null
-  useEffect(() => setConfirming(false), [ceilingShown, speaker, retakeWeak, stage])
+  const creditsShown = plan.data?.ok ? (plan.data.plan.eleven?.ceiling ?? 0) : 0
+  useEffect(() => setConfirming(false), [ceilingShown, creditsShown, speaker, retakeWeak, stage])
   useEffect(() => setRemoveOrphans(false), [orphanSet])
 
   if (current && (running || shownJob === current.id)) {
@@ -149,9 +151,14 @@ export function GeneratePanel({
     return <Problems title="Generation cannot be planned" problems={answer.problems} />
   }
   const { plan: p } = answer
-  const paid = p.keys.length > 0 && (p.ceiling ?? 0) > 0
-  // What "Pay up to" shows and sends: the most it can cost, rounded up to the cent.
-  const agreed = centsUp(p.ceiling ?? 0)
+  const fishPaid = p.keys.length > 0 && (p.ceiling ?? 0) > 0
+  // What "Pay up to" shows and sends: the most it can cost, rounded up to the cent, and the most
+  // credits its ElevenLabs lines can take, up to the whole credit.
+  const agreed = fishPaid ? centsUp(p.ceiling ?? 0) : 0
+  const agreedCredits = Math.ceil(p.eleven?.ceiling ?? 0)
+  const paid = fishPaid || agreedCredits > 0
+  // The Fish lines' facts are shown when there are any (or nothing at all is on ElevenLabs).
+  const fishLines = p.keys.length > (p.eleven?.keys.length ?? 0) || !p.eleven
   const nothing = p.keys.length === 0 && (p.orphans.length === 0 || !removeOrphans)
   // The previous plan, shown while the new one loads: nothing is started from it.
   const waiting = plan.isPlaceholderData
@@ -182,7 +189,11 @@ export function GeneratePanel({
             disabled={nothing || waiting || start.isPending}
             title={
               paid
-                ? 'The most this can cost on your Fish account: every line, every take'
+                ? agreedCredits
+                  ? fishPaid
+                    ? 'The most this can cost on your Fish account and take of your ElevenLabs plan: every line, every take'
+                    : 'The most this can take of your ElevenLabs plan: every line, every take'
+                  : 'The most this can cost on your Fish account: every line, every take'
                 : undefined
             }
             onClick={() => {
@@ -197,7 +208,8 @@ export function GeneratePanel({
                   speaker,
                   keys: p.keys,
                   orphans: removeOrphans ? p.orphans : [],
-                  confirmedCost: paid ? agreed : undefined,
+                  confirmedCost: fishPaid ? agreed : undefined,
+                  confirmedCredits: agreedCredits ? agreedCredits : undefined,
                 },
                 {
                   onSuccess: (started) => {
@@ -211,7 +223,7 @@ export function GeneratePanel({
             {start.isPending
               ? 'Starting…'
               : confirming
-                ? `Pay up to ${dollars(agreed)}`
+                ? planPayWords(agreed, agreedCredits)
                 : 'Generate'}
           </button>
         </div>
@@ -320,9 +332,16 @@ export function GeneratePanel({
           Also remove {plural(p.orphans.length, 'orphaned clip')} (their lines left the dialog)
         </label>
       )}
+      {p.eleven && (
+        <span className="muted plan-facts">{elevenPlanFacts(p.eleven, answer.elevenAccount)}</span>
+      )}
       <span className="muted plan-facts">
-        {p.model} · {formatBytes(p.bytes)} of text ·{' '}
-        {p.cost === null ? 'price unknown' : p.cost ? aboutDollars(p.cost) : 'free'} ·{' '}
+        {fishLines && (
+          <>
+            {p.model} · {formatBytes(p.bytes)} of text ·{' '}
+            {p.cost === null ? 'price unknown' : p.cost ? aboutDollars(p.cost) : 'free'} ·{' '}
+          </>
+        )}
         {p.checked
           ? `each take checked with Whisper${language ? ` in ${language.name}` : ''}, up to ${plural(p.takes, 'take')} a line${
               p.cost ? ` (at most ${aboutDollars(p.cost * p.takes)})` : ''
