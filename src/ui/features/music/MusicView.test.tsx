@@ -16,8 +16,11 @@ const { MusicView } = await import('./MusicView')
 
 // What the page asks the audio element to play, instead of playing it.
 const played: string[] = []
+// The element's volume when play began: 0 when a fade-in starts, 1 when there is no fade.
+const volumes: number[] = []
 HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
   played.push(this.src)
+  volumes.push(this.volume)
   return Promise.resolve()
 }
 HTMLMediaElement.prototype.pause = () => {}
@@ -57,6 +60,10 @@ const list = (id: string, kind: MusicListSummary['kind']): MusicListSummary => (
     track('cellar', 'Cellar', 'changed'),
     track('tower', 'Tower', 'missing'),
     track('roof', 'Roof', 'not-chosen'),
+    {
+      ...track('gate', 'Gate', 'chosen'),
+      current: { kind: 'game', file: 'music/gate.ogg', exists: true },
+    },
   ],
   orphans: [],
   dropped: 0,
@@ -106,6 +113,17 @@ describe.each(['act', 'stingers'] as const)('the play button on a %s page', (kin
     act(() => play.click())
     expect(played).toEqual(['/api/music/tracks/hall/current'])
     expect(page.button('Lantern hall').getAttribute('aria-label')).toBe('Stop Lantern hall')
+  })
+
+  it('fades a chosen take in, and plays the game’s own file without a fade', () => {
+    const take = button('Lantern hall')
+    const game = button('Gate')
+    volumes.length = 0
+    act(() => take.click())
+    expect(volumes).toEqual([0])
+    volumes.length = 0
+    act(() => game.click())
+    expect(volumes).toEqual([1])
   })
 
   it('still plays a chosen take whose track changed since', () => {

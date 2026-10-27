@@ -114,7 +114,9 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
   const playing = player.playing
   const press = (id: string) => {
     setFailed(({ [id]: _, ...rest }) => rest)
-    player.toggle(id, currentUrl(id))
+    // A chosen take fades in and out; the game's own file plays as it is.
+    const fade = list.tracks.find((t) => t.id === id)?.current.kind === 'take'
+    player.toggle(id, currentUrl(id), { fade })
   }
   return (
     <>
