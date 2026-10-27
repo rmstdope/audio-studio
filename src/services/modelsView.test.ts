@@ -153,6 +153,6 @@ describe('modelsView, with ElevenLabs', () => {
     })
     expect(view.castsEleven).toBe(true)
     // Sent with its style, which Eleven v3 reads: "[warm] Once."
-    expect(view.recorded.eleven_v3).toEqual({ lines: 1, bytes: 12, characters: 12 })
+    expect(view.recorded.eleven_v3).toEqual({ lines: 1, bytes: 12, characters: 12, bare: 5 })
   })
 })

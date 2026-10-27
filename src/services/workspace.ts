@@ -1,5 +1,5 @@
 import { mergeCues } from '../core/cued'
-import { hasFinalStep, stageWords } from '../core/elevenSpeech'
+import { finalStepFor, stageWords, voicesOf } from '../core/elevenSpeech'
 import { providerOf } from '../core/voices'
 import { statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -235,13 +235,11 @@ export interface PartDetail extends PartState {
   sceneCueSpeakers: string[]
   /** The model everyday plans record with (the project's draft stage). */
   draftModel: string
-  /** The model of the final recording; the same as the draft one when there is no final step. */
-  finalModel: string
   /**
    * The stages as the generate panel names them (the Fish model, and ElevenLabs' beside it in a
-   * part with an ElevenLabs voice), and whether the project has a final step on either side.
+   * part with an ElevenLabs voice, `both`), and whether the part's voices have a final step.
    */
-  stages: { draft: string; final: string; finalStep: boolean }
+  stages: { draft: string; final: string; finalStep: boolean; both: boolean }
   /** The language these lines are in (the one asked for, or the source language). */
   language: string
   /** Every declared language with how far it has come, in the order the project declares them. */
@@ -299,11 +297,11 @@ export async function loadPart(
       chunkLimit: project.narration.quality.chunkLimit,
       sceneCueSpeakers: project.narration.sceneCueSpeakers,
       draftModel: project.narration.models.draft,
-      finalModel: project.narration.models.final,
       stages: {
         draft: stageWords(project.narration, 'draft', eleven),
         final: stageWords(project.narration, 'final', eleven),
-        finalStep: hasFinalStep(project.narration),
+        finalStep: finalStepFor(project.narration, voicesOf(input.lines, input.cast.speakers)),
+        both: eleven,
       },
       notes: onLines(notes.notes.lines, input.lines),
       problems: notes.problem ? [...problems, notes.problem] : problems,

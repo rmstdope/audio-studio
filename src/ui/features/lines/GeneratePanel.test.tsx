@@ -83,7 +83,12 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
             partId: 'act1',
             language: null,
             speaker: null,
-            models: { draft: 's2.1-pro-free', final: 's2.1-pro-free', finalStep: false },
+            models: {
+              draft: 's2.1-pro-free',
+              final: 's2.1-pro-free',
+              finalStep: false,
+              both: false,
+            },
           }),
         ),
       ),
@@ -126,6 +131,7 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
               draft: 's2.1-pro-free · Eleven v3',
               final: 's2.1-pro-free · Multilingual v2',
               finalStep: true,
+              both: true,
             },
           }),
         ),
@@ -135,6 +141,12 @@ describe('GeneratePanel, with lines on ElevenLabs', () => {
       container.querySelector('[aria-label="Which recording"]')?.textContent ?? ''
     await until(() => stages() !== '')
     expect(stages()).toBe('Draft s2.1-pro-free · Eleven v3Final s2.1-pro-free · Multilingual v2')
+    const final = [...container.querySelectorAll('input[type="radio"]')][1] as HTMLInputElement
+    await act(() => final.click())
+    await until(() => (container.textContent ?? '').includes('The final recording records'))
+    expect(container.textContent).toContain(
+      'The final recording records every line whose clip was not made with its voice’s final model yet; draft plans leave final clips alone.',
+    )
     await act(() => page.unmount())
   })
 })

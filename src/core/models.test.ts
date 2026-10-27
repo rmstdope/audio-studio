@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  sameAsDraftWords,
   elevenChangeOf,
   elevenOptions,
   elevenQuestionWords,
@@ -111,9 +112,9 @@ describe('priceWords', () => {
 
 describe('changeOf', () => {
   const recorded = {
-    's2.1-pro-free': { lines: 1412, bytes: 71_400, characters: 71_400 },
-    's2.1-pro': { lines: 640, bytes: 21_333, characters: 21_333 },
-    s1: { lines: 10, bytes: 400, characters: 400 },
+    's2.1-pro-free': { lines: 1412, bytes: 71_400, characters: 71_400, bare: 71_400 },
+    's2.1-pro': { lines: 640, bytes: 21_333, characters: 21_333, bare: 21_333 },
+    s1: { lines: 10, bytes: 400, characters: 400, bare: 400 },
   }
   const models = { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 'drama-3' }
 
@@ -150,7 +151,7 @@ describe('changeOf', () => {
 
   it('gives both prices of a promotion, and says free for a free model', () => {
     const m = { ...models, draft: 's2.1-pro', final: 's2.1-pro' }
-    const rec = { 's2.1-pro': { lines: 640, bytes: 32_000, characters: 32_000 } }
+    const rec = { 's2.1-pro': { lines: 640, bytes: 32_000, characters: 32_000, bare: 32_000 } }
     const promo = changeOf('final', 'drama-3', { ...m, draft: 's2-pro' }, rec, before)
     expect(promo).toMatchObject({ kind: 'ask', lines: 640 })
     expect(promo.kind === 'ask' && promo.cost.now).toBeCloseTo(0.32, 6)
@@ -263,8 +264,8 @@ describe('busyWords and SAME_AS_DRAFT', () => {
 describe('ElevenLabs’ stages on the Models panel', () => {
   const eleven = { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_v3' }
   const recorded = {
-    eleven_v3: { lines: 12, bytes: 400, characters: 380 },
-    's2.1-pro-free': { lines: 3, bytes: 90, characters: 90 },
+    eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 },
+    's2.1-pro-free': { lines: 3, bytes: 90, characters: 90, bare: 90 },
   }
 
   it('offers ElevenLabs’ models, each with its credits and whether it speaks cues', () => {
@@ -293,7 +294,8 @@ describe('ElevenLabs’ stages on the Models panel', () => {
     expect(elevenChangeOf('draft', 'eleven_flash_v2_5', separate, recorded)).toEqual({
       kind: 'ask',
       lines: 12,
-      credits: 190,
+      // Flash is sent the lines without their cues: 300 characters at half a credit.
+      credits: 150,
     })
   })
 
@@ -317,5 +319,17 @@ describe('ElevenLabs’ stages on the Models panel', () => {
       keep: 'Keep Eleven v3',
       confirm: 'Switch to Flash v2.5',
     })
+  })
+})
+
+describe('sameAsDraftWords', () => {
+  it('says a final row is the draft’s, for whose voices when the project casts both providers’', () => {
+    expect(sameAsDraftWords(null)).toBe(SAME_AS_DRAFT)
+    expect(sameAsDraftWords('fish')).toBe(
+      'Same as draft: Fish voices’ lines are recorded once, with no separate final recording.',
+    )
+    expect(sameAsDraftWords('elevenlabs')).toBe(
+      'Same as draft: ElevenLabs voices’ lines are recorded once, with no separate final recording.',
+    )
   })
 })

@@ -777,6 +777,12 @@ describe('a final step on ElevenLabs’ side only', () => {
     expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({ status: 'ok', final: true })
   })
 
+  it('gives a part with Fish voices alone no final step, so no clip is badged final', () => {
+    const lock = { n1: entryFor(lines[0]!) }
+    const state = planPart(input({ lock, narration: withElevenFinal }))
+    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({ status: 'ok', final: false })
+  })
+
   it('counts an ElevenLabs line drafted with v3 as not final yet', () => {
     const lock = { m1: entryFor(lines[1]!, elevenCast) }
     const state = planPart(input({ cast: elevenCast, lock, narration: withElevenFinal }))
@@ -784,28 +790,31 @@ describe('a final step on ElevenLabs’ side only', () => {
   })
 })
 
-describe('whether a line’s model reads its cues', () => {
-  it('is false for a line drafted on an ElevenLabs model that would speak them', () => {
-    const elevenCast: Cast = {
-      speakers: { ...cast.speakers, mira: { voice: 'eleven:abc' } },
-      pronounce: {},
-    }
-    const onV2 = {
-      ...narration,
-      elevenlabs: {
-        models: {
-          audition: 'eleven_v3',
-          draft: 'eleven_multilingual_v2',
-          final: 'eleven_multilingual_v2',
+describe('which stages of a line are sent without its cues', () => {
+  const elevenCast: Cast = {
+    speakers: { ...cast.speakers, mira: { voice: 'eleven:abc' } },
+    pronounce: {},
+  }
+  const on = (draft: string, final: string) =>
+    planPart(
+      input({
+        cast: elevenCast,
+        narration: {
+          ...narration,
+          elevenlabs: { models: { audition: 'eleven_v3', draft, final } },
         },
-      },
-    }
-    const state = planPart(input({ cast: elevenCast, narration: onV2 }))
-    expect(state.lines.map((l) => [l.key, l.readsCues])).toEqual([
-      ['n1', true],
-      ['m1', false],
-      ['t1', true],
+      }),
+    ).lines.map((l) => [l.key, l.unspokenCues])
+
+  it('names the stages whose ElevenLabs model would speak them, and none for Fish’s lines', () => {
+    expect(on('eleven_multilingual_v2', 'eleven_multilingual_v2')).toEqual([
+      ['n1', null],
+      ['m1', 'both'],
+      ['t1', null],
     ])
+    expect(on('eleven_v3', 'eleven_flash_v2_5')[1]).toEqual(['m1', 'final'])
+    expect(on('eleven_flash_v2_5', 'eleven_v3')[1]).toEqual(['m1', 'draft'])
+    expect(on('eleven_v3', 'eleven_v3')[1]).toEqual(['m1', null])
   })
 })
 

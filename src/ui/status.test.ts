@@ -25,7 +25,7 @@ function line(overrides: Partial<LineState>): LineState {
     insideStale: null,
     sourceInside: [],
     final: false,
-    readsCues: true,
+    unspokenCues: null,
     status: 'ok',
     reasons: [],
     heard: null,

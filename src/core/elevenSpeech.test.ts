@@ -9,7 +9,7 @@ import {
   elevenCredits,
   isElevenModel,
   takesLanguage,
-  hasFinalStep,
+  finalStepFor,
   stageWords,
   modelForStage,
   speedProblem,
@@ -112,12 +112,14 @@ describe('ElevenLabs’ stages, from the project file', () => {
     expect(parsed.success).toBe(false)
   })
 
-  it('make a final step when either provider’s draft and final differ', () => {
-    expect(hasFinalStep(narration)).toBe(false)
-    expect(hasFinalStep(withEleven({ final: 'eleven_multilingual_v2' }))).toBe(true)
-    expect(hasFinalStep({ ...narration, models: { ...narration.models, final: 's2-pro' } })).toBe(
-      true,
-    )
+  it('make a final step for a part only when a voice it has records its final with another model', () => {
+    const elevenFinal = withEleven({ final: 'eleven_multilingual_v2' })
+    expect(finalStepFor(elevenFinal, ['v-fish'])).toBe(false)
+    expect(finalStepFor(elevenFinal, ['v-fish', 'eleven:abc'])).toBe(true)
+    expect(finalStepFor(narration, ['eleven:abc'])).toBe(false)
+    const fishFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    expect(finalStepFor(fishFinal, ['eleven:abc'])).toBe(false)
+    expect(finalStepFor(fishFinal, ['v-fish'])).toBe(true)
   })
 })
 

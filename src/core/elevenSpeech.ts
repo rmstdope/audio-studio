@@ -77,13 +77,30 @@ export function modelForStage(
 }
 
 /**
- * Whether the project has a final recording of its own: either provider's final model differs
- * from its draft one. A voice whose own provider's stages are the same has no final step: its
- * up-to-date clips are as final as they get.
+ * Whether recording `voices` (a part's, say) has a final step: one of them records its final with
+ * another model than its draft, on its own provider's stages. A voice whose stages are one has no
+ * final step: its up-to-date clips are as final as they get.
  */
-export function hasFinalStep(narration: Project['narration']): boolean {
-  const { models, elevenlabs } = narration
-  return models.final !== models.draft || elevenlabs.models.final !== elevenlabs.models.draft
+export function finalStepFor(narration: Project['narration'], voices: Iterable<string>): boolean {
+  for (const voice of voices) {
+    if (modelForStage(narration, voice, 'final') !== modelForStage(narration, voice, 'draft')) {
+      return true
+    }
+  }
+  return false
+}
+
+/** The voices cast for `lines`' speakers, each once: what a part is recorded with. */
+export function voicesOf(
+  lines: { speaker: string }[],
+  speakers: Record<string, { voice?: string }>,
+): Set<string> {
+  const voices = new Set<string>()
+  for (const line of lines) {
+    const voice = speakers[line.speaker]?.voice
+    if (voice) voices.add(voice)
+  }
+  return voices
 }
 
 /** Why ElevenLabs cannot speak at `speed`, or null when it can. */

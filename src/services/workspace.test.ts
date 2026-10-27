@@ -329,16 +329,10 @@ describe('review fixes', () => {
     expect(result?.ok && result.part.minHeard).toBe(0.9)
   })
 
-  it('gives the models of the draft and the final recording', async () => {
-    const withFinal = projectJson({
-      narration: { ...(projectJson().narration as object), models: { final: 's2-pro' } },
-    })
-    const root = tempRepo({ ...files, 'audio-studio.json': withFinal })
+  it('gives the draft model, which a line’s extra takes are made with', async () => {
+    const root = tempRepo(files)
     const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
-    expect(result?.ok && [result.part.draftModel, result.part.finalModel]).toEqual([
-      's2.1-pro-free',
-      's2-pro',
-    ])
+    expect(result?.ok && result.part.draftModel).toBe('s2.1-pro-free')
   })
 
   it('names its stages’ models, both providers’ in a part with an ElevenLabs voice, and its final step', async () => {
@@ -348,11 +342,18 @@ describe('review fixes', () => {
         elevenlabs: { models: { final: 'eleven_multilingual_v2' } },
       },
     })
+    // A project whose ElevenLabs stages differ, but whose part has Fish voices alone.
+    const fishPart = await loadPart(
+      join(tempRepo({ ...files, 'audio-studio.json': elevenFinal }), 'audio-studio.json'),
+      'act1',
+    )
+    expect(fishPart?.ok && fishPart.part.stages.finalStep).toBe(false)
     const fishOnly = await loadPart(join(tempRepo(files), 'audio-studio.json'), 'act1')
     expect(fishOnly?.ok && fishOnly.part.stages).toEqual({
       draft: 's2.1-pro-free',
       final: 's2.1-pro-free',
       finalStep: false,
+      both: false,
     })
     const root = tempRepo({
       ...files,
@@ -364,6 +365,7 @@ describe('review fixes', () => {
       draft: 's2.1-pro-free · Eleven v3',
       final: 's2.1-pro-free · Multilingual v2',
       finalStep: true,
+      both: true,
     })
   })
 

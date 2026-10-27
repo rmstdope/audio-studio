@@ -34,9 +34,9 @@ export function GeneratePanel({
   speaker: string | null
   /**
    * The draft and final stages as named (Fish's model, and ElevenLabs' beside it in a part with
-   * an ElevenLabs voice), and whether there is a final step: offered only then.
+   * an ElevenLabs voice, `both`), and whether there is a final step: offered only then.
    */
-  models: { draft: string; final: string; finalStep: boolean }
+  models: { draft: string; final: string; finalStep: boolean; both: boolean }
 }) {
   const [retakeWeak, setRetakeWeak] = useState(false)
   const [stage, setStage] = useState<'draft' | 'final'>('draft')
@@ -248,7 +248,9 @@ export function GeneratePanel({
       )}
       {stage === 'final' && hasFinal && (
         <span className="muted">
-          The final recording records every line whose clip was not made with {models.final} yet;
+          {models.both
+            ? 'The final recording records every line whose clip was not made with its voice’s final model yet;'
+            : `The final recording records every line whose clip was not made with ${models.final} yet;`}{' '}
           draft plans leave final clips alone.
         </span>
       )}

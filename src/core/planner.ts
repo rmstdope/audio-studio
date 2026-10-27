@@ -1,4 +1,4 @@
-import { hasFinalStep, modelForStage, readsCues } from './elevenSpeech'
+import { finalStepFor, modelForStage, readsCues, voicesOf } from './elevenSpeech'
 import {
   clipInputs,
   cueInputs,
@@ -82,8 +82,11 @@ export interface LineState {
   sourceCue: string | null
   /** Whether the clip was made with the final model (when it differs from the draft one). */
   final: boolean
-  /** Whether the line's draft model reads its cues as directions; one that would speak them is sent none. */
-  readsCues: boolean
+  /**
+   * Which of the line's recordings are sent without its cues, because the voice's model for that
+   * stage would speak them: its drafts, its final recording, both, or neither (null).
+   */
+  unspokenCues: 'draft' | 'final' | 'both' | null
   status: LineStatus
   reasons: StaleReason[]
   heard: number | null
@@ -171,6 +174,8 @@ export function planPart(input: PlanInput): PartState {
   const own = input.ownCues ?? cues
   const lines = withSource(input.lines, input.source)
   const counts = Object.fromEntries(LINE_STATUSES.map((s) => [s, 0])) as Record<LineStatus, number>
+  // Whether the part has a final step: a voice it is recorded with has a final model of its own.
+  const partFinalStep = finalStepFor(narration, voicesOf(input.lines, cast.speakers))
 
   const states = lines.map(({ line, english }): LineState => {
     const scene = line.scene ?? null
@@ -194,7 +199,7 @@ export function planPart(input: PlanInput): PartState {
         insideStale: null,
         sourceInside: [],
         final: false,
-        readsCues: true,
+        unspokenCues: null,
         status: 'untranslated',
         reasons: [],
         heard: null,
@@ -220,7 +225,7 @@ export function planPart(input: PlanInput): PartState {
     // A voice whose own provider's stages are one, while the project has a final step (the
     // other provider's stages differ): an up-to-date clip is as final as it gets, so a final
     // recording leaves it alone.
-    const noFinalStep = finalModel === draft && hasFinalStep(narration)
+    const noFinalStep = finalModel === draft && partFinalStep
     const final = Boolean(
       entry &&
       file &&
@@ -255,7 +260,7 @@ export function planPart(input: PlanInput): PartState {
       english,
       // What the line is delivered with, shown whatever model speaks it (one may be sent none).
       ...cueInputs(line, character ?? {}, cues, narration),
-      readsCues: readsCues(draft),
+      unspokenCues: unspokenStages(readsCues(draft), readsCues(finalModel)),
       insideStale: parseCued(cueFor(own, line.key) ?? '', line.text).stale,
       sourceInside: Object.hasOwn(input.sourceInside ?? {}, line.key)
         ? input.sourceInside![line.key]!
@@ -401,4 +406,11 @@ export function adoptUntracked(input: PlanInput, now: string): { lock: Lock; ado
     lock[line.key] = { fp, voice: inputs.voice, model: inputs.model, parts, adopted: true, at: now }
   }
   return { lock, adopted: untracked.size }
+}
+
+/** The stages whose model would speak a line's cues, from whether its draft and final read them. */
+function unspokenStages(draft: boolean, final: boolean): LineState['unspokenCues'] {
+  if (draft && final) return null
+  if (!draft && !final) return 'both'
+  return draft ? 'final' : 'draft'
 }

@@ -9,7 +9,7 @@ import {
   modelOptions,
   priceWords,
   questionWords,
-  SAME_AS_DRAFT,
+  sameAsDraftWords,
   STAGES,
   type Stage,
 } from '../../../core/models'
@@ -382,7 +382,9 @@ function StageRow({
           </section>
         )}
         {stage === 'final' && view.models.final === view.models.draft && (
-          <span className="muted models-same">{SAME_AS_DRAFT}</span>
+          <span className="muted models-same">
+            {sameAsDraftWords(view.castsEleven ? 'fish' : null)}
+          </span>
         )}
       </div>
     </div>
@@ -623,7 +625,7 @@ function ElevenRow({
           </span>
         )}
         {stage === 'final' && models.final === models.draft && (
-          <span className="muted models-same">{SAME_AS_DRAFT}</span>
+          <span className="muted models-same">{sameAsDraftWords('elevenlabs')}</span>
         )}
       </div>
     </div>

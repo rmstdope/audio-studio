@@ -27,7 +27,7 @@ function line(
     insideStale: null,
     sourceInside: [],
     final: false,
-    readsCues: true,
+    unspokenCues: null,
     status,
     reasons,
     heard: null,

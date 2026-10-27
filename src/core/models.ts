@@ -28,8 +28,25 @@ export const STAGES: readonly { stage: Stage; name: string; purpose: string }[] 
 export const SAME_AS_DRAFT =
   'Same as draft: every line is recorded once, with no separate final recording.'
 
-/** What the project's recorded clips were made with: lines, and the bytes and characters sent, by model. */
-export type Recorded = Record<string, { lines: number; bytes: number; characters: number }>
+/**
+ * The line under a final row naming its draft's model: for every line in a project of one
+ * provider's voices (`whose` null), else for that provider's voices' lines.
+ */
+export function sameAsDraftWords(whose: 'fish' | 'elevenlabs' | null): string {
+  if (!whose) return SAME_AS_DRAFT
+  const voices = whose === 'fish' ? 'Fish voices’' : 'ElevenLabs voices’'
+  return `Same as draft: ${voices} lines are recorded once, with no separate final recording.`
+}
+
+/**
+ * What the project's recorded clips were made with, by model: lines, the bytes they were sent,
+ * and their characters with their cues and without (`bare`), for pricing them again on a model
+ * that reads cues or on one that speaks them.
+ */
+export type Recorded = Record<
+  string,
+  { lines: number; bytes: number; characters: number; bare: number }
+>
 
 /** The project's whole dialog: every line in every language, and the bytes sent to say them. */
 export interface Dialog {
@@ -298,7 +315,8 @@ export function elevenChangeOf(
   for (const [made, got] of Object.entries(recorded)) {
     if (inUse(made, models) && !inUse(made, after)) {
       lines += got.lines
-      characters += got.characters
+      // Recorded again on `to`: with their cues, or without them on a model that speaks them.
+      characters += readsCues(to) ? got.characters : got.bare
     }
   }
   if (lines === 0) return { kind: 'save' }

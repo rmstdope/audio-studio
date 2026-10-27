@@ -17,7 +17,7 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     insideStale: null,
     sourceInside: [],
     final: false,
-    readsCues: true,
+    unspokenCues: null,
     status: 'missing',
     reasons: [],
     heard: null,
@@ -50,9 +50,15 @@ describe('cueTargets', () => {
 })
 
 describe('unspokenCueNote', () => {
-  it('says a line on a model that reads no cues is recorded without them, and nothing otherwise', () => {
-    expect(unspokenCueNote(line('a', { readsCues: false }))).toBe(
-      'This voice’s ElevenLabs model speaks cues aloud, so the line is recorded without them.',
+  it('says which recordings of a line are made without its cues, and nothing otherwise', () => {
+    expect(unspokenCueNote(line('a', { unspokenCues: 'both' }))).toBe(
+      'This voice’s ElevenLabs models speak cues aloud, so the line is recorded without them.',
+    )
+    expect(unspokenCueNote(line('a', { unspokenCues: 'draft' }))).toBe(
+      'This voice’s ElevenLabs draft model speaks cues aloud, so its drafts are recorded without them.',
+    )
+    expect(unspokenCueNote(line('a', { unspokenCues: 'final' }))).toBe(
+      'This voice’s ElevenLabs final model speaks cues aloud, so its final recording is made without them.',
     )
     expect(unspokenCueNote(line('a'))).toBeNull()
   })

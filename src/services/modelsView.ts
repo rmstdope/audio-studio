@@ -79,10 +79,16 @@ export async function modelsView(
             input.cast.pronounce,
             project.narration.quality.chunkLimit,
           )
-          const got = (recorded[made] ??= { lines: 0, bytes: 0, characters: 0 })
+          const { pronounce } = input.cast
+          const { chunkLimit } = project.narration.quality
+          const count = (texts: string[]) => texts.reduce((sum, text) => sum + [...text].length, 0)
+          const got = (recorded[made] ??= { lines: 0, bytes: 0, characters: 0, bare: 0 })
           got.lines++
           got.bytes += sent.reduce((sum, text) => sum + encoder.encode(text).length, 0)
-          got.characters += sent.reduce((sum, text) => sum + [...text].length, 0)
+          got.characters += count(
+            spokenPieces(line.text, line.cue, pronounce, chunkLimit, line.inside),
+          )
+          got.bare += count(spokenPieces(line.text, '', pronounce, chunkLimit))
         }
       }
     }

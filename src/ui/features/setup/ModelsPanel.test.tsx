@@ -207,7 +207,10 @@ describe('the Music row of the Models panel', () => {
 
 describe('the ElevenLabs rows of the Models panel', () => {
   const withEleven = (
-    recorded: Record<string, { lines: number; bytes: number; characters: number }> = {},
+    recorded: Record<
+      string,
+      { lines: number; bytes: number; characters: number; bare: number }
+    > = {},
     final = 'eleven_v3',
   ) => ({
     ...(answer(null) as Extract<ModelsAnswer, { ok: true }>),
@@ -267,7 +270,7 @@ describe('the ElevenLabs rows of the Models panel', () => {
   it('asks first when lines go out of date, naming the credits', async () => {
     const page = render(
       withEleven(
-        { eleven_v3: { lines: 12, bytes: 400, characters: 380 } },
+        { eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 } },
         'eleven_multilingual_v2',
       ),
     )
@@ -278,7 +281,7 @@ describe('the ElevenLabs rows of the Models panel', () => {
     })
     expect(elevenPut).toEqual([])
     expect(page.container.textContent).toContain('Switch ElevenLabs drafts to Flash v2.5?')
-    expect(page.container.textContent).toContain('about 190 credits')
+    expect(page.container.textContent).toContain('about 150 credits')
     const confirm = [...page.container.querySelectorAll('button')].find(
       (b) => b.textContent === 'Switch to Flash v2.5',
     )!

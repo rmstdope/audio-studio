@@ -18,7 +18,7 @@ import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/mu
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import { FISH_VOICE_ID, providerOf, VOICE_ID } from '../core/voices'
-import { hasFinalStep, modelForStage } from '../core/elevenSpeech'
+import { finalStepFor, modelForStage, voicesOf } from '../core/elevenSpeech'
 import type { ElevenAnswer } from '../core/setup'
 import {
   accountOf,
@@ -711,9 +711,13 @@ export function startServer({
     if (!read.ok) return read
     if (read.problems.length) return { ok: false as const, problems: read.problems }
     const { narration } = read.project
-    // With one model for both, there is no final step: the final plan is the draft one.
+    // Without a final step for its voices (one model for both, on each one's provider), the final
+    // plan is the draft one.
     const stage: 'draft' | 'final' =
-      asked === 'final' && hasFinalStep(narration) ? 'final' : 'draft'
+      asked === 'final' &&
+      finalStepFor(narration, voicesOf(read.input.lines, read.input.cast.speakers))
+        ? 'final'
+        : 'draft'
     const { pronounce, speakers } = read.input.cast
     const state = planPart(read.input)
     // A line with an ElevenLabs voice is recorded, and priced, by ElevenLabs.

@@ -444,9 +444,11 @@ fp = sha256(json([
 
 For an ElevenLabs voice the settings begin with its voice settings in place of temperature and
 top-p: stability, similarity, style, then the speed and the rest. A Fish voice's fingerprint is
-what it always was (a test pins one), so no clip goes stale for ElevenLabs' coming. While the
-project's Fish stages differ, an up-to-date clip of a voice whose provider has no final step of
-its own (ElevenLabs', until 14.9) counts as final, so a final recording leaves it alone.
+what it always was (a test pins one), so no clip goes stale for ElevenLabs' coming. A part has a
+final step when one of its voices records its final with another model than its draft, on that
+voice's own provider's stages (`finalStepFor`); then an up-to-date clip of a voice whose own
+stages are one counts as final, so a final recording leaves it alone. A part of Fish voices alone
+has no final step for ElevenLabs' stages differing, and the other way round.
 
 A clip made with `s1` counts as made with `s2.1-pro` (Fish serves and bills them as one):
 `fingerprintMatches` also accepts the fingerprint computed with `s1` when the project names
@@ -806,7 +808,8 @@ generation while the script and cast still change) and `final` (the recording th
   stale like any other, and the draft plan records it again with the draft model (so a paid clip
   edited afterwards becomes a draft one until the next final recording). A weak final clip is
   retaken only with the final model: from its row, or by the final plan when asked. With one
-  model for both, there is no final step: a final plan or recording is a draft one. A paid
+  model for both, on each of a part's voices' own providers, the part has no final step: a final
+  plan or recording is a draft one (§8.6). A paid
   `audition` model is still to come, with its cost per take.
 
 ### 8.5 Music
@@ -1636,8 +1639,9 @@ Small, independently useful increments:
           panel's ElevenLabs draft and final rows (shown in a project with an ElevenLabs voice: a
           menu of the models with their credits a character and whether they speak cues, saved at
           once or after a question naming the lines going out of date and the credits to record
-          them again, as Fish's rows do); a final step when either provider's stages differ
-          (`hasFinalStep`), the part's generate panel naming both providers' models; the credits
+          them again, as Fish's rows do); a final step for a part when one of its voices'
+          own stages differ (`finalStepFor`), the part's generate panel naming both providers'
+          models; the credits
           budget on the stage's ElevenLabs model; the cue editor saying a line's model speaks
           cues, so none are sent. A line recorded with cues and now on such a model is stale for
           its model and its cue. The audition row comes with 14.10, which first uses it. The

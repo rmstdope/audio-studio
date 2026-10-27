@@ -905,6 +905,15 @@ describe('server, choosing the stages’ models', () => {
     expect(view.busy).toEqual({ kind: 'recording', name: 'Act I' })
     const refused = await put('final', { model: 'drama-3', was: 's2.1-pro-free' })
     expect(refused.status).toBe(409)
+    const elevenRefused = await fetch(at('/api/models/elevenlabs/final'), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', origin: modelServer.url.origin },
+      body: JSON.stringify({ model: 'eleven_flash_v2_5', was: 'eleven_v3' }),
+    })
+    expect(elevenRefused.status).toBe(409)
+    expect(await elevenRefused.json()).toMatchObject({
+      problems: [{ path: 'narration.elevenlabs.models.final', message: 'Act I is recording' }],
+    })
     release()
   })
 })
