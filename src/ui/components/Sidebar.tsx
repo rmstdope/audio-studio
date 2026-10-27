@@ -13,6 +13,7 @@ import {
   CheckIcon,
 } from './icons'
 import { dollars, plural, shortTitle } from '../format'
+import { amountText } from '../spending'
 import { actCount, openWorkspace } from '../sidebarActs'
 
 /** The studio's navigation: project, the workspaces with the open one's acts, and the project-wide pages. */
@@ -156,8 +157,8 @@ export function Sidebar({
           aria-current={route.view === 'spending' ? 'page' : undefined}
         >
           <SpendingIcon /> <span className="grow">Spending</span>
-          {spending.data?.ok && spending.data.count > 0 && (
-            <span className="meta">{dollars(spending.data.total)}</span>
+          {spending.data?.ok && spending.data.count + spending.data.takes > 0 && (
+            <span className="meta">{amountText(spending.data.total, spending.data.credits)}</span>
           )}
         </a>
         <a

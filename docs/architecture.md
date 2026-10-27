@@ -766,7 +766,8 @@ An audition is for a character, not for a part: the result applies to every part
 - Refresh dialog (runs `refreshDialog`; built).
 - **Changes** panel (built): `git status` for the project's paths, so the user sees what to
   commit.
-- **Spending** page (built): what paid recordings cost, project-wide and read only. Every
+- **Spending** page (built): what paid recordings (and, with ElevenLabs, music takes) cost,
+  project-wide and read only. Every
   recording made with a paid model (a whole part's, draft or final, or one line's record or extra
   take) is added to `.audio-studio/spending.json` when it ends: when it started, part, language
   (the source language, as recording is), model, lines recorded out of lines planned, how it ended
@@ -775,7 +776,8 @@ An audition is for a character, not for a part: the result applies to every part
   nothing is not saved, nor is a free model's. A recording running now is not in the file: the page
   reads it live from the job and its budget, shows it at the top and counts it in the totals. A
   studio killed mid-recording loses that recording's entry. A damaged file is reported with its
-  file and path and never written over. The sidebar entry shows the total.
+  file and path and never written over. The sidebar entry shows the total. With ElevenLabs, the
+  record also keeps credits and paid music takes, in its version 2 (§8.6).
 
 ### 8.4 Model stages and final generation
 
@@ -1143,13 +1145,22 @@ only, the fingerprint needs no provider of its own.
   characters, is not confirmed (a try is a few hundred characters) and is logged. An audition
   sitting on ElevenLabs is budgeted in characters, as a paid Fish sitting is in dollars (§8.1).
 
-**Spending.** The log (`.audio-studio/spending.json`) moves to version 2 when it first needs to,
-with its first ElevenLabs or music row, so a Fish-only project's log stays version 1 and readable by
-an older studio (which cannot read a version 2 log, and then logs nothing of its own). In version 2
-each row has a `provider`, a `unit` (`usd` or `characters`) and its amount, a recording that uses
-both providers writes one row for each, and music takes are rows of their own (`kind: "music"`, the
-track, the model, the seconds); a version 1 log is read as Fish rows. The Spending page totals each
-unit on its own line.
+**Spending** (built in 14.7d). The log (`.audio-studio/spending.json`) moves to version 2 when it
+first needs to, with its first ElevenLabs credits or music take (`needsVersion2`), so a Fish-only
+project's log stays version 1 and readable by an older studio (which cannot read a version 2 log,
+and then logs nothing of its own). In version 2 a recording's row keeps its Fish dollars (`cost`)
+and adds the ElevenLabs credits its lines took (`credits`) and their model (`elevenModel`): one row
+per recording, since its lines are counted together; a recording on ElevenLabs alone is followed
+and saved as a Fish one is. Music takes are a list of their own (`music`: when, the list, the
+track and its title, the model, the seconds made and billed, the dollars at the model's price a
+minute, and whether it was made (billed, also when the studio then could not keep it) or stopped
+while being made, which may still be billed; a take that fails before ElevenLabs makes it costs
+nothing and is not listed). Only credits spent are kept, so a recording given credits but
+spending none stays a version 1 row. A version 1 log is read with no credits and no music.
+The Spending page and the sidebar total dollars and credits apart (`$0.78 · 1,200 credits`), for
+all and per act, music takes in their act and stingers on a tile of their own once one cost
+something; a recording's Cost and Model cells name the providers that spent, a take's Lines cell
+says "Music take · The cave" and how long it was made.
 
 **Casting.** The audition board searches either provider (a switch above the search: _Fish Audio_,
 _ElevenLabs_). ElevenLabs' search is its shared voice library (`GET /v1/shared-voices`: the
@@ -1172,7 +1183,7 @@ kept as design takes with their `generated_voice_id` and audio; casting one save
 kept preview's id in a later session, its card says so and offers to design again. A design's price,
 unknown today, is settled in 14.12 and confirmed as Fish's is. Cloning stays Fish's.
 
-**Music** (built in 14.4 and 14.5, but for the spending log, 14.7d). One more family, `elevenlabs`,
+**Music** (built in 14.4, 14.5 and, the spending log, 14.7d). One more family, `elevenlabs`,
 with one model, _Eleven Music_ (id `eleven`, recipe `eleven-music-v2.5`, `longest` 600 s, so loops
 up to 580 s, no folders, no download, about a minute a take until measured), in its own menu group,
 "ElevenLabs · in the cloud, paid". A take is `POST /v1/music` with `model_id` `music_v2_5`, the
@@ -1199,9 +1210,9 @@ read by an older studio.
   made longer included (`takePrice`). A track's menu entry says "about 1 min and $0.28 a take",
   Setup's menu "about 1 min a take, $0.15 a minute of music" with "$0.15 a minute" beside it, and
   More takes and Make 2 takes the price of both, twice a take's as the menu shows it ("More takes ·
-  $0.56"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed; each
-  is logged with step 14.7d. Stop aborts the request; ElevenLabs may still bill a take stopped while
-  being made, which Stop's title says while a paid take is being made.
+  $0.56"), and Try again a failed paid take's ("Try again · $0.28"). Takes are not confirmed;
+  each is logged in the spending record (14.7d). Stop aborts the request; ElevenLabs may still
+  bill a take stopped while being made, which Stop's title says while a paid take is being made.
 
 **Testing.** Every test uses a fake `ElevenLabsClient`. Opt-in live tests
 (`AUDIO_STUDIO_LIVE_ELEVENLABS=1`, with a key; §11 says so when they come) speak one short line,
@@ -1581,7 +1592,7 @@ Small, independently useful increments:
        and shaped, outside the GPU queue (the take queue by family), ready by key, Setup's Music
        row, an opt-in live take.
     5. **What music costs** (built): the price on the menus, More takes and Make 2 takes, and Stop's
-       warning. Music rows in the spending log go with its version 2, in 14.7d.
+       warning. Music rows in the spending log came with its version 2, in 14.7d.
     6. **A voice says whose it is** (built): `eleven:` voice ids (`core/voices.ts`: `providerOf`,
        `providerId`, `elevenVoice`, `FISH_VOICE_ID` and `VOICE_ID`), and no Fish page linked for an
        ElevenLabs voice. The routes that would reach Fish or the cast (a take, adding, moving and
@@ -1609,8 +1620,8 @@ Small, independently useful increments:
           recording and extra takes, its own limiter (two at once), a part's plan split by
           provider, credits in the confirm and admission against what the plan has left, and the
           speed refusal on the character's page (under its speed).
-       4. **The spending log's version 2**: ElevenLabs rows for recordings (their credits) and a
-          row for each Eleven Music take.
+       4. **The spending log's version 2** (built): a recording's ElevenLabs credits, a row for
+          each paid music take, and the Spending page's totals in dollars and credits apart.
     8. **Cues by model**: cues left out of the text and the fingerprint for models that would speak
        them, so that choosing such a model (next) never reads a cue aloud.
     9. **Choose ElevenLabs' models and settings**: `narration.elevenlabs` saved from the Models

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Spending with ElevenLabs</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --ok: #3ddc97;
+        --warn: #ffc24b;
+        --bad: #ff6b6b;
+        --accent: #7aa2ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px;
+      }
+      section {
+        max-width: 860px;
+        margin: 0 auto 28px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 0 0 8px;
+      }
+      .intro,
+      .note {
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+      .btn,
+      select,
+      input {
+        background: var(--inset);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #0b0c10;
+        border-color: var(--accent);
+      }
+      input {
+        width: 220px;
+      }
+      .error {
+        color: var(--bad);
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 380px;
+      }
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--inset);
+        color: var(--text);
+      }
+      .new {
+        outline: 2px dashed var(--warn);
+        outline-offset: 3px;
+        border-radius: 8px;
+      }
+      .legend {
+        color: var(--warn);
+        font-size: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .right {
+        text-align: right;
+      }
+      .tiles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .tile {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 14px;
+        display: flex;
+        flex-direction: column;
+        min-width: 160px;
+      }
+      .table-box {
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>Spending, with ElevenLabs</h1>
+      <p class="intro">
+        Step 14.7d. The Spending page totals dollars and ElevenLabs credits apart, and lists each
+        paid music take beside the recordings. <span class="legend">Dashed: new.</span>
+      </p>
+    </section>
+
+    <section>
+      <p class="note">
+        Every recording and music take made with a paid model, newest first. A recording’s cost is
+        worked out as each line is sent, at Fish’s prices or in your ElevenLabs plan’s credits; a
+        music take’s at its model’s price a minute. The bills themselves can differ slightly.
+      </p>
+      <div class="tiles">
+        <div class="tile">
+          <b class="new">$0.83 · 1,540 credits</b
+          ><span class="muted">All acts · 3 recordings · 2 music takes</span>
+        </div>
+        <div class="tile">
+          <b class="new">$0.78 · 1,200 credits</b><span class="muted">Act I: The Lantern</span>
+        </div>
+        <div class="tile">
+          <b class="new">340 credits</b><span class="muted">Act II: The Road</span>
+        </div>
+        <div class="tile new">
+          <b>$0.03</b><span class="muted">Stingers (once a stinger take cost something)</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Recordings</h2>
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Act</th>
+              <th>Model</th>
+              <th class="right">Lines</th>
+              <th class="right">Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Now</td>
+              <td>Act II: The Road</td>
+              <td class="mono new">s2.1-pro-free · eleven_v3</td>
+              <td class="right">Recording 3 of 12</td>
+              <td class="right new">40 credits so far</td>
+            </tr>
+            <tr>
+              <td>27 Oct, 16:00</td>
+              <td>Act I: The Lantern</td>
+              <td class="mono new">Eleven Music</td>
+              <td class="right new">Music take · The cave <span class="muted">1:50 made</span></td>
+              <td class="right">$0.28</td>
+            </tr>
+            <tr>
+              <td>27 Oct, 15:58</td>
+              <td>Stingers</td>
+              <td class="mono new">Eleven Music</td>
+              <td class="right new">
+                Music take · Win <span class="muted">stopped while being made; may be billed</span>
+              </td>
+              <td class="right">$0.03</td>
+            </tr>
+            <tr>
+              <td>27 Oct, 14:02</td>
+              <td>Act I: The Lantern</td>
+              <td class="mono new">s2-pro · eleven_v3</td>
+              <td class="right">12</td>
+              <td class="right new">$0.50 · 1,200 credits</td>
+            </tr>
+            <tr>
+              <td>26 Oct, 09:10</td>
+              <td>Act II: The Road</td>
+              <td class="mono">s2.1-pro-free · eleven_v3</td>
+              <td class="right">8</td>
+              <td class="right new">300 credits</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        The sidebar's Spending entry shows the same total:
+        <span class="new">$0.83 · 1,540 credits</span>.
+      </p>
+    </section>
+  </body>
+</html>

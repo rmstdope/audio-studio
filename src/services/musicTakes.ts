@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
@@ -22,9 +22,11 @@ import {
   modelLine,
   musicModel,
   onThisComputer,
+  takePrice,
   tooLongOnTrack,
   type MusicModelId,
 } from '../core/musicModels'
+import type { MusicSpend } from '../core/spending'
 import { trackFor, type TrackRow } from '../core/music'
 import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
@@ -193,6 +195,7 @@ export function createMusicTakes({
   now = Date.now,
   newSeed = () => Math.floor(Math.random() * 2 ** 31),
   encode = ffmpegEncoder,
+  spent = () => undefined,
 }: {
   generator: MusicGenerator
   queue?: Serial
@@ -200,6 +203,11 @@ export function createMusicTakes({
   newSeed?: () => number
   /** Encodes the chosen take (tests); ffmpeg by default. */
   encode?: Encoder
+  /**
+   * Hears what a paid take cost: once it is made, or once it is stopped while being made (the
+   * request was sent, so it may be billed). Takes that fail, and free ones, cost nothing.
+   */
+  spent?: (projectFile: string, take: MusicSpend) => void | Promise<void>
 }): MusicTakes {
   // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
   const shared = globalThis as { audioStudioMakingTakes?: Map<string, Map<number, Entry>> }
@@ -280,6 +288,10 @@ export function createMusicTakes({
     entry.startedAt = now()
     const stop = new AbortController()
     entry.stop = stop
+    // What the take costs, sent once ElevenLabs made it (billed, kept or not), or once it was
+    // stopped while being made (the request was sent, so it may be billed).
+    const price = takePrice(entry.model, inputs)
+    let generated = false
     try {
       const seed = newSeed()
       const take = await generator.generate(
@@ -294,6 +306,7 @@ export function createMusicTakes({
         },
         stop.signal,
       )
+      generated = true
       // Stopped while it was made: it is discarded, and no longer in the map.
       if (stop.signal.aborted) return
       const shaped = shapeTake(take.wav, inputs.kind, inputs.seconds)
@@ -324,6 +337,26 @@ export function createMusicTakes({
       if (stop.signal.aborted) return
       entry.state = 'failed'
       entry.message = describeFailure(error)
+    } finally {
+      const outcome = generated ? 'done' : stop.signal.aborted ? 'stopped' : null
+      if (price !== null && outcome) {
+        // Saving what was spent must never undo or crash the take it describes.
+        try {
+          await spent(projectFile, {
+            id: randomUUID(),
+            at: new Date(now()).toISOString(),
+            part: found.listId,
+            track: found.id,
+            title: found.title,
+            model: entry.model,
+            seconds: generatedSeconds(inputs.kind, inputs.seconds),
+            cost: price,
+            outcome,
+          })
+        } catch (error) {
+          console.error('Audio Studio: could not save what a music take cost:', error)
+        }
+      }
     }
   }
 

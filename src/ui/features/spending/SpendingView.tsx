@@ -1,12 +1,21 @@
 import type { SpendingRow, SpendingSummary } from '../../../core/spending'
 import type { ProjectSummary } from '../../../core/summary'
 import { useSpending } from '../../api'
-import { dollars } from '../../format'
-import { actText, costText, languageText, linesText, totalsLabel, whenText } from '../../spending'
+import {
+  actText,
+  amountText,
+  costText,
+  languageText,
+  linesText,
+  modelText,
+  totalsLabel,
+  whenText,
+} from '../../spending'
 
 /**
- * What the paid recordings cost: a total for everything and for each part, and every paid
- * recording, newest first. Read only; the running ones update as lines are recorded.
+ * What was spent: a total for everything and for each part (dollars, and ElevenLabs credits when
+ * any were used), and every paid recording and music take, newest first. Read only; the running
+ * ones update as lines are recorded.
  */
 export function SpendingView({ summary }: { summary: ProjectSummary }) {
   return (
@@ -16,8 +25,10 @@ export function SpendingView({ summary }: { summary: ProjectSummary }) {
           <span className="crumbs">Project</span>
           <h1>Spending</h1>
           <span className="muted">
-            Every recording made with a paid model, newest first. Costs are worked out at Fish’s
-            prices as each line is sent; Fish’s own bill can differ slightly.
+            Every recording and music take made with a paid model, newest first. A recording’s cost
+            is worked out as each line is sent, at Fish’s prices or in your ElevenLabs plan’s
+            credits; a music take’s at its model’s price a minute. The bills themselves can differ
+            slightly.
           </span>
         </div>
       </header>
@@ -54,11 +65,11 @@ function SpendingBody({ summary }: { summary: ProjectSummary }) {
       </div>
     )
   }
-  if (answer.count === 0) {
+  if (answer.count === 0 && answer.takes === 0) {
     return (
       <div className="empty-state">
         <strong>No paid recordings yet.</strong>
-        <span>Recordings made with a free model are not listed here.</span>
+        <span>Recordings and music takes made with a free model are not listed here.</span>
       </div>
     )
   }
@@ -66,12 +77,12 @@ function SpendingBody({ summary }: { summary: ProjectSummary }) {
     <div className="spending">
       <div className="spending-tiles">
         <div className="spending-tile all">
-          <b>{dollars(answer.total)}</b>
-          <span>{totalsLabel(answer.count, summary.partLabel)}</span>
+          <b>{amountText(answer.total, answer.credits)}</b>
+          <span>{totalsLabel(answer.count, summary.partLabel, answer.takes)}</span>
         </div>
         {answer.acts.map((act) => (
           <div className="spending-tile" key={act.part}>
-            <b>{dollars(act.total)}</b>
+            <b>{amountText(act.total, act.credits)}</b>
             <span>
               {act.title}
               {act.removed && <span className="muted"> (no longer in the project)</span>}
@@ -121,8 +132,8 @@ function Row({
         {actText(row, acts)}
         {row.removed && <span className="muted"> (no longer in the project)</span>}
       </td>
-      {languages > 1 && <td>{languageText(row.language)}</td>}
-      <td className="mono">{row.model}</td>
+      {languages > 1 && <td>{row.kind === 'music' ? '' : languageText(row.language)}</td>}
+      <td className="mono">{modelText(row)}</td>
       <td className="right">
         {running && <span className="spending-pill">Recording</span>} {lines.count}
         {lines.note && <span className="muted"> {lines.note}</span>}

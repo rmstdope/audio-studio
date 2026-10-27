@@ -20,6 +20,7 @@ import { loadProject } from './workspace'
 import { boardQueue, createMusicTakes, musicTakeHash } from './musicTakes'
 import { GPU } from './gpu'
 import { refreshDialog, refreshShared, stopRefreshes } from './refresh'
+import type { MusicSpend } from '../core/spending'
 import { createHash } from 'node:crypto'
 
 const music = {
@@ -578,6 +579,88 @@ describe('createMusicTakes', () => {
     })
     release()
     await busy
+  })
+
+  it('says what a paid take cost once it is made, and nothing of a free one', async () => {
+    const { file } = setup()
+    const spent: { projectFile: string; take: MusicSpend }[] = []
+    const takes = createMusicTakes({
+      generator: fakeGenerator().generator,
+      queue: createSerial(),
+      newSeed: () => 1,
+      now: () => Date.parse('2026-10-27T12:00:00Z'),
+      spent: (projectFile, take) => void spent.push({ projectFile, take }),
+    })
+    await takes.make(file, 'hall', { count: 1, model: 'eleven' })
+    await takes.make(file, 'hall', { count: 1, model: 'balanced' })
+    for (let i = 0; i < 200 && spent.length === 0; i++) await Bun.sleep(5)
+    await Bun.sleep(20)
+    // A 30-second loop is made 50 seconds long, at $0.15 a minute.
+    expect(spent).toEqual([
+      {
+        projectFile: file,
+        take: {
+          id: expect.any(String),
+          at: '2026-10-27T12:00:00.000Z',
+          part: 'act1',
+          track: 'hall',
+          title: 'Hall',
+          model: 'eleven',
+          seconds: 50,
+          cost: 0.125,
+          outcome: 'done',
+        },
+      },
+    ])
+  })
+
+  it('says a paid take cost its price when ElevenLabs made it but the studio could not keep it', async () => {
+    const { file } = setup()
+    const spent: MusicSpend[] = []
+    const takes = createMusicTakes({
+      generator: {
+        ...fakeGenerator().generator,
+        // Made and billed, but not audio the studio can read.
+        generate: async () => ({ wav: new Uint8Array([1, 2, 3]) }),
+      },
+      queue: createSerial(),
+      newSeed: () => 1,
+      spent: (_file, take) => void spent.push(take),
+    })
+    await takes.make(file, 'victory', { count: 1, model: 'eleven' })
+    for (let i = 0; i < 200 && spent.length === 0; i++) await Bun.sleep(5)
+    expect(spent).toMatchObject([{ track: 'victory', cost: 0.025, outcome: 'done' }])
+    const view = await takes.view(file, 'victory')
+    expect(view).toMatchObject({ failed: [{ n: 1 }] })
+  })
+
+  it('says a paid take stopped while it was made may have cost its price', async () => {
+    const { file } = setup()
+    const spent: MusicSpend[] = []
+    const takes = createMusicTakes({
+      generator: {
+        ...fakeGenerator().generator,
+        // As ElevenLabs' client does: a stop ends the request, which then fails.
+        generate: (_request, signal) =>
+          new Promise((_resolve, reject) =>
+            signal?.addEventListener('abort', () => reject(new Error('stopped'))),
+          ),
+      },
+      queue: createSerial(),
+      newSeed: () => 1,
+      spent: (_file, take) => void spent.push(take),
+    })
+    await takes.make(file, 'victory', { count: 1, model: 'eleven' })
+    for (let i = 0; i < 200; i++) {
+      const view = await takes.view(file, 'victory')
+      if (view && 'ok' in view && view.ok && view.making[0]?.state === 'making') break
+      await Bun.sleep(5)
+    }
+    await takes.stop(file, 'victory')
+    await Bun.sleep(20)
+    expect(spent).toMatchObject([
+      { part: 'stingers', track: 'victory', seconds: 10, cost: 0.025, outcome: 'stopped' },
+    ])
   })
 
   it('refuses a model that is not on this computer, and says which models are', async () => {
