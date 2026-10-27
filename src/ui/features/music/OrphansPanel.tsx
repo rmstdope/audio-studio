@@ -14,7 +14,7 @@ import { chosenOn } from '../../musicText'
  * none.
  */
 export function OrphansPanel({ orphans }: { orphans: OrphanRow[] }) {
-  const player = useClipPlayer()
+  const player = useClipPlayer(undefined, { fade: true })
   const [asking, setAsking] = useState<string | null>(null)
   const opener = useRef<HTMLButtonElement | null>(null)
   const refocus = useFocusWhenClosed(asking !== null, opener)

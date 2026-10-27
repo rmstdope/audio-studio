@@ -54,7 +54,7 @@ export function TakesPanel({
   const takes = useMusicTakes(trackId)
   const make = useMakeTakes(trackId)
   const stop = useStopTakes(trackId)
-  const player = useClipPlayer()
+  const player = useClipPlayer(undefined, { fade: true })
   const view = takes.data
   const making = useMusicMaking().data ?? {}
   // The take the Move… dialog is open for, and where the last move went; neither outlives the page.

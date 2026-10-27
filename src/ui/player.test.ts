@@ -152,3 +152,121 @@ describe('createPlayer, telling a failure', () => {
     expect(failed).toEqual([])
   })
 })
+
+/** A fake element with a volume and a length, and a clock the test moves by hand. */
+function fadingSetUp(duration = 10) {
+  const { element } = fakeAudio()
+  const fake = Object.assign(element, { volume: 1, duration })
+  let now = 0
+  const ticks = new Set<() => void>()
+  const clock = {
+    now: () => now,
+    every(fn: () => void) {
+      ticks.add(fn)
+      return () => ticks.delete(fn)
+    },
+  }
+  const states: PlayerState[] = []
+  const player = createPlayer(
+    fake,
+    (s) => states.push(s),
+    () => {},
+    { fadeSeconds: 0.2, clock },
+  )
+  /** Moves the clock on in 10 ms steps, the playhead with it, ticking at each. */
+  const wait = (ms: number) => {
+    for (let spent = 0; spent < ms; spent += 10) {
+      now += 10
+      if (!fake.paused) fake.currentTime += 0.01
+      for (const fn of [...ticks]) fn()
+    }
+  }
+  return { element: fake, ticks, player, wait, last: () => states.at(-1) }
+}
+
+describe('createPlayer, fading', () => {
+  it('fades a clip in from silence', () => {
+    const { element, player, wait } = fadingSetUp()
+    player.toggle('a', '/a.mp3')
+    expect(element.volume).toBe(0)
+    wait(100)
+    expect(element.volume).toBeCloseTo(0.5, 1)
+    wait(100)
+    expect(element.volume).toBe(1)
+  })
+
+  it('fades out over the last of the clip', () => {
+    const { element, player, wait } = fadingSetUp(1)
+    player.toggle('a', '/a.mp3')
+    wait(700)
+    expect(element.volume).toBe(1)
+    wait(200)
+    expect(element.volume).toBeCloseTo(0.5, 1)
+  })
+
+  it('fades out on stop, and says stopped at once', () => {
+    const { element, player, wait, last } = fadingSetUp()
+    player.toggle('a', '/a.mp3')
+    wait(500)
+    player.stop()
+    expect([last(), element.paused]).toEqual([{ playing: null, inTurn: false }, false])
+    wait(100)
+    expect(element.volume).toBeCloseTo(0.5, 1)
+    expect(element.paused).toBe(false)
+    wait(100)
+    expect([element.volume, element.paused]).toEqual([0, true])
+  })
+
+  it('fades the old take out before the next starts, and only the last asked starts', () => {
+    const { element, player, wait, last } = fadingSetUp()
+    player.toggle('a', '/a.mp3')
+    wait(500)
+    player.toggle('b', '/b.mp3')
+    player.toggle('c', '/c.mp3')
+    expect([element.src, last()]).toEqual(['/a.mp3', { playing: 'c', inTurn: false }])
+    wait(200)
+    expect([element.src, element.volume, element.paused]).toEqual(['/c.mp3', 0, false])
+    wait(200)
+    expect(element.volume).toBe(1)
+  })
+
+  it('starts nothing after a stop that came during a fade-out', () => {
+    const { element, player, wait } = fadingSetUp()
+    player.toggle('a', '/a.mp3')
+    wait(500)
+    player.toggle('b', '/b.mp3')
+    player.stop()
+    wait(300)
+    expect([element.src, element.paused]).toEqual(['/a.mp3', true])
+  })
+
+  it('still starts the next take if the old one ends during its fade-out', () => {
+    const { element, player } = fadingSetUp()
+    player.toggle('a', '/a.mp3')
+    player.toggle('b', '/b.mp3')
+    player.ended()
+    expect(element.src).toBe('/b.mp3')
+  })
+
+  it('leaves no ticker running once a clip ends, fails or is disposed', () => {
+    const { ticks, player } = fadingSetUp()
+    player.toggle('a', '/a.mp3')
+    player.ended()
+    expect(ticks.size).toBe(0)
+    player.toggle('b', '/b.mp3')
+    player.failed()
+    expect(ticks.size).toBe(0)
+    player.toggle('c', '/c.mp3')
+    player.dispose()
+    expect(ticks.size).toBe(0)
+  })
+
+  it('does not touch the volume without a fade', () => {
+    const { element } = fakeAudio()
+    const touched = Object.assign(element, { volume: 1 })
+    const player = createPlayer(touched, () => {})
+    player.toggle('a', '/a.mp3')
+    player.stop()
+    expect([touched.volume, touched.paused]).toEqual([1, true])
+  })
+})
