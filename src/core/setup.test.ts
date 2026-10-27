@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { setupChecks, type SetupFacts } from './setup'
+import { setupChecks, type ElevenAccount, type SetupFacts } from './setup'
 
 const ready: SetupFacts = {
   ffmpeg: true,
@@ -14,6 +14,17 @@ const ready: SetupFacts = {
   parallel: 4,
   fishTier: null,
   music: { ready: { ok: true }, checkpoints: '/models', model: 'balanced', stableAudioMissing: [] },
+  elevenlabs: { ok: false, reason: 'no-key', message: 'x' },
+}
+
+/** An ElevenLabs Starter account as `GET /v1/user/subscription` describes it. */
+const starter: ElevenAccount = {
+  tier: 'starter',
+  charactersUsed: 2550,
+  characterLimit: 30000,
+  renewsAt: Date.UTC(2026, 10, 12, 9) / 1000,
+  overage: 0,
+  voiceSlots: { used: 3, limit: 10 },
 }
 
 const byId = (facts: SetupFacts) => Object.fromEntries(setupChecks(facts).map((c) => [c.id, c]))
@@ -30,8 +41,13 @@ describe('setupChecks', () => {
       'refresh',
       'music',
       'stableAudio',
+      'elevenlabsKey',
+      'elevenlabs',
     ])
-    expect(checks.every((c) => c.state === 'ok')).toBe(true)
+    expect(checks.filter((c) => c.state !== 'ok').map((c) => c.id)).toEqual([
+      'elevenlabsKey',
+      'elevenlabs',
+    ])
     expect(byId(ready).fish!.credit).toBe(12.5)
   })
 
@@ -270,6 +286,84 @@ describe('the requests-at-once check', () => {
         ],
       })
       expect(steps?.note).toBe('The studio never asks for or keeps your token.')
+    })
+  })
+})
+
+describe('the ElevenLabs rows', () => {
+  const rows = (elevenlabs: SetupFacts['elevenlabs']) => {
+    const checks = byId({ ...ready, elevenlabs })
+    return { key: checks.elevenlabsKey!, account: checks.elevenlabs! }
+  }
+
+  it('are optional, and say where the key goes, without one', () => {
+    const { key, account } = rows({ ok: false, reason: 'no-key', message: 'x' })
+    expect(key).toMatchObject({
+      title: 'ElevenLabs API key',
+      state: 'off',
+      label: 'Not set up',
+      detail:
+        'Optional: for ElevenLabs voices and music. No ELEVENLABS_API_KEY in the environment or in .env.',
+      fix: 'Put ELEVENLABS_API_KEY=... in .env (from elevenlabs.io, Developers, API keys), or export it.',
+    })
+    expect(account).toMatchObject({
+      title: 'ElevenLabs',
+      state: 'off',
+      detail: 'Not asked: there is no key.',
+    })
+  })
+
+  it('show the plan, the characters left and when they renew, the voice slots and the terms', () => {
+    const { key, account } = rows({ ok: true, account: starter })
+    expect(key).toMatchObject({ state: 'ok', detail: 'Found.' })
+    expect(account).toMatchObject({
+      state: 'ok',
+      detail: 'Answers. Starter plan: 27,450 of 30,000 credits left, renewing 12 November 2026.',
+      notes: [
+        'Nothing is billed beyond them: ElevenLabs work stops when they run out.',
+        'Voice slots: 3 of 10 used.',
+        "Music made with ElevenLabs may be used in a game while the game has earned under $500,000 and you under $1,000,000 a year from games (ElevenLabs' music terms of 9 October 2026); beyond that it needs their Enterprise Music plan.",
+      ],
+    })
+  })
+
+  it('say what usage beyond the plan may cost', () => {
+    const notes = (overage: ElevenAccount['overage']) =>
+      rows({ ok: true, account: { ...starter, overage } }).account.notes![0]
+    expect(notes(5000)).toBe('Up to 5,000 more credits may be used beyond them, billed in dollars.')
+    expect(notes('unlimited')).toBe('Usage beyond them is billed in dollars, without limit.')
+  })
+
+  it('say that the Free plan makes no music and allows no commercial use', () => {
+    const { account } = rows({
+      ok: true,
+      account: {
+        ...starter,
+        tier: 'free',
+        characterLimit: 10000,
+        charactersUsed: 0,
+        renewsAt: null,
+      },
+    })
+    expect(account.detail).toBe('Answers. Free plan: 10,000 of 10,000 credits left.')
+    expect(account.notes).toContain(
+      'On the Free plan ElevenLabs makes no music through the API, and nothing it makes may be used commercially.',
+    )
+  })
+
+  it('name a plan with more than one word plainly', () => {
+    const { account } = rows({ ok: true, account: { ...starter, tier: 'creator_tier' } })
+    expect(account.detail).toStartWith('Answers. Creator tier plan:')
+  })
+
+  it('report ElevenLabs not answering, with what to check', () => {
+    expect(
+      rows({ ok: false, reason: 'elevenlabs', message: 'ElevenLabs answered 401: invalid key' })
+        .account,
+    ).toMatchObject({
+      state: 'problem',
+      detail: 'Did not answer: ElevenLabs answered 401: invalid key',
+      fix: 'Check the key, and that api.elevenlabs.io can be reached.',
     })
   })
 })

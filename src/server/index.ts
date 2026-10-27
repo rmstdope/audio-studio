@@ -17,6 +17,8 @@ import { BriefChangeBody } from '../core/music'
 import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
+import type { ElevenAnswer } from '../core/setup'
+import { accountOf, createElevenLabsClient, type ElevenLabsClient } from '../services/elevenlabs'
 import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
 import { createBudget, spendProblem, type Budget, type SpendProblem } from '../core/spend'
 import { planPart } from '../core/planner'
@@ -104,6 +106,8 @@ export interface ServerOptions {
   transcriber?: Transcriber | null
   /** The music generator to use (tests); by default an ACE-Step worker, started on use. */
   music?: MusicGenerator
+  /** The ElevenLabs client to use (tests); by default one is made from the project's API key. */
+  elevenlabs?: ElevenLabsClient | null
 }
 
 /**
@@ -309,6 +313,7 @@ export function startServer({
   encode,
   transcriber,
   music,
+  elevenlabs,
 }: ServerOptions) {
   const musicGenerator = music ?? sharedMusic()
   const musicTakes = createMusicTakes({
@@ -406,6 +411,17 @@ export function startServer({
         message: error instanceof Error ? error.message : String(error),
       }
     }
+  }
+
+  /**
+   * The ElevenLabs account, asked with the key Setup found: through the client given (tests; null
+   * is none, so nothing is asked), else one made from that key.
+   */
+  async function elevenAccountOf(apiKey: string): Promise<ElevenAnswer> {
+    const client = elevenlabs !== undefined ? elevenlabs : createElevenLabsClient(apiKey)
+    return client
+      ? accountOf(client)
+      : { ok: false, reason: 'no-key', message: 'No ElevenLabs client.' }
   }
 
   /**
@@ -1076,7 +1092,18 @@ export function startServer({
         GET: guard(async () => Response.json(await creditOf())),
       },
       '/api/setup': {
-        GET: guard(async () => Response.json(await checkSetup(projectFile, creditOf))),
+        GET: guard(async () =>
+          Response.json(
+            await checkSetup(
+              projectFile,
+              creditOf,
+              undefined,
+              undefined,
+              undefined,
+              elevenAccountOf,
+            ),
+          ),
+        ),
       },
       '/api/changes': {
         GET: guard(async () => Response.json(await gitChanges(projectFile))),

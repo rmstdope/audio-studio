@@ -5,6 +5,30 @@ import type { FishTierSchema } from './project'
 /** The name of the variable that holds the Fish Audio API key (`services/env.ts` reads it). */
 const FISH_KEY = 'FISH_AUDIO_API_KEY'
 
+/** The name of the variable that holds the ElevenLabs API key (`services/env.ts` reads it). */
+const ELEVENLABS_KEY = 'ELEVENLABS_API_KEY'
+
+/** An ElevenLabs account, as `GET /v1/user/subscription` describes it (`services/elevenlabs.ts`). */
+export interface ElevenAccount {
+  /** The plan, as ElevenLabs names it (`free`, `starter`, `creator`, …). */
+  tier: string
+  /** Credits used this period (`character_count`: a character costs a credit or less). */
+  charactersUsed: number
+  /** Credits the plan includes this period (`character_limit`). */
+  characterLimit: number
+  /** When the characters renew (Unix seconds), if ElevenLabs says. */
+  renewsAt: number | null
+  /** Credits that may be used beyond the plan, billed in dollars: 0 is none. */
+  overage: number | 'unlimited'
+  /** The plan's voice slots: how many are in use, and how many it has. */
+  voiceSlots: { used: number; limit: number }
+}
+
+/** What asking ElevenLabs for the account gave. */
+export type ElevenAnswer =
+  | { ok: true; account: ElevenAccount }
+  | { ok: false; reason: 'no-key' | 'elevenlabs'; message: string }
+
 /** What asking Fish for the account's credit gave: the shape of `services/fish.ts`'s `CreditResult`. */
 export type FishAnswer =
   | { ok: true; credit: number }
@@ -54,6 +78,8 @@ export interface SetupFacts {
     /** The Stable Audio models that are not in `~/.cache/stable-audio`. */
     stableAudioMissing: MusicModelId[]
   } | null
+  /** What asking ElevenLabs for the account gave (not asked without its key). */
+  elevenlabs: ElevenAnswer
 }
 
 /** One numbered step: text with links in it, and commands to copy after it. */
@@ -67,7 +93,17 @@ export interface SetupStep {
  * optional and not set).
  */
 export interface SetupCheck {
-  id: 'ffmpeg' | 'whisper' | 'key' | 'fish' | 'requests' | 'refresh' | 'music' | 'stableAudio'
+  id:
+    | 'ffmpeg'
+    | 'whisper'
+    | 'key'
+    | 'fish'
+    | 'requests'
+    | 'refresh'
+    | 'music'
+    | 'stableAudio'
+    | 'elevenlabsKey'
+    | 'elevenlabs'
   title: string
   state: 'ok' | 'problem' | 'off'
   /** What was found, in a sentence. */
@@ -76,6 +112,8 @@ export interface SetupCheck {
   fix?: string
   /** Replaces the state's own word ("Not used") on the row, when another says it better. */
   label?: string
+  /** Further lines under the detail, each a sentence. */
+  notes?: string[]
   /** Numbered steps to put it right, with the note under them. */
   steps?: { list: SetupStep[]; note: string }
   /** The account's credit in dollars, when Fish answered. */
@@ -98,6 +136,8 @@ export function setupChecks(facts: SetupFacts): SetupCheck[] {
     refresh(facts),
     music(facts),
     stableAudio(facts),
+    elevenlabsKey(facts),
+    elevenlabs(facts),
   ]
 }
 
@@ -351,4 +391,72 @@ function stableAudio(facts: SetupFacts): SetupCheck {
             ' and ',
           )} is in place; ${missing.map((id) => musicModel(id).name).join(' and ')} is missing from ${STABLE_AUDIO_HOME}.`
   return { id: 'stableAudio', title, state: 'off', label: 'Not set up', detail, steps }
+}
+
+function elevenlabsKey(facts: SetupFacts): SetupCheck {
+  const title = 'ElevenLabs API key'
+  if (facts.elevenlabs.ok || facts.elevenlabs.reason !== 'no-key') {
+    return { id: 'elevenlabsKey', title, state: 'ok', detail: 'Found.' }
+  }
+  return {
+    id: 'elevenlabsKey',
+    title,
+    state: 'off',
+    label: 'Not set up',
+    detail: `Optional: for ElevenLabs voices and music. No ${ELEVENLABS_KEY} in the environment or in ${facts.envPath}.`,
+    fix: `Put ${ELEVENLABS_KEY}=... in ${facts.envPath} (from elevenlabs.io, Developers, API keys), or export it.`,
+  }
+}
+
+/** A number as a person reads it, with thousands separated: 27,450. */
+const count = (n: number) => n.toLocaleString('en-US')
+
+/** A plan's name as ElevenLabs gives it, as a person reads it: `creator_tier` is Creator tier. */
+function planName(tier: string): string {
+  const words = tier.replace(/_/g, ' ').trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/** What the account allows beyond its characters, in a sentence. */
+function overageNote(overage: ElevenAccount['overage']): string {
+  if (overage === 'unlimited') return 'Usage beyond them is billed in dollars, without limit.'
+  if (overage > 0)
+    return `Up to ${count(overage)} more credits may be used beyond them, billed in dollars.`
+  return 'Nothing is billed beyond them: ElevenLabs work stops when they run out.'
+}
+
+function elevenlabs(facts: SetupFacts): SetupCheck {
+  const title = 'ElevenLabs'
+  const answer = facts.elevenlabs
+  if (!answer.ok) {
+    return answer.reason === 'no-key'
+      ? { id: 'elevenlabs', title, state: 'off', detail: 'Not asked: there is no key.' }
+      : {
+          id: 'elevenlabs',
+          title,
+          state: 'problem',
+          detail: `Did not answer: ${answer.message}`,
+          fix: 'Check the key, and that api.elevenlabs.io can be reached.',
+        }
+  }
+  const { account } = answer
+  const left = Math.max(0, account.characterLimit - account.charactersUsed)
+  const renews =
+    account.renewsAt === null
+      ? ''
+      : `, renewing ${new Date(account.renewsAt * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}`
+  const free = account.tier === 'free'
+  return {
+    id: 'elevenlabs',
+    title,
+    state: 'ok',
+    detail: `Answers. ${planName(account.tier)} plan: ${count(left)} of ${count(account.characterLimit)} credits left${renews}.`,
+    notes: [
+      overageNote(account.overage),
+      `Voice slots: ${account.voiceSlots.used} of ${account.voiceSlots.limit} used.`,
+      free
+        ? 'On the Free plan ElevenLabs makes no music through the API, and nothing it makes may be used commercially.'
+        : "Music made with ElevenLabs may be used in a game while the game has earned under $500,000 and you under $1,000,000 a year from games (ElevenLabs' music terms of 9 October 2026); beyond that it needs their Enterprise Music plan.",
+    ],
+  }
 }

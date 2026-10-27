@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { dirname, join } from 'node:path'
 import { readWav, writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
+import type { ElevenLabsClient } from '../services/elevenlabs'
 import { FishError, type FishClient } from '../services/fish'
 import { createLimiter } from '../services/limit'
 import { recordLine } from '../services/narration'
@@ -64,6 +65,8 @@ const server = startServer({
   fish,
   encode,
   transcriber: null,
+  // No ElevenLabs, so Setup never asks it, even with ELEVENLABS_API_KEY exported.
+  elevenlabs: null,
 })
 afterAll(() => server.stop(true))
 
@@ -266,6 +269,8 @@ describe('server', () => {
       'refresh',
       'music',
       'stableAudio',
+      'elevenlabsKey',
+      'elevenlabs',
     ])
   })
 
@@ -996,6 +1001,7 @@ describe('server, the Fish tier', () => {
     fish,
     encode,
     transcriber: null,
+    elevenlabs: null,
   })
   afterAll(() => server.stop(true))
   const patch = (body: unknown, origin: string | null = server.url.origin) =>
@@ -3714,5 +3720,70 @@ describe('server, moving a take', () => {
     expect(hut.takes[0].movedFrom).toEqual({ title: 'Hall', n: 1 })
     const hall = await (await fetch(at('/api/music/tracks/hall/takes'))).json()
     expect(hall.takes).toEqual([])
+  })
+})
+
+describe('the ElevenLabs account on Setup', () => {
+  const elevenRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    '.env': 'ELEVENLABS_API_KEY=k\n',
+  })
+  const starter = {
+    tier: 'starter',
+    charactersUsed: 2550,
+    characterLimit: 30000,
+    renewsAt: null,
+    overage: 0,
+    voiceSlots: { used: 3, limit: 10 },
+  }
+  const setupOf = async (elevenlabs: ElevenLabsClient) => {
+    const server = startServer({
+      projectFile: join(elevenRoot, 'audio-studio.json'),
+      port: 0,
+      fish,
+      elevenlabs,
+    })
+    try {
+      const body = await (await fetch(new URL('/api/setup', server.url))).json()
+      return body.checks.find((c: { id: string }) => c.id === 'elevenlabs')
+    } finally {
+      server.stop(true)
+    }
+  }
+
+  it('shows the plan and the characters left', async () => {
+    expect(await setupOf({ subscription: async () => starter })).toMatchObject({
+      state: 'ok',
+      detail: 'Answers. Starter plan: 27,450 of 30,000 credits left.',
+    })
+  })
+
+  it('treats no ElevenLabs client as no key, and asks nothing', async () => {
+    const server = startServer({
+      projectFile: join(elevenRoot, 'audio-studio.json'),
+      port: 0,
+      fish,
+      elevenlabs: null,
+    })
+    try {
+      const body = await (await fetch(new URL('/api/setup', server.url))).json()
+      expect(body.checks.find((c: { id: string }) => c.id === 'elevenlabs')).toMatchObject({
+        state: 'off',
+      })
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  it('says why when ElevenLabs does not answer', async () => {
+    const check = await setupOf({
+      subscription: async () => {
+        throw new Error('ElevenLabs answered 401: Invalid API key')
+      },
+    })
+    expect(check).toMatchObject({
+      state: 'problem',
+      detail: 'Did not answer: ElevenLabs answered 401: Invalid API key',
+    })
   })
 })

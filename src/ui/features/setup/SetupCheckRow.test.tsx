@@ -84,3 +84,23 @@ describe('a setup row with steps', () => {
     expect(row.querySelector('ol')).toBeNull()
   })
 })
+
+describe('a setup row with notes', () => {
+  it('shows each note as a line of its own under what was found', () => {
+    const container = render({
+      id: 'elevenlabs',
+      title: 'ElevenLabs',
+      state: 'ok',
+      detail: 'Answers. Starter plan: 27,450 of 30,000 credits left.',
+      notes: ['Voice slots: 3 of 10 used.', 'Music made with ElevenLabs may be used in a game.'],
+    })
+    const notes = [...container.querySelectorAll('.setup-notes li')].map((li) => li.textContent)
+    expect(notes).toEqual([
+      'Voice slots: 3 of 10 used.',
+      'Music made with ElevenLabs may be used in a game.',
+    ])
+    expect(container.querySelector('.setup-text .muted')!.textContent).toBe(
+      'Answers. Starter plan: 27,450 of 30,000 credits left.',
+    )
+  })
+})

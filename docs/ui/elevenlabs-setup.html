@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ElevenLabs on Setup</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --ok: #3ddc97;
+        --warn: #ffc24b;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px;
+      }
+      .intro,
+      .note,
+      ul {
+        max-width: 860px;
+        margin: 0 auto;
+      }
+      .intro {
+        color: var(--muted);
+        margin-bottom: 18px;
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 22px;
+        margin-bottom: 8px;
+        color: var(--muted);
+      }
+      ul.list {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        gap: 16px;
+      }
+      .state {
+        width: 130px;
+        flex: none;
+        font-size: 13px;
+      }
+      .state.ok {
+        color: var(--ok);
+      }
+      .state.problem {
+        color: var(--warn);
+      }
+      .state.off {
+        color: var(--faint);
+      }
+      .text {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .notes {
+        margin: 0;
+        padding-left: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      code {
+        font:
+          12px ui-monospace,
+          Menlo,
+          monospace;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: var(--inset);
+        border: 1px solid var(--line);
+        width: fit-content;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }
+      @media (max-width: 560px) {
+        .panel {
+          flex-direction: column;
+          gap: 6px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>ElevenLabs on Setup</h1>
+      Two optional rows at the end of Setup's checklist, as Stable Audio's is: the key, and the
+      account. The account is asked only when there is a key. Each state is drawn below; the words
+      are those that ship.
+    </div>
+
+    <p class="note"><b>1 — No key</b> (every project until one is set)</p>
+    <ul class="list">
+      <li class="panel">
+        <span class="state off">Not set up</span>
+        <div class="text">
+          <strong>ElevenLabs API key</strong
+          ><span class="muted"
+            >Optional: for ElevenLabs voices and music. No ELEVENLABS_API_KEY in the environment or
+            in .env.</span
+          ><code
+            >Put ELEVENLABS_API_KEY=... in .env (from elevenlabs.io, Developers, API keys), or
+            export it.</code
+          >
+        </div>
+      </li>
+      <li class="panel">
+        <span class="state off">Not used</span>
+        <div class="text">
+          <strong>ElevenLabs</strong><span class="muted">Not asked: there is no key.</span>
+        </div>
+      </li>
+    </ul>
+
+    <p class="note"><b>2 — A Starter plan</b></p>
+    <ul class="list">
+      <li class="panel">
+        <span class="state ok">✓ Ready</span>
+        <div class="text"><strong>ElevenLabs API key</strong><span class="muted">Found.</span></div>
+      </li>
+      <li class="panel">
+        <span class="state ok">✓ Ready</span>
+        <div class="text">
+          <strong>ElevenLabs</strong
+          ><span class="muted"
+            >Answers. Starter plan: 27,450 of 30,000 credits left, renewing 12 November 2026.</span
+          >
+          <ul class="notes small muted">
+            <li>Nothing is billed beyond them: ElevenLabs work stops when they run out.</li>
+            <li>Voice slots: 3 of 10 used.</li>
+            <li>
+              Music made with ElevenLabs may be used in a game while the game has earned under
+              $500,000 and you under $1,000,000 a year from games (ElevenLabs' music terms of 9
+              October 2026); beyond that it needs their Enterprise Music plan.
+            </li>
+          </ul>
+        </div>
+      </li>
+    </ul>
+    <p class="note">
+      With usage beyond the plan allowed, the first note reads "Up to 5,000 more credits may be used
+      beyond them, billed in dollars." or "Usage beyond them is billed in dollars, without limit."
+    </p>
+
+    <p class="note"><b>3 — The Free plan</b></p>
+    <ul class="list">
+      <li class="panel">
+        <span class="state ok">✓ Ready</span>
+        <div class="text">
+          <strong>ElevenLabs</strong
+          ><span class="muted">Answers. Free plan: 10,000 of 10,000 credits left.</span>
+          <ul class="notes small muted">
+            <li>Nothing is billed beyond them: ElevenLabs work stops when they run out.</li>
+            <li>Voice slots: 0 of 3 used.</li>
+            <li>
+              On the Free plan ElevenLabs makes no music through the API, and nothing it makes may
+              be used commercially.
+            </li>
+          </ul>
+        </div>
+      </li>
+    </ul>
+
+    <p class="note"><b>4 — A key ElevenLabs refuses, or no answer</b></p>
+    <ul class="list">
+      <li class="panel">
+        <span class="state problem">⚠ Needs attention</span>
+        <div class="text">
+          <strong>ElevenLabs</strong
+          ><span class="muted">Did not answer: ElevenLabs answered 401: Invalid API key</span
+          ><code>Check the key, and that api.elevenlabs.io can be reached.</code>
+        </div>
+      </li>
+    </ul>
+  </body>
+</html>
