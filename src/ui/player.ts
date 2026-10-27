@@ -2,6 +2,8 @@
 export interface Clip {
   id: string
   url: string
+  /** Fade it in and out (a take); the game's file and narration play as they are. */
+  fade?: boolean
 }
 
 /** The part of an audio element the player uses, so tests can give a fake one. */
@@ -62,6 +64,7 @@ export function createPlayer(
   // start once that fade-out is over, whether the element is making sound, and the ticker's end.
   let startedAt = 0
   let outSince: number | null = null
+  let outFrom = 1
   let afterOut: (() => void) | null = null
   let audible = false
   let cancelTick: (() => void) | null = null
@@ -82,7 +85,7 @@ export function createPlayer(
     if (length !== undefined && Number.isFinite(length)) {
       gain = Math.min(gain, ((length - element.currentTime) * 1000) / fadeMs)
     }
-    if (outSince !== null) gain = Math.min(gain, 1 - (t - outSince) / fadeMs)
+    if (outSince !== null) gain = Math.min(gain, outFrom * (1 - (t - outSince) / fadeMs))
     return Math.max(0, Math.min(1, gain))
   }
 
@@ -112,7 +115,10 @@ export function createPlayer(
   /** Begins to fade the sound out; `then` runs when it is over. */
   const fadeOut = (then: (() => void) | null) => {
     afterOut = then
-    outSince ??= clock.now()
+    if (outSince === null) {
+      outFrom = level()
+      outSince = clock.now()
+    }
   }
 
   const begin = (clip: Clip) => {
@@ -121,12 +127,16 @@ export function createPlayer(
     element.currentTime = 0
     current = clip.id
     if (fadeMs > 0) {
-      element.volume = 0
-      startedAt = clock.now()
-      outSince = null
-      audible = true
       endTicker()
-      cancelTick = clock.every(tick)
+      outSince = null
+      if (clip.fade) {
+        element.volume = 0
+        startedAt = clock.now()
+        audible = true
+        cancelTick = clock.every(tick)
+      } else {
+        element.volume = 1
+      }
     }
     emit()
     element.play().catch(() => fail(mine))
@@ -178,10 +188,10 @@ export function createPlayer(
 
   return {
     /** Plays a clip on its own, or stops it if it is the one playing. */
-    toggle(id: string, url: string) {
+    toggle(id: string, url: string, how: { fade?: boolean } = {}) {
       if (current === id) return stop()
       queue = []
-      start({ id, url })
+      start({ id, url, ...how })
     },
     /** Plays the clips one after another. */
     playInTurn(clips: Clip[]) {
@@ -196,7 +206,11 @@ export function createPlayer(
       if (!over()) advance()
     },
     /** The clip playing could not be played. */
-    failed: () => fail(token),
+    failed() {
+      // An old take that errs while it fades out for the next: its fade is over, nothing more.
+      if (outSince !== null) silent()?.()
+      else fail(token)
+    },
     /** Stops for good: the page is left, and nothing the element says after starts a clip. */
     dispose() {
       stop()

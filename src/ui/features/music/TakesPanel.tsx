@@ -54,7 +54,7 @@ export function TakesPanel({
   const takes = useMusicTakes(trackId)
   const make = useMakeTakes(trackId)
   const stop = useStopTakes(trackId)
-  const player = useClipPlayer(undefined, { fade: true })
+  const player = useClipPlayer()
   const view = takes.data
   const making = useMusicMaking().data ?? {}
   // The take the Move… dialog is open for, and where the last move went; neither outlives the page.
@@ -380,7 +380,7 @@ function TakeCard({
           type="button"
           className="play"
           aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-          onClick={() => player.toggle(id, url)}
+          onClick={() => player.toggle(id, url, { fade: true })}
         >
           {playing ? '■' : '▶'}
         </button>
@@ -392,7 +392,7 @@ function TakeCard({
           <button
             type="button"
             className="btn btn-small"
-            onClick={() => player.toggle(seamId, `${url}?seam=1`)}
+            onClick={() => player.toggle(seamId, `${url}?seam=1`, { fade: true })}
           >
             {seamPlaying ? 'Stop' : 'Hear the seam'}
           </button>

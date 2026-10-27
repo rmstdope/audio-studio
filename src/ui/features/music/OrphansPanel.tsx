@@ -14,7 +14,7 @@ import { chosenOn } from '../../musicText'
  * none.
  */
 export function OrphansPanel({ orphans }: { orphans: OrphanRow[] }) {
-  const player = useClipPlayer(undefined, { fade: true })
+  const player = useClipPlayer()
   const [asking, setAsking] = useState<string | null>(null)
   const opener = useRef<HTMLButtonElement | null>(null)
   const refocus = useFocusWhenClosed(asking !== null, opener)
@@ -58,7 +58,9 @@ export function OrphansPanel({ orphans }: { orphans: OrphanRow[] }) {
                           : `Play ${row.title}: music file missing`
                       }
                       onClick={() =>
-                        player.toggle(row.id, `/api/music/clips/${encodeURIComponent(row.file)}`)
+                        player.toggle(row.id, `/api/music/clips/${encodeURIComponent(row.file)}`, {
+                          fade: true,
+                        })
                       }
                     >
                       {playing ? <PauseIcon /> : <PlayIcon />}

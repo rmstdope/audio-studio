@@ -5,24 +5,20 @@ import { createPlayer, TAKE_FADE_SECONDS, type Clip, type PlayerState } from '..
  * One clip playing at a time (see `createPlayer`): `toggle(id, url)` plays it, or stops it if it
  * is the one playing; `playInTurn(clips)` plays clips one after another, skipping one that fails
  * (any toggle stops that). `onFailed` hears the id of a clip that failed. `playing` is the id of
- * the clip playing, or null; `inTurn` says whether a list is being played. With `fade` set (for
- * takes) every clip fades in and out and a stop is a short fade, never a cut.
+ * the clip playing, or null; `inTurn` says whether a list is being played. `toggle(id, url, { fade: true })`
+ * plays a take: it fades in and out, and a stop is a short fade, never a cut.
  */
-export function useClipPlayer(onFailed?: (id: string) => void, options: { fade?: boolean } = {}) {
+export function useClipPlayer(onFailed?: (id: string) => void) {
   const [state, setState] = useState<PlayerState>({ playing: null, inTurn: false })
   const player = useRef<ReturnType<typeof createPlayer> | null>(null)
-  const fade = useRef(options.fade ?? false)
   const failed = useRef(onFailed)
   failed.current = onFailed
 
   useEffect(() => {
     const element = new Audio()
-    const made = createPlayer(
-      element,
-      setState,
-      (id) => failed.current?.(id),
-      fade.current ? { fadeSeconds: TAKE_FADE_SECONDS } : {},
-    )
+    const made = createPlayer(element, setState, (id) => failed.current?.(id), {
+      fadeSeconds: TAKE_FADE_SECONDS,
+    })
     element.addEventListener('ended', made.ended)
     element.addEventListener('error', made.failed)
     player.current = made
@@ -38,7 +34,8 @@ export function useClipPlayer(onFailed?: (id: string) => void, options: { fade?:
   // The same functions on every render; they reach the player made on mount.
   const actions = useMemo(
     () => ({
-      toggle: (id: string, url: string) => player.current?.toggle(id, url),
+      toggle: (id: string, url: string, how?: { fade?: boolean }) =>
+        player.current?.toggle(id, url, how),
       playInTurn: (clips: Clip[]) => player.current?.playInTurn(clips),
       stop: () => player.current?.stop(),
     }),
