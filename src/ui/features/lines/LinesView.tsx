@@ -31,6 +31,7 @@ import { longTitle, plural, shortTitle } from '../../format'
 import { cueButtonTitle, cueHint, cueNote, noDialogPanel } from '../../languages'
 import { bandsBefore, sceneCueWithoutOwn, tableRows } from '../../sceneBands'
 import { SceneBand } from './SceneBand'
+import { partOnlyProblems } from '../../problems'
 import { routeHref } from '../../route'
 import { STATUS, percent, seconds, statusDetail } from '../../status'
 import { clipsInTurn, playthroughButton } from '../../playthrough'
@@ -328,12 +329,13 @@ export function LinesView({
     { id: 'all', label: 'All', count: loaded.lines.length },
   ]
   const speakers = [...new Set(loaded.lines.map((l) => l.speaker))].sort()
+  const ownProblems = partOnlyProblems(loaded.problems, summary.problems)
 
   return (
     <>
       {header}
-      {loaded.problems.length > 0 && (
-        <Problems title="Some of this part’s files could not be read" problems={loaded.problems} />
+      {ownProblems.length > 0 && (
+        <Problems title="Some of this part’s files could not be read" problems={ownProblems} />
       )}
 
       <div className="toolbar">

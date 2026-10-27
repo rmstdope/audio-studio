@@ -14,6 +14,7 @@ import { StatusBar, StatusDot } from '../../components/StatusBar'
 import { longTitle, plural, shortTitle } from '../../format'
 import { sceneOfKey } from '../../../core/resources'
 import { cueTargets, type CueTarget } from '../../cueTargets'
+import { partOnlyProblems } from '../../problems'
 import { routeHref } from '../../route'
 import { REASON, STATUS, reasonCounts } from '../../status'
 
@@ -34,6 +35,7 @@ export function PartOverview({
   const hasDialog = part.dialog === 'ok'
   const detail = usePart(part.id, hasDialog || several, asked)
   const loaded = detail.data?.ok ? detail.data.part : null
+  const ownProblems = loaded ? partOnlyProblems(loaded.problems, summary.problems) : []
   const toRecord = loaded ? loaded.counts.missing + loaded.counts.stale : 0
   const refresh = useRefreshDialog(part.id)
   // Another language than the source may have no dialog yet, whatever the source has.
@@ -105,11 +107,8 @@ export function PartOverview({
         <NoDialog summary={summary} part={part} />
       ) : (
         <>
-          {loaded && loaded.problems.length > 0 && (
-            <Problems
-              title="Some of this part’s files could not be read"
-              problems={loaded.problems}
-            />
+          {ownProblems.length > 0 && (
+            <Problems title="Some of this part’s files could not be read" problems={ownProblems} />
           )}
           {loaded && loaded.orphanCues.length > 0 && <OrphanCues part={loaded} language={asked} />}
           {goneRecorded ? (
