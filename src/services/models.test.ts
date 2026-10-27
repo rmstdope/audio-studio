@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { setMusicModel, setStageModel, switchRetiredModels } from './models'
+import { setElevenModel, setMusicModel, setStageModel, switchRetiredModels } from './models'
 import { setSoundAlike } from './soundAlike'
 
 function projectWith(models: Record<string, string>) {
@@ -239,5 +239,42 @@ describe('setMusicModel', () => {
       problems: [{ path: 'music' }],
     })
     expect(read()).toBe(`${JSON.stringify(withMusic(), null, 2)}\n`)
+  })
+})
+
+describe('setElevenModel', () => {
+  it('changes one ElevenLabs stage’s model and nothing else, writing the section it needs', async () => {
+    const { projectFile, read } = repo(projectJson(), 4)
+    expect(await setElevenModel(projectFile, 'draft', 'eleven_flash_v2_5', 'eleven_v3')).toEqual({
+      ok: true,
+    })
+    const saved = JSON.parse(read())
+    expect(saved.narration.elevenlabs).toEqual({
+      models: { audition: 'eleven_v3', draft: 'eleven_flash_v2_5', final: 'eleven_v3' },
+    })
+    expect(read()).toBe(
+      `${JSON.stringify({ ...projectJson(), narration: { ...(projectJson().narration as object), elevenlabs: saved.narration.elevenlabs } }, null, 4)}\n`,
+    )
+  })
+
+  it('refuses, writing nothing, a model it does not know, or a file changed meanwhile', async () => {
+    const { projectFile, read } = repo(projectJson())
+    const before = read()
+    expect(await setElevenModel(projectFile, 'draft', 's2-pro', 'eleven_v3')).toMatchObject({
+      ok: false,
+      problems: [{ path: 'narration.elevenlabs.models.draft' }],
+    })
+    expect(
+      await setElevenModel(projectFile, 'final', 'eleven_flash_v2_5', 'eleven_multilingual_v2'),
+    ).toMatchObject({
+      ok: false,
+      problems: [
+        {
+          path: 'narration.elevenlabs.models.final',
+          message: 'the model in the file changed since the page was read; reload the studio',
+        },
+      ],
+    })
+    expect(read()).toBe(before)
   })
 })

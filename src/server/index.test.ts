@@ -869,6 +869,30 @@ describe('server, choosing the stages’ models', () => {
     expect((await put('draft', { model: 'mystery', was: 's2.1-pro' })).status).toBe(409)
   })
 
+  it('saves an ElevenLabs stage’s model from its own page only, and shows it', async () => {
+    const putEleven = (stage: string, body: unknown, origin = modelServer.url.origin) =>
+      fetch(at(`/api/models/elevenlabs/${stage}`), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', origin },
+        body: JSON.stringify(body),
+      })
+    const body = { model: 'eleven_flash_v2_5', was: 'eleven_v3' }
+    expect((await putEleven('draft', body, 'http://evil.test')).status).toBe(403)
+    expect((await putEleven('nope', body)).status).toBe(404)
+    expect((await putEleven('draft', { model: 's2-pro', was: 'eleven_v3' })).status).toBe(409)
+    const saved = await putEleven('draft', body)
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    const view = await (await fetch(at('/api/models'))).json()
+    expect(view.elevenlabs).toEqual({
+      audition: 'eleven_v3',
+      draft: 'eleven_flash_v2_5',
+      final: 'eleven_v3',
+    })
+    expect(
+      (await putEleven('draft', { model: 'eleven_v3', was: 'eleven_flash_v2_5' })).status,
+    ).toBe(200)
+  })
+
   it('refuses a change while a part is recording, and names it', async () => {
     expect((await put('draft', { model: 's2.1-pro-free', was: 's2.1-pro' })).status).toBe(200)
     const started = await fetch(at('/api/parts/act1/jobs'), {
@@ -4206,6 +4230,94 @@ describe('recording an ElevenLabs voice’s lines', () => {
       expect(await fishOnly.json()).toMatchObject({ ok: true, key: 'b' })
     } finally {
       running.stop(true)
+    }
+  })
+})
+
+describe('a final recording on ElevenLabs’ side only', () => {
+  const where = tempRepo({
+    'audio-studio.json': projectJson({
+      narration: {
+        ...(projectJson().narration as object),
+        elevenlabs: { models: { final: 'eleven_multilingual_v2' } },
+      },
+    }),
+    'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1' } }, pronounce: {} },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const running = startServer({
+    projectFile: join(where, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    elevenlabs: null,
+  })
+  afterAll(() => running.stop(true))
+
+  it('is planned with ElevenLabs’ final model, though Fish’s stages are one', async () => {
+    const plan = await (
+      await fetch(new URL('/api/parts/act1/plan?stage=final', running.url))
+    ).json()
+    expect(plan).toMatchObject({
+      ok: true,
+      stage: 'final',
+      plan: { final: true, keys: ['a'], eleven: { model: 'eleven_multilingual_v2' } },
+    })
+  })
+
+  it('takes an up-to-date line again with its stage’s ElevenLabs model', async () => {
+    const draftOnFlash = tempRepo({
+      'audio-studio.json': projectJson({
+        narration: {
+          ...(projectJson().narration as object),
+          elevenlabs: { models: { draft: 'eleven_flash_v2_5', final: 'eleven_flash_v2_5' } },
+        },
+      }),
+      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1' } }, pronounce: {} },
+      'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+    })
+    const eleven = fakeEleven(
+      {},
+      {
+        account: {
+          tier: 'starter',
+          charactersUsed: 0,
+          characterLimit: 30_000,
+          renewsAt: null,
+          overage: 0,
+          voiceSlots: { used: 0, limit: 10 },
+        },
+        speak: () =>
+          writeWav({
+            format: { channels: 1, sampleRate: 1000, bitsPerSample: 16 },
+            data: new Uint8Array(2000),
+          }),
+      },
+    )
+    const flash = startServer({
+      projectFile: join(draftOnFlash, 'audio-studio.json'),
+      port: 0,
+      fish,
+      encode,
+      transcriber: null,
+      elevenlabs: eleven.client,
+    })
+    try {
+      const post = (path: string, body: unknown) =>
+        fetch(new URL(path, flash.url), {
+          method: 'POST',
+          headers: { origin: flash.url.origin, 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      // Five characters at half a credit, up to three takes.
+      const recorded = await post('/api/parts/act1/lines/a/record', { confirmedCredits: 8 })
+      expect(await recorded.json()).toMatchObject({ ok: true })
+      const taken = await post('/api/parts/act1/lines/a/takes', { confirmedCredits: 3 })
+      expect(await taken.json()).toMatchObject({ ok: true })
+      expect(eleven.spoken.map((r) => r.model)).toEqual(['eleven_flash_v2_5', 'eleven_flash_v2_5'])
+    } finally {
+      flash.stop(true)
     }
   })
 })

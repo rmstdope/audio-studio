@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DEFAULT_ELEVEN_MODEL, isElevenModel } from './elevenSpeech'
 import { knownLanguage } from './languages'
 import { MUSIC_MODEL_IDS } from './musicModels'
 import { isPriced } from './prices'
@@ -36,6 +37,14 @@ const recordingModel = z
   .default(FREE_MODELS[0])
   .refine(isPriced, {
     error: (issue) => `"${String(issue.input)}" has no known price, so its cost cannot be shown`,
+  })
+
+/** A stage's ElevenLabs model: one of ElevenLabs' speech models the studio knows (Eleven v3 unless named). */
+const elevenModel = z
+  .string()
+  .default(DEFAULT_ELEVEN_MODEL)
+  .refine(isElevenModel, {
+    error: (issue) => `"${String(issue.input)}" is not an ElevenLabs speech model the studio knows`,
   })
 
 /** Groups of words or phrases that sound the same: two or more each. */
@@ -107,6 +116,17 @@ const NarrationSchema = z
     sceneCueSpeakers: z.array(z.string().min(1)).default(['narrator']),
     models: z
       .object({ audition: recordingModel, draft: recordingModel, final: recordingModel })
+      .prefault({}),
+    /**
+     * ElevenLabs' side of the stages, for characters cast with an ElevenLabs voice: each stage's
+     * model, saved from the Models panel.
+     */
+    elevenlabs: z
+      .object({
+        models: z
+          .object({ audition: elevenModel, draft: elevenModel, final: elevenModel })
+          .prefault({}),
+      })
       .prefault({}),
     tts: z
       .object({

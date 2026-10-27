@@ -2,6 +2,9 @@ import { useEffect, useReducer, useRef, type ReactNode } from 'react'
 import {
   busyWords,
   changeOf,
+  elevenChangeOf,
+  elevenOptions,
+  elevenQuestionWords,
   failureHeading,
   modelOptions,
   priceWords,
@@ -22,7 +25,14 @@ import {
   saveFailureHeading,
   type MusicModelId,
 } from '../../../core/musicModels'
-import { useModelsView, useSetMusicModel, useSetStageModel, type ModelsAnswer } from '../../api'
+import {
+  useModelsView,
+  useSetElevenModel,
+  useSetMusicModel,
+  useSetStageModel,
+  type ModelsAnswer,
+} from '../../api'
+import { elevenModelName, readsCues } from '../../../core/elevenSpeech'
 import { Confirm } from '../../components/Confirm'
 import { markSwitched } from '../../retirementSwitched'
 import { focusAfter, rowReducer, startRow } from '../../modelsRow'
@@ -88,6 +98,17 @@ export function ModelsPanel() {
           save={(model, was) => save.mutateAsync({ stage, model, was })}
         />
       ))}
+      {view.data.castsEleven &&
+        ELEVEN_STAGES.map(({ stage, name, purpose }) => (
+          <ElevenRow
+            key={stage}
+            stage={stage}
+            name={name}
+            purpose={purpose}
+            view={view.data as View}
+            locked={locked}
+          />
+        ))}
       {view.data.music && <MusicRow file={view.data.file} music={view.data.music} />}
     </section>
   )
@@ -418,6 +439,192 @@ function Question({
           {switching ? 'Switching…' : words.confirm}
         </button>
       </Confirm>
+    </div>
+  )
+}
+
+/**
+ * ElevenLabs' side of the stages the panel shows: draft and final. Its audition model is used
+ * first by page takes and auditions with an ElevenLabs voice (§12 step 14.10).
+ */
+const ELEVEN_STAGES = [
+  {
+    stage: 'draft',
+    name: 'ElevenLabs draft',
+    purpose: 'Every line of a character with an ElevenLabs voice, while the game is written.',
+  },
+  {
+    stage: 'final',
+    name: 'ElevenLabs final',
+    purpose: 'Those lines again, for the game you ship.',
+  },
+] as const
+
+/**
+ * One of ElevenLabs' stages: its menu of ElevenLabs' speech models (each with its credits a
+ * character, and whether it speaks cues), saved at once, or after a question when recorded lines
+ * go out of date; a failure says why, as the Fish rows do.
+ */
+function ElevenRow({
+  stage,
+  name,
+  purpose,
+  view,
+  locked,
+}: {
+  stage: 'draft' | 'final'
+  name: string
+  purpose: string
+  view: View
+  locked: boolean
+}) {
+  const save = useSetElevenModel()
+  const [state, dispatch] = useReducer(rowReducer, startRow)
+  const menu = useRef<HTMLSelectElement>(null)
+  const confirm = useRef<HTMLButtonElement>(null)
+  const retry = useRef<HTMLButtonElement>(null)
+  const previous = useRef(state)
+  const lastRun = useRef('')
+  const models = view.elevenlabs
+  const current = models[stage]
+
+  useEffect(() => {
+    const target = focusAfter(previous.current, state)
+    previous.current = state
+    if (target === 'confirm') confirm.current?.focus()
+    else if (target === 'menu') requestAnimationFrame(() => menu.current?.focus())
+    else if (target === 'retry') retry.current?.focus()
+  }, [state])
+
+  // The save runs from the state's own transition, so a retry and a confirm share one path.
+  useEffect(() => {
+    const key =
+      state.phase === 'saving' || state.phase === 'switching' ? `${state.phase}:${state.to}` : ''
+    if (
+      key &&
+      key !== lastRun.current &&
+      (state.phase === 'saving' || state.phase === 'switching')
+    ) {
+      save.mutateAsync({ stage, model: state.to, was: current }).then(
+        (result) =>
+          result.ok
+            ? dispatch({ type: 'saved' })
+            : dispatch({ type: 'failed', reason: result.problems?.[0]?.message ?? 'refused' }),
+        (error: Error) => dispatch({ type: 'failed', reason: error.message }),
+      )
+    }
+    lastRun.current = key
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
+
+  const pending = state.phase === 'saving' || state.phase === 'switching'
+  const shown = state.phase === 'saving' ? state.to : current
+  const change =
+    state.phase === 'asking' || state.phase === 'switching'
+      ? elevenChangeOf(stage, state.to, models, view.recorded)
+      : null
+  return (
+    <div className="mrow">
+      <div className="mname">{name}</div>
+      <div className="mtx">
+        <span className="muted">{purpose}</span>
+        <div className="mmenu">
+          <select
+            ref={menu}
+            aria-label={`${name} model`}
+            value={shown}
+            disabled={locked || pending || state.phase === 'asking'}
+            onChange={(event) => {
+              const to = event.target.value
+              dispatch({
+                type: 'pick',
+                to,
+                change: elevenChangeOf(stage, to, models, view.recorded),
+              })
+            }}
+          >
+            {elevenOptions().map((o) => (
+              <option key={o.model} value={o.model}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {state.phase === 'saving' && <span className="muted">Saving…</span>}
+        </div>
+        {change?.kind === 'ask' && (
+          <div
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && state.phase === 'asking') dispatch({ type: 'keep' })
+            }}
+          >
+            {(() => {
+              const words = elevenQuestionWords(
+                stage,
+                current,
+                state.phase === 'asking' || state.phase === 'switching' ? state.to : current,
+                change,
+                view.file,
+              )
+              return (
+                <Confirm
+                  title={words.heading}
+                  effects={words.items}
+                  back={words.keep}
+                  onBack={() => dispatch({ type: 'keep' })}
+                  backDisabled={state.phase === 'switching'}
+                >
+                  <button
+                    ref={confirm}
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={state.phase === 'switching'}
+                    onClick={() => dispatch({ type: 'confirm' })}
+                  >
+                    {state.phase === 'switching' ? 'Switching…' : words.confirm}
+                  </button>
+                </Confirm>
+              )
+            })()}
+          </div>
+        )}
+        {state.phase === 'failed' && (
+          <section className="notice notice-err" role="alert">
+            <div className="notice-text">
+              <strong>
+                Could not switch {name.toLowerCase()} to {elevenModelName(state.to)}
+              </strong>
+              <span className="muted">
+                <Mono text={failureBody(view.file, state.reason)} words={[view.file]} />
+              </span>
+            </div>
+            <div className="notice-actions">
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => dispatch({ type: 'keep' })}
+              >
+                Keep {elevenModelName(current)}
+              </button>
+              <button
+                ref={retry}
+                className="btn btn-primary"
+                type="button"
+                onClick={() => dispatch({ type: 'retry' })}
+              >
+                Try again
+              </button>
+            </div>
+          </section>
+        )}
+        {!readsCues(shown) && (
+          <span className="muted models-same">
+            {elevenModelName(shown)} speaks cues aloud, so its lines are sent without them.
+          </span>
+        )}
+        {stage === 'final' && models.final === models.draft && (
+          <span className="muted models-same">{SAME_AS_DRAFT}</span>
+        )}
+      </div>
     </div>
   )
 }

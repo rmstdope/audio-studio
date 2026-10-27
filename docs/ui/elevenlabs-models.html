@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ElevenLabs models on Setup</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --ok: #3ddc97;
+        --warn: #ffc24b;
+        --bad: #ff6b6b;
+        --accent: #7aa2ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px;
+      }
+      section {
+        max-width: 860px;
+        margin: 0 auto 28px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 0 0 8px;
+      }
+      .intro,
+      .note {
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+      .btn,
+      select,
+      input {
+        background: var(--inset);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #0b0c10;
+        border-color: var(--accent);
+      }
+      input {
+        width: 220px;
+      }
+      .error {
+        color: var(--bad);
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 380px;
+      }
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--inset);
+        color: var(--text);
+      }
+      .new {
+        outline: 2px dashed var(--warn);
+        outline-offset: 3px;
+        border-radius: 8px;
+      }
+      .legend {
+        color: var(--warn);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>ElevenLabs' models on Setup</h1>
+      <p class="intro">
+        Step 14.9.1. In a project with an ElevenLabs voice, the Models panel has two more rows,
+        under Fish's: the model ElevenLabs drafts and records the final with.
+        <span class="legend">Dashed: new.</span>
+      </p>
+    </section>
+
+    <section>
+      <h2>1 · The Models panel</h2>
+      <div class="panel">
+        <p class="muted">
+          Which model records each stage of the voices, and which makes the music. Saved in
+          <span class="mono">audio-studio.json</span> for everyone on the project.
+        </p>
+        <p>
+          <strong>Audition</strong> · <strong>Draft</strong> · <strong>Final</strong>
+          <span class="faint">(Fish's rows, as before)</span>
+        </p>
+        <div class="new" style="padding: 8px">
+          <p>
+            <strong>ElevenLabs draft</strong><br /><span class="muted"
+              >Every line of a character with an ElevenLabs voice, while the game is written.</span
+            >
+          </p>
+          <select>
+            <option>Eleven v3 · 1 credit a character</option>
+            <option>Multilingual v2 · 1 credit a character · cues not spoken</option>
+            <option selected>Flash v2.5 · 0.5 credits a character · cues not spoken</option>
+          </select>
+          <p class="muted">Flash v2.5 speaks cues aloud, so its lines are sent without them.</p>
+          <p>
+            <strong>ElevenLabs final</strong><br /><span class="muted"
+              >Those lines again, for the game you ship.</span
+            >
+          </p>
+          <select>
+            <option>Eleven v3 · 1 credit a character</option>
+          </select>
+          <p class="muted">
+            Same as draft: every line is recorded once, with no separate final recording.
+          </p>
+        </div>
+        <p><strong>Music</strong> <span class="faint">(as before)</span></p>
+      </div>
+    </section>
+
+    <section>
+      <h2>2 · A switch that puts recorded lines out of date</h2>
+      <div class="panel new">
+        <strong>Switch ElevenLabs drafts to Flash v2.5?</strong>
+        <ul>
+          <li>ElevenLabs draft: Eleven v3 → Flash v2.5</li>
+          <li>
+            12 lines drafted with Eleven v3 become out of date: the next draft records them again,
+            about 190 credits.
+          </li>
+          <li>
+            Flash v2.5 speaks cues aloud, so lines are sent without them; they stay in the cue
+            files.
+          </li>
+          <li>Saved in audio-studio.json; nothing else in it changes.</li>
+        </ul>
+        <div class="row">
+          <button class="btn">Keep Eleven v3</button
+          ><button class="btn primary">Switch to Flash v2.5</button>
+        </div>
+      </div>
+      <p class="note">
+        A switch with nothing at stake saves at once ("Saving…"); one that fails shows "Could not
+        switch elevenlabs draft to Flash v2.5" with Keep and Try again, as Fish's rows do.
+      </p>
+    </section>
+
+    <section>
+      <h2>3 · A part's page</h2>
+      <p class="note">
+        The generate panel offers the final recording when either provider's stages differ, naming
+        both models:
+      </p>
+      <div class="panel">
+        <div class="row new">
+          <label
+            ><input type="radio" checked /> Draft
+            <span class="mono">s2.1-pro-free · Eleven v3</span></label
+          ><label
+            ><input type="radio" /> Final
+            <span class="mono">s2.1-pro-free · Multilingual v2</span></label
+          >
+        </div>
+      </div>
+      <p class="note">Editing the cue of a line whose voice's model speaks cues:</p>
+      <div class="panel">
+        <input value="[whispers]" />
+        <p class="muted new">
+          This voice’s ElevenLabs model speaks cues aloud, so the line is recorded without them.
+        </p>
+      </div>
+    </section>
+  </body>
+</html>

@@ -2,6 +2,7 @@ import { basename } from 'node:path'
 import { ProjectSchema, problemsFrom, type Problem } from '../core/project'
 import type { Stage } from '../core/models'
 import { MUSIC_MODEL_IDS, DEFAULT_MUSIC_MODEL } from '../core/musicModels'
+import { isElevenModel } from '../core/elevenSpeech'
 import { isPriced } from '../core/prices'
 import { REPLACEMENT_MODEL, RETIRED_MODEL, retiringTakes, type Take } from '../core/retirement'
 import { openProject, projectJson, projectWrites, saveProject } from './projectFile'
@@ -118,5 +119,46 @@ export function setMusicModel(
     return saveProject(projectFile, opened, 'music.model', (indent) =>
       projectJson(opened.raw, indent),
     )
+  })
+}
+
+/**
+ * Saves the ElevenLabs model one stage uses for characters with ElevenLabs voices
+ * (`narration.elevenlabs.models.<stage>` in the project file). `was` is the model the page showed
+ * (Eleven v3 when the file names none): if the file names another, someone changed it meanwhile
+ * and nothing is written. Only ElevenLabs' speech models are accepted. A file that named no
+ * ElevenLabs models gets all three written, as they were. The rest of the file stays as it was, in
+ * its own indentation and line endings.
+ */
+export function setElevenModel(
+  projectFile: string,
+  stage: Stage,
+  model: string,
+  was: string,
+): Promise<ModelsChange> {
+  return projectWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const file = basename(projectFile)
+    const path = `narration.elevenlabs.models.${stage}`
+    const refuse = (message: string): ModelsChange => ({
+      ok: false,
+      problems: [{ file, path, message }],
+    })
+    if (!isElevenModel(model)) {
+      return refuse(`${model} is not an ElevenLabs speech model the studio knows`)
+    }
+    const { elevenlabs } = opened.project.narration
+    if (elevenlabs.models[stage] !== was) {
+      return refuse('the model in the file changed since the page was read; reload the studio')
+    }
+    const narration = (opened.raw as { narration: { elevenlabs?: { models?: object } } }).narration
+    narration.elevenlabs = {
+      ...narration.elevenlabs,
+      models: { ...elevenlabs.models, ...narration.elevenlabs?.models, [stage]: model },
+    }
+    const parsed = ProjectSchema.safeParse(opened.raw)
+    if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
+    return saveProject(projectFile, opened, path, (indent) => projectJson(opened.raw, indent))
   })
 }

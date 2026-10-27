@@ -341,6 +341,32 @@ describe('review fixes', () => {
     ])
   })
 
+  it('names its stages’ models, both providers’ in a part with an ElevenLabs voice, and its final step', async () => {
+    const elevenFinal = projectJson({
+      narration: {
+        ...(projectJson().narration as object),
+        elevenlabs: { models: { final: 'eleven_multilingual_v2' } },
+      },
+    })
+    const fishOnly = await loadPart(join(tempRepo(files), 'audio-studio.json'), 'act1')
+    expect(fishOnly?.ok && fishOnly.part.stages).toEqual({
+      draft: 's2.1-pro-free',
+      final: 's2.1-pro-free',
+      finalStep: false,
+    })
+    const root = tempRepo({
+      ...files,
+      'audio-studio.json': elevenFinal,
+      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1' } } },
+    })
+    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    expect(result?.ok && result.part.stages).toEqual({
+      draft: 's2.1-pro-free · Eleven v3',
+      final: 's2.1-pro-free · Multilingual v2',
+      finalStep: true,
+    })
+  })
+
   it('reports a dialog key that could not be a file name', async () => {
     const root = tempRepo({
       ...files,

@@ -759,6 +759,56 @@ describe('a line on an ElevenLabs model that reads no cues', () => {
   })
 })
 
+describe('a final step on ElevenLabs’ side only', () => {
+  const elevenCast: Cast = {
+    speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]' } },
+    pronounce: {},
+  }
+  const withElevenFinal = {
+    ...narration,
+    elevenlabs: {
+      models: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_multilingual_v2' },
+    },
+  }
+
+  it('leaves a Fish line, whose stages are one, final when up to date', () => {
+    const lock = { n1: entryFor(lines[0]!, elevenCast) }
+    const state = planPart(input({ cast: elevenCast, lock, narration: withElevenFinal }))
+    expect(state.lines.find((l) => l.key === 'n1')).toMatchObject({ status: 'ok', final: true })
+  })
+
+  it('counts an ElevenLabs line drafted with v3 as not final yet', () => {
+    const lock = { m1: entryFor(lines[1]!, elevenCast) }
+    const state = planPart(input({ cast: elevenCast, lock, narration: withElevenFinal }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'ok', final: false })
+  })
+})
+
+describe('whether a line’s model reads its cues', () => {
+  it('is false for a line drafted on an ElevenLabs model that would speak them', () => {
+    const elevenCast: Cast = {
+      speakers: { ...cast.speakers, mira: { voice: 'eleven:abc' } },
+      pronounce: {},
+    }
+    const onV2 = {
+      ...narration,
+      elevenlabs: {
+        models: {
+          audition: 'eleven_v3',
+          draft: 'eleven_multilingual_v2',
+          final: 'eleven_multilingual_v2',
+        },
+      },
+    }
+    const state = planPart(input({ cast: elevenCast, narration: onV2 }))
+    expect(state.lines.map((l) => [l.key, l.readsCues])).toEqual([
+      ['n1', true],
+      ['m1', false],
+      ['t1', true],
+    ])
+  })
+})
+
 describe('a Fish voice’s fingerprint', () => {
   it('is what it was before ElevenLabs, so no consumer’s clip goes stale', () => {
     const inputs = clipInputs(

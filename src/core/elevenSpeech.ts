@@ -7,12 +7,23 @@ import { providerOf } from './voices'
  * Flash half of one). A table of its own, beside Fish's prices, so neither provider's models can
  * stand for the other's.
  */
-const ELEVEN_SPEECH: Record<string, { credits: number; language: boolean; cues: boolean }> = {
+const ELEVEN_SPEECH: Record<
+  string,
+  { name: string; credits: number; language: boolean; cues: boolean }
+> = {
   // Eleven v3 reads `[bracket]` tags as directions, as Fish's models do.
-  eleven_v3: { credits: 1, language: true, cues: true },
+  eleven_v3: { name: 'Eleven v3', credits: 1, language: true, cues: true },
   // ElevenLabs takes no language_code with Multilingual v2; it and Flash would speak a cue aloud.
-  eleven_multilingual_v2: { credits: 1, language: false, cues: false },
-  eleven_flash_v2_5: { credits: 0.5, language: true, cues: false },
+  eleven_multilingual_v2: { name: 'Multilingual v2', credits: 1, language: false, cues: false },
+  eleven_flash_v2_5: { name: 'Flash v2.5', credits: 0.5, language: true, cues: false },
+}
+
+/** ElevenLabs' speech models, in the order menus offer them. */
+export const ELEVEN_MODEL_IDS: readonly string[] = Object.keys(ELEVEN_SPEECH)
+
+/** An ElevenLabs speech model's name as the page writes it (`Eleven v3`); the id for one not known. */
+export function elevenModelName(model: string): string {
+  return Object.hasOwn(ELEVEN_SPEECH, model) ? ELEVEN_SPEECH[model]!.name : model
 }
 
 /** The ElevenLabs model every stage records with until the project names its own (§8.6). */
@@ -52,15 +63,27 @@ export function takesLanguage(model: string): boolean {
 }
 
 /**
- * The model a stage records a voice with: the project's for a Fish voice, ElevenLabs' for an
- * ElevenLabs one (the same for every stage, so its lines have no final step of their own yet).
+ * The model a stage records a voice with: the project's Fish model for a Fish voice, its
+ * ElevenLabs model (`narration.elevenlabs.models`) for an ElevenLabs one.
  */
 export function modelForStage(
   narration: Project['narration'],
   voice: string,
   stage: 'audition' | 'draft' | 'final',
 ): string {
-  return providerOf(voice) === 'elevenlabs' ? DEFAULT_ELEVEN_MODEL : narration.models[stage]
+  return providerOf(voice) === 'elevenlabs'
+    ? narration.elevenlabs.models[stage]
+    : narration.models[stage]
+}
+
+/**
+ * Whether the project has a final recording of its own: either provider's final model differs
+ * from its draft one. A voice whose own provider's stages are the same has no final step: its
+ * up-to-date clips are as final as they get.
+ */
+export function hasFinalStep(narration: Project['narration']): boolean {
+  const { models, elevenlabs } = narration
+  return models.final !== models.draft || elevenlabs.models.final !== elevenlabs.models.draft
 }
 
 /** Why ElevenLabs cannot speak at `speed`, or null when it can. */
@@ -78,4 +101,17 @@ const ELEVEN_AT_ONCE = 2
 /** How many requests for a voice's lines are sent at once: the project's, ElevenLabs' at most two. */
 export function requestsAtOnce(parallel: number, voice: string): number {
   return providerOf(voice) === 'elevenlabs' ? Math.min(parallel, ELEVEN_AT_ONCE) : parallel
+}
+
+/**
+ * The models a stage records a part with, as its page names them: the Fish model, and
+ * ElevenLabs' beside it when the part has an ElevenLabs voice (`s2-pro · Eleven v3`).
+ */
+export function stageWords(
+  narration: Project['narration'],
+  stage: 'draft' | 'final',
+  eleven: boolean,
+): string {
+  const fish = narration.models[stage]
+  return eleven ? `${fish} · ${elevenModelName(narration.elevenlabs.models[stage])}` : fish
 }

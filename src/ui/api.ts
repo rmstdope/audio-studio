@@ -250,6 +250,29 @@ export function useSetStageModel() {
 }
 
 /**
+ * Saves one stage's ElevenLabs model in the project file (`was` is the one the page showed), then
+ * reloads everything, as a Fish stage's save does.
+ */
+export function useSetElevenModel() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'models' },
+    mutationFn: async ({ stage, model, was }: { stage: Stage; model: string; was: string }) => {
+      const response = await fetch(`/api/models/elevenlabs/${stage}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model, was }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the model answered ${response.status}`)
+      }
+      return (await response.json()) as ModelsChange
+    },
+    onSettled: () => client.invalidateQueries(),
+  })
+}
+
+/**
  * Saves the project's music model in the project file (`was` is the one the page showed), then
  * reloads everything that shows it: the Models panel, the takes' menus and the setup checks.
  */

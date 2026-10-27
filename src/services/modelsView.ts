@@ -2,7 +2,8 @@ import { basename, dirname } from 'node:path'
 import type { Dialog, Recorded, StageModels } from '../core/models'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS, type MusicModelId } from '../core/musicModels'
 import { planPart } from '../core/planner'
-import { spokenPieces } from '../core/spoken'
+import { sentPieces, spokenPieces } from '../core/spoken'
+import { providerOf } from '../core/voices'
 import { readMusic } from './musicLists'
 import { openProject, readPart, type ProjectFailure } from './workspace'
 
@@ -12,6 +13,10 @@ export type ModelsView =
       ok: true
       file: string
       models: StageModels
+      /** ElevenLabs' stage models, for characters with ElevenLabs voices. */
+      elevenlabs: StageModels
+      /** Whether any character has an ElevenLabs voice, in any language. */
+      castsEleven: boolean
       dialog: Dialog
       recorded: Recorded
       music: MusicModels | null
@@ -43,11 +48,16 @@ export async function modelsView(
   const { project } = opened
   const dialog: Dialog = { lines: 0, bytes: 0 }
   const recorded: Recorded = {}
+  let castsEleven = false
   for (const part of project.narration.parts) {
     for (const language of project.narration.languages) {
       const read = await readPart(projectFile, part.id, language)
       if (!read?.ok || read.dialog.status !== 'ok') continue
       const { input } = read
+      castsEleven ||= Object.values(input.cast.speakers).some(
+        (character) =>
+          character.voice !== undefined && providerOf(character.voice) === 'elevenlabs',
+      )
       const state = planPart(input)
       for (const line of state.lines) {
         if (line.status === 'untranslated') continue
@@ -62,9 +72,17 @@ export async function modelsView(
         dialog.bytes += bytes
         const made = input.lock[line.key]?.model
         if (line.file && made) {
-          const got = (recorded[made] ??= { lines: 0, bytes: 0 })
+          // What the clip was sent, on the model it was made with (no cues for one that speaks them).
+          const sent = sentPieces(
+            line,
+            made,
+            input.cast.pronounce,
+            project.narration.quality.chunkLimit,
+          )
+          const got = (recorded[made] ??= { lines: 0, bytes: 0, characters: 0 })
           got.lines++
-          got.bytes += bytes
+          got.bytes += sent.reduce((sum, text) => sum + encoder.encode(text).length, 0)
+          got.characters += sent.reduce((sum, text) => sum + [...text].length, 0)
         }
       }
     }
@@ -73,6 +91,8 @@ export async function modelsView(
     ok: true,
     file: basename(projectFile),
     models: project.narration.models,
+    elevenlabs: project.narration.elevenlabs.models,
+    castsEleven,
     dialog,
     recorded,
     music: project.music

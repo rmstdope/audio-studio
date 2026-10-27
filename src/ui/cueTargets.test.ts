@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { LineState } from '../core/planner'
-import { cueTargets } from './cueTargets'
+import { cueTargets, unspokenCueNote } from './cueTargets'
 
 function line(key: string, overrides: Partial<LineState> = {}): LineState {
   return {
@@ -17,6 +17,7 @@ function line(key: string, overrides: Partial<LineState> = {}): LineState {
     insideStale: null,
     sourceInside: [],
     final: false,
+    readsCues: true,
     status: 'missing',
     reasons: [],
     heard: null,
@@ -45,5 +46,14 @@ describe('cueTargets', () => {
   it('suggests the one line without a clip, when there is just one', () => {
     expect(cueTargets([line('a', { file: 'a.mp3' }), line('c')]).suggested).toBe('c')
     expect(cueTargets([line('c'), line('d')]).suggested).toBeNull()
+  })
+})
+
+describe('unspokenCueNote', () => {
+  it('says a line on a model that reads no cues is recorded without them, and nothing otherwise', () => {
+    expect(unspokenCueNote(line('a', { readsCues: false }))).toBe(
+      'This voice’s ElevenLabs model speaks cues aloud, so the line is recorded without them.',
+    )
+    expect(unspokenCueNote(line('a'))).toBeNull()
   })
 })

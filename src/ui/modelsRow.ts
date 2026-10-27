@@ -14,7 +14,7 @@ export type RowState =
 
 /** What happens to a row. */
 export type RowAction =
-  | { type: 'pick'; to: string; change: Change }
+  | { type: 'pick'; to: string; change: Pick<Change, 'kind'> }
   | { type: 'keep' }
   | { type: 'confirm' }
   | { type: 'retry' }

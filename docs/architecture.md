@@ -84,7 +84,8 @@ retroquest/                      ← user runs `audio-studio` here
    beyond reading the dialog, the loops or the stingers again.
    Besides those paths, the studio writes the project file itself in a few places only: the project's
    own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3),
-   the models (`narration.models`, and `music.model`) from Setup's Models panel, the retirement
+   the models (`narration.models`, `narration.elevenlabs.models` and `music.model`) from Setup's
+   Models panel, the retirement
    switch of `s1`, `narration.quality.fishTier`, and `takeFade` from Setup's Playing takes panel.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
    rebinding), and takes changes (POST) only from its own page (the Origin header).
@@ -1112,7 +1113,7 @@ one makes its lines stale for the voice, as any recast does; since a model is va
 only, the fingerprint needs no provider of its own.
 
 - **Settings.** ElevenLabs' voice settings, `narration.elevenlabs.tts` (`stability`,
-  `similarityBoost`, `style`; defaults 0.5, 0.75, 0), stand in for temperature and top-p in an
+  `similarityBoost`, `style`; defaults 0.5, 0.75, 0; fixed at the defaults until 14.9.2), stand in for temperature and top-p in an
   ElevenLabs line's fingerprint and take key. The speed in use (the character's, else the project's
   `narration.tts.speed`) is sent as `speed`; ElevenLabs takes 0.7–1.2, so a character with an
   ElevenLabs voice whose speed in use lies outside it has each of its lines refused when recorded,
@@ -1628,11 +1629,22 @@ Small, independently useful increments:
        for models that would speak them, so that choosing such a model (next) never reads a cue
        aloud; the page still shows them. Nothing changes on screen yet: no such model can be
        chosen.
-    9. **Choose ElevenLabs' models and settings**: `narration.elevenlabs` saved from the Models
-       panel's ElevenLabs rows (only models in ElevenLabs' table, so `readsCues` knows each), and
-       the cue editor saying a model reads no cues; a line recorded with cues and now on such a
-       model is stale for its model and its cue, which the page words; the consumer rules in
-       CLAUDE.md name the new saved keys.
+    9. **Choose ElevenLabs' models and settings**, in two pull requests:
+       1. **ElevenLabs' models** (built): `narration.elevenlabs.models` (`audition`, `draft`,
+          `final`; Eleven v3 unless named; only ElevenLabs' speech models, so `readsCues` knows
+          each) in the project file, each ElevenLabs voice's stage model taken from it; the Models
+          panel's ElevenLabs draft and final rows (shown in a project with an ElevenLabs voice: a
+          menu of the models with their credits a character and whether they speak cues, saved at
+          once or after a question naming the lines going out of date and the credits to record
+          them again, as Fish's rows do); a final step when either provider's stages differ
+          (`hasFinalStep`), the part's generate panel naming both providers' models; the credits
+          budget on the stage's ElevenLabs model; the cue editor saying a line's model speaks
+          cues, so none are sent. A line recorded with cues and now on such a model is stale for
+          its model and its cue. The audition row comes with 14.10, which first uses it. The
+          consumer rules in CLAUDE.md name the new saved keys.
+       2. **ElevenLabs' voice settings**: `narration.elevenlabs.tts` (stability, similarity,
+          style) in the project file and saved from the Models panel, in place of the fixed
+          defaults.
     10. **Page takes, tries and auditions with an ElevenLabs voice**, budgeted in characters; a try
         on a model that reads no cues says so rather than sending the line's cues or dropping
         them unseen (its cues from `cueInputs`).

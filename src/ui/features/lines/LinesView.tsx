@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { unspokenCueNote } from '../../cueTargets'
 import { payWords } from '../../agreed'
 import type { LineState, LineStatus } from '../../../core/planner'
 import type { PartSummary, ProjectSummary } from '../../../core/summary'
@@ -396,7 +397,7 @@ export function LinesView({
         partId={loaded.id}
         language={several ? active : null}
         speaker={speaker || null}
-        models={{ draft: loaded.draftModel, final: loaded.finalModel }}
+        models={loaded.stages}
       />
 
       {filter === 'orphans' ? (
@@ -908,6 +909,7 @@ function CueCell({
           {hear.isPending ? 'Recording…' : playing === tryId ? 'Stop' : 'Hear it'}
         </button>
       </div>
+      {unspokenCueNote(line) && <span className="muted">{unspokenCueNote(line)}</span>}
       {heard && playing === tryId && <span className="muted cue-tried mono">{heard.spoken}</span>}
       {problems.length > 0 && <Problems title="The cue could not be saved" problems={problems} />}
       {save.isError && <span className="adopt-error">{save.error.message}</span>}

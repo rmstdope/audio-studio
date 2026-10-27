@@ -1,4 +1,4 @@
-import { modelForStage } from './elevenSpeech'
+import { hasFinalStep, modelForStage, readsCues } from './elevenSpeech'
 import {
   clipInputs,
   cueInputs,
@@ -82,6 +82,8 @@ export interface LineState {
   sourceCue: string | null
   /** Whether the clip was made with the final model (when it differs from the draft one). */
   final: boolean
+  /** Whether the line's draft model reads its cues as directions; one that would speak them is sent none. */
+  readsCues: boolean
   status: LineStatus
   reasons: StaleReason[]
   heard: number | null
@@ -192,6 +194,7 @@ export function planPart(input: PlanInput): PartState {
         insideStale: null,
         sourceInside: [],
         final: false,
+        readsCues: true,
         status: 'untranslated',
         reasons: [],
         heard: null,
@@ -214,10 +217,10 @@ export function planPart(input: PlanInput): PartState {
       finalModel !== draft
         ? clipInputs(line, character, cues, cast.pronounce, narration, finalModel)
         : null
-    // A voice whose provider has no final step of its own (ElevenLabs', for now), while the
-    // project's Fish stages differ: an up-to-date clip is as final as it gets, so a final
+    // A voice whose own provider's stages are one, while the project has a final step (the
+    // other provider's stages differ): an up-to-date clip is as final as it gets, so a final
     // recording leaves it alone.
-    const noFinalStep = finalModel === draft && narration.models.final !== narration.models.draft
+    const noFinalStep = finalModel === draft && hasFinalStep(narration)
     const final = Boolean(
       entry &&
       file &&
@@ -252,6 +255,7 @@ export function planPart(input: PlanInput): PartState {
       english,
       // What the line is delivered with, shown whatever model speaks it (one may be sent none).
       ...cueInputs(line, character ?? {}, cues, narration),
+      readsCues: readsCues(draft),
       insideStale: parseCued(cueFor(own, line.key) ?? '', line.text).stale,
       sourceInside: Object.hasOwn(input.sourceInside ?? {}, line.key)
         ? input.sourceInside![line.key]!

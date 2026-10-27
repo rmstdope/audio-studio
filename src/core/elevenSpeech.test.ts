@@ -9,6 +9,8 @@ import {
   elevenCredits,
   isElevenModel,
   takesLanguage,
+  hasFinalStep,
+  stageWords,
   modelForStage,
   speedProblem,
 } from './elevenSpeech'
@@ -75,5 +77,53 @@ describe('readsCues', () => {
     expect(readsCues('eleven_v3')).toBe(true)
     expect(readsCues('eleven_multilingual_v2')).toBe(false)
     expect(readsCues('eleven_flash_v2_5')).toBe(false)
+  })
+})
+
+describe('ElevenLabs’ stages, from the project file', () => {
+  const withEleven = (models: Record<string, string>) =>
+    ProjectSchema.parse(
+      projectJson({
+        narration: { ...(projectJson().narration as object), elevenlabs: { models } },
+      }),
+    ).narration
+
+  it('take each stage’s ElevenLabs model from narration.elevenlabs.models, Eleven v3 when unnamed', () => {
+    const named = withEleven({ draft: 'eleven_flash_v2_5', final: 'eleven_multilingual_v2' })
+    expect(modelForStage(named, 'eleven:abc', 'draft')).toBe('eleven_flash_v2_5')
+    expect(modelForStage(named, 'eleven:abc', 'final')).toBe('eleven_multilingual_v2')
+    expect(modelForStage(named, 'eleven:abc', 'audition')).toBe('eleven_v3')
+    expect(narration.elevenlabs.models).toEqual({
+      audition: 'eleven_v3',
+      draft: 'eleven_v3',
+      final: 'eleven_v3',
+    })
+  })
+
+  it('refuses a model that is not one of ElevenLabs’ speech models', () => {
+    const parsed = ProjectSchema.safeParse(
+      projectJson({
+        narration: {
+          ...(projectJson().narration as object),
+          elevenlabs: { models: { draft: 's2-pro' } },
+        },
+      }),
+    )
+    expect(parsed.success).toBe(false)
+  })
+
+  it('make a final step when either provider’s draft and final differ', () => {
+    expect(hasFinalStep(narration)).toBe(false)
+    expect(hasFinalStep(withEleven({ final: 'eleven_multilingual_v2' }))).toBe(true)
+    expect(hasFinalStep({ ...narration, models: { ...narration.models, final: 's2-pro' } })).toBe(
+      true,
+    )
+  })
+})
+
+describe('stageWords', () => {
+  it('names a stage’s Fish model, and ElevenLabs’ beside it in a part with an ElevenLabs voice', () => {
+    expect(stageWords(narration, 'draft', false)).toBe('s2.1-pro-free')
+    expect(stageWords(narration, 'final', true)).toBe('s2.1-pro-free · Eleven v3')
   })
 })
