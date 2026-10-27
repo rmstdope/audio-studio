@@ -213,7 +213,17 @@ export function planPart(input: PlanInput): PartState {
       finalModel !== draft
         ? clipInputs(line, character, cues, cast.pronounce, narration, finalModel)
         : null
-    const final = Boolean(entry && file && finalInputs && fingerprintMatches(entry, finalInputs))
+    // A voice whose provider has no final step of its own (ElevenLabs', for now), while the
+    // project's Fish stages differ: an up-to-date clip is as final as it gets, so a final
+    // recording leaves it alone.
+    const noFinalStep = finalModel === draft && narration.models.final !== narration.models.draft
+    const final = Boolean(
+      entry &&
+      file &&
+      (finalInputs
+        ? fingerprintMatches(entry, finalInputs)
+        : noFinalStep && inputs && fingerprintMatches(entry, inputs)),
+    )
     let status: LineStatus
     let reasons: StaleReason[] = []
     if (!inputs) status = 'uncast'

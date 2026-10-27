@@ -42,7 +42,7 @@ import { inPartTurn } from './partFiles'
 import { readPart, type Ears, type ProjectFailure } from './workspace'
 import { NO_KEY } from './fish'
 import type { ElevenLabsClient } from './elevenlabs'
-import { ELEVEN_TTS, modelForStage, speedProblem } from '../core/elevenSpeech'
+import { ELEVEN_TTS, modelForStage, speedProblem, takesLanguage } from '../core/elevenSpeech'
 import { providerId, providerOf } from '../core/voices'
 
 /** Seconds of silence between the pieces of a long line (as in RetroQuest's narrate.py). */
@@ -161,7 +161,7 @@ export async function speakerFor({
           voice: providerId(inputs.voice),
           model: inputs.model,
           settings,
-          language,
+          ...(takesLanguage(inputs.model) && { language }),
         }),
     }
   }
@@ -426,7 +426,7 @@ export async function speakLine({
         inputs.inside,
       )
       for (const text of texts) {
-        // Charged before it is sent: nothing beyond what was confirmed reaches Fish.
+        // Charged before it is sent: nothing beyond what was confirmed reaches the provider.
         const refused = budget.spend(inputs.model, text, new Date())
         if (refused) throw new SpendRefused(refused)
         spoken.push(await speak(text))
@@ -440,7 +440,8 @@ export async function speakLine({
   try {
     return { ok: true, clip: joinWavs(pieces, GAP_SECONDS) }
   } catch (error) {
-    const message = `Fish sent audio that could not be joined: ${messageOf(error)}`
+    const provider = providerOf(inputs.voice) === 'elevenlabs' ? 'ElevenLabs' : 'Fish'
+    const message = `${provider} sent audio that could not be joined: ${messageOf(error)}`
     return { ok: false, reason: 'audio', message }
   }
 }

@@ -6,6 +6,7 @@ import {
   ELEVEN_TTS,
   elevenCredits,
   isElevenModel,
+  takesLanguage,
   modelForStage,
   speedProblem,
 } from './elevenSpeech'
@@ -47,5 +48,13 @@ describe('the speed ElevenLabs takes', () => {
     expect(speedProblem(1.5)).toBe(
       'ElevenLabs speaks at 0.7 to 1.2 times its pace, and this voice is set to 1.5; change its speed to record it.',
     )
+  })
+})
+
+describe('the language sent', () => {
+  it('goes with v3 and Flash, but not with Multilingual v2, which does not take one', () => {
+    expect(takesLanguage('eleven_v3')).toBe(true)
+    expect(takesLanguage('eleven_flash_v2_5')).toBe(true)
+    expect(takesLanguage('eleven_multilingual_v2')).toBe(false)
   })
 })

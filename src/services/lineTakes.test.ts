@@ -8,6 +8,7 @@ import { ProjectSchema } from '../core/project'
 import { createBudget, type Budget } from '../core/spend'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
+import type { ElevenLabsClient } from './elevenlabs'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
 import { dropLineTake, lineTakeFile, listLineTakes, takeLine, useLineTake } from './lineTakes'
@@ -381,5 +382,37 @@ describe('takes of a line in a language besides the source', () => {
       ok: true,
       takes: [],
     })
+  })
+})
+
+describe('takeLine, with an ElevenLabs voice', () => {
+  const elevenFiles = {
+    ...files,
+    'tts/cast.json': { speakers: { narrator: { voice: 'eleven:abc', speed: 1.5 } }, pronounce: {} },
+  }
+  it('is spoken by ElevenLabs, refused without its key or at a speed it does not take', async () => {
+    const asked: string[] = []
+    const eleven: ElevenLabsClient = {
+      subscription: () => Promise.reject(new Error('not used')),
+      music: () => Promise.reject(new Error('not used')),
+      async tts(request) {
+        asked.push(request.voice)
+        return silence(1)
+      },
+    }
+    const run = (root: string, client: ElevenLabsClient | null) =>
+      takeLine(projectFileOf(root), 'act1', 'k1', async () => fakeFish().fish, {
+        limiter: createLimiter(),
+        budget: createBudget({ model: 'eleven_v3', dollars: 100 }),
+        elevenlabs: async () => client,
+      })
+    expect(await run(tempRepo(elevenFiles), eleven)).toMatchObject({ ok: false, reason: 'speed' })
+    const calm = tempRepo({
+      ...elevenFiles,
+      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:abc' } }, pronounce: {} },
+    })
+    expect(await run(calm, null)).toMatchObject({ ok: false, reason: 'no-key' })
+    expect(await run(calm, eleven)).toMatchObject({ ok: true })
+    expect(asked).toEqual(['abc'])
   })
 })

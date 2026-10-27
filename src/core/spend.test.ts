@@ -150,3 +150,23 @@ describe('a budget for an ElevenLabs model', () => {
     expect(flash.left).toBe(0)
   })
 })
+
+describe('what a budget is counted in', () => {
+  const at = new Date('2026-10-27T12:00:00Z')
+  it('is dollars for a Fish model and credits for an ElevenLabs one', () => {
+    expect(createBudget({ model: 's2-pro', dollars: 1 }).unit).toBe('usd')
+    expect(createBudget({ model: 'eleven_v3', dollars: 1 }).unit).toBe('credits')
+  })
+  it('says one credit, and a part of one, as a person would', () => {
+    expect(createBudget({ model: 'eleven_v3', dollars: 1 }).spend('eleven_v3', 'ab', at)).toBe(
+      'this would go past the confirmed budget (1 credit left); plan again',
+    )
+    expect(
+      createBudget({ model: 'eleven_flash_v2_5', dollars: 2.5 }).spend(
+        'eleven_flash_v2_5',
+        'abcdef',
+        at,
+      ),
+    ).toBe('this would go past the confirmed budget (2.5 credits left); plan again')
+  })
+})

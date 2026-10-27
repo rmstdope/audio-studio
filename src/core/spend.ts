@@ -12,6 +12,12 @@ export type SpendProblem =
 /** Below this, a difference in dollars is rounding, not money (sums of per-piece prices). */
 const ROUNDING = 1e-9
 
+/** An amount of ElevenLabs credits, as messages write it: "1 credit", "2.5 credits". */
+function creditWords(amount: number): string {
+  const shown = Math.floor(amount * 10) / 10
+  return `${shown} ${shown === 1 ? 'credit' : 'credits'}`
+}
+
 /** An amount in dollars, as messages and the page write it. */
 export function usd(amount: number): string {
   return `$${amount.toFixed(2)}`
@@ -62,6 +68,11 @@ export function spendProblem({
  */
 export interface Budget {
   readonly model: string
+  /**
+   * What its amounts are counted in: US dollars for a Fish model, ElevenLabs credits for an
+   * ElevenLabs one. `dollars`, `left` and `spent` are in it.
+   */
+  readonly unit: 'usd' | 'credits'
   /** The dollars it was given. */
   readonly dollars: number
   /** Dollars left to spend. */
@@ -87,8 +98,10 @@ export interface Budget {
 export function createBudget({ model, dollars }: { model: string; dollars: number }): Budget {
   let left = dollars
   let given = dollars
+  const unit = isElevenModel(model) ? 'credits' : 'usd'
   return {
     model,
+    unit,
     get dollars() {
       return given
     },
@@ -103,15 +116,17 @@ export function createBudget({ model, dollars }: { model: string; dollars: numbe
       if (asked !== model) {
         return `the project now names ${asked}, but ${model} was confirmed; plan again`
       }
-      const eleven = isElevenModel(asked)
-      const price = eleven ? 0 : priceOf(asked, at)
-      if (price === undefined) return `the price of ${asked} is unknown`
-      const cost = eleven
-        ? elevenCredits(asked, text)
-        : (utf8.encode(text).length / 1_000_000) * price
+      const price = unit === 'credits' ? undefined : priceOf(asked, at)
+      const cost =
+        unit === 'credits'
+          ? elevenCredits(asked, text)
+          : price === undefined
+            ? undefined
+            : (utf8.encode(text).length / 1_000_000) * price
+      if (cost === undefined) return `the price of ${asked} is unknown`
       if (cost > left + ROUNDING) {
         const rest = Math.max(left, 0)
-        const shown = eleven ? `${Math.floor(rest)} credits` : usd(rest)
+        const shown = unit === 'credits' ? creditWords(rest) : usd(rest)
         return `this would go past the confirmed budget (${shown} left); plan again`
       }
       left -= cost

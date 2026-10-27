@@ -433,13 +433,19 @@ everything that changes the audio:
 
 ```
 fp = sha256(json([
-  model,                      // the draft stage's model
+  model,                      // the draft stage's model of the voice's provider (§8.6)
   voiceId,
   cue,                        // the line's cue, else the character's style
   said,                       // the line with pronunciations applied and checklist bullets read as a list
   settings                    // temperature, topP, speed (the character's own if set), chunkLimit, codec, bitrate, channels
 ]))[:16]
 ```
+
+For an ElevenLabs voice the settings begin with its voice settings in place of temperature and
+top-p: stability, similarity, style, then the speed and the rest. A Fish voice's fingerprint is
+what it always was (a test pins one), so no clip goes stale for ElevenLabs' coming. While the
+project's Fish stages differ, an up-to-date clip of a voice whose provider has no final step of
+its own (ElevenLabs', until 14.9) counts as final, so a final recording leaves it alone.
 
 A clip made with `s1` counts as made with `s2.1-pro` (Fish serves and bills them as one):
 `fingerprintMatches` also accepts the fingerprint computed with `s1` when the project names

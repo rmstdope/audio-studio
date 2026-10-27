@@ -7,10 +7,11 @@ import { providerOf } from './voices'
  * Flash half of one). A table of its own, beside Fish's prices, so neither provider's models can
  * stand for the other's.
  */
-const ELEVEN_SPEECH: Record<string, { credits: number }> = {
-  eleven_v3: { credits: 1 },
-  eleven_multilingual_v2: { credits: 1 },
-  eleven_flash_v2_5: { credits: 0.5 },
+const ELEVEN_SPEECH: Record<string, { credits: number; language: boolean }> = {
+  eleven_v3: { credits: 1, language: true },
+  // ElevenLabs takes no language_code with Multilingual v2.
+  eleven_multilingual_v2: { credits: 1, language: false },
+  eleven_flash_v2_5: { credits: 0.5, language: true },
 }
 
 /** The ElevenLabs model every stage records with until the project names its own (§8.6). */
@@ -27,11 +28,18 @@ export function isElevenModel(model: string): boolean {
   return Object.hasOwn(ELEVEN_SPEECH, model)
 }
 
-/** The credits speaking `text` with an ElevenLabs model takes: a character is what a person reads as one. */
-export function elevenCredits(model: string, text: string): number {
+/**
+ * The credits speaking `text` with an ElevenLabs model takes (a character is what a person reads
+ * as one), or undefined for a model that is not one of ElevenLabs'.
+ */
+export function elevenCredits(model: string, text: string): number | undefined {
   const entry = Object.hasOwn(ELEVEN_SPEECH, model) ? ELEVEN_SPEECH[model] : undefined
-  if (!entry) throw new Error(`${model} is not an ElevenLabs speech model`)
-  return [...text].length * entry.credits
+  return entry && [...text].length * entry.credits
+}
+
+/** Whether an ElevenLabs model is told the language it speaks. */
+export function takesLanguage(model: string): boolean {
+  return Object.hasOwn(ELEVEN_SPEECH, model) && ELEVEN_SPEECH[model]!.language
 }
 
 /**
