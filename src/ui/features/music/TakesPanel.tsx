@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { changedLine } from '../../../core/musicChoose'
 import { trackFor, type MusicListSummary, type TrackRow } from '../../../core/music'
 import {
@@ -9,14 +9,21 @@ import {
   movedLineParts,
   nowhereLine,
 } from '../../../core/musicMove'
-import type { MakingView, MusicTakesView, TakeView } from '../../../core/musicTake'
+import {
+  MAX_TAKES_AT_ONCE,
+  type MakingView,
+  type MusicTakesView,
+  type TakeView,
+} from '../../../core/musicTake'
 import {
   MUSIC_GROUPS,
   canMake as canMakeTrack,
   eachWords,
+  makeTakesWords,
   menuEntry,
   missingOnTrack,
   shortMenuLabel,
+  takeCountEntry,
   takesButton,
   tooLongOnTrack,
   type MusicModelId,
@@ -39,8 +46,28 @@ import { InTheGame, Wave } from './InTheGame'
 import { MoveTakeDialog } from './MoveTakeDialog'
 
 /**
+ * The handlers that tell whether a menu's list is probably open, for a menu whose closed text is
+ * shorter than its entries: a click or a key that opens it, and Escape or leaving that closes it.
+ */
+function openTracking(setOpen: (open: boolean) => void) {
+  return {
+    onMouseDown: () => setOpen(true),
+    onKeyDown: (event: KeyboardEvent<HTMLSelectElement>) => {
+      if (event.key === 'Escape') setOpen(false)
+      else if (
+        [' ', 'Enter', 'F4', 'ArrowUp', 'ArrowDown'].includes(event.key) &&
+        // Alt+Arrow opens the list everywhere; a bare arrow does on macOS.
+        (event.key.startsWith('Arrow') || !event.altKey)
+      )
+        setOpen(true)
+    },
+    onBlur: () => setOpen(false),
+  }
+}
+
+/**
  * A track's Takes panel: the takes made, played from the start and, for a loop, around their
- * seam; the ones being made; and "Make 2 takes" when there are none yet. A take that failed says
+ * seam; the ones being made; and "Make 2 takes" (the count is the menu's: 1 to 6) when there are none yet. A take that failed says
  * why, with Try again; when no music can be made, it says why and links Setup.
  */
 export function TakesPanel({
@@ -76,8 +103,11 @@ export function TakesPanel({
   }, [moving])
   // The pick holds while the page stays open; until there is one, the project's model.
   const [picked, setPicked] = useState<MusicModelId | null>(null)
+  // How many takes the next press makes: back to 2 whenever one is started, never kept.
+  const [count, setCount] = useState(2)
   // Whether the model menu's list is probably open: then every entry reads in full.
   const [listOpen, setListOpen] = useState(false)
+  const [countOpen, setCountOpen] = useState(false)
   if (!view)
     return (
       <section className="panel">
@@ -114,17 +144,7 @@ export function TakesPanel({
         setPicked(event.target.value as MusicModelId)
         setListOpen(false)
       }}
-      onMouseDown={() => setListOpen(true)}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') setListOpen(false)
-        else if (
-          [' ', 'Enter', 'F4', 'ArrowUp', 'ArrowDown'].includes(event.key) &&
-          // Alt+Arrow opens the list everywhere; a bare arrow does on macOS.
-          (event.key.startsWith('Arrow') || !event.altKey)
-        )
-          setListOpen(true)
-      }}
-      onBlur={() => setListOpen(false)}
+      {...openTracking(setListOpen)}
     >
       {MUSIC_GROUPS.map((group) => (
         <optgroup key={group.heading} label={group.heading}>
@@ -148,6 +168,36 @@ export function TakesPanel({
       ))}
     </select>
   )
+  const counts = Array.from({ length: MAX_TAKES_AT_ONCE }, (_, i) => i + 1)
+  const countMenu: ReactNode = (
+    <select
+      className="takes-count"
+      aria-label="Number of new takes"
+      value={count}
+      disabled={view.making.length > 0}
+      onChange={(event) => {
+        setCount(Number(event.target.value))
+        setCountOpen(false)
+      }}
+      {...openTracking(setCountOpen)}
+    >
+      {counts.map((n) => (
+        // The closed menu shows only the count; the open list shows each entry in full.
+        <option
+          key={n}
+          value={n}
+          label={n === count && !countOpen ? `${n} ${n === 1 ? 'take' : 'takes'}` : undefined}
+        >
+          {takeCountEntry(n, model, length)}
+        </option>
+      ))}
+    </select>
+  )
+  /** Starts the batch the menus say, and sets the count back to 2. */
+  const makeBatch = () => {
+    make.mutate({ count, model })
+    setCount(2)
+  }
   const result = make.data
   const movingTake = view.takes.find((take) => take.n === moving)
   const nowhere = hasNowhere(moveTargets(lists, { id: trackId, kind: view.kind }).groups)
@@ -189,8 +239,8 @@ export function TakesPanel({
         <div className="warnbox" role="status">
           <strong>{changedLine(track.changed)}</strong>
           <span className="muted small">
-            The game plays the chosen take until you choose another. Make takes from the new brief
-            with More takes.
+            The game plays the chosen take until you choose another. Make more takes to hear the new
+            brief.
           </span>
         </div>
       )}
@@ -216,13 +266,14 @@ export function TakesPanel({
                 </button>
               )}
               {menu}
+              {countMenu}
               <button
                 type="button"
                 className="btn btn-primary"
                 disabled={!canMake || make.isPending || view.making.length > 0}
-                onClick={() => make.mutate({ count: 2, model })}
+                onClick={makeBatch}
               >
-                {takesButton('More takes', model, length, 2)}
+                {takesButton(makeTakesWords(count, true), model, length, count)}
               </button>
             </div>
           )}
@@ -280,13 +331,14 @@ export function TakesPanel({
             </span>
             <div className="takes-make">
               {menu}
+              {countMenu}
               <button
                 type="button"
                 className="btn btn-primary"
                 disabled={!canMake || make.isPending}
-                onClick={() => make.mutate({ count: 2, model })}
+                onClick={makeBatch}
               >
-                {takesButton('Make 2 takes', model, length, 2)}
+                {takesButton(makeTakesWords(count, false), model, length, count)}
               </button>
             </div>
             {missing}
