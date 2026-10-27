@@ -162,7 +162,11 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
               </optgroup>
             ))}
           </select>
-          <span className="free">{onThisComputer(shown) ? 'Free' : 'Paid'}</span>
+          {onThisComputer(shown) ? (
+            <span className="free">Free</span>
+          ) : (
+            <span className="price">Paid</span>
+          )}
           {!here && <span className="warnline">{lacking(shown)}</span>}
           {pending && <span className="muted">Saving…</span>}
         </div>

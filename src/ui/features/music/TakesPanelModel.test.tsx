@@ -418,3 +418,28 @@ describe('the closed model menu’s short label', () => {
     expect(labels(menu)[0]).toBe('Balanced — about 3 min a take')
   })
 })
+
+describe('the banner when no music can be made', () => {
+  it('says why, in the generator’s own words, and sends to Setup', () => {
+    const page = render(
+      view({
+        generator: { ok: false, message: 'There is no ElevenLabs key.' },
+        models: everyModel([
+          'balanced',
+          'quick',
+          'quickest',
+          'careful',
+          'short',
+          'shortest',
+          'eleven',
+        ]),
+      }),
+    )
+    const banner = page.container.querySelector('.errbox')!
+    expect(banner.querySelector('strong')!.textContent).toBe("Music can't be made yet.")
+    expect(banner.querySelector('.muted')!.textContent).toBe(
+      'There is no ElevenLabs key. Setup says what is missing.',
+    )
+    expect(banner.querySelector('a')!.textContent).toBe('Open Setup')
+  })
+})

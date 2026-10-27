@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { writeWav } from '../core/wav'
+import { readdirSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { readWav, writeWav } from '../core/wav'
+import { wavSeconds } from '../core/musicTake'
+import { tempRepo } from '../../test/helpers'
+import { ffmpegEncoder } from './audio'
 import type { ElevenLabsClient, MusicPieceRequest } from './elevenlabs'
 import { createElevenMusic } from './elevenMusic'
 
@@ -79,5 +85,27 @@ describe('createElevenMusic', () => {
   it('refuses a take without a key, saying so', async () => {
     const music = createElevenMusic({ apiKey: async () => null })
     await expect(music.generate(request)).rejects.toThrow('There is no ElevenLabs key.')
+  })
+})
+
+describe.skipIf(Bun.which('ffmpeg') === null)('createElevenMusic, decoding with ffmpeg', () => {
+  it('turns ElevenLabs’ MP3 into 16-bit WAV of its length, leaving no temporary file', async () => {
+    const second = writeWav({
+      format: { channels: 2, sampleRate: 44100, bitsPerSample: 16 },
+      data: new Uint8Array(44100 * 4),
+    })
+    const mp3File = join(tempRepo({}), 'piece.mp3')
+    await ffmpegEncoder(second, mp3File, { bitrate: '128k', channels: 2 })
+    const mp3 = new Uint8Array(readFileSync(mp3File))
+    const leftover = () => readdirSync(tmpdir()).filter((f) => f.startsWith('audio-studio-eleven-'))
+    const before = leftover()
+    const take = await createElevenMusic({
+      apiKey: async () => 'k',
+      client: () => ({ ...fakeClient().client, music: async () => mp3 }),
+    }).generate(request)
+    const { format } = readWav(take.wav)
+    expect(format.bitsPerSample).toBe(16)
+    expect(wavSeconds(readWav(take.wav))).toBeCloseTo(1, 1)
+    expect(leftover()).toEqual(before)
   })
 })

@@ -104,7 +104,8 @@ describe('the Music row of the Models panel', () => {
     expect(text).toContain(
       "Loops and stingers, made by ElevenLabs in the cloud. A track's takes can use another.",
     )
-    expect(page.menu()!.parentElement!.querySelector('.free')!.textContent).toBe('Paid')
+    expect(page.menu()!.parentElement!.querySelector('.price')!.textContent).toBe('Paid')
+    expect(page.menu()!.parentElement!.querySelector('.free')).toBeNull()
     expect(page.container.querySelector('.warnline')).toBeNull()
     const keyless = render(
       answer({ model: 'eleven', installed: { ...installed, eleven: false }, loops: [90] }),

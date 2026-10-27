@@ -1022,8 +1022,8 @@ to 27 s · this one is 1:30", which wins over "not on this computer"), the track
 picked model, Setup's included, cannot make it and More takes is disabled until another is picked, and
 `make` refuses it too. Setup's menu greys nothing and, while a Stable Audio model is the default,
 says how many of the project's loops (`modelsView`'s `loops`) are longer. The menus are two groups,
-"ACE-Step · any length" and "Stable Audio · short music only", and later
-"ElevenLabs · in the cloud, paid" (§8.6). A second worker
+"ACE-Step · any length", "Stable Audio · short music only" and "ElevenLabs · in the cloud,
+paid" (§8.6). A second worker
 (`worker/stable_audio.py`, `services/stableAudio.ts`, stable-audio-tools through uv, offline: no
 token is read) loads a model from its own folder in `~/.cache/stable-audio` (fixed, one named folder
 per model, downloaded by the user after accepting Stability AI's Community Licence); `createMusicRouter`

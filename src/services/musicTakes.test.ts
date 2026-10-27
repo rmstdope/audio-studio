@@ -510,6 +510,42 @@ describe('createMusicTakes', () => {
     expect(view).toMatchObject({ takes: [{ model: 'Balanced · XL turbo · 4B' }] })
   })
 
+  describe('whether music can be made, as the page says', () => {
+    /** Takes for a project whose model is Eleven Music, every model installed as `installed` says. */
+    function elevenProject(installed: (model: string) => boolean, localReady: MusicReady) {
+      const root = tempRepo({
+        'audio-studio.json': projectJson({ music: { ...music, model: 'eleven' } }),
+        'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
+        'tts/stingers.json': [],
+      })
+      const generator: MusicGenerator = {
+        ...fakeGenerator().generator,
+        installed,
+        ready: (model) =>
+          model === 'eleven'
+            ? installed('eleven')
+              ? { ok: true }
+              : { ok: false, message: 'There is no ElevenLabs key.', fix: '' }
+            : localReady,
+      }
+      const takes = createMusicTakes({ generator, queue: createSerial(), newSeed: () => 1 })
+      return { file: join(root, 'audio-studio.json'), takes }
+    }
+    const noUv: MusicReady = { ok: false, message: 'uv is not on the PATH.', fix: '' }
+
+    it('is the project’s model’s answer when it can be used, not the first local one’s', async () => {
+      const { file, takes } = elevenProject(() => true, noUv)
+      expect(await takes.view(file, 'hall')).toMatchObject({ generator: { ok: true } })
+    })
+
+    it('says the key is missing when nothing can be used and the project’s model is Eleven Music', async () => {
+      const { file, takes } = elevenProject(() => false, noUv)
+      expect(await takes.view(file, 'hall')).toMatchObject({
+        generator: { ok: false, message: 'There is no ElevenLabs key.' },
+      })
+    })
+  })
+
   it('refuses Eleven Music without a key, saying so', async () => {
     const { file, takes } = setup(undefined, {}, [], undefined, ['eleven'])
     expect(await takes.make(file, 'hall', { count: 1, model: 'eleven' })).toEqual({

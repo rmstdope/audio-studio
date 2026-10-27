@@ -33,15 +33,15 @@ import { readWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
 import { gpuQueue, GPU } from './gpu'
-
-/** The queue's key for takes made in the cloud: one at a time, beside the GPU's. */
-const CLOUD = 'music-cloud'
 import type { MusicGenerator } from './music'
 import { commitChoice, readChosen, uncommitChoice, type CommitResult } from './musicClips'
 import { readMusic } from './musicLists'
 import { isRefreshing, isRefreshingShared } from './refresh'
 import { createSerial, type Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
+
+/** The queue's key for takes made in the cloud: one at a time, beside the GPU's. */
+const CLOUD = 'music-cloud'
 
 /** Where a project's music takes are cached, one folder per track. */
 export const MUSIC_TAKES_DIR = '.audio-studio/music-takes'
@@ -377,9 +377,11 @@ export function createMusicTakes({
       const models = await Promise.all(
         MUSIC_MODELS.map(async ({ id }) => ({ id, installed: await generator.installed(id) })),
       )
-      // Not installed at all when no model is here: the first one that is says the rest (the
-      // machine and uv); with none, the project's model says what to download.
-      const here = models.find((m) => m.installed)
+      // The project's model says whether music can be made when it can be used; else the first
+      // model that is here says the rest (the machine and uv); with none, the project's model says
+      // what is missing (its download, or for Eleven Music its key).
+      const here =
+        models.find((m) => m.id === found.model && m.installed) ?? models.find((m) => m.installed)
       return {
         ok: true,
         kind: inputs.kind,
