@@ -4,6 +4,7 @@ import {
   isAbout,
   takeAnswerState,
   takeToRecord,
+  triedNote,
   withAuditionTakes,
   withTake,
   withVoiceTake,
@@ -148,5 +149,20 @@ describe('takeAnswerState', () => {
       refusal: null,
     })
     expect(takeAnswerState({ ok: false, problems: [] })).toEqual({ toConfirm: null, refusal: null })
+  })
+})
+
+describe('triedNote', () => {
+  it('says what an ElevenLabs try cost, and when its cues were left out; nothing for Fish', () => {
+    expect(triedNote({})).toBeNull()
+    expect(triedNote({ model: 'eleven_v3', credits: 21, cuesLeftOut: false })).toBe(
+      'Said with Eleven v3: 21 credits.',
+    )
+    expect(triedNote({ model: 'eleven_v3', cuesLeftOut: false })).toBe(
+      'Said with Eleven v3, already kept: no credits.',
+    )
+    expect(triedNote({ model: 'eleven_flash_v2_5', credits: 7.5, cuesLeftOut: true })).toBe(
+      'Said with Flash v2.5: 8 credits. Flash v2.5 speaks cues aloud, so it was said without them.',
+    )
   })
 })

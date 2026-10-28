@@ -9,6 +9,7 @@ import {
   type Outcome,
   type Recording,
   type Running,
+  type TrySpend,
 } from '../core/spending'
 import { readResource, writeAtomic } from './files'
 import { createSerial } from './serial'
@@ -17,19 +18,27 @@ import { createSerial } from './serial'
 export const SPENDING_FILE = '.audio-studio/spending.json'
 
 /** What the record holds (a version 1 record has no music takes), or what is wrong with the file. */
-export type SpendingRead =
-  { ok: true; recordings: Recording[]; music: MusicSpend[] } | { ok: false; problems: Problem[] }
+export type SpendingRead = ({ ok: true } & Saved) | { ok: false; problems: Problem[] }
+
+/** What the record holds: version 1's recordings, and version 2's music takes and tries. */
+interface Saved {
+  recordings: Recording[]
+  music: MusicSpend[]
+  tries: TrySpend[]
+}
 
 /** Changes to the record, one at a time. */
 const writes = createSerial()
 
-/** The paid recordings and music takes so far, oldest first; none if nothing was spent yet. */
+/** The paid recordings, music takes and tries so far, oldest first; none if nothing was spent yet. */
 export async function readSpending(projectFile: string): Promise<SpendingRead> {
   const problems: Problem[] = []
   const read = await readResource(dirname(projectFile), SPENDING_FILE, SpendingSchema, problems)
-  if (read === 'missing') return { ok: true, recordings: [], music: [] }
+  if (read === 'missing') return { ok: true, recordings: [], music: [], tries: [] }
   if (read === 'invalid') return { ok: false, problems }
-  return { ok: true, recordings: read.recordings, music: read.version === 2 ? read.music : [] }
+  return read.version === 2
+    ? { ok: true, recordings: read.recordings, music: read.music, tries: read.tries }
+    : { ok: true, recordings: read.recordings, music: [], tries: [] }
 }
 
 /**
@@ -37,22 +46,16 @@ export async function readSpending(projectFile: string): Promise<SpendingRead> {
  * recordings alone (which an older studio reads), else as version 2. A damaged record is left as
  * it is (the user may want to repair it) and its problems given instead.
  */
-function appendTo(
-  projectFile: string,
-  add: (read: { recordings: Recording[]; music: MusicSpend[] }) => {
-    recordings: Recording[]
-    music: MusicSpend[]
-  },
-): Promise<SpendingRead> {
+function appendTo(projectFile: string, add: (read: Saved) => Saved): Promise<SpendingRead> {
   return writes.run(projectFile, async () => {
     const before = await readSpending(projectFile)
     if (!before.ok) return before
-    const { recordings, music } = add(before)
-    const saved = needsVersion2(recordings, music)
-      ? { version: 2, recordings, music }
+    const { recordings, music, tries } = add(before)
+    const saved = needsVersion2(recordings, music, tries)
+      ? { version: 2, recordings, music, tries }
       : { version: 1, recordings }
     await writeAtomic(dirname(projectFile), SPENDING_FILE, `${JSON.stringify(saved, null, 1)}\n`)
-    return { ok: true, recordings, music }
+    return { ok: true, recordings, music, tries }
   })
 }
 
@@ -64,6 +67,11 @@ export function appendRecording(projectFile: string, recording: Recording): Prom
 /** Adds a paid music take to the record (version 2). */
 export function appendMusic(projectFile: string, take: MusicSpend): Promise<SpendingRead> {
   return appendTo(projectFile, (read) => ({ ...read, music: [...read.music, take] }))
+}
+
+/** Adds a take or try with an ElevenLabs voice that cost credits to the record (version 2). */
+export function appendTry(projectFile: string, tried: TrySpend): Promise<SpendingRead> {
+  return appendTo(projectFile, (read) => ({ ...read, tries: [...read.tries, tried] }))
 }
 
 /** A paid recording being followed: tell it how it ended. */

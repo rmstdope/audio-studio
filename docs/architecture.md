@@ -1154,10 +1154,20 @@ only, the fingerprint needs no provider of its own.
   provider's budget before it is sent. Whether running music takes draw on the same allowance is
   checked by hand (step 14's test script); they are not counted yet. If ElevenLabs refuses a
   request (its quota among the reasons), that line fails with ElevenLabs' words.
-- **Page takes and tries.** Fish's are made with its free model. ElevenLabs has none, so a page take
-  or a cue try with an ElevenLabs voice uses `narration.elevenlabs.models.audition`, shows its
-  characters, is not confirmed (a try is a few hundred characters) and is logged. An audition
-  sitting on ElevenLabs is budgeted in characters, as a paid Fish sitting is in dollars (§8.1).
+- **Page takes and tries** (built in 14.10a, `docs/ui/elevenlabs-takes.html`). Fish's are made
+  with its free model. ElevenLabs has none, so the cast voice's take on its character's page and
+  a cue try (Hear it, in the cue, scene cue and cue-inside editors) with an ElevenLabs voice use
+  `narration.elevenlabs.models.audition` with the project's voice settings at the character's
+  speed (refused, with the reason, outside 0.7–1.2), in ElevenLabs' requests at once. They are not
+  confirmed (a try is a line's worth of characters). On a model that would speak cues the text is
+  sent without them (the style, the opening cue and the cues inside) and the page says so. The
+  page take's model and credits are on the Voice panel before it is recorded (`elevenPageTake`);
+  a try says after it what it was said with and cost (`triedNote`). Each kept in the take cache
+  under a key that adds the voice settings to Fish's (a Fish take's key is as it was), as
+  ElevenLabs' WAV: `GET /api/takes/:file` serves a file that starts with `RIFF` as `audio/wav`. One
+  already kept costs nothing. What one costs is added to the spending record's `tries`. Board
+  takes with an ElevenLabs voice are refused until 14.10b: an audition sitting on ElevenLabs is
+  budgeted in characters, as a paid Fish sitting is in dollars (§8.1).
 
 **Spending** (built in 14.7d). The log (`.audio-studio/spending.json`) moves to version 2 when it
 first needs to, with its first ElevenLabs credits or music take (`needsVersion2`), so a Fish-only
@@ -1170,11 +1180,16 @@ track and its title, the model, the seconds made and billed, the dollars at the 
 minute, and whether it was made (billed, also when the studio then could not keep it) or stopped
 while being made, which may still be billed; a take that fails before ElevenLabs makes it costs
 nothing and is not listed). Only credits spent are kept, so a recording given credits but
-spending none stays a version 1 row. A version 1 log is read with no credits and no music.
+spending none stays a version 1 row. Takes and tries with ElevenLabs voices (14.10a) are a list
+of their own too (`tries`: when, `take` or `try`, the character, a try's part, the language, the
+model, the characters sent and the credits), absent from a version 2 log written before them. A
+version 1 log is read with no credits, no music and no tries.
 The Spending page and the sidebar total dollars and credits apart (`$0.78 · 1,200 credits`), for
 all and per act, music takes in their act and stingers on a tile of their own once one cost
 something; a recording's Cost and Model cells name the providers that spent, a take's Lines cell
-says "Music take · The cave" and how long it was made.
+says "Music take · The cave" and how long it was made. Takes and tries count in the totals and
+on a tile of their own ("Takes and tries with ElevenLabs voices"), never as rows: there can be
+hundreds.
 
 **Casting.** The audition board searches either provider (a switch above the search: _Fish Audio_,
 _ElevenLabs_). ElevenLabs' search is its shared voice library (`GET /v1/shared-voices`: the
@@ -1250,7 +1265,7 @@ and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, m
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
 retakeWeak }`: start a generation, a measuring or a checking again, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
 `GET`/`DELETE /api/jobs/:id` (progress, cancel).
-Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries), voice,
+Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries, ElevenLabs' audition model for an ElevenLabs voice's, with its voice settings), voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
 `undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model; `GET`, `POST` (`{ amount }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }`) are the audition's money; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
@@ -1658,12 +1673,16 @@ Small, independently useful increments:
           similarity, style) in the project file, spoken with and fingerprinted in place of the
           fixed defaults, and saved from the Models panel's ElevenLabs voice row, asking first
           when recorded lines go out of date. The consumer rules in CLAUDE.md name the key.
-    10. **Page takes, tries and auditions with an ElevenLabs voice**, budgeted in characters; a try
-        on a model that reads no cues says so rather than sending the line's cues or dropping
-        them unseen (its cues from `cueInputs`).
-    11. **Find a voice in ElevenLabs' library**: the provider switch on the audition board, library
+    10. **Page takes, tries and auditions with an ElevenLabs voice**, in two steps:
+    11. **The page take and cue tries** (built): on ElevenLabs' audition model, not confirmed,
+        their credits shown and kept in the spending record's `tries` (totals and a tile of
+        their own on the Spending page); a try on a model that reads no cues says so rather
+        than sending the line's cues or dropping them unseen.
+    12. **Auditions on ElevenLabs**: board takes with ElevenLabs voices, the sitting budgeted
+        in credits, and the ElevenLabs audition row on the Models panel.
+    13. **Find a voice in ElevenLabs' library**: the provider switch on the audition board, library
         cards and previews, adding a voice on its first take, voice slots shown and freed.
-    12. **Design a voice with ElevenLabs**: previews kept as design takes, saved as a voice when
+    14. **Design a voice with ElevenLabs**: previews kept as design takes, saved as a voice when
         cast.
 
 ---

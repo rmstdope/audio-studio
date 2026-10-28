@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ElevenLabs takes and tries</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --ok: #3ddc97;
+        --warn: #ffc24b;
+        --bad: #ff6b6b;
+        --accent: #7aa2ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px 16px;
+      }
+      section {
+        max-width: 860px;
+        margin: 0 auto 28px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 0 0 8px;
+      }
+      .intro,
+      .note {
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+      .btn,
+      select,
+      input {
+        background: var(--inset);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #0b0c10;
+        border-color: var(--accent);
+      }
+      input {
+        width: 220px;
+      }
+      input[type='range'] {
+        width: 200px;
+        padding: 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 8px 12px;
+        align-items: center;
+      }
+      .error {
+        color: var(--bad);
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 380px;
+      }
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--inset);
+        color: var(--text);
+      }
+      .new {
+        outline: 2px dashed var(--warn);
+        outline-offset: 3px;
+        border-radius: 8px;
+      }
+      .legend {
+        color: var(--warn);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>Takes and tries with an ElevenLabs voice</h1>
+      <p class="intro">
+        Step 14.10a. A character cast with an ElevenLabs voice gets its take on its page, and its
+        lines' cues can be tried with Hear it, both on ElevenLabs' audition model, without asking
+        first. <span class="legend">Dashed: new.</span>
+      </p>
+    </section>
+
+    <section>
+      <h2>1 · The character's Voice panel</h2>
+      <div class="panel">
+        <p><strong>George</strong> <span class="muted">ElevenLabs voice</span></p>
+        <div class="row new" style="padding: 8px">
+          <button class="btn">Record</button>
+          <span
+            ><strong>Take</strong><br /><span class="muted"
+              >The audition phrase, in Mira’s style</span
+            ><br /><span class="muted"
+              >Recorded with Eleven v3, without asking first: about 42 credits.</span
+            ></span
+          >
+        </div>
+        <p class="note">
+          With an audition model that speaks cues (Multilingual v2, Flash v2.5), one more line:
+          “Flash v2.5 speaks cues aloud, so the take is without the style.” Once recorded, Record
+          becomes the play button, as for a Fish voice. No “free model” chip.
+        </p>
+        <div class="row">
+          <button class="play">▶</button>
+          <span><strong>ElevenLabs preview</strong> <span class="faint">(as before)</span></span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2 · Hear it in a cue editor</h2>
+      <div class="panel">
+        <input value="[whispers]" />
+        <div class="row" style="margin-top: 8px">
+          <button class="btn">Save</button><button class="btn">Cancel</button
+          ><button class="btn">Stop</button>
+        </div>
+        <p class="mono muted">[whispers] Come closer, all of you.</p>
+        <p class="muted new">Said with Eleven v3: 36 credits.</p>
+        <p class="note">
+          On a model that speaks cues: “Said with Flash v2.5: 15 credits. Flash v2.5 speaks cues
+          aloud, so it was said without them.” A try already made: “Said with Eleven v3, already
+          kept: no credits.” The same line under the scene cue and the cue-inside-the-line editors.
+          A Fish voice's try shows nothing new. The button's hover: “… (free with a Fish voice, a
+          few credits with an ElevenLabs one)”.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>3 · The Spending page</h2>
+      <div class="panel">
+        <div class="row">
+          <div class="card">
+            <b>$0.78 · 1,278 credits</b
+            ><span class="muted">All acts · 3 recordings · 5 takes and tries</span>
+          </div>
+          <div class="card new">
+            <b>78 credits</b><span class="muted">Takes and tries with ElevenLabs voices</span>
+          </div>
+        </div>
+        <p class="note">
+          Takes and tries are counted in the totals and in their own tile, never as rows of the
+          Recordings table (there can be hundreds). With nothing but them, the table says “No paid
+          recordings or music takes yet.”
+        </p>
+      </div>
+    </section>
+  </body>
+</html>

@@ -110,7 +110,7 @@ describe('CharacterView', () => {
     await act(() => page.unmount())
   })
 
-  it('shows an ElevenLabs voice as ElevenLabs gives it, with its preview and no take', async () => {
+  it('shows an ElevenLabs voice as ElevenLabs gives it, with its preview and a take on ElevenLabs', async () => {
     const cast: CharacterLanguage = { ...uncast, voice: 'eleven:g1', voiceName: 'George' }
     const castSummary: ProjectSummary = {
       ...summary,
@@ -143,6 +143,7 @@ describe('CharacterView', () => {
           take: null,
           audition: { spoken: 'Come in.', phrase: 'Come in.', from: 'own', standard: false },
           language: 'en',
+          eleven: { model: 'eleven_flash_v2_5', credits: 4, cuesLeftOut: true },
         })
       }
       return studio(path)
@@ -163,15 +164,16 @@ describe('CharacterView', () => {
     await until(() => panel().includes('Warm storyteller'))
     expect(panel()).toContain('ElevenLabs voice')
     expect(panel()).not.toContain('uses')
-    expect(panel()).toContain('No takes with ElevenLabs voices yet: hear its preview.')
+    expect(panel()).toContain('Recorded with Flash v2.5, without asking first: about 4 credits.')
+    expect(panel()).toContain('Flash v2.5 speaks cues aloud, so the take is without the style.')
+    expect(panel()).not.toContain('free model')
     expect(panel()).toContain('ElevenLabs preview')
     expect(panel()).not.toContain('Open on Fish Audio')
     const labels = [...container.querySelectorAll('[aria-label="Voice"] button')].map(
       (b) => b.getAttribute('aria-label') ?? b.textContent,
     )
     expect(labels).toContain('Play ElevenLabs’ preview')
-    expect(labels).not.toContain('Record')
-    expect(posted.filter((p) => p.includes('/takes'))).toEqual([])
+    expect(labels).toContain('Record')
 
     await act(() => page.unmount())
   })

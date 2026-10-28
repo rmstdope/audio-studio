@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
+import { characterVoice } from './auditions'
+import { NO_ELEVENLABS_KEY } from './elevenlabs'
 import type { FishClient, TtsRequest } from './fish'
 import { createLimiter } from './limit'
 import { createBudget } from '../core/spend'
@@ -46,25 +48,23 @@ function fakeFish() {
 }
 
 describe('recordTake', () => {
-  it('makes no take with an ElevenLabs voice, on the board or its page, and asks Fish nothing', async () => {
+  it('makes no board take with an ElevenLabs voice yet, and asks Fish nothing', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
-    for (const board of [false, true]) {
-      expect(
-        await recordTake(
-          join(root, 'audio-studio.json'),
-          'grandmother',
-          'eleven:g1',
-          async () => fish,
-          createLimiter(),
-          { board },
-        ),
-      ).toEqual({
-        ok: false,
-        reason: 'not-yet',
-        message: 'Takes and tries are not made with ElevenLabs voices yet.',
-      })
-    }
+    expect(
+      await recordTake(
+        join(root, 'audio-studio.json'),
+        'grandmother',
+        'eleven:g1',
+        async () => fish,
+        createLimiter(),
+        { board: true },
+      ),
+    ).toEqual({
+      ok: false,
+      reason: 'not-yet',
+      message: 'Auditions with ElevenLabs voices come in a later step.',
+    })
     expect(requests).toEqual([])
   })
 
@@ -478,28 +478,181 @@ describe('tryLine', () => {
   })
 })
 
-describe('tryLine with an ElevenLabs voice', () => {
-  it('makes no try, and asks Fish nothing', async () => {
-    const root = tempRepo({
-      ...files,
-      'tts/cast.json': { speakers: { grandmother: { voice: 'eleven:g1' } }, pronounce: {} },
-      'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+describe('takes and tries with an ElevenLabs voice', () => {
+  const wav = () => new Uint8Array([82, 73, 70, 70, 1])
+  const elevenFiles = (model?: string, speed = 0.9) => ({
+    ...files,
+    'audio-studio.json': projectJson({
+      narration: {
+        ...(projectJson().narration as object),
+        ...(model && { elevenlabs: { models: { audition: model } } }),
+      },
+    }),
+    'tts/cast.json': {
+      speakers: {
+        grandmother: {
+          voice: 'eleven:g1',
+          style: '[warm]',
+          speed,
+          audition: { phrase: 'Elior, dear.' },
+        },
+      },
+      pronounce: { Elior: 'El-ee-or' },
+    },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+  })
+  const spending = (root: string) => {
+    const file = join(root, '.audio-studio/spending.json')
+    return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null
+  }
+  const take = (root: string, eleven: ReturnType<typeof fakeEleven>['client'] | null) =>
+    recordTake(
+      join(root, 'audio-studio.json'),
+      'grandmother',
+      'eleven:g1',
+      async () => fakeFish().fish,
+      createLimiter(),
+      { elevenlabs: async () => eleven },
+    )
+
+  it('makes the page take with ElevenLabs’ audition model and settings, logs its credits, and keeps it', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({}, { speak: wav })
+    const result = await take(root, eleven.client)
+    expect(result).toMatchObject({
+      ok: true,
+      spoken: '[warm] El-ee-or, dear.',
+      cached: false,
+      model: 'eleven_v3',
+      credits: 22,
+      cuesLeftOut: false,
     })
-    const { fish, requests } = fakeFish()
+    expect(eleven.spoken).toEqual([
+      {
+        text: '[warm] El-ee-or, dear.',
+        voice: 'g1',
+        model: 'eleven_v3',
+        settings: { stability: 0.5, similarityBoost: 0.75, style: 0, speed: 0.9 },
+        language: 'en',
+      },
+    ])
+    const key = (result as { key: string }).key
+    expect(readFileSync(join(root, `.audio-studio/takes/${key}.mp3`))).toEqual(Buffer.from(wav()))
+    expect(spending(root)).toMatchObject({
+      version: 2,
+      tries: [
+        {
+          kind: 'take',
+          character: 'grandmother',
+          language: 'en',
+          model: 'eleven_v3',
+          characters: 22,
+          credits: 22,
+        },
+      ],
+    })
+    // Again: from the cache, costing and logging nothing.
+    expect(await take(root, eleven.client)).toMatchObject({ ok: true, cached: true })
+    expect(eleven.spoken).toHaveLength(1)
+    expect(spending(root).tries).toHaveLength(1)
+  })
+
+  it('is found again as the cast voice’s take on its page', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({ g1: elevenVoiceOf('g1') }, { speak: wav })
+    const result = await take(root, eleven.client)
+    const page = await characterVoice(
+      join(root, 'audio-studio.json'),
+      'grandmother',
+      async () => fakeFish().fish,
+      undefined,
+      async () => eleven.client,
+    )
+    expect(page).toMatchObject({ ok: true, take: (result as { key: string }).key })
+  })
+
+  it('sends no cues to an audition model that would speak them, and says so', async () => {
+    const root = tempRepo(elevenFiles('eleven_flash_v2_5'))
+    const eleven = fakeEleven({}, { speak: wav })
+    expect(await take(root, eleven.client)).toMatchObject({
+      ok: true,
+      spoken: 'El-ee-or, dear.',
+      model: 'eleven_flash_v2_5',
+      credits: 7.5,
+      cuesLeftOut: true,
+    })
+    expect(eleven.spoken[0]!.text).toBe('El-ee-or, dear.')
+  })
+
+  it('refuses a speed ElevenLabs does not take, no key, and what ElevenLabs answered, spending nothing', async () => {
+    const fast = tempRepo(elevenFiles(undefined, 1.5))
+    const eleven = fakeEleven({}, { speak: wav })
+    expect(await take(fast, eleven.client)).toMatchObject({ ok: false, reason: 'speed' })
+    expect(eleven.spoken).toEqual([])
+    const root = tempRepo(elevenFiles())
+    expect(await take(root, null)).toEqual({
+      ok: false,
+      reason: 'no-key',
+      message: NO_ELEVENLABS_KEY,
+    })
+    const failing = fakeEleven(
+      {},
+      {
+        speak: () => {
+          throw new Error('ElevenLabs answered 401: quota exceeded')
+        },
+      },
+    )
+    expect(await take(root, failing.client)).toEqual({
+      ok: false,
+      reason: 'elevenlabs',
+      message: 'ElevenLabs answered 401: quota exceeded',
+    })
+    expect(spending(root)).toBeNull()
+    expect(existsSync(join(root, '.audio-studio/takes'))).toBe(false)
+  })
+
+  it('tries a line with its cue on the audition model, logging the try with its part', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({}, { speak: wav })
     const result = await tryLine(
       join(root, 'audio-studio.json'),
       'act1',
       'a',
       '[soft]',
-      async () => fish,
+      async () => fakeFish().fish,
       createLimiter(),
+      undefined,
+      undefined,
+      { elevenlabs: async () => eleven.client },
     )
-    expect(result).toEqual({
-      ok: false,
-      reason: 'not-yet',
-      message: 'Takes and tries are not made with ElevenLabs voices yet.',
+    expect(result).toMatchObject({
+      ok: true,
+      spoken: '[soft] Come here now.',
+      model: 'eleven_v3',
+      credits: 21,
+      cuesLeftOut: false,
     })
-    expect(requests).toEqual([])
+    expect(spending(root).tries).toMatchObject([
+      { kind: 'try', character: 'grandmother', part: 'act1', credits: 21 },
+    ])
+  })
+
+  it('tries a line without its cue on a model that would speak it, and says so', async () => {
+    const root = tempRepo(elevenFiles('eleven_multilingual_v2'))
+    const eleven = fakeEleven({}, { speak: wav })
+    const result = await tryLine(
+      join(root, 'audio-studio.json'),
+      'act1',
+      'a',
+      '[soft]',
+      async () => fakeFish().fish,
+      createLimiter(),
+      undefined,
+      undefined,
+      { elevenlabs: async () => eleven.client },
+    )
+    expect(result).toMatchObject({ ok: true, spoken: 'Come here now.', cuesLeftOut: true })
   })
 })
 

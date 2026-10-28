@@ -1,7 +1,9 @@
 import { FREE_MODELS } from '../core/project'
 import { providerOf } from '../core/voices'
 import type { TakeLineResult } from '../services/lineTakes'
-import { agreedOf, type Agreed } from './agreed'
+import { agreedOf, credits, type Agreed } from './agreed'
+import { elevenModelName } from '../core/elevenSpeech'
+import type { ElevenSpoken } from '../services/takes'
 
 /** The part of an answer about the board that takes belong to. */
 interface WithTakes {
@@ -114,4 +116,21 @@ export function takeAnswerState(answer: NonNullable<TakeLineResult>): {
     return { toConfirm: null, refusal: answer.message }
   }
   return { toConfirm: null, refusal: null }
+}
+
+/**
+ * What a try or take with an ElevenLabs voice says beneath it: the model, the credits it cost (or
+ * none, kept from before), and that its cues were left out when the model would speak them. Null
+ * for a Fish voice's, which is free.
+ */
+export function triedNote(result: ElevenSpoken): string | null {
+  if (!result.model) return null
+  const name = elevenModelName(result.model)
+  const cost =
+    result.credits === undefined
+      ? `Said with ${name}, already kept: no credits.`
+      : `Said with ${name}: ${credits(Math.ceil(result.credits))}.`
+  return result.cuesLeftOut
+    ? `${cost} ${name} speaks cues aloud, so it was said without them.`
+    : cost
 }

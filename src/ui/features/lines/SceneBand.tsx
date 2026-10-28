@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { triedNote } from '../../takes'
 import type { SceneState } from '../../../core/planner'
 import { takeUrl, useSetSceneCue, useTryCue } from '../../api'
 import { Problems } from '../../components/Problems'
@@ -190,7 +191,7 @@ export function SceneBand({
               type="button"
               title={
                 scene.firstFollowing
-                  ? 'Hear the first line that follows the cue said with it, without saving anything (a free take)'
+                  ? 'Hear the first line that follows the cue said with it, without saving anything (free with a Fish voice, a few credits with an ElevenLabs one)'
                   : 'No line in this scene follows the cue'
               }
               disabled={hear.isPending || !scene.firstFollowing}
@@ -202,6 +203,7 @@ export function SceneBand({
           {heard && playing === tryId && (
             <span className="muted cue-tried mono">{heard.spoken}</span>
           )}
+          {heard && triedNote(heard) && <span className="muted">{triedNote(heard)}</span>}
           {problems.length > 0 && (
             <Problems title="The scene cue could not be saved" problems={problems} />
           )}

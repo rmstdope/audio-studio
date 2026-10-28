@@ -428,7 +428,7 @@ describe('server', () => {
     expect((await fetch(url(`/api/takes/${body.key}`))).status).toBe(404)
   })
 
-  it('refuses an ElevenLabs voice for a take, and for casting a voice made from recordings', async () => {
+  it('refuses an ElevenLabs voice on the board, and for casting a voice made from recordings', async () => {
     const send = (path: string, body: unknown) =>
       fetch(url(path), {
         method: 'POST',
@@ -436,12 +436,18 @@ describe('server', () => {
         body: JSON.stringify(body),
       })
     const voice = 'eleven:abc'
-    for (const [path, body] of [
-      ['/api/characters/narrator/takes', { voice, board: true }],
-      ['/api/characters/narrator/cast-voice', { voice, name: 'Mine' }],
-    ] as const) {
-      expect([path, (await send(path, body)).status]).toEqual([path, 400])
-    }
+    expect(
+      (await send('/api/characters/narrator/cast-voice', { voice, name: 'Mine' })).status,
+    ).toBe(400)
+    const board = await send('/api/characters/narrator/takes', { voice, board: true })
+    expect([board.status, await board.json()]).toEqual([
+      200,
+      {
+        ok: false,
+        reason: 'not-yet',
+        message: 'Auditions with ElevenLabs voices come in a later step.',
+      },
+    ])
   })
 
   it('rules out a dropped voice, lists it, and allows one or all again', async () => {
@@ -4361,5 +4367,50 @@ describe('a final recording on ElevenLabs’ side only', () => {
     } finally {
       flash.stop(true)
     }
+  })
+})
+
+describe('takes and tries with an ElevenLabs voice', () => {
+  const elevenRoot = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1', style: '[warm]' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
+  })
+  const wav = new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2])
+  const { client: eleven, spoken } = fakeEleven({ g1: elevenVoiceOf('g1') }, { speak: () => wav })
+  const elevenServer = startServer({
+    projectFile: join(elevenRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    elevenlabs: eleven,
+  })
+  afterAll(() => elevenServer.stop(true))
+  const send = (path: string, body: unknown) =>
+    fetch(new URL(path, elevenServer.url), {
+      method: 'POST',
+      headers: { origin: elevenServer.url.origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('makes them on ElevenLabs, serves them as WAV, and counts their credits on the Spending page', async () => {
+    const tried = await (await send('/api/parts/act1/lines/a/try', { cue: '[soft]' })).json()
+    expect(tried).toMatchObject({
+      ok: true,
+      spoken: '[soft] Once.',
+      model: 'eleven_v3',
+      credits: 12,
+    })
+    const taken = await (
+      await send('/api/characters/narrator/takes', { voice: 'eleven:g1' })
+    ).json()
+    expect(taken).toMatchObject({ ok: true, model: 'eleven_v3' })
+    expect(spoken.map((s) => s.voice)).toEqual(['g1', 'g1'])
+    const file = await fetch(new URL(`/api/takes/${tried.key}.mp3`, elevenServer.url))
+    expect(file.headers.get('content-type')).toBe('audio/wav')
+    expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([...wav])
+    const page = await (await fetch(new URL('/api/spending', elevenServer.url))).json()
+    expect(page.tries).toEqual({ count: 2, credits: 12 + taken.credits })
   })
 })

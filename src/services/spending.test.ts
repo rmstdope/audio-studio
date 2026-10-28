@@ -8,6 +8,7 @@ import type { MusicSpend } from '../core/spending'
 import {
   appendMusic,
   appendRecording,
+  appendTry,
   createSpendLog,
   readSpending,
   SPENDING_FILE,
@@ -30,7 +31,12 @@ const project = () => join(tempRepo({ 'audio-studio.json': projectJson() }), 'au
 
 describe('the spending record', () => {
   it('is empty before anything was recorded', async () => {
-    expect(await readSpending(project())).toEqual({ ok: true, recordings: [], music: [] })
+    expect(await readSpending(project())).toEqual({
+      ok: true,
+      recordings: [],
+      music: [],
+      tries: [],
+    })
   })
 
   it('keeps recordings across reads (a restart), in the order added', async () => {
@@ -106,6 +112,7 @@ describe('the spending record, version 2', () => {
       ok: true,
       recordings: [rec('a'), rec('b', { credits: 120, elevenModel: 'eleven_v3' })],
       music: [],
+      tries: [],
     })
   })
 
@@ -117,6 +124,28 @@ describe('the spending record, version 2', () => {
     const read = await readSpending(file)
     expect(read.ok && read.music).toEqual([take('m1')])
     expect(read.ok && read.recordings.map((r) => r.id)).toEqual(['a'])
+  })
+
+  it('keeps a take or try with an ElevenLabs voice as a row of its own, in version 2', async () => {
+    const file = project()
+    await appendRecording(file, rec('a'))
+    const tried = {
+      id: 't1',
+      at: '2026-10-25T17:00:00.000Z',
+      kind: 'try' as const,
+      character: 'mira',
+      part: 'act1',
+      language: 'en',
+      model: 'eleven_v3',
+      characters: 42,
+      credits: 42,
+    }
+    await appendTry(file, tried)
+    await appendMusic(file, take('m1'))
+    expect(versionOf(file)).toBe(2)
+    const read = await readSpending(file)
+    expect(read.ok && read.tries).toEqual([tried])
+    expect(read.ok && read.music).toEqual([take('m1')])
   })
 })
 

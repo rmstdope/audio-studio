@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  needsVersion2,
   outcomeOf,
   SpendingSchema,
   summariseSpending,
   type MusicSpend,
   type Recording,
   type Running,
+  type TrySpend,
 } from './spending'
 
 const rec = (over: Partial<Recording> = {}): Recording => ({
@@ -153,7 +155,51 @@ describe('summariseSpending, ElevenLabs credits and music', () => {
   })
 })
 
+describe('summariseSpending, takes and tries with ElevenLabs voices', () => {
+  const tried = (over: Partial<TrySpend> = {}): TrySpend => ({
+    id: 't1',
+    at: '2026-10-25T17:00:00.000Z',
+    kind: 'try',
+    character: 'mira',
+    part: 'act1',
+    language: 'en',
+    model: 'eleven_v3',
+    characters: 42,
+    credits: 42,
+    ...over,
+  })
+
+  it('counts them and their credits apart, in the total but in no act and no row', () => {
+    const s = summariseSpending(
+      [rec({ credits: 100, elevenModel: 'eleven_v3' })],
+      [],
+      parts,
+      [],
+      [tried(), tried({ id: 't2', kind: 'take', part: undefined, credits: 30 })],
+    )
+    expect(s.credits).toBe(172)
+    expect(s.tries).toEqual({ count: 2, credits: 72 })
+    expect(s.acts[0]).toMatchObject({ part: 'act1', credits: 100 })
+    expect(s.rows).toHaveLength(1)
+    expect(summariseSpending([], [], parts).tries).toEqual({ count: 0, credits: 0 })
+  })
+
+  it('need version 2 of the record', () => {
+    expect(needsVersion2([rec()], [], [tried()])).toBe(true)
+    expect(needsVersion2([rec()], [], [])).toBe(false)
+  })
+})
+
 describe('SpendingSchema', () => {
+  it('reads a version 2 record without tries as having none', () => {
+    expect(SpendingSchema.parse({ version: 2, recordings: [], music: [] })).toEqual({
+      version: 2,
+      recordings: [],
+      music: [],
+      tries: [],
+    })
+  })
+
   it('reads version 1, a Fish-only log, and version 2, with credits and music takes', () => {
     expect(SpendingSchema.parse({ version: 1, recordings: [rec()] })).toEqual({
       version: 1,
@@ -176,6 +222,6 @@ describe('SpendingSchema', () => {
         },
       ],
     }
-    expect(SpendingSchema.parse(two)).toEqual(two)
+    expect(SpendingSchema.parse(two)).toEqual({ ...two, tries: [] })
   })
 })

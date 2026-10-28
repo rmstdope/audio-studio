@@ -313,10 +313,10 @@ const MoveBody = VoiceBody.extend({ move: z.enum(['shortlist', 'unlist', 'drop']
 
 /**
  * A take to record: for the board (the audition model, paid from the sitting) or the cast voice's
- * page (free). Fish's voices only, until takes are made with ElevenLabs ones (§12 step 14.10).
+ * page (free with a Fish voice, ElevenLabs' audition model with an ElevenLabs one).
  */
 const AuditionTakeBody = z.object({
-  voice: z.string().regex(FISH_VOICE_ID),
+  voice: z.string().regex(VOICE_ID),
   board: z.boolean().default(false),
 })
 
@@ -1326,7 +1326,13 @@ export function startServer({
             : []
           return Response.json({
             ok: true,
-            ...summariseSpending(saved.recordings, spendLog.running(), parts, saved.music),
+            ...summariseSpending(
+              saved.recordings,
+              spendLog.running(),
+              parts,
+              saved.music,
+              saved.tries,
+            ),
             languages: project.ok ? project.summary.languages.length : 1,
           })
         }),
@@ -1540,6 +1546,7 @@ export function startServer({
               fishWork,
               languageOf(request),
               body.data.at,
+              { elevenlabs: elevenFor, elevenLimiter: elevenWork },
             ),
           )
           if (!result) return notFound()
@@ -1635,6 +1642,8 @@ export function startServer({
                 },
                 charged: async (dollars) =>
                   void (await recordSpent(projectFile, id, dollars, languageOf(request))),
+                elevenlabs: elevenFor,
+                elevenLimiter: elevenWork,
               },
               languageOf(request),
             ),
@@ -1924,7 +1933,14 @@ export function startServer({
         GET: guard(async (request) => {
           const key = /^([0-9a-f]{16})\.mp3$/.exec(request.params.file)?.[1]
           const file = key ? await takeFile(projectFile, key) : null
-          return file ? new Response(Bun.file(file)) : notFound()
+          if (!file) return notFound()
+          // Fish's takes are MP3; ElevenLabs' are WAV, kept under the same name.
+          const head = new Uint8Array(await Bun.file(file).slice(0, 4).arrayBuffer())
+          const wav = String.fromCharCode(...head) === 'RIFF'
+          return new Response(
+            Bun.file(file),
+            wav ? { headers: { 'content-type': 'audio/wav' } } : undefined,
+          )
         }),
       },
       '/api/characters/:id/voice': {

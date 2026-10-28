@@ -25,7 +25,7 @@ import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
 import { NO_KEY, type FishClient } from './fish'
 import { readJson, writeAtomic } from './files'
 import { ruledOutIds } from './ruledOut'
-import { auditionIn, castProblems, phrasePath, recordedTakes } from './takes'
+import { auditionIn, castProblems, elevenPageTake, phrasePath, recordedTakes } from './takes'
 import { createSerial } from './serial'
 import { searchVoices } from './voiceSearch'
 import { loadWorkspace, openProject, type ProjectFailure } from './workspace'
@@ -198,6 +198,8 @@ export type CharacterVoiceResult =
       audition: AuditionText
       /** The language voices are searched in. */
       language: string
+      /** What the page take costs with an ElevenLabs voice (`elevenPageTake`); null with Fish's. */
+      eleven?: { model: string; credits: number; cuesLeftOut: boolean } | null
     }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
@@ -248,7 +250,10 @@ export async function characterVoice(
     )[id] ?? null
   if (providerOf(id) === 'elevenlabs') {
     const found = await elevenVoiceFor(elevenFor, dirname(projectFile), project, id)
-    return found.ok ? { ...answer, take, voice: found.voice } : { ...answer, take, lookup: found }
+    const eleven = elevenPageTake(project, seen.cast, characterId, audition, id)
+    return found.ok
+      ? { ...answer, take, eleven, voice: found.voice }
+      : { ...answer, take, eleven, lookup: found }
   }
   const fish = await fishFor(dirname(projectFile), project)
   if (!fish) return { ...answer, take, lookup: { reason: 'no-key' as const, message: NO_KEY } }
