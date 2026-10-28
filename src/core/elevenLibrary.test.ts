@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { addedVoiceFor, ElevenVoicesSchema, libraryFilters, libraryWords } from './elevenLibrary'
+import {
+  addedVoiceFor,
+  freeableVoices,
+  ElevenVoicesSchema,
+  libraryFilters,
+  libraryWords,
+} from './elevenLibrary'
 
 describe('libraryFilters', () => {
   it('asks for the gender and age the keywords name', () => {
@@ -51,5 +57,30 @@ describe('the voices the studio added', () => {
     })
     expect(addedVoiceFor(file, 'eleven:lib1')).toBe('eleven:own1')
     expect(addedVoiceFor(file, 'eleven:lib2')).toBeNull()
+  })
+})
+
+describe('freeableVoices', () => {
+  const entry = (library: string, voice: string) => ({
+    library,
+    voice,
+    name: library.toUpperCase(),
+    character: 'wizard',
+    at: '2026-10-28T10:00:00.000Z',
+  })
+  const file = {
+    version: 1 as const,
+    added: [
+      entry('eleven:a', 'eleven:a2'),
+      entry('eleven:b', 'eleven:b2'),
+      entry('eleven:c', 'eleven:c2'),
+    ],
+  }
+
+  it('offers the voices added that nothing uses: cast, or on an audition, by either id', () => {
+    expect(freeableVoices(file, new Set(['eleven:a2', 'eleven:b'])).map((a) => a.voice)).toEqual([
+      'eleven:c2',
+    ])
+    expect(freeableVoices(file, new Set())).toHaveLength(3)
   })
 })

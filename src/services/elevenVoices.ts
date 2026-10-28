@@ -1,9 +1,14 @@
 import { dirname } from 'node:path'
-import { addedVoiceFor, ElevenVoicesSchema, type ElevenVoices } from '../core/elevenLibrary'
+import {
+  addedVoiceFor,
+  ElevenVoicesSchema,
+  freeableVoices,
+  type ElevenVoices,
+} from '../core/elevenLibrary'
 import { resolveInRoot } from '../core/paths'
 import type { Voice } from '../core/voiceSearch'
 import { elevenVoice, providerId } from '../core/voices'
-import { NO_ELEVENLABS_KEY, type ElevenLabsClient } from './elevenlabs'
+import { ElevenLabsError, NO_ELEVENLABS_KEY, type ElevenLabsClient } from './elevenlabs'
 import { readJson, writeAtomic } from './files'
 import { createSerial } from './serial'
 
@@ -53,11 +58,58 @@ export async function voiceToSpeak(
         { library: voice.id, voice: id, name: voice.title, character, at: at.toISOString() },
       ],
     }
-    await writeAtomic(
-      dirname(projectFile),
-      ELEVEN_VOICES_FILE,
-      `${JSON.stringify(next, null, 1)}\n`,
-    )
+    await writeAdded(projectFile, next)
     return id
   })
+}
+
+/** What freeing voice slots did: the names of the voices removed, and those ElevenLabs kept. */
+export type FreedResult =
+  | { ok: true; freed: string[]; failed: { name: string; message: string }[] }
+  | { ok: false; reason: 'no-key'; message: string }
+
+/**
+ * Removes from the user's ElevenLabs voices those of `voices` (account ids) that the studio added
+ * and that are not in `used` (see `freeableVoices`), freeing their voice slots, and forgets them.
+ * A voice ElevenLabs no longer has counts as removed; one it would not remove is kept, with why.
+ */
+export async function freeVoices(
+  projectFile: string,
+  clientFor: () => Promise<ElevenLabsClient | null>,
+  voices: string[],
+  used: Set<string>,
+): Promise<FreedResult> {
+  const client = await clientFor()
+  if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+  return writes.run(projectFile, async () => {
+    const before = await readAddedVoices(projectFile)
+    const asked = new Set(voices)
+    const freed: ElevenVoices['added'] = []
+    const failed: { name: string; message: string }[] = []
+    for (const added of freeableVoices(before, used).filter((a) => asked.has(a.voice))) {
+      try {
+        await client.deleteVoice(providerId(added.voice))
+        freed.push(added)
+      } catch (error) {
+        if (error instanceof ElevenLabsError && error.status === 404) freed.push(added)
+        else
+          failed.push({
+            name: added.name,
+            message: error instanceof Error ? error.message : String(error),
+          })
+      }
+    }
+    if (freed.length) {
+      await writeAdded(projectFile, {
+        ...before,
+        added: before.added.filter((a) => !freed.includes(a)),
+      })
+    }
+    return { ok: true, freed: freed.map((a) => a.name), failed }
+  })
+}
+
+/** Writes the voices the studio added. */
+async function writeAdded(projectFile: string, file: ElevenVoices): Promise<void> {
+  await writeAtomic(dirname(projectFile), ELEVEN_VOICES_FILE, `${JSON.stringify(file, null, 1)}\n`)
 }

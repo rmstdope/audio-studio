@@ -100,9 +100,11 @@ import {
   undoLastDrop,
   viewOf,
   voiceAdded,
+  voicesInUse,
   type SessionResult,
 } from '../services/sessions'
-import { voiceToSpeak } from '../services/elevenVoices'
+import { freeVoices, readAddedVoices, voiceToSpeak } from '../services/elevenVoices'
+import { freeableVoices } from '../core/elevenLibrary'
 import type { Voice } from '../core/voiceSearch'
 import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
 import { heardFor } from '../services/heard'
@@ -318,6 +320,9 @@ const RecordBody = z
 
 /** A voice to bring in or cast: either provider's. */
 const VoiceBody = z.object({ voice: z.string().regex(VOICE_ID) })
+
+/** The voices to remove from the user's ElevenLabs voices, by their studio ids. */
+const FreeBody = z.object({ voices: z.array(z.string().regex(VOICE_ID)).min(1).max(500) }).strict()
 
 /** Whose library more voices come from: Fish's unless ElevenLabs' is asked for. */
 const MoreBody = z.object({ provider: z.enum(['fish', 'elevenlabs']).default('fish') }).strict()
@@ -1661,6 +1666,33 @@ export function startServer({
         GET: guard(async () =>
           Response.json({ account: await shownAccount(), held: elevenHeld() }),
         ),
+      },
+      '/api/elevenlabs/voices/freeable': {
+        // The voices the studio added from the library that nothing uses: their slots can be freed.
+        GET: guard(async () => {
+          const added = await readAddedVoices(projectFile)
+          const voices = freeableVoices(added, await voicesInUse(projectFile))
+          return Response.json({
+            ok: true,
+            voices: voices.map(({ voice, name, character }) => ({ voice, name, character })),
+          })
+        }),
+      },
+      '/api/elevenlabs/voices/free': {
+        POST: fromOwnPage(async (request) => {
+          const body = FreeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { voices }' }, { status: 400 })
+          const result = await freeVoices(
+            projectFile,
+            async () => {
+              const opened = await openProject(projectFile)
+              return opened.ok ? elevenFor(dirname(projectFile), opened.project) : null
+            },
+            body.data.voices,
+            await voicesInUse(projectFile),
+          )
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
       },
       '/api/elevenlabs/tts': {
         PUT: fromOwnPage(async (request) => {

@@ -660,6 +660,30 @@ export async function boardVoice(
   return (await readSession(projectFile, characterId, language))?.voices[voiceId]
 }
 
+/**
+ * The voices in use: every voice cast for a character in a language, and every voice on an
+ * audition in progress (shortlisted, to hear, queued, or the voice it started with). A voice
+ * dropped is not in use there.
+ */
+export async function voicesInUse(projectFile: string): Promise<Set<string>> {
+  const used = new Set<string>()
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return used
+  for (const character of loaded.summary.characters) {
+    for (const casting of Object.values(character.languages)) {
+      if (casting.voice) used.add(casting.voice)
+    }
+    for (const language of loaded.project.narration.languages) {
+      const session = await readSession(projectFile, character.id, language)
+      if (!session) continue
+      const { current, shortlist, yours, designed, toHear, queue } = session
+      for (const id of [...shortlist, ...yours, ...designed, ...toHear, ...queue]) used.add(id)
+      if (current) used.add(current)
+    }
+  }
+  return used
+}
+
 /** The saved session; none if there is no file, or it does not fit (an older version, a hand edit). */
 async function readSession(
   projectFile: string,

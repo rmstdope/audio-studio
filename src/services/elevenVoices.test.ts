@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fakeEleven, projectJson, tempRepo } from '../../test/helpers'
 import type { Voice } from '../core/voiceSearch'
-import { ELEVEN_VOICES_FILE, readAddedVoices, voiceToSpeak } from './elevenVoices'
+import { ElevenLabsError, NO_ELEVENLABS_KEY } from './elevenlabs'
+import { ELEVEN_VOICES_FILE, freeVoices, readAddedVoices, voiceToSpeak } from './elevenVoices'
 
 /** Gravel, a voice of ElevenLabs' library. */
 const gravel: Voice = {
@@ -103,5 +104,83 @@ describe('voiceToSpeak', () => {
       'voice limit',
     )
     expect(await readAddedVoices(projectFile)).toEqual({ version: 1, added: [] })
+  })
+})
+
+describe('freeVoices', () => {
+  /** A project whose studio added Gravel, Brook and Rasp. */
+  async function withThree() {
+    const set = setUp()
+    for (const id of ['lib1', 'lib2', 'lib3']) {
+      await voiceToSpeak(
+        set.projectFile,
+        async () => set.client,
+        { ...gravel, id: `eleven:${id}`, title: id },
+        'wizard',
+      )
+    }
+    return set
+  }
+
+  it('removes the voices asked for that nothing uses, forgets them, and says which', async () => {
+    const { projectFile, client } = await withThree()
+    const deleted: string[] = []
+    client.deleteVoice = async (id) => void deleted.push(id)
+    const result = await freeVoices(
+      projectFile,
+      async () => client,
+      ['eleven:own-lib1', 'eleven:own-lib2', 'eleven:own-lib3'],
+      new Set(['eleven:own-lib3']),
+    )
+    expect(result).toEqual({ ok: true, freed: ['lib1', 'lib2'], failed: [] })
+    expect(deleted).toEqual(['own-lib1', 'own-lib2'])
+    expect((await readAddedVoices(projectFile)).added.map((a) => a.voice)).toEqual([
+      'eleven:own-lib3',
+    ])
+  })
+
+  it('counts a voice ElevenLabs no longer has as freed, and keeps one it would not remove', async () => {
+    const { projectFile, client } = await withThree()
+    client.deleteVoice = async (id) => {
+      if (id === 'own-lib1')
+        throw new ElevenLabsError(404, 'A voice with the voice_id was not found.')
+      if (id === 'own-lib2') throw new ElevenLabsError(500, 'Try again later.')
+    }
+    const result = await freeVoices(
+      projectFile,
+      async () => client,
+      ['eleven:own-lib1', 'eleven:own-lib2'],
+      new Set(),
+    )
+    expect(result).toEqual({
+      ok: true,
+      freed: ['lib1'],
+      failed: [{ name: 'lib2', message: 'ElevenLabs answered 500: Try again later.' }],
+    })
+    expect((await readAddedVoices(projectFile)).added.map((a) => a.voice)).toEqual([
+      'eleven:own-lib2',
+      'eleven:own-lib3',
+    ])
+  })
+
+  it('removes nothing without a key, or that the studio did not add', async () => {
+    const { projectFile, client } = await withThree()
+    expect(await freeVoices(projectFile, async () => null, ['eleven:own-lib1'], new Set())).toEqual(
+      {
+        ok: false,
+        reason: 'no-key',
+        message: NO_ELEVENLABS_KEY,
+      },
+    )
+    client.deleteVoice = async () => {
+      throw new Error('asked')
+    }
+    expect(await freeVoices(projectFile, async () => client, ['eleven:theirs'], new Set())).toEqual(
+      {
+        ok: true,
+        freed: [],
+        failed: [],
+      },
+    )
   })
 })

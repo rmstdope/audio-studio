@@ -61,6 +61,7 @@ export function fakeEleven(
     tts: speak ? async (request) => (spoken.push(request), await speak()) : unused,
     sharedVoices: unused,
     addSharedVoice: unused,
+    deleteVoice: unused,
     async voice(id) {
       asked.push(id)
       const found = voices[id]

@@ -21,6 +21,7 @@ import {
   startAudition,
   undoLastDrop,
   viewOf,
+  voicesInUse,
 } from './sessions'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { setKeywords } from './auditions'
@@ -962,5 +963,23 @@ describe('an audition per language', () => {
     expect(await sessionFor(projectFile, 'mira', 'sv')).toEqual({ ok: true, session: null })
     const en = await sessionFor(projectFile, 'mira')
     expect(en?.ok && en.session).not.toBeNull()
+  })
+})
+
+describe('voicesInUse', () => {
+  it('names every voice cast, and every voice on an audition in progress', async () => {
+    const { projectFile, session } = await started()
+    await moveVoice(projectFile, 'mira', 'a', 'drop')
+    const used = await voicesInUse(projectFile)
+    expect([...used].sort()).toEqual(
+      [
+        ...new Set(['cur', 't1', ...session.toHear.filter((id) => id !== 'a'), ...session.queue]),
+      ].sort(),
+    )
+  })
+
+  it('names only the cast when no audition is in progress', async () => {
+    const root = tempRepo(files)
+    expect([...(await voicesInUse(join(root, 'audio-studio.json')))].sort()).toEqual(['cur', 't1'])
   })
 })

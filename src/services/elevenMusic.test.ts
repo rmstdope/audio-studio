@@ -23,6 +23,7 @@ function fakeClient() {
     },
     sharedVoices: () => Promise.reject(new Error('not used')),
     addSharedVoice: () => Promise.reject(new Error('not used')),
+    deleteVoice: () => Promise.reject(new Error('not used')),
     music: async (request) => {
       asked.push(request)
       return new Uint8Array([1, 2, 3])

@@ -3925,6 +3925,7 @@ describe('the ElevenLabs account on Setup', () => {
         subscription: async () => starter,
         sharedVoices: () => Promise.reject(new Error('not used')),
         addSharedVoice: () => Promise.reject(new Error('not used')),
+        deleteVoice: () => Promise.reject(new Error('not used')),
         music: unused,
         tts: unused,
         voice: unused,
@@ -3959,6 +3960,7 @@ describe('the ElevenLabs account on Setup', () => {
       },
       sharedVoices: () => Promise.reject(new Error('not used')),
       addSharedVoice: () => Promise.reject(new Error('not used')),
+      deleteVoice: () => Promise.reject(new Error('not used')),
       music: unused,
       tts: unused,
       voice: unused,
@@ -4810,5 +4812,26 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     const cast = await send('POST', '/api/auditions/gran/cast', { voice: 'eleven:l1' })
     expect(await cast.json()).toMatchObject({ ok: true, voice: { id: 'eleven:own-l1' } })
     expect(added).toEqual(['o1/l1'])
+  })
+
+  it('offers a voice it added for freeing once nothing uses it, and frees it', async () => {
+    const freeable = async () =>
+      (await (await fetch(new URL('/api/elevenlabs/voices/freeable', server.url))).json()).voices
+    // Cast as gran's voice: in use.
+    expect(await freeable()).toEqual([])
+    writeFileSync(
+      join(root, 'tts/cast.json'),
+      JSON.stringify({ speakers: { gran: { style: '[warm]' } } }),
+    )
+    expect(await freeable()).toEqual([
+      { voice: 'eleven:own-l1', name: 'Warm Gravel', character: 'gran' },
+    ])
+    const deleted: string[] = []
+    eleven.client.deleteVoice = async (id) => void deleted.push(id)
+    expect((await send('POST', '/api/elevenlabs/voices/free', { voices: [] })).status).toBe(400)
+    const freed = await send('POST', '/api/elevenlabs/voices/free', { voices: ['eleven:own-l1'] })
+    expect(await freed.json()).toEqual({ ok: true, freed: ['Warm Gravel'], failed: [] })
+    expect(deleted).toEqual(['own-l1'])
+    expect(await freeable()).toEqual([])
   })
 })
