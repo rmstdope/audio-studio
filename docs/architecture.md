@@ -1671,7 +1671,7 @@ Small, independently useful increments:
           models; the credits
           budget on the stage's ElevenLabs model; the cue editor saying a line's model speaks
           cues, so none are sent. A line recorded with cues and now on such a model is stale for
-          its model and its cue. The audition row comes with 14.10, which first uses it. The
+          its model and its cue. The audition row came with 14.10b. The
           consumer rules in CLAUDE.md name the new saved keys.
        2. **ElevenLabs' voice settings** (built): `narration.elevenlabs.tts` (stability,
           similarity, style) in the project file, spoken with and fingerprinted in place of the
@@ -1682,8 +1682,17 @@ Small, independently useful increments:
            confirmed, their credits shown and kept in the spending record's `tries` (totals and
            a tile of their own on the Spending page); a try on a model that reads no cues says
            so rather than sending the line's cues or dropping them unseen.
-        2. **Auditions on ElevenLabs**: board takes with ElevenLabs voices, the sitting budgeted
-           in credits, and the ElevenLabs audition row on the Models panel.
+        2. **Auditions on ElevenLabs**, a credits sitting beside Fish's dollars (chosen over a
+           Record button per card, so a board of ElevenLabs voices fills with takes by itself), in
+           three pull requests:
+           1. **The ElevenLabs audition row** (built) on the Models panel, saved at once as
+              Fish's audition row is.
+           2. **The credits sitting** on the server: started and added to in credits, held back
+              from the plan as a recording's credits are, board takes with ElevenLabs voices
+              charged to it.
+           3. **The board's screens** for it: the start box asking for credits (with Fish's
+              dollars when its model is paid), the meter, Add, and "Take waits for more
+              credits".
     11. **Find a voice in ElevenLabs' library**: the provider switch on the audition board, library
         cards and previews, adding a voice on its first take, voice slots shown and freed.
     12. **Design a voice with ElevenLabs**: previews kept as design takes, saved as a voice when

@@ -897,6 +897,15 @@ describe('server, choosing the stages’ models', () => {
     expect(
       (await putEleven('draft', { model: 'eleven_v3', was: 'eleven_flash_v2_5' })).status,
     ).toBe(200)
+    expect(
+      (await putEleven('audition', { model: 'eleven_flash_v2_5', was: 'eleven_v3' })).status,
+    ).toBe(200)
+    expect((await (await fetch(at('/api/models'))).json()).elevenlabs.audition).toBe(
+      'eleven_flash_v2_5',
+    )
+    expect(
+      (await putEleven('audition', { model: 'eleven_v3', was: 'eleven_flash_v2_5' })).status,
+    ).toBe(200)
   })
 
   it('saves ElevenLabs’ voice settings from its own page only, and shows them', async () => {

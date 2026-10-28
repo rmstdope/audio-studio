@@ -241,6 +241,7 @@ describe('the ElevenLabs rows of the Models panel', () => {
       'Audition',
       'Draft',
       'Final',
+      'ElevenLabs audition',
       'ElevenLabs draft',
       'ElevenLabs final',
       'ElevenLabs voice',
@@ -264,6 +265,36 @@ describe('the ElevenLabs rows of the Models panel', () => {
     expect(elevenPut).toEqual([
       {
         url: '/api/models/elevenlabs/draft',
+        body: { model: 'eleven_flash_v2_5', was: 'eleven_v3' },
+      },
+    ])
+  })
+
+  it('says an audition model that speaks cues sends takes and tries without them', () => {
+    const page = render({
+      ...withEleven(),
+      elevenlabs: { audition: 'eleven_flash_v2_5', draft: 'eleven_v3', final: 'eleven_v3' },
+    })
+    expect(page.container.textContent).toContain(
+      'Flash v2.5 speaks cues aloud, so its takes and tries are sent without them.',
+    )
+  })
+
+  it('saves the audition model at once, whatever is recorded', async () => {
+    const page = render(
+      withEleven({ eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 } }),
+    )
+    expect(page.container.textContent).toContain(
+      'Takes and tries of ElevenLabs voices: on a character’s page, Hear it, and auditions.',
+    )
+    await act(async () => {
+      const menu = elevenMenu(page.container, 'audition')
+      menu.value = 'eleven_flash_v2_5'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(elevenPut).toEqual([
+      {
+        url: '/api/models/elevenlabs/audition',
         body: { model: 'eleven_flash_v2_5', was: 'eleven_v3' },
       },
     ])
