@@ -1272,9 +1272,12 @@ within its 1,000; `core/elevenDesign.ts`); when she has too few words ElevenLabs
 text (`auto_generate_text`). A design costs a credit a character of that text, once for its three
 voices (ElevenLabs' help centre), so the confirm names the credits ("Use 130 credits", or "Use up
 to 1,000 credits" for ElevenLabs' own text), and the server holds them back from the plan while it
-designs, as a recording's are; what was charged (the text's characters) is logged in the spending
-record's `tries` as a `design` (a studio from 14.10a to 14.11 cannot read a record holding one). Casting one saves it (`POST /v1/text-to-voice`, named "Mara
-(designed)", a voice slot) and casts `eleven:<new id>`; a save that worked is remembered as Fish's
+designs, as a recording's are, and sends the text it confirmed (not one made again since); the
+description takes 20 to 1,000 characters there (ElevenLabs' reference names no limit; to be checked
+by hand), checked before anything is held; what was charged (the text's characters) is logged in the spending
+record's `tries` as a `design` (a studio from 14.10a to 14.11 cannot read a record holding one). An answer with no voices is a failure that may have been charged. Casting one saves it
+(`POST /v1/text-to-voice`, named "Mara (designed)" each time, since ElevenLabs takes the same name
+twice and the studio does not list the user's voices, a voice slot) and casts `eleven:<new id>`; a save that worked is remembered as Fish's
 is, so a cast that then failed saves nothing twice. If ElevenLabs no longer takes a kept preview's
 id, nothing is cast and its card says a design from an earlier session may need designing again. Cloning stays Fish's.
 
@@ -1404,7 +1407,7 @@ POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json
 POST   /api/characters/:id/clone-voice           a private voice on the Fish account from recordings (multipart: title, voices)
 POST   /api/characters/:id/cast-voice            cast a voice no audition holds ({ voice, name }); ends an audition going on
-GET    /api/characters/:id/designs               the description the design box starts with, and what an ElevenLabs design would say and cost (eleven: { text, credits })
+GET    /api/characters/:id/designs               the description the design box starts with, and what an ElevenLabs design would say and cost (eleven: { text, credits }, null without an audition phrase)
 POST   /api/characters/:id/design                have Fish design voices ({ description, spendUpTo: 0.01 }), or ElevenLabs ({ description, provider: 'elevenlabs', creditsUpTo }); 409 until the cost is confirmed and covered
 POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
                                                  part and language at a time); a paid

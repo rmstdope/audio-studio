@@ -89,7 +89,7 @@ import {
   designsFor,
   elevenDesignFor,
 } from '../services/designs'
-import { ELEVEN_DESIGN_MODEL } from '../core/elevenDesign'
+import { ELEVEN_DESIGN_MODEL, elevenDescriptionState } from '../core/elevenDesign'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -2202,6 +2202,13 @@ export function startServer({
           const { id } = request.params
           if ((await designsFor(projectFile, id, languageOf(request))) === null) return notFound()
           if (body.data.provider === 'elevenlabs') {
+            // A description ElevenLabs would refuse costs no account read and holds nothing.
+            const state = elevenDescriptionState(body.data.description)
+            if (!state.canSend) {
+              const message =
+                state.tooLong ?? 'Describe the voice you want in 20 characters or more.'
+              return Response.json({ ok: false, reason: 'invalid', message }, { status: 409 })
+            }
             const plan = await elevenDesignFor(projectFile, id, languageOf(request))
             if (!plan) return notFound()
             if (!plan.ok) return Response.json(plan, { status: 409 })
@@ -2217,6 +2224,9 @@ export function startServer({
                 body.data.description,
                 elevenFor,
                 languageOf(request),
+                undefined,
+                // The text whose credits were confirmed and held, not one made again since.
+                { text: plan.text },
               )
               if (!result) return notFound()
               return Response.json(result, { status: 'added' in result ? 200 : 409 })

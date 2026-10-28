@@ -404,12 +404,14 @@ describe('designs with ElevenLabs', () => {
     const result = await designElevenVoices(
       projectFile,
       'mira',
-      ' An old wizard ',
+      ' An old wizard, gruff and slow ',
       eleven.elevenFor,
     )
     expect(result).toMatchObject({ ok: true, added: 3 })
     const plan = (await elevenDesignFor(projectFile, 'mira')) as { text: string; credits: number }
-    expect(eleven.asked).toEqual([{ description: 'An old wizard', text: plan.text }])
+    expect(eleven.asked).toEqual([
+      { description: 'An old wizard, gruff and slow', text: plan.text },
+    ])
     const designs = Object.values((await readDesigns(projectFile, 'mira')).voices)
     expect(designs.map((v) => v.design?.generated)).toEqual(['g1', 'g2', 'g3'])
     for (const v of designs) {
@@ -428,13 +430,25 @@ describe('designs with ElevenLabs', () => {
     const eleven = elevenThat()
     eleven.client.designVoices = () =>
       Promise.reject(new ElevenLabsError(422, 'The description is too short.'))
-    expect(await designElevenVoices(projectFile, 'mira', 'old', eleven.elevenFor)).toEqual({
+    expect(
+      await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff', eleven.elevenFor),
+    ).toEqual({
       ok: false,
       reason: 'elevenlabs',
       message: 'The description is too short.',
     })
     expect(Object.keys((await readDesigns(projectFile, 'mira')).voices)).toEqual([])
-    expect(await designElevenVoices(projectFile, 'mira', 'old', async () => null)).toEqual({
+    eleven.client.designVoices = async () => ({ text: 'x'.repeat(120), previews: [] })
+    expect(
+      await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff', eleven.elevenFor),
+    ).toEqual({ ok: false, reason: 'failed', message: 'ElevenLabs sent no voices' })
+    expect(await designElevenVoices(projectFile, 'mira', 'old', eleven.elevenFor)).toMatchObject({
+      ok: false,
+      reason: 'invalid',
+    })
+    expect(
+      await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff', async () => null),
+    ).toEqual({
       ok: false,
       reason: 'no-key',
       message: NO_ELEVENLABS_KEY,
@@ -444,7 +458,7 @@ describe('designs with ElevenLabs', () => {
   it('casts a design by saving it as a voice of the user’s, once, and casting that', async () => {
     const { root, projectFile } = elevenSetup()
     const eleven = elevenThat()
-    await designElevenVoices(projectFile, 'mira', 'An old wizard', eleven.elevenFor)
+    await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff and slow', eleven.elevenFor)
     const started = await startAudition(projectFile, 'mira', fishThat().fishFor)
     if (!started?.ok) throw new Error('no session')
     const first = started.session.designed[0]!
@@ -462,17 +476,35 @@ describe('designs with ElevenLabs', () => {
       voice: { id: 'eleven:v-g1', name: 'Mira (designed)' },
     })
     expect(eleven.saved).toEqual([
-      { generated: 'g1', name: 'Mira (designed)', description: 'An old wizard' },
+      { generated: 'g1', name: 'Mira (designed)', description: 'An old wizard, gruff and slow' },
     ])
     expect(JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).speakers.mira.voice).toBe(
       'eleven:v-g1',
     )
   })
 
+  it('says the text confirmed, not one made again since', async () => {
+    const { projectFile } = elevenSetup()
+    const eleven = elevenThat()
+    const confirmed = 'y'.repeat(140)
+    await designElevenVoices(
+      projectFile,
+      'mira',
+      'An old wizard, gruff and slow',
+      eleven.elevenFor,
+      undefined,
+      undefined,
+      {
+        text: confirmed,
+      },
+    )
+    expect(eleven.asked[0]?.text).toBe(confirmed)
+  })
+
   it('casts nothing when ElevenLabs no longer takes the preview, and says so', async () => {
     const { projectFile } = elevenSetup()
     const eleven = elevenThat()
-    await designElevenVoices(projectFile, 'mira', 'An old wizard', eleven.elevenFor)
+    await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff and slow', eleven.elevenFor)
     const started = await startAudition(projectFile, 'mira', fishThat().fishFor)
     if (!started?.ok) throw new Error('no session')
     const first = started.session.designed[0]!

@@ -4974,14 +4974,33 @@ describe('server, designing voices with ElevenLabs', () => {
     expect(plan.eleven.text).toContain('Come in from the cold')
     const credits = plan.eleven.credits
     expect(credits).toBe([...plan.eleven.text].length)
+    const vague = await send('POST', '/api/characters/gran/design', {
+      description: 'old wizard',
+      provider: 'elevenlabs',
+      creditsUpTo: credits,
+    })
+    expect([vague.status, (await vague.json()).reason]).toEqual([409, 'invalid'])
+    // More than the plan has left is refused, and ElevenLabs is asked nothing.
+    const subscription = eleven.client.subscription
+    eleven.client.subscription = async () => ({
+      ...(await subscription()),
+      charactersUsed: 1000 - credits + 1,
+    })
+    const short = await send('POST', '/api/characters/gran/design', {
+      description: 'An old wizard, gruff and slow',
+      provider: 'elevenlabs',
+      creditsUpTo: credits,
+    })
+    expect(short.status).toBe(409)
+    eleven.client.subscription = subscription
     const unconfirmed = await send('POST', '/api/characters/gran/design', {
-      description: 'An old wizard',
+      description: 'An old wizard, gruff and slow',
       provider: 'elevenlabs',
     })
     expect(unconfirmed.status).toBe(409)
     expect(asked).toEqual([])
     const designed = await send('POST', '/api/characters/gran/design', {
-      description: 'An old wizard',
+      description: 'An old wizard, gruff and slow',
       provider: 'elevenlabs',
       creditsUpTo: credits,
     })

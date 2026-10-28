@@ -28,7 +28,38 @@ export function elevenDesignText(phrase: string, lines: string[]): string | null
   if (chars.length <= MOST_CHARS) return chars.join('')
   const cut = chars.slice(0, MOST_CHARS).join('')
   const space = cut.lastIndexOf(' ')
-  return space > 0 ? cut.slice(0, space).trimEnd() : cut
+  // At a word, unless that leaves too few characters (a line without spaces).
+  const atWord = space > 0 ? cut.slice(0, space).trimEnd() : cut
+  return [...atWord].length >= LEAST_CHARS ? atWord : cut
+}
+
+/** The fewest and most characters of a description ElevenLabs designs from. */
+const DESCRIPTION_CHARS = { least: 20, most: 1000 }
+
+/**
+ * Judges a description for ElevenLabs: it takes 20 to 1,000 characters. The count line says how
+ * many it has of the 20 it needs, or of the 1,000 near the end.
+ */
+export function elevenDescriptionState(text: string): {
+  canSend: boolean
+  count: string | null
+  tooLong: string | null
+} {
+  const length = [...text.trim()].length
+  const { least, most } = DESCRIPTION_CHARS
+  const tooLong = length > most
+  return {
+    canSend: length >= least && !tooLong,
+    count:
+      length > 0 && length < least
+        ? `${length} / ${least} characters at least`
+        : length >= most - 100
+          ? `${length.toLocaleString('en-US')} / ${most.toLocaleString('en-US')}`
+          : null,
+    tooLong: tooLong
+      ? `That’s longer than ElevenLabs takes: ${most.toLocaleString('en-US')} characters at most.`
+      : null,
+  }
 }
 
 /** The credits an ElevenLabs design uses: one a character of its text, at most 1,000 for its own. */

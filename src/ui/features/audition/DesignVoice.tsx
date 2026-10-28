@@ -6,7 +6,11 @@ import {
   designCredit,
   designPoints,
 } from '../../../core/design'
-import { ELEVEN_DESIGN_COUNT, elevenDesignPoints } from '../../../core/elevenDesign'
+import {
+  ELEVEN_DESIGN_COUNT,
+  elevenDescriptionState,
+  elevenDesignPoints,
+} from '../../../core/elevenDesign'
 import { usd } from '../../../core/spend'
 import type { VoiceProvider } from '../../../core/voices'
 import { useCredit, useDesigns, useDesignVoices, useElevenAccount } from '../../api'
@@ -51,13 +55,15 @@ export function DesignVoice({
   // ElevenLabs' plan is read when its confirm opens, for what is left on it.
   const account = useElevenAccount(eleven && confirming)
   const plan = designs.data?.ok ? designs.data.eleven : null
+  // What ElevenLabs' confirm can do: wait for what the previews would say, ask, or say it cannot.
+  const elevenState = plan ? 'ask' : designs.isPending ? 'reading' : 'cannot'
   const field = useRef<HTMLTextAreaElement>(null)
   const pay = useRef<HTMLButtonElement>(null)
   const retry = useRef<HTMLButtonElement>(null)
 
   const last = designs.data?.ok ? designs.data.description : null
   const text = typed ?? last ?? start
-  const state = descriptionState(text)
+  const state = eleven ? elevenDescriptionState(text) : descriptionState(text)
   const pending = design.isPending
   const failure = design.data && !design.data.ok ? design.data : undefined
   const money = designCredit(
@@ -75,10 +81,10 @@ export function DesignVoice({
   }, [confirming, eleven, refetch])
   useEffect(() => {
     if (!confirming) return
-    if (eleven) pay.current?.focus()
-    else if (money.kind === 'ask') pay.current?.focus()
-    else if (money.kind === 'cannot') retry.current?.focus()
-  }, [confirming, eleven, money.kind])
+    const ready = eleven ? elevenState : money.kind
+    if (ready === 'ask') pay.current?.focus()
+    else if (ready === 'cannot') retry.current?.focus()
+  }, [confirming, eleven, elevenState, money.kind])
 
   function onKeyDown(event: KeyboardEvent) {
     if (event.key !== 'Escape' || pending) return
@@ -88,6 +94,8 @@ export function DesignVoice({
   }
 
   function send() {
+    // Never a design the user did not confirm: ElevenLabs' needs its credits known.
+    if (eleven && !plan) return
     setConfirming(false)
     design.mutate(
       eleven && plan
@@ -120,7 +128,7 @@ export function DesignVoice({
         </div>
         <p className="muted">
           {eleven
-            ? `Describe the voice you want. ElevenLabs makes ${ELEVEN_DESIGN_COUNT} voices from it, each saying the audition phrase and ${name}’s lines; they join the audition board.`
+            ? `Describe the voice you want. ElevenLabs makes ${ELEVEN_DESIGN_COUNT} voices from it, each saying ${plan?.text === null ? 'a text it writes' : `the audition phrase and ${name}’s lines`}; they join the audition board.`
             : `Describe the voice you want. Fish makes ${DESIGN_COUNT} voices from it, each saying the audition phrase; they join the audition board.`}
         </p>
         <textarea
@@ -173,31 +181,54 @@ export function DesignVoice({
           </button>
         </div>
       </section>
-      {confirming && eleven && (
-        <Confirm
-          title="Design voices with ElevenLabs?"
-          effects={
-            plan
-              ? elevenDesignPoints(name, auditioning, plan.text)
-              : ['There is no audition phrase to design with; write one first.']
-          }
-          note={planLeftLine(account.error ?? account.data?.account, account.data?.held ?? 0)}
-          back="Cancel"
-          onBack={() => setConfirming(false)}
-        >
-          <button
-            ref={pay}
-            className="btn btn-primary"
-            type="button"
-            disabled={!plan}
-            onClick={send}
+      {confirming &&
+        eleven &&
+        (elevenState === 'cannot' ? (
+          <Confirm
+            title="ElevenLabs can’t design voices now"
+            effects={[
+              designs.isError
+                ? `What the previews would say couldn’t be read: ${designs.error.message}`
+                : 'There is no audition phrase to design with; write one first.',
+            ]}
+            back="Cancel"
+            onBack={() => setConfirming(false)}
           >
-            {plan?.text === null
-              ? `Use up to ${plan.credits.toLocaleString('en-US')} credits`
-              : `Use ${(plan?.credits ?? 0).toLocaleString('en-US')} credits`}
-          </button>
-        </Confirm>
-      )}
+            <button
+              ref={retry}
+              className="btn"
+              type="button"
+              disabled={designs.isFetching}
+              onClick={() => void designs.refetch()}
+            >
+              Try again
+            </button>
+          </Confirm>
+        ) : (
+          <Confirm
+            title="Design voices with ElevenLabs?"
+            effects={
+              plan
+                ? elevenDesignPoints(name, auditioning, plan.text)
+                : ['Reading what the previews would say…']
+            }
+            note={planLeftLine(account.error ?? account.data?.account, account.data?.held ?? 0)}
+            back="Cancel"
+            onBack={() => setConfirming(false)}
+          >
+            <button
+              ref={pay}
+              className="btn btn-primary"
+              type="button"
+              disabled={!plan}
+              onClick={send}
+            >
+              {plan?.text === null
+                ? `Use up to ${plan.credits.toLocaleString('en-US')} credits`
+                : `Use ${(plan?.credits ?? 0).toLocaleString('en-US')} credits`}
+            </button>
+          </Confirm>
+        ))}
       {confirming &&
         !eleven &&
         (money.kind === 'cannot' ? (

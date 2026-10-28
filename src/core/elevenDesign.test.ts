@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test'
-import { elevenDesignCredits, elevenDesignPoints, elevenDesignText } from './elevenDesign'
+import {
+  elevenDescriptionState,
+  elevenDesignCredits,
+  elevenDesignPoints,
+  elevenDesignText,
+} from './elevenDesign'
 
 describe('elevenDesignText', () => {
   const phrase = 'Elior, dear, come in from the cold.'
@@ -28,6 +33,11 @@ describe('elevenDesignText', () => {
     expect(elevenDesignText(enough, ['more'])).toBe(enough)
   })
 
+  it('cuts without a word break rather than fall under 100 characters', () => {
+    const text = elevenDesignText('短い言葉です', ['あ'.repeat(1200)])!
+    expect([...text].length).toBe(1000)
+  })
+
   it('is null when she has too few words: ElevenLabs then writes its own text', () => {
     expect(elevenDesignText('Hush.', ['Go.'])).toBeNull()
   })
@@ -49,5 +59,22 @@ describe('what an ElevenLabs design costs', () => {
       'It uses as many credits as that text has characters, up to 1,000, charged only if it works.',
       'No audition is going on for Mara: this starts one, and the voices join its board.',
     ])
+  })
+})
+
+describe('elevenDescriptionState', () => {
+  it('takes 20 to 1,000 characters, counting how many more it needs or how close it is', () => {
+    expect(elevenDescriptionState('old wizard')).toEqual({
+      canSend: false,
+      count: '10 / 20 characters at least',
+      tooLong: null,
+    })
+    expect(elevenDescriptionState('An old wizard, gruff and slow').canSend).toBe(true)
+    expect(elevenDescriptionState('x'.repeat(950)).count).toBe('950 / 1,000')
+    expect(elevenDescriptionState('x'.repeat(1001))).toMatchObject({
+      canSend: false,
+      tooLong: 'That’s longer than ElevenLabs takes: 1,000 characters at most.',
+    })
+    expect(elevenDescriptionState('  ')).toEqual({ canSend: false, count: null, tooLong: null })
   })
 })

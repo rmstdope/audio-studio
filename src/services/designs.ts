@@ -6,7 +6,12 @@ import { DESIGN_COUNT, descriptionState, previewText, savedName } from '../core/
 import { addDesigns, listDesigns, markSaved, removeDesign } from '../core/designs'
 import { resolveInRoot } from '../core/paths'
 import { declaredLanguage, type Problem } from '../core/project'
-import { ELEVEN_DESIGN_MODEL, elevenDesignCredits, elevenDesignText } from '../core/elevenDesign'
+import {
+  ELEVEN_DESIGN_MODEL,
+  elevenDescriptionState,
+  elevenDesignCredits,
+  elevenDesignText,
+} from '../core/elevenDesign'
 import { elevenVoice } from '../core/voices'
 import { ffmpegEncoder, type Encoder } from './audio'
 import type { FishFactory } from './auditions'
@@ -173,24 +178,27 @@ export async function elevenDesignFor(
       message: 'There is no audition phrase to design with; write one first.',
     }
   }
+  const phrase = seen.audition.phrase
   const lines: string[] = []
   for (const { part } of character.languages[seen.language]?.appearances ?? []) {
+    // Parts are read only until there is enough to say.
+    if (elevenDesignText(phrase, lines) !== null) break
     const read = await readPart(projectFile, part, asked)
     if (!read?.ok || read.dialog.status !== 'ok') continue
     for (const line of read.dialog.lines) {
       if (line.speaker === characterId && line.text) lines.push(line.text)
     }
   }
-  const text = elevenDesignText(seen.audition.phrase, lines)
+  const text = elevenDesignText(phrase, lines)
   return { ok: true, text, credits: elevenDesignCredits(text) }
 }
 
 /**
- * Has ElevenLabs design voices from a description (Eleven v3 design), each saying what
- * `elevenDesignFor` gives, and keeps them for the character as Fish's designs are kept, with the id
- * each is saved by; the credits it charged (its text's characters) go in the spending record. If
- * an audition is going on they join its board. Nothing is kept when ElevenLabs fails. The caller
- * has admitted the cost.
+ * Has ElevenLabs design voices from a description (Eleven v3 design), each saying `planned`'s
+ * text (what was confirmed; what `elevenDesignFor` gives when absent), and keeps them for the
+ * character as Fish's designs are kept, with the id each is saved by; the credits it charged (its
+ * text's characters) go in the spending record. If an audition is going on they join its board.
+ * Nothing is kept when ElevenLabs fails. The caller has admitted the cost.
  */
 export async function designElevenVoices(
   projectFile: string,
@@ -199,18 +207,24 @@ export async function designElevenVoices(
   elevenFor: ElevenLabsFactory,
   asked?: string,
   at: Date = new Date(),
+  planned?: { text: string | null },
 ): Promise<DesignResult> {
   const text = description.trim()
-  const state = descriptionState(text)
+  const state = elevenDescriptionState(text)
   if (!state.canSend) {
     return {
       ok: false,
       reason: 'invalid',
-      message: state.tooLong ?? 'Describe the voice you want first.',
+      message: state.tooLong ?? 'Describe the voice you want in 20 characters or more.',
     }
   }
-  const plan = await elevenDesignFor(projectFile, characterId, asked)
-  if (!plan?.ok) return plan
+  let preview: string | null
+  if (planned) preview = planned.text
+  else {
+    const plan = await elevenDesignFor(projectFile, characterId, asked)
+    if (!plan?.ok) return plan
+    preview = plan.text
+  }
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
   const root = dirname(projectFile)
@@ -225,7 +239,7 @@ export async function designElevenVoices(
   const language = declaredLanguage(loaded.project.narration, asked)
   const stamp = at.toISOString()
   try {
-    const designed = await client.designVoices({ description: text, text: plan.text })
+    const designed = await client.designVoices({ description: text, text: preview })
     const said = [...designed.text].length
     try {
       // Charged by ElevenLabs as soon as it answered: logged even if the studio cannot keep them.
@@ -241,6 +255,9 @@ export async function designElevenVoices(
       })
     } catch {
       // Only the record of what it cost is lost.
+    }
+    if (!designed.previews.length) {
+      return { ok: false, reason: 'failed', message: 'ElevenLabs sent no voices' }
     }
     const ids = designed.previews.map((_, index) => designId(characterId, language, stamp, index))
     for (const [index, preview] of designed.previews.entries()) {
