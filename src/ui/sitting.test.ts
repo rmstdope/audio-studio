@@ -171,5 +171,8 @@ describe('the words of an audition’s credits', () => {
       'What is left on your plan is unknown: Down.',
     )
     expect(planLeftLine(undefined, 0)).toBe('Reading your plan…')
+    expect(planLeftLine(new Error('the studio answered 500'), 0)).toBe(
+      'What is left on your plan is unknown: the studio answered 500',
+    )
   })
 })

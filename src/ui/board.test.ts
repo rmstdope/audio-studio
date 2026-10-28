@@ -13,6 +13,7 @@ import {
   takeClip,
   takesToRecord,
   undoFor,
+  takeWaits,
   waitingForCredits,
 } from './board'
 
@@ -352,5 +353,19 @@ describe('designFailureLine', () => {
       expect(designFailureLine({ reason, message: 'Say it.' })).toBe('Say it.')
     }
     expect(designFailureLine({ ok: false } as never)).toBe('The project’s files need fixing.')
+  })
+})
+
+describe('takeWaits', () => {
+  const none = new Set<string>()
+  it('an ElevenLabs voice without a take waits for credits while the audition has none', () => {
+    expect(takeWaits('eleven:g', { credits: false, waiting: none, take: false })).toBe('credits')
+    expect(takeWaits('eleven:g', { credits: false, waiting: none, take: true })).toBeUndefined()
+    expect(takeWaits('eleven:g', { credits: true, waiting: none, take: false })).toBeUndefined()
+  })
+  it('a voice the server made wait waits for more of its own money', () => {
+    const waiting = new Set(['eleven:g', 'f'])
+    expect(takeWaits('eleven:g', { credits: true, waiting, take: false })).toBe('more-credits')
+    expect(takeWaits('f', { credits: false, waiting, take: false })).toBe('money')
   })
 })

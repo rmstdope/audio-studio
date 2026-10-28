@@ -25,6 +25,7 @@ import {
   saveFailedLine,
   stopEffectsFor,
   takesToRecord,
+  takeWaits,
   undoFor,
   waitingForCredits,
 } from '../../board'
@@ -117,7 +118,10 @@ export function ShortlistBoard({
   // ElevenLabs voices' takes are paid in credits: without them they wait, and the board asks.
   const credits = money?.eleven.sitting ?? null
   const onBoard = recordable(session, credits !== null)
-  const wantCredits = money && !credits ? waitingForCredits(session, takes) : []
+  // While a paid model's dollars are asked for, so are the credits after them: the dollars'
+  // fresh sitting would end credits given before.
+  const wantCredits =
+    money && !credits && !(paid && !sitting) ? waitingForCredits(session, takes) : []
   // Unknown money counts as free: the server refuses a paid take that has no sitting anyway.
   const ready = !sittingQuery.isPending && (!paid || sitting !== null)
   const missing =
@@ -135,10 +139,13 @@ export function ShortlistBoard({
   }, [missing.join(',')])
 
   // Money added to the sitting: the voices that waited for it get their takes.
+  // Only a change of a total is new money, and only for the voices it pays for.
   useEffect(() => {
-    if ((sitting && !sitting.usedUp) || (credits && !credits.usedUp)) recorder.retryWaiting()
-    // Only a change of a total is new money.
-  }, [sitting?.dollars, credits?.dollars])
+    if (sitting && !sitting.usedUp) recorder.retryWaiting('fish')
+  }, [sitting?.dollars])
+  useEffect(() => {
+    if (credits && !credits.usedUp) recorder.retryWaiting('elevenlabs')
+  }, [credits?.dollars])
   const waitingIn = (provider: VoiceProvider) =>
     [...recorder.waiting].filter((v) => providerOf(v) === provider).length
   // The account's own voices are fetched when the board opens (a start, or a resume).
@@ -216,15 +223,11 @@ export function ShortlistBoard({
         take={takes[id] ?? null}
         recording={recorder.recording.has(id)}
         onRecord={() => void recorder.record(id)}
-        waits={
-          wantCredits.includes(id)
-            ? 'credits'
-            : recorder.waiting.has(id)
-              ? providerOf(id) === 'elevenlabs'
-                ? 'more-credits'
-                : 'money'
-              : undefined
-        }
+        waits={takeWaits(id, {
+          credits: credits !== null,
+          waiting: recorder.waiting,
+          take: Boolean(takes[id]),
+        })}
         listed={listed}
         error={saveFailed ? saveFailedLine(saveFailed) : (recorder.errors[id] ?? null)}
         actions={

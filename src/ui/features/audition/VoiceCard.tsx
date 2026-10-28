@@ -16,7 +16,8 @@ const WAITS = {
 
 /**
  * A voice in an audition: who made it and how popular it is, its take (the audition phrase in the
- * character's style) or a button to record one (or why it waits), its provider's own sample, and, on the board, what can be done with it (`actions`).
+ * character's style) or a button to record one (or why it waits), its provider's own sample,
+ * and, on the board, what can be done with it (`actions`).
  */
 export function VoiceCard({
   voice,

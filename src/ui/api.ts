@@ -56,6 +56,7 @@ import type { TakeResult, TryResult } from '../services/takes'
 import type { AuditionText } from '../core/takes'
 import type { SittingView } from '../core/sitting'
 import { takeCaches, waitingAfter } from './sitting'
+import { providerOf, type VoiceProvider } from '../core/voices'
 import { voiceTitleOf } from './castLanguages'
 import { isAbout, takeAnswerState, withAuditionTakes, withTake, withVoiceTake } from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
@@ -1034,7 +1035,7 @@ export function useSetCue(partId: string, language?: string) {
  * credits the Spending page then reads again); each goes only to its own cached answer
  * (`takeCaches`). `recording` holds the voices in progress, `errors` what went
  * wrong per voice, `waiting` the voices whose take waits for more money (`retryWaiting` asks for
- * them again).
+ * a provider's again, once its money was added).
  */
 export function useTakes(characterId: string, board = false, language?: string) {
   const client = useQueryClient()
@@ -1102,9 +1103,12 @@ export function useTakes(characterId: string, board = false, language?: string) 
     [board, characterId, client, language],
   )
 
-  const retryWaiting = useCallback(() => {
-    for (const voice of waiting) void record(voice)
-  }, [record, waiting])
+  const retryWaiting = useCallback(
+    (provider: VoiceProvider) => {
+      for (const voice of waiting) if (providerOf(voice) === provider) void record(voice)
+    },
+    [record, waiting],
+  )
 
   return { record, recording, errors, waiting, retryWaiting }
 }

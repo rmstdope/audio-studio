@@ -1193,7 +1193,9 @@ only, the fingerprint needs no provider of its own.
 /api/elevenlabs/account`: the account as plans show it and the credits running recordings and
   sittings hold), with "Use up to N credits". It is `…/sitting/add` `{ credits }`, which, for a
   sitting that has none yet and an audition that is going on, admits them as a fresh half beside
-  any dollars, so a Fish-only audition never asks and an ElevenLabs outage never stops one. Once
+  any dollars, so a Fish-only audition never asks and an ElevenLabs outage never stops one. While
+  a paid model's dollars are asked for (the resume box), the bar waits until they are given,
+  since that box's fresh sitting would end credits given before it. Once
   given, those voices record by themselves, and a second meter shows the credits (model, used of
   given, about N takes left) with Add when they are used up, as the dollars' meter does. A resume
   asks for them again the same way.

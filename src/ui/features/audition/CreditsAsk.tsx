@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { parseCredits } from '../../../core/sitting'
 import { useElevenAccount } from '../../api'
 import { creditsLabel, creditsPoints, creditsWaitLine, planLeftLine } from '../../sitting'
@@ -22,26 +22,26 @@ export function CreditsAsk({
   model: string
   /** A take's credits on it. */
   perTake: number
+  /** The credits the field starts with: about 50 takes. */
   suggested: number
   /** How many ElevenLabs voices on the board wait for credits. */
   waiting: number
+  /** Whether credits are being given now (the button waits). */
   busy: boolean
   /** Why giving them did nothing, if it did not. */
   failure?: string
+  /** Gives the audition the credits typed. */
   onGive: (credits: number) => void
 }) {
   const [text, setText] = useState(String(suggested))
   const fieldId = useId()
+  // Read afresh when the bar opens (nothing keeps it fresh), and the last answer shown meanwhile.
   const account = useElevenAccount()
-  const { refetch } = account
-  // What is left on the plan may have changed since it was last read: ask when the bar opens.
-  useEffect(() => void refetch(), [refetch])
   const given = parseCredits(text)
   const give = (event: FormEvent) => {
     event.preventDefault()
     if (given !== null && !busy) onGive(given)
   }
-  const plan = account.isFetching ? undefined : account.data
   return (
     <form className="credits-ask" aria-label="Credits for ElevenLabs voices" onSubmit={give}>
       <strong>{creditsWaitLine(waiting)}</strong>
@@ -64,9 +64,7 @@ export function CreditsAsk({
           <span aria-hidden="true">credits</span>
         </span>
         <span className="muted">
-          {account.isError
-            ? `What is left on your plan is unknown: ${account.error.message}`
-            : planLeftLine(plan?.account, plan?.held ?? 0)}
+          {planLeftLine(account.error ?? account.data?.account, account.data?.held ?? 0)}
         </span>
         <button className="btn btn-primary" type="submit" disabled={given === null || busy}>
           {creditsLabel(text)}

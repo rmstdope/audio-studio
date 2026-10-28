@@ -151,10 +151,11 @@ export function creditsLabel(text: string, more = false): string {
 
 /**
  * What is left on the ElevenLabs plan beside what running recordings and auditions hold (`held`),
- * or why it is unknown; undefined while it is read.
+ * or why it is unknown (ElevenLabs' answer, or the studio's error); undefined while it is read.
  */
-export function planLeftLine(account: ElevenAnswer | undefined, held: number): string {
+export function planLeftLine(account: ElevenAnswer | Error | undefined, held: number): string {
   if (!account) return 'Reading your plan…'
+  if (account instanceof Error) return `What is left on your plan is unknown: ${account.message}`
   if (!account.ok) return `What is left on your plan is unknown: ${account.message}`
   const left = Math.max(creditsLeft(account.account) - held, 0)
   const besides = held ? ', besides what recordings and auditions running now hold' : ''

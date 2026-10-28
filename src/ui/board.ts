@@ -54,6 +54,20 @@ export function recordable(session: AuditionSession, credits: boolean): string[]
   return boardVoices(session).filter((id) => credits || providerOf(id) === 'fish')
 }
 
+/**
+ * What a voice's take waits for: credits (an ElevenLabs voice without a take, in an audition given
+ * none), or more of its own money once the server made it wait; undefined when it does not wait.
+ */
+export function takeWaits(
+  voice: string,
+  { credits, waiting, take }: { credits: boolean; waiting: Set<string>; take: boolean },
+): 'money' | 'credits' | 'more-credits' | undefined {
+  const eleven = providerOf(voice) === 'elevenlabs'
+  if (eleven && !credits && !take) return 'credits'
+  if (!waiting.has(voice)) return undefined
+  return eleven ? 'more-credits' : 'money'
+}
+
 /** The ElevenLabs voices on the board with no take, which wait while the audition has no credits. */
 export function waitingForCredits(
   session: AuditionSession,
