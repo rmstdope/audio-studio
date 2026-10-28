@@ -500,7 +500,9 @@ async function speakEleven(
     let outcome = await run()
     // A run shared with another request that was not paid for (its sitting was short or had
     // ended) is not this one's answer: this one tries on its own, with its own money.
-    if (!ran && !('made' in outcome)) outcome = await run()
+    // Several may be queued so: each pass either runs this request's own job or shares a run
+    // whose owner's job finished it, so this ends; the bound only guards against a bug.
+    for (let pass = 0; !ran && !('made' in outcome) && pass < 20; pass++) outcome = await run()
     if ('ended' in outcome) {
       return { ok: false, reason: 'no-sitting', message: 'The audition’s sitting has ended.' }
     }

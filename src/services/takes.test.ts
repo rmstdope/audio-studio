@@ -665,6 +665,33 @@ describe('takes and tries with an ElevenLabs voice', () => {
     expect(short.left).toBe(10)
   })
 
+  it('makes a page take queued behind two short board takes', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({}, { speak: wav })
+    const { limiter, free, waiting } = queued()
+    const short = createBudget({ model: 'eleven_v3', dollars: 10 })
+    const options = { elevenlabs: async () => eleven.client, elevenLimiter: limiter }
+    const ask = (board: boolean) =>
+      recordTake(
+        join(root, 'audio-studio.json'),
+        'grandmother',
+        'eleven:g1',
+        async () => fakeFish().fish,
+        createLimiter(),
+        board ? { ...options, board, credits: short } : options,
+      )
+    const first = ask(true)
+    await waiting(1)
+    const second = ask(true)
+    await waiting(2)
+    const page = ask(false)
+    await waiting(3)
+    free()
+    expect(await first).toMatchObject({ reason: 'waits' })
+    expect(await second).toMatchObject({ reason: 'waits' })
+    expect(await page).toMatchObject({ ok: true, credits: 22 })
+  })
+
   it('reports the credits of a shared board take once, to the request that paid them', async () => {
     const root = tempRepo(elevenFiles())
     const eleven = fakeEleven({}, { speak: wav })

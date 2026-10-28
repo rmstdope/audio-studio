@@ -603,12 +603,13 @@ export function startServer({
     const heldWhenAsked = new Set(creditBudgets)
     const answer = await accountOf(client)
     // From here to `hold` nothing awaits.
-    const holding = [...new Set([...creditBudgets, ...heldWhenAsked])].filter(
-      (b) => b !== replacing,
+    const holding = [...new Set([...creditBudgets, ...heldWhenAsked])]
+    // A sitting about to be replaced holds only its takes in flight, which ElevenLabs may still bill.
+    const held = holding.reduce(
+      (sum, b) => sum + (b === replacing ? (creditsInFlight.get(b) ?? 0) : heldCredits(b)),
+      0,
     )
-    const left = answer.ok
-      ? creditsLeft(answer.account) - holding.reduce((sum, b) => sum + heldCredits(b), 0)
-      : null
+    const left = answer.ok ? creditsLeft(answer.account) - held - landingCredits() : null
     const problem = creditProblem({ ceiling: credits, confirmed: credits, left })
     if (!problem) hold()
     return problem
@@ -645,6 +646,13 @@ export function startServer({
       : budget.dollars
   /** What ElevenLabs takes sent but not finished cost, per sitting. */
   const creditsInFlight = new Map<Budget, number>()
+  /**
+   * Sittings ended (or replaced) with takes still in flight: what those takes cost stays held
+   * until each lands, since ElevenLabs may bill them all the same.
+   */
+  const landing = new Set<Budget>()
+  const landingCredits = () =>
+    [...landing].reduce((sum, b) => sum + (creditsInFlight.get(b) ?? 0), 0)
 
   /**
    * Admits recording `keys` of a planned part: a Fish budget in dollars and an ElevenLabs one in
@@ -704,7 +712,11 @@ export function startServer({
     map.set(budget, (map.get(budget) ?? 0) + amount)
     return () => {
       const now = map.get(budget)
-      if (now !== undefined) map.set(budget, Math.max(now - amount, 0))
+      if (now === undefined) return
+      const rest = Math.max(now - amount, 0)
+      map.set(budget, rest)
+      // An ended sitting's last take has landed: nothing of it is held any more.
+      if (rest === 0 && landing.delete(budget)) map.delete(budget)
     }
   }
   /** What takes sent but not finished cost, per sitting: Fish's credit may not show it yet. */
@@ -804,12 +816,16 @@ export function startServer({
     if (given.credits && creditSittings.get(key) === given.credits) endCredits(key)
   }
 
-  /** Ends a sitting's ElevenLabs credits alone: the plan's credits are free again. */
+  /**
+   * Ends a sitting's ElevenLabs credits alone: what was left is free again, but what its takes in
+   * flight cost stays held until they land (`landing`).
+   */
   function endCredits(characterId: string) {
     const credits = creditSittings.get(characterId)
     if (credits) {
       creditBudgets.delete(credits)
-      creditsInFlight.delete(credits)
+      if (creditsInFlight.get(credits)) landing.add(credits)
+      else creditsInFlight.delete(credits)
     }
     creditSittings.delete(characterId)
   }
@@ -1157,10 +1173,9 @@ export function startServer({
           if (!plan.ok || !plan.plan.eleven) return Response.json(plan)
           // What the plan has left, beside what its ElevenLabs lines take and what running
           // recordings and auditions hold.
-          const elevenHeld = [...creditBudgets].reduce(
-            (sum, budget) => sum + heldCredits(budget),
-            0,
-          )
+          const elevenHeld =
+            [...creditBudgets].reduce((sum, budget) => sum + heldCredits(budget), 0) +
+            landingCredits()
           return Response.json({ ...plan, elevenAccount: await shownAccount(), elevenHeld })
         }),
       },

@@ -1174,7 +1174,9 @@ only, the fingerprint needs no provider of its own.
   a fresh sitting's `{ amount?, credits? }` (its dollars needed on a paid model, refused with
   nothing to give on a free one), and `…/sitting/add` `{ amount }` or `{ credits }` to top it up.
   A start or a fresh sitting admits both halves before replacing either, so a refusal leaves the
-  running sitting as it was, and its old credits are not counted against the new. The credits are admitted as a recording's are (what the plan has left, less what running
+  running sitting as it was, and its old credits are not counted against the new, but for
+  its takes in flight: those stay held, also once their sitting has ended, until each lands
+  (ElevenLabs may bill them all the same). The credits are admitted as a recording's are (what the plan has left, less what running
   recordings hold and what sittings have left and have in flight), checked and held in one step
   (`holdCredits`), and charged to the take just before it is sent, given back when ElevenLabs
   fails; one that does not fit waits ("Take waits for more credits"), a request that shared another's
