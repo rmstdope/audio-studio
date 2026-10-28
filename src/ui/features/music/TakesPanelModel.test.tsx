@@ -503,19 +503,14 @@ describe('the count menu on a track’s Takes panel', () => {
       '5 takes · $0.65',
       '6 takes · $0.78',
     ])
-    // The closed menu shows the chosen entry's count; the list, once open, shows every total.
-    expect([...page.count().options].map((o) => o.getAttribute('label'))).toEqual([
-      null,
-      '2 takes',
-      null,
-      null,
-      null,
-      null,
-    ])
+    // Closed, every entry reads as its bare count so the menu is only as wide as '6 takes';
+    // the list, once open, shows every total.
+    const labels = () => [...page.count().options].map((o) => o.getAttribute('label'))
+    expect(labels()).toEqual(['1 take', '2 takes', '3 takes', '4 takes', '5 takes', '6 takes'])
     act(() => {
       page.count().dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     })
-    expect(page.count().selectedOptions[0]!.getAttribute('label')).toBeNull()
+    expect(labels().every((l) => l === null)).toBe(true)
   })
 
   it('names the count on the button, and the total on a paid model, later or first batch', () => {

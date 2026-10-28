@@ -184,7 +184,7 @@ export function TakesPanel({
     >
       {counts.map((n) => (
         // The closed menu shows only the count; the open list shows each entry in full.
-        <option key={n} value={n} label={n === count && !countOpen ? takesCount(n) : undefined}>
+        <option key={n} value={n} label={countOpen ? undefined : takesCount(n)}>
           {takeCountEntry(n, model, length)}
         </option>
       ))}
