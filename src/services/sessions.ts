@@ -8,6 +8,7 @@ import {
   bringFound,
   bringMore,
   markAdded,
+  unmarkAdded,
   drop,
   placeOf,
   seen,
@@ -650,6 +651,27 @@ export function voiceAdded(
   )
 }
 
+/**
+ * Marks library voices (their library ids) as no longer among the user's voices on every
+ * audition in progress, once removed to free their slots, so a take or cast adds them again.
+ */
+export async function voicesRemoved(projectFile: string, voices: string[]): Promise<void> {
+  if (!voices.length) return
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return
+  for (const character of loaded.summary.characters) {
+    for (const language of loaded.project.narration.languages) {
+      await changeSession(
+        projectFile,
+        character.id,
+        (session) => unmarkAdded(session, voices),
+        undefined,
+        language,
+      )
+    }
+  }
+}
+
 /** A voice as the character's audition in progress shows it; undefined if it is not in one. */
 export async function boardVoice(
   projectFile: string,
@@ -658,6 +680,44 @@ export async function boardVoice(
   language?: string,
 ): Promise<Voice | undefined> {
   return (await readSession(projectFile, characterId, language))?.voices[voiceId]
+}
+
+/**
+ * The voices in use: every voice cast for a character in a language, and every voice on an
+ * audition in progress (shortlisted, to hear, queued, the last one dropped, which Undo brings
+ * back, or the voice it started with). Null when that cannot be known (the project, the cast or a saved
+ * audition cannot be read), so nothing is taken for unused.
+ */
+export async function voicesInUse(projectFile: string): Promise<Set<string> | null> {
+  const used = new Set<string>()
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok || !loaded.cast) return null
+  for (const character of loaded.summary.characters) {
+    for (const casting of Object.values(character.languages)) {
+      if (casting.voice) used.add(casting.voice)
+    }
+    for (const language of loaded.project.narration.languages) {
+      const json = await readJson(await sessionPath(projectFile, character.id, language))
+      if (json.status === 'missing') continue
+      // One of an earlier version is no longer an audition in progress (see the schema).
+      if (json.status === 'ok' && isOlderSession(json.value)) continue
+      const parsed = json.status === 'ok' ? AuditionSessionSchema.safeParse(json.value) : null
+      if (!parsed?.success) return null
+      const { current, shortlist, yours, designed, toHear, queue, dropped } = parsed.data
+      for (const id of [...shortlist, ...yours, ...designed, ...toHear, ...queue]) used.add(id)
+      // Undo brings back the last voice dropped.
+      const undoable = dropped.at(-1)
+      if (undoable) used.add(undoable.id)
+      if (current) used.add(current)
+    }
+  }
+  return used
+}
+
+/** Whether a saved session is of an earlier version than the studio reads. */
+function isOlderSession(value: unknown): boolean {
+  const version = (value as { version?: unknown } | null)?.version
+  return typeof version === 'number' && version < 2
 }
 
 /** The saved session; none if there is no file, or it does not fit (an older version, a hand edit). */

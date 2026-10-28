@@ -390,3 +390,27 @@ describe('adding a library voice', () => {
     ).rejects.toThrow('ElevenLabs answered 400: You have reached your voice limit.')
   })
 })
+
+describe('removing a voice', () => {
+  it('deletes it by its id', async () => {
+    const { fetch, asked } = fakeFetch({ status: 'ok' })
+    await createElevenLabsClient('k', { fetch }).deleteVoice('own1')
+    expect(asked[0]!.url).toBe('https://api.elevenlabs.io/v1/voices/own1')
+    expect(asked[0]!.method).toBe('DELETE')
+  })
+
+  it('takes an empty answer as done', async () => {
+    const { fetch } = fakeFetch('')
+    await createElevenLabsClient('k', { fetch }).deleteVoice('own1')
+  })
+
+  it("throws ElevenLabs' own message", async () => {
+    const { fetch } = fakeFetch(
+      { detail: { message: 'A voice with the voice_id x was not found.' } },
+      404,
+    )
+    await expect(createElevenLabsClient('k', { fetch }).deleteVoice('x')).rejects.toThrow(
+      'ElevenLabs answered 404: A voice with the voice_id x was not found.',
+    )
+  })
+})

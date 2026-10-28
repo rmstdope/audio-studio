@@ -102,3 +102,12 @@ export type ElevenVoices = z.infer<typeof ElevenVoicesSchema>
 export function addedVoiceFor(file: ElevenVoices, library: string): string | null {
   return file.added.find((a) => a.library === library)?.voice ?? null
 }
+
+/**
+ * The voices the studio added that may be removed to free their voice slots: those not in `used`
+ * (the voices cast, and those on an audition in progress) by either id. A voice the user added on
+ * ElevenLabs is never among them, since the studio did not add it.
+ */
+export function freeableVoices(file: ElevenVoices, used: Set<string>): ElevenVoices['added'] {
+  return file.added.filter((a) => !used.has(a.library) && !used.has(a.voice))
+}

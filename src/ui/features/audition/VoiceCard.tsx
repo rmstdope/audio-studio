@@ -12,6 +12,7 @@ const WAITS = {
   money: 'Take waits for more money',
   credits: 'Take waits for credits',
   'more-credits': 'Take waits for more credits',
+  slot: 'Take waits for a free voice slot',
 }
 
 /**
@@ -47,9 +48,10 @@ export function VoiceCard({
   onRecord: () => void
   /**
    * What its take waits for: more money (a paid audition whose money is used), credits (an
-   * ElevenLabs voice in an audition given none) or more of them (its credits used).
+   * ElevenLabs voice in an audition given none), more of them (its credits used), or a free voice
+   * slot (a library voice its take would add, at the plan's limit).
    */
-  waits?: 'money' | 'credits' | 'more-credits'
+  waits?: 'money' | 'credits' | 'more-credits' | 'slot'
   /** Whether the voice is on the shortlist, which is shown apart. */
   listed?: boolean
   /** On the board: buttons for what can be done with the voice. */

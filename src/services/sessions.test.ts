@@ -21,6 +21,8 @@ import {
   startAudition,
   undoLastDrop,
   viewOf,
+  voicesInUse,
+  voicesRemoved,
 } from './sessions'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { setKeywords } from './auditions'
@@ -876,6 +878,12 @@ describe('an audition per language', () => {
   }
   const castFile = (root: string) => JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
 
+  it('counts the voices on an audition in another language as in use', async () => {
+    const { projectFile, session } = await begin()
+    const used = await voicesInUse(projectFile)
+    expect(session.toHear.every((id) => used?.has(id))).toBe(true)
+  })
+
   it('starts with her voice in another language on the shortlist, when she has none in this one', async () => {
     const { projectFile, session } = await begin()
     expect(session.current).toBeNull()
@@ -962,5 +970,59 @@ describe('an audition per language', () => {
     expect(await sessionFor(projectFile, 'mira', 'sv')).toEqual({ ok: true, session: null })
     const en = await sessionFor(projectFile, 'mira')
     expect(en?.ok && en.session).not.toBeNull()
+  })
+})
+
+describe('voicesInUse', () => {
+  it('names every voice cast, and every voice on an audition in progress', async () => {
+    const { projectFile, session } = await started()
+    await moveVoice(projectFile, 'mira', 'a', 'drop')
+    // The last voice dropped can be brought back with Undo: it is in use too.
+    expect([...(await voicesInUse(projectFile))!].sort()).toEqual(
+      [...new Set(['cur', 't1', ...session.toHear, ...session.queue])].sort(),
+    )
+    // One dropped before it cannot.
+    await moveVoice(projectFile, 'mira', 'b', 'drop')
+    const used = await voicesInUse(projectFile)
+    expect(used!.has('b')).toBe(true)
+    expect(used!.has('a')).toBe(false)
+  })
+
+  it('knows nothing in use when the cast or a session cannot be read, so nothing is freed', async () => {
+    const { root, projectFile } = await started()
+    const [file] = readdirSync(join(root, '.audio-studio/auditions'))
+    writeFileSync(join(root, '.audio-studio/auditions', file!), '{"version": 2}')
+    expect(await voicesInUse(projectFile)).toBeNull()
+    // One of an earlier version is no audition in progress.
+    writeFileSync(join(root, '.audio-studio/auditions', file!), '{"version": 1}')
+    expect([...(await voicesInUse(projectFile))!].sort()).toEqual(['cur', 't1'])
+    const broken = tempRepo({ ...files, 'tts/cast.json': '{ not json' })
+    expect(await voicesInUse(join(broken, 'audio-studio.json'))).toBeNull()
+  })
+
+  it('names only the cast when no audition is in progress', async () => {
+    const root = tempRepo(files)
+    expect([...(await voicesInUse(join(root, 'audio-studio.json')))!].sort()).toEqual(['cur', 't1'])
+  })
+})
+
+describe('voicesRemoved', () => {
+  it('marks a library voice removed as not added on the audition showing it', async () => {
+    const { projectFile } = await started()
+    const { client } = fakeEleven()
+    client.sharedVoices = async () => ({
+      voices: [{ ...voice('eleven:l1', 'Warm l1'), library: { owner: 'o', added: true } }],
+      more: false,
+    })
+    await moreVoices(projectFile, 'mira', fishFor, undefined, {
+      provider: 'elevenlabs',
+      elevenFor: async () => client,
+    })
+    await voicesRemoved(projectFile, ['eleven:l1'])
+    const result = await sessionFor(projectFile, 'mira')
+    expect(result?.ok && result.session?.voices['eleven:l1']?.library).toEqual({
+      owner: 'o',
+      added: false,
+    })
   })
 })

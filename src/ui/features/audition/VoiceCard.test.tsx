@@ -26,7 +26,7 @@ const george: Voice = {
 }
 
 /** The card's text, rendered without a take. */
-async function rendered(voice: Voice, waits?: 'money' | 'credits' | 'more-credits') {
+async function rendered(voice: Voice, waits?: 'money' | 'credits' | 'more-credits' | 'slot') {
   const container = document.createElement('div')
   const page = createRoot(container)
   await act(() =>
@@ -79,6 +79,9 @@ describe('VoiceCard, an ElevenLabs voice', () => {
     expect((await rendered(gravel, 'credits')).text).toContain(
       'Its first take adds it to your ElevenLabs voices',
     )
+    const full = await rendered(gravel, 'slot')
+    expect(full.text).toContain('Take waits for a free voice slot')
+    expect(full.buttons).toEqual(['Play ElevenLabs’ preview of George'])
   })
 
   it('says a library voice already in the user’s voices is, and that nothing is added', async () => {

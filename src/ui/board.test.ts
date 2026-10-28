@@ -7,6 +7,10 @@ import {
   designFailureLine,
   recordable,
   saveFailedLine,
+  freeEffects,
+  slotWaiters,
+  slotsLeftFor,
+  slotsLine,
   sampleClip,
   stopEffects,
   stopEffectsFor,
@@ -391,5 +395,83 @@ describe('takeWaits', () => {
     const waiting = new Set(['eleven:g', 'f'])
     expect(takeWaits('eleven:g', { credits: true, waiting, take: false })).toBe('more-credits')
     expect(takeWaits('f', { credits: false, waiting, take: false })).toBe('money')
+  })
+})
+
+describe('voice slots', () => {
+  const lib = (added: boolean) => ({ library: { owner: 'o', added } })
+  const session = {
+    shortlist: ['eleven:a'],
+    yours: [],
+    toHear: ['eleven:b', 'eleven:c', 'eleven:d', 'f'],
+    designed: [],
+    voices: {
+      'eleven:a': lib(false),
+      'eleven:b': lib(true),
+      'eleven:c': lib(false),
+      'eleven:d': lib(false),
+    },
+  }
+
+  it('makes the library voices a take would add wait beyond the slots left, in board order', () => {
+    expect([...slotWaiters(session as never, {}, 1)]).toEqual(['eleven:c', 'eleven:d'])
+    // A voice with a take was added already: it takes no slot.
+    expect([...slotWaiters(session as never, { 'eleven:a': 'k' }, 1)]).toEqual(['eleven:d'])
+    expect([...slotWaiters(session as never, {}, 0)]).toEqual(['eleven:a', 'eleven:c', 'eleven:d'])
+    // Unknown slots: nothing waits; ElevenLabs refuses at its limit anyway.
+    expect([...slotWaiters(session as never, {}, null)]).toEqual([])
+  })
+
+  it('lets a voice whose take failed before adding it hold no slot', () => {
+    expect([...slotWaiters(session as never, {}, 1, new Set(['eleven:a']))]).toEqual(['eleven:d'])
+  })
+
+  it('counts takes that may have added a voice since the slots were read as using one', () => {
+    const slots = { used: 8, limit: 10 }
+    const added = new Map([
+      ['eleven:a', 1000],
+      ['eleven:b', 3000],
+    ])
+    expect(slotsLeftFor(slots, added, 2000)).toBe(1)
+    expect(slotsLeftFor(slots, added, 4000)).toBe(2)
+    expect(slotsLeftFor(null, added, 0)).toBeNull()
+  })
+
+  it('leaves the voices that wait for a slot out of the voices to record', () => {
+    const waiting = slotWaiters(session as never, {}, 1)
+    expect(recordable(session as never, true, waiting)).toEqual(['eleven:a', 'eleven:b', 'f'])
+  })
+
+  it('says a take waits for a free slot once it has credits', () => {
+    const none = new Set<string>()
+    expect(takeWaits('eleven:c', { credits: true, waiting: none, take: false, slot: true })).toBe(
+      'slot',
+    )
+    expect(takeWaits('eleven:c', { credits: false, waiting: none, take: false, slot: true })).toBe(
+      'credits',
+    )
+  })
+
+  it('says how many slots are used, and when all are', () => {
+    expect(slotsLine({ used: 8, limit: 10 })).toBe('ElevenLabs voice slots: 8 of 10 used')
+    expect(slotsLine({ used: 10, limit: 10 })).toBe(
+      'All 10 ElevenLabs voice slots are used: takes that would add a library voice wait until one is free.',
+    )
+  })
+
+  it('names the voices freeing removes, and what it does not touch', () => {
+    expect(
+      freeEffects([
+        { voice: 'eleven:a', name: 'Gravel', character: 'wizard' },
+        { voice: 'eleven:b', name: 'Brook', character: 'gran' },
+      ]),
+    ).toEqual([
+      'Removes Gravel and Brook from your ElevenLabs voices. The studio added them in auditions; neither is cast or on an audition in progress in this project.',
+      'Their takes are kept. A voice removed can be found in the library and added again.',
+      'Voices you added on ElevenLabs yourself are never removed. Another game using the same ElevenLabs account is not checked.',
+    ])
+    expect(freeEffects([{ voice: 'eleven:a', name: 'Gravel', character: 'wizard' }])[0]).toBe(
+      'Removes Gravel from your ElevenLabs voices. The studio added it in an audition; it is not cast or on an audition in progress in this project.',
+    )
   })
 })

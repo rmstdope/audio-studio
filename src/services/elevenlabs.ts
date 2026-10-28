@@ -34,6 +34,8 @@ export interface ElevenLabsClient {
    * `name`, and gives its id on the account.
    */
   addSharedVoice(owner: string, id: string, name: string): Promise<string>
+  /** Removes a voice from the user's voices, by ElevenLabs' id, which frees its voice slot. */
+  deleteVoice(id: string): Promise<void>
 }
 
 /** What ElevenLabs' library is searched with. */
@@ -175,14 +177,19 @@ export function createElevenLabsClient(
   }: { fetch?: typeof globalThis.fetch; baseUrl?: string; timeoutMs?: number } = {},
 ): ElevenLabsClient {
   /**
-   * A GET (or, given a `body`, a POST of it as JSON) whose whole answer, the body included, gives
+   * A GET (a DELETE when asked, or, given a `body`, a POST of it as JSON) whose whole answer, the body included, gives
    * up after `waitMs`, saying so.
    */
-  async function call(path: string, waitMs: number, body?: unknown): Promise<unknown> {
+  async function call(
+    path: string,
+    waitMs: number,
+    body?: unknown,
+    method?: 'DELETE',
+  ): Promise<unknown> {
     try {
       const response = await fetch(new URL(path, baseUrl), {
         ...(body === undefined
-          ? { headers: { 'xi-api-key': apiKey } }
+          ? { method: method ?? 'GET', headers: { 'xi-api-key': apiKey } }
           : {
               method: 'POST',
               headers: { 'xi-api-key': apiKey, 'content-type': 'application/json' },
@@ -192,6 +199,8 @@ export function createElevenLabsClient(
       })
       if (!response.ok) throw new ElevenLabsError(response.status, await errorMessage(response))
       const text = await response.text()
+      // A delete may answer with nothing.
+      if (!text && method === 'DELETE') return null
       try {
         return JSON.parse(text) as unknown
       } catch {
@@ -335,6 +344,15 @@ export function createElevenLabsClient(
       )
       if (!parsed.success) throw new Error(UNREADABLE)
       return parsed.data.voice_id
+    },
+
+    async deleteVoice(id) {
+      await call(
+        `/v1/voices/${encodeURIComponent(id)}`,
+        Math.min(timeoutMs, LOOKUP_TIMEOUT_MS),
+        undefined,
+        'DELETE',
+      )
     },
 
     async subscription() {

@@ -1,4 +1,5 @@
 import type { AuditionSession } from '../core/audition'
+import type { FreedResult } from '../services/elevenVoices'
 import {
   keepPreviousData,
   useIsMutating,
@@ -1036,23 +1037,26 @@ export function useSetCue(partId: string, language?: string) {
 }
 
 /**
- * Records audition takes: `record(voice)` asks the server for the take and adds it to the board
- * and the cast voice in the cache, without asking Fish for anything else. `board` says the takes
- * are the audition board's (on the audition model, paid from the sitting); the cast voice's on
- * its page are on the free model (ElevenLabs' audition model for an ElevenLabs voice, whose
+ * Records audition takes: `record(voice, adding)` asks the server for the take and adds it to the
+ * board and the cast voice in the cache, without asking Fish for anything else. `board` says the
+ * takes are the audition board's (on the audition model, paid from the sitting); the cast voice's
+ * on its page are on the free model (ElevenLabs' audition model for an ElevenLabs voice, whose
  * credits the Spending page then reads again); each goes only to its own cached answer
- * (`takeCaches`). `recording` holds the voices in progress, `errors` what went
- * wrong per voice, `waiting` the voices whose take waits for more money (`retryWaiting` asks for
- * a provider's again, once its money was added).
+ * (`takeCaches`). `recording` holds the voices in progress, `errors` what went wrong per voice,
+ * `waiting` the voices whose take waits for more money (`retryWaiting` asks for a provider's
+ * again, once its money was added). `adding` says a take would add a library voice to the user's
+ * voices: `mayHaveAdded` holds when each such take answered, as it may have used a voice slot.
  */
 export function useTakes(characterId: string, board = false, language?: string) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [waiting, setWaiting] = useState<Set<string>>(new Set())
+  // When a board take of a library voice not yet added answered: it may have used a voice slot.
+  const [mayHaveAdded, setMayHaveAdded] = useState<Map<string, number>>(new Map())
 
   const record = useCallback(
-    async (voice: string) => {
+    async (voice: string, adding = false) => {
       setRecording((now) => new Set(now).add(voice))
       setErrors(({ [voice]: _gone, ...rest }) => rest)
       try {
@@ -1068,6 +1072,12 @@ export function useTakes(characterId: string, board = false, language?: string) 
           throw new Error(`recording answered ${response.status}`)
         }
         const result = (await response.json()) as NonNullable<TakeResult>
+        if (adding && !('reason' in result && result.reason === 'waits')) {
+          // Counted as a slot used until the account is read again, which it now is.
+          setMayHaveAdded((now) => new Map(now).set(voice, Date.now()))
+          void client.invalidateQueries({ queryKey: ['eleven-account'] })
+          void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+        }
         if (result.ok) {
           setWaiting((now) => waitingAfter(now, voice, 'recorded'))
           const caches = takeCaches(board)
@@ -1102,6 +1112,9 @@ export function useTakes(characterId: string, board = false, language?: string) 
         // An ElevenLabs take spent credits: the Spending page and the sidebar read them again.
         if (result.ok && result.credits !== undefined) {
           void client.invalidateQueries({ queryKey: ['spending'] })
+          // It may have added a library voice, using a voice slot.
+          void client.invalidateQueries({ queryKey: ['eleven-account'] })
+          void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
         }
       } catch (error) {
         setErrors((now) => ({
@@ -1120,13 +1133,15 @@ export function useTakes(characterId: string, board = false, language?: string) 
   )
 
   const retryWaiting = useCallback(
-    (provider: VoiceProvider) => {
-      for (const voice of waiting) if (providerOf(voice) === provider) void record(voice)
+    (provider: VoiceProvider, adding: (voice: string) => boolean = () => false) => {
+      for (const voice of waiting) {
+        if (providerOf(voice) === provider) void record(voice, adding(voice))
+      }
     },
     [record, waiting],
   )
 
-  return { record, recording, errors, waiting, retryWaiting }
+  return { record, recording, errors, waiting, retryWaiting, mayHaveAdded }
 }
 
 /** A character's audition in progress, with the phrase and the takes of the voices in it. */
@@ -1217,6 +1232,8 @@ export function useSessionAction(characterId: string, language?: string) {
         )
       }
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId, language ?? ''] })
+      // A voice dropped, brought back or cast may change which voices' slots can be freed.
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
       // Starting opens a sitting, stopping ends it.
       if (action === 'start' || action === 'discard') {
         void client.invalidateQueries({ queryKey: ['sitting', characterId] })
@@ -1313,6 +1330,9 @@ export function useCast(characterId: string, language?: string) {
       void client.invalidateQueries({ queryKey: ['part'] })
       void client.invalidateQueries({ queryKey: ['voice', characterId] })
       void client.invalidateQueries({ queryKey: ['sitting', characterId] })
+      // Casting may add a library voice (a slot used) and ends the audition (voices freed).
+      void client.invalidateQueries({ queryKey: ['eleven-account'] })
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
     },
   })
 }
@@ -1724,11 +1744,70 @@ export interface ElevenAccountAnswer {
   held: number
 }
 
-/** The ElevenLabs plan and what is held of it, for the board's bar that asks for credits. */
-export function useElevenAccount() {
+/**
+ * The ElevenLabs plan and what is held of it, for the board's bar that asks for credits and its
+ * voice slots; asked only while `enabled`.
+ */
+export function useElevenAccount(enabled = true) {
   return useQuery({
     queryKey: ['eleven-account'],
     queryFn: () => getJson<ElevenAccountAnswer>('/api/elevenlabs/account'),
+    enabled,
+  })
+}
+
+/** A voice the studio added from ElevenLabs' library that nothing uses, whose slot can be freed. */
+export interface FreeableVoice {
+  voice: string
+  name: string
+  /** The character whose audition added it. */
+  character: string
+}
+
+/** The voices whose slots can be freed, or why none is offered (what is in use cannot be read). */
+export type FreeableAnswer =
+  { ok: true; voices: FreeableVoice[] } | { ok: false; reason: 'unknown-use'; message: string }
+
+/** The voices the studio added that nothing uses, or why none is offered. */
+export function useFreeableVoices() {
+  return useQuery({
+    queryKey: ['eleven-freeable'],
+    queryFn: async () => {
+      const response = await fetch('/api/elevenlabs/voices/freeable')
+      // A 409 is an answer: what is in use cannot be read.
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`the voices to free answered ${response.status}`)
+      }
+      return (await response.json()) as FreeableAnswer
+    },
+  })
+}
+
+/** What freeing voice slots did, or why the server removed nothing: what is in use cannot be read. */
+export type FreeAnswer = FreedResult | { ok: false; reason: 'unknown-use'; message: string }
+
+/**
+ * Removes voices the studio added from the user's ElevenLabs voices, freeing their slots; the
+ * account and the voices that can be freed are read again after.
+ */
+export function useFreeVoices() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (voices: string[]) => {
+      const response = await fetch('/api/elevenlabs/voices/free', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ voices }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`freeing voice slots answered ${response.status}`)
+      }
+      return (await response.json()) as FreeAnswer
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['eleven-account'] })
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+    },
   })
 }
 

@@ -1519,6 +1519,19 @@ button.cue-chip[aria-expanded='true'] {
   align-self: auto;
 }
 
+/* The plan's ElevenLabs voice slots, on a line of their own below Bring in more */
+.voice-slots {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.voice-slots .confirm {
+  flex-basis: 100%;
+}
+
 .voice-card.kept {
   background: var(--panel);
   border-color: var(--kept-line);

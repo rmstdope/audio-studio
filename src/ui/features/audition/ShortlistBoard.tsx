@@ -7,6 +7,7 @@ import type { SessionView } from '../../../services/sessions'
 import { castInLanguage, shortlistNote, type Language } from '../../castLanguages'
 import {
   useCast,
+  useElevenAccount,
   useOwnVoices,
   useRuledOut,
   useSessionAction,
@@ -22,6 +23,9 @@ import {
   ownSectionState,
   playsVoice,
   recordable,
+  addsVoice,
+  slotWaiters,
+  slotsLeftFor,
   saveFailedLine,
   stopEffectsFor,
   takesToRecord,
@@ -39,6 +43,7 @@ import { voiceIdFrom } from '../../voiceId'
 import { CreditsAsk } from './CreditsAsk'
 import { SittingBox, sittingFailure } from './SittingBox'
 import { SittingMeter } from './SittingMeter'
+import { VoiceSlots } from './VoiceSlots'
 import { VoiceCard } from './VoiceCard'
 
 /** What the board is asking about before it acts: casting a voice, or stopping the audition. */
@@ -119,7 +124,26 @@ export function ShortlistBoard({
   const sitting = money?.sitting ?? null
   // ElevenLabs voices' takes are paid in credits: without them they wait, and the board asks.
   const credits = money?.eleven.sitting ?? null
-  const onBoard = recordable(session, credits !== null)
+  // The plan's voice slots matter once library voices are on the board, or are being searched for.
+  const showsSlots =
+    from === 'elevenlabs' || Object.values(session.voices).some((voice) => voice.library)
+  const account = useElevenAccount(showsSlots)
+  const slots =
+    account.data?.account.ok && account.data.account.account.voiceSlots.limit > 0
+      ? account.data.account.account.voiceSlots
+      : null
+  // Whether a voice's take would add it to the user's ElevenLabs voices, using a slot.
+  const adds = (id: string) => addsVoice(session, takes, id)
+  // Library voices whose take would add them wait while no slot is free for them; a take that
+  // may have added one counts until the account is read again.
+  const slotWaiting = slotWaiters(
+    session,
+    takes,
+    // While the account is being read, none is known to be free.
+    account.isPending ? 0 : slotsLeftFor(slots, recorder.mayHaveAdded, account.dataUpdatedAt),
+    new Set(Object.keys(recorder.errors)),
+  )
+  const onBoard = recordable(session, credits !== null, slotWaiting)
   // While a paid model's dollars are asked for, so are the credits after them: the dollars'
   // fresh sitting would end credits given before.
   const wantCredits =
@@ -135,7 +159,7 @@ export function ShortlistBoard({
   useEffect(() => {
     for (const voice of missing) {
       asked.current.add(`${audition?.spoken}\n${voice}`)
-      void recorder.record(voice)
+      void recorder.record(voice, adds(voice))
     }
     // `missing` is new on every render; what it holds is what matters.
   }, [missing.join(',')])
@@ -146,7 +170,7 @@ export function ShortlistBoard({
     if (sitting && !sitting.usedUp) recorder.retryWaiting('fish')
   }, [sitting?.dollars])
   useEffect(() => {
-    if (credits && !credits.usedUp) recorder.retryWaiting('elevenlabs')
+    if (credits && !credits.usedUp) recorder.retryWaiting('elevenlabs', adds)
   }, [credits?.dollars])
   const waitingIn = (provider: VoiceProvider) =>
     [...recorder.waiting].filter((v) => providerOf(v) === provider).length
@@ -198,8 +222,7 @@ export function ShortlistBoard({
     const designed = voice.design !== undefined
     // Saving a design to the Fish account takes a while: its card says so, and a failure stays on it.
     // A library voice not yet in the user's ElevenLabs voices is added when it is cast.
-    const adds = Boolean(voice.library && !voice.library.added && !takes[id])
-    const saving = (designed || adds) && cast.isPending && cast.variables === id
+    const saving = (designed || adds(id)) && cast.isPending && cast.variables === id
     const saveFailed =
       (designed || voice.library) &&
       cast.data &&
@@ -226,11 +249,12 @@ export function ShortlistBoard({
         toggle={toggle}
         take={takes[id] ?? null}
         recording={recorder.recording.has(id)}
-        onRecord={() => void recorder.record(id)}
+        onRecord={() => void recorder.record(id, adds(id))}
         waits={takeWaits(id, {
           credits: credits !== null,
           waiting: recorder.waiting,
           take: Boolean(takes[id]),
+          slot: slotWaiting.has(id),
         })}
         listed={listed}
         error={
@@ -638,6 +662,13 @@ export function ShortlistBoard({
           </button>
         </form>
         {idError && <span className="adopt-error">{idError}</span>}
+        {showsSlots && (
+          <VoiceSlots
+            slots={slots}
+            unread={account.isError && account.data ? account.error.message : undefined}
+            onRetry={() => void account.refetch()}
+          />
+        )}
         <Failure title="The audition could not go on" result={act.data} />
         <Failure
           title="The voice could not be cast"

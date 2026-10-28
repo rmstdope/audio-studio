@@ -1,3 +1,4 @@
+import type { FreeableVoice } from './api'
 import type { AuditionSession } from '../core/audition'
 import type { Appearance } from '../core/summary'
 import { providerOf, type VoiceProvider } from '../core/voices'
@@ -54,22 +55,109 @@ function boardVoices(session: AuditionSession): string[] {
 
 /**
  * The voices of the board that get a take recorded: Fish's, and ElevenLabs' once the audition has
- * credits for them (`credits`).
+ * credits for them (`credits`), except those waiting for a free voice slot (`slotWaiting`).
  */
-export function recordable(session: AuditionSession, credits: boolean): string[] {
-  return boardVoices(session).filter((id) => credits || providerOf(id) === 'fish')
+export function recordable(
+  session: AuditionSession,
+  credits: boolean,
+  slotWaiting: Set<string> = new Set(),
+): string[] {
+  return boardVoices(session).filter(
+    (id) => (credits || providerOf(id) === 'fish') && !slotWaiting.has(id),
+  )
+}
+
+/** Whether a voice's take would add it to the user's ElevenLabs voices: from the library, not added, no take yet. */
+export function addsVoice(
+  session: AuditionSession,
+  takes: Record<string, string>,
+  voice: string,
+): boolean {
+  const library = session.voices[voice]?.library
+  return Boolean(library && !library.added && !takes[voice])
+}
+
+/**
+ * The library voices on the board whose take would add them (`addsVoice`) beyond the `slotsLeft`
+ * free voice slots, in board order: they wait for a slot. With no slot known to be free (0, as
+ * while the account is being read) all of them wait; with the slots unknown (null: no key, or the
+ * account could not be read) none does, as ElevenLabs refuses at its limit anyway. None of those
+ * in `failed`, whose take failed and is not asked again.
+ */
+export function slotWaiters(
+  session: AuditionSession,
+  takes: Record<string, string>,
+  slotsLeft: number | null,
+  failed: Set<string> = new Set(),
+): Set<string> {
+  if (slotsLeft === null) return new Set()
+  // A voice whose take failed is not asked again for this phrase, so it holds no slot.
+  const adding = boardVoices(session).filter(
+    (id) => addsVoice(session, takes, id) && !failed.has(id),
+  )
+  return new Set(adding.slice(Math.max(0, slotsLeft)))
+}
+
+/**
+ * The voice slots free for library voices' takes: those the account had when last read
+ * (`readAt`), less one for every take that may have added a voice since (`mayHaveAdded`, when
+ * each answered), until the account is read again. Null while the slots are unknown.
+ */
+export function slotsLeftFor(
+  slots: { used: number; limit: number } | null,
+  mayHaveAdded: Map<string, number>,
+  readAt: number,
+): number | null {
+  if (!slots) return null
+  const since = [...mayHaveAdded.values()].filter((at) => at > readAt).length
+  return slots.limit - slots.used - since
+}
+
+/** The line that says how many of the plan's ElevenLabs voice slots are used. */
+export function slotsLine({ used, limit }: { used: number; limit: number }): string {
+  return used >= limit
+    ? `All ${limit} ElevenLabs voice slots are used: takes that would add a library voice wait until one is free.`
+    : `ElevenLabs voice slots: ${used} of ${limit} used`
+}
+
+/** What freeing voice slots does, in sentences, for the page to ask before removing voices. */
+export function freeEffects(voices: FreeableVoice[]): string[] {
+  const names = voices.map((v) => v.name)
+  const listed =
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
+  const one = names.length === 1
+  return [
+    one
+      ? `Removes ${listed} from your ElevenLabs voices. The studio added it in an audition; it is not cast or on an audition in progress in this project.`
+      : `Removes ${listed} from your ElevenLabs voices. The studio added them in auditions; ${names.length === 2 ? 'neither' : 'none'} is cast or on an audition in progress in this project.`,
+    `${one ? 'Its takes are' : 'Their takes are'} kept. A voice removed can be found in the library and added again.`,
+    'Voices you added on ElevenLabs yourself are never removed. Another game using the same ElevenLabs account is not checked.',
+  ]
 }
 
 /**
  * What a voice's take waits for: credits (an ElevenLabs voice without a take, in an audition given
- * none), or more of its own money once the server made it wait; undefined when it does not wait.
+ * none), a free voice slot (a library voice its take would add, at the plan's limit), or more of
+ * its own money once the server made it wait; undefined when it does not wait.
  */
 export function takeWaits(
   voice: string,
-  { credits, waiting, take }: { credits: boolean; waiting: Set<string>; take: boolean },
-): 'money' | 'credits' | 'more-credits' | undefined {
+  {
+    credits,
+    waiting,
+    take,
+    slot = false,
+  }: {
+    credits: boolean
+    waiting: Set<string>
+    take: boolean
+    /** Whether it waits for a free voice slot (see `slotWaiters`). */
+    slot?: boolean
+  },
+): 'money' | 'credits' | 'more-credits' | 'slot' | undefined {
   const eleven = providerOf(voice) === 'elevenlabs'
   if (eleven && !credits && !take) return 'credits'
+  if (eleven && slot && !take) return 'slot'
   if (!waiting.has(voice)) return undefined
   return eleven ? 'more-credits' : 'money'
 }
