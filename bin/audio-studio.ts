@@ -62,8 +62,8 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
 }
 
 // Bun has read the env files of this folder into the environment, where a key would win over
-// the project's env file for good: forget those, so a key changed in the file is seen.
-forgetLoadedKeys(process.cwd())
+// the project's env file for good: forget those of the project's own, so a key changed in it is seen.
+forgetLoadedKeys(process.cwd(), projectFile)
 
 const server = startServer({ projectFile, port, development: values.dev })
 

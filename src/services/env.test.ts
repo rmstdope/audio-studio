@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { elevenLabsApiKey, fishApiKey, forgetLoadedKeys, parseEnv } from './env'
 
@@ -7,6 +8,14 @@ describe('parseEnv', () => {
     expect(
       parseEnv('# comment\nA=1\nexport B="two words"\nC = \'3\'\n\nnot a line\nD=x=y\n'),
     ).toEqual({ A: '1', B: 'two words', C: '3', D: 'x=y' })
+  })
+
+  it('leaves out a comment after an unquoted value, as Bun does, and keeps a # in quotes', () => {
+    expect(parseEnv('A=abc  # my key\nB="x # y" # note\nC=a#b\n')).toEqual({
+      A: 'abc',
+      B: 'x # y',
+      C: 'a#b',
+    })
   })
 })
 
@@ -43,9 +52,13 @@ describe('elevenLabsApiKey', () => {
 })
 
 describe('forgetLoadedKeys', () => {
-  it('forgets the keys Bun loaded from the folder’s env files, so the project’s file is read live', () => {
-    const dir = tempRepo({
-      '.env': 'FISH_AUDIO_API_KEY=from-file\nELEVENLABS_API_KEY="eleven-file"\n',
+  /** A project in a folder, its env file and the folder's other env files as given. */
+  const project = (files: Record<string, unknown>, env?: string) =>
+    tempRepo({ 'audio-studio.json': projectJson(env ? { env } : {}), ...files })
+
+  it('forgets the keys Bun loaded from the project’s env file in the start folder, so it is read live', () => {
+    const dir = project({
+      '.env': 'FISH_AUDIO_API_KEY=from-file  # mine\nELEVENLABS_API_KEY="eleven-file"\n',
       '.env.local': 'ELEVENLABS_API_KEY=eleven-local\n',
     })
     const environment: Record<string, string | undefined> = {
@@ -53,17 +66,26 @@ describe('forgetLoadedKeys', () => {
       ELEVENLABS_API_KEY: 'eleven-local',
       OTHER: 'kept',
     }
-    forgetLoadedKeys(dir, environment)
+    forgetLoadedKeys(dir, join(dir, 'audio-studio.json'), environment)
     expect(environment).toEqual({ OTHER: 'kept' })
   })
 
-  it('keeps a key exported with another value, and does nothing without env files', () => {
-    const dir = tempRepo({ '.env': 'FISH_AUDIO_API_KEY=from-file\n' })
+  it('keeps a key exported with another value', () => {
+    const dir = project({ '.env': 'FISH_AUDIO_API_KEY=from-file\n' })
     const environment: Record<string, string | undefined> = { FISH_AUDIO_API_KEY: 'exported' }
-    forgetLoadedKeys(dir, environment)
+    forgetLoadedKeys(dir, join(dir, 'audio-studio.json'), environment)
     expect(environment).toEqual({ FISH_AUDIO_API_KEY: 'exported' })
-    const none: Record<string, string | undefined> = { ELEVENLABS_API_KEY: 'x' }
-    forgetLoadedKeys(tempRepo({}), none)
-    expect(none).toEqual({ ELEVENLABS_API_KEY: 'x' })
+  })
+
+  it('keeps the keys of a start folder that is not the project’s, or whose .env is not its env file', () => {
+    const parent = tempRepo({ '.env': 'FISH_AUDIO_API_KEY=parent\n' })
+    const game = project({})
+    const fromParent: Record<string, string | undefined> = { FISH_AUDIO_API_KEY: 'parent' }
+    forgetLoadedKeys(parent, join(game, 'audio-studio.json'), fromParent)
+    expect(fromParent).toEqual({ FISH_AUDIO_API_KEY: 'parent' })
+    const other = project({ '.env': 'FISH_AUDIO_API_KEY=root\n' }, 'config/keys.env')
+    const fromRoot: Record<string, string | undefined> = { FISH_AUDIO_API_KEY: 'root' }
+    forgetLoadedKeys(other, join(other, 'audio-studio.json'), fromRoot)
+    expect(fromRoot).toEqual({ FISH_AUDIO_API_KEY: 'root' })
   })
 })
