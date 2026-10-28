@@ -6,6 +6,7 @@ import {
   parseAmount,
   perTakeCost,
   suggestedAmount,
+  suggestedCredits,
   sittingMoney,
   takesLeft,
 } from './sitting'
@@ -19,6 +20,15 @@ describe('perTakeCost', () => {
   it('is free on the free model and unknown for an unpriced one', () => {
     expect(perTakeCost('s2.1-pro-free', 100, at)).toBe(0)
     expect(perTakeCost('mystery', 100, at)).toBeNull()
+  })
+})
+
+describe('suggestedCredits', () => {
+  it('is about 50 takes, rounded up to the next hundred credits (at least a hundred)', () => {
+    expect(suggestedCredits(42)).toBe(2100)
+    expect(suggestedCredits(43)).toBe(2200)
+    expect(suggestedCredits(1)).toBe(100)
+    expect(suggestedCredits(0)).toBe(100)
   })
 })
 

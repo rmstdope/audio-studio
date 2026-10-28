@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { dirname, join } from 'node:path'
 import { readWav, writeWav } from '../core/wav'
 import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
-import type { ElevenLabsClient } from '../services/elevenlabs'
+import { NO_ELEVENLABS_KEY, type ElevenLabsClient } from '../services/elevenlabs'
 import { FishError, type FishClient } from '../services/fish'
 import { createLimiter } from '../services/limit'
 import { recordLine } from '../services/narration'
@@ -428,7 +428,7 @@ describe('server', () => {
     expect((await fetch(url(`/api/takes/${body.key}`))).status).toBe(404)
   })
 
-  it('refuses an ElevenLabs voice on the board, and for casting a voice made from recordings', async () => {
+  it('makes no board take of an ElevenLabs voice without a key, and refuses one for casting a voice made from recordings', async () => {
     const send = (path: string, body: unknown) =>
       fetch(url(path), {
         method: 'POST',
@@ -442,11 +442,8 @@ describe('server', () => {
     const board = await send('/api/characters/narrator/takes', { voice, board: true })
     expect([board.status, await board.json()]).toEqual([
       200,
-      {
-        ok: false,
-        reason: 'not-yet',
-        message: 'Auditions with ElevenLabs voices come in a later step.',
-      },
+      // This studio has no ElevenLabs key; with one, a board take without credits is refused too.
+      { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY },
     ])
   })
 
@@ -4421,5 +4418,279 @@ describe('takes and tries with an ElevenLabs voice', () => {
     expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([...wav])
     const page = await (await fetch(new URL('/api/spending', elevenServer.url))).json()
     expect(page.tries).toEqual({ count: 2, credits: 12 + taken.credits })
+  })
+})
+
+describe('server, an audition paid in ElevenLabs credits', () => {
+  const root = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': {
+      speakers: { gran: { voice: 'eleven:g1', style: '[warm]' }, kid: { voice: 'k1' } },
+    },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'gran', text: 'Hello.' },
+      { key: 'b', speaker: 'kid', text: 'Hi.' },
+    ],
+  })
+  const { client: eleven, spoken } = fakeEleven(
+    { g1: elevenVoiceOf('g1') },
+    {
+      account: {
+        tier: 'starter',
+        charactersUsed: 0,
+        characterLimit: 1000,
+        renewsAt: null,
+        overage: 0,
+        voiceSlots: { used: 0, limit: 10 },
+      },
+      speak: () => new Uint8Array([0x52, 0x49, 0x46, 0x46, 1]),
+    },
+  )
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    elevenlabs: eleven,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const sitting = async (id: string) => (await fetch(at(`/api/auditions/${id}/sitting`))).json()
+  const boardTake = async (id: string, voice: string) =>
+    (await send('POST', `/api/characters/${id}/takes`, { voice, board: true })).json()
+
+  it('tells ElevenLabs’ audition model, a take’s credits and the credits to suggest', async () => {
+    const body = await sitting('gran')
+    expect(body.eleven).toMatchObject({ model: 'eleven_v3', sitting: null })
+    expect(body.eleven.perTake).toBeGreaterThan(0)
+    expect(body.eleven.suggested % 100).toBe(0)
+  })
+
+  it('makes no board take of an ElevenLabs voice without credits, nor starts with more than the plan has', async () => {
+    expect(await boardTake('gran', 'eleven:g1')).toMatchObject({ ok: false, reason: 'no-sitting' })
+    const over = await send('POST', '/api/auditions/gran/start', { creditsUpTo: 2000 })
+    expect([over.status, (await over.json()).reason]).toEqual([409, 'credits'])
+    expect((await sitting('gran')).eleven.sitting).toBeNull()
+    expect(spoken).toEqual([])
+  })
+
+  it('starts with credits, charges board takes to them, holds what is left, and adds more', async () => {
+    const started = await send('POST', '/api/auditions/gran/start', { creditsUpTo: 100 })
+    expect(started.status).toBe(200)
+    expect((await sitting('gran')).eleven.sitting).toMatchObject({ dollars: 100, spent: 0 })
+    const taken = await boardTake('gran', 'eleven:g1')
+    expect(taken).toMatchObject({ ok: true, model: 'eleven_v3' })
+    const after = (await sitting('gran')).eleven
+    expect(after.sitting.spent).toBe(after.perTake)
+    // What the sitting has left is held back from the plan's credits for any other sitting.
+    const free = 1000 - after.sitting.left
+    const greedy = await send('POST', '/api/auditions/kid/start', { creditsUpTo: free + 1 })
+    expect([greedy.status, (await greedy.json()).reason]).toEqual([409, 'credits'])
+    // Exactly what is free fits: the sitting holds what it has left, not what it was given.
+    expect((await send('POST', '/api/auditions/kid/start', { creditsUpTo: free })).status).toBe(200)
+    await send('DELETE', '/api/auditions/kid/sitting')
+    const added = await send('POST', '/api/auditions/gran/sitting/add', { credits: 50 })
+    expect(added.status).toBe(200)
+    expect((await added.json()).eleven.sitting.dollars).toBe(150)
+    const tooMuch = await send('POST', '/api/auditions/gran/sitting/add', { credits: 5000 })
+    expect([tooMuch.status, (await tooMuch.json()).reason]).toEqual([409, 'credits'])
+  })
+
+  it('ends the credits with the sitting, and a fresh sitting can be given them alone', async () => {
+    await send('DELETE', '/api/auditions/gran/sitting')
+    expect((await sitting('gran')).eleven.sitting).toBeNull()
+    expect(await boardTake('gran', 'eleven:g1')).toMatchObject({ ok: true, cached: true })
+    const fresh = await send('POST', '/api/auditions/gran/sitting', { credits: 200 })
+    expect(fresh.status).toBe(200)
+    expect((await fresh.json()).eleven.sitting).toMatchObject({ dollars: 200, spent: 0 })
+    expect((await send('POST', '/api/auditions/gran/sitting', {})).status).toBe(400)
+    // On a free audition model there are no dollars to give, and the credits are left as they are.
+    const dollars = await send('POST', '/api/auditions/gran/sitting', { amount: 1 })
+    expect([dollars.status, (await dollars.json()).reason]).toEqual([409, 'confirm-credits'])
+    expect((await sitting('gran')).eleven.sitting).toMatchObject({ dollars: 200 })
+    const both = await send('POST', '/api/auditions/gran/sitting/add', { amount: 1, credits: 1 })
+    expect(both.status).toBe(400)
+  })
+})
+
+describe('server, an audition’s dollars and credits together', () => {
+  const paid = projectJson({
+    narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
+  })
+  const root = tempRepo({
+    'audio-studio.json': paid,
+    'tts/cast.json': {
+      speakers: { gran: { voice: 'eleven:g1', style: '[warm]' }, kid: { voice: 'k1' } },
+    },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'gran', text: 'Hello.' },
+      { key: 'b', speaker: 'kid', text: 'Hi.' },
+    ],
+  })
+  let release: () => void = () => {}
+  const { client: eleven } = fakeEleven(
+    { g1: elevenVoiceOf('g1') },
+    {
+      account: {
+        tier: 'starter',
+        charactersUsed: 0,
+        characterLimit: 1000,
+        renewsAt: null,
+        overage: 0,
+        voiceSlots: { used: 0, limit: 10 },
+      },
+      speak: () =>
+        new Promise<Uint8Array>((resolve) => {
+          release = () => resolve(new Uint8Array([0x52, 0x49, 0x46, 0x46, 1]))
+        }),
+    },
+  )
+  const account: FishClient = { ...fish, credit: async () => 4.82 }
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish: account,
+    encode,
+    transcriber: null,
+    elevenlabs: eleven,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const sitting = async (id: string) => (await fetch(at(`/api/auditions/${id}/sitting`))).json()
+  const held = async () => (await (await fetch(at('/api/parts/act1/plan'))).json()).elevenHeld
+
+  it('starts with both, and a fresh sitting on a paid model needs its dollars', async () => {
+    const started = await send('POST', '/api/auditions/gran/start', {
+      spendUpTo: 0.05,
+      creditsUpTo: 100,
+    })
+    expect(started.status).toBe(200)
+    const credits = await send('POST', '/api/auditions/gran/sitting', { credits: 200 })
+    expect([credits.status, (await credits.json()).reason]).toEqual([409, 'confirm'])
+    const view = await sitting('gran')
+    expect(view.sitting).toMatchObject({ dollars: 0.05 })
+    expect(view.eleven.sitting).toMatchObject({ dollars: 100 })
+  })
+
+  it('leaves the sitting as it was when its credits are refused, holding no new dollars', async () => {
+    const refused = await send('POST', '/api/auditions/gran/sitting', {
+      amount: 0.05,
+      credits: 5000,
+    })
+    expect([refused.status, (await refused.json()).reason]).toEqual([409, 'credits'])
+    const view = await sitting('gran')
+    expect(view.sitting).toMatchObject({ dollars: 0.05 })
+    expect(view.eleven.sitting).toMatchObject({ dollars: 100 })
+    // Only the running sitting's dollars are held: 4.82 less 0.05 is free.
+    const fits = await send('POST', '/api/auditions/gran/sitting', { amount: 4.75, credits: 100 })
+    expect(fits.status).toBe(200)
+  })
+
+  it('does not count a sitting’s old credits against the fresh ones, and a refused start keeps it', async () => {
+    const fresh = await send('POST', '/api/auditions/gran/sitting', { amount: 0.05, credits: 950 })
+    expect(fresh.status).toBe(200)
+    const refused = await send('POST', '/api/auditions/gran/start', {
+      spendUpTo: 0.05,
+      creditsUpTo: 5000,
+    })
+    expect(refused.status).toBe(409)
+    expect((await sitting('gran')).eleven.sitting).toMatchObject({ dollars: 950 })
+  })
+
+  it('holds a take’s credits while it is in flight, and what is left after', async () => {
+    expect(await held()).toBe(950)
+    const take = send('POST', '/api/characters/gran/takes', { voice: 'eleven:g1', board: true })
+    for (let i = 0; i < 200 && (await sitting('gran')).eleven.sitting.spent === 0; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    const per = (await sitting('gran')).eleven.perTake
+    expect((await sitting('gran')).eleven.sitting.left).toBe(950 - per)
+    expect(await held()).toBe(950)
+    release()
+    expect(await (await take).json()).toMatchObject({ ok: true })
+    expect(await held()).toBe(950 - per)
+  })
+
+  it('lets only one of two sittings asking at once have the same credits', async () => {
+    await send('DELETE', '/api/auditions/gran/sitting')
+    const [one, two] = await Promise.all([
+      send('POST', '/api/auditions/gran/sitting', { amount: 0.05, credits: 600 }),
+      send('POST', '/api/auditions/kid/sitting', { amount: 0.05, credits: 600 }),
+    ])
+    expect([one.status, two.status].sort()).toEqual([200, 409])
+  })
+})
+
+describe('server, credits in flight when a sitting is replaced or ended', () => {
+  const root = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { gran: { voice: 'eleven:g1', style: '[warm]' } } },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
+  })
+  const { client: eleven } = fakeEleven(
+    { g1: elevenVoiceOf('g1') },
+    {
+      account: {
+        tier: 'starter',
+        charactersUsed: 0,
+        characterLimit: 1000,
+        renewsAt: null,
+        overage: 0,
+        voiceSlots: { used: 0, limit: 10 },
+      },
+      // ElevenLabs never answers: the take stays in flight.
+      speak: () => new Promise<Uint8Array>(() => {}),
+    },
+  )
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    elevenlabs: eleven,
+  })
+  afterAll(() => server.stop(true))
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(new URL(path, server.url), {
+      method,
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const sitting = async () =>
+    (await (await fetch(new URL('/api/auditions/gran/sitting', server.url))).json()).eleven
+
+  it('keeps holding a take’s credits in flight after its sitting is replaced, and after it ended', async () => {
+    expect((await send('POST', '/api/auditions/gran/sitting', { credits: 100 })).status).toBe(200)
+    // Never answered: the server stopping at the end cuts it off, which is expected.
+    void send('POST', '/api/characters/gran/takes', { voice: 'eleven:g1', board: true }).catch(
+      () => undefined,
+    )
+    for (let i = 0; i < 200 && (await sitting()).sitting.spent === 0; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    const per = (await sitting()).perTake
+    // The plan's 1,000 credits, less the take ElevenLabs may still bill.
+    const all = await send('POST', '/api/auditions/gran/sitting', { credits: 1000 })
+    expect([all.status, (await all.json()).reason]).toEqual([409, 'credits'])
+    expect(
+      (await send('POST', '/api/auditions/gran/sitting', { credits: 1000 - per })).status,
+    ).toBe(200)
+    await send('DELETE', '/api/auditions/gran/sitting')
+    const after = await send('POST', '/api/auditions/gran/sitting', { credits: 1000 })
+    expect([after.status, (await after.json()).reason]).toEqual([409, 'credits'])
   })
 })

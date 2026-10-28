@@ -611,6 +611,14 @@ describe('the money of an audition', () => {
     expect(free).toMatchObject({ ok: true, model: 's2.1-pro-free', perTake: 0 })
   })
 
+  it('prices an ElevenLabs take of the phrase in credits on ElevenLabs’ audition model', async () => {
+    const money = await auditionMoney(join(tempRepo(files), 'audio-studio.json'), 'mira')
+    if (!money?.ok) throw new Error(JSON.stringify(money))
+    expect(money.eleven.model).toBe('eleven_v3')
+    // A credit a character of the phrase as sent, with mira's style.
+    expect(money.eleven.perTake).toBeGreaterThan(10)
+  })
+
   it('keeps what takes were charged in the saved audition, across sittings', async () => {
     const projectFile = join(tempRepo(paidFiles), 'audio-studio.json')
     await startAudition(projectFile, 'mira', fishFor)

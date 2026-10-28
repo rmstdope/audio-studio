@@ -24,6 +24,7 @@ import { loadWorkspace, readPart, type ProjectFailure } from './workspace'
 import { providerId, providerOf } from '../core/voices'
 import {
   elevenCredits,
+  elevenModelName,
   readsCues,
   requestsAtOnce,
   speedProblem,
@@ -90,6 +91,11 @@ export type TryResult =
  */
 export interface TakeOptions extends ElevenTakeOptions {
   board?: boolean
+  /**
+   * The ElevenLabs credits of the audition's sitting: a board take with an ElevenLabs voice is
+   * charged to it just before it is sent, as a paid Fish take is to `budget`.
+   */
+  credits?: Budget
   budget?: Budget
   charged?: (dollars: number) => void | Promise<void>
   /** Whether the sitting `budget` belongs to is still going on; checked when the take is charged. */
@@ -147,15 +153,8 @@ export async function recordTake(
   const character = seen.speakers[characterId]
   const tts = ttsFor(project.narration.tts, character)
   if (providerOf(voiceId) === 'elevenlabs') {
-    if (options.board) {
-      return {
-        ok: false,
-        reason: 'not-yet',
-        message: 'Auditions with ElevenLabs voices come in a later step.',
-      }
-    }
     return speakEleven(projectFile, project, voiceId, tts, options, {
-      kind: 'take',
+      kind: options.board ? 'audition' : 'take',
       character: characterId,
       language,
       ...pageText(text, seen, characterId),
@@ -366,7 +365,7 @@ async function speak(
 
 /** What an ElevenLabs take or try is of, for the text sent and the spending record. */
 interface ElevenText {
-  kind: 'take' | 'try'
+  kind: 'take' | 'try' | 'audition'
   character: string
   /** A try's part. */
   part?: string
@@ -404,7 +403,7 @@ async function speakEleven(
   project: Project,
   voice: string,
   tts: Project['narration']['tts'],
-  options: ElevenTakeOptions,
+  options: ElevenTakeOptions & Pick<TakeOptions, 'credits' | 'open' | 'flight'>,
   text: ElevenText,
 ): Promise<TakeResult> {
   const root = dirname(projectFile)
@@ -419,23 +418,64 @@ async function speakEleven(
   if (slow) return { ok: false, reason: 'speed', message: slow }
   const client = await (options.elevenlabs ?? (async () => null))(root, project)
   if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+  // A board take is paid from the sitting's credits; there is no free model to fall back on.
+  const board = text.kind === 'audition'
+  const sitting = board ? options.credits : undefined
+  if (board && !sitting) {
+    return {
+      ok: false,
+      reason: 'no-sitting',
+      message:
+        'Takes of ElevenLabs voices are paid in credits: give the audition credits to spend.',
+    }
+  }
+  if (sitting && sitting.model !== model) {
+    return {
+      ok: false,
+      reason: 'no-sitting',
+      message: `The audition’s credits were given for ${elevenModelName(sitting.model)}, and ElevenLabs’ audition model is now ${elevenModelName(model)}: resume the audition.`,
+    }
+  }
   const limiter = options.elevenLimiter ?? createLimiter()
   const credits = elevenCredits(model, spoken)!
-  try {
-    const cached = await limiter.run(
+  // What became of the run: made (by whoever ran it), already there, or not paid for.
+  type Outcome = { made: 'made' | 'cached' } | { waits: string } | { ended: true }
+  // Whether this request's own job ran (only then is the outcome its own), and whether it paid.
+  let ran = false as boolean
+  let paid = false as boolean
+  const run = () =>
+    limiter.run(
       key,
       requestsAtOnce(narration.quality.parallel, voice),
-      async () => {
+      async (): Promise<Outcome> => {
+        ran = true
         // Another request may have made it while this one waited: never pay for it twice.
-        if (existsSync(file)) return true
-        const audio = await client.tts({
-          text: spoken,
-          voice: providerId(voice),
-          model,
-          settings: { ...settings, speed: tts.speed },
-          ...(takesLanguage(model) && { language: text.language }),
-        })
-        if (!audio.length) throw new Error('ElevenLabs sent no audio')
+        if (existsSync(file)) return { made: 'cached' }
+        // Charged now, as late as it can be: the sitting may have ended or been spent meanwhile.
+        if (sitting) {
+          if (options.open && !options.open()) return { ended: true }
+          const waits = sitting.spend(model, spoken, new Date())
+          if (waits) return { waits }
+        }
+        const landed = sitting ? options.flight?.(credits) : undefined
+        let audio: Uint8Array
+        try {
+          audio = await client.tts({
+            text: spoken,
+            voice: providerId(voice),
+            model,
+            settings: { ...settings, speed: tts.speed },
+            ...(takesLanguage(model) && { language: text.language }),
+          })
+          if (!audio.length) throw new Error('ElevenLabs sent no audio')
+        } catch (error) {
+          // Nothing was made, so nothing is charged.
+          sitting?.refund(credits)
+          throw error
+        } finally {
+          landed?.()
+        }
+        paid = true
         // Logged as soon as ElevenLabs made it: it is paid for even if it cannot be kept.
         try {
           await appendTry(projectFile, {
@@ -453,10 +493,30 @@ async function speakEleven(
           // Only the record of what it cost is lost; the take stays.
         }
         await writeAtomic(root, takePath(key), audio)
-        return false
+        return { made: 'made' }
       },
     )
-    return { ok: true, key, spoken, cached, ...said, ...(!cached && { credits }) }
+  try {
+    let outcome = await run()
+    // A run shared with another request that was not paid for (its sitting was short or had
+    // ended) is not this one's answer: this one tries on its own, with its own money.
+    // Several may be queued so: each pass either runs this request's own job or shares a run
+    // whose owner's job finished it, so this ends; the bound only guards against a bug.
+    for (let pass = 0; !ran && !('made' in outcome) && pass < 20; pass++) outcome = await run()
+    if ('ended' in outcome) {
+      return { ok: false, reason: 'no-sitting', message: 'The audition’s sitting has ended.' }
+    }
+    if ('waits' in outcome) {
+      return {
+        ok: false,
+        reason: 'waits',
+        message: `Take waits for more credits: ${outcome.waits}`,
+      }
+    }
+    if (!existsSync(file)) {
+      return { ok: false, reason: 'elevenlabs', message: 'The take could not be kept.' }
+    }
+    return { ok: true, key, spoken, cached: !paid, ...said, ...(paid && { credits }) }
   } catch (error) {
     return {
       ok: false,
@@ -593,6 +653,23 @@ function takeOf(
   }
   return takeKey({ model, voice, spoken: text.spoken, tts: settings })
 }
+
+/**
+ * What one take of the character's audition phrase costs with an ElevenLabs voice, whichever:
+ * ElevenLabs' audition model and its credits, for the sitting's box and meter.
+ */
+export function elevenTakeCost(
+  project: Project,
+  cast: Cast,
+  characterId: string,
+  text: AuditionText,
+): { model: string; perTake: number } {
+  const { model, credits } = elevenPageTake(project, cast, characterId, text, ELEVEN_ANY, '')
+  return { model, perTake: credits }
+}
+
+/** A voice id standing for any ElevenLabs voice: what a take costs does not depend on which. */
+const ELEVEN_ANY = 'eleven:any'
 
 /**
  * What the cast voice's page take costs with an ElevenLabs voice, before it is recorded: the

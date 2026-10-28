@@ -184,6 +184,17 @@ describe('summariseSpending, takes and tries with ElevenLabs voices', () => {
     expect(summariseSpending([], [], parts).tries).toEqual({ count: 0, credits: 0 })
   })
 
+  it('read an audition take as one of them', () => {
+    expect(
+      SpendingSchema.parse({
+        version: 2,
+        recordings: [],
+        music: [],
+        tries: [tried({ kind: 'audition', part: undefined })],
+      }).version,
+    ).toBe(2)
+  })
+
   it('need version 2 of the record', () => {
     expect(needsVersion2([rec()], [], [tried()])).toBe(true)
     expect(needsVersion2([rec()], [], [])).toBe(false)

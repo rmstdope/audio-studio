@@ -57,7 +57,7 @@ describe('elevenPlanFacts', () => {
 
   it('leaves out what running recordings hold', () => {
     expect(elevenPlanFacts(eleven, { ok: true, account }, 25000)).toBe(
-      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 credits · only 2,450 credits left on your plan, besides what recordings running now hold',
+      'ElevenLabs · eleven_v3 · 1,234 characters of text · about 1,234 credits, at most 3,702 credits · only 2,450 credits left on your plan, besides what recordings and auditions running now hold',
     )
   })
 

@@ -44,13 +44,14 @@ const MusicSpendSchema = z.object({
 
 /**
  * One take or try spoken by an ElevenLabs voice that cost credits: the cast voice's take on its
- * character's page, or a line tried with a cue. Neither is confirmed first; each is kept here.
+ * character's page, a line tried with a cue (neither confirmed first), or a take on the audition
+ * board, charged to its sitting's credits. Each is kept here.
  */
 const TrySpendSchema = z.object({
   id: z.string(),
   /** When it was made (ISO 8601). */
   at: z.string(),
-  kind: z.enum(['take', 'try']),
+  kind: z.enum(['take', 'try', 'audition']),
   character: z.string(),
   /** A try's part; a take has none. */
   part: z.string().optional(),
