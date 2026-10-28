@@ -6,16 +6,20 @@ import {
   designCredit,
   designPoints,
 } from '../../../core/design'
+import { ELEVEN_DESIGN_COUNT, elevenDesignPoints } from '../../../core/elevenDesign'
 import { usd } from '../../../core/spend'
-import { useCredit, useDesigns, useDesignVoices } from '../../api'
+import type { VoiceProvider } from '../../../core/voices'
+import { useCredit, useDesigns, useDesignVoices, useElevenAccount } from '../../api'
 import { designFailureLine } from '../../board'
 import { Confirm } from '../../components/Confirm'
+import { planLeftLine } from '../../sitting'
 
 /**
  * The box that designs voices from a description, on the character page and on the audition
- * board: the text (it opens with the last one sent, else a start made from the casting brief),
- * the confirm of the cost, the wait and the failure. A design that works calls `onDone`.
- * Escape closes the box, or goes back from the confirm to the box.
+ * board: whose design (Fish's, in dollars, or ElevenLabs', in credits of the plan), the text (it
+ * opens with the last one sent, else a start made from the casting brief), the confirm of the
+ * cost, the wait and the failure. A design that works calls `onDone`. Escape closes the box, or
+ * goes back from the confirm to the box.
  */
 export function DesignVoice({
   characterId,
@@ -42,6 +46,11 @@ export function DesignVoice({
   const design = useDesignVoices(characterId, language)
   const [typed, setTyped] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [provider, setProvider] = useState<VoiceProvider>('fish')
+  const eleven = provider === 'elevenlabs'
+  // ElevenLabs' plan is read when its confirm opens, for what is left on it.
+  const account = useElevenAccount(eleven && confirming)
+  const plan = designs.data?.ok ? designs.data.eleven : null
   const field = useRef<HTMLTextAreaElement>(null)
   const pay = useRef<HTMLButtonElement>(null)
   const retry = useRef<HTMLButtonElement>(null)
@@ -62,13 +71,14 @@ export function DesignVoice({
   // The credit may have changed since it was last read: ask when the confirm opens.
   const { refetch } = credit
   useEffect(() => {
-    if (confirming) void refetch()
-  }, [confirming, refetch])
+    if (confirming && !eleven) void refetch()
+  }, [confirming, eleven, refetch])
   useEffect(() => {
     if (!confirming) return
-    if (money.kind === 'ask') pay.current?.focus()
+    if (eleven) pay.current?.focus()
+    else if (money.kind === 'ask') pay.current?.focus()
     else if (money.kind === 'cannot') retry.current?.focus()
-  }, [confirming, money.kind])
+  }, [confirming, eleven, money.kind])
 
   function onKeyDown(event: KeyboardEvent) {
     if (event.key !== 'Escape' || pending) return
@@ -79,16 +89,39 @@ export function DesignVoice({
 
   function send() {
     setConfirming(false)
-    design.mutate(text.trim(), { onSuccess: (result) => result.ok && onDone() })
+    design.mutate(
+      eleven && plan
+        ? { description: text.trim(), provider: 'elevenlabs', credits: plan.credits }
+        : { description: text.trim(), provider: 'fish' },
+      { onSuccess: (result) => result.ok && onDone() },
+    )
   }
 
   return (
     <div className="design" onKeyDown={onKeyDown}>
       <section className="panel design-box" aria-label="Design a voice">
         <h2 className="section-title">Design a voice</h2>
+        <div className="stage-switch" role="radiogroup" aria-label="Design with">
+          {(['fish', 'elevenlabs'] as const).map((who) => (
+            <label key={who} className={provider === who ? 'on' : ''}>
+              <input
+                type="radio"
+                name={`design-with-${characterId}`}
+                checked={provider === who}
+                disabled={pending}
+                onChange={() => {
+                  setProvider(who)
+                  design.reset()
+                }}
+              />
+              {who === 'fish' ? 'Fish Audio' : 'ElevenLabs'}
+            </label>
+          ))}
+        </div>
         <p className="muted">
-          Describe the voice you want. Fish makes {DESIGN_COUNT} voices from it, each saying the
-          audition phrase; they join the audition board.
+          {eleven
+            ? `Describe the voice you want. ElevenLabs makes ${ELEVEN_DESIGN_COUNT} voices from it, each saying the audition phrase and ${name}’s lines; they join the audition board.`
+            : `Describe the voice you want. Fish makes ${DESIGN_COUNT} voices from it, each saying the audition phrase; they join the audition board.`}
         </p>
         <textarea
           ref={field}
@@ -109,11 +142,21 @@ export function DesignVoice({
             {state.tooLong}
           </span>
         )}
-        {pending && <span className="muted">Fish is making {DESIGN_COUNT} voices.</span>}
+        {pending && (
+          <span className="muted">
+            {eleven
+              ? `ElevenLabs is making ${ELEVEN_DESIGN_COUNT} voices.`
+              : `Fish is making ${DESIGN_COUNT} voices.`}
+          </span>
+        )}
         {design.isError && <span className="adopt-error">{design.error.message}</span>}
         {failure && (
           <span className="adopt-error" role="alert">
-            {designFailureLine(failure as { reason?: string; message?: string })}
+            {designFailureLine(
+              failure as { reason?: string; message?: string },
+              provider,
+              plan?.credits,
+            )}
           </span>
         )}
         <div className="design-actions">
@@ -130,7 +173,33 @@ export function DesignVoice({
           </button>
         </div>
       </section>
+      {confirming && eleven && (
+        <Confirm
+          title="Design voices with ElevenLabs?"
+          effects={
+            plan
+              ? elevenDesignPoints(name, auditioning, plan.text)
+              : ['There is no audition phrase to design with; write one first.']
+          }
+          note={planLeftLine(account.error ?? account.data?.account, account.data?.held ?? 0)}
+          back="Cancel"
+          onBack={() => setConfirming(false)}
+        >
+          <button
+            ref={pay}
+            className="btn btn-primary"
+            type="button"
+            disabled={!plan}
+            onClick={send}
+          >
+            {plan?.text === null
+              ? `Use up to ${plan.credits.toLocaleString('en-US')} credits`
+              : `Use ${(plan?.credits ?? 0).toLocaleString('en-US')} credits`}
+          </button>
+        </Confirm>
+      )}
       {confirming &&
+        !eleven &&
         (money.kind === 'cannot' ? (
           <Confirm
             title="Fish can’t design voices now"

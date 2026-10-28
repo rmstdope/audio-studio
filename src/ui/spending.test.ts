@@ -84,11 +84,11 @@ describe('totalsLabel', () => {
     expect(totalsLabel(2, 'Chapter')).toBe('All chapters · 2 recordings')
   })
 
-  it('counts ElevenLabs takes and tries too, and leaves out recordings when there are none', () => {
+  it('counts ElevenLabs takes, tries and designs too, and leaves out recordings when there are none', () => {
     expect(totalsLabel(2, 'Act', 1, 5)).toBe(
-      'All acts · 2 recordings · 1 music take · 5 takes and tries',
+      'All acts · 2 recordings · 1 music take · 5 takes, tries and designs',
     )
-    expect(totalsLabel(0, 'Act', 0, 1)).toBe('All acts · 1 take or try')
+    expect(totalsLabel(0, 'Act', 0, 1)).toBe('All acts · 1 take, try or design')
   })
 })
 

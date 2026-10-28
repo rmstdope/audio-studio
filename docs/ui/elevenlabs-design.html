@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ElevenLabs voice design</title>
+    <style>
+      body {
+        background: #07080b;
+        color: #eceef3;
+        font:
+          14px/1.45 system-ui,
+          sans-serif;
+        padding: 24px 16px;
+        margin: 0;
+      }
+      section {
+        max-width: 820px;
+        margin: 0 auto 24px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      h2 {
+        font-size: 15px;
+      }
+      .panel {
+        background: #12141a;
+        border: 1px solid #1f232d;
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 8px;
+      }
+      .ask {
+        border-color: #3a4a7a;
+        background: #141a2a;
+      }
+      .muted {
+        color: #a9b0bd;
+      }
+      .btn {
+        background: #0d0f14;
+        color: #eceef3;
+        border: 1px solid #1f232d;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      .primary {
+        background: #7aa2ff;
+        color: #0b0c10;
+        border-color: #7aa2ff;
+      }
+      input {
+        background: #0d0f14;
+        color: #eceef3;
+        border: 1px solid #1f232d;
+        border-radius: 8px;
+        padding: 6px 10px;
+        width: 90px;
+        font: inherit;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .chip {
+        border: 1px solid #1f232d;
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 12px;
+        color: #a9b0bd;
+      }
+      .bar {
+        flex: 1 1 160px;
+        height: 8px;
+        border-radius: 4px;
+        background: #1f232d;
+        overflow: hidden;
+      }
+      .bar span {
+        display: block;
+        height: 100%;
+        width: 20%;
+        background: #3ddc97;
+      }
+      .card {
+        border: 1px solid #1f232d;
+        border-radius: 12px;
+        padding: 10px;
+        width: 240px;
+        display: inline-block;
+        margin: 8px 8px 0 0;
+      }
+      .error {
+        color: #ff6b6b;
+      }
+      .switch {
+        display: inline-flex;
+        border: 1px solid #1f232d;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .switch span {
+        padding: 6px 10px;
+      }
+      .switch .on {
+        background: #1f2a44;
+        color: #7aa2ff;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>Designing a voice with ElevenLabs (14.12)</h1>
+      <p class="muted">
+        Design a voice… opens the same box, on the board and on the character's page, with a switch
+        at the top. ElevenLabs makes 3 voices; each preview says the audition phrase, then the
+        character's own lines until ElevenLabs' least of 100 characters (or a text ElevenLabs
+        writes, when she has too few). It costs a credit a character of that text, once.
+      </p>
+    </section>
+    <section>
+      <h2>1 · The box</h2>
+      <div class="panel">
+        <strong>Design a voice</strong>
+        <div class="row" style="margin: 8px 0">
+          <span class="switch" role="radiogroup" aria-label="Design with"
+            ><span>Fish Audio</span><span class="on">ElevenLabs</span></span
+          >
+        </div>
+        <p class="muted">
+          Describe the voice you want. ElevenLabs makes 3 voices from it, each saying the audition
+          phrase and Mara’s lines; they join the audition board.
+        </p>
+        <textarea style="width: 100%; background: #0d0f14; color: #eceef3" rows="3">
+An old wizard, gruff and slow</textarea>
+        <div class="row">
+          <button class="btn primary" type="button">Design voices…</button>
+          <button class="btn" type="button">Cancel</button>
+        </div>
+        <p class="muted">While it works: "ElevenLabs is making 3 voices."</p>
+        <p class="error">
+          Errors: "ElevenLabs couldn’t design voices: …. Nothing was charged." · "The voices weren’t
+          kept: …. ElevenLabs may have charged 130 credits." · "Set ELEVENLABS_API_KEY …".
+        </p>
+      </div>
+    </section>
+    <section>
+      <h2>2 · The confirm</h2>
+      <div class="panel ask">
+        <strong>Design voices with ElevenLabs?</strong>
+        <ul>
+          <li>
+            ElevenLabs makes 3 voices from your description, each saying the audition phrase and
+            Mara’s lines (130 characters).
+          </li>
+          <li>It uses 130 credits of your ElevenLabs plan, charged only if it works.</li>
+        </ul>
+        <p class="muted">48,200 credits left on your plan</p>
+        <div class="row">
+          <button class="btn" type="button">Cancel</button>
+          <button class="btn primary" type="button">Use 130 credits</button>
+        </div>
+      </div>
+      <p class="muted">
+        When her phrase and lines are under 100 characters: "…each saying a text it writes: Mara’s
+        phrase and lines are under the 100 characters it needs." · "It uses as many credits as that
+        text has characters, up to 1,000, charged only if it works." · Use up to 1,000 credits.
+      </p>
+    </section>
+    <section>
+      <h2>3 · Designed for Mara, and casting one</h2>
+      <p class="muted">
+        Not saved to your Fish account or ElevenLabs voices until you cast one. Its cards are as
+        Fish's designs: Designed · not saved, the preview as its take.
+      </p>
+      <div class="panel ask">
+        <strong>Cast Design 5 as Mara?</strong>
+        <ul>
+          <li>
+            It is saved to your ElevenLabs voices first, as “Mara (designed)”, using one of your
+            plan’s voice slots.
+          </li>
+        </ul>
+        <div class="row">
+          <button class="btn" type="button">Back</button>
+          <button class="btn primary" type="button">Save and cast as Mara</button>
+        </div>
+      </div>
+      <div class="card">
+        <strong>Design 5</strong><br /><span class="error"
+          >ElevenLabs couldn’t save this design: The generated voice ID was not found. It wasn’t
+          cast; a design from an earlier session may need designing again.</span
+        >
+      </div>
+    </section>
+  </body>
+</html>

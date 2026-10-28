@@ -29,7 +29,8 @@ export function SpendingView({ summary }: { summary: ProjectSummary }) {
             Every recording and music take made with a paid model, newest first. A recording’s cost
             is worked out as each line is sent, at Fish’s prices or in your ElevenLabs plan’s
             credits; a music take’s at its model’s price a minute. Takes and tries with ElevenLabs
-            voices are counted in the totals, not listed. The bills themselves can differ slightly.
+            voices, and voices designed with ElevenLabs, are counted in the totals, not listed. The
+            bills themselves can differ slightly.
           </span>
         </div>
       </header>
@@ -86,7 +87,7 @@ function SpendingBody({ summary }: { summary: ProjectSummary }) {
         {answer.tries.count > 0 && (
           <div className="spending-tile">
             <b>{amountText(0, answer.tries.credits)}</b>
-            <span>Takes and tries with ElevenLabs voices</span>
+            <span>ElevenLabs takes, tries and designs</span>
           </div>
         )}
         {answer.acts.map((act) => (

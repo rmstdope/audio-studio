@@ -258,7 +258,9 @@ export function ShortlistBoard({
         })}
         listed={listed}
         error={
-          saveFailed ? saveFailedLine(saveFailed, providerOf(id)) : (recorder.errors[id] ?? null)
+          saveFailed
+            ? saveFailedLine(saveFailed, voice.design?.generated ? 'eleven-design' : providerOf(id))
+            : (recorder.errors[id] ?? null)
         }
         actions={
           <>
@@ -287,9 +289,11 @@ export function ShortlistBoard({
                   onClick={() => setAsking({ kind: 'cast', voice: id })}
                 >
                   {saving
-                    ? designed
+                    ? designed && !voice.design?.generated
                       ? 'Saving to your Fish account…'
-                      : 'Adding to your ElevenLabs voices…'
+                      : designed
+                        ? 'Saving to your ElevenLabs voices…'
+                        : 'Adding to your ElevenLabs voices…'
                     : designed
                       ? `Save and cast as ${name}`
                       : isCurrent
@@ -444,7 +448,10 @@ export function ShortlistBoard({
             dropped,
             unheard: session.toHear.length + session.queue.length,
             ...(language ? { language: language.name, stale: inLanguage?.stale } : {}),
-            saves: castingDesign,
+            saves:
+              castingDesign && session.voices[casting!]?.design?.generated
+                ? 'elevenlabs'
+                : castingDesign,
             adds: castingAdds,
           })}
           {...(language ? { back: 'Cancel' } : {})}
@@ -458,7 +465,9 @@ export function ShortlistBoard({
           >
             {cast.isPending
               ? castingDesign
-                ? 'Saving to your Fish account…'
+                ? session.voices[casting!]?.design?.generated
+                  ? 'Saving to your ElevenLabs voices…'
+                  : 'Saving to your Fish account…'
                 : castingAdds
                   ? 'Adding to your ElevenLabs voices…'
                   : 'Casting…'
@@ -509,7 +518,9 @@ export function ShortlistBoard({
         <section className="section" id="designed" aria-label={`Designed for ${name}`}>
           <div className="section-head">
             <h2 className="section-title">Designed for {name}</h2>
-            <span className="muted">Not on your Fish account until you cast one.</span>
+            <span className="muted">
+              Not saved to your Fish account or ElevenLabs voices until you cast one.
+            </span>
           </div>
           {designs.map((group) => (
             <div className="design-group" key={group.at}>

@@ -55,7 +55,7 @@ export function actText(row: SpendingRow, acts: SpendingSummary['acts']): string
 }
 
 /**
- * The first total's label: `All acts · 9 recordings · 2 music takes · 5 takes and tries`, the
+ * The first total's label: `All acts · 9 recordings · 2 music takes · 5 takes, tries and designs`, the
  * part label in the project's words, each count there is any of.
  */
 export function totalsLabel(count: number, partLabel: string, takes = 0, tries = 0): string {
@@ -63,7 +63,11 @@ export function totalsLabel(count: number, partLabel: string, takes = 0, tries =
     ...(count || (!takes && !tries) ? [plural(count, 'recording')] : []),
     ...(takes ? [plural(takes, 'music take')] : []),
     ...(tries
-      ? [tries === 1 ? '1 take or try' : `${tries.toLocaleString('en-US')} takes and tries`]
+      ? [
+          tries === 1
+            ? '1 take, try or design'
+            : `${tries.toLocaleString('en-US')} takes, tries and designs`,
+        ]
       : []),
   ]
   return `All ${partLabel.toLowerCase()}s · ${counts.join(' · ')}`
