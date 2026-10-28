@@ -104,6 +104,8 @@ export function ShortlistBoard({
   const [voiceId, setVoiceId] = useState('')
   // Whose voice the id is: Fish's ids and ElevenLabs' look alike, so the user says.
   const [provider, setProvider] = useState<VoiceProvider>('fish')
+  // Whose library Bring in more searches.
+  const [from, setFrom] = useState<VoiceProvider>('fish')
   const [idError, setIdError] = useState<string | null>(null)
   const [designing, setDesigning] = useState(false)
   const designButton = useRef<HTMLButtonElement>(null)
@@ -195,9 +197,11 @@ export function ShortlistBoard({
     const isCurrent = id === session.current
     const designed = voice.design !== undefined
     // Saving a design to the Fish account takes a while: its card says so, and a failure stays on it.
-    const saving = designed && cast.isPending && cast.variables === id
+    // A library voice not yet in the user's ElevenLabs voices is added when it is cast.
+    const adds = Boolean(voice.library && !voice.library.added && !takes[id])
+    const saving = (designed || adds) && cast.isPending && cast.variables === id
     const saveFailed =
-      designed &&
+      (designed || voice.library) &&
       cast.data &&
       !cast.data.ok &&
       'reason' in cast.data &&
@@ -229,7 +233,9 @@ export function ShortlistBoard({
           take: Boolean(takes[id]),
         })}
         listed={listed}
-        error={saveFailed ? saveFailedLine(saveFailed) : (recorder.errors[id] ?? null)}
+        error={
+          saveFailed ? saveFailedLine(saveFailed, providerOf(id)) : (recorder.errors[id] ?? null)
+        }
         actions={
           <>
             <button
@@ -257,7 +263,9 @@ export function ShortlistBoard({
                   onClick={() => setAsking({ kind: 'cast', voice: id })}
                 >
                   {saving
-                    ? 'Saving to your Fish account…'
+                    ? designed
+                      ? 'Saving to your Fish account…'
+                      : 'Adding to your ElevenLabs voices…'
                     : designed
                       ? `Save and cast as ${name}`
                       : isCurrent
@@ -304,6 +312,8 @@ export function ShortlistBoard({
         )
       : null
   const castingDesign = casting !== null && session.voices[casting]?.design !== undefined
+  const castingLibrary = casting !== null ? session.voices[casting]?.library : undefined
+  const castingAdds = Boolean(castingLibrary && !castingLibrary.added && !takes[casting!])
 
   return (
     <div className="board">
@@ -411,6 +421,7 @@ export function ShortlistBoard({
             unheard: session.toHear.length + session.queue.length,
             ...(language ? { language: language.name, stale: inLanguage?.stale } : {}),
             saves: castingDesign,
+            adds: castingAdds,
           })}
           {...(language ? { back: 'Cancel' } : {})}
           onBack={() => setAsking(null)}
@@ -424,7 +435,9 @@ export function ShortlistBoard({
             {cast.isPending
               ? castingDesign
                 ? 'Saving to your Fish account…'
-                : 'Casting…'
+                : castingAdds
+                  ? 'Adding to your ElevenLabs voices…'
+                  : 'Casting…'
               : keeping
                 ? 'Keep it'
                 : castingDesign
@@ -561,11 +574,27 @@ export function ShortlistBoard({
       )}
 
       <div className="panel board-more">
+        <span className="muted">Bring in more from</span>
+        <div className="stage-switch" role="radiogroup" aria-label="Whose library">
+          {(['fish', 'elevenlabs'] as const).map((library) => (
+            <label key={library} className={from === library ? 'on' : ''}>
+              <input
+                type="radio"
+                name={`more-from-${characterId}`}
+                checked={from === library}
+                onChange={() => setFrom(library)}
+              />
+              {library === 'fish' ? 'Fish Audio' : 'ElevenLabs'}
+            </label>
+          ))}
+        </div>
         <button
           className="btn"
           type="button"
           disabled={act.isPending}
-          onClick={() => run({ action: 'more' }, () => setDroppedHere(null))}
+          onClick={() =>
+            run({ action: 'more', body: { provider: from } }, () => setDroppedHere(null))
+          }
         >
           Bring in more
         </button>

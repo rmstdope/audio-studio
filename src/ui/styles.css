@@ -1316,7 +1316,8 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--text-soft);
 }
 
-.take-error {
+.take-error,
+.take-note {
   font-size: 12px;
 }
 

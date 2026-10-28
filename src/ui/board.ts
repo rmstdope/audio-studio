@@ -1,6 +1,6 @@
 import type { AuditionSession } from '../core/audition'
 import type { Appearance } from '../core/summary'
-import { providerOf } from '../core/voices'
+import { providerOf, type VoiceProvider } from '../core/voices'
 import { plural } from './format'
 
 /**
@@ -34,9 +34,15 @@ export function designFailureLine(
   return failure.message
 }
 
-/** The line on a designed voice's card when Fish could not save it to the account. */
-export function saveFailedLine(reason: string): string {
-  return `Fish couldn’t save this voice: ${reason.replace(/\.$/, '')}. It wasn’t cast.`
+/**
+ * The line on a card whose voice could not be cast: a design Fish could not save to the account,
+ * or a library voice ElevenLabs would not add to the user's voices.
+ */
+export function saveFailedLine(reason: string, provider: VoiceProvider = 'fish'): string {
+  const why = reason.replace(/\.$/, '')
+  return provider === 'fish'
+    ? `Fish couldn’t save this voice: ${why}. It wasn’t cast.`
+    : `ElevenLabs couldn’t add this voice: ${why}. It wasn’t cast.`
 }
 
 /** The voices on the board that are not designs, whose preview is their take. */
@@ -89,6 +95,7 @@ export function castEffects({
   stale,
   auditioning = true,
   saves = false,
+  adds = false,
 }: {
   /** The character's name. */
   name: string
@@ -112,12 +119,19 @@ export function castEffects({
   auditioning?: boolean
   /** Whether the voice is a design, which is saved to the user's Fish account before it is cast. */
   saves?: boolean
+  /** Whether the voice is from ElevenLabs' library and not yet added to the user's voices. */
+  adds?: boolean
 }): string[] {
   const lines = replacing ? recorded.reduce((sum, a) => sum + a.lines, 0) : 0
   const effects: string[] = []
   if (saves) {
     effects.push(
       `It is saved to your Fish account first, as a private voice named “${name} (designed)” (“${name} (designed 2)” and so on if that name is taken).`,
+    )
+  }
+  if (adds) {
+    effects.push(
+      'It is added to your ElevenLabs voices first, using one of your plan’s voice slots.',
     )
   }
   if (stale !== undefined) {
