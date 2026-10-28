@@ -455,23 +455,26 @@ function Question({
 }
 
 /**
- * ElevenLabs' side of the stages the panel shows: the audition model (page takes, tries and
- * auditions), draft and final.
+ * ElevenLabs' side of the stages the panel shows: the audition model (page takes and tries, and
+ * auditions from 14.10b), draft and final, each with what the failure box calls its recordings.
  */
 const ELEVEN_STAGES = [
   {
     stage: 'audition',
     name: 'ElevenLabs audition',
-    purpose: 'Takes and tries of ElevenLabs voices: on a character’s page, Hear it, and auditions.',
+    made: 'auditions',
+    purpose: 'Takes and tries of ElevenLabs voices, on a character’s page and with Hear it.',
   },
   {
     stage: 'draft',
     name: 'ElevenLabs draft',
+    made: 'drafts',
     purpose: 'Every line of a character with an ElevenLabs voice, while the game is written.',
   },
   {
     stage: 'final',
     name: 'ElevenLabs final',
+    made: 'final recording',
     purpose: 'Those lines again, for the game you ship.',
   },
 ] as const
@@ -567,6 +570,7 @@ function ElevenRow({
           </select>
           {state.phase === 'saving' && <span className="muted">Saving…</span>}
         </div>
+        {/* The audition model never asks (nothing recorded depends on it); this narrows `stage`. */}
         {change?.kind === 'ask' && stage !== 'audition' && (
           <div
             onKeyDown={(event) => {
@@ -607,13 +611,8 @@ function ElevenRow({
           <section className="notice notice-err" role="alert">
             <div className="notice-text">
               <strong>
-                Could not switch ElevenLabs{' '}
-                {stage === 'audition'
-                  ? 'auditions'
-                  : stage === 'draft'
-                    ? 'drafts'
-                    : 'final recording'}{' '}
-                to {elevenModelName(state.to)}
+                Could not switch ElevenLabs {ELEVEN_STAGES.find((s) => s.stage === stage)!.made} to{' '}
+                {elevenModelName(state.to)}
               </strong>
               <span className="muted">
                 <Mono text={failureBody(view.file, state.reason)} words={[view.file]} />

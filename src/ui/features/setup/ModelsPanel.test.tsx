@@ -285,7 +285,7 @@ describe('the ElevenLabs rows of the Models panel', () => {
       withEleven({ eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 } }),
     )
     expect(page.container.textContent).toContain(
-      'Takes and tries of ElevenLabs voices: on a character’s page, Hear it, and auditions.',
+      'Takes and tries of ElevenLabs voices, on a character’s page and with Hear it.',
     )
     await act(async () => {
       const menu = elevenMenu(page.container, 'audition')
@@ -340,6 +340,39 @@ describe('the ElevenLabs rows of the Models panel', () => {
     expect(alert).toContain('Could not switch ElevenLabs drafts to Flash v2.5')
     expect(alert).toContain('Keep Eleven v3')
     expect(alert).toContain('Try again')
+  })
+
+  it('says an audition switch failed in its own words, and Try again saves it again', async () => {
+    const sent: unknown[] = []
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PUT') sent.push(JSON.parse(String(init.body)))
+      return new Response(
+        JSON.stringify({ ok: false, problems: [{ message: 'Act I is recording' }] }),
+        { status: 409 },
+      )
+    }) as unknown as typeof fetch
+    const page = render(withEleven())
+    await act(async () => {
+      const menu = elevenMenu(page.container, 'audition')
+      menu.value = 'eleven_flash_v2_5'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    for (let i = 0; i < 50 && !page.container.querySelector('[role="alert"]'); i++) {
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+    const alert = page.container.querySelector('[role="alert"]')!.textContent
+    expect(alert).toContain('Could not switch ElevenLabs auditions to Flash v2.5')
+    expect(alert).toContain('Keep Eleven v3')
+    const retry = [...page.container.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Try again',
+    )!
+    await act(async () => retry.click())
+    for (let i = 0; i < 50 && sent.length < 2; i++) {
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+    const body = { model: 'eleven_flash_v2_5', was: 'eleven_v3' }
+    expect(sent).toEqual([body, body])
+    expect(page.container.textContent).not.toContain('Switch ElevenLabs')
   })
 })
 

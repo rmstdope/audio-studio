@@ -1157,7 +1157,8 @@ only, the fingerprint needs no provider of its own.
 - **Page takes and tries** (built in 14.10a, `docs/ui/elevenlabs-takes.html`). Fish's are made
   with its free model. ElevenLabs has none, so the cast voice's take on its character's page and
   a cue try (Hear it, in the cue, scene cue and cue-inside editors) with an ElevenLabs voice use
-  `narration.elevenlabs.models.audition` with the project's voice settings at the character's
+  `narration.elevenlabs.models.audition` (chosen on Setup's ElevenLabs audition row, saved at
+  once, since 14.10b-1) with the project's voice settings at the character's
   speed (refused, with the reason, outside 0.7–1.2), in ElevenLabs' requests at once. They are not
   confirmed (a try is a line's worth of characters). On a model that would speak cues the text is
   sent without them (the style, the opening cue and the cues inside) and the page says so. The
@@ -1671,7 +1672,7 @@ Small, independently useful increments:
           models; the credits
           budget on the stage's ElevenLabs model; the cue editor saying a line's model speaks
           cues, so none are sent. A line recorded with cues and now on such a model is stale for
-          its model and its cue. The audition row came with 14.10b. The
+          its model and its cue. The audition row came with 14.10b-1. The
           consumer rules in CLAUDE.md name the new saved keys.
        2. **ElevenLabs' voice settings** (built): `narration.elevenlabs.tts` (stability,
           similarity, style) in the project file, spoken with and fingerprinted in place of the
