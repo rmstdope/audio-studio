@@ -1,4 +1,5 @@
 import type { AuditionSession } from '../core/audition'
+import type { FreedResult } from '../services/elevenVoices'
 import {
   keepPreviousData,
   useIsMutating,
@@ -1102,6 +1103,9 @@ export function useTakes(characterId: string, board = false, language?: string) 
         // An ElevenLabs take spent credits: the Spending page and the sidebar read them again.
         if (result.ok && result.credits !== undefined) {
           void client.invalidateQueries({ queryKey: ['spending'] })
+          // It may have added a library voice, using a voice slot.
+          void client.invalidateQueries({ queryKey: ['eleven-account'] })
+          void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
         }
       } catch (error) {
         setErrors((now) => ({
@@ -1724,11 +1728,58 @@ export interface ElevenAccountAnswer {
   held: number
 }
 
-/** The ElevenLabs plan and what is held of it, for the board's bar that asks for credits. */
-export function useElevenAccount() {
+/**
+ * The ElevenLabs plan and what is held of it, for the board's bar that asks for credits and its
+ * voice slots; asked only while `enabled`.
+ */
+export function useElevenAccount(enabled = true) {
   return useQuery({
     queryKey: ['eleven-account'],
     queryFn: () => getJson<ElevenAccountAnswer>('/api/elevenlabs/account'),
+    enabled,
+  })
+}
+
+/** A voice the studio added from ElevenLabs' library that nothing uses, whose slot can be freed. */
+export interface FreeableVoice {
+  voice: string
+  name: string
+  /** The character whose audition added it. */
+  character: string
+}
+
+/** The voices the studio added that nothing uses; asked only while `enabled`. */
+export function useFreeableVoices(enabled: boolean) {
+  return useQuery({
+    queryKey: ['eleven-freeable'],
+    queryFn: () =>
+      getJson<{ ok: true; voices: FreeableVoice[] }>('/api/elevenlabs/voices/freeable'),
+    enabled,
+  })
+}
+
+/**
+ * Removes voices the studio added from the user's ElevenLabs voices, freeing their slots; the
+ * account and the voices that can be freed are read again after.
+ */
+export function useFreeVoices() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (voices: string[]) => {
+      const response = await fetch('/api/elevenlabs/voices/free', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ voices }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`freeing voice slots answered ${response.status}`)
+      }
+      return (await response.json()) as FreedResult
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['eleven-account'] })
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+    },
   })
 }
 

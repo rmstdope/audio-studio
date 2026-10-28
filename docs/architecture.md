@@ -1244,10 +1244,15 @@ added it, when it is the id it became; once added, the board marks it so and no 
 or cast will add it. When ElevenLabs
 will not add one, its take fails with ElevenLabs' answer and its credits are given back, or it is
 not cast. The studio remembers which voices it added (`.audio-studio/eleven-voices.json`: the
-library id, the id on the account, its name, the character and when), so each is added once. Coming in 14.11b: one ruled out, or not cast when its character is, is offered
-for removal (a button, "Free 3 voice slots", confirmed before anything is removed), and never one
-the user added on ElevenLabs. At the plan's limit the board says so and makes no takes of new
-library voices until slots are freed. Whether a library voice can speak before it is added
+library id, the id on the account, its name, the character and when), so each is added once. **Voice slots** (built in 14.11b): below Bring in more, once a library
+voice is on the board or ElevenLabs' library is chosen, the board says how many of the plan's
+slots are used (from the subscription's `voice_limit` and `voice_slots_used`). A voice the studio
+added that nothing uses (not cast for any character in any language, and on no audition in
+progress, by either id) is offered for removal ("Free 3 voice slots", confirmed before anything is
+removed: `DELETE /v1/voices/{id}`, one ElevenLabs no longer has counting as removed), and never
+one the user added on ElevenLabs. At the plan's limit the board says so, and the library voices
+whose take would add them wait ("Take waits for a free voice slot", as many as slots are left
+record), recording by themselves once slots are freed. Whether a library voice can speak before it is added
 is checked by hand at the end of step 14 (no key in CI); if it can, nothing need be added before
 casting. **Add by id** takes an id from the
 user's own ElevenLabs voices (one made or added on ElevenLabs' site), with the provider chosen
@@ -1315,7 +1320,7 @@ retakeWeak }`: start a generation, a measuring or a checking again, the server p
 Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries, ElevenLabs' audition model for an ElevenLabs voice's, with its voice settings), voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
-`undo` (the last drop), `more` (`{ provider }`, `fish` unless `elevenlabs`; no body is Fish's), `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`, the first credits giving a sitting its ElevenLabs half) are the audition's money, and `GET /api/elevenlabs/account` the plan's account and what is held of it; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
+`undo` (the last drop), `more` (`{ provider }`, `fish` unless `elevenlabs`; no body is Fish's), `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`, the first credits giving a sitting its ElevenLabs half) are the audition's money, and `GET /api/elevenlabs/account` the plan's account and what is held of it, `GET /api/elevenlabs/voices/freeable` the voices the studio added that nothing uses and `POST /api/elevenlabs/voices/free` (`{ voices }`) removes them; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
 `DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
 voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
@@ -1741,8 +1746,9 @@ Small, independently useful increments:
            provider switch beside Bring in more, library cards and previews, a library voice added
            on its first board take (once charged, its credits given back if ElevenLabs will not)
            or when cast, and the voices added remembered.
-        2. **Voice slots**: shown on the board, the plan's limit said before a take that would
-           add a voice, and the voices the studio added offered for removal.
+        2. **Voice slots** (built): shown on the board, takes that would add a voice waiting at
+           the plan's limit, and the voices the studio added that nothing uses offered for
+           removal (the client's `deleteVoice`).
     12. **Design a voice with ElevenLabs**: previews kept as design takes, saved as a voice when
         cast.
 

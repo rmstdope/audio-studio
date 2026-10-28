@@ -291,6 +291,8 @@ describe('ShortlistBoard', () => {
     dollars = null as { dollars: number; left: number } | null,
     credits = null as { dollars: number; left: number } | null,
     addRefused = null as string | null,
+    slots = null as { used: number; limit: number } | null,
+    freeable = [] as { voice: string; name: string; character: string }[],
   } = {}) {
     const asked: { method: string; path: string; body: unknown }[] = []
     const money = (given: { dollars: number; left: number } | null, perTake: number) =>
@@ -335,6 +337,30 @@ describe('ShortlistBoard', () => {
         })
       }
       if (path === '/api/credit') return Response.json({ ok: true, credit: 25 })
+      if (path === '/api/elevenlabs/account' && slots) {
+        return Response.json({
+          account: {
+            ok: true,
+            account: {
+              tier: 'starter',
+              charactersUsed: 0,
+              characterLimit: 30000,
+              renewsAt: null,
+              overage: 0,
+              voiceSlots: slots,
+            },
+          },
+          held: 0,
+        })
+      }
+      if (path === '/api/elevenlabs/voices/freeable') {
+        return Response.json({ ok: true, voices: freeable })
+      }
+      if (path === '/api/elevenlabs/voices/free') {
+        freeable = []
+        if (slots) slots = { ...slots, used: slots.used - body.voices.length }
+        return Response.json({ ok: true, freed: ['Rasp'], failed: [] })
+      }
       return new Response('', { status: 404 })
     }) as unknown as typeof fetch
     return asked
@@ -371,6 +397,39 @@ describe('ShortlistBoard', () => {
     await act(() => button('Bring in more')!.click())
     await until(() => more().length === 2)
     expect(more()).toEqual([{ provider: 'fish' }, { provider: 'elevenlabs' }])
+    await act(() => page.unmount())
+  })
+
+  it('makes a library voice’s take wait for a free slot, and records it once one is freed', async () => {
+    const gravel = {
+      ...george,
+      id: 'eleven:l1',
+      title: 'Gravel',
+      library: { owner: 'o', added: false },
+    }
+    const asked = studio({
+      credits: { dollars: 2100, left: 2100 },
+      slots: { used: 10, limit: 10 },
+      freeable: [{ voice: 'eleven:r2', name: 'Rasp', character: 'wizard' }],
+    })
+    const { container, page, button } = await boardOf(gravel)
+    await until(() => container.textContent!.includes('Take waits for a free voice slot'))
+    expect(container.textContent).toContain('All 10 ElevenLabs voice slots are used')
+    const takes = () => asked.filter((a) => a.path.includes('/takes'))
+    expect(takes()).toEqual([])
+    await until(() => button('Free 1 voice slot') !== undefined)
+    await act(() => button('Free 1 voice slot')!.click())
+    expect(container.textContent).toContain('Removes Rasp from your ElevenLabs voices.')
+    const confirm = [...container.querySelectorAll('[role="alertdialog"] button')].find((b) =>
+      b.textContent?.includes('Free 1 voice slot'),
+    ) as HTMLElement
+    await act(() => confirm.click())
+    await until(() => takes().length === 1)
+    expect(asked.find((a) => a.path === '/api/elevenlabs/voices/free')?.body).toEqual({
+      voices: ['eleven:r2'],
+    })
+    expect(takes()[0]!.body).toEqual({ voice: 'eleven:l1', board: true })
+    await until(() => container.textContent!.includes('ElevenLabs voice slots: 9 of 10 used'))
     await act(() => page.unmount())
   })
 
