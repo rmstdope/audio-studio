@@ -221,6 +221,29 @@ export function queueMore(session: AuditionSession, candidates: Candidate[]): Au
 }
 
 /**
+ * The session with the first `count` of a search's candidates it has not seen brought straight in
+ * to hear, the queue left as it is (ElevenLabs' library, searched again for the next ones, beside
+ * Fish's queue). The rest are not kept.
+ */
+export function bringFound(
+  session: AuditionSession,
+  candidates: Candidate[],
+  count: number,
+): AuditionSession {
+  const fresh = candidates.filter((c) => !seen(session, c.voice.id)).slice(0, count)
+  if (!fresh.length) return session
+  return {
+    ...session,
+    toHear: [...session.toHear, ...fresh.map((c) => c.voice.id)],
+    voices: { ...session.voices, ...Object.fromEntries(fresh.map((c) => [c.voice.id, c.voice])) },
+    matched: {
+      ...session.matched,
+      ...Object.fromEntries(fresh.map((c) => [c.voice.id, c.matched])),
+    },
+  }
+}
+
+/**
  * The session with a voice brought in by id, at the front of those to hear (of Your voices, if it
  * is on the user's account): from the queue, one dropped earlier, or a new one. Unchanged if the
  * voice is on the board already.

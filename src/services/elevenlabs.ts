@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ElevenAccount, ElevenAnswer } from '../core/setup'
+import type { LibraryFilters } from '../core/elevenLibrary'
 import type { Voice } from '../core/voiceSearch'
 import type { Project } from '../core/project'
 import { elevenVoice } from '../core/voices'
@@ -22,6 +23,26 @@ export interface ElevenLabsClient {
    * preview as its sample.
    */
   voice(id: string): Promise<Voice>
+  /**
+   * Voices in ElevenLabs' shared library matching the words (and the filters given), as the
+   * studio shows voices, each with its owner's public id; voices at a rate of their own are left
+   * out, since they cost more credits than the studio counts.
+   */
+  sharedVoices(query: LibraryQuery): Promise<Voice[]>
+  /**
+   * Adds a library voice to the user's voices (taking one of the plan's voice slots), named
+   * `name`, and gives its id on the account.
+   */
+  addSharedVoice(owner: string, id: string, name: string): Promise<string>
+}
+
+/** What ElevenLabs' library is searched with. */
+export interface LibraryQuery extends LibraryFilters {
+  search: string
+  /** The language, as an ISO 639-1 code. */
+  language?: string
+  /** Voices to give at most (ElevenLabs allows up to 100). */
+  pageSize?: number
 }
 
 /** The ElevenLabs client for a project, or null when it has no key. Replaced in tests. */
@@ -95,11 +116,40 @@ const ApiVoiceSchema = z.looseObject({
   verified_languages: z.array(z.looseObject({ language: z.string() })).nullish(),
 })
 
+/** A voice of ElevenLabs' shared library as its API returns it: only what the studio reads. */
+const ApiSharedVoiceSchema = z.looseObject({
+  public_owner_id: z.string(),
+  voice_id: z.string(),
+  name: z.string(),
+  accent: z.string().nullish(),
+  gender: z.string().nullish(),
+  age: z.string().nullish(),
+  descriptive: z.string().nullish(),
+  use_case: z.string().nullish(),
+  language: z.string().nullish(),
+  description: z.string().nullish(),
+  preview_url: z.string().nullish(),
+  cloned_by_count: z.number().default(0),
+  rate: z.number().nullish(),
+  fiat_rate: z.number().nullish(),
+  verified_languages: z.array(z.looseObject({ language: z.string() })).nullish(),
+  is_added_by_user: z.boolean().nullish(),
+})
+
+/** A page of the shared library. */
+const ApiSharedVoicesSchema = z.looseObject({ voices: z.array(ApiSharedVoiceSchema) })
+
+/** What adding a library voice answers. */
+const ApiAddedSchema = z.looseObject({ voice_id: z.string() })
+
 /** How long asking for the account may take: it holds up Setup, so not as long as other work. */
 const ACCOUNT_TIMEOUT_MS = 10_000
 
 /** How long looking a voice up may take: it holds up a character's page, as the account holds up Setup. */
 const LOOKUP_TIMEOUT_MS = 10_000
+
+/** How long a search of the library may take: the board waits on it, as a page waits on a lookup. */
+const SEARCH_TIMEOUT_MS = 20_000
 
 /** How long making a piece may take: up to ten minutes of music, made in the cloud. */
 const MUSIC_TIMEOUT_MS = 10 * 60_000
@@ -119,11 +169,20 @@ export function createElevenLabsClient(
     timeoutMs = 120_000,
   }: { fetch?: typeof globalThis.fetch; baseUrl?: string; timeoutMs?: number } = {},
 ): ElevenLabsClient {
-  /** A GET whose whole answer, the body included, gives up after `waitMs`, saying so. */
-  async function get(path: string, waitMs: number): Promise<unknown> {
+  /**
+   * A GET (or, given a `body`, a POST of it as JSON) whose whole answer, the body included, gives
+   * up after `waitMs`, saying so.
+   */
+  async function get(path: string, waitMs: number, body?: unknown): Promise<unknown> {
     try {
       const response = await fetch(new URL(path, baseUrl), {
-        headers: { 'xi-api-key': apiKey },
+        ...(body === undefined
+          ? { headers: { 'xi-api-key': apiKey } }
+          : {
+              method: 'POST',
+              headers: { 'xi-api-key': apiKey, 'content-type': 'application/json' },
+              body: JSON.stringify(body),
+            }),
         signal: AbortSignal.timeout(waitMs),
       })
       if (!response.ok) throw new ElevenLabsError(response.status, await errorMessage(response))
@@ -223,6 +282,52 @@ export function createElevenLabsClient(
         author: '',
         sample: api.preview_url ? { text: '', audio: api.preview_url } : null,
       }
+    },
+
+    async sharedVoices({ search, language, gender, age, pageSize }) {
+      const query = new URLSearchParams({ search })
+      if (language) query.set('language', language)
+      if (gender) query.set('gender', gender)
+      if (age) query.set('age', age)
+      if (pageSize) query.set('page_size', String(pageSize))
+      const parsed = ApiSharedVoicesSchema.safeParse(
+        await get(`/v1/shared-voices?${query}`, Math.min(timeoutMs, SEARCH_TIMEOUT_MS)),
+      )
+      if (!parsed.success) throw new Error(UNREADABLE)
+      return parsed.data.voices
+        .filter((api) => (api.rate ?? 1) === 1 && api.fiat_rate == null)
+        .map((api) => ({
+          id: elevenVoice(api.voice_id),
+          title: api.name,
+          description: api.description ?? '',
+          tags: [api.accent, api.gender, api.age, api.descriptive, api.use_case]
+            .filter((tag): tag is string => Boolean(tag))
+            .map((tag) => tag.replaceAll('_', ' ')),
+          languages: [
+            ...new Set([
+              ...(api.language ? [api.language] : []),
+              ...(api.verified_languages ?? []).map((l) => l.language),
+            ]),
+          ],
+          // How many have added it: the library's measure of popularity.
+          uses: api.cloned_by_count,
+          likes: 0,
+          author: '',
+          sample: api.preview_url ? { text: '', audio: api.preview_url } : null,
+          library: { owner: api.public_owner_id, added: api.is_added_by_user === true },
+        }))
+    },
+
+    async addSharedVoice(owner, id, name) {
+      const parsed = ApiAddedSchema.safeParse(
+        await get(
+          `/v1/voices/add/${encodeURIComponent(owner)}/${encodeURIComponent(id)}`,
+          Math.min(timeoutMs, LOOKUP_TIMEOUT_MS),
+          { new_name: name },
+        ),
+      )
+      if (!parsed.success) throw new Error(UNREADABLE)
+      return parsed.data.voice_id
     },
 
     async subscription() {

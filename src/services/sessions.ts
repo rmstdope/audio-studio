@@ -5,6 +5,7 @@ import {
   addVoice,
   setDesigned,
   addSpent,
+  bringFound,
   bringMore,
   drop,
   placeOf,
@@ -23,15 +24,16 @@ import { declaredLanguage, type Problem } from '../core/project'
 import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import type { Candidate, Voice } from '../core/voiceSearch'
-import { providerOf } from '../core/voices'
+import { providerOf, type VoiceProvider } from '../core/voices'
 import { elevenVoiceFor, findCandidates, setVoice, type FishFactory } from './auditions'
 import { designTakes, readDesigns } from './designStore'
 import { characterFile, readJson, writeAtomic } from './files'
-import type { ElevenLabsFactory } from './elevenlabs'
+import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
 import { NO_KEY } from './fish'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
-import { auditionIn, auditionTakes, elevenTakeCost } from './takes'
+import { auditionIn, auditionTakes, castProblems, elevenTakeCost } from './takes'
+import { searchLibrary } from './voiceSearch'
 import {
   cacheNameFor,
   knownCharacter,
@@ -262,7 +264,11 @@ export async function moreVoices(
   characterId: string,
   fishFor: FishFactory,
   language?: string,
+  from: { provider: VoiceProvider; elevenFor?: ElevenLabsFactory } = { provider: 'fish' },
 ): Promise<SessionResult> {
+  if (from.provider === 'elevenlabs') {
+    return moreFromLibrary(projectFile, characterId, from.elevenFor, language)
+  }
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
   const perRound = opened.project.narration.audition.candidatesPerRound
@@ -307,6 +313,63 @@ export async function moreVoices(
     },
     undefined,
     language,
+  )
+}
+
+/**
+ * A round's worth more voices to hear from ElevenLabs' shared library, found with the audition's
+ * keywords in its language, leaving out voices ruled out for the character; Fish's queue is left
+ * as it is.
+ */
+async function moreFromLibrary(
+  projectFile: string,
+  characterId: string,
+  elevenFor: ElevenLabsFactory = async () => null,
+  asked?: string,
+): Promise<SessionResult> {
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  const { project, cast, summary } = loaded
+  if (!summary.characters.some((c) => c.id === characterId)) return null
+  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  const language = auditionIn(project, cast, summary, characterId, asked).language
+  const snapshot = await readSession(projectFile, characterId, asked)
+  if (!snapshot) {
+    return { ok: false, reason: 'no-session', message: 'There is no audition in progress.' }
+  }
+  const client = await elevenFor(dirname(projectFile), project)
+  if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+  let found: Candidate[]
+  try {
+    found = await searchLibrary(client, snapshot.keywords, {
+      language:
+        language === project.narration.languages[0]
+          ? project.narration.audition.language
+          : language,
+      exclude: new Set(await ruledOutIds(projectFile, characterId, language)),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { ok: false, reason: 'elevenlabs', message }
+  }
+  const perRound = project.narration.audition.candidatesPerRound
+  return changeSession(
+    projectFile,
+    characterId,
+    (session) => {
+      const next = bringFound(session, found, perRound)
+      if (next === session) {
+        return {
+          ok: false,
+          reason: 'exhausted',
+          message:
+            'No more ElevenLabs voices found for these keywords. Try other keywords, or bring in a specific voice.',
+        }
+      }
+      return next
+    },
+    undefined,
+    asked,
   )
 }
 
@@ -390,7 +453,7 @@ export type CastResult =
       stale: Appearance[]
     }
   | { ok: false; reason: 'no-session' | 'not-shortlisted'; message: string }
-  /** A designed voice that Fish could not save to the account, so was not cast. */
+  /** A designed voice that Fish could not save to the account, or a library voice ElevenLabs would not add, so not cast. */
   | { ok: false; reason: 'save'; voice: string; message: string }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
@@ -398,13 +461,15 @@ export type CastResult =
 
 /**
  * Casts a shortlisted voice: writes it to the cast and ends the audition. Keeping the current
- * voice leaves the cast as it is.
+ * voice leaves the cast as it is. A voice of ElevenLabs' library is cast as the voice `saveAs`
+ * gives (it adds it to the user's voices); if it cannot be added nothing is cast.
  */
 export async function castVoice(
   projectFile: string,
   characterId: string,
   winner: string,
   asked?: string,
+  saveAs?: (voice: Voice) => Promise<string>,
 ): Promise<CastResult> {
   const name = await cacheNameFor(projectFile, characterId, asked)
   return sessionWrites.run(key(projectFile, name), async () => {
@@ -424,7 +489,17 @@ export async function castVoice(
         message: 'Only a shortlisted voice can be cast; shortlist it first.',
       }
     }
-    const voice = { id: winner, name: session.voices[winner]?.title ?? winner }
+    const shown = session.voices[winner]
+    let id = winner
+    if (shown?.library && saveAs) {
+      try {
+        id = await saveAs(shown)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { ok: false, reason: 'save', voice: winner, message }
+      }
+    }
+    const voice = { id, name: shown?.title ?? winner }
     return writeCast(
       projectFile,
       characterId,
@@ -543,6 +618,16 @@ export async function viewOf(
 }
 
 /** The saved session; none if there is no file, or it does not fit (an older version, a hand edit). */
+/** A voice as the character's audition in progress shows it; undefined if it is not in one. */
+export async function boardVoice(
+  projectFile: string,
+  characterId: string,
+  voiceId: string,
+  language?: string,
+): Promise<Voice | undefined> {
+  return (await readSession(projectFile, characterId, language))?.voices[voiceId]
+}
+
 async function readSession(
   projectFile: string,
   characterId: string,

@@ -1,4 +1,6 @@
 import { rankVoices, searchTerms, type Candidate, type Voice } from '../core/voiceSearch'
+import { libraryFilters } from '../core/elevenLibrary'
+import type { ElevenLabsClient } from './elevenlabs'
 import type { FishClient } from './fish'
 
 /** How to search: the language to filter on, voices to leave out, and how far to page. */
@@ -33,6 +35,30 @@ export async function searchVoices(
   }
   for (let i = 0; i < terms.length; i += parallel) {
     await Promise.all(terms.slice(i, i + parallel).map(searchTerm))
+  }
+  return rankVoices(pooled, keywords, exclude)
+}
+
+/**
+ * Voices in ElevenLabs' shared library for an audition: every search term (see `searchTerms`) is
+ * searched once, in the language and for the gender and age the keywords name, two at a time,
+ * and the pooled results ranked as Fish's are.
+ */
+export async function searchLibrary(
+  client: ElevenLabsClient,
+  keywords: string[],
+  { language, exclude }: Pick<SearchOptions, 'language' | 'exclude'>,
+): Promise<Candidate[]> {
+  const terms = searchTerms(keywords)
+  const filters = libraryFilters(keywords)
+  const pooled: Voice[] = []
+  for (let i = 0; i < terms.length; i += 2) {
+    const pages = await Promise.all(
+      terms
+        .slice(i, i + 2)
+        .map((search) => client.sharedVoices({ search, language, ...filters, pageSize: 100 })),
+    )
+    pooled.push(...pages.flat())
   }
   return rankVoices(pooled, keywords, exclude)
 }

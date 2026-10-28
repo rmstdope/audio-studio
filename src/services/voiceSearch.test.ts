@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
+import { fakeEleven } from '../../test/helpers'
+import type { LibraryQuery } from './elevenlabs'
 import type { Voice } from '../core/voiceSearch'
 import type { FishClient, VoiceQuery } from './fish'
-import { searchVoices } from './voiceSearch'
+import { searchLibrary, searchVoices } from './voiceSearch'
 
 function voice(id: string, title: string, uses = 0): Voice {
   return {
@@ -85,5 +87,60 @@ describe('searchVoices', () => {
     const { client, queries } = fakeFish([voice('a', 'warm')])
     expect(await searchVoices(client, [], { language: 'en', exclude: new Set() })).toEqual([])
     expect(queries).toEqual([])
+  })
+})
+
+describe('searchLibrary', () => {
+  /** A library voice titled `title`, described `description`, used `uses` times. */
+  const shared = (id: string, title: string, description: string, uses = 0): Voice => ({
+    id: `eleven:${id}`,
+    title,
+    description,
+    tags: [],
+    languages: ['en'],
+    uses,
+    likes: 0,
+    author: '',
+    sample: null,
+    library: { owner: 'o', added: false },
+  })
+
+  it('searches every term with the gender and age the keywords name, pools and ranks', async () => {
+    const queries: LibraryQuery[] = []
+    const { client } = fakeEleven()
+    client.sharedVoices = async (query) => {
+      queries.push(query)
+      return query.search === 'gruff'
+        ? [shared('a', 'Gruff', 'a gruff old man', 5), shared('b', 'Bark', 'gruff', 50)]
+        : [shared('a', 'Gruff', 'a gruff old man', 5)]
+    }
+    const found = await searchLibrary(client, ['gruff', 'old man'], {
+      language: 'en',
+      exclude: new Set(),
+    })
+    expect(found.map((c) => [c.voice.id, c.matched])).toEqual([
+      ['eleven:a', ['gruff', 'old man']],
+      ['eleven:b', ['gruff']],
+    ])
+    expect(queries.map((q) => q.search)).toEqual(['gruff', 'old man', 'old', 'man'])
+    expect(queries[0]).toEqual({
+      search: 'gruff',
+      language: 'en',
+      gender: 'male',
+      age: 'old',
+      pageSize: 100,
+    })
+  })
+
+  it('leaves out excluded voices, and asks nothing without keywords', async () => {
+    const { client } = fakeEleven()
+    client.sharedVoices = async () => [shared('a', 'Gruff', 'gruff')]
+    expect(
+      await searchLibrary(client, ['gruff'], { language: 'en', exclude: new Set(['eleven:a']) }),
+    ).toEqual([])
+    client.sharedVoices = async () => {
+      throw new Error('asked')
+    }
+    expect(await searchLibrary(client, [], { language: 'en', exclude: new Set() })).toEqual([])
   })
 })

@@ -729,6 +729,32 @@ describe('takes and tries with an ElevenLabs voice', () => {
     expect(eleven.spoken).toEqual([])
   })
 
+  it('speaks a board take with the voice `speakAs` gives, once charged, and refunds when it fails', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({}, { speak: wav })
+    const credits = createBudget({ model: 'eleven_v3', dollars: 100 })
+    const asked: number[] = []
+    const run = (speakAs: () => Promise<string>) =>
+      recordTake(
+        join(root, 'audio-studio.json'),
+        'grandmother',
+        'eleven:g1',
+        async () => fakeFish().fish,
+        createLimiter(),
+        { board: true, credits, elevenlabs: async () => eleven.client, speakAs },
+      )
+    const refused = await run(async () => {
+      asked.push(credits.left)
+      throw new Error('ElevenLabs answered 400: You have reached your voice limit.')
+    })
+    expect(refused).toMatchObject({ ok: false, reason: 'elevenlabs' })
+    expect(asked).toEqual([78])
+    expect(credits.left).toBe(100)
+    expect(eleven.spoken).toHaveLength(0)
+    expect(await run(async () => 'eleven:own1')).toMatchObject({ ok: true })
+    expect(eleven.spoken[0]!.voice).toBe('own1')
+  })
+
   it('gives the credits back when ElevenLabs fails', async () => {
     const root = tempRepo(elevenFiles())
     const failing = fakeEleven(
