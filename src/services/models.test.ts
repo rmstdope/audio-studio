@@ -328,6 +328,13 @@ describe('setElevenSettings', () => {
     )
   })
 
+  it('writes nothing for settings the file already holds', async () => {
+    const { projectFile, read } = repo(projectJson())
+    const before = read()
+    expect(await setElevenSettings(projectFile, defaults, defaults)).toEqual({ ok: true })
+    expect(read()).toBe(before)
+  })
+
   it('refuses, writing nothing, settings out of range, or a file changed meanwhile', async () => {
     const { projectFile, read } = repo(projectJson())
     const before = read()

@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { ProjectSchema, problemsFrom, type ElevenTts, type Problem } from '../core/project'
-import type { Stage } from '../core/models'
+import { sameSettings, type Stage } from '../core/models'
 import { MUSIC_MODEL_IDS, DEFAULT_MUSIC_MODEL } from '../core/musicModels'
 import { isElevenModel } from '../core/elevenSpeech'
 import { isPriced } from '../core/prices'
@@ -168,8 +168,8 @@ export function setElevenModel(
  * project file), all three written. `was` is what the page showed (ElevenLabs' defaults when the
  * file names none): if the file holds others, someone changed it meanwhile and nothing is written.
  * Settings the project file does not take (a stability other than Eleven v3's three, or a
- * similarity or style outside 0 to 1) are refused with their path. The rest of the file stays as it was, in its
- * own indentation and line endings.
+ * similarity or style outside 0 to 1) are refused with their path, and settings it already holds
+ * write nothing. The rest of the file stays as it was, in its own indentation and line endings.
  */
 export function setElevenSettings(
   projectFile: string,
@@ -182,7 +182,7 @@ export function setElevenSettings(
     const file = basename(projectFile)
     const path = 'narration.elevenlabs.tts'
     const { tts: now } = opened.project.narration.elevenlabs
-    if (KEYS.some((key) => now[key] !== was[key])) {
+    if (!sameSettings(now, was)) {
       return {
         ok: false,
         problems: [
@@ -194,6 +194,8 @@ export function setElevenSettings(
         ],
       }
     }
+    // Nothing to change: the file stays as it is, without a section it never named.
+    if (sameSettings(now, tts)) return { ok: true }
     const narration = (opened.raw as { narration: { elevenlabs?: object } }).narration
     narration.elevenlabs = {
       ...narration.elevenlabs,
@@ -204,5 +206,3 @@ export function setElevenSettings(
     return saveProject(projectFile, opened, path, (indent) => projectJson(opened.raw, indent))
   })
 }
-
-const KEYS = ['stability', 'similarityBoost', 'style'] as const

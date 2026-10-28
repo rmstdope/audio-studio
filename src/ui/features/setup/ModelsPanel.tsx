@@ -7,6 +7,7 @@ import {
   elevenQuestionWords,
   elevenSettingsChangeOf,
   elevenSettingsWords,
+  sameSettings,
   settingWords,
   STABILITY,
   failureHeading,
@@ -15,6 +16,7 @@ import {
   questionWords,
   sameAsDraftWords,
   STAGES,
+  type Question,
   type Stage,
 } from '../../../core/models'
 import { failureBody, RETIRED_MODEL } from '../../../core/retirement'
@@ -639,45 +641,62 @@ function ElevenRow({
   )
 }
 
-/** Where a voice settings save is: being changed, asked about, saving, or failed with a reason. */
+/**
+ * Where a voice settings save is: being changed, asked about (the question as it was asked, so
+ * data read meanwhile cannot take it away), saving, or failed with a reason.
+ */
 type VoicePhase =
   | { phase: 'editing' }
-  | { phase: 'asking' }
-  | { phase: 'saving' }
+  | { phase: 'asking'; words: Question; was: ElevenTts }
+  | { phase: 'saving'; words: Question | null }
   | { phase: 'failed'; reason: string }
 
 /**
  * The ElevenLabs voice row: the settings every ElevenLabs voice speaks with (stability as Eleven
  * v3's three steps, similarity and style as sliders), changed in the row and saved with its own
  * button, at once or after a question when recorded lines go out of date. Undo puts the saved
- * settings back; ElevenLabs' defaults can be put in the row when it shows others.
+ * settings back; ElevenLabs' defaults can be put in the row when it shows others. A change is kept
+ * through a failed save, and Try again weighs it afresh against the settings saved by then.
  */
 function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
   const save = useSetElevenTts()
   const saved = view.elevenTts
   const [edited, setEdited] = useState<ElevenTts | null>(null)
   const [state, setState] = useState<VoicePhase>({ phase: 'editing' })
+  const stability = useRef<HTMLSelectElement>(null)
   const confirm = useRef<HTMLButtonElement>(null)
+  const retry = useRef<HTMLButtonElement>(null)
+  const previous = useRef(state.phase)
   const shown = edited ?? saved
-  const changed = !same(shown, saved)
-  const change = elevenSettingsChangeOf(saved, shown, view.elevenlabs, view.recorded)
+  const changed = !sameSettings(shown, saved)
   const disabled = locked || state.phase !== 'editing'
 
   useEffect(() => {
+    const was = previous.current
+    previous.current = state.phase
     if (state.phase === 'asking') confirm.current?.focus()
+    else if (state.phase === 'failed') retry.current?.focus()
+    else if (state.phase === 'editing' && was !== 'editing') {
+      requestAnimationFrame(() => stability.current?.focus())
+    }
   }, [state.phase])
 
-  // Settings saved here or elsewhere replace the row's own once the panel reads them again.
-  useEffect(() => setEdited(null), [saved.stability, saved.similarityBoost, saved.style])
+  // Settings saved here or elsewhere replace the row's own once the panel reads them again,
+  // unless a save of the row's own is under way or failed.
+  const editing = state.phase === 'editing'
+  useEffect(() => {
+    if (editing) setEdited(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved.stability, saved.similarityBoost, saved.style])
 
   const set = (next: Partial<ElevenTts>) => setEdited({ ...shown, ...next })
   const keep = () => {
     setEdited(null)
     setState({ phase: 'editing' })
   }
-  const send = () => {
-    setState({ phase: 'saving' })
-    save.mutateAsync({ tts: shown, was: saved }).then(
+  const send = (tts: ElevenTts, was: ElevenTts, words: Question | null) => {
+    setState({ phase: 'saving', words })
+    save.mutateAsync({ tts, was }).then(
       (result) => {
         if (result.ok) setState({ phase: 'editing' })
         else setState({ phase: 'failed', reason: result.problems?.[0]?.message ?? 'refused' })
@@ -685,7 +704,18 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
       (error: Error) => setState({ phase: 'failed', reason: error.message }),
     )
   }
-  const words = change.kind === 'ask' ? elevenSettingsWords(saved, shown, change, view.file) : null
+  /** Saves what the row shows over what is saved now: at once, or after the question. */
+  const offer = () => {
+    const change = elevenSettingsChangeOf(saved, shown, view.elevenlabs, view.recorded)
+    if (change.kind === 'none') return keep()
+    if (change.kind === 'save') return send(shown, saved, null)
+    setState({
+      phase: 'asking',
+      words: elevenSettingsWords(saved, shown, change, view.file),
+      was: saved,
+    })
+  }
+  const words = state.phase === 'asking' || state.phase === 'saving' ? state.words : null
   return (
     <div className="mrow">
       <div className="mname">ElevenLabs voice</div>
@@ -695,6 +725,7 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
           <label htmlFor="eleven-stability">Stability</label>
           <div className="mmenu">
             <select
+              ref={stability}
               id="eleven-stability"
               aria-label="ElevenLabs stability"
               value={String(shown.stability)}
@@ -728,17 +759,12 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
               <button className="btn btn-ghost" type="button" disabled={disabled} onClick={keep}>
                 Undo changes
               </button>
-              <button
-                className="btn btn-primary"
-                type="button"
-                disabled={disabled}
-                onClick={() => (change.kind === 'ask' ? setState({ phase: 'asking' }) : send())}
-              >
+              <button className="btn btn-primary" type="button" disabled={disabled} onClick={offer}>
                 Save voice settings
               </button>
             </>
           )}
-          {!same(shown, ELEVEN_TTS) && (
+          {!sameSettings(shown, ELEVEN_TTS) && (
             <button
               className="btn btn-ghost"
               type="button"
@@ -748,11 +774,9 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
               Use ElevenLabs' defaults
             </button>
           )}
-          {state.phase === 'saving' && change.kind !== 'ask' && (
-            <span className="muted">Saving…</span>
-          )}
+          {state.phase === 'saving' && !words && <span className="muted">Saving…</span>}
         </div>
-        {words && (state.phase === 'asking' || state.phase === 'saving') && (
+        {words && (
           <div
             onKeyDown={(event) => {
               if (event.key === 'Escape' && state.phase === 'asking') keep()
@@ -770,7 +794,7 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
                 className="btn btn-primary"
                 type="button"
                 disabled={state.phase === 'saving'}
-                onClick={send}
+                onClick={() => state.phase === 'asking' && send(shown, state.was, words)}
               >
                 {state.phase === 'saving' ? 'Saving…' : words.confirm}
               </button>
@@ -789,7 +813,7 @@ function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
               <button className="btn btn-ghost" type="button" onClick={keep}>
                 Keep the saved settings
               </button>
-              <button className="btn btn-primary" type="button" onClick={send}>
+              <button ref={retry} className="btn btn-primary" type="button" onClick={offer}>
                 Try again
               </button>
             </div>
@@ -842,12 +866,5 @@ function SettingSlider({
         <span className="muted models-same">{hint}</span>
       </div>
     </>
-  )
-}
-
-/** Whether two sets of voice settings are the same. */
-function same(a: ElevenTts, b: ElevenTts): boolean {
-  return (
-    a.stability === b.stability && a.similarityBoost === b.similarityBoost && a.style === b.style
   )
 }

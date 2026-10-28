@@ -68,7 +68,7 @@ function render(data: ModelsAnswer) {
       menu()!.value = value
       menu()!.dispatchEvent(new Event('change', { bubbles: true }))
     })
-  return { container, menu, pick }
+  return { container, menu, pick, client }
 }
 
 describe('the Music row of the Models panel', () => {
@@ -344,6 +344,12 @@ describe('the ElevenLabs voice row of the Models panel', () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
+  /** The panel reading the models again; the query tells its readers on the next tick. */
+  const reread = (client: InstanceType<typeof QueryClient>, data: ModelsAnswer) =>
+    act(async () => {
+      client.setQueryData(['models'], data)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
   const button = (container: HTMLElement, text: string) =>
     [...container.querySelectorAll('button')].find((b) => b.textContent === text)
 
@@ -425,6 +431,52 @@ describe('the ElevenLabs voice row of the Models panel', () => {
     expect(alert).toContain('Try again')
     await act(async () => button(page.container, 'Keep the saved settings')!.click())
     expect(field<HTMLInputElement>(page.container, 'similarity').value).toBe('0.75')
+  })
+
+  it('keeps its question while the saved settings change under it, and Escape closes it', async () => {
+    const page = render(
+      withEleven({ eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 } }),
+    )
+    await slide(page.container, 'style', '0.3')
+    await act(async () => button(page.container, 'Save voice settings')!.click())
+    // Someone else saves the very same settings meanwhile.
+    await reread(page.client, withEleven({}, { ...defaults, style: 0.3 }))
+    expect(page.container.textContent).toContain('Change how ElevenLabs voices speak?')
+    await act(async () => {
+      button(page.container, 'Save and put them out of date')!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )
+    })
+    expect(page.container.textContent).not.toContain('Change how ElevenLabs voices speak?')
+    const stability = field<HTMLSelectElement>(page.container, 'stability')
+    expect(stability.disabled).toBe(false)
+    expect(document.activeElement).toBe(stability)
+  })
+
+  it('keeps the change after a refusal, and Try again saves it over the settings now saved', async () => {
+    globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PUT')
+        sent.push({ url: String(url), body: JSON.parse(String(init.body)) })
+      return new Response(
+        JSON.stringify({ ok: false, problems: [{ message: 'the settings in the file changed' }] }),
+        { status: 409 },
+      )
+    }) as typeof fetch
+    const page = render(withEleven())
+    await slide(page.container, 'style', '0.3')
+    await act(async () => button(page.container, 'Save voice settings')!.click())
+    for (let i = 0; i < 50 && !page.container.querySelector('[role="alert"]'); i++) {
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+    expect(document.activeElement).toBe(button(page.container, 'Try again')!)
+    const elsewhere = { ...defaults, similarityBoost: 0.4 }
+    await reread(page.client, withEleven({}, elsewhere))
+    expect(field<HTMLInputElement>(page.container, 'style').value).toBe('0.3')
+    await act(async () => button(page.container, 'Try again')!.click())
+    expect(sent.at(-1)).toEqual({
+      url: '/api/elevenlabs/tts',
+      body: { tts: { ...defaults, style: 0.3 }, was: elsewhere },
+    })
   })
 
   it('is locked while a part records', () => {

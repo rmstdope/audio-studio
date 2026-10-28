@@ -381,7 +381,7 @@ export function elevenSettingsChangeOf(
   models: StageModels,
   recorded: Recorded,
 ): ElevenChange {
-  if (SETTINGS.every(({ key }) => from[key] === to[key])) return { kind: 'none' }
+  if (sameSettings(from, to)) return { kind: 'none' }
   let lines = 0
   let credits = 0
   for (const [made, got] of Object.entries(recorded)) {
@@ -421,6 +421,14 @@ export function settingWords(key: keyof ElevenTts, value: number): string {
   return key === 'stability'
     ? (STABILITY.find((s) => s.value === value)?.name ?? String(value))
     : value.toFixed(2)
+}
+
+/** Whether two sets of ElevenLabs voice settings are the same, setting by setting. */
+export function sameSettings(
+  a: Record<keyof ElevenTts, number>,
+  b: Record<keyof ElevenTts, number>,
+): boolean {
+  return SETTINGS.every(({ key }) => a[key] === b[key])
 }
 
 const SETTINGS: readonly { key: keyof ElevenTts; name: string }[] = [
