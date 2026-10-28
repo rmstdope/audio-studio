@@ -1,4 +1,11 @@
-import { ELEVEN_MODEL_IDS, elevenCredits, elevenModelName, readsCues } from './elevenSpeech'
+import {
+  ELEVEN_MODEL_IDS,
+  elevenCredits,
+  elevenModelName,
+  isElevenModel,
+  readsCues,
+} from './elevenSpeech'
+import type { ElevenTts } from './project'
 import { priceDetail, pricedModels } from './prices'
 import { RETIRED_MODEL, sameModel } from './retirement'
 import { usd } from './spend'
@@ -355,3 +362,77 @@ export function elevenQuestionWords(
     confirm: `Switch to ${toName}`,
   }
 }
+
+/** Eleven v3's three stabilities, the only ones the Models panel offers: name and what each does. */
+export const STABILITY: readonly { value: 0 | 0.5 | 1; name: string; hint: string }[] = [
+  { value: 0, name: 'Creative', hint: 'more expressive, less steady' },
+  { value: 0.5, name: 'Natural', hint: "ElevenLabs' default" },
+  { value: 1, name: 'Robust', hint: 'steady, less expressive' },
+]
+
+/**
+ * What saving ElevenLabs' voice settings `to` over `from` does: nothing when they are the same, a
+ * save at once when no line is recorded on an ElevenLabs model in use, or a question with how
+ * many are and the credits recording them again on their own model takes.
+ */
+export function elevenSettingsChangeOf(
+  from: ElevenTts,
+  to: ElevenTts,
+  models: StageModels,
+  recorded: Recorded,
+): ElevenChange {
+  if (sameSettings(from, to)) return { kind: 'none' }
+  let lines = 0
+  let credits = 0
+  for (const [made, got] of Object.entries(recorded)) {
+    if (!isElevenModel(made) || !inUse(made, models)) continue
+    lines += got.lines
+    credits += elevenCredits(made, 'x')! * (readsCues(made) ? got.characters : got.bare)
+  }
+  return lines === 0 ? { kind: 'save' } : { kind: 'ask', lines, credits }
+}
+
+/** The words of the question before saving ElevenLabs' voice settings that put lines out of date. */
+export function elevenSettingsWords(
+  from: ElevenTts,
+  to: ElevenTts,
+  change: { lines: number; credits: number },
+  file: string,
+): Question {
+  const one = change.lines === 1
+  const count = `${change.lines.toLocaleString('en-US')} line${one ? '' : 's'}`
+  return {
+    heading: 'Change how ElevenLabs voices speak?',
+    items: [
+      ...SETTINGS.filter(({ key }) => from[key] !== to[key]).map(
+        ({ key, name }) =>
+          `${name}: ${settingWords(key, from[key])} → ${settingWords(key, to[key])}`,
+      ),
+      `${count} recorded with ElevenLabs ${one ? 'becomes' : 'become'} out of date: ${one ? 'it is' : 'they are'} recorded again with these settings next time, about ${creditWords(Math.ceil(change.credits))}.`,
+      `Saved in ${file}; nothing else in it changes.`,
+    ],
+    keep: 'Keep the saved settings',
+    confirm: 'Save and put them out of date',
+  }
+}
+
+/** One voice setting as the page writes it: stability by its name, the others to two places. */
+export function settingWords(key: keyof ElevenTts, value: number): string {
+  return key === 'stability'
+    ? (STABILITY.find((s) => s.value === value)?.name ?? String(value))
+    : value.toFixed(2)
+}
+
+/** Whether two sets of ElevenLabs voice settings are the same, setting by setting. */
+export function sameSettings(
+  a: Record<keyof ElevenTts, number>,
+  b: Record<keyof ElevenTts, number>,
+): boolean {
+  return SETTINGS.every(({ key }) => a[key] === b[key])
+}
+
+const SETTINGS: readonly { key: keyof ElevenTts; name: string }[] = [
+  { key: 'stability', name: 'Stability' },
+  { key: 'similarityBoost', name: 'Similarity' },
+  { key: 'style', name: 'Style' },
+]

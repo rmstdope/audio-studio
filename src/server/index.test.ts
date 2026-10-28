@@ -893,6 +893,26 @@ describe('server, choosing the stages’ models', () => {
     ).toBe(200)
   })
 
+  it('saves ElevenLabs’ voice settings from its own page only, and shows them', async () => {
+    const putTts = (body: unknown, origin = modelServer.url.origin) =>
+      fetch(at('/api/elevenlabs/tts'), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', origin },
+        body: JSON.stringify(body),
+      })
+    const was = { stability: 0.5, similarityBoost: 0.75, style: 0 }
+    const tts = { stability: 1, similarityBoost: 0.4, style: 0.3 }
+    expect((await putTts({ tts, was }, 'http://evil.test')).status).toBe(403)
+    expect((await putTts({ tts })).status).toBe(400)
+    expect((await putTts({ tts: { ...tts, style: 2 }, was })).status).toBe(409)
+    const saved = await putTts({ tts, was })
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await putTts({ tts, was })).status).toBe(409)
+    const view = await (await fetch(at('/api/models'))).json()
+    expect(view.elevenTts).toEqual(tts)
+    expect((await putTts({ tts: was, was: tts })).status).toBe(200)
+  })
+
   it('refuses a change while a part is recording, and names it', async () => {
     expect((await put('draft', { model: 's2.1-pro-free', was: 's2.1-pro' })).status).toBe(200)
     const started = await fetch(at('/api/parts/act1/jobs'), {
@@ -913,6 +933,18 @@ describe('server, choosing the stages’ models', () => {
     expect(elevenRefused.status).toBe(409)
     expect(await elevenRefused.json()).toMatchObject({
       problems: [{ path: 'narration.elevenlabs.models.final', message: 'Act I is recording' }],
+    })
+    const ttsRefused = await fetch(at('/api/elevenlabs/tts'), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', origin: modelServer.url.origin },
+      body: JSON.stringify({
+        tts: { stability: 1, similarityBoost: 0.75, style: 0 },
+        was: { stability: 0.5, similarityBoost: 0.75, style: 0 },
+      }),
+    })
+    expect(ttsRefused.status).toBe(409)
+    expect(await ttsRefused.json()).toMatchObject({
+      problems: [{ path: 'narration.elevenlabs.tts', message: 'Act I is recording' }],
     })
     release()
   })

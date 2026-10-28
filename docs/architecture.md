@@ -1115,9 +1115,17 @@ with that provider's model for the stage. Recasting a character from a Fish voic
 one makes its lines stale for the voice, as any recast does; since a model is valid for one provider
 only, the fingerprint needs no provider of its own.
 
-- **Settings.** ElevenLabs' voice settings, `narration.elevenlabs.tts` (`stability`,
-  `similarityBoost`, `style`; defaults 0.5, 0.75, 0; fixed at the defaults until 14.9.2), stand in for temperature and top-p in an
-  ElevenLabs line's fingerprint and take key. The speed in use (the character's, else the project's
+- **Settings** (saved from Setup since 14.9.2). ElevenLabs' voice settings, `narration.elevenlabs.tts`
+  (`stability`, `similarityBoost`, `style`; defaults 0.5, 0.75, 0, ElevenLabs' own), are one set for
+  every ElevenLabs voice at every stage, and stand in for temperature and top-p in an ElevenLabs
+  line's fingerprint and take key, so changing them puts every line recorded with them out of date
+  (stale for its `settings`). Stability is one of 0, 0.5 and 1 (Creative, Natural, Robust), the only
+  ones Eleven v3 takes; similarity and style run from 0 to 1. The Models panel's ElevenLabs voice
+  row (`docs/ui/elevenlabs-voice.html`) edits them and saves them with its own button
+  (`PUT /api/elevenlabs/tts` with `{ tts, was }`, refused while a part records or a character
+  auditions), at once, or after a question naming each change, the lines recorded on an
+  ElevenLabs model in use that go out of date and the credits to record them again on that model
+  (`elevenSettingsChangeOf`). The speed in use (the character's, else the project's
   `narration.tts.speed`) is sent as `speed`; ElevenLabs takes 0.7–1.2, so a character with an
   ElevenLabs voice whose speed in use lies outside it has each of its lines refused when recorded,
   with the reason, and its page says why under its speed. Nothing is clamped.
@@ -1646,9 +1654,10 @@ Small, independently useful increments:
           cues, so none are sent. A line recorded with cues and now on such a model is stale for
           its model and its cue. The audition row comes with 14.10, which first uses it. The
           consumer rules in CLAUDE.md name the new saved keys.
-       2. **ElevenLabs' voice settings**: `narration.elevenlabs.tts` (stability, similarity,
-          style) in the project file and saved from the Models panel, in place of the fixed
-          defaults.
+       2. **ElevenLabs' voice settings** (built): `narration.elevenlabs.tts` (stability,
+          similarity, style) in the project file, spoken with and fingerprinted in place of the
+          fixed defaults, and saved from the Models panel's ElevenLabs voice row, asking first
+          when recorded lines go out of date. The consumer rules in CLAUDE.md name the key.
     10. **Page takes, tries and auditions with an ElevenLabs voice**, budgeted in characters; a try
         on a model that reads no cues says so rather than sending the line's cues or dropping
         them unseen (its cues from `cueInputs`).

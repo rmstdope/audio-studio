@@ -705,6 +705,24 @@ describe('a line with an ElevenLabs voice', () => {
     ])
   })
 
+  it('is spoken with the project’s ElevenLabs voice settings, and goes stale for them', () => {
+    const tuned = {
+      ...narration,
+      elevenlabs: {
+        ...narration.elevenlabs,
+        tts: { stability: 1 as const, similarityBoost: 0.4, style: 0.3 },
+      },
+    }
+    const inputs = clipInputs(m1, elevenCast.speakers.mira, {}, {}, tuned)!
+    expect(JSON.parse(inputs.settings).slice(0, 4)).toEqual([1, 0.4, 0.3, 1.1])
+    const lock = { m1: entryFor(m1, elevenCast) }
+    const state = planPart(input({ cast: elevenCast, lock, narration: tuned }))
+    expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({
+      status: 'stale',
+      reasons: ['settings'],
+    })
+  })
+
   it('is up to date as made, while Fish’s stages differ', () => {
     const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
     const lock = { m1: entryFor(m1, elevenCast) }
@@ -767,6 +785,7 @@ describe('a final step on ElevenLabs’ side only', () => {
   const withElevenFinal = {
     ...narration,
     elevenlabs: {
+      ...narration.elevenlabs,
       models: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_multilingual_v2' },
     },
   }
@@ -801,7 +820,7 @@ describe('which stages of a line are sent without its cues', () => {
         cast: elevenCast,
         narration: {
           ...narration,
-          elevenlabs: { models: { audition: 'eleven_v3', draft, final } },
+          elevenlabs: { ...narration.elevenlabs, models: { audition: 'eleven_v3', draft, final } },
         },
       }),
     ).lines.map((l) => [l.key, l.unspokenCues])

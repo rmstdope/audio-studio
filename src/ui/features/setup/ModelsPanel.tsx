@@ -1,16 +1,22 @@
-import { useEffect, useReducer, useRef, type ReactNode } from 'react'
+import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import {
   busyWords,
   changeOf,
   elevenChangeOf,
   elevenOptions,
   elevenQuestionWords,
+  elevenSettingsChangeOf,
+  elevenSettingsWords,
+  sameSettings,
+  settingWords,
+  STABILITY,
   failureHeading,
   modelOptions,
   priceWords,
   questionWords,
   sameAsDraftWords,
   STAGES,
+  type Question,
   type Stage,
 } from '../../../core/models'
 import { failureBody, RETIRED_MODEL } from '../../../core/retirement'
@@ -28,11 +34,13 @@ import {
 import {
   useModelsView,
   useSetElevenModel,
+  useSetElevenTts,
   useSetMusicModel,
   useSetStageModel,
   type ModelsAnswer,
 } from '../../api'
-import { elevenModelName, readsCues } from '../../../core/elevenSpeech'
+import { ELEVEN_TTS, elevenModelName, readsCues } from '../../../core/elevenSpeech'
+import type { ElevenTts } from '../../../core/project'
 import { Confirm } from '../../components/Confirm'
 import { markSwitched } from '../../retirementSwitched'
 import { focusAfter, rowReducer, startRow } from '../../modelsRow'
@@ -109,6 +117,7 @@ export function ModelsPanel() {
             locked={locked}
           />
         ))}
+      {view.data.castsEleven && <ElevenVoiceRow view={view.data as View} locked={locked} />}
       {view.data.music && <MusicRow file={view.data.file} music={view.data.music} />}
     </section>
   )
@@ -629,5 +638,233 @@ function ElevenRow({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Where a voice settings save is: being changed, asked about (the question as it was asked, so
+ * data read meanwhile cannot take it away), saving, or failed with a reason.
+ */
+type VoicePhase =
+  | { phase: 'editing' }
+  | { phase: 'asking'; words: Question; was: ElevenTts }
+  | { phase: 'saving'; words: Question | null }
+  | { phase: 'failed'; reason: string }
+
+/**
+ * The ElevenLabs voice row: the settings every ElevenLabs voice speaks with (stability as Eleven
+ * v3's three steps, similarity and style as sliders), changed in the row and saved with its own
+ * button, at once or after a question when recorded lines go out of date. Undo puts the saved
+ * settings back; ElevenLabs' defaults can be put in the row when it shows others. A change is kept
+ * through a failed save, and Try again weighs it afresh against the settings saved by then.
+ */
+function ElevenVoiceRow({ view, locked }: { view: View; locked: boolean }) {
+  const save = useSetElevenTts()
+  const saved = view.elevenTts
+  const [edited, setEdited] = useState<ElevenTts | null>(null)
+  const [state, setState] = useState<VoicePhase>({ phase: 'editing' })
+  const stability = useRef<HTMLSelectElement>(null)
+  const confirm = useRef<HTMLButtonElement>(null)
+  const retry = useRef<HTMLButtonElement>(null)
+  const previous = useRef(state.phase)
+  const shown = edited ?? saved
+  const changed = !sameSettings(shown, saved)
+  const disabled = locked || state.phase !== 'editing'
+
+  useEffect(() => {
+    const was = previous.current
+    previous.current = state.phase
+    if (state.phase === 'asking') confirm.current?.focus()
+    else if (state.phase === 'failed') retry.current?.focus()
+    else if (state.phase === 'editing' && was !== 'editing') {
+      requestAnimationFrame(() => stability.current?.focus())
+    }
+  }, [state.phase])
+
+  // Settings saved here or elsewhere replace the row's own once the panel reads them again,
+  // unless a save of the row's own is under way or failed.
+  const editing = state.phase === 'editing'
+  useEffect(() => {
+    if (editing) setEdited(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved.stability, saved.similarityBoost, saved.style])
+
+  const set = (next: Partial<ElevenTts>) => setEdited({ ...shown, ...next })
+  const keep = () => {
+    setEdited(null)
+    setState({ phase: 'editing' })
+  }
+  const send = (tts: ElevenTts, was: ElevenTts, words: Question | null) => {
+    setState({ phase: 'saving', words })
+    save.mutateAsync({ tts, was }).then(
+      (result) => {
+        if (result.ok) setState({ phase: 'editing' })
+        else setState({ phase: 'failed', reason: result.problems?.[0]?.message ?? 'refused' })
+      },
+      (error: Error) => setState({ phase: 'failed', reason: error.message }),
+    )
+  }
+  /** Saves what the row shows over what is saved now: at once, or after the question. */
+  const offer = () => {
+    const change = elevenSettingsChangeOf(saved, shown, view.elevenlabs, view.recorded)
+    if (change.kind === 'none') return keep()
+    if (change.kind === 'save') return send(shown, saved, null)
+    setState({
+      phase: 'asking',
+      words: elevenSettingsWords(saved, shown, change, view.file),
+      was: saved,
+    })
+  }
+  const words = state.phase === 'asking' || state.phase === 'saving' ? state.words : null
+  return (
+    <div className="mrow">
+      <div className="mname">ElevenLabs voice</div>
+      <div className="mtx">
+        <span className="muted">How every ElevenLabs voice speaks, at every stage.</span>
+        <div className="voice-settings">
+          <label htmlFor="eleven-stability">Stability</label>
+          <div className="mmenu">
+            <select
+              ref={stability}
+              id="eleven-stability"
+              aria-label="ElevenLabs stability"
+              value={String(shown.stability)}
+              disabled={disabled}
+              onChange={(event) =>
+                set({ stability: Number(event.target.value) as ElevenTts['stability'] })
+              }
+            >
+              {STABILITY.map((s) => (
+                <option key={s.value} value={String(s.value)}>
+                  {s.name} · {s.hint}
+                </option>
+              ))}
+            </select>
+          </div>
+          {SLIDERS.map(({ key, name, hint }) => (
+            <SettingSlider
+              key={key}
+              name={name}
+              hint={hint}
+              value={shown[key]}
+              shown={settingWords(key, shown[key])}
+              disabled={disabled}
+              onChange={(value) => set({ [key]: value })}
+            />
+          ))}
+        </div>
+        <div className="mmenu">
+          {changed && (
+            <>
+              <button className="btn btn-ghost" type="button" disabled={disabled} onClick={keep}>
+                Undo changes
+              </button>
+              <button className="btn btn-primary" type="button" disabled={disabled} onClick={offer}>
+                Save voice settings
+              </button>
+            </>
+          )}
+          {!sameSettings(shown, ELEVEN_TTS) && (
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={disabled}
+              onClick={() => setEdited({ ...ELEVEN_TTS })}
+            >
+              Use ElevenLabs' defaults
+            </button>
+          )}
+          {state.phase === 'saving' && !words && <span className="muted">Saving…</span>}
+        </div>
+        {words && (
+          <div
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && state.phase === 'asking') keep()
+            }}
+          >
+            <Confirm
+              title={words.heading}
+              effects={words.items}
+              back={words.keep}
+              onBack={keep}
+              backDisabled={state.phase === 'saving'}
+            >
+              <button
+                ref={confirm}
+                className="btn btn-primary"
+                type="button"
+                disabled={state.phase === 'saving'}
+                onClick={() => state.phase === 'asking' && send(shown, state.was, words)}
+              >
+                {state.phase === 'saving' ? 'Saving…' : words.confirm}
+              </button>
+            </Confirm>
+          </div>
+        )}
+        {state.phase === 'failed' && (
+          <section className="notice notice-err" role="alert">
+            <div className="notice-text">
+              <strong>Could not save ElevenLabs' voice settings</strong>
+              <span className="muted">
+                <Mono text={failureBody(view.file, state.reason)} words={[view.file]} />
+              </span>
+            </div>
+            <div className="notice-actions">
+              <button className="btn btn-ghost" type="button" onClick={keep}>
+                Keep the saved settings
+              </button>
+              <button ref={retry} className="btn btn-primary" type="button" onClick={offer}>
+                Try again
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** The voice settings shown as sliders, with what each does. */
+const SLIDERS: readonly { key: 'similarityBoost' | 'style'; name: string; hint: string }[] = [
+  { key: 'similarityBoost', name: 'Similarity', hint: 'how closely it keeps to the voice' },
+  { key: 'style', name: 'Style', hint: "how much it exaggerates the voice's style" },
+]
+
+/** One voice setting from 0 to 1 in steps of 0.05, with its value and what it does. */
+function SettingSlider({
+  name,
+  hint,
+  value,
+  shown,
+  disabled,
+  onChange,
+}: {
+  name: string
+  hint: string
+  value: number
+  shown: string
+  disabled: boolean
+  onChange: (value: number) => void
+}) {
+  const id = `eleven-${name.toLowerCase()}`
+  return (
+    <>
+      <label htmlFor={id}>{name}</label>
+      <div className="mmenu">
+        <input
+          id={id}
+          type="range"
+          aria-label={`ElevenLabs ${name.toLowerCase()}`}
+          min={0}
+          max={1}
+          step={0.05}
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onChange(Number(event.target.value))}
+        />
+        <span className="mono">{shown}</span>
+        <span className="muted models-same">{hint}</span>
+      </div>
+    </>
   )
 }

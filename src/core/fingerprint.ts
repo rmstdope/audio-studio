@@ -1,4 +1,4 @@
-import { ELEVEN_TTS, modelForStage, readsCues } from './elevenSpeech'
+import { modelForStage, readsCues } from './elevenSpeech'
 import { providerOf } from './voices'
 import { createHash } from 'node:crypto'
 import type { Project } from './project'
@@ -74,7 +74,7 @@ export function cueInputs(
 /**
  * The inputs of a line's clip, or null when its speaker has no voice yet. The model is the draft
  * stage's of the voice's provider: everyday generation uses it. An ElevenLabs voice is spoken
- * with ElevenLabs' voice settings in place of Fish's temperature and top-p.
+ * with the project's ElevenLabs voice settings in place of Fish's temperature and top-p.
  */
 export function clipInputs(
   line: CueLine & { text: string },
@@ -88,9 +88,10 @@ export function clipInputs(
   const { output, quality } = narration
   const tts = ttsFor(narration.tts, character)
   const voice = character.voice
+  const eleven = narration.elevenlabs.tts
   const delivery =
     providerOf(voice) === 'elevenlabs'
-      ? [ELEVEN_TTS.stability, ELEVEN_TTS.similarityBoost, ELEVEN_TTS.style, tts.speed]
+      ? [eleven.stability, eleven.similarityBoost, eleven.style, tts.speed]
       : [tts.temperature, tts.topP, tts.speed]
   const made = model ?? modelForStage(narration, voice, 'draft')
   // A model that would speak a cue is sent none: editing one then changes nothing it makes.
