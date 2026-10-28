@@ -683,7 +683,9 @@ describe('takes and tries with an ElevenLabs voice', () => {
     await waiting(2)
     free()
     const [first, second] = await both
-    expect([first, second].map((r) => (r as { credits?: number }).credits)).toEqual([22, undefined])
+    // Whichever ran it paid; the other shared it, and reports nothing.
+    const reported = [first, second].map((r) => (r as { credits?: number }).credits)
+    expect(reported.filter((c) => c !== undefined)).toEqual([22])
     expect(credits.left).toBe(78)
   })
 
