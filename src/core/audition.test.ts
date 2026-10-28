@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import {
   addSpent,
   addVoice,
+  bringFound,
+  markAdded,
   bringMore,
   drop,
   queueMore,
@@ -154,6 +156,25 @@ describe('more voices', () => {
     expect(next.queue).toEqual(['d', 'e', 'f', 'g'])
     expect(next.voices.g?.title).toBe('G')
     expect(queueMore(next, candidates('a'))).toBe(next)
+  })
+
+  it('marks a library voice as added to the user’s voices, and leaves any other voice alone', () => {
+    const lib = { ...voice('l'), library: { owner: 'o', added: false } }
+    const session = bringFound(start(), [{ voice: lib, matched: ['x'] }], 1)
+    expect(markAdded(session, 'l').voices.l?.library).toEqual({ owner: 'o', added: true })
+    expect(markAdded(markAdded(session, 'l'), 'l')).toEqual(markAdded(session, 'l'))
+    expect(markAdded(session, 'a')).toBe(session)
+  })
+
+  it('brings found voices straight in to hear, leaving the queue and every voice seen alone', () => {
+    const session = drop(start(voice('cur')), 'a')
+    const next = bringFound(session, candidates('a', 'cur', 'x', 'y', 'z'), 2)
+    expect(next.toHear).toEqual([...session.toHear, 'x', 'y'])
+    expect(next.queue).toEqual(session.queue)
+    expect(next.voices.y?.title).toBe('Y')
+    expect(next.voices.z).toBeUndefined()
+    expect(next.matched.x).toBeDefined()
+    expect(bringFound(next, candidates('a', 'x'), 2)).toBe(next)
   })
 
   it('brings a voice in by id at the front of the voices to hear, also one dropped before', () => {

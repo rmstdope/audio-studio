@@ -3923,6 +3923,8 @@ describe('the ElevenLabs account on Setup', () => {
     expect(
       await setupOf({
         subscription: async () => starter,
+        sharedVoices: () => Promise.reject(new Error('not used')),
+        addSharedVoice: () => Promise.reject(new Error('not used')),
         music: unused,
         tts: unused,
         voice: unused,
@@ -3955,6 +3957,8 @@ describe('the ElevenLabs account on Setup', () => {
       subscription: async () => {
         throw new Error('ElevenLabs answered 401: Invalid API key')
       },
+      sharedVoices: () => Promise.reject(new Error('not used')),
+      addSharedVoice: () => Promise.reject(new Error('not used')),
       music: unused,
       tts: unused,
       voice: unused,
@@ -4720,5 +4724,91 @@ describe('server, credits in flight when a sitting is replaced or ended', () => 
     await send('DELETE', '/api/auditions/gran/sitting')
     const after = await send('POST', '/api/auditions/gran/sitting', { credits: 1000 })
     expect([after.status, (await after.json()).reason]).toEqual([409, 'credits'])
+  })
+})
+
+describe('server, voices from ElevenLabs’ library on the board', () => {
+  const root = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': {
+      speakers: { gran: { style: '[warm]', audition: { keywords: ['warm'] } } },
+    },
+    'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
+  })
+  const eleven = fakeEleven(
+    {},
+    {
+      account: {
+        tier: 'starter',
+        charactersUsed: 0,
+        characterLimit: 1000,
+        renewsAt: null,
+        overage: 0,
+        voiceSlots: { used: 0, limit: 10 },
+      },
+      speak: () => new Uint8Array([0x52, 0x49, 0x46, 0x46, 1]),
+    },
+  )
+  const added: string[] = []
+  eleven.client.sharedVoices = async () => ({
+    voices: [{ ...elevenVoiceOf('l1', 'Warm Gravel'), library: { owner: 'o1', added: false } }],
+    more: false,
+  })
+  eleven.client.addSharedVoice = async (owner, id) => {
+    added.push(`${owner}/${id}`)
+    return `own-${id}`
+  }
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    elevenlabs: eleven.client,
+  })
+  afterAll(() => server.stop(true))
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(new URL(path, server.url), {
+      method,
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('brings library voices in, adds one at its first take, and casts it as added', async () => {
+    expect((await send('POST', '/api/auditions/gran/start')).status).toBe(200)
+    expect((await send('POST', '/api/auditions/gran/more', { provider: 'nobody' })).status).toBe(
+      400,
+    )
+    const garbled = await fetch(new URL('/api/auditions/gran/more', server.url), {
+      method: 'POST',
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: '{',
+    })
+    expect(garbled.status).toBe(400)
+    const more = await (
+      await send('POST', '/api/auditions/gran/more', { provider: 'elevenlabs' })
+    ).json()
+    expect(more.session.toHear).toContain('eleven:l1')
+    expect((await send('POST', '/api/auditions/gran/sitting/add', { credits: 300 })).status).toBe(
+      200,
+    )
+    const take = await send('POST', '/api/characters/gran/takes', {
+      voice: 'eleven:l1',
+      board: true,
+    })
+    expect(await take.json()).toMatchObject({ ok: true })
+    expect(added).toEqual(['o1/l1'])
+    expect(eleven.spoken.map((s) => s.voice)).toEqual(['own-l1'])
+    const board = await (await fetch(new URL('/api/auditions/gran', server.url))).json()
+    expect(board.session.voices['eleven:l1'].library).toEqual({ owner: 'o1', added: true })
+    expect(
+      JSON.parse(readFileSync(join(root, '.audio-studio/eleven-voices.json'), 'utf8')),
+    ).toMatchObject({
+      added: [{ library: 'eleven:l1', voice: 'eleven:own-l1', character: 'gran' }],
+    })
+    await send('POST', '/api/auditions/gran/move', { voice: 'eleven:l1', move: 'shortlist' })
+    const cast = await send('POST', '/api/auditions/gran/cast', { voice: 'eleven:l1' })
+    expect(await cast.json()).toMatchObject({ ok: true, voice: { id: 'eleven:own-l1' } })
+    expect(added).toEqual(['o1/l1'])
   })
 })

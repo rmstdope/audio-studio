@@ -360,6 +360,20 @@ describe('ShortlistBoard', () => {
     return { container, page, button }
   }
 
+  it('brings in more from the library the switch names, Fish’s first', async () => {
+    const asked = studio()
+    const { container, page, button } = await boardOf({ ...george, id: 'f1', title: 'Old Wizard' })
+    const more = () => asked.filter((a) => a.path.includes('/more')).map((a) => a.body)
+    await act(() => button('Bring in more')!.click())
+    await until(() => more().length === 1)
+    const eleven = [...container.querySelectorAll('[aria-label="Whose library"] input')][1]!
+    await act(() => (eleven as HTMLInputElement).click())
+    await act(() => button('Bring in more')!.click())
+    await until(() => more().length === 2)
+    expect(more()).toEqual([{ provider: 'fish' }, { provider: 'elevenlabs' }])
+    await act(() => page.unmount())
+  })
+
   it('says when the credits are used, and adds more with Add', async () => {
     const asked = studio({ credits: { dollars: 2100, left: 20 } })
     const { container, page, button } = await boardOf(george)

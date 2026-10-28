@@ -70,6 +70,23 @@ describe('VoiceCard, an ElevenLabs voice', () => {
     )
   })
 
+  it('says a library voice is from the library, how many added it, and that its first take adds it', async () => {
+    const gravel = { ...george, uses: 1234, library: { owner: 'o', added: false } }
+    const { text, buttons } = await rendered(gravel)
+    expect(text).toContain('ElevenLabs library · added by 1.2k')
+    expect(text).toContain('Its first take adds it to your ElevenLabs voices, using a voice slot.')
+    expect(buttons).toEqual(['Record take', 'Play ElevenLabs’ preview of George'])
+    expect((await rendered(gravel, 'credits')).text).toContain(
+      'Its first take adds it to your ElevenLabs voices',
+    )
+  })
+
+  it('says a library voice already in the user’s voices is, and that nothing is added', async () => {
+    const { text } = await rendered({ ...george, library: { owner: 'o', added: true } })
+    expect(text).toContain('ElevenLabs library · in your voices')
+    expect(text).not.toContain('adds it')
+  })
+
   it('keeps a Fish voice’s popularity, take and sample', async () => {
     const { text, buttons } = await rendered({ ...george, id: 'g1', uses: 1200, likes: 3 })
     expect(text).toContain('1.2k uses · 3 likes')

@@ -394,6 +394,8 @@ describe('takeLine, with an ElevenLabs voice', () => {
     const asked: string[] = []
     const eleven: ElevenLabsClient = {
       subscription: () => Promise.reject(new Error('not used')),
+      sharedVoices: () => Promise.reject(new Error('not used')),
+      addSharedVoice: () => Promise.reject(new Error('not used')),
       music: () => Promise.reject(new Error('not used')),
       voice: () => Promise.reject(new Error('not used')),
       async tts(request) {
@@ -431,6 +433,8 @@ describe('takeLine, its provider’s budget and slots', () => {
     })
     const eleven: ElevenLabsClient = {
       subscription: () => Promise.reject(new Error('not used')),
+      sharedVoices: () => Promise.reject(new Error('not used')),
+      addSharedVoice: () => Promise.reject(new Error('not used')),
       music: () => Promise.reject(new Error('not used')),
       voice: () => Promise.reject(new Error('not used')),
       tts: async () => silence(1),

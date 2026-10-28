@@ -327,7 +327,31 @@ describe('castEffects for a designed voice', () => {
   })
 })
 
+describe('castEffects for a library voice not yet added', () => {
+  it('says it is added to the ElevenLabs voices first, using a slot', () => {
+    const effects = castEffects({
+      name: 'Mara',
+      current: null,
+      replacing: true,
+      recorded: [],
+      titles: new Map(),
+      dropped: 0,
+      unheard: 0,
+      adds: true,
+    })
+    expect(effects[0]).toBe(
+      'It is added to your ElevenLabs voices first, using one of your plan’s voice slots.',
+    )
+  })
+})
+
 describe('saveFailedLine', () => {
+  it('gives ElevenLabs’ reason for a library voice it would not add', () => {
+    expect(saveFailedLine('You have reached your voice limit.', 'elevenlabs')).toBe(
+      'ElevenLabs couldn’t add this voice: You have reached your voice limit. It wasn’t cast.',
+    )
+  })
+
   it('gives Fish’s reason and says the voice was not cast', () => {
     expect(saveFailedLine('Audio too short.')).toBe(
       'Fish couldn’t save this voice: Audio too short. It wasn’t cast.',

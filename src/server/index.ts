@@ -87,6 +87,7 @@ import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ru
 import {
   addVoiceById,
   auditionMoney,
+  boardVoice,
   castOwnVoice,
   castVoice,
   discardSession,
@@ -98,8 +99,11 @@ import {
   startAudition,
   undoLastDrop,
   viewOf,
+  voiceAdded,
   type SessionResult,
 } from '../services/sessions'
+import { voiceToSpeak } from '../services/elevenVoices'
+import type { Voice } from '../core/voiceSearch'
 import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
 import { heardFor } from '../services/heard'
 import { onGpu } from '../services/gpu'
@@ -314,6 +318,9 @@ const RecordBody = z
 
 /** A voice to bring in or cast: either provider's. */
 const VoiceBody = z.object({ voice: z.string().regex(VOICE_ID) })
+
+/** Whose library more voices come from: Fish's unless ElevenLabs' is asked for. */
+const MoreBody = z.object({ provider: z.enum(['fish', 'elevenlabs']).default('fish') }).strict()
 
 const MoveBody = VoiceBody.extend({ move: z.enum(['shortlist', 'unlist', 'drop']) })
 
@@ -745,6 +752,22 @@ export function startServer({
   /** What a character's sitting is kept under: its id and the language of the audition it is for. */
   const sittingKey = (characterId: string, request: Request) =>
     cacheNameFor(projectFile, characterId, languageOf(request))
+
+  /**
+   * The id a shortlisted voice of ElevenLabs' library is cast as: the voice it became when the
+   * studio added it, added now if it was not (once).
+   */
+  async function saveToAccount(voice: Voice, characterId: string): Promise<string> {
+    return voiceToSpeak(
+      projectFile,
+      async () => {
+        const opened = await openProject(projectFile)
+        return opened.ok ? elevenFor(dirname(projectFile), opened.project) : null
+      },
+      voice,
+      characterId,
+    )
+  }
 
   /** Ends a character's sitting: what was left is not kept, and the credit is free again. */
   function endSitting(characterId: string) {
@@ -1816,6 +1839,10 @@ export function startServer({
           // An ElevenLabs voice's board take is paid from the sitting's credits instead.
           const credits =
             board && providerOf(voice) === 'elevenlabs' ? creditSittings.get(sitting) : undefined
+          // A voice of ElevenLabs' library is added to the user's voices at its first take.
+          const shown = credits
+            ? await boardVoice(projectFile, id, voice, languageOf(request))
+            : undefined
           const result = await whileGoing('character', id, () =>
             recordTake(
               projectFile,
@@ -1833,6 +1860,13 @@ export function startServer({
                   void (await recordSpent(projectFile, id, dollars, languageOf(request))),
                 elevenlabs: elevenFor,
                 elevenLimiter: elevenWork,
+                ...(shown?.library && {
+                  speakAs: async (client: ElevenLabsClient) => {
+                    const spoken = await voiceToSpeak(projectFile, async () => client, shown, id)
+                    await voiceAdded(projectFile, id, voice, languageOf(request))
+                    return spoken
+                  },
+                }),
                 ...(credits && {
                   credits,
                   open: () => creditSittings.get(sitting) === credits,
@@ -2008,15 +2042,27 @@ export function startServer({
         ),
       },
       '/api/auditions/:id/more': {
-        POST: fromOwnPage((request) =>
-          answer(
+        POST: fromOwnPage(async (request) => {
+          // No body is Fish's library, as before there was a choice.
+          const text = await request.text()
+          const body = MoreBody.safeParse(
+            text ? await Promise.try(() => JSON.parse(text)).catch(() => null) : {},
+          )
+          if (!body.success) {
+            return Response.json({ error: 'expected { provider? }' }, { status: 400 })
+          }
+          const { provider } = body.data
+          return answer(
             request.params.id,
             whileGoing('character', request.params.id, () =>
-              moreVoices(projectFile, request.params.id, fishFor, languageOf(request)),
+              moreVoices(projectFile, request.params.id, fishFor, languageOf(request), {
+                provider,
+                elevenFor,
+              }),
             ),
             { language: languageOf(request) },
-          ),
-        ),
+          )
+        }),
       },
       '/api/auditions/:id/add': {
         POST: fromOwnPage(async (request) => {
@@ -2119,7 +2165,9 @@ export function startServer({
           // A designed voice is saved to the account first; Fish makes no voice from a design.
           const result = isDesignId(voice)
             ? await castDesign(projectFile, request.params.id, voice, fishFor, language)
-            : await castVoice(projectFile, request.params.id, voice, language)
+            : await castVoice(projectFile, request.params.id, voice, language, (shown) =>
+                saveToAccount(shown, request.params.id),
+              )
           if (!result) return notFound()
           if (result.ok) endSitting(await sittingKey(request.params.id, request))
           return Response.json(result, { status: result.ok ? 200 : 409 })

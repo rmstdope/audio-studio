@@ -245,6 +245,90 @@ describe('moreVoices', () => {
   })
 })
 
+describe('moreVoices from ElevenLabs’ library', () => {
+  /** A library voice, warm, popular by `uses`. */
+  const shared = (id: string, uses: number): Voice => ({
+    ...voice(`eleven:${id}`, `Warm ${id}`, uses),
+    library: { owner: 'o', added: false },
+  })
+
+  it('brings a round’s worth of the best library voices in to hear, leaving Fish’s queue', async () => {
+    const { projectFile, session } = await started()
+    const { client } = fakeEleven()
+    const asked: string[] = []
+    client.sharedVoices = async (query) => {
+      asked.push(`${query.search}/${query.language}`)
+      return {
+        voices: [shared('l1', 5), shared('l2', 50), shared('l3', 9), shared('l4', 1)],
+        more: false,
+      }
+    }
+    await ruleOutVoices(projectFile, 'mira', [{ id: 'eleven:l3', title: 'Warm l3' }])
+    const result = await moreVoices(projectFile, 'mira', fishFor, undefined, {
+      provider: 'elevenlabs',
+      elevenFor: async () => client,
+    })
+    expect(result?.ok && result.session.toHear).toEqual([
+      ...session.toHear,
+      'eleven:l2',
+      'eleven:l1',
+      'eleven:l4',
+    ])
+    expect(result?.ok && result.session.queue).toEqual(session.queue)
+    expect(result?.ok && result.session.voices['eleven:l2']?.library).toEqual({
+      owner: 'o',
+      added: false,
+    })
+    expect(asked).toEqual(['warm/en'])
+    const again = await moreVoices(projectFile, 'mira', fishFor, undefined, {
+      provider: 'elevenlabs',
+      elevenFor: async () => client,
+    })
+    expect(again).toMatchObject({ ok: false, reason: 'exhausted' })
+  })
+
+  it('leaves out a library voice the studio added that is cast or on the board as its own id', async () => {
+    const { root, projectFile } = await started()
+    writeFileSync(
+      join(root, '.audio-studio/eleven-voices.json'),
+      JSON.stringify({
+        version: 1,
+        added: [
+          { library: 'eleven:l1', voice: 'cur', name: 'Old', character: 'mira', at: '' },
+          { library: 'eleven:l2', voice: 'eleven:gone', name: 'Gone', character: 'x', at: '' },
+        ],
+      }),
+    )
+    const { client } = fakeEleven()
+    client.sharedVoices = async () => ({ voices: [shared('l1', 50), shared('l2', 5)], more: false })
+    const result = await moreVoices(projectFile, 'mira', fishFor, undefined, {
+      provider: 'elevenlabs',
+      elevenFor: async () => client,
+    })
+    expect(result?.ok && result.session.toHear.filter((id) => id.startsWith('eleven:'))).toEqual([
+      'eleven:l2',
+    ])
+  })
+
+  it('says so without a key, or when ElevenLabs refuses', async () => {
+    const { projectFile } = await started()
+    expect(
+      await moreVoices(projectFile, 'mira', fishFor, undefined, {
+        provider: 'elevenlabs',
+        elevenFor: async () => null,
+      }),
+    ).toEqual({ ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY })
+    const { client } = fakeEleven()
+    client.sharedVoices = () => Promise.reject(new Error('ElevenLabs answered 401: bad key'))
+    expect(
+      await moreVoices(projectFile, 'mira', fishFor, undefined, {
+        provider: 'elevenlabs',
+        elevenFor: async () => client,
+      }),
+    ).toEqual({ ok: false, reason: 'elevenlabs', message: 'ElevenLabs answered 401: bad key' })
+  })
+})
+
 describe('moreVoices, with a large library', () => {
   it('keeps finding new voices beyond the first search, and says when there are none', async () => {
     const many = Array.from({ length: 40 }, (_, i) => voice(`m${i}`, `Warm m${i}`, 1000 - i))
@@ -437,6 +521,46 @@ describe('castVoice', () => {
         '  },\n  "pronounce": { "Act I:": "Act One:", "Elior": "El-ee-or" }\n}\n',
     )
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
+  })
+
+  it('casts a library voice as the voice `saveAs` gives, and nothing when it cannot be added', async () => {
+    const { projectFile } = await started()
+    const { client } = fakeEleven()
+    client.sharedVoices = async () => ({
+      voices: [{ ...voice('eleven:l1', 'Warm l1'), library: { owner: 'o', added: false } }],
+      more: false,
+    })
+    await moreVoices(projectFile, 'mira', fishFor, undefined, {
+      provider: 'elevenlabs',
+      elevenFor: async () => client,
+    })
+    await moveVoice(projectFile, 'mira', 'eleven:l1', 'shortlist')
+    const refused = await castVoice(projectFile, 'mira', 'eleven:l1', undefined, async () => {
+      throw new Error('ElevenLabs answered 400: You have reached your voice limit.')
+    })
+    expect(refused).toEqual({
+      ok: false,
+      reason: 'save',
+      voice: 'eleven:l1',
+      message: 'ElevenLabs answered 400: You have reached your voice limit.',
+    })
+    expect((await sessionFor(projectFile, 'mira'))?.ok).toBe(true)
+    const saved: string[] = []
+    const result = await castVoice(projectFile, 'mira', 'eleven:l1', undefined, async (v) => {
+      saved.push(v.id)
+      return 'eleven:own1'
+    })
+    expect(result).toMatchObject({ ok: true, voice: { id: 'eleven:own1', name: 'Warm l1' } })
+    expect(saved).toEqual(['eleven:l1'])
+  })
+
+  it('asks `saveAs` nothing for a voice not of the library', async () => {
+    const { projectFile } = await started()
+    await moveVoice(projectFile, 'mira', 'b', 'shortlist')
+    const result = await castVoice(projectFile, 'mira', 'b', undefined, async () => {
+      throw new Error('asked')
+    })
+    expect(result).toMatchObject({ ok: true, voice: { id: 'b' } })
   })
 
   it('changes nothing when the current voice is kept', async () => {

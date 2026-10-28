@@ -156,8 +156,8 @@ export async function findCandidates(
   }
 }
 
-/** The language Fish is searched in for voices of `language`: the source language as the project says, another by its code. */
-function searchLanguage(project: Project, language: string): string {
+/** The language a library is searched in for voices of `language`: the source language as the project says, another by its code. */
+export function searchLanguage(project: Project, language: string): string {
   return language === project.narration.languages[0]
     ? project.narration.audition.language
     : language

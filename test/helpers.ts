@@ -59,6 +59,8 @@ export function fakeEleven(
     subscription: account ? async () => account : unused,
     music: unused,
     tts: speak ? async (request) => (spoken.push(request), await speak()) : unused,
+    sharedVoices: unused,
+    addSharedVoice: unused,
     async voice(id) {
       asked.push(id)
       const found = voices[id]

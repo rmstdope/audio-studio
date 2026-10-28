@@ -31,7 +31,7 @@ import {
   takesLanguage,
 } from '../core/elevenSpeech'
 import { spokenText } from '../core/spoken'
-import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
+import { NO_ELEVENLABS_KEY, type ElevenLabsClient, type ElevenLabsFactory } from './elevenlabs'
 import { appendTry } from './spending'
 import { randomUUID } from 'node:crypto'
 import { NO_KEY } from './fish'
@@ -105,6 +105,11 @@ export interface TakeOptions extends ElevenTakeOptions {
    * the server hold that money back from the credit while Fish may not have billed it yet.
    */
   flight?: (dollars: number) => () => void
+  /**
+   * The ElevenLabs voice to speak an ElevenLabs take with, asked once it is charged: a voice of
+   * the library is added to the user's voices first. The voice itself when absent.
+   */
+  speakAs?: (client: ElevenLabsClient) => Promise<string>
 }
 
 /**
@@ -403,7 +408,7 @@ async function speakEleven(
   project: Project,
   voice: string,
   tts: Project['narration']['tts'],
-  options: ElevenTakeOptions & Pick<TakeOptions, 'credits' | 'open' | 'flight'>,
+  options: ElevenTakeOptions & Pick<TakeOptions, 'credits' | 'open' | 'flight' | 'speakAs'>,
   text: ElevenText,
 ): Promise<TakeResult> {
   const root = dirname(projectFile)
@@ -460,9 +465,10 @@ async function speakEleven(
         const landed = sitting ? options.flight?.(credits) : undefined
         let audio: Uint8Array
         try {
+          const speaker = options.speakAs ? await options.speakAs(client) : voice
           audio = await client.tts({
             text: spoken,
-            voice: providerId(voice),
+            voice: providerId(speaker),
             model,
             settings: { ...settings, speed: tts.speed },
             ...(takesLanguage(model) && { language: text.language }),

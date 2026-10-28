@@ -21,6 +21,11 @@ export const VoiceSchema = z.object({
    * asked for (ISO 8601; the designs of one request share it).
    */
   design: z.object({ n: z.number(), description: z.string(), at: z.string() }).optional(),
+  /**
+   * Set on a voice from ElevenLabs' shared library: its owner's public id, by which it is added
+   * to the user's voices to speak, and whether the user had added it already.
+   */
+  library: z.object({ owner: z.string(), added: z.boolean() }).optional(),
 })
 
 /** A voice in Fish Audio's library, as the studio uses it. */

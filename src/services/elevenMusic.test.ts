@@ -21,6 +21,8 @@ function fakeClient() {
     subscription: async () => {
       throw new Error('not used')
     },
+    sharedVoices: () => Promise.reject(new Error('not used')),
+    addSharedVoice: () => Promise.reject(new Error('not used')),
     music: async (request) => {
       asked.push(request)
       return new Uint8Array([1, 2, 3])

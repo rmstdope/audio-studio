@@ -3,9 +3,14 @@ import { createElevenLabsClient, ElevenLabsError } from './elevenlabs'
 
 /** A fetch that answers every request with `body` and `status`, and records what was asked. */
 function fakeFetch(body: unknown, status = 200) {
-  const asked: { url: string; headers: Headers }[] = []
+  const asked: { url: string; headers: Headers; method?: string; body?: unknown }[] = []
   const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
-    asked.push({ url: String(input), headers: new Headers(init?.headers) })
+    asked.push({
+      url: String(input),
+      headers: new Headers(init?.headers),
+      method: init?.method,
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+    })
     return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status })
   }) as typeof globalThis.fetch
   return { fetch, asked }
@@ -277,5 +282,111 @@ describe('looking a voice up', () => {
     await expect(createElevenLabsClient('k', { fetch }).voice('x')).rejects.toThrow(
       'ElevenLabs answered 404: A voice with the voice_id x was not found.',
     )
+  })
+})
+
+describe('searching the library', () => {
+  /** A library voice as ElevenLabs' API reference shows one, with fields the studio does not read. */
+  const shared = {
+    public_owner_id: 'owner1',
+    voice_id: 'lib1',
+    date_unix: 1714204800,
+    name: 'Gravel',
+    accent: 'british',
+    gender: 'male',
+    age: 'old',
+    descriptive: 'gruff',
+    use_case: 'characters_animation',
+    category: 'professional',
+    language: 'en',
+    description: 'An old wizard, gruff and slow',
+    preview_url: 'https://example.com/gravel.mp3',
+    usage_character_count_1y: 10,
+    usage_character_count_7d: 1,
+    play_api_usage_character_count_1y: 0,
+    cloned_by_count: 1234,
+    free_users_allowed: true,
+    live_moderation_enabled: false,
+    featured: false,
+    rate: 1,
+    is_added_by_user: false,
+  }
+
+  it('asks for the words, language, gender and age, and gives voices as the studio shows them', async () => {
+    const { fetch, asked } = fakeFetch({ voices: [shared], has_more: true })
+    const found = await createElevenLabsClient('k', { fetch }).sharedVoices({
+      search: 'old wizard',
+      language: 'en',
+      gender: 'male',
+      age: 'old',
+      pageSize: 100,
+      page: 1,
+    })
+    expect(found.more).toBe(true)
+    expect(found.voices).toEqual([
+      {
+        id: 'eleven:lib1',
+        title: 'Gravel',
+        description: 'An old wizard, gruff and slow',
+        tags: ['british', 'male', 'old', 'gruff', 'characters animation'],
+        languages: ['en'],
+        uses: 1234,
+        likes: 0,
+        author: '',
+        sample: { text: '', audio: 'https://example.com/gravel.mp3' },
+        library: { owner: 'owner1', added: false },
+      },
+    ])
+    const url = new URL(asked[0]!.url)
+    expect(url.pathname).toBe('/v1/shared-voices')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      search: 'old wizard',
+      language: 'en',
+      gender: 'male',
+      age: 'old',
+      page_size: '100',
+      page: '1',
+    })
+  })
+
+  it('leaves out voices at a rate of their own, which cost more credits than the studio counts', async () => {
+    const { fetch } = fakeFetch({
+      voices: [
+        { ...shared, voice_id: 'a', rate: 2 },
+        { ...shared, voice_id: 'b', fiat_rate: 0.3 },
+        { ...shared, voice_id: 'c', rate: null, is_added_by_user: true, cloned_by_count: null },
+      ],
+      has_more: false,
+    })
+    const found = await createElevenLabsClient('k', { fetch }).sharedVoices({ search: 'x' })
+    expect(found.more).toBe(false)
+    expect(found.voices.map((v) => [v.id, v.library, v.uses])).toEqual([
+      ['eleven:c', { owner: 'owner1', added: true }, 0],
+    ])
+  })
+})
+
+describe('adding a library voice', () => {
+  it('adds it under its name and gives the id it has on the account', async () => {
+    const { fetch, asked } = fakeFetch({ voice_id: 'own1' })
+    const id = await createElevenLabsClient('k', { fetch }).addSharedVoice(
+      'owner1',
+      'lib1',
+      'Gravel',
+    )
+    expect(id).toBe('own1')
+    expect(asked[0]!.url).toBe('https://api.elevenlabs.io/v1/voices/add/owner1/lib1')
+    expect(asked[0]!.method).toBe('POST')
+    expect(asked[0]!.body).toEqual({ new_name: 'Gravel' })
+  })
+
+  it("throws ElevenLabs' own message, such as at the plan's voice limit", async () => {
+    const { fetch } = fakeFetch(
+      { detail: { status: 'voice_limit_reached', message: 'You have reached your voice limit.' } },
+      400,
+    )
+    await expect(
+      createElevenLabsClient('k', { fetch }).addSharedVoice('o', 'v', 'N'),
+    ).rejects.toThrow('ElevenLabs answered 400: You have reached your voice limit.')
   })
 })

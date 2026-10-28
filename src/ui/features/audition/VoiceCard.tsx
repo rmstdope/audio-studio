@@ -73,6 +73,8 @@ export function VoiceCard({
               'Designed · not saved'
             ) : voice.own ? (
               'Your voice · private'
+            ) : voice.library ? (
+              `ElevenLabs library · ${voice.library.added ? 'in your voices' : `added by ${compact(voice.uses)}`}`
             ) : eleven ? (
               'ElevenLabs voice'
             ) : (
@@ -134,6 +136,11 @@ export function VoiceCard({
           </button>
         )}
       </div>
+      {!take && voice.library && !voice.library.added && (
+        <span className="muted take-note">
+          Its first take adds it to your ElevenLabs voices, using a voice slot.
+        </span>
+      )}
       {error && <span className="adopt-error take-error">{error}</span>}
       {!designed && (
         <div className="voice-sample">
