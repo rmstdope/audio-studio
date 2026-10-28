@@ -25,6 +25,8 @@ describe('libraryFilters', () => {
   it('names the words of the keywords that asked for them', () => {
     expect(libraryWords(['gruff', 'old man'])).toEqual(['old', 'man'])
     expect(libraryWords(['Middle aged', 'man', 'woman'])).toEqual(['middle', 'aged'])
+    // "boy" is a gender too, and no gender was asked for: a young woman is no boy.
+    expect(libraryWords(['boy', 'female', 'young'])).toEqual(['young'])
   })
 
   it('reads whole words only', () => {

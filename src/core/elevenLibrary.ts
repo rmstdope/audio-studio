@@ -65,7 +65,13 @@ export function libraryFilters(keywords: string[]): LibraryFilters {
 export function libraryWords(keywords: string[]): string[] {
   const words = keywordWords(keywords)
   const { gender, age } = libraryFilters(keywords)
-  const asked = words.filter((w) => (gender && GENDERS[w] === gender) || (age && AGES[w] === age))
+  // A word counts only if everything it names was asked for ("boy" is male and young).
+  const asked = words.filter(
+    (w) =>
+      (GENDERS[w] || AGES[w]) &&
+      (!GENDERS[w] || GENDERS[w] === gender) &&
+      (!AGES[w] || AGES[w] === age),
+  )
   return [...new Set(asked.flatMap((w) => w.split('-')))]
 }
 

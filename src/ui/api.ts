@@ -1,3 +1,4 @@
+import type { AuditionSession } from '../core/audition'
 import {
   keepPreviousData,
   useIsMutating,
@@ -58,7 +59,14 @@ import type { SittingView } from '../core/sitting'
 import { takeCaches, waitingAfter } from './sitting'
 import { providerOf, type VoiceProvider } from '../core/voices'
 import { voiceTitleOf } from './castLanguages'
-import { isAbout, takeAnswerState, withAuditionTakes, withTake, withVoiceTake } from './takes'
+import {
+  isAbout,
+  takeAnswerState,
+  withAuditionTakes,
+  withBoardTake,
+  withTake,
+  withVoiceTake,
+} from './takes'
 import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
 
 /** A successful answer about a character's cast voice. */
@@ -1071,13 +1079,21 @@ export function useTakes(characterId: string, board = false, language?: string) 
           }
           if (caches.session) {
             client.setQueryData<SessionView>(['session', characterId, language ?? ''], (old) =>
-              old?.ok && old.audition ? withTake<Viewed>(old as Viewed, voice, result) : old,
+              old?.ok && old.audition
+                ? old.session
+                  ? withBoardTake(old as Viewed & { session: AuditionSession }, voice, result)
+                  : withTake<Viewed>(old as Viewed, voice, result)
+                : old,
             )
           }
         } else if ('reason' in result && result.reason === 'waits') {
           setWaiting((now) => waitingAfter(now, voice, 'waits'))
         } else {
           setWaiting((now) => waitingAfter(now, voice, 'failed'))
+          // A library voice may have been added before ElevenLabs failed: the board reads it again.
+          if (board) {
+            void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
+          }
           const message = 'message' in result ? result.message : 'the project’s files need fixing'
           setErrors((now) => ({ ...now, [voice]: message }))
         }

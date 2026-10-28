@@ -1,3 +1,4 @@
+import { startSession } from '../core/audition'
 import { describe, expect, it } from 'bun:test'
 import {
   extraTakeWords,
@@ -6,6 +7,7 @@ import {
   takeToRecord,
   triedNote,
   withAuditionTakes,
+  withBoardTake,
   withTake,
   withVoiceTake,
 } from './takes'
@@ -26,6 +28,36 @@ describe('withTake', () => {
 
   it('ignores a take of a phrase no longer shown', () => {
     expect(withTake(candidates, 'b', { key: 'old', spoken: '[warm] Old.' })).toBe(candidates)
+  })
+})
+
+describe('withBoardTake', () => {
+  const lib = (added: boolean) => ({
+    ...startSession({ character: 'k', keywords: [], current: null, candidates: [], perRound: 1 }),
+    voices: {
+      l: {
+        id: 'l',
+        title: 'L',
+        description: '',
+        tags: [],
+        languages: [],
+        uses: 0,
+        likes: 0,
+        author: '',
+        sample: null,
+        library: { owner: 'o', added },
+      },
+    },
+  })
+
+  it('adds the take and marks a library voice as in the user’s voices, its take having added it', () => {
+    const view = { ...candidates, session: lib(false) }
+    const next = withBoardTake(view, 'l', { key: 'key-l', spoken: '[warm] New.' })
+    expect(next.takes.l).toBe('key-l')
+    expect(next.session.voices.l?.library).toEqual({ owner: 'o', added: true })
+    // A take of a phrase changed since still added the voice.
+    const old = withBoardTake(view, 'l', { key: 'old', spoken: '[warm] Old.' })
+    expect([old.takes.l, old.session.voices.l?.library?.added]).toEqual([undefined, true])
   })
 })
 

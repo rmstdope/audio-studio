@@ -1,3 +1,4 @@
+import { markAdded, type AuditionSession } from '../core/audition'
 import { FREE_MODELS } from '../core/project'
 import { providerOf } from '../core/voices'
 import type { TakeLineResult } from '../services/lineTakes'
@@ -22,6 +23,19 @@ export function withTake<T extends WithTakes>(
 ): T {
   if ((take.asked ?? take.spoken) !== candidates.audition.spoken) return candidates
   return { ...candidates, takes: { ...candidates.takes, [voice]: take.key } }
+}
+
+/**
+ * The board with a newly recorded take of `voice` added (see `withTake`), and the voice, if it is
+ * from ElevenLabs' library, marked as among the user's voices: its take added it.
+ */
+export function withBoardTake<T extends WithTakes & { session: AuditionSession }>(
+  board: T,
+  voice: string,
+  take: { key: string; spoken: string; asked?: string },
+): T {
+  const taken = withTake(board, voice, take)
+  return { ...taken, session: markAdded(taken.session, voice) }
 }
 
 /**
