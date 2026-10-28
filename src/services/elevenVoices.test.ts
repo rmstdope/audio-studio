@@ -132,7 +132,12 @@ describe('freeVoices', () => {
       ['eleven:own-lib1', 'eleven:own-lib2', 'eleven:own-lib3'],
       new Set(['eleven:own-lib3']),
     )
-    expect(result).toEqual({ ok: true, freed: ['lib1', 'lib2'], failed: [] })
+    expect(result).toEqual({
+      ok: true,
+      freed: ['lib1', 'lib2'],
+      libraries: ['eleven:lib1', 'eleven:lib2'],
+      failed: [],
+    })
     expect(deleted).toEqual(['own-lib1', 'own-lib2'])
     expect((await readAddedVoices(projectFile)).added.map((a) => a.voice)).toEqual([
       'eleven:own-lib3',
@@ -155,6 +160,7 @@ describe('freeVoices', () => {
     expect(result).toEqual({
       ok: true,
       freed: ['lib1'],
+      libraries: ['eleven:lib1'],
       failed: [
         {
           voice: 'eleven:own-lib2',
@@ -185,6 +191,7 @@ describe('freeVoices', () => {
       {
         ok: true,
         freed: [],
+        libraries: [],
         failed: [],
       },
     )

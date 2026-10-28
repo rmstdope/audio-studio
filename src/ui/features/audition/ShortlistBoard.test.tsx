@@ -303,7 +303,11 @@ describe('ShortlistBoard', () => {
     slots = null as { used: number; limit: number } | null,
     freeable = [] as { voice: string; name: string; character: string }[],
     takesAdd = false,
+    noKey = false,
+    freeRefused = null as string | null,
+    accountFails = false,
   } = {}) {
+    let took = false
     const asked: { method: string; path: string; body: unknown }[] = []
     const money = (given: { dollars: number; left: number } | null, perTake: number) =>
       given && {
@@ -339,7 +343,11 @@ describe('ShortlistBoard', () => {
           eleven: { model: 'eleven_v3', perTake: 42, suggested: 2100, sitting: money(credits, 42) },
         })
       }
+      if (path === '/api/elevenlabs/account' && accountFails && took) {
+        return new Response('', { status: 502 })
+      }
       if (path.includes('/takes') && takesAdd && slots) {
+        took = true
         // A library voice's take adds it, using a slot.
         slots = { ...slots, used: slots.used + 1 }
         return Response.json({
@@ -375,13 +383,25 @@ describe('ShortlistBoard', () => {
           held: 0,
         })
       }
+      if (path === '/api/elevenlabs/account' && noKey) {
+        return Response.json({
+          account: { ok: false, reason: 'no-key', message: 'Set ELEVENLABS_API_KEY.' },
+          held: 0,
+        })
+      }
+      if (path === '/api/elevenlabs/voices/freeable' && freeRefused) {
+        return Response.json(
+          { ok: false, reason: 'unknown-use', message: freeRefused },
+          { status: 409 },
+        )
+      }
       if (path === '/api/elevenlabs/voices/freeable') {
         return Response.json({ ok: true, voices: freeable })
       }
       if (path === '/api/elevenlabs/voices/free') {
         freeable = []
         if (slots) slots = { ...slots, used: slots.used - body.voices.length }
-        return Response.json({ ok: true, freed: ['Rasp'], failed: [] })
+        return Response.json({ ok: true, freed: ['Rasp'], libraries: ['eleven:r'], failed: [] })
       }
       return new Response('', { status: 404 })
     }) as unknown as typeof fetch
@@ -472,6 +492,45 @@ describe('ShortlistBoard', () => {
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
     expect(takes()).toEqual(['eleven:l1'])
     expect(container.textContent).toContain('Take waits for a free voice slot')
+    await act(() => page.unmount())
+  })
+
+  it('says when the slots cannot be read again after a take, offering to try again', async () => {
+    const library = { owner: 'o', added: false }
+    const gravel = { ...george, id: 'eleven:l1', title: 'Gravel', library }
+    const brook = { ...george, id: 'eleven:l2', title: 'Brook', library }
+    const asked = studio({
+      credits: { dollars: 2100, left: 2100 },
+      slots: { used: 8, limit: 10 },
+      takesAdd: true,
+      accountFails: true,
+    })
+    const { container, page, button } = await boardOf(gravel, [brook])
+    await until(() => container.textContent!.includes('couldn’t be read again'))
+    const takes = () => asked.filter((a) => a.path.includes('/takes')).length
+    expect(takes()).toBe(2)
+    expect(button('Try again')).toBeDefined()
+    await act(() => page.unmount())
+  })
+
+  it('records library voices when the slots cannot be known, and says why none can be freed', async () => {
+    const gravel = {
+      ...george,
+      id: 'eleven:l1',
+      title: 'Gravel',
+      library: { owner: 'o', added: false },
+    }
+    const asked = studio({
+      credits: { dollars: 2100, left: 2100 },
+      noKey: true,
+      freeRefused: 'tts/cast.json or a saved audition can’t be read.',
+    })
+    const { container, page } = await boardOf(gravel)
+    await until(() => asked.some((a) => a.path.includes('/takes')))
+    await until(() =>
+      container.textContent!.includes('tts/cast.json or a saved audition can’t be read.'),
+    )
+    expect(container.textContent).not.toContain('Take waits for a free voice slot')
     await act(() => page.unmount())
   })
 

@@ -67,11 +67,22 @@ export function recordable(
   )
 }
 
+/** Whether a voice's take would add it to the user's ElevenLabs voices: from the library, not added, no take yet. */
+export function addsVoice(
+  session: AuditionSession,
+  takes: Record<string, string>,
+  voice: string,
+): boolean {
+  const library = session.voices[voice]?.library
+  return Boolean(library && !library.added && !takes[voice])
+}
+
 /**
- * The library voices on the board whose take would add them to the user's ElevenLabs voices
- * (not added, no take yet) beyond the `slotsLeft` free voice slots, in board order: they wait for
- * a slot. None while the slots are unknown (null), as ElevenLabs refuses at its limit anyway;
- * none of those in `failed`, whose take failed and is not asked again.
+ * The library voices on the board whose take would add them (`addsVoice`) beyond the `slotsLeft`
+ * free voice slots, in board order: they wait for a slot. With no slot known to be free (0, as
+ * while the account is being read) all of them wait; with the slots unknown (null: no key, or the
+ * account could not be read) none does, as ElevenLabs refuses at its limit anyway. None of those
+ * in `failed`, whose take failed and is not asked again.
  */
 export function slotWaiters(
   session: AuditionSession,
@@ -81,10 +92,9 @@ export function slotWaiters(
 ): Set<string> {
   if (slotsLeft === null) return new Set()
   // A voice whose take failed is not asked again for this phrase, so it holds no slot.
-  const adding = boardVoices(session).filter((id) => {
-    const library = session.voices[id]?.library
-    return library && !library.added && !takes[id] && !failed.has(id)
-  })
+  const adding = boardVoices(session).filter(
+    (id) => addsVoice(session, takes, id) && !failed.has(id),
+  )
   return new Set(adding.slice(Math.max(0, slotsLeft)))
 }
 

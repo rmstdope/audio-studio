@@ -1037,15 +1037,15 @@ export function useSetCue(partId: string, language?: string) {
 }
 
 /**
- * Records audition takes: `record(voice, adding)` asks the server for the take and adds it to the board
- * and the cast voice in the cache, without asking Fish for anything else. `board` says the takes
- * are the audition board's (on the audition model, paid from the sitting); the cast voice's on
- * its page are on the free model (ElevenLabs' audition model for an ElevenLabs voice, whose
+ * Records audition takes: `record(voice, adding)` asks the server for the take and adds it to the
+ * board and the cast voice in the cache, without asking Fish for anything else. `board` says the
+ * takes are the audition board's (on the audition model, paid from the sitting); the cast voice's
+ * on its page are on the free model (ElevenLabs' audition model for an ElevenLabs voice, whose
  * credits the Spending page then reads again); each goes only to its own cached answer
- * (`takeCaches`). `recording` holds the voices in progress, `errors` what went
- * wrong per voice, `waiting` the voices whose take waits for more money (`retryWaiting` asks for
- * a provider's again, once its money was added; `adding` says which would add a voice), `mayHaveAdded` when each take that was `adding`
- * a library voice to the user's voices answered (it may have used a voice slot).
+ * (`takeCaches`). `recording` holds the voices in progress, `errors` what went wrong per voice,
+ * `waiting` the voices whose take waits for more money (`retryWaiting` asks for a provider's
+ * again, once its money was added). `adding` says a take would add a library voice to the user's
+ * voices: `mayHaveAdded` holds when each such take answered, as it may have used a voice slot.
  */
 export function useTakes(characterId: string, board = false, language?: string) {
   const client = useQueryClient()
@@ -1330,6 +1330,9 @@ export function useCast(characterId: string, language?: string) {
       void client.invalidateQueries({ queryKey: ['part'] })
       void client.invalidateQueries({ queryKey: ['voice', characterId] })
       void client.invalidateQueries({ queryKey: ['sitting', characterId] })
+      // Casting may add a library voice (a slot used) and ends the audition (voices freed).
+      void client.invalidateQueries({ queryKey: ['eleven-account'] })
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
     },
   })
 }
@@ -1780,6 +1783,9 @@ export function useFreeableVoices() {
   })
 }
 
+/** What freeing voice slots did, or why the server removed nothing: what is in use cannot be read. */
+export type FreeAnswer = FreedResult | { ok: false; reason: 'unknown-use'; message: string }
+
 /**
  * Removes voices the studio added from the user's ElevenLabs voices, freeing their slots; the
  * account and the voices that can be freed are read again after.
@@ -1796,7 +1802,7 @@ export function useFreeVoices() {
       if (!response.ok && response.status !== 409) {
         throw new Error(`freeing voice slots answered ${response.status}`)
       }
-      return (await response.json()) as FreedResult
+      return (await response.json()) as FreeAnswer
     },
     onSettled: () => {
       void client.invalidateQueries({ queryKey: ['eleven-account'] })

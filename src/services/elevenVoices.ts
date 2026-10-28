@@ -65,9 +65,15 @@ export async function voiceToSpeak(
 
 /** What freeing voice slots did: the names of the voices removed, and those ElevenLabs kept. */
 export type FreedResult =
-  | { ok: true; freed: string[]; failed: { voice: string; name: string; message: string }[] }
-  /** No key; or, from the server, what is in use cannot be known, so nothing was removed. */
-  | { ok: false; reason: 'no-key' | 'unknown-use'; message: string }
+  | {
+      ok: true
+      /** The names of the voices removed. */
+      freed: string[]
+      /** Their library ids. */
+      libraries: string[]
+      failed: { voice: string; name: string; message: string }[]
+    }
+  | { ok: false; reason: 'no-key'; message: string }
 
 /**
  * Removes from the user's ElevenLabs voices those of `voices` (account ids) that the studio added
@@ -107,7 +113,12 @@ export async function freeVoices(
         added: before.added.filter((a) => !freed.includes(a)),
       })
     }
-    return { ok: true, freed: freed.map((a) => a.name), failed }
+    return {
+      ok: true,
+      freed: freed.map((a) => a.name),
+      libraries: freed.map((a) => a.library),
+      failed,
+    }
   })
 }
 

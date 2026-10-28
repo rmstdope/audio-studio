@@ -4830,7 +4830,12 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     eleven.client.deleteVoice = async (id) => void deleted.push(id)
     expect((await send('POST', '/api/elevenlabs/voices/free', { voices: [] })).status).toBe(400)
     const freed = await send('POST', '/api/elevenlabs/voices/free', { voices: ['eleven:own-l1'] })
-    expect(await freed.json()).toEqual({ ok: true, freed: ['Warm Gravel'], failed: [] })
+    expect(await freed.json()).toEqual({
+      ok: true,
+      freed: ['Warm Gravel'],
+      libraries: ['eleven:l1'],
+      failed: [],
+    })
     expect(deleted).toEqual(['own-l1'])
     expect(await freeable()).toEqual([])
   })
@@ -4863,6 +4868,25 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     eleven.client.deleteVoice = async () => {}
     await send('POST', '/api/elevenlabs/voices/free', { voices: ['eleven:z2'] })
     expect((await slots()).used).toBe(3)
+    // ...and so does casting a library voice, which adds it.
+    used = 2
+    expect((await slots()).used).toBe(3)
+    eleven.client.addSharedVoice = async () => 'own-c1'
+    eleven.client.sharedVoices = async () => ({
+      voices: [{ ...elevenVoiceOf('c1', 'Warm Cedar'), library: { owner: 'o1', added: false } }],
+      more: false,
+    })
+    writeFileSync(
+      join(root, 'tts/cast.json'),
+      JSON.stringify({ speakers: { gran: { style: '[warm]', audition: { keywords: ['warm'] } } } }),
+    )
+    await send('POST', '/api/auditions/gran/start')
+    await send('POST', '/api/auditions/gran/more', { provider: 'elevenlabs' })
+    await send('POST', '/api/auditions/gran/move', { voice: 'eleven:c1', move: 'shortlist' })
+    used = 4
+    const cast = await send('POST', '/api/auditions/gran/cast', { voice: 'eleven:c1' })
+    expect(await cast.json()).toMatchObject({ ok: true, voice: { id: 'eleven:own-c1' } })
+    expect((await slots()).used).toBe(4)
   })
 
   it('offers and frees nothing while the cast cannot be read', async () => {
@@ -4877,9 +4901,17 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     const deleted: string[] = []
     eleven.client.deleteVoice = async (id) => void deleted.push(id)
     const offered = await fetch(new URL('/api/elevenlabs/voices/freeable', server.url))
-    expect([offered.status, (await offered.json()).reason]).toEqual([409, 'unknown-use'])
+    const refusal = await offered.json()
+    expect([offered.status, refusal.reason]).toEqual([409, 'unknown-use'])
+    expect(refusal.message).toStartWith(
+      'tts/cast.json or a saved audition in .audio-studio/auditions',
+    )
     const freed = await send('POST', '/api/elevenlabs/voices/free', { voices: ['eleven:y2'] })
     expect([freed.status, (await freed.json()).reason]).toEqual([409, 'unknown-use'])
     expect(deleted).toEqual([])
+    // With nothing the studio added there is nothing to offer, and nothing to say.
+    writeFileSync(join(root, '.audio-studio/eleven-voices.json'), '{"version": 1, "added": []}')
+    const none = await fetch(new URL('/api/elevenlabs/voices/freeable', server.url))
+    expect([none.status, await none.json()]).toEqual([200, { ok: true, voices: [] }])
   })
 })

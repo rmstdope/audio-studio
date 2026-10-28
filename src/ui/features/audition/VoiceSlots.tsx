@@ -8,7 +8,17 @@ import { plural } from '../../format'
  * The plan's ElevenLabs voice slots on the audition board: how many are used, and a button that
  * frees those of the voices the studio added that nothing uses, asking first.
  */
-export function VoiceSlots({ slots }: { slots: { used: number; limit: number } | null }) {
+export function VoiceSlots({
+  slots,
+  unread,
+  onRetry,
+}: {
+  slots: { used: number; limit: number } | null
+  /** Why the account could not be read again, while the slots shown may be out of date. */
+  unread?: string
+  /** Reads the account again. */
+  onRetry: () => void
+}) {
   const freeable = useFreeableVoices()
   const free = useFreeVoices()
   const [asking, setAsking] = useState(false)
@@ -18,6 +28,15 @@ export function VoiceSlots({ slots }: { slots: { used: number; limit: number } |
   return (
     <div className="voice-slots">
       {slots && <span className="muted">{slotsLine(slots)}</span>}
+      {unread && (
+        <span className="adopt-error" role="alert">
+          ElevenLabs’ voice slots couldn’t be read again: {unread.replace(/\.$/, '')}. Takes that
+          would add a library voice wait until they are.{' '}
+          <button className="btn btn-small" type="button" onClick={onRetry}>
+            Try again
+          </button>
+        </span>
+      )}
       {voices.length > 0 && !asking && (
         <button className="btn btn-small" type="button" onClick={() => setAsking(true)}>
           {label}
@@ -58,7 +77,7 @@ export function VoiceSlots({ slots }: { slots: { used: number; limit: number } |
             ElevenLabs kept {f.name}: {f.message.replace(/\.$/, '')}.
           </span>
         ))}
-      {answer && !answer.ok && (
+      {answer && !answer.ok && freeable.data?.ok && (
         <span className="adopt-error" role="alert">
           {answer.message}
         </span>

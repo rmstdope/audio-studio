@@ -23,6 +23,7 @@ import {
   ownSectionState,
   playsVoice,
   recordable,
+  addsVoice,
   slotWaiters,
   slotsLeftFor,
   saveFailedLine,
@@ -132,10 +133,7 @@ export function ShortlistBoard({
       ? account.data.account.account.voiceSlots
       : null
   // Whether a voice's take would add it to the user's ElevenLabs voices, using a slot.
-  const adds = (id: string) => {
-    const library = session.voices[id]?.library
-    return Boolean(library && !library.added && !takes[id])
-  }
+  const adds = (id: string) => addsVoice(session, takes, id)
   // Library voices whose take would add them wait while no slot is free for them; a take that
   // may have added one counts until the account is read again.
   const slotWaiting = slotWaiters(
@@ -664,7 +662,13 @@ export function ShortlistBoard({
           </button>
         </form>
         {idError && <span className="adopt-error">{idError}</span>}
-        {showsSlots && <VoiceSlots slots={slots} />}
+        {showsSlots && (
+          <VoiceSlots
+            slots={slots}
+            unread={account.isError && account.data ? account.error.message : undefined}
+            onRetry={() => void account.refetch()}
+          />
+        )}
         <Failure title="The audition could not go on" result={act.data} />
         <Failure
           title="The voice could not be cast"

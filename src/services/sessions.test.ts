@@ -22,6 +22,7 @@ import {
   undoLastDrop,
   viewOf,
   voicesInUse,
+  voicesRemoved,
 } from './sessions'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { setKeywords } from './auditions'
@@ -976,11 +977,15 @@ describe('voicesInUse', () => {
   it('names every voice cast, and every voice on an audition in progress', async () => {
     const { projectFile, session } = await started()
     await moveVoice(projectFile, 'mira', 'a', 'drop')
-    const used = await voicesInUse(projectFile)
-    // A voice dropped can be brought back with Undo: it is in use too.
-    expect([...used!].sort()).toEqual(
+    // The last voice dropped can be brought back with Undo: it is in use too.
+    expect([...(await voicesInUse(projectFile))!].sort()).toEqual(
       [...new Set(['cur', 't1', ...session.toHear, ...session.queue])].sort(),
     )
+    // One dropped before it cannot.
+    await moveVoice(projectFile, 'mira', 'b', 'drop')
+    const used = await voicesInUse(projectFile)
+    expect(used!.has('b')).toBe(true)
+    expect(used!.has('a')).toBe(false)
   })
 
   it('knows nothing in use when the cast or a session cannot be read, so nothing is freed', async () => {
@@ -998,5 +1003,26 @@ describe('voicesInUse', () => {
   it('names only the cast when no audition is in progress', async () => {
     const root = tempRepo(files)
     expect([...(await voicesInUse(join(root, 'audio-studio.json')))!].sort()).toEqual(['cur', 't1'])
+  })
+})
+
+describe('voicesRemoved', () => {
+  it('marks a library voice removed as not added on the audition showing it', async () => {
+    const { projectFile } = await started()
+    const { client } = fakeEleven()
+    client.sharedVoices = async () => ({
+      voices: [{ ...voice('eleven:l1', 'Warm l1'), library: { owner: 'o', added: true } }],
+      more: false,
+    })
+    await moreVoices(projectFile, 'mira', fishFor, undefined, {
+      provider: 'elevenlabs',
+      elevenFor: async () => client,
+    })
+    await voicesRemoved(projectFile, ['eleven:l1'])
+    const result = await sessionFor(projectFile, 'mira')
+    expect(result?.ok && result.session?.voices['eleven:l1']?.library).toEqual({
+      owner: 'o',
+      added: false,
+    })
   })
 })

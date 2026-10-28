@@ -274,6 +274,21 @@ export function markAdded(session: AuditionSession, voice: string): AuditionSess
   }
 }
 
+/**
+ * The session with library voices no longer marked as among the user's voices, once removed
+ * from them: a take or cast would add them again.
+ */
+export function unmarkAdded(session: AuditionSession, voices: string[]): AuditionSession {
+  const removed = voices.filter((id) => session.voices[id]?.library?.added)
+  if (!removed.length) return session
+  const next = { ...session.voices }
+  for (const id of removed) {
+    const shown = next[id]!
+    next[id] = { ...shown, library: { ...shown.library!, added: false } }
+  }
+  return { ...session, voices: next }
+}
+
 /** Where a voice is on the board, or null if it is not on it. */
 export function placeOf(session: AuditionSession, voice: string): Place | null {
   if (session.yours.includes(voice)) return 'yours'

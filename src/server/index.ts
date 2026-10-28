@@ -101,6 +101,8 @@ import {
   viewOf,
   voiceAdded,
   voicesInUse,
+  voicesRemoved,
+  SESSIONS_DIR,
   type SessionResult,
 } from '../services/sessions'
 import { freeVoices, readAddedVoices, voiceToSpeak } from '../services/elevenVoices'
@@ -320,10 +322,6 @@ const RecordBody = z
 
 /** A voice to bring in or cast: either provider's. */
 const VoiceBody = z.object({ voice: z.string().regex(VOICE_ID) })
-
-/** Why no voice is offered for removal when what is in use cannot be known. */
-const UNKNOWN_USE =
-  'The cast or an audition in progress can’t be read, so no ElevenLabs voice is offered for removal. Fix the files and try again.'
 
 /** The voices to remove from the user's ElevenLabs voices, by their studio ids. */
 const FreeBody = z.object({ voices: z.array(z.string().regex(VOICE_ID)).min(1).max(500) }).strict()
@@ -767,7 +765,7 @@ export function startServer({
    * studio added it, added now if it was not (once).
    */
   async function saveToAccount(voice: Voice, characterId: string): Promise<string> {
-    return voiceToSpeak(
+    const id = await voiceToSpeak(
       projectFile,
       async () => {
         const opened = await openProject(projectFile)
@@ -775,6 +773,23 @@ export function startServer({
       },
       voice,
       characterId,
+    )
+    // It may have taken a voice slot: the board asks for the account afresh.
+    shown = null
+    return id
+  }
+
+  /** The refusal to offer or remove voices while what is in use cannot be read, naming the files. */
+  async function unknownUse(): Promise<Response> {
+    const opened = await openProject(projectFile)
+    const cast = opened.ok ? opened.project.narration.characters : 'The cast'
+    return Response.json(
+      {
+        ok: false,
+        reason: 'unknown-use',
+        message: `${cast} or a saved audition in ${SESSIONS_DIR} can’t be read, so no ElevenLabs voice is offered for removal. Fix it and try again.`,
+      },
+      { status: 409 },
     )
   }
 
@@ -1674,13 +1689,12 @@ export function startServer({
       '/api/elevenlabs/voices/freeable': {
         // The voices the studio added from the library that nothing uses: their slots can be freed.
         GET: guard(async () => {
+          const added = await readAddedVoices(projectFile)
+          // Nothing the studio added: nothing to offer, whatever can be read.
+          if (!added.added.length) return Response.json({ ok: true, voices: [] })
           const used = await voicesInUse(projectFile)
-          if (!used)
-            return Response.json(
-              { ok: false, reason: 'unknown-use', message: UNKNOWN_USE },
-              { status: 409 },
-            )
-          const voices = freeableVoices(await readAddedVoices(projectFile), used)
+          if (!used) return unknownUse()
+          const voices = freeableVoices(added, used)
           return Response.json({
             ok: true,
             voices: voices.map(({ voice, name, character }) => ({ voice, name, character })),
@@ -1692,11 +1706,7 @@ export function startServer({
           const body = FreeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voices }' }, { status: 400 })
           const used = await voicesInUse(projectFile)
-          if (!used)
-            return Response.json(
-              { ok: false, reason: 'unknown-use', message: UNKNOWN_USE },
-              { status: 409 },
-            )
+          if (!used) return unknownUse()
           const result = await freeVoices(
             projectFile,
             async () => {
@@ -1706,8 +1716,10 @@ export function startServer({
             body.data.voices,
             used,
           )
-          // Slots were freed: the board asks for the account afresh.
+          // Slots were freed: the board asks for the account afresh, and a take or cast of a
+          // voice removed adds it again.
           shown = null
+          if (result.ok) await voicesRemoved(projectFile, result.libraries)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
