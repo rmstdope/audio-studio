@@ -167,6 +167,98 @@ describe('ShortlistBoard', () => {
     await act(() => page.unmount())
   })
 
+  it('designs with ElevenLabs once its credits are confirmed', async () => {
+    const posted: { path: string; body: unknown }[] = []
+    globalThis.fetch = (async (path: string, init?: RequestInit) => {
+      if (init?.method === 'POST') posted.push({ path, body: JSON.parse(String(init.body)) })
+      if (path.includes('/designs')) {
+        return Response.json({
+          ok: true,
+          description: 'An old wizard, gruff and slow',
+          eleven: { text: 'x'.repeat(130), credits: 130 },
+        })
+      }
+      if (path.endsWith('/design')) return Response.json({ ok: true, added: 3 })
+      return new Response('', { status: 404 })
+    }) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board, {}),
+        ),
+      ),
+    )
+    const button = (label: string) =>
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.includes(label))
+    await act(() => button('Design a voice…')!.click())
+    const eleven = [...container.querySelectorAll('[aria-label="Design with"] input')][1]!
+    await act(() => (eleven as HTMLInputElement).click())
+    expect(container.textContent).toContain('ElevenLabs makes 3 voices from it')
+    await until(() => container.textContent!.includes('An old wizard, gruff and slow'))
+    await act(() => button('Design voices…')!.click())
+    expect(container.textContent).toContain('Design voices with ElevenLabs?')
+    expect(container.textContent).toContain('It uses 130 credits of your ElevenLabs plan')
+    await act(() => button('Use 130 credits')!.click())
+    await until(() => posted.length === 1)
+    expect(posted[0]!.body).toEqual({
+      description: 'An old wizard, gruff and slow',
+      provider: 'elevenlabs',
+      creditsUpTo: 130,
+    })
+    await act(() => page.unmount())
+  })
+
+  /** The keeper's board with the design box open on ElevenLabs, the studio answering `eleven`. */
+  async function elevenBox(eleven: { text: string | null; credits: number } | null) {
+    globalThis.fetch = (async (path: string) =>
+      path.includes('/designs')
+        ? Response.json({ ok: true, description: 'An old wizard, gruff and slow', eleven })
+        : new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board, {}),
+        ),
+      ),
+    )
+    const button = (label: string) =>
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.includes(label))
+    await act(() => button('Design a voice…')!.click())
+    const radio = [...container.querySelectorAll('[aria-label="Design with"] input')][1]!
+    await act(() => (radio as HTMLInputElement).click())
+    await until(() => container.textContent!.includes('An old wizard, gruff and slow'))
+    await act(() => button('Design voices…')!.click())
+    return { container, page, button }
+  }
+
+  it('asks for up to 1,000 credits when ElevenLabs writes its own text', async () => {
+    const { container, page, button } = await elevenBox({ text: null, credits: 1000 })
+    expect(container.textContent).toContain('each saying a text it writes')
+    await until(() => document.activeElement === button('Use up to 1,000 credits'))
+    await act(() => page.unmount())
+  })
+
+  it('says ElevenLabs cannot design without a phrase, with focus on Try again', async () => {
+    const { container, page } = await elevenBox(null)
+    expect(container.textContent).toContain('ElevenLabs can’t design voices now')
+    const retry = () =>
+      [...container.querySelectorAll('[role="alertdialog"] button')].find(
+        (b) => b.textContent === 'Try again',
+      )
+    await until(() => retry() !== undefined && document.activeElement === retry())
+    await act(() => page.unmount())
+  })
+
   it('brings in an ElevenLabs voice by its id, with ElevenLabs chosen beside the field', async () => {
     const posted: { path: string; body: unknown }[] = []
     globalThis.fetch = (async (path: string, init?: RequestInit) => {

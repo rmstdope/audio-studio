@@ -349,6 +349,30 @@ describe('castEffects for a library voice not yet added', () => {
   })
 })
 
+describe('an ElevenLabs design cast', () => {
+  it('says it is saved to the ElevenLabs voices first, using a slot', () => {
+    const effects = castEffects({
+      name: 'Mara',
+      current: null,
+      replacing: true,
+      recorded: [],
+      titles: new Map(),
+      dropped: 0,
+      unheard: 0,
+      saves: 'elevenlabs',
+    })
+    expect(effects[0]).toBe(
+      'It is saved to your ElevenLabs voices first, as “Mara (designed)”, using one of your plan’s voice slots.',
+    )
+  })
+
+  it('says when ElevenLabs would not save it, and that an old design may need designing again', () => {
+    expect(saveFailedLine('The generated voice ID was not found.', 'eleven-design')).toBe(
+      'ElevenLabs couldn’t save this design: The generated voice ID was not found. It wasn’t cast; a design from an earlier session may need designing again.',
+    )
+  })
+})
+
 describe('saveFailedLine', () => {
   it('gives ElevenLabs’ reason for a library voice it would not add', () => {
     expect(saveFailedLine('You have reached your voice limit.', 'elevenlabs')).toBe(
@@ -373,6 +397,15 @@ describe('designFailureLine', () => {
   it('says Fish may have charged when the studio failed after asking', () => {
     expect(designFailureLine({ reason: 'failed', message: 'ffmpeg is needed' })).toBe(
       'The voices weren’t kept: ffmpeg is needed. Fish may have charged $0.01.',
+    )
+  })
+
+  it('says what ElevenLabs refused, or that it may have charged the credits', () => {
+    expect(designFailureLine({ reason: 'elevenlabs', message: 'Too short.' }, 'elevenlabs')).toBe(
+      'ElevenLabs couldn’t design voices: Too short. Nothing was charged.',
+    )
+    expect(designFailureLine({ reason: 'failed', message: 'Disk full.' }, 'elevenlabs', 130)).toBe(
+      'The voices weren’t kept: Disk full. ElevenLabs may have charged 130 credits.',
     )
   })
 

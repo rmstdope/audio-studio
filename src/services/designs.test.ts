@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { fakeEleven, projectJson, tempRepo } from '../../test/helpers'
 import { isDesignId } from '../core/design'
 import type { Voice } from '../core/voiceSearch'
-import { castDesign, designVoices, designsFor } from './designs'
+import {
+  castDesign,
+  designElevenVoices,
+  designVoices,
+  designsFor,
+  elevenDesignFor,
+} from './designs'
+import { ElevenLabsError, NO_ELEVENLABS_KEY } from './elevenlabs'
 import { designPreviewPath, readDesigns } from './designStore'
 import type { Encoder } from './audio'
 import type { DesignVoiceRequest, FishClient } from './fish'
@@ -345,5 +352,173 @@ describe('designs per language', () => {
     expect(Object.keys((await readDesigns(projectFile, 'mira', 'sv')).voices).length).toBe(4)
     const swedish = await startAudition(projectFile, 'mira', fishFor, 'sv')
     expect(swedish?.ok && swedish.session.designed.length).toBe(4)
+  })
+})
+
+describe('designs with ElevenLabs', () => {
+  const lines = [
+    { key: 'a1', speaker: 'mira', text: 'Welcome to the lighthouse, where the lamps never sleep.' },
+    { key: 'a2', speaker: 'mira', text: 'Sit by the fire and I will tell you of the sea.' },
+  ]
+  function elevenSetup(script = lines) {
+    const root = tempRepo({ ...files, 'tts/act1/script.json': script })
+    return { root, projectFile: join(root, 'audio-studio.json') }
+  }
+  /** ElevenLabs designing three previews saying what it is given, and saving them as `v-<id>`. */
+  function elevenThat() {
+    const { client } = fakeEleven()
+    const asked: { description: string; text: string | null }[] = []
+    const saved: { generated: string; name: string; description: string }[] = []
+    client.designVoices = async (request) => {
+      asked.push(request)
+      return {
+        text: request.text ?? 'ElevenLabs’ own words, long enough to say.',
+        previews: [1, 2, 3].map((i) => ({ generated: `g${i}`, audio: new Uint8Array([i]) })),
+      }
+    }
+    client.saveDesignedVoice = async (request) => {
+      saved.push(request)
+      return `v-${request.generated}`
+    }
+    return { elevenFor: async () => client, client, asked, saved }
+  }
+
+  it('says what the previews will say and what they cost: the phrase and her lines', async () => {
+    const { projectFile } = elevenSetup()
+    const plan = await elevenDesignFor(projectFile, 'mira')
+    expect(plan).toMatchObject({ ok: true })
+    const text = (plan as { text: string }).text
+    expect(text).toContain('Welcome to the lighthouse')
+    expect(plan).toMatchObject({ credits: [...text].length })
+    const short = elevenSetup([{ key: 'a1', speaker: 'mira', text: 'Hi.' }])
+    expect(await elevenDesignFor(short.projectFile, 'mira')).toEqual({
+      ok: true,
+      text: null,
+      credits: 1000,
+    })
+  })
+
+  it('keeps three designs with ElevenLabs’ ids and previews, and logs the credits', async () => {
+    const { root, projectFile } = elevenSetup()
+    const eleven = elevenThat()
+    const result = await designElevenVoices(
+      projectFile,
+      'mira',
+      ' An old wizard, gruff and slow ',
+      eleven.elevenFor,
+    )
+    expect(result).toMatchObject({ ok: true, added: 3 })
+    const plan = (await elevenDesignFor(projectFile, 'mira')) as { text: string; credits: number }
+    expect(eleven.asked).toEqual([
+      { description: 'An old wizard, gruff and slow', text: plan.text },
+    ])
+    const designs = Object.values((await readDesigns(projectFile, 'mira')).voices)
+    expect(designs.map((v) => v.design?.generated)).toEqual(['g1', 'g2', 'g3'])
+    for (const v of designs) {
+      expect(readFileSync(join(root, designPreviewPath(v.id)))).toEqual(
+        Buffer.from([Number(v.design!.generated!.slice(1))]),
+      )
+    }
+    const spending = JSON.parse(readFileSync(join(root, '.audio-studio/spending.json'), 'utf8'))
+    expect(spending.tries).toMatchObject([
+      { kind: 'design', character: 'mira', model: 'eleven_ttv_v3', credits: plan.credits },
+    ])
+  })
+
+  it('keeps nothing when ElevenLabs refuses, and says why; no key says so', async () => {
+    const { projectFile } = elevenSetup()
+    const eleven = elevenThat()
+    eleven.client.designVoices = () =>
+      Promise.reject(new ElevenLabsError(422, 'The description is too short.'))
+    expect(
+      await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff', eleven.elevenFor),
+    ).toEqual({
+      ok: false,
+      reason: 'elevenlabs',
+      message: 'The description is too short.',
+    })
+    expect(Object.keys((await readDesigns(projectFile, 'mira')).voices)).toEqual([])
+    eleven.client.designVoices = async () => ({ text: 'x'.repeat(120), previews: [] })
+    expect(
+      await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff', eleven.elevenFor),
+    ).toEqual({ ok: false, reason: 'failed', message: 'ElevenLabs sent no voices' })
+    expect(await designElevenVoices(projectFile, 'mira', 'old', eleven.elevenFor)).toMatchObject({
+      ok: false,
+      reason: 'invalid',
+    })
+    expect(
+      await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff', async () => null),
+    ).toEqual({
+      ok: false,
+      reason: 'no-key',
+      message: NO_ELEVENLABS_KEY,
+    })
+  })
+
+  it('casts a design by saving it as a voice of the user’s, once, and casting that', async () => {
+    const { root, projectFile } = elevenSetup()
+    const eleven = elevenThat()
+    await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff and slow', eleven.elevenFor)
+    const started = await startAudition(projectFile, 'mira', fishThat().fishFor)
+    if (!started?.ok) throw new Error('no session')
+    const first = started.session.designed[0]!
+    await moveVoice(projectFile, 'mira', first, 'shortlist')
+    const result = await castDesign(
+      projectFile,
+      'mira',
+      first,
+      fishThat().fishFor,
+      undefined,
+      eleven.elevenFor,
+    )
+    expect(result).toMatchObject({
+      ok: true,
+      voice: { id: 'eleven:v-g1', name: 'Mira (designed)' },
+    })
+    expect(eleven.saved).toEqual([
+      { generated: 'g1', name: 'Mira (designed)', description: 'An old wizard, gruff and slow' },
+    ])
+    expect(JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).speakers.mira.voice).toBe(
+      'eleven:v-g1',
+    )
+  })
+
+  it('says the text confirmed, not one made again since', async () => {
+    const { projectFile } = elevenSetup()
+    const eleven = elevenThat()
+    const confirmed = 'y'.repeat(140)
+    await designElevenVoices(
+      projectFile,
+      'mira',
+      'An old wizard, gruff and slow',
+      eleven.elevenFor,
+      undefined,
+      undefined,
+      {
+        text: confirmed,
+      },
+    )
+    expect(eleven.asked[0]?.text).toBe(confirmed)
+  })
+
+  it('casts nothing when ElevenLabs no longer takes the preview, and says so', async () => {
+    const { projectFile } = elevenSetup()
+    const eleven = elevenThat()
+    await designElevenVoices(projectFile, 'mira', 'An old wizard, gruff and slow', eleven.elevenFor)
+    const started = await startAudition(projectFile, 'mira', fishThat().fishFor)
+    if (!started?.ok) throw new Error('no session')
+    const first = started.session.designed[0]!
+    await moveVoice(projectFile, 'mira', first, 'shortlist')
+    eleven.client.saveDesignedVoice = () =>
+      Promise.reject(new ElevenLabsError(400, 'The generated voice ID was not found.'))
+    expect(
+      await castDesign(projectFile, 'mira', first, fishThat().fishFor, undefined, eleven.elevenFor),
+    ).toEqual({
+      ok: false,
+      reason: 'save',
+      voice: first,
+      message: 'The generated voice ID was not found.',
+    })
+    expect((await sessionFor(projectFile, 'mira'))?.ok).toBe(true)
   })
 })

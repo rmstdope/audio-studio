@@ -28,13 +28,15 @@ export function emptyDesigns(character: string): Designs {
 
 /**
  * With the designs `ids` made from `description` at `at` kept, numbered on from the ones made
- * before ("Design n"), and the description remembered.
+ * before ("Design n"), and the description remembered; ElevenLabs' designs with the id each is
+ * saved by (`generated`, in the same order).
  */
 export function addDesigns(
   designs: Designs,
   description: string,
   at: string,
   ids: string[],
+  generated?: string[],
 ): Designs {
   const voices: Record<string, Voice> = { ...designs.voices }
   ids.forEach((id, index) => {
@@ -49,7 +51,12 @@ export function addDesigns(
       likes: 0,
       author: '',
       sample: null,
-      design: { n, description, at },
+      design: {
+        n,
+        description,
+        at,
+        ...(generated?.[index] !== undefined && { generated: generated[index] }),
+      },
     }
   })
   return { ...designs, description, made: designs.made + ids.length, voices }

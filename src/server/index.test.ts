@@ -2918,7 +2918,7 @@ describe('designing a voice', () => {
     expect(await response.json()).toEqual({ ok: true, added: 4 })
     expect(asked).toEqual(['an old woman'])
     const last = await fetch(new URL('/api/characters/narrator/designs', designing.url))
-    expect(await last.json()).toEqual({ ok: true, description: 'an old woman' })
+    expect(await last.json()).toMatchObject({ ok: true, description: 'an old woman' })
   })
 
   it('gives Fish’s refusal with a 409', async () => {
@@ -3926,6 +3926,8 @@ describe('the ElevenLabs account on Setup', () => {
         sharedVoices: () => Promise.reject(new Error('not used')),
         addSharedVoice: () => Promise.reject(new Error('not used')),
         deleteVoice: () => Promise.reject(new Error('not used')),
+        designVoices: () => Promise.reject(new Error('not used')),
+        saveDesignedVoice: () => Promise.reject(new Error('not used')),
         music: unused,
         tts: unused,
         voice: unused,
@@ -3961,6 +3963,8 @@ describe('the ElevenLabs account on Setup', () => {
       sharedVoices: () => Promise.reject(new Error('not used')),
       addSharedVoice: () => Promise.reject(new Error('not used')),
       deleteVoice: () => Promise.reject(new Error('not used')),
+      designVoices: () => Promise.reject(new Error('not used')),
+      saveDesignedVoice: () => Promise.reject(new Error('not used')),
       music: unused,
       tts: unused,
       voice: unused,
@@ -4913,5 +4917,99 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     writeFileSync(join(root, '.audio-studio/eleven-voices.json'), '{"version": 1, "added": []}')
     const none = await fetch(new URL('/api/elevenlabs/voices/freeable', server.url))
     expect([none.status, await none.json()]).toEqual([200, { ok: true, voices: [] }])
+  })
+})
+
+describe('server, designing voices with ElevenLabs', () => {
+  const root = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': {
+      speakers: { gran: { style: '[warm]', audition: { keywords: ['warm'] } } },
+    },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'gran', text: 'Come in from the cold, child, the kettle is singing.' },
+      { key: 'b', speaker: 'gran', text: 'Sit by the fire and I will tell you of the sea.' },
+    ],
+  })
+  const eleven = fakeEleven(
+    {},
+    {
+      account: {
+        tier: 'starter',
+        charactersUsed: 0,
+        characterLimit: 1000,
+        renewsAt: null,
+        overage: 0,
+        voiceSlots: { used: 0, limit: 10 },
+      },
+    },
+  )
+  const asked: (string | null)[] = []
+  eleven.client.designVoices = async ({ text }) => {
+    asked.push(text)
+    return {
+      text: text ?? '',
+      previews: [1, 2, 3].map((i) => ({ generated: `g${i}`, audio: new Uint8Array([i]) })),
+    }
+  }
+  eleven.client.saveDesignedVoice = async ({ generated }) => `v-${generated}`
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    elevenlabs: eleven.client,
+  })
+  afterAll(() => server.stop(true))
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(new URL(path, server.url), {
+      method,
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('says what a design costs, designs once confirmed, and casts a design as a saved voice', async () => {
+    const plan = await (await fetch(new URL('/api/characters/gran/designs', server.url))).json()
+    expect(plan.eleven.text).toContain('Come in from the cold')
+    const credits = plan.eleven.credits
+    expect(credits).toBe([...plan.eleven.text].length)
+    const vague = await send('POST', '/api/characters/gran/design', {
+      description: 'old wizard',
+      provider: 'elevenlabs',
+      creditsUpTo: credits,
+    })
+    expect([vague.status, (await vague.json()).reason]).toEqual([409, 'invalid'])
+    // More than the plan has left is refused, and ElevenLabs is asked nothing.
+    const subscription = eleven.client.subscription
+    eleven.client.subscription = async () => ({
+      ...(await subscription()),
+      charactersUsed: 1000 - credits + 1,
+    })
+    const short = await send('POST', '/api/characters/gran/design', {
+      description: 'An old wizard, gruff and slow',
+      provider: 'elevenlabs',
+      creditsUpTo: credits,
+    })
+    expect(short.status).toBe(409)
+    eleven.client.subscription = subscription
+    const unconfirmed = await send('POST', '/api/characters/gran/design', {
+      description: 'An old wizard, gruff and slow',
+      provider: 'elevenlabs',
+    })
+    expect(unconfirmed.status).toBe(409)
+    expect(asked).toEqual([])
+    const designed = await send('POST', '/api/characters/gran/design', {
+      description: 'An old wizard, gruff and slow',
+      provider: 'elevenlabs',
+      creditsUpTo: credits,
+    })
+    expect(await designed.json()).toEqual({ ok: true, added: 3 })
+    expect(asked).toEqual([plan.eleven.text])
+    const started = await (await send('POST', '/api/auditions/gran/start')).json()
+    const first = started.session.designed[0]
+    await send('POST', '/api/auditions/gran/move', { voice: first, move: 'shortlist' })
+    const cast = await send('POST', '/api/auditions/gran/cast', { voice: first })
+    expect(await cast.json()).toMatchObject({ ok: true, voice: { id: 'eleven:v-g1' } })
   })
 })

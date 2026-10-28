@@ -1212,7 +1212,7 @@ minute, and whether it was made (billed, also when the studio then could not kee
 while being made, which may still be billed; a take that fails before ElevenLabs makes it costs
 nothing and is not listed). Only credits spent are kept, so a recording given credits but
 spending none stays a version 1 row. Takes and tries with ElevenLabs voices (14.10a) are a list
-of their own too (`tries`: when, `take` or `try`, the character, a try's part, the language, the
+of their own too (`tries`: when, `take`, `try`, `audition` or, since 14.12, `design`, the character, a try's part, the language, the
 model, the characters sent and the credits), absent from a version 2 log written before them. A
 studio from before 14.10a reads such a log but drops `tries` when it next writes it; tries are
 small and the bills are ElevenLabs', so this is accepted rather than a version 3. A
@@ -1221,7 +1221,7 @@ The Spending page and the sidebar total dollars and credits apart (`$0.78 · 1,2
 all and per act, music takes in their act and stingers on a tile of their own once one cost
 something; a recording's Cost and Model cells name the providers that spent, a take's Lines cell
 says "Music take · The cave" and how long it was made. Takes and tries count in the totals and
-on a tile of their own ("Takes and tries with ElevenLabs voices"), never as rows: there can be
+on a tile of their own ("ElevenLabs takes, tries and designs"), never as rows: there can be
 hundreds.
 
 **Casting.** The audition board searches either provider (built in 14.11a,
@@ -1262,13 +1262,24 @@ recording by themselves once slots are freed. Whether a library voice can speak 
 is checked by hand at the end of step 14 (no key in CI); if it can, nothing need be added before
 casting. **Add by id** takes an id from the
 user's own ElevenLabs voices (one made or added on ElevenLabs' site), with the provider chosen
-beside the field; a library voice is found by search. **Design** offers ElevenLabs beside Fish:
-`POST /v1/text-to-voice/design` (`eleven_ttv_v3`, the character's description, the audition phrase
-as the text, or ElevenLabs' own text when the phrase is under its 100 characters) gives previews,
-kept as design takes with their `generated_voice_id` and audio; casting one saves it (`POST
-/v1/text-to-voice`, a voice slot) and casts `eleven:<new id>`. If ElevenLabs no longer accepts a
-kept preview's id in a later session, its card says so and offers to design again. A design's price,
-unknown today, is settled in 14.12 and confirmed as Fish's is. Cloning stays Fish's.
+beside the field; a library voice is found by search. **Design** offers ElevenLabs beside Fish (built in 14.12,
+`docs/ui/elevenlabs-design.html`: a switch at the top of the design box): `POST
+/v1/text-to-voice/design` (`eleven_ttv_v3`, the description, MP3 previews) gives three previews,
+kept as Fish's designs are (numbered, under the description, the preview as the design's take),
+each with its `generated_voice_id`. The previews say the audition phrase, then the character's own
+lines in the order of the parts, each once, until ElevenLabs' least of 100 characters (cut at a word
+within its 1,000; `core/elevenDesign.ts`); when she has too few words ElevenLabs writes its own
+text (`auto_generate_text`). A design costs a credit a character of that text, once for its three
+voices (ElevenLabs' help centre), so the confirm names the credits ("Use 130 credits", or "Use up
+to 1,000 credits" for ElevenLabs' own text), and the server holds them back from the plan while it
+designs, as a recording's are, and sends the text it confirmed (not one made again since); the
+description takes 20 to 1,000 characters there (ElevenLabs' reference names no limit; to be checked
+by hand), checked before anything is held; what was charged (the text's characters) is logged in the spending
+record's `tries` as a `design` (a studio from 14.10a to 14.11 cannot read a record holding one). An answer with no voices is a failure that may have been charged. Casting one saves it
+(`POST /v1/text-to-voice`, named "Mara (designed)" each time, since ElevenLabs takes the same name
+twice and the studio does not list the user's voices, a voice slot) and casts `eleven:<new id>`; a save that worked is remembered as Fish's
+is, so a cast that then failed saves nothing twice. If ElevenLabs no longer takes a kept preview's
+id, nothing is cast and its card says a design from an earlier session may need designing again. Cloning stays Fish's.
 
 **Music** (built in 14.4, 14.5 and, the spending log, 14.7d). One more family, `elevenlabs`,
 with one model, _Eleven Music_ (id `eleven`, recipe `eleven-music-v2.5`, `longest` 600 s, so loops
@@ -1396,8 +1407,8 @@ POST   /api/auditions/:id/add                    a voice by its Fish id
 POST   /api/auditions/:id/cast                   write a shortlisted voice to cast.json
 POST   /api/characters/:id/clone-voice           a private voice on the Fish account from recordings (multipart: title, voices)
 POST   /api/characters/:id/cast-voice            cast a voice no audition holds ({ voice, name }); ends an audition going on
-GET    /api/characters/:id/designs               the description the design box starts with
-POST   /api/characters/:id/design                have Fish design voices ({ description, spendUpTo: 0.01 }); 409 until the cost is confirmed and covered
+GET    /api/characters/:id/designs               the description the design box starts with, and what an ElevenLabs design would say and cost (eleven: { text, credits }, null without an audition phrase)
+POST   /api/characters/:id/design                have Fish design voices ({ description, spendUpTo: 0.01 }), or ElevenLabs ({ description, provider: 'elevenlabs', creditsUpTo }); 409 until the cost is confirmed and covered
 POST   /api/parts/:part/jobs                     run a plan ({ stage: draft | final }; one job per
                                                  part and language at a time); a paid
                                                  one with { confirmedCost }, else 409 with
@@ -1755,8 +1766,10 @@ Small, independently useful increments:
         2. **Voice slots** (built): shown on the board, takes that would add a voice waiting at
            the plan's limit, and the voices the studio added that nothing uses offered for
            removal (the client's `deleteVoice`).
-    12. **Design a voice with ElevenLabs**: previews kept as design takes, saved as a voice when
-        cast.
+    12. **Design a voice with ElevenLabs** (built): the design box's switch, previews saying the
+        phrase and the character's lines kept as designs, confirmed and held in credits, logged
+        as `design` tries, and saved as a voice when cast (the client's `designVoices` and
+        `saveDesignedVoice`).
 
 ---
 

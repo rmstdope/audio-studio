@@ -1367,27 +1367,46 @@ export function useDesigns(characterId: string, language?: string) {
   return useQuery({
     queryKey: ['designs', characterId, language ?? ''],
     queryFn: () =>
-      getJson<{ ok: true; description: string | null } | ProjectFailure>(
-        inLanguage(`/api/characters/${encodeURIComponent(characterId)}/designs`, language),
-      ),
+      getJson<
+        | {
+            ok: true
+            description: string | null
+            /** What a design with ElevenLabs would say (null: a text it writes) and cost. */
+            eleven: { text: string | null; credits: number } | null
+          }
+        | ProjectFailure
+      >(inLanguage(`/api/characters/${encodeURIComponent(characterId)}/designs`, language)),
   })
 }
 
+/** A design to ask for: the description, and with ElevenLabs the credits the user confirmed. */
+export type DesignAsked =
+  | { description: string; provider: 'fish' }
+  | { description: string; provider: 'elevenlabs'; credits: number }
+
 /**
- * Has Fish design voices from the description, once the user has confirmed the cost. The answer
- * says what was made, or why not; the audition (the designs join it), the last description and the
- * credit are read again after one that was made.
+ * Has Fish or ElevenLabs design voices from the description, once the user has confirmed the
+ * cost. The answer says what was made, or why not; the audition (the designs join it), the last
+ * description, Fish's credit and the ElevenLabs plan are read again after one that was made.
  */
 export function useDesignVoices(characterId: string, language?: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (description: string) => {
+    mutationFn: async (asked: DesignAsked) => {
       const response = await fetch(
         inLanguage(`/api/characters/${encodeURIComponent(characterId)}/design`, language),
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ description, spendUpTo: DESIGN_PRICE }),
+          body: JSON.stringify(
+            asked.provider === 'fish'
+              ? { description: asked.description, spendUpTo: DESIGN_PRICE }
+              : {
+                  description: asked.description,
+                  provider: 'elevenlabs',
+                  creditsUpTo: asked.credits,
+                },
+          ),
         },
       )
       if (!response.ok && response.status !== 409) {
@@ -1400,6 +1419,8 @@ export function useDesignVoices(characterId: string, language?: string) {
       if (!result?.ok) return
       void client.invalidateQueries({ queryKey: ['session', characterId, language ?? ''] })
       void client.invalidateQueries({ queryKey: ['credit'] })
+      void client.invalidateQueries({ queryKey: ['eleven-account'] })
+      void client.invalidateQueries({ queryKey: ['spending'] })
     },
   })
 }

@@ -17,6 +17,21 @@ describe('designs', () => {
     expect(DesignsSchema.safeParse(second).success).toBe(true)
   })
 
+  it('keeps the id each of ElevenLabs’ designs is saved by', () => {
+    const designs = addDesigns(emptyDesigns('mara'), 'old', 't', ['d1', 'd2'], ['g1', 'g2'])
+    expect(designs.voices.d2?.design).toEqual({
+      n: 2,
+      description: 'old',
+      at: 't',
+      generated: 'g2',
+    })
+    expect(addDesigns(emptyDesigns('mara'), 'old', 't', ['d1']).voices.d1?.design).toEqual({
+      n: 1,
+      description: 'old',
+      at: 't',
+    })
+  })
+
   it('removes a design without renumbering the others', () => {
     const store = addDesigns(emptyDesigns('mara'), 'x', 't', ['a', 'b'])
     const left = removeDesign(store, 'a')

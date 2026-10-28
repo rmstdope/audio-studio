@@ -62,6 +62,8 @@ export function fakeEleven(
     sharedVoices: unused,
     addSharedVoice: unused,
     deleteVoice: unused,
+    designVoices: unused,
+    saveDesignedVoice: unused,
     async voice(id) {
       asked.push(id)
       const found = voices[id]

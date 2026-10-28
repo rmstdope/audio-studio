@@ -16,11 +16,20 @@ export const VoiceSchema = z.object({
   /** Whether it is a voice on the user's own Fish account (cloned or private), not the library's. */
   own: z.boolean().optional(),
   /**
-   * Set on a voice Fish designed from a description and that is not on the user's account yet:
+   * Set on a voice designed from a description (by Fish, or ElevenLabs when `generated` is set) and
+   * not on the user's account yet:
    * its number for the character ("Design n"), the description it was made from, and when it was
    * asked for (ISO 8601; the designs of one request share it).
    */
-  design: z.object({ n: z.number(), description: z.string(), at: z.string() }).optional(),
+  design: z
+    .object({
+      n: z.number(),
+      description: z.string(),
+      at: z.string(),
+      /** Set on a design of ElevenLabs': the id its preview is saved as a voice by. */
+      generated: z.string().optional(),
+    })
+    .optional(),
   /**
    * Set on a voice from ElevenLabs' shared library: its owner's public id, by which it is added
    * to the user's voices to speak, and whether the user had added it already.

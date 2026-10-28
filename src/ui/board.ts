@@ -18,32 +18,41 @@ export function takesToRecord(
 }
 
 /**
- * What a design that did not work says. Fish refusing is the only case where nothing was charged;
- * the studio failing after Fish answered may have cost $0.01; the studio's own reasons are said
- * as they are.
+ * What a design that did not work says. Fish or ElevenLabs refusing is the only case where
+ * nothing was charged; the studio failing after it answered may have cost Fish's $0.01 or the
+ * `credits` ElevenLabs' design uses; the studio's own reasons are said as they are.
  */
 export function designFailureLine(
   failure: { reason?: string; message?: string } | undefined,
+  provider: VoiceProvider = 'fish',
+  credits = 0,
 ): string {
   if (!failure?.message) return 'The project’s files need fixing.'
-  if (failure.reason === 'fish') {
-    return `Fish couldn’t design voices: ${failure.message.replace(/\.$/, '')}. Nothing was charged.`
+  const why = failure.message.replace(/\.$/, '')
+  if (failure.reason === 'fish' || failure.reason === 'elevenlabs') {
+    return `${provider === 'fish' ? 'Fish' : 'ElevenLabs'} couldn’t design voices: ${why}. Nothing was charged.`
   }
   if (failure.reason === 'failed') {
-    return `The voices weren’t kept: ${failure.message.replace(/\.$/, '')}. Fish may have charged $0.01.`
+    return provider === 'fish'
+      ? `The voices weren’t kept: ${why}. Fish may have charged $0.01.`
+      : `The voices weren’t kept: ${why}. ElevenLabs may have charged ${credits.toLocaleString('en-US')} credits.`
   }
   return failure.message
 }
 
 /**
- * The line on a card whose voice could not be cast: a design Fish could not save to the account,
- * or a library voice ElevenLabs would not add to the user's voices.
+ * The line on a card whose voice could not be cast: a design Fish could not save to the account
+ * (`fish`), a library voice ElevenLabs would not add to the user's voices (`elevenlabs`), or a
+ * design of ElevenLabs' it would not save (`eleven-design`; its preview's id may have expired).
  */
-export function saveFailedLine(reason: string, provider: VoiceProvider = 'fish'): string {
+export function saveFailedLine(
+  reason: string,
+  kind: VoiceProvider | 'eleven-design' = 'fish',
+): string {
   const why = reason.replace(/\.$/, '')
-  return provider === 'fish'
-    ? `Fish couldn’t save this voice: ${why}. It wasn’t cast.`
-    : `ElevenLabs couldn’t add this voice: ${why}. It wasn’t cast.`
+  if (kind === 'fish') return `Fish couldn’t save this voice: ${why}. It wasn’t cast.`
+  if (kind === 'elevenlabs') return `ElevenLabs couldn’t add this voice: ${why}. It wasn’t cast.`
+  return `ElevenLabs couldn’t save this design: ${why}. It wasn’t cast; a design from an earlier session may need designing again.`
 }
 
 /** The voices on the board that are not designs, whose preview is their take. */
@@ -205,14 +214,21 @@ export function castEffects({
   unheard: number
   /** Whether an audition is going on, which casting ends (false: casting from the character's page). */
   auditioning?: boolean
-  /** Whether the voice is a design, which is saved to the user's Fish account before it is cast. */
-  saves?: boolean
+  /**
+   * Whether the voice is a design, saved before it is cast: to the user's Fish account (true), or
+   * to their ElevenLabs voices (`elevenlabs`).
+   */
+  saves?: boolean | 'elevenlabs'
   /** Whether the voice is from ElevenLabs' library and not yet added to the user's voices. */
   adds?: boolean
 }): string[] {
   const lines = replacing ? recorded.reduce((sum, a) => sum + a.lines, 0) : 0
   const effects: string[] = []
-  if (saves) {
+  if (saves === 'elevenlabs') {
+    effects.push(
+      `It is saved to your ElevenLabs voices first, as “${name} (designed)”, using one of your plan’s voice slots.`,
+    )
+  } else if (saves) {
     effects.push(
       `It is saved to your Fish account first, as a private voice named “${name} (designed)” (“${name} (designed 2)” and so on if that name is taken).`,
     )
