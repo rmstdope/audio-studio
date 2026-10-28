@@ -5,7 +5,7 @@ import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/hel
 import { characterVoice } from './auditions'
 import { NO_ELEVENLABS_KEY } from './elevenlabs'
 import type { FishClient, TtsRequest } from './fish'
-import { createLimiter } from './limit'
+import { createLimiter, type Limiter } from './limit'
 import { createBudget } from '../core/spend'
 import { auditionTakes, recordTake, takeFile, tryLine } from './takes'
 
@@ -612,20 +612,33 @@ describe('takes and tries with an ElevenLabs voice', () => {
     expect(spending(root)).toBeNull()
   })
 
-  /** A limiter whose two ElevenLabs slots are taken until `free`, so requests queue and share. */
+  /**
+   * A limiter whose two ElevenLabs slots are taken until `free`, so requests queue and share;
+   * `queued(n)` waits until `n` requests have reached it.
+   */
   const queued = () => {
-    const limiter = createLimiter()
+    const inner = createLimiter()
     let free!: () => void
     const held = new Promise<void>((resolve) => (free = resolve))
-    void limiter.run('a', 2, () => held)
-    void limiter.run('b', 2, () => held)
-    return { limiter, free }
+    let asked = 0
+    const limiter: Limiter = {
+      run: (key, limit, job) => {
+        asked++
+        return inner.run(key, limit, job)
+      },
+    }
+    void inner.run('a', 2, () => held)
+    void inner.run('b', 2, () => held)
+    const waiting = async (n: number) => {
+      for (let i = 0; i < 500 && asked < n; i++) await new Promise((r) => setTimeout(r, 2))
+    }
+    return { limiter, free, waiting }
   }
 
   it('makes a page take that shared a board take’s wait for credits, charging the sitting nothing', async () => {
     const root = tempRepo(elevenFiles())
     const eleven = fakeEleven({}, { speak: wav })
-    const { limiter, free } = queued()
+    const { limiter, free, waiting } = queued()
     const short = createBudget({ model: 'eleven_v3', dollars: 10 })
     const options = { elevenlabs: async () => eleven.client, elevenLimiter: limiter }
     const projectFile = join(root, 'audio-studio.json')
@@ -635,6 +648,8 @@ describe('takes and tries with an ElevenLabs voice', () => {
       board: true,
       credits: short,
     })
+    // The board take queues first, so the page take shares its run.
+    await waiting(1)
     const page = recordTake(
       projectFile,
       'grandmother',
@@ -643,7 +658,7 @@ describe('takes and tries with an ElevenLabs voice', () => {
       createLimiter(),
       options,
     )
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await waiting(2)
     free()
     expect(await board).toMatchObject({ ok: false, reason: 'waits' })
     expect(await page).toMatchObject({ ok: true, cached: false, credits: 22 })
@@ -653,7 +668,7 @@ describe('takes and tries with an ElevenLabs voice', () => {
   it('reports the credits of a shared board take once, to the request that paid them', async () => {
     const root = tempRepo(elevenFiles())
     const eleven = fakeEleven({}, { speak: wav })
-    const { limiter, free } = queued()
+    const { limiter, free, waiting } = queued()
     const credits = createBudget({ model: 'eleven_v3', dollars: 100 })
     const ask = () =>
       recordTake(
@@ -665,7 +680,7 @@ describe('takes and tries with an ElevenLabs voice', () => {
         { board: true, credits, elevenlabs: async () => eleven.client, elevenLimiter: limiter },
       )
     const both = Promise.all([ask(), ask()])
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await waiting(2)
     free()
     const [first, second] = await both
     expect([first, second].map((r) => (r as { credits?: number }).credits)).toEqual([22, undefined])
