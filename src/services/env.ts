@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { resolveInRoot } from '../core/paths'
 
 /** The name of the variable that holds the Fish Audio API key. */
@@ -49,5 +51,33 @@ async function apiKey(
     return parseEnv(await readFile(resolveInRoot(root, envPath), 'utf8'))[name] || null
   } catch {
     return null
+  }
+}
+
+/** The env files Bun reads from the folder it starts in, before the studio runs. */
+const LOADED_FILES = ['.env', '.env.development', '.env.production', '.env.test', '.env.local']
+
+/**
+ * Forgets the API keys Bun put in the environment from the env files of `dir` (the folder it was
+ * started in): Bun reads them once at start, and a key in the environment wins over the project's
+ * env file, so a key changed in the file afterwards would never be seen. A key with another value
+ * than the files' was exported, and is kept.
+ */
+export function forgetLoadedKeys(
+  dir: string,
+  environment: Record<string, string | undefined> = process.env,
+): void {
+  const loaded = LOADED_FILES.flatMap((file) => {
+    try {
+      return [parseEnv(readFileSync(join(dir, file), 'utf8'))]
+    } catch {
+      return []
+    }
+  })
+  for (const name of [FISH_KEY, ELEVENLABS_KEY]) {
+    const value = environment[name]
+    if (value !== undefined && loaded.some((values) => values[name] === value)) {
+      delete environment[name]
+    }
   }
 }

@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util'
 import { resolve } from 'node:path'
 import { PROJECT_FILE } from '../src/core/project'
 import { startServer } from '../src/server/index'
+import { forgetLoadedKeys } from '../src/services/env'
 import { findProjectFile, projectFileProblem } from '../src/services/workspace'
 
 const HELP = `audio-studio: cast and record a game's narration.
@@ -59,6 +60,10 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
   console.error(`--port must be a number from 0 to 65535, not ${values.port}.`)
   process.exit(1)
 }
+
+// Bun has read the env files of this folder into the environment, where a key would win over
+// the project's env file for good: forget those, so a key changed in the file is seen.
+forgetLoadedKeys(process.cwd())
 
 const server = startServer({ projectFile, port, development: values.dev })
 

@@ -1433,7 +1433,10 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
 - Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
   ffmpeg, uv for Whisper (off when `quality.transcriber` is `none`; a problem off Apple silicon),
-  the Fish key in the environment or the env file, whether Fish answers (the server's credit
+  the Fish key in the environment or the env file (read on every check; the keys Bun loads at start
+  from the env files of the folder the studio is started in are forgotten, `forgetLoadedKeys`, so a
+  key changed in the file is seen, while one exported with another value still wins), whether Fish
+  answers (the server's credit
   lookup, only with a key), Requests at once (`quality.parallel` against the Fish account's limit
   from `quality.fishTier`: ready up to 5 with no tier, a problem above it until the tier is
   chosen, and above the chosen tier's limit; off without a key; saving the tier checks again,
