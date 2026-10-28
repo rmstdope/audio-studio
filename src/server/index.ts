@@ -615,6 +615,13 @@ export function startServer({
     return problem
   }
 
+  /** The credits running recordings and audition sittings hold back from the plan. */
+  function elevenHeld(): number {
+    return (
+      [...creditBudgets].reduce((sum, budget) => sum + heldCredits(budget), 0) + landingCredits()
+    )
+  }
+
   /**
    * The ElevenLabs account as plans show it: asked at most every half minute, since a part's plan
    * is asked for again after every line recorded. Admission always asks afresh.
@@ -1173,10 +1180,11 @@ export function startServer({
           if (!plan.ok || !plan.plan.eleven) return Response.json(plan)
           // What the plan has left, beside what its ElevenLabs lines take and what running
           // recordings and auditions hold.
-          const elevenHeld =
-            [...creditBudgets].reduce((sum, budget) => sum + heldCredits(budget), 0) +
-            landingCredits()
-          return Response.json({ ...plan, elevenAccount: await shownAccount(), elevenHeld })
+          return Response.json({
+            ...plan,
+            elevenAccount: await shownAccount(),
+            elevenHeld: elevenHeld(),
+          })
         }),
       },
       '/api/parts/:part/jobs': {
@@ -1625,6 +1633,12 @@ export function startServer({
           ),
         ),
       },
+      // The plan's account and what running recordings and auditions hold of it, for the board.
+      '/api/elevenlabs/account': {
+        GET: guard(async () =>
+          Response.json({ account: await shownAccount(), held: elevenHeld() }),
+        ),
+      },
       '/api/elevenlabs/tts': {
         PUT: fromOwnPage(async (request) => {
           const body = ElevenTtsBody.safeParse(await request.json().catch(() => null))
@@ -1915,17 +1929,29 @@ export function startServer({
           const { id } = request.params
           const key = await sittingKey(id, request)
           if ('credits' in body.data) {
+            const more = body.data.credits
             const credits = creditSittings.get(key)
-            if (!credits) {
+            if (credits) {
+              const problem = await holdCredits(more, () => credits.add(more))
+              return sittingAnswer(request, id, problem)
+            }
+            // None yet: the board gives the sitting its credits, beside any dollars it has.
+            const money = await auditionMoney(projectFile, id, languageOf(request))
+            if (!money) return notFound()
+            if (!money.ok) return Response.json(money, { status: 409 })
+            if (!money.going) {
               return sittingAnswer(request, id, {
                 reason: 'confirm-credits',
                 ceiling: 0,
-                message: 'There are no credits to add to; resume the audition.',
+                message: 'There is no audition to give credits to; start one.',
               })
             }
-            const more = body.data.credits
-            const problem = await holdCredits(more, () => credits.add(more))
-            return sittingAnswer(request, id, problem)
+            const got = await admitCredits(money.eleven.model, more, more)
+            if ('problem' in got) return sittingAnswer(request, id, got.problem)
+            // Two at once: the first given stays, and the second holds nothing.
+            if (creditSittings.has(key)) creditBudgets.delete(got.budget)
+            else creditSittings.set(key, got.budget)
+            return sittingAnswer(request, id)
           }
           const budget = sittings.get(key)
           if (!budget) {

@@ -589,6 +589,8 @@ export type AuditionMoney =
       model: string
       perTake: number
       spentBefore: number
+      /** Whether the character has an audition going on (or paused). */
+      going: boolean
       /** An ElevenLabs voice's board take: ElevenLabs' audition model and its credits. */
       eleven: { model: string; perTake: number }
     }
@@ -598,7 +600,8 @@ export type AuditionMoney =
 /**
  * What a board take of the character's current phrase costs on the audition model (nothing on a
  * free one) and, for an ElevenLabs voice, in credits on ElevenLabs' audition model, and the
- * dollars already charged to the audition in earlier sittings. Null for an unknown character.
+ * dollars already charged to the audition in earlier sittings, and whether one is going on. Null
+ * for an unknown character.
  */
 export async function auditionMoney(
   projectFile: string,
@@ -610,16 +613,19 @@ export async function auditionMoney(
   if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
   const { project, cast, summary } = loaded
   const model = project.narration.models.audition
-  const spentBefore = (await readSession(projectFile, characterId, language))?.spent ?? 0
+  const session = await readSession(projectFile, characterId, language)
+  const spentBefore = session?.spent ?? 0
+  const going = session !== null
   const elevenModel = project.narration.elevenlabs.models.audition
   if (!cast) {
-    return { ok: true, model, perTake: 0, spentBefore, eleven: { model: elevenModel, perTake: 0 } }
+    const eleven = { model: elevenModel, perTake: 0 }
+    return { ok: true, model, perTake: 0, spentBefore, going, eleven }
   }
   const seen = auditionIn(project, cast, summary, characterId, language)
   const { spoken } = seen.audition
   const perTake = perTakeCost(model, new TextEncoder().encode(spoken).length, new Date()) ?? 0
   const eleven = elevenTakeCost(project, seen.cast, characterId, seen.audition)
-  return { ok: true, model, perTake, spentBefore, eleven }
+  return { ok: true, model, perTake, spentBefore, going, eleven }
 }
 
 /** Adds `dollars` charged for a take to the character's audition; nothing if none is going on. */

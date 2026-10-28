@@ -628,6 +628,13 @@ describe('the money of an audition', () => {
     expect(money?.ok && money.spentBefore).toBeCloseTo(0.03, 12)
   })
 
+  it('says whether the character has an audition going on', async () => {
+    const projectFile = join(tempRepo(files), 'audio-studio.json')
+    expect(await auditionMoney(projectFile, 'mira')).toMatchObject({ going: false })
+    await startAudition(projectFile, 'mira', fishFor)
+    expect(await auditionMoney(projectFile, 'mira')).toMatchObject({ going: true })
+  })
+
   it('is null for an unknown character, and records nothing without an audition', async () => {
     const projectFile = join(tempRepo(paidFiles), 'audio-studio.json')
     expect(await auditionMoney(projectFile, 'nobody')).toBeNull()
