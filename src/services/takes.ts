@@ -24,6 +24,7 @@ import { loadWorkspace, readPart, type ProjectFailure } from './workspace'
 import { providerId, providerOf } from '../core/voices'
 import {
   elevenCredits,
+  elevenModelName,
   readsCues,
   requestsAtOnce,
   speedProblem,
@@ -428,25 +429,33 @@ async function speakEleven(
         'Takes of ElevenLabs voices are paid in credits: give the audition credits to spend.',
     }
   }
+  if (sitting && sitting.model !== model) {
+    return {
+      ok: false,
+      reason: 'no-sitting',
+      message: `The audition’s credits were given for ${elevenModelName(sitting.model)}, and ElevenLabs’ audition model is now ${elevenModelName(model)}: resume the audition.`,
+    }
+  }
   const limiter = options.elevenLimiter ?? createLimiter()
   const credits = elevenCredits(model, spoken)!
-  let waits: string | null = null
-  let ended = false
-  try {
-    const cached = await limiter.run(
+  // What became of the run: made (by whoever ran it), already there, or not paid for.
+  type Outcome = { made: 'made' | 'cached' } | { waits: string } | { ended: true }
+  // Whether this request's own job ran (only then is the outcome its own), and whether it paid.
+  let ran = false as boolean
+  let paid = false as boolean
+  const run = () =>
+    limiter.run(
       key,
       requestsAtOnce(narration.quality.parallel, voice),
-      async () => {
+      async (): Promise<Outcome> => {
+        ran = true
         // Another request may have made it while this one waited: never pay for it twice.
-        if (existsSync(file)) return true
+        if (existsSync(file)) return { made: 'cached' }
         // Charged now, as late as it can be: the sitting may have ended or been spent meanwhile.
         if (sitting) {
-          if (options.open && !options.open()) {
-            ended = true
-            return true
-          }
-          waits = sitting.spend(model, spoken, new Date())
-          if (waits) return true
+          if (options.open && !options.open()) return { ended: true }
+          const waits = sitting.spend(model, spoken, new Date())
+          if (waits) return { waits }
         }
         const landed = sitting ? options.flight?.(credits) : undefined
         let audio: Uint8Array
@@ -466,6 +475,7 @@ async function speakEleven(
         } finally {
           landed?.()
         }
+        paid = true
         // Logged as soon as ElevenLabs made it: it is paid for even if it cannot be kept.
         try {
           await appendTry(projectFile, {
@@ -483,21 +493,28 @@ async function speakEleven(
           // Only the record of what it cost is lost; the take stays.
         }
         await writeAtomic(root, takePath(key), audio)
-        return false
+        return { made: 'made' }
       },
     )
-    if (ended) {
+  try {
+    let outcome = await run()
+    // A run shared with another request that was not paid for (its sitting was short or had
+    // ended) is not this one's answer: this one tries on its own, with its own money.
+    if (!ran && !('made' in outcome)) outcome = await run()
+    if ('ended' in outcome) {
       return { ok: false, reason: 'no-sitting', message: 'The audition’s sitting has ended.' }
     }
-    // Also for a request that shared another's take, which the credits did not cover.
-    if (waits || !existsSync(file)) {
+    if ('waits' in outcome) {
       return {
         ok: false,
         reason: 'waits',
-        message: `Take waits for more credits${waits ? `: ${waits}` : ''}`,
+        message: `Take waits for more credits: ${outcome.waits}`,
       }
     }
-    return { ok: true, key, spoken, cached, ...said, ...(!cached && { credits }) }
+    if (!existsSync(file)) {
+      return { ok: false, reason: 'elevenlabs', message: 'The take could not be kept.' }
+    }
+    return { ok: true, key, spoken, cached: !paid, ...said, ...(paid && { credits }) }
   } catch (error) {
     return {
       ok: false,

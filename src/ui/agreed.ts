@@ -69,6 +69,6 @@ export function elevenPlanFacts(
   if (!account) return taken
   if (!account.ok) return `${taken} · what is left on your plan is unknown: ${account.message}`
   const left = Math.max(creditsLeft(account.account) - held, 0)
-  const besides = held ? ', besides what recordings running now hold' : ''
+  const besides = held ? ', besides what recordings and auditions running now hold' : ''
   return `${taken} · ${left < eleven.ceiling ? 'only ' : ''}${credits(left)} left on your plan${besides}`
 }

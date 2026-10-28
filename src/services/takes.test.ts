@@ -612,6 +612,79 @@ describe('takes and tries with an ElevenLabs voice', () => {
     expect(spending(root)).toBeNull()
   })
 
+  /** A limiter whose two ElevenLabs slots are taken until `free`, so requests queue and share. */
+  const queued = () => {
+    const limiter = createLimiter()
+    let free!: () => void
+    const held = new Promise<void>((resolve) => (free = resolve))
+    void limiter.run('a', 2, () => held)
+    void limiter.run('b', 2, () => held)
+    return { limiter, free }
+  }
+
+  it('makes a page take that shared a board take’s wait for credits, charging the sitting nothing', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({}, { speak: wav })
+    const { limiter, free } = queued()
+    const short = createBudget({ model: 'eleven_v3', dollars: 10 })
+    const options = { elevenlabs: async () => eleven.client, elevenLimiter: limiter }
+    const projectFile = join(root, 'audio-studio.json')
+    const fishFor = async () => fakeFish().fish
+    const board = recordTake(projectFile, 'grandmother', 'eleven:g1', fishFor, createLimiter(), {
+      ...options,
+      board: true,
+      credits: short,
+    })
+    const page = recordTake(
+      projectFile,
+      'grandmother',
+      'eleven:g1',
+      fishFor,
+      createLimiter(),
+      options,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    free()
+    expect(await board).toMatchObject({ ok: false, reason: 'waits' })
+    expect(await page).toMatchObject({ ok: true, cached: false, credits: 22 })
+    expect(short.left).toBe(10)
+  })
+
+  it('reports the credits of a shared board take once, to the request that paid them', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({}, { speak: wav })
+    const { limiter, free } = queued()
+    const credits = createBudget({ model: 'eleven_v3', dollars: 100 })
+    const ask = () =>
+      recordTake(
+        join(root, 'audio-studio.json'),
+        'grandmother',
+        'eleven:g1',
+        async () => fakeFish().fish,
+        createLimiter(),
+        { board: true, credits, elevenlabs: async () => eleven.client, elevenLimiter: limiter },
+      )
+    const both = Promise.all([ask(), ask()])
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    free()
+    const [first, second] = await both
+    expect([first, second].map((r) => (r as { credits?: number }).credits)).toEqual([22, undefined])
+    expect(credits.left).toBe(78)
+  })
+
+  it('says a sitting given credits for another audition model must be resumed', async () => {
+    const root = tempRepo(elevenFiles('eleven_flash_v2_5'))
+    const eleven = fakeEleven({}, { speak: wav })
+    const credits = createBudget({ model: 'eleven_v3', dollars: 100 })
+    expect(await boardTake(root, eleven.client, credits)).toEqual({
+      ok: false,
+      reason: 'no-sitting',
+      message:
+        'The audition’s credits were given for Eleven v3, and ElevenLabs’ audition model is now Flash v2.5: resume the audition.',
+    })
+    expect(eleven.spoken).toEqual([])
+  })
+
   it('gives the credits back when ElevenLabs fails', async () => {
     const root = tempRepo(elevenFiles())
     const failing = fakeEleven(

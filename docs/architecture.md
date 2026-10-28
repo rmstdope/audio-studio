@@ -1143,7 +1143,7 @@ only, the fingerprint needs no provider of its own.
   with ElevenLabs voices in credits (`plan.eleven`: their keys, the model, the characters sent, the
   credits of one take each and at most, every take). The plan's answer carries the account
   (`elevenAccount`, read at most every half minute, since a part's plan is asked for again after
-  every line) and the credits running recordings hold (`elevenHeld`), so the panel says what the
+  every line) and the credits running recordings and audition sittings hold (`elevenHeld`), so the panel says what the
   plan has left besides them ("27,450 credits left on your plan", "only …" when it falls short). One confirmation agrees to both ("Pay up to $0.42 and 1,200
   credits", or "Use up to 1,200 credits" with only ElevenLabs lines paid), sent as `confirmedCost`
   and `confirmedCredits`; a line's Record and Another take ask in the unit of its voice's provider.
@@ -1170,12 +1170,16 @@ only, the fingerprint needs no provider of its own.
   already kept costs nothing. What one costs is added to the spending record's `tries` as soon as
   ElevenLabs has made it, even if it then cannot be kept. Board
   takes with an ElevenLabs voice (14.10b-2) are the same take, on the same key, paid from the
-  audition's sitting in credits instead: `start` takes `creditsUpTo` beside `spendUpTo`, `POST
-…/sitting` a fresh sitting's `{ amount?, credits? }`, and `…/sitting/add` `{ credits }` to top it
-  up. The credits are admitted as a recording's are (what the plan has left, less what running
+  audition's sitting in credits instead: `start` takes `creditsUpTo` beside `spendUpTo`, `POST …/sitting`
+  a fresh sitting's `{ amount?, credits? }` (its dollars needed on a paid model, refused with
+  nothing to give on a free one), and `…/sitting/add` `{ amount }` or `{ credits }` to top it up.
+  A start or a fresh sitting admits both halves before replacing either, so a refusal leaves the
+  running sitting as it was, and its old credits are not counted against the new. The credits are admitted as a recording's are (what the plan has left, less what running
   recordings hold and what sittings have left and have in flight), checked and held in one step
   (`holdCredits`), and charged to the take just before it is sent, given back when ElevenLabs
-  fails; one that does not fit waits ("Take waits for more credits"), and without credits a board
+  fails; one that does not fit waits ("Take waits for more credits"), a request that shared another's
+  unpaid run tries again with its own money, and only the request that paid reports the credits;
+  a sitting given credits for another audition model than the project's now asks to be resumed; and without credits a board
   take of an ElevenLabs voice is refused (`no-sitting`). Ending the sitting (Pause, Stop, Cast,
   `DELETE …/sitting`) ends its credits too. The sitting's view adds `eleven`: ElevenLabs' audition
   model, a take's credits, the credits to suggest (about 50 takes, to the next hundred) and the

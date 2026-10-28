@@ -1842,7 +1842,7 @@ export type PlanAnswer =
       parallel: number
       /** The ElevenLabs account, when the plan has lines with ElevenLabs voices. */
       elevenAccount?: ElevenAnswer
-      /** The credits running recordings hold, beside the account. */
+      /** The credits running recordings and auditions hold, beside the account. */
       elevenHeld?: number
     }
   | { ok: false; problems: Problem[] }
