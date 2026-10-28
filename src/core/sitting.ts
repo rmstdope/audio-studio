@@ -24,6 +24,14 @@ export function suggestedAmount(perTake: number): number {
   return Number((nickels * 0.05).toFixed(2))
 }
 
+/**
+ * The credits to suggest for an ElevenLabs sitting: about 50 takes, rounded up to the next hundred
+ * (at least a hundred).
+ */
+export function suggestedCredits(perTake: number): number {
+  return Math.max(1, Math.ceil((SUGGESTED_TAKES * perTake) / 100 - ROUNDING)) * 100
+}
+
 /** How many whole takes `dollars` pay for (an amount in the box, or what is left in a sitting). */
 export function takesLeft(dollars: number, perTake: number): number {
   return perTake > 0 ? Math.max(0, Math.floor(dollars / perTake + ROUNDING)) : 0
@@ -86,6 +94,12 @@ export interface SittingView {
   spentBefore: number
   /** The sitting going on, or null (none yet, or paused, stopped or cast since). */
   sitting: SittingMoney | null
+  /**
+   * The same for ElevenLabs voices' board takes, in credits: ElevenLabs' audition model, a take's
+   * credits, the credits to suggest, and the sitting's credits (its `dollars`, `spent` and `left`
+   * are credits), or null when it was given none.
+   */
+  eleven: { model: string; perTake: number; suggested: number; sitting: SittingMoney | null }
 }
 
 /** The money of a sitting that was given `dollars` and has `left` of it, for takes of `perTake`. */

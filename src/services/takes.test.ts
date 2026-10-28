@@ -48,26 +48,6 @@ function fakeFish() {
 }
 
 describe('recordTake', () => {
-  it('makes no board take with an ElevenLabs voice yet, and asks Fish nothing', async () => {
-    const root = tempRepo(files)
-    const { fish, requests } = fakeFish()
-    expect(
-      await recordTake(
-        join(root, 'audio-studio.json'),
-        'grandmother',
-        'eleven:g1',
-        async () => fish,
-        createLimiter(),
-        { board: true },
-      ),
-    ).toEqual({
-      ok: false,
-      reason: 'not-yet',
-      message: 'Auditions with ElevenLabs voices come in a later step.',
-    })
-    expect(requests).toEqual([])
-  })
-
   it('has the voice say the character’s phrase in its style, and keeps the audio', async () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
@@ -569,6 +549,85 @@ describe('takes and tries with an ElevenLabs voice', () => {
       async () => eleven.client,
     )
     expect(page).toMatchObject({ ok: true, take: (result as { key: string }).key })
+  })
+
+  const boardTake = (
+    root: string,
+    eleven: ReturnType<typeof fakeEleven>['client'],
+    credits?: ReturnType<typeof createBudget>,
+    open = () => true,
+  ) =>
+    recordTake(
+      join(root, 'audio-studio.json'),
+      'grandmother',
+      'eleven:g1',
+      async () => fakeFish().fish,
+      createLimiter(),
+      { board: true, credits, open, elevenlabs: async () => eleven },
+    )
+
+  it('charges a board take to the sitting’s credits, logs it as an audition take, and keeps it', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({}, { speak: wav })
+    const credits = createBudget({ model: 'eleven_v3', dollars: 100 })
+    expect(await boardTake(root, eleven.client, credits)).toMatchObject({
+      ok: true,
+      cached: false,
+      credits: 22,
+    })
+    expect(credits.left).toBe(78)
+    expect(spending(root).tries).toMatchObject([
+      { kind: 'audition', character: 'grandmother', credits: 22 },
+    ])
+    // The same take again, or as the page take: from the cache, charged nothing.
+    expect(await boardTake(root, eleven.client, credits)).toMatchObject({ ok: true, cached: true })
+    expect(await take(root, eleven.client)).toMatchObject({ ok: true, cached: true })
+    expect(credits.left).toBe(78)
+    expect(eleven.spoken).toHaveLength(1)
+  })
+
+  it('makes no board take without a sitting, or once it ended, and waits when its credits run out', async () => {
+    const root = tempRepo(elevenFiles())
+    const eleven = fakeEleven({}, { speak: wav })
+    expect(await boardTake(root, eleven.client)).toEqual({
+      ok: false,
+      reason: 'no-sitting',
+      message:
+        'Takes of ElevenLabs voices are paid in credits: give the audition credits to spend.',
+    })
+    const ended = createBudget({ model: 'eleven_v3', dollars: 100 })
+    expect(await boardTake(root, eleven.client, ended, () => false)).toMatchObject({
+      ok: false,
+      reason: 'no-sitting',
+      message: 'The audition’s sitting has ended.',
+    })
+    expect(ended.left).toBe(100)
+    const short = createBudget({ model: 'eleven_v3', dollars: 10 })
+    expect(await boardTake(root, eleven.client, short)).toMatchObject({
+      ok: false,
+      reason: 'waits',
+      message: expect.stringContaining('Take waits for more credits'),
+    })
+    expect(eleven.spoken).toEqual([])
+    expect(spending(root)).toBeNull()
+  })
+
+  it('gives the credits back when ElevenLabs fails', async () => {
+    const root = tempRepo(elevenFiles())
+    const failing = fakeEleven(
+      {},
+      {
+        speak: () => {
+          throw new Error('ElevenLabs answered 500')
+        },
+      },
+    )
+    const credits = createBudget({ model: 'eleven_v3', dollars: 100 })
+    expect(await boardTake(root, failing.client, credits)).toMatchObject({
+      ok: false,
+      reason: 'elevenlabs',
+    })
+    expect(credits.left).toBe(100)
   })
 
   it('sends no cues to an audition model that would speak them, and says so', async () => {

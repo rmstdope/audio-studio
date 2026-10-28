@@ -31,7 +31,7 @@ import type { ElevenLabsFactory } from './elevenlabs'
 import { NO_KEY } from './fish'
 import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
-import { auditionIn, auditionTakes } from './takes'
+import { auditionIn, auditionTakes, elevenTakeCost } from './takes'
 import {
   cacheNameFor,
   knownCharacter,
@@ -584,12 +584,21 @@ async function sessionPath(
 
 /** What an audition's takes cost: the model, the price of a take of the phrase, and what was charged so far. */
 export type AuditionMoney =
-  { ok: true; model: string; perTake: number; spentBefore: number } | ProjectFailure | null
+  | {
+      ok: true
+      model: string
+      perTake: number
+      spentBefore: number
+      /** An ElevenLabs voice's board take: ElevenLabs' audition model and its credits. */
+      eleven: { model: string; perTake: number }
+    }
+  | ProjectFailure
+  | null
 
 /**
  * What a board take of the character's current phrase costs on the audition model (nothing on a
- * free one), and the dollars already charged to the audition in earlier sittings. Null for an
- * unknown character.
+ * free one) and, for an ElevenLabs voice, in credits on ElevenLabs' audition model, and the
+ * dollars already charged to the audition in earlier sittings. Null for an unknown character.
  */
 export async function auditionMoney(
   projectFile: string,
@@ -602,10 +611,15 @@ export async function auditionMoney(
   const { project, cast, summary } = loaded
   const model = project.narration.models.audition
   const spentBefore = (await readSession(projectFile, characterId, language))?.spent ?? 0
-  if (!cast) return { ok: true, model, perTake: 0, spentBefore }
-  const { spoken } = auditionIn(project, cast, summary, characterId, language).audition
+  const elevenModel = project.narration.elevenlabs.models.audition
+  if (!cast) {
+    return { ok: true, model, perTake: 0, spentBefore, eleven: { model: elevenModel, perTake: 0 } }
+  }
+  const seen = auditionIn(project, cast, summary, characterId, language)
+  const { spoken } = seen.audition
   const perTake = perTakeCost(model, new TextEncoder().encode(spoken).length, new Date()) ?? 0
-  return { ok: true, model, perTake, spentBefore }
+  const eleven = elevenTakeCost(project, seen.cast, characterId, seen.audition)
+  return { ok: true, model, perTake, spentBefore, eleven }
 }
 
 /** Adds `dollars` charged for a take to the character's audition; nothing if none is going on. */

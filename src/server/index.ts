@@ -30,7 +30,13 @@ import {
 } from '../services/elevenlabs'
 import { createElevenMusic } from '../services/elevenMusic'
 import { elevenLabsApiKey } from '../services/env'
-import { isPaid, sittingMoney, suggestedAmount, type SittingView } from '../core/sitting'
+import {
+  isPaid,
+  sittingMoney,
+  suggestedAmount,
+  suggestedCredits,
+  type SittingView,
+} from '../core/sitting'
 import {
   createBudget,
   creditProblem,
@@ -320,11 +326,32 @@ const AuditionTakeBody = z.object({
   board: z.boolean().default(false),
 })
 
-/** What a sitting may spend: dollars, from the box. */
-const AmountBody = z.object({ amount: z.number().positive().max(10_000) }).strict()
+/** Credits a sitting may spend on ElevenLabs voices' takes, from the box. */
+const SittingCredits = z.number().int().positive().max(10_000_000)
 
-/** Starting an audition; a paid audition model needs the amount its sitting may spend. */
-const StartBody = z.object({ spendUpTo: z.number().positive().max(10_000).optional() }).strict()
+/**
+ * What a sitting may spend, from the box: Fish's dollars, ElevenLabs' credits, or both; at least
+ * one of them.
+ */
+const AmountBody = z
+  .object({
+    amount: z.number().positive().max(10_000).optional(),
+    credits: SittingCredits.optional(),
+  })
+  .strict()
+  .refine((body) => body.amount !== undefined || body.credits !== undefined)
+
+/**
+ * Starting an audition; a paid audition model needs the amount its sitting may spend, and
+ * ElevenLabs voices' board takes the credits (`creditsUpTo`, optional: without them those voices
+ * make no takes).
+ */
+const StartBody = z
+  .object({
+    spendUpTo: z.number().positive().max(10_000).optional(),
+    creditsUpTo: SittingCredits.optional(),
+  })
+  .strict()
 /** Designing voices: the description, and the most the user agreed to spend on the design. */
 const DesignBody = z
   .object({ description: z.string(), spendUpTo: z.number().positive().max(10_000).optional() })
@@ -546,22 +573,31 @@ export function startServer({
     if (!ceiling) return { budget: createBudget({ model, dollars: 0 }) }
     // The confirmation covers the ceiling; what is held is the ceiling up to the whole credit.
     const credits = Math.ceil(ceiling)
+    const budget = createBudget({ model, dollars: credits })
+    const problem = await holdCredits(credits, () => creditBudgets.add(budget))
+    return problem ? { problem } : { budget }
+  }
+
+  /**
+   * Checks that the plan has `credits` free beyond what running recordings and sittings hold, and
+   * if so calls `hold` before anything else can run, so two of them cannot count on the same
+   * credits; else gives the problem (no key, unknown, too few).
+   */
+  async function holdCredits(credits: number, hold: () => void): Promise<SpendProblem | null> {
     const opened = await openProject(projectFile)
     const client = opened.ok ? await elevenFor(dirname(projectFile), opened.project) : null
-    if (!client) return { problem: { reason: 'credits', message: NO_ELEVENLABS_KEY } }
+    if (!client) return { reason: 'credits', message: NO_ELEVENLABS_KEY }
     // As with Fish's credit: what was held back when the account was asked is still counted.
     const heldWhenAsked = new Set(creditBudgets)
     const answer = await accountOf(client)
-    // From here to adding the budget nothing awaits, so two recordings cannot count on the same credits.
+    // From here to `hold` nothing awaits.
     const holding = [...new Set([...creditBudgets, ...heldWhenAsked])]
     const left = answer.ok
-      ? creditsLeft(answer.account) - holding.reduce((sum, b) => sum + b.dollars, 0)
+      ? creditsLeft(answer.account) - holding.reduce((sum, b) => sum + heldCredits(b), 0)
       : null
     const problem = creditProblem({ ceiling: credits, confirmed: credits, left })
-    if (problem) return { problem }
-    const budget = createBudget({ model, dollars: credits })
-    creditBudgets.add(budget)
-    return { budget }
+    if (!problem) hold()
+    return problem
   }
 
   /**
@@ -585,6 +621,17 @@ export function startServer({
    * what the plan has left until they end.
    */
   const creditBudgets = new Set<Budget>()
+  /**
+   * What an ElevenLabs budget holds back from the plan: all a recording was given, but only what
+   * is left of a sitting, and what its takes in flight cost, as Fish's sittings hold dollars.
+   */
+  const heldCredits = (budget: Budget) =>
+    creditSittingSet().has(budget)
+      ? budget.left + (creditsInFlight.get(budget) ?? 0)
+      : budget.dollars
+  /** What ElevenLabs takes sent but not finished cost, per sitting. */
+  const creditsInFlight = new Map<Budget, number>()
+  const creditSittingSet = () => new Set(creditSittings.values())
 
   /**
    * Admits recording `keys` of a planned part: a Fish budget in dollars and an ElevenLabs one in
@@ -646,6 +693,11 @@ export function startServer({
    * also in `budgets`, so its money is held back from the credit while it lasts.
    */
   const sittings = new Map<string, Budget>()
+  /**
+   * The ElevenLabs credits of the same sittings, for board takes of ElevenLabs voices; each is also
+   * in `creditBudgets`, so what it has left is held back from the plan while it lasts.
+   */
+  const creditSittings = new Map<string, Budget>()
 
   /** What a character's sitting is kept under: its id and the language of the audition it is for. */
   const sittingKey = (characterId: string, request: Request) =>
@@ -659,6 +711,17 @@ export function startServer({
       inFlight.delete(budget)
     }
     sittings.delete(characterId)
+    endCredits(characterId)
+  }
+
+  /** Ends a sitting's ElevenLabs credits alone: the plan's credits are free again. */
+  function endCredits(characterId: string) {
+    const credits = creditSittings.get(characterId)
+    if (credits) {
+      creditBudgets.delete(credits)
+      creditsInFlight.delete(credits)
+    }
+    creditSittings.delete(characterId)
   }
 
   /** The money of a character's audition for the page; null for an unknown character. */
@@ -674,6 +737,16 @@ export function startServer({
       suggested: paid ? suggestedAmount(money.perTake) : 0,
       spentBefore: money.spentBefore,
       sitting: budget ? sittingMoney(budget.dollars, budget.left, money.perTake) : null,
+      eleven: (() => {
+        const credits = creditSittings.get(key)
+        const { model, perTake } = money.eleven
+        return {
+          model,
+          perTake,
+          suggested: suggestedCredits(perTake),
+          sitting: credits ? sittingMoney(credits.dollars, credits.left, perTake) : null,
+        }
+      })(),
     }
     return { ok: true as const, ...view }
   }
@@ -997,7 +1070,10 @@ export function startServer({
           if (!plan) return notFound()
           if (!plan.ok || !plan.plan.eleven) return Response.json(plan)
           // What the plan has left, beside what its ElevenLabs lines take and running recordings hold.
-          const elevenHeld = [...creditBudgets].reduce((sum, budget) => sum + budget.dollars, 0)
+          const elevenHeld = [...creditBudgets].reduce(
+            (sum, budget) => sum + heldCredits(budget),
+            0,
+          )
           return Response.json({ ...plan, elevenAccount: await shownAccount(), elevenHeld })
         }),
       },
@@ -1621,6 +1697,9 @@ export function startServer({
           const { voice, board } = body.data
           const sitting = await sittingKey(id, request)
           const budget = board ? sittings.get(sitting) : undefined
+          // An ElevenLabs voice's board take is paid from the sitting's credits instead.
+          const credits =
+            board && providerOf(voice) === 'elevenlabs' ? creditSittings.get(sitting) : undefined
           const result = await whileGoing('character', id, () =>
             recordTake(
               projectFile,
@@ -1644,6 +1723,17 @@ export function startServer({
                   void (await recordSpent(projectFile, id, dollars, languageOf(request))),
                 elevenlabs: elevenFor,
                 elevenLimiter: elevenWork,
+                ...(credits && {
+                  credits,
+                  open: () => creditSittings.get(sitting) === credits,
+                  flight: (spent: number) => {
+                    creditsInFlight.set(credits, (creditsInFlight.get(credits) ?? 0) + spent)
+                    return () => {
+                      const now = creditsInFlight.get(credits)
+                      if (now !== undefined) creditsInFlight.set(credits, Math.max(now - spent, 0))
+                    }
+                  },
+                }),
               },
               languageOf(request),
             ),
@@ -1677,7 +1767,10 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const body = StartBody.safeParse(await request.json().catch(() => ({})))
           if (!body.success)
-            return Response.json({ error: 'expected { spendUpTo? }' }, { status: 400 })
+            return Response.json(
+              { error: 'expected { spendUpTo?, creditsUpTo? }' },
+              { status: 400 },
+            )
           const { id } = request.params
           const money = await auditionMoney(projectFile, id, languageOf(request))
           if (!money) return notFound()
@@ -1701,11 +1794,24 @@ export function startServer({
             endSitting(await sittingKey(id, request))
             sittings.set(await sittingKey(id, request), admitted)
           }
+          const { creditsUpTo } = body.data
+          if (creditsUpTo !== undefined) {
+            const key = await sittingKey(id, request)
+            const got = await admitCredits(money.eleven.model, creditsUpTo, creditsUpTo)
+            if ('problem' in got) {
+              endSitting(key)
+              return sittingAnswer(request, id, got.problem)
+            }
+            endCredits(key)
+            creditSittings.set(key, got.budget)
+          }
           const started = await whileGoing('character', id, () =>
             startAudition(projectFile, id, fishFor, languageOf(request), elevenFor),
           )
           // An audition that did not start has no sitting.
-          if (admitted && !started?.ok) endSitting(await sittingKey(id, request))
+          if ((admitted || creditsUpTo !== undefined) && !started?.ok) {
+            endSitting(await sittingKey(id, request))
+          }
           return answer(id, Promise.resolve(started), { language: languageOf(request) })
         }),
       },
@@ -1713,19 +1819,35 @@ export function startServer({
         GET: guard((request) => sittingAnswer(request, request.params.id)),
         POST: fromOwnPage(async (request) => {
           const body = AmountBody.safeParse(await request.json().catch(() => null))
-          if (!body.success) return Response.json({ error: 'expected { amount }' }, { status: 400 })
+          if (!body.success) {
+            return Response.json({ error: 'expected { amount?, credits? }' }, { status: 400 })
+          }
           const { id } = request.params
           const money = await auditionMoney(projectFile, id, languageOf(request))
           if (!money) return notFound()
           if (!money.ok) return Response.json(money, { status: 409 })
-          if (isPaid(money.model, new Date())) {
-            const got = await admit(money.model, body.data.amount, body.data.amount)
+          const { amount, credits } = body.data
+          const key = await sittingKey(id, request)
+          let dollars: Budget | null = null
+          if (amount !== undefined && isPaid(money.model, new Date())) {
+            const got = await admit(money.model, amount, amount)
             if ('problem' in got) return sittingAnswer(request, id, got.problem)
-            // Resuming is a fresh sitting; what the last one had left is not kept. It was held
-            // while the new amount was checked, which is less than one take (a used-up sitting).
-            endSitting(await sittingKey(id, request))
-            sittings.set(await sittingKey(id, request), got.budget)
+            dollars = got.budget
           }
+          let given: Budget | null = null
+          if (credits !== undefined) {
+            const got = await admitCredits(money.eleven.model, credits, credits)
+            if ('problem' in got) {
+              if (dollars) budgets.delete(dollars)
+              return sittingAnswer(request, id, got.problem)
+            }
+            given = got.budget
+          }
+          // Resuming is a fresh sitting; what the last one had left is not kept. It was held
+          // while the new amounts were checked, which is less than one take (a used-up sitting).
+          endSitting(key)
+          if (dollars) sittings.set(key, dollars)
+          if (given) creditSittings.set(key, given)
           return sittingAnswer(request, id)
         }),
         DELETE: fromOwnPage(async (request) => {
@@ -1736,9 +1858,25 @@ export function startServer({
       '/api/auditions/:id/sitting/add': {
         POST: fromOwnPage(async (request) => {
           const body = AmountBody.safeParse(await request.json().catch(() => null))
-          if (!body.success) return Response.json({ error: 'expected { amount }' }, { status: 400 })
+          if (!body.success) {
+            return Response.json({ error: 'expected { amount } or { credits }' }, { status: 400 })
+          }
           const { id } = request.params
-          const budget = sittings.get(await sittingKey(id, request))
+          const key = await sittingKey(id, request)
+          if (body.data.credits !== undefined) {
+            const credits = creditSittings.get(key)
+            if (!credits) {
+              return sittingAnswer(request, id, {
+                reason: 'confirm-credits',
+                ceiling: 0,
+                message: 'There are no credits to add to; resume the audition.',
+              })
+            }
+            const more = body.data.credits
+            const problem = await holdCredits(more, () => credits.add(more))
+            return sittingAnswer(request, id, problem)
+          }
+          const budget = sittings.get(key)
           if (!budget) {
             return sittingAnswer(request, id, {
               reason: 'confirm',
@@ -1749,13 +1887,10 @@ export function startServer({
           const heldWhenAsked = new Set(budgets)
           const credit = await creditOf()
           const free = credit.ok ? credit.credit - reserved(heldWhenAsked) : null
-          const problem = spendProblem({
-            ceiling: body.data.amount,
-            confirmed: body.data.amount,
-            credit: free,
-          })
+          const amount = body.data.amount!
+          const problem = spendProblem({ ceiling: amount, confirmed: amount, credit: free })
           if (problem) return sittingAnswer(request, id, problem)
-          budget.add(body.data.amount)
+          budget.add(amount)
           return sittingAnswer(request, id)
         }),
       },

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { dirname, join } from 'node:path'
 import { readWav, writeWav } from '../core/wav'
 import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
-import type { ElevenLabsClient } from '../services/elevenlabs'
+import { NO_ELEVENLABS_KEY, type ElevenLabsClient } from '../services/elevenlabs'
 import { FishError, type FishClient } from '../services/fish'
 import { createLimiter } from '../services/limit'
 import { recordLine } from '../services/narration'
@@ -428,7 +428,7 @@ describe('server', () => {
     expect((await fetch(url(`/api/takes/${body.key}`))).status).toBe(404)
   })
 
-  it('refuses an ElevenLabs voice on the board, and for casting a voice made from recordings', async () => {
+  it('makes no board take of an ElevenLabs voice without a key, and refuses one for casting a voice made from recordings', async () => {
     const send = (path: string, body: unknown) =>
       fetch(url(path), {
         method: 'POST',
@@ -442,11 +442,8 @@ describe('server', () => {
     const board = await send('/api/characters/narrator/takes', { voice, board: true })
     expect([board.status, await board.json()]).toEqual([
       200,
-      {
-        ok: false,
-        reason: 'not-yet',
-        message: 'Auditions with ElevenLabs voices come in a later step.',
-      },
+      // This studio has no ElevenLabs key; with one, a board take without credits is refused too.
+      { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY },
     ])
   })
 
@@ -4421,5 +4418,95 @@ describe('takes and tries with an ElevenLabs voice', () => {
     expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([...wav])
     const page = await (await fetch(new URL('/api/spending', elevenServer.url))).json()
     expect(page.tries).toEqual({ count: 2, credits: 12 + taken.credits })
+  })
+})
+
+describe('server, an audition paid in ElevenLabs credits', () => {
+  const root = tempRepo({
+    'audio-studio.json': projectJson(),
+    'tts/cast.json': {
+      speakers: { gran: { voice: 'eleven:g1', style: '[warm]' }, kid: { voice: 'k1' } },
+    },
+    'tts/act1/script.json': [
+      { key: 'a', speaker: 'gran', text: 'Hello.' },
+      { key: 'b', speaker: 'kid', text: 'Hi.' },
+    ],
+  })
+  const { client: eleven, spoken } = fakeEleven(
+    { g1: elevenVoiceOf('g1') },
+    {
+      account: {
+        tier: 'starter',
+        charactersUsed: 0,
+        characterLimit: 1000,
+        renewsAt: null,
+        overage: 0,
+        voiceSlots: { used: 0, limit: 10 },
+      },
+      speak: () => new Uint8Array([0x52, 0x49, 0x46, 0x46, 1]),
+    },
+  )
+  const server = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    elevenlabs: eleven,
+  })
+  afterAll(() => server.stop(true))
+  const at = (path: string) => new URL(path, server.url)
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(at(path), {
+      method,
+      headers: { origin: server.url.origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const sitting = async (id: string) => (await fetch(at(`/api/auditions/${id}/sitting`))).json()
+  const boardTake = async (id: string, voice: string) =>
+    (await send('POST', `/api/characters/${id}/takes`, { voice, board: true })).json()
+
+  it('tells ElevenLabs’ audition model, a take’s credits and the credits to suggest', async () => {
+    const body = await sitting('gran')
+    expect(body.eleven).toMatchObject({ model: 'eleven_v3', sitting: null })
+    expect(body.eleven.perTake).toBeGreaterThan(0)
+    expect(body.eleven.suggested % 100).toBe(0)
+  })
+
+  it('makes no board take of an ElevenLabs voice without credits, nor starts with more than the plan has', async () => {
+    expect(await boardTake('gran', 'eleven:g1')).toMatchObject({ ok: false, reason: 'no-sitting' })
+    const over = await send('POST', '/api/auditions/gran/start', { creditsUpTo: 2000 })
+    expect([over.status, (await over.json()).reason]).toEqual([409, 'credits'])
+    expect((await sitting('gran')).eleven.sitting).toBeNull()
+    expect(spoken).toEqual([])
+  })
+
+  it('starts with credits, charges board takes to them, holds what is left, and adds more', async () => {
+    const started = await send('POST', '/api/auditions/gran/start', { creditsUpTo: 100 })
+    expect(started.status).toBe(200)
+    expect((await sitting('gran')).eleven.sitting).toMatchObject({ dollars: 100, spent: 0 })
+    const taken = await boardTake('gran', 'eleven:g1')
+    expect(taken).toMatchObject({ ok: true, model: 'eleven_v3' })
+    const after = (await sitting('gran')).eleven
+    expect(after.sitting.spent).toBe(after.perTake)
+    // What the sitting has left is held back from the plan's credits for any other sitting.
+    const free = 1000 - after.sitting.left
+    const greedy = await send('POST', '/api/auditions/kid/start', { creditsUpTo: free + 1 })
+    expect([greedy.status, (await greedy.json()).reason]).toEqual([409, 'credits'])
+    const added = await send('POST', '/api/auditions/gran/sitting/add', { credits: 50 })
+    expect(added.status).toBe(200)
+    expect((await added.json()).eleven.sitting.dollars).toBe(150)
+    const tooMuch = await send('POST', '/api/auditions/gran/sitting/add', { credits: 5000 })
+    expect([tooMuch.status, (await tooMuch.json()).reason]).toEqual([409, 'credits'])
+  })
+
+  it('ends the credits with the sitting, and a fresh sitting can be given them alone', async () => {
+    await send('DELETE', '/api/auditions/gran/sitting')
+    expect((await sitting('gran')).eleven.sitting).toBeNull()
+    expect(await boardTake('gran', 'eleven:g1')).toMatchObject({ ok: true, cached: true })
+    const fresh = await send('POST', '/api/auditions/gran/sitting', { credits: 200 })
+    expect(fresh.status).toBe(200)
+    expect((await fresh.json()).eleven.sitting).toMatchObject({ dollars: 200, spent: 0 })
+    expect((await send('POST', '/api/auditions/gran/sitting', {})).status).toBe(400)
   })
 })

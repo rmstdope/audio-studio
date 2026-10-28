@@ -1169,8 +1169,18 @@ only, the fingerprint needs no provider of its own.
   ElevenLabs' WAV: `GET /api/takes/:file` serves a file that starts with `RIFF` as `audio/wav`. One
   already kept costs nothing. What one costs is added to the spending record's `tries` as soon as
   ElevenLabs has made it, even if it then cannot be kept. Board
-  takes with an ElevenLabs voice are refused until 14.10b: an audition sitting on ElevenLabs is
-  budgeted in characters, as a paid Fish sitting is in dollars (§8.1).
+  takes with an ElevenLabs voice (14.10b-2) are the same take, on the same key, paid from the
+  audition's sitting in credits instead: `start` takes `creditsUpTo` beside `spendUpTo`, `POST
+…/sitting` a fresh sitting's `{ amount?, credits? }`, and `…/sitting/add` `{ credits }` to top it
+  up. The credits are admitted as a recording's are (what the plan has left, less what running
+  recordings hold and what sittings have left and have in flight), checked and held in one step
+  (`holdCredits`), and charged to the take just before it is sent, given back when ElevenLabs
+  fails; one that does not fit waits ("Take waits for more credits"), and without credits a board
+  take of an ElevenLabs voice is refused (`no-sitting`). Ending the sitting (Pause, Stop, Cast,
+  `DELETE …/sitting`) ends its credits too. The sitting's view adds `eleven`: ElevenLabs' audition
+  model, a take's credits, the credits to suggest (about 50 takes, to the next hundred) and the
+  sitting's credits. Each board take that cost credits is a row of the spending record's `tries`
+  (`audition`).
 
 **Spending** (built in 14.7d). The log (`.audio-studio/spending.json`) moves to version 2 when it
 first needs to, with its first ElevenLabs credits or music take (`needsVersion2`), so a Fish-only
@@ -1273,7 +1283,7 @@ retakeWeak }`: start a generation, a measuring or a checking again, the server p
 Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries, ElevenLabs' audition model for an ElevenLabs voice's, with its voice settings), voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
-`undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model; `GET`, `POST` (`{ amount }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }`) are the audition's money; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
+`undo` (the last drop), `more`, `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`) are the audition's money; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
 `DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
 voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
@@ -1688,9 +1698,10 @@ Small, independently useful increments:
            three pull requests:
            1. **The ElevenLabs audition row** (built) on the Models panel, saved at once as
               Fish's audition row is.
-           2. **The credits sitting** on the server: started and added to in credits, held back
-              from the plan as a recording's credits are, board takes with ElevenLabs voices
-              charged to it.
+           2. **The credits sitting** (built) on the server: started and added to in credits,
+              held back from the plan as a recording's credits are, board takes with ElevenLabs
+              voices charged to it. The board's screens still say ElevenLabs voices make no
+              takes; without credits the server refuses theirs, so nothing is spent.
            3. **The board's screens** for it: the start box asking for credits (with Fish's
               dollars when its model is paid), the meter, Add, and "Take waits for more
               credits".
