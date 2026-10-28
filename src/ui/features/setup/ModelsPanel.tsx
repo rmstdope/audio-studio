@@ -455,18 +455,26 @@ function Question({
 }
 
 /**
- * ElevenLabs' side of the stages the panel shows: draft and final. Its audition model, which page
- * takes and tries already use, gets its row with auditions on ElevenLabs (§12 step 14.10b).
+ * ElevenLabs' side of the stages the panel shows: the audition model (page takes and tries, and
+ * auditions from 14.10b), draft and final, each with what the failure box calls its recordings.
  */
 const ELEVEN_STAGES = [
   {
+    stage: 'audition',
+    name: 'ElevenLabs audition',
+    made: 'auditions',
+    purpose: 'Takes and tries of ElevenLabs voices, on a character’s page and with Hear it.',
+  },
+  {
     stage: 'draft',
     name: 'ElevenLabs draft',
+    made: 'drafts',
     purpose: 'Every line of a character with an ElevenLabs voice, while the game is written.',
   },
   {
     stage: 'final',
     name: 'ElevenLabs final',
+    made: 'final recording',
     purpose: 'Those lines again, for the game you ship.',
   },
 ] as const
@@ -483,7 +491,7 @@ function ElevenRow({
   view,
   locked,
 }: {
-  stage: 'draft' | 'final'
+  stage: Stage
   name: string
   purpose: string
   view: View
@@ -562,7 +570,8 @@ function ElevenRow({
           </select>
           {state.phase === 'saving' && <span className="muted">Saving…</span>}
         </div>
-        {change?.kind === 'ask' && (
+        {/* The audition model never asks (nothing recorded depends on it); this narrows `stage`. */}
+        {change?.kind === 'ask' && stage !== 'audition' && (
           <div
             onKeyDown={(event) => {
               if (event.key === 'Escape' && state.phase === 'asking') dispatch({ type: 'keep' })
@@ -602,7 +611,7 @@ function ElevenRow({
           <section className="notice notice-err" role="alert">
             <div className="notice-text">
               <strong>
-                Could not switch ElevenLabs {stage === 'draft' ? 'drafts' : 'final recording'} to{' '}
+                Could not switch ElevenLabs {ELEVEN_STAGES.find((s) => s.stage === stage)!.made} to{' '}
                 {elevenModelName(state.to)}
               </strong>
               <span className="muted">
@@ -630,7 +639,8 @@ function ElevenRow({
         )}
         {!readsCues(shown) && (
           <span className="muted models-same">
-            {elevenModelName(shown)} speaks cues aloud, so its lines are sent without them.
+            {elevenModelName(shown)} speaks cues aloud, so its{' '}
+            {stage === 'audition' ? 'takes and tries are' : 'lines are'} sent without them.
           </span>
         )}
         {stage === 'final' && models.final === models.draft && (

@@ -241,6 +241,7 @@ describe('the ElevenLabs rows of the Models panel', () => {
       'Audition',
       'Draft',
       'Final',
+      'ElevenLabs audition',
       'ElevenLabs draft',
       'ElevenLabs final',
       'ElevenLabs voice',
@@ -264,6 +265,36 @@ describe('the ElevenLabs rows of the Models panel', () => {
     expect(elevenPut).toEqual([
       {
         url: '/api/models/elevenlabs/draft',
+        body: { model: 'eleven_flash_v2_5', was: 'eleven_v3' },
+      },
+    ])
+  })
+
+  it('says an audition model that speaks cues sends takes and tries without them', () => {
+    const page = render({
+      ...withEleven(),
+      elevenlabs: { audition: 'eleven_flash_v2_5', draft: 'eleven_v3', final: 'eleven_v3' },
+    })
+    expect(page.container.textContent).toContain(
+      'Flash v2.5 speaks cues aloud, so its takes and tries are sent without them.',
+    )
+  })
+
+  it('saves the audition model at once, whatever is recorded', async () => {
+    const page = render(
+      withEleven({ eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 } }),
+    )
+    expect(page.container.textContent).toContain(
+      'Takes and tries of ElevenLabs voices, on a character’s page and with Hear it.',
+    )
+    await act(async () => {
+      const menu = elevenMenu(page.container, 'audition')
+      menu.value = 'eleven_flash_v2_5'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(elevenPut).toEqual([
+      {
+        url: '/api/models/elevenlabs/audition',
         body: { model: 'eleven_flash_v2_5', was: 'eleven_v3' },
       },
     ])
@@ -309,6 +340,39 @@ describe('the ElevenLabs rows of the Models panel', () => {
     expect(alert).toContain('Could not switch ElevenLabs drafts to Flash v2.5')
     expect(alert).toContain('Keep Eleven v3')
     expect(alert).toContain('Try again')
+  })
+
+  it('says an audition switch failed in its own words, and Try again saves it again', async () => {
+    const sent: unknown[] = []
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PUT') sent.push(JSON.parse(String(init.body)))
+      return new Response(
+        JSON.stringify({ ok: false, problems: [{ message: 'Act I is recording' }] }),
+        { status: 409 },
+      )
+    }) as unknown as typeof fetch
+    const page = render(withEleven())
+    await act(async () => {
+      const menu = elevenMenu(page.container, 'audition')
+      menu.value = 'eleven_flash_v2_5'
+      menu.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    for (let i = 0; i < 50 && !page.container.querySelector('[role="alert"]'); i++) {
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+    const alert = page.container.querySelector('[role="alert"]')!.textContent
+    expect(alert).toContain('Could not switch ElevenLabs auditions to Flash v2.5')
+    expect(alert).toContain('Keep Eleven v3')
+    const retry = [...page.container.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Try again',
+    )!
+    await act(async () => retry.click())
+    for (let i = 0; i < 50 && sent.length < 2; i++) {
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+    const body = { model: 'eleven_flash_v2_5', was: 'eleven_v3' }
+    expect(sent).toEqual([body, body])
+    expect(page.container.textContent).not.toContain('Switch ElevenLabs')
   })
 })
 
