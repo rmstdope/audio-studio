@@ -285,7 +285,7 @@ describe('the ElevenLabs rows of the Models panel', () => {
       withEleven({ eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 } }),
     )
     expect(page.container.textContent).toContain(
-      'Takes and tries of ElevenLabs voices, on a character’s page and with Hear it.',
+      'Takes, tries and auditions of ElevenLabs voices, on a character’s page, with Hear it and on the audition board.',
     )
     await act(async () => {
       const menu = elevenMenu(page.container, 'audition')

@@ -39,11 +39,41 @@ export function saveFailedLine(reason: string): string {
   return `Fish couldn’t save this voice: ${reason.replace(/\.$/, '')}. It wasn’t cast.`
 }
 
-/** The voices of the board that get a take recorded; a designed voice already has its preview. */
-export function recordable(session: AuditionSession): string[] {
+/** The voices on the board that are not designs, whose preview is their take. */
+function boardVoices(session: AuditionSession): string[] {
   return [...session.shortlist, ...session.yours, ...session.toHear].filter(
-    (id) => !session.voices[id]?.design && providerOf(id) === 'fish',
+    (id) => !session.voices[id]?.design,
   )
+}
+
+/**
+ * The voices of the board that get a take recorded: Fish's, and ElevenLabs' once the audition has
+ * credits for them (`credits`).
+ */
+export function recordable(session: AuditionSession, credits: boolean): string[] {
+  return boardVoices(session).filter((id) => credits || providerOf(id) === 'fish')
+}
+
+/**
+ * What a voice's take waits for: credits (an ElevenLabs voice without a take, in an audition given
+ * none), or more of its own money once the server made it wait; undefined when it does not wait.
+ */
+export function takeWaits(
+  voice: string,
+  { credits, waiting, take }: { credits: boolean; waiting: Set<string>; take: boolean },
+): 'money' | 'credits' | 'more-credits' | undefined {
+  const eleven = providerOf(voice) === 'elevenlabs'
+  if (eleven && !credits && !take) return 'credits'
+  if (!waiting.has(voice)) return undefined
+  return eleven ? 'more-credits' : 'money'
+}
+
+/** The ElevenLabs voices on the board with no take, which wait while the audition has no credits. */
+export function waitingForCredits(
+  session: AuditionSession,
+  takes: Record<string, string>,
+): string[] {
+  return boardVoices(session).filter((id) => providerOf(id) === 'elevenlabs' && !takes[id])
 }
 
 /** What casting a voice does, in sentences, for the page to ask before casting. */

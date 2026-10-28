@@ -4503,6 +4503,12 @@ describe('server, an audition paid in ElevenLabs credits', () => {
     expect([tooMuch.status, (await tooMuch.json()).reason]).toEqual([409, 'credits'])
   })
 
+  it('tells the plan’s account and what running sittings hold of it', async () => {
+    const answer = await (await fetch(at('/api/elevenlabs/account'))).json()
+    expect(answer.account).toMatchObject({ ok: true, account: { characterLimit: 1000 } })
+    expect(answer.held).toBe((await sitting('gran')).eleven.sitting.left)
+  })
+
   it('ends the credits with the sitting, and a fresh sitting can be given them alone', async () => {
     await send('DELETE', '/api/auditions/gran/sitting')
     expect((await sitting('gran')).eleven.sitting).toBeNull()
@@ -4622,6 +4628,28 @@ describe('server, an audition’s dollars and credits together', () => {
     release()
     expect(await (await take).json()).toMatchObject({ ok: true })
     expect(await held()).toBe(950 - per)
+  })
+
+  it('gives a sitting credits of its own on the board, leaving its dollars as they are', async () => {
+    await send('DELETE', '/api/auditions/gran/sitting')
+    expect((await send('POST', '/api/auditions/gran/sitting', { amount: 0.05 })).status).toBe(200)
+    expect((await sitting('gran')).eleven.sitting).toBeNull()
+    const given = await send('POST', '/api/auditions/gran/sitting/add', { credits: 300 })
+    expect(given.status).toBe(200)
+    const view = await given.json()
+    expect(view.sitting).toMatchObject({ dollars: 0.05 })
+    expect(view.eleven.sitting).toMatchObject({ dollars: 300, spent: 0 })
+    expect(await held()).toBe(300)
+    // More than the plan has free is refused, and leaves the credits given as they were.
+    const over = await send('POST', '/api/auditions/gran/sitting/add', { credits: 800 })
+    expect([over.status, (await over.json()).reason]).toEqual([409, 'credits'])
+    expect((await sitting('gran')).eleven.sitting).toMatchObject({ dollars: 300 })
+  })
+
+  it('gives no credits to a character with no audition', async () => {
+    const none = await send('POST', '/api/auditions/kid/sitting/add', { credits: 100 })
+    expect([none.status, (await none.json()).reason]).toEqual([409, 'confirm-credits'])
+    expect((await sitting('kid')).eleven.sitting).toBeNull()
   })
 
   it('lets only one of two sittings asking at once have the same credits', async () => {

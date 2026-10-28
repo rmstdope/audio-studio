@@ -7,10 +7,17 @@ import { PauseIcon, PlayIcon } from '../../components/icons'
 import { compact } from '../../format'
 import { providerWords } from '../../voiceId'
 
+/** What a card says while its take waits. */
+const WAITS = {
+  money: 'Take waits for more money',
+  credits: 'Take waits for credits',
+  'more-credits': 'Take waits for more credits',
+}
+
 /**
  * A voice in an audition: who made it and how popular it is, its take (the audition phrase in the
- * character's style) or a button to record one (none for an ElevenLabs voice yet), its provider's
- * own sample, and, on the board, what can be done with it (`actions`).
+ * character's style) or a button to record one (or why it waits), its provider's own sample,
+ * and, on the board, what can be done with it (`actions`).
  */
 export function VoiceCard({
   voice,
@@ -23,7 +30,7 @@ export function VoiceCard({
   recording,
   error,
   onRecord,
-  waiting = false,
+  waits,
   listed = false,
   actions,
 }: {
@@ -38,8 +45,11 @@ export function VoiceCard({
   recording: boolean
   error: string | null
   onRecord: () => void
-  /** Whether its take waits for more money (a paid audition whose money is used). */
-  waiting?: boolean
+  /**
+   * What its take waits for: more money (a paid audition whose money is used), credits (an
+   * ElevenLabs voice in an audition given none) or more of them (its credits used).
+   */
+  waits?: 'money' | 'credits' | 'more-credits'
   /** Whether the voice is on the shortlist, which is shown apart. */
   listed?: boolean
   /** On the board: buttons for what can be done with the voice. */
@@ -48,7 +58,6 @@ export function VoiceCard({
   const sample = voice.sample
   // Fish's design, not yet on the account: its preview is its take, and it has no sample or id.
   const designed = voice.design !== undefined
-  // An ElevenLabs voice makes no board takes yet (§12 step 14.10b); its preview is how it is heard.
   const eleven = providerOf(voice.id) === 'elevenlabs'
   const words = providerWords(voice.id)
   return (
@@ -117,10 +126,8 @@ export function VoiceCard({
           </>
         ) : designed ? (
           <span className="muted">The preview of this design is no longer kept.</span>
-        ) : eleven ? (
-          <span className="muted">No takes with ElevenLabs voices yet: hear its preview.</span>
-        ) : waiting ? (
-          <span className="muted take-waits">Take waits for more money</span>
+        ) : waits ? (
+          <span className="muted take-waits">{WAITS[waits]}</span>
         ) : (
           <button className="btn" type="button" disabled={recording} onClick={onRecord}>
             {recording ? 'Recording take…' : 'Record take'}
