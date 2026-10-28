@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ElevenAccount, ElevenAnswer } from '../core/setup'
+import { ELEVEN_DESIGN_MODEL } from '../core/elevenDesign'
 import type { LibraryFilters } from '../core/elevenLibrary'
 import type { Voice } from '../core/voiceSearch'
 import type { Project } from '../core/project'
@@ -36,6 +37,24 @@ export interface ElevenLabsClient {
   addSharedVoice(owner: string, id: string, name: string): Promise<string>
   /** Removes a voice from the user's voices, by ElevenLabs' id, which frees its voice slot. */
   deleteVoice(id: string): Promise<void>
+  /**
+   * Voices designed from a description (Eleven v3 design), each a preview saying `text` (or, when
+   * it is null, a text ElevenLabs writes), as MP3, with the id it is saved by; and the text said,
+   * whose characters it charged.
+   */
+  designVoices(request: { description: string; text: string | null }): Promise<DesignedVoices>
+  /** Saves a designed preview as a voice of the user's, named, taking a voice slot; gives its id. */
+  saveDesignedVoice(request: {
+    generated: string
+    name: string
+    description: string
+  }): Promise<string>
+}
+
+/** What a design gave: the text the previews say, and each preview with the id it is saved by. */
+export interface DesignedVoices {
+  text: string
+  previews: { generated: string; audio: Uint8Array }[]
 }
 
 /** What ElevenLabs' library is searched with. */
@@ -146,6 +165,12 @@ const ApiSharedVoicesSchema = z.looseObject({
   has_more: z.boolean().nullish(),
 })
 
+/** What a design answers: its previews, as base64 MP3, and the text they say. */
+const ApiDesignSchema = z.looseObject({
+  previews: z.array(z.looseObject({ audio_base_64: z.string(), generated_voice_id: z.string() })),
+  text: z.string(),
+})
+
 /** What adding a library voice answers. */
 const ApiAddedSchema = z.looseObject({ voice_id: z.string() })
 
@@ -157,6 +182,9 @@ const LOOKUP_TIMEOUT_MS = 10_000
 
 /** How long a search of the library may take: the board waits on it, as a page waits on a lookup. */
 const SEARCH_TIMEOUT_MS = 20_000
+
+/** How long a design may take: three voices made in the cloud. */
+const DESIGN_TIMEOUT_MS = 120_000
 
 /** How long making a piece may take: up to ten minutes of music, made in the cloud. */
 const MUSIC_TIMEOUT_MS = 10 * 60_000
@@ -353,6 +381,40 @@ export function createElevenLabsClient(
         undefined,
         'DELETE',
       )
+    },
+
+    async designVoices({ description, text }) {
+      const parsed = ApiDesignSchema.safeParse(
+        await call(
+          '/v1/text-to-voice/design?output_format=mp3_44100_128',
+          Math.min(timeoutMs, DESIGN_TIMEOUT_MS),
+          {
+            voice_description: description,
+            model_id: ELEVEN_DESIGN_MODEL,
+            ...(text === null ? { auto_generate_text: true } : { text }),
+          },
+        ),
+      )
+      if (!parsed.success) throw new Error(UNREADABLE)
+      return {
+        text: parsed.data.text,
+        previews: parsed.data.previews.map((p) => ({
+          generated: p.generated_voice_id,
+          audio: new Uint8Array(Buffer.from(p.audio_base_64, 'base64')),
+        })),
+      }
+    },
+
+    async saveDesignedVoice({ generated, name, description }) {
+      const parsed = ApiAddedSchema.safeParse(
+        await call('/v1/text-to-voice', Math.min(timeoutMs, LOOKUP_TIMEOUT_MS), {
+          voice_name: name,
+          voice_description: description,
+          generated_voice_id: generated,
+        }),
+      )
+      if (!parsed.success) throw new Error(UNREADABLE)
+      return parsed.data.voice_id
     },
 
     async subscription() {

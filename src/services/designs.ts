@@ -1,19 +1,31 @@
+import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { setDesigned } from '../core/audition'
 import { DESIGN_COUNT, descriptionState, previewText, savedName } from '../core/design'
 import { addDesigns, listDesigns, markSaved, removeDesign } from '../core/designs'
 import { resolveInRoot } from '../core/paths'
-import type { Problem } from '../core/project'
+import { declaredLanguage, type Problem } from '../core/project'
+import { ELEVEN_DESIGN_MODEL, elevenDesignCredits, elevenDesignText } from '../core/elevenDesign'
+import { elevenVoice } from '../core/voices'
 import { ffmpegEncoder, type Encoder } from './audio'
 import type { FishFactory } from './auditions'
 import { createSerial } from './serial'
 import { changeDesigns, designId, designPreviewPath, readDesigns } from './designStore'
 import { FishError, NO_KEY } from './fish'
+import { ElevenLabsError, NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
+import { appendTry } from './spending'
+import { writeAtomic } from './files'
 import { ruledOutIds } from './ruledOut'
 import { castOwnVoice, changeSession, sessionFor, type CastResult } from './sessions'
 import { auditionIn, castProblems } from './takes'
-import { cacheNameFor, knownCharacter, loadWorkspace, type ProjectFailure } from './workspace'
+import {
+  cacheNameFor,
+  knownCharacter,
+  loadWorkspace,
+  readPart,
+  type ProjectFailure,
+} from './workspace'
 
 /** The description to start the design box with, or why it cannot be read. Null for an unknown character. */
 export async function designsFor(
@@ -32,7 +44,11 @@ export async function designsFor(
 /** Designs made, or why not. Null for an unknown character. */
 export type DesignResult =
   | { ok: true; added: number }
-  | { ok: false; reason: 'invalid' | 'no-key' | 'no-phrase' | 'fish' | 'failed'; message: string }
+  | {
+      ok: false
+      reason: 'invalid' | 'no-key' | 'no-phrase' | 'fish' | 'elevenlabs' | 'failed'
+      message: string
+    }
   | { ok: false; problems: Problem[] }
   | ProjectFailure
   | null
@@ -125,6 +141,141 @@ export async function designVoices(
   }
 }
 
+/** What an ElevenLabs design would say and cost, or why there is none. Null for an unknown character. */
+export type ElevenDesignPlan =
+  | { ok: true; text: string | null; credits: number }
+  | { ok: false; reason: 'no-phrase'; message: string }
+  | { ok: false; problems: Problem[] }
+  | ProjectFailure
+  | null
+
+/**
+ * What the previews of an ElevenLabs design for the character would say (`elevenDesignText`: the
+ * audition phrase of the language, then her lines in the order of the parts; null for ElevenLabs'
+ * own text), and the credits it uses.
+ */
+export async function elevenDesignFor(
+  projectFile: string,
+  characterId: string,
+  asked?: string,
+): Promise<ElevenDesignPlan> {
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  const { project, summary, cast } = loaded
+  const character = summary.characters.find((c) => c.id === characterId)
+  if (!character) return null
+  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  const seen = auditionIn(project, cast, summary, characterId, asked)
+  if (seen.audition.phrase === null) {
+    return {
+      ok: false,
+      reason: 'no-phrase',
+      message: 'There is no audition phrase to design with; write one first.',
+    }
+  }
+  const lines: string[] = []
+  for (const { part } of character.languages[seen.language]?.appearances ?? []) {
+    const read = await readPart(projectFile, part, asked)
+    if (!read?.ok || read.dialog.status !== 'ok') continue
+    for (const line of read.dialog.lines) {
+      if (line.speaker === characterId && line.text) lines.push(line.text)
+    }
+  }
+  const text = elevenDesignText(seen.audition.phrase, lines)
+  return { ok: true, text, credits: elevenDesignCredits(text) }
+}
+
+/**
+ * Has ElevenLabs design voices from a description (Eleven v3 design), each saying what
+ * `elevenDesignFor` gives, and keeps them for the character as Fish's designs are kept, with the id
+ * each is saved by; the credits it charged (its text's characters) go in the spending record. If
+ * an audition is going on they join its board. Nothing is kept when ElevenLabs fails. The caller
+ * has admitted the cost.
+ */
+export async function designElevenVoices(
+  projectFile: string,
+  characterId: string,
+  description: string,
+  elevenFor: ElevenLabsFactory,
+  asked?: string,
+  at: Date = new Date(),
+): Promise<DesignResult> {
+  const text = description.trim()
+  const state = descriptionState(text)
+  if (!state.canSend) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      message: state.tooLong ?? 'Describe the voice you want first.',
+    }
+  }
+  const plan = await elevenDesignFor(projectFile, characterId, asked)
+  if (!plan?.ok) return plan
+  const loaded = await loadWorkspace(projectFile)
+  if (!loaded.ok) return loaded
+  const root = dirname(projectFile)
+  const client = await elevenFor(root, loaded.project)
+  if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+  await changeDesigns(
+    projectFile,
+    characterId,
+    (designs) => ({ ...designs, description: text }),
+    asked,
+  )
+  const language = declaredLanguage(loaded.project.narration, asked)
+  const stamp = at.toISOString()
+  try {
+    const designed = await client.designVoices({ description: text, text: plan.text })
+    const said = [...designed.text].length
+    try {
+      // Charged by ElevenLabs as soon as it answered: logged even if the studio cannot keep them.
+      await appendTry(projectFile, {
+        id: randomUUID(),
+        at: stamp,
+        kind: 'design',
+        character: characterId,
+        language,
+        model: ELEVEN_DESIGN_MODEL,
+        characters: said,
+        credits: said,
+      })
+    } catch {
+      // Only the record of what it cost is lost.
+    }
+    const ids = designed.previews.map((_, index) => designId(characterId, language, stamp, index))
+    for (const [index, preview] of designed.previews.entries()) {
+      await writeAtomic(root, designPreviewPath(ids[index]!), preview.audio)
+    }
+    const kept = await changeDesigns(
+      projectFile,
+      characterId,
+      (designs) =>
+        addDesigns(
+          designs,
+          text,
+          stamp,
+          ids,
+          designed.previews.map((p) => p.generated),
+        ),
+      asked,
+    )
+    const ruled = await ruledOutIds(projectFile, characterId, asked)
+    await changeSession(
+      projectFile,
+      characterId,
+      (s) => setDesigned(s, listDesigns(kept), ruled),
+      undefined,
+      asked,
+    )
+    return { ok: true, added: ids.length }
+  } catch (error) {
+    if (error instanceof ElevenLabsError) {
+      return { ok: false, reason: 'elevenlabs', message: error.detail }
+    }
+    return { ok: false, reason: 'failed', message: errorText(error) }
+  }
+}
+
 /** Casts of designs, one at a time per character and language: a second press waits for the first. */
 const casts = createSerial()
 
@@ -141,6 +292,7 @@ export async function castDesign(
   voiceId: string,
   fishFor: FishFactory,
   language?: string,
+  elevenFor: ElevenLabsFactory = async () => null,
 ): Promise<CastResult> {
   const name = await cacheNameFor(projectFile, characterId, language)
   return casts.run(`${projectFile}\n${name}`, async () => {
@@ -167,6 +319,25 @@ export async function castDesign(
       message,
     })
     let saved = (await readDesigns(projectFile, characterId, language)).saved[voiceId]
+    const design = found.session.voices[voiceId]!.design!
+    if (!saved && design.generated) {
+      // ElevenLabs saves the preview it made by its id, as a voice of the user's.
+      const client = await elevenFor(root, loaded.project)
+      if (!client) return failed(NO_ELEVENLABS_KEY)
+      const title = savedName(character.name, [])
+      try {
+        const id = await client.saveDesignedVoice({
+          generated: design.generated,
+          name: title,
+          description: design.description,
+        })
+        saved = { id: elevenVoice(id), name: title }
+      } catch (error) {
+        return failed(error instanceof ElevenLabsError ? error.detail : errorText(error))
+      }
+      const voice = saved
+      await changeDesigns(projectFile, characterId, (d) => markSaved(d, voiceId, voice), language)
+    }
     if (!saved) {
       const fish = await fishFor(root, loaded.project)
       if (!fish) return failed(NO_KEY)

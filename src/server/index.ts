@@ -82,7 +82,14 @@ import {
 } from '../services/lineTakes'
 import { cloneVoice } from '../services/cloneVoice'
 import { DESIGN_MODEL, DESIGN_PRICE, isDesignId } from '../core/design'
-import { castDesign, designVoices, designsFor } from '../services/designs'
+import {
+  castDesign,
+  designElevenVoices,
+  designVoices,
+  designsFor,
+  elevenDesignFor,
+} from '../services/designs'
+import { ELEVEN_DESIGN_MODEL } from '../core/elevenDesign'
 import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ruledOut'
 import {
   addVoiceById,
@@ -374,7 +381,13 @@ const StartBody = z
   .strict()
 /** Designing voices: the description, and the most the user agreed to spend on the design. */
 const DesignBody = z
-  .object({ description: z.string(), spendUpTo: z.number().positive().max(10_000).optional() })
+  .object({
+    description: z.string(),
+    spendUpTo: z.number().positive().max(10_000).optional(),
+    /** Whose design: Fish's unless ElevenLabs' is asked for, with the credits confirmed. */
+    provider: z.enum(['fish', 'elevenlabs']).default('fish'),
+    creditsUpTo: z.number().int().positive().max(10_000).optional(),
+  })
   .strict()
 /** What casting a voice made from recordings sends: the voice and the name to cast it under. */
 const CastOwnBody = z.object({
@@ -2171,7 +2184,13 @@ export function startServer({
         GET: guard(async (request) => {
           const result = await designsFor(projectFile, request.params.id, languageOf(request))
           if (!result) return notFound()
-          return Response.json(result, { status: result.ok ? 200 : 409 })
+          if (!result.ok) return Response.json(result, { status: 409 })
+          // What a design with ElevenLabs would say and cost, for its confirm.
+          const plan = await elevenDesignFor(projectFile, request.params.id, languageOf(request))
+          return Response.json({
+            ...result,
+            eleven: plan?.ok ? { text: plan.text, credits: plan.credits } : null,
+          })
         }),
       },
       '/api/characters/:id/design': {
@@ -2182,6 +2201,29 @@ export function startServer({
           }
           const { id } = request.params
           if ((await designsFor(projectFile, id, languageOf(request))) === null) return notFound()
+          if (body.data.provider === 'elevenlabs') {
+            const plan = await elevenDesignFor(projectFile, id, languageOf(request))
+            if (!plan) return notFound()
+            if (!plan.ok) return Response.json(plan, { status: 409 })
+            // Held back from the plan while ElevenLabs designs, as the credits confirmed.
+            const got = await admitCredits(ELEVEN_DESIGN_MODEL, plan.credits, body.data.creditsUpTo)
+            if ('problem' in got) {
+              return Response.json({ ok: false, ...got.problem }, { status: 409 })
+            }
+            try {
+              const result = await designElevenVoices(
+                projectFile,
+                id,
+                body.data.description,
+                elevenFor,
+                languageOf(request),
+              )
+              if (!result) return notFound()
+              return Response.json(result, { status: 'added' in result ? 200 : 409 })
+            } finally {
+              creditBudgets.delete(got.budget)
+            }
+          }
           // Held back from the credit while Fish designs; Fish bills a request that works.
           const got = await admit(DESIGN_MODEL, DESIGN_PRICE, body.data.spendUpTo)
           if ('problem' in got) return Response.json({ ok: false, ...got.problem }, { status: 409 })
@@ -2227,7 +2269,7 @@ export function startServer({
           const language = languageOf(request)
           // A designed voice is saved to the account first; Fish makes no voice from a design.
           const result = isDesignId(voice)
-            ? await castDesign(projectFile, request.params.id, voice, fishFor, language)
+            ? await castDesign(projectFile, request.params.id, voice, fishFor, language, elevenFor)
             : await castVoice(projectFile, request.params.id, voice, language, (shown) =>
                 saveToAccount(shown, request.params.id),
               )

@@ -414,3 +414,70 @@ describe('removing a voice', () => {
     )
   })
 })
+
+describe('designing voices', () => {
+  it('asks Eleven v3 design for previews of the description saying the text, and decodes them', async () => {
+    const { fetch, asked } = fakeFetch({
+      previews: [
+        {
+          audio_base_64: Buffer.from([1, 2]).toString('base64'),
+          generated_voice_id: 'g1',
+          media_type: 'audio/mpeg',
+          duration_secs: 3,
+        },
+        {
+          audio_base_64: Buffer.from([3]).toString('base64'),
+          generated_voice_id: 'g2',
+          media_type: 'audio/mpeg',
+          duration_secs: 3,
+        },
+      ],
+      text: 'What they said.',
+    })
+    const designed = await createElevenLabsClient('k', { fetch }).designVoices({
+      description: 'An old wizard',
+      text: 'x'.repeat(100),
+    })
+    expect(designed).toEqual({
+      text: 'What they said.',
+      previews: [
+        { generated: 'g1', audio: new Uint8Array([1, 2]) },
+        { generated: 'g2', audio: new Uint8Array([3]) },
+      ],
+    })
+    expect(asked[0]!.url).toBe(
+      'https://api.elevenlabs.io/v1/text-to-voice/design?output_format=mp3_44100_128',
+    )
+    expect(asked[0]!.body).toEqual({
+      voice_description: 'An old wizard',
+      model_id: 'eleven_ttv_v3',
+      text: 'x'.repeat(100),
+    })
+  })
+
+  it('asks ElevenLabs to write its own text when given none', async () => {
+    const { fetch, asked } = fakeFetch({ previews: [], text: 'Its own.' })
+    await createElevenLabsClient('k', { fetch }).designVoices({ description: 'd', text: null })
+    expect(asked[0]!.body).toEqual({
+      voice_description: 'd',
+      model_id: 'eleven_ttv_v3',
+      auto_generate_text: true,
+    })
+  })
+
+  it('saves a preview as a voice of the user’s, named, and gives its id', async () => {
+    const { fetch, asked } = fakeFetch({ voice_id: 'v9', name: 'Mara (designed)' })
+    const id = await createElevenLabsClient('k', { fetch }).saveDesignedVoice({
+      generated: 'g1',
+      name: 'Mara (designed)',
+      description: 'An old wizard',
+    })
+    expect(id).toBe('v9')
+    expect(asked[0]!.url).toBe('https://api.elevenlabs.io/v1/text-to-voice')
+    expect(asked[0]!.body).toEqual({
+      voice_name: 'Mara (designed)',
+      voice_description: 'An old wizard',
+      generated_voice_id: 'g1',
+    })
+  })
+})
