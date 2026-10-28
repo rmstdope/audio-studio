@@ -155,7 +155,13 @@ describe('freeVoices', () => {
     expect(result).toEqual({
       ok: true,
       freed: ['lib1'],
-      failed: [{ name: 'lib2', message: 'ElevenLabs answered 500: Try again later.' }],
+      failed: [
+        {
+          voice: 'eleven:own-lib2',
+          name: 'lib2',
+          message: 'ElevenLabs answered 500: Try again later.',
+        },
+      ],
     })
     expect((await readAddedVoices(projectFile)).added.map((a) => a.voice)).toEqual([
       'eleven:own-lib2',

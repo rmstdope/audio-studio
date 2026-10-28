@@ -9,10 +9,10 @@ import { plural } from '../../format'
  * frees those of the voices the studio added that nothing uses, asking first.
  */
 export function VoiceSlots({ slots }: { slots: { used: number; limit: number } | null }) {
-  const freeable = useFreeableVoices(true)
+  const freeable = useFreeableVoices()
   const free = useFreeVoices()
   const [asking, setAsking] = useState(false)
-  const voices = freeable.data?.voices ?? []
+  const voices = freeable.data?.ok ? freeable.data.voices : []
   const label = `Free ${plural(voices.length, 'voice slot')}`
   const answer = free.data
   return (
@@ -46,6 +46,7 @@ export function VoiceSlots({ slots }: { slots: { used: number; limit: number } |
           </button>
         </Confirm>
       )}
+      {freeable.data && !freeable.data.ok && <span className="muted">{freeable.data.message}</span>}
       {answer?.ok && answer.freed.length > 0 && (
         <span className="muted" role="status">
           Freed {plural(answer.freed.length, 'voice slot')}.
@@ -53,7 +54,7 @@ export function VoiceSlots({ slots }: { slots: { used: number; limit: number } |
       )}
       {answer?.ok &&
         answer.failed.map((f) => (
-          <span key={f.name} className="adopt-error" role="alert">
+          <span key={f.voice} className="adopt-error" role="alert">
             ElevenLabs kept {f.name}: {f.message.replace(/\.$/, '')}.
           </span>
         ))}

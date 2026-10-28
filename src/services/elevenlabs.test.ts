@@ -399,6 +399,11 @@ describe('removing a voice', () => {
     expect(asked[0]!.method).toBe('DELETE')
   })
 
+  it('takes an empty answer as done', async () => {
+    const { fetch } = fakeFetch('')
+    await createElevenLabsClient('k', { fetch }).deleteVoice('own1')
+  })
+
   it("throws ElevenLabs' own message", async () => {
     const { fetch } = fakeFetch(
       { detail: { message: 'A voice with the voice_id x was not found.' } },

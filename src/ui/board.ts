@@ -55,7 +55,7 @@ function boardVoices(session: AuditionSession): string[] {
 
 /**
  * The voices of the board that get a take recorded: Fish's, and ElevenLabs' once the audition has
- * credits for them (`credits`).
+ * credits for them (`credits`), except those waiting for a free voice slot (`slotWaiting`).
  */
 export function recordable(
   session: AuditionSession,
@@ -70,19 +70,37 @@ export function recordable(
 /**
  * The library voices on the board whose take would add them to the user's ElevenLabs voices
  * (not added, no take yet) beyond the `slotsLeft` free voice slots, in board order: they wait for
- * a slot. None while the slots are unknown (null), as ElevenLabs refuses at its limit anyway.
+ * a slot. None while the slots are unknown (null), as ElevenLabs refuses at its limit anyway;
+ * none of those in `failed`, whose take failed and is not asked again.
  */
 export function slotWaiters(
   session: AuditionSession,
   takes: Record<string, string>,
   slotsLeft: number | null,
+  failed: Set<string> = new Set(),
 ): Set<string> {
   if (slotsLeft === null) return new Set()
+  // A voice whose take failed is not asked again for this phrase, so it holds no slot.
   const adding = boardVoices(session).filter((id) => {
     const library = session.voices[id]?.library
-    return library && !library.added && !takes[id]
+    return library && !library.added && !takes[id] && !failed.has(id)
   })
   return new Set(adding.slice(Math.max(0, slotsLeft)))
+}
+
+/**
+ * The voice slots free for library voices' takes: those the account had when last read
+ * (`readAt`), less one for every take that may have added a voice since (`mayHaveAdded`, when
+ * each answered), until the account is read again. Null while the slots are unknown.
+ */
+export function slotsLeftFor(
+  slots: { used: number; limit: number } | null,
+  mayHaveAdded: Map<string, number>,
+  readAt: number,
+): number | null {
+  if (!slots) return null
+  const since = [...mayHaveAdded.values()].filter((at) => at > readAt).length
+  return slots.limit - slots.used - since
 }
 
 /** The line that says how many of the plan's ElevenLabs voice slots are used. */
@@ -100,10 +118,10 @@ export function freeEffects(voices: FreeableVoice[]): string[] {
   const one = names.length === 1
   return [
     one
-      ? `Removes ${listed} from your ElevenLabs voices. The studio added it in an audition; it is not cast or on an audition in progress.`
-      : `Removes ${listed} from your ElevenLabs voices. The studio added them in auditions; ${names.length === 2 ? 'neither' : 'none'} is cast or on an audition in progress.`,
+      ? `Removes ${listed} from your ElevenLabs voices. The studio added it in an audition; it is not cast or on an audition in progress in this project.`
+      : `Removes ${listed} from your ElevenLabs voices. The studio added them in auditions; ${names.length === 2 ? 'neither' : 'none'} is cast or on an audition in progress in this project.`,
     `${one ? 'Its takes are' : 'Their takes are'} kept. A voice removed can be found in the library and added again.`,
-    'Voices you added on ElevenLabs yourself are never removed.',
+    'Voices you added on ElevenLabs yourself are never removed. Another game using the same ElevenLabs account is not checked.',
   ]
 }
 

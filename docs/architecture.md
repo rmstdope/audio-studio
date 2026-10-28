@@ -1247,12 +1247,16 @@ not cast. The studio remembers which voices it added (`.audio-studio/eleven-voic
 library id, the id on the account, its name, the character and when), so each is added once. **Voice slots** (built in 14.11b): below Bring in more, once a library
 voice is on the board or ElevenLabs' library is chosen, the board says how many of the plan's
 slots are used (from the subscription's `voice_limit` and `voice_slots_used`). A voice the studio
-added that nothing uses (not cast for any character in any language, and on no audition in
-progress, by either id) is offered for removal ("Free 3 voice slots", confirmed before anything is
+added that nothing in this project uses (not cast for any character in any language, and on no
+audition in progress, dropped ones included since Undo brings them back, by either id) is offered
+for removal; while the cast or a saved audition cannot be read, none is (another game on the same
+account is not checked, and the confirm says so) ("Free 3 voice slots", confirmed before anything is
 removed: `DELETE /v1/voices/{id}`, one ElevenLabs no longer has counting as removed), and never
 one the user added on ElevenLabs. At the plan's limit the board says so, and the library voices
 whose take would add them wait ("Take waits for a free voice slot", as many as slots are left
-record), recording by themselves once slots are freed. Whether a library voice can speak before it is added
+record; while the account is being read none does, and a take that may have added a voice counts
+as a slot used until the account is read again, which the server then asks ElevenLabs for afresh),
+recording by themselves once slots are freed. Whether a library voice can speak before it is added
 is checked by hand at the end of step 14 (no key in CI); if it can, nothing need be added before
 casting. **Add by id** takes an id from the
 user's own ElevenLabs voices (one made or added on ElevenLabs' site), with the provider chosen

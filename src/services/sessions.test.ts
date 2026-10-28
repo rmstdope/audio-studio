@@ -877,6 +877,12 @@ describe('an audition per language', () => {
   }
   const castFile = (root: string) => JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
 
+  it('counts the voices on an audition in another language as in use', async () => {
+    const { projectFile, session } = await begin()
+    const used = await voicesInUse(projectFile)
+    expect(session.toHear.every((id) => used?.has(id))).toBe(true)
+  })
+
   it('starts with her voice in another language on the shortlist, when she has none in this one', async () => {
     const { projectFile, session } = await begin()
     expect(session.current).toBeNull()
@@ -971,15 +977,26 @@ describe('voicesInUse', () => {
     const { projectFile, session } = await started()
     await moveVoice(projectFile, 'mira', 'a', 'drop')
     const used = await voicesInUse(projectFile)
-    expect([...used].sort()).toEqual(
-      [
-        ...new Set(['cur', 't1', ...session.toHear.filter((id) => id !== 'a'), ...session.queue]),
-      ].sort(),
+    // A voice dropped can be brought back with Undo: it is in use too.
+    expect([...used!].sort()).toEqual(
+      [...new Set(['cur', 't1', ...session.toHear, ...session.queue])].sort(),
     )
+  })
+
+  it('knows nothing in use when the cast or a session cannot be read, so nothing is freed', async () => {
+    const { root, projectFile } = await started()
+    const [file] = readdirSync(join(root, '.audio-studio/auditions'))
+    writeFileSync(join(root, '.audio-studio/auditions', file!), '{"version": 2}')
+    expect(await voicesInUse(projectFile)).toBeNull()
+    // One of an earlier version is no audition in progress.
+    writeFileSync(join(root, '.audio-studio/auditions', file!), '{"version": 1}')
+    expect([...(await voicesInUse(projectFile))!].sort()).toEqual(['cur', 't1'])
+    const broken = tempRepo({ ...files, 'tts/cast.json': '{ not json' })
+    expect(await voicesInUse(join(broken, 'audio-studio.json'))).toBeNull()
   })
 
   it('names only the cast when no audition is in progress', async () => {
     const root = tempRepo(files)
-    expect([...(await voicesInUse(join(root, 'audio-studio.json')))].sort()).toEqual(['cur', 't1'])
+    expect([...(await voicesInUse(join(root, 'audio-studio.json')))!].sort()).toEqual(['cur', 't1'])
   })
 })

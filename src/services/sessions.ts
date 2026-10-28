@@ -662,26 +662,38 @@ export async function boardVoice(
 
 /**
  * The voices in use: every voice cast for a character in a language, and every voice on an
- * audition in progress (shortlisted, to hear, queued, or the voice it started with). A voice
- * dropped is not in use there.
+ * audition in progress (shortlisted, to hear, queued, dropped, which Undo brings back, or the
+ * voice it started with). Null when that cannot be known (the project, the cast or a saved
+ * audition cannot be read), so nothing is taken for unused.
  */
-export async function voicesInUse(projectFile: string): Promise<Set<string>> {
+export async function voicesInUse(projectFile: string): Promise<Set<string> | null> {
   const used = new Set<string>()
   const loaded = await loadWorkspace(projectFile)
-  if (!loaded.ok) return used
+  if (!loaded.ok || !loaded.cast) return null
   for (const character of loaded.summary.characters) {
     for (const casting of Object.values(character.languages)) {
       if (casting.voice) used.add(casting.voice)
     }
     for (const language of loaded.project.narration.languages) {
-      const session = await readSession(projectFile, character.id, language)
-      if (!session) continue
-      const { current, shortlist, yours, designed, toHear, queue } = session
+      const json = await readJson(await sessionPath(projectFile, character.id, language))
+      if (json.status === 'missing') continue
+      // One of an earlier version is no longer an audition in progress (see the schema).
+      if (json.status === 'ok' && isOlderSession(json.value)) continue
+      const parsed = json.status === 'ok' ? AuditionSessionSchema.safeParse(json.value) : null
+      if (!parsed?.success) return null
+      const { current, shortlist, yours, designed, toHear, queue, dropped } = parsed.data
       for (const id of [...shortlist, ...yours, ...designed, ...toHear, ...queue]) used.add(id)
+      for (const { id } of dropped) used.add(id)
       if (current) used.add(current)
     }
   }
   return used
+}
+
+/** Whether a saved session is of an earlier version than the studio reads. */
+function isOlderSession(value: unknown): boolean {
+  const version = (value as { version?: unknown } | null)?.version
+  return typeof version === 'number' && version < 2
 }
 
 /** The saved session; none if there is no file, or it does not fit (an older version, a hand edit). */

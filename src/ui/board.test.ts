@@ -9,6 +9,7 @@ import {
   saveFailedLine,
   freeEffects,
   slotWaiters,
+  slotsLeftFor,
   slotsLine,
   sampleClip,
   stopEffects,
@@ -421,6 +422,21 @@ describe('voice slots', () => {
     expect([...slotWaiters(session as never, {}, null)]).toEqual([])
   })
 
+  it('lets a voice whose take failed before adding it hold no slot', () => {
+    expect([...slotWaiters(session as never, {}, 1, new Set(['eleven:a']))]).toEqual(['eleven:d'])
+  })
+
+  it('counts takes that may have added a voice since the slots were read as using one', () => {
+    const slots = { used: 8, limit: 10 }
+    const added = new Map([
+      ['eleven:a', 1000],
+      ['eleven:b', 3000],
+    ])
+    expect(slotsLeftFor(slots, added, 2000)).toBe(1)
+    expect(slotsLeftFor(slots, added, 4000)).toBe(2)
+    expect(slotsLeftFor(null, added, 0)).toBeNull()
+  })
+
   it('leaves the voices that wait for a slot out of the voices to record', () => {
     const waiting = slotWaiters(session as never, {}, 1)
     expect(recordable(session as never, true, waiting)).toEqual(['eleven:a', 'eleven:b', 'f'])
@@ -450,12 +466,12 @@ describe('voice slots', () => {
         { voice: 'eleven:b', name: 'Brook', character: 'gran' },
       ]),
     ).toEqual([
-      'Removes Gravel and Brook from your ElevenLabs voices. The studio added them in auditions; neither is cast or on an audition in progress.',
+      'Removes Gravel and Brook from your ElevenLabs voices. The studio added them in auditions; neither is cast or on an audition in progress in this project.',
       'Their takes are kept. A voice removed can be found in the library and added again.',
-      'Voices you added on ElevenLabs yourself are never removed.',
+      'Voices you added on ElevenLabs yourself are never removed. Another game using the same ElevenLabs account is not checked.',
     ])
     expect(freeEffects([{ voice: 'eleven:a', name: 'Gravel', character: 'wizard' }])[0]).toBe(
-      'Removes Gravel from your ElevenLabs voices. The studio added it in an audition; it is not cast or on an audition in progress.',
+      'Removes Gravel from your ElevenLabs voices. The studio added it in an audition; it is not cast or on an audition in progress in this project.',
     )
   })
 })

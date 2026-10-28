@@ -4834,4 +4834,52 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     expect(deleted).toEqual(['own-l1'])
     expect(await freeable()).toEqual([])
   })
+
+  it('asks ElevenLabs for the account afresh after a free or an add, for the slots shown', async () => {
+    const slots = async () =>
+      (await (await fetch(new URL('/api/elevenlabs/account', server.url))).json()).account.account
+        .voiceSlots
+    let used = 4
+    eleven.client.subscription = async () => ({
+      tier: 'starter',
+      charactersUsed: 0,
+      characterLimit: 1000,
+      renewsAt: null,
+      overage: 0,
+      voiceSlots: { used, limit: 10 },
+    })
+    // Within half a minute of the last answer the account is not asked again...
+    await slots()
+    used = 3
+    expect((await slots()).used).not.toBe(3)
+    // ...but a free changes the slots, so it is.
+    writeFileSync(
+      join(root, '.audio-studio/eleven-voices.json'),
+      JSON.stringify({
+        version: 1,
+        added: [{ library: 'eleven:z', voice: 'eleven:z2', name: 'Z', character: 'gran', at: '' }],
+      }),
+    )
+    eleven.client.deleteVoice = async () => {}
+    await send('POST', '/api/elevenlabs/voices/free', { voices: ['eleven:z2'] })
+    expect((await slots()).used).toBe(3)
+  })
+
+  it('offers and frees nothing while the cast cannot be read', async () => {
+    writeFileSync(
+      join(root, '.audio-studio/eleven-voices.json'),
+      JSON.stringify({
+        version: 1,
+        added: [{ library: 'eleven:y', voice: 'eleven:y2', name: 'Y', character: 'gran', at: '' }],
+      }),
+    )
+    writeFileSync(join(root, 'tts/cast.json'), '{ not json')
+    const deleted: string[] = []
+    eleven.client.deleteVoice = async (id) => void deleted.push(id)
+    const offered = await fetch(new URL('/api/elevenlabs/voices/freeable', server.url))
+    expect([offered.status, (await offered.json()).reason]).toEqual([409, 'unknown-use'])
+    const freed = await send('POST', '/api/elevenlabs/voices/free', { voices: ['eleven:y2'] })
+    expect([freed.status, (await freed.json()).reason]).toEqual([409, 'unknown-use'])
+    expect(deleted).toEqual([])
+  })
 })

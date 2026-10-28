@@ -8,7 +8,7 @@ import type { Voice } from '../../../core/voiceSearch'
 GlobalRegistrator.register()
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
+const { QueryClient, QueryClientProvider, useQuery } = await import('@tanstack/react-query')
 const { useCast } = await import('../../api')
 const { ShortlistBoard } = await import('./ShortlistBoard')
 
@@ -47,17 +47,26 @@ const george: Voice = {
  * The keeper's audition board, just started with nothing to hear; `current` is cast and on the
  * shortlist, and a phrase is given when `current` is.
  */
-function Board({ current = null }: { current?: Voice | null }) {
+function Board({ current = null, hear = [] }: { current?: Voice | null; hear?: Voice[] }) {
   const session = startSession({
     character: 'keeper',
     keywords: [],
     current,
-    candidates: [],
+    candidates: hear.map((voice) => ({ voice, matched: [] })),
     perRound: 4,
   })
   const audition = current
     ? { phrase: 'Hello there.', from: 'own' as const, standard: false, spoken: 'Hello there.' }
     : null
+  // Read from the cache, as the page reads it, so takes recorded show on the board.
+  const first = { ok: true as const, session, audition, takes: {} as Record<string, string> }
+  const cached = useQuery({
+    queryKey: ['session', 'keeper', ''],
+    queryFn: () => first,
+    initialData: first,
+    staleTime: Infinity,
+  })
+  const view = cached.data.ok && cached.data.session ? cached.data : first
   return createElement(ShortlistBoard, {
     characterId: 'keeper',
     character: keeper,
@@ -66,7 +75,7 @@ function Board({ current = null }: { current?: Voice | null }) {
     name: 'Keeper',
     lines: 0,
     designStart: 'A calm, slow old voice, worn by the sea wind.',
-    view: { ok: true, session, audition, takes: {} },
+    view: view as typeof first,
     playing: null,
     toggle: () => {},
     stop: () => {},
@@ -293,6 +302,7 @@ describe('ShortlistBoard', () => {
     addRefused = null as string | null,
     slots = null as { used: number; limit: number } | null,
     freeable = [] as { voice: string; name: string; character: string }[],
+    takesAdd = false,
   } = {}) {
     const asked: { method: string; path: string; body: unknown }[] = []
     const money = (given: { dollars: number; left: number } | null, perTake: number) =>
@@ -329,6 +339,16 @@ describe('ShortlistBoard', () => {
           eleven: { model: 'eleven_v3', perTake: 42, suggested: 2100, sitting: money(credits, 42) },
         })
       }
+      if (path.includes('/takes') && takesAdd && slots) {
+        // A library voice's take adds it, using a slot.
+        slots = { ...slots, used: slots.used + 1 }
+        return Response.json({
+          ok: true,
+          key: `k-${body.voice}`,
+          spoken: 'Hello there.',
+          credits: 42,
+        })
+      }
       if (path.includes('/takes')) {
         return Response.json({
           ok: false,
@@ -338,6 +358,8 @@ describe('ShortlistBoard', () => {
       }
       if (path === '/api/credit') return Response.json({ ok: true, credit: 25 })
       if (path === '/api/elevenlabs/account' && slots) {
+        // ElevenLabs takes a moment to answer: the board must not act on the old count meanwhile.
+        if (takesAdd) await new Promise((resolve) => setTimeout(resolve, 150))
         return Response.json({
           account: {
             ok: true,
@@ -367,7 +389,7 @@ describe('ShortlistBoard', () => {
   }
 
   /** Renders the keeper's board with `current` cast; its container and how to find a button. */
-  async function boardOf(current: Voice) {
+  async function boardOf(current: Voice, hear: Voice[] = []) {
     const container = document.createElement('div')
     document.body.append(container)
     const page = createRoot(container)
@@ -376,7 +398,7 @@ describe('ShortlistBoard', () => {
         createElement(
           QueryClientProvider,
           { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-          createElement(Board, { current }),
+          createElement(Board, { current, hear }),
         ),
       ),
     )
@@ -430,6 +452,26 @@ describe('ShortlistBoard', () => {
     })
     expect(takes()[0]!.body).toEqual({ voice: 'eleven:l1', board: true })
     await until(() => container.textContent!.includes('ElevenLabs voice slots: 9 of 10 used'))
+    await act(() => page.unmount())
+  })
+
+  it('starts no second library voice on the last slot while the first one’s take may have taken it', async () => {
+    const library = { owner: 'o', added: false }
+    const gravel = { ...george, id: 'eleven:l1', title: 'Gravel', library }
+    const brook = { ...george, id: 'eleven:l2', title: 'Brook', library }
+    const asked = studio({
+      credits: { dollars: 2100, left: 2100 },
+      slots: { used: 9, limit: 10 },
+      takesAdd: true,
+    })
+    const { container, page } = await boardOf(gravel, [brook])
+    const takes = () =>
+      asked.filter((a) => a.path.includes('/takes')).map((a) => (a.body as { voice: string }).voice)
+    await until(() => container.textContent!.includes('All 10 ElevenLabs voice slots are used'))
+    // Let the board settle: Brook is never asked for.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+    expect(takes()).toEqual(['eleven:l1'])
+    expect(container.textContent).toContain('Take waits for a free voice slot')
     await act(() => page.unmount())
   })
 

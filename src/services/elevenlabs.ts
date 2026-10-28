@@ -199,6 +199,8 @@ export function createElevenLabsClient(
       })
       if (!response.ok) throw new ElevenLabsError(response.status, await errorMessage(response))
       const text = await response.text()
+      // A delete may answer with nothing.
+      if (!text && method === 'DELETE') return null
       try {
         return JSON.parse(text) as unknown
       } catch {

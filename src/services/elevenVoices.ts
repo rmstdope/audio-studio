@@ -65,8 +65,9 @@ export async function voiceToSpeak(
 
 /** What freeing voice slots did: the names of the voices removed, and those ElevenLabs kept. */
 export type FreedResult =
-  | { ok: true; freed: string[]; failed: { name: string; message: string }[] }
-  | { ok: false; reason: 'no-key'; message: string }
+  | { ok: true; freed: string[]; failed: { voice: string; name: string; message: string }[] }
+  /** No key; or, from the server, what is in use cannot be known, so nothing was removed. */
+  | { ok: false; reason: 'no-key' | 'unknown-use'; message: string }
 
 /**
  * Removes from the user's ElevenLabs voices those of `voices` (account ids) that the studio added
@@ -85,7 +86,7 @@ export async function freeVoices(
     const before = await readAddedVoices(projectFile)
     const asked = new Set(voices)
     const freed: ElevenVoices['added'] = []
-    const failed: { name: string; message: string }[] = []
+    const failed: { voice: string; name: string; message: string }[] = []
     for (const added of freeableVoices(before, used).filter((a) => asked.has(a.voice))) {
       try {
         await client.deleteVoice(providerId(added.voice))
@@ -94,6 +95,7 @@ export async function freeVoices(
         if (error instanceof ElevenLabsError && error.status === 404) freed.push(added)
         else
           failed.push({
+            voice: added.voice,
             name: added.name,
             message: error instanceof Error ? error.message : String(error),
           })

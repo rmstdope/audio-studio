@@ -1037,23 +1037,26 @@ export function useSetCue(partId: string, language?: string) {
 }
 
 /**
- * Records audition takes: `record(voice)` asks the server for the take and adds it to the board
+ * Records audition takes: `record(voice, adding)` asks the server for the take and adds it to the board
  * and the cast voice in the cache, without asking Fish for anything else. `board` says the takes
  * are the audition board's (on the audition model, paid from the sitting); the cast voice's on
  * its page are on the free model (ElevenLabs' audition model for an ElevenLabs voice, whose
  * credits the Spending page then reads again); each goes only to its own cached answer
  * (`takeCaches`). `recording` holds the voices in progress, `errors` what went
  * wrong per voice, `waiting` the voices whose take waits for more money (`retryWaiting` asks for
- * a provider's again, once its money was added).
+ * a provider's again, once its money was added; `adding` says which would add a voice), `mayHaveAdded` when each take that was `adding`
+ * a library voice to the user's voices answered (it may have used a voice slot).
  */
 export function useTakes(characterId: string, board = false, language?: string) {
   const client = useQueryClient()
   const [recording, setRecording] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [waiting, setWaiting] = useState<Set<string>>(new Set())
+  // When a board take of a library voice not yet added answered: it may have used a voice slot.
+  const [mayHaveAdded, setMayHaveAdded] = useState<Map<string, number>>(new Map())
 
   const record = useCallback(
-    async (voice: string) => {
+    async (voice: string, adding = false) => {
       setRecording((now) => new Set(now).add(voice))
       setErrors(({ [voice]: _gone, ...rest }) => rest)
       try {
@@ -1069,6 +1072,12 @@ export function useTakes(characterId: string, board = false, language?: string) 
           throw new Error(`recording answered ${response.status}`)
         }
         const result = (await response.json()) as NonNullable<TakeResult>
+        if (adding && !('reason' in result && result.reason === 'waits')) {
+          // Counted as a slot used until the account is read again, which it now is.
+          setMayHaveAdded((now) => new Map(now).set(voice, Date.now()))
+          void client.invalidateQueries({ queryKey: ['eleven-account'] })
+          void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
+        }
         if (result.ok) {
           setWaiting((now) => waitingAfter(now, voice, 'recorded'))
           const caches = takeCaches(board)
@@ -1124,13 +1133,15 @@ export function useTakes(characterId: string, board = false, language?: string) 
   )
 
   const retryWaiting = useCallback(
-    (provider: VoiceProvider) => {
-      for (const voice of waiting) if (providerOf(voice) === provider) void record(voice)
+    (provider: VoiceProvider, adding: (voice: string) => boolean = () => false) => {
+      for (const voice of waiting) {
+        if (providerOf(voice) === provider) void record(voice, adding(voice))
+      }
     },
     [record, waiting],
   )
 
-  return { record, recording, errors, waiting, retryWaiting }
+  return { record, recording, errors, waiting, retryWaiting, mayHaveAdded }
 }
 
 /** A character's audition in progress, with the phrase and the takes of the voices in it. */
@@ -1221,6 +1232,8 @@ export function useSessionAction(characterId: string, language?: string) {
         )
       }
       void client.invalidateQueries({ queryKey: ['ruled-out', characterId, language ?? ''] })
+      // A voice dropped, brought back or cast may change which voices' slots can be freed.
+      void client.invalidateQueries({ queryKey: ['eleven-freeable'] })
       // Starting opens a sitting, stopping ends it.
       if (action === 'start' || action === 'discard') {
         void client.invalidateQueries({ queryKey: ['sitting', characterId] })
@@ -1748,13 +1761,22 @@ export interface FreeableVoice {
   character: string
 }
 
-/** The voices the studio added that nothing uses; asked only while `enabled`. */
-export function useFreeableVoices(enabled: boolean) {
+/** The voices whose slots can be freed, or why none is offered (what is in use cannot be read). */
+export type FreeableAnswer =
+  { ok: true; voices: FreeableVoice[] } | { ok: false; reason: 'unknown-use'; message: string }
+
+/** The voices the studio added that nothing uses, or why none is offered. */
+export function useFreeableVoices() {
   return useQuery({
     queryKey: ['eleven-freeable'],
-    queryFn: () =>
-      getJson<{ ok: true; voices: FreeableVoice[] }>('/api/elevenlabs/voices/freeable'),
-    enabled,
+    queryFn: async () => {
+      const response = await fetch('/api/elevenlabs/voices/freeable')
+      // A 409 is an answer: what is in use cannot be read.
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`the voices to free answered ${response.status}`)
+      }
+      return (await response.json()) as FreeableAnswer
+    },
   })
 }
 

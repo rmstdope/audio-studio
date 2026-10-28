@@ -321,6 +321,10 @@ const RecordBody = z
 /** A voice to bring in or cast: either provider's. */
 const VoiceBody = z.object({ voice: z.string().regex(VOICE_ID) })
 
+/** Why no voice is offered for removal when what is in use cannot be known. */
+const UNKNOWN_USE =
+  'The cast or an audition in progress can’t be read, so no ElevenLabs voice is offered for removal. Fix the files and try again.'
+
 /** The voices to remove from the user's ElevenLabs voices, by their studio ids. */
 const FreeBody = z.object({ voices: z.array(z.string().regex(VOICE_ID)).min(1).max(500) }).strict()
 
@@ -1670,8 +1674,13 @@ export function startServer({
       '/api/elevenlabs/voices/freeable': {
         // The voices the studio added from the library that nothing uses: their slots can be freed.
         GET: guard(async () => {
-          const added = await readAddedVoices(projectFile)
-          const voices = freeableVoices(added, await voicesInUse(projectFile))
+          const used = await voicesInUse(projectFile)
+          if (!used)
+            return Response.json(
+              { ok: false, reason: 'unknown-use', message: UNKNOWN_USE },
+              { status: 409 },
+            )
+          const voices = freeableVoices(await readAddedVoices(projectFile), used)
           return Response.json({
             ok: true,
             voices: voices.map(({ voice, name, character }) => ({ voice, name, character })),
@@ -1682,6 +1691,12 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const body = FreeBody.safeParse(await request.json().catch(() => null))
           if (!body.success) return Response.json({ error: 'expected { voices }' }, { status: 400 })
+          const used = await voicesInUse(projectFile)
+          if (!used)
+            return Response.json(
+              { ok: false, reason: 'unknown-use', message: UNKNOWN_USE },
+              { status: 409 },
+            )
           const result = await freeVoices(
             projectFile,
             async () => {
@@ -1689,8 +1704,10 @@ export function startServer({
               return opened.ok ? elevenFor(dirname(projectFile), opened.project) : null
             },
             body.data.voices,
-            await voicesInUse(projectFile),
+            used,
           )
+          // Slots were freed: the board asks for the account afresh.
+          shown = null
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
@@ -1872,7 +1889,7 @@ export function startServer({
           const credits =
             board && providerOf(voice) === 'elevenlabs' ? creditSittings.get(sitting) : undefined
           // A voice of ElevenLabs' library is added to the user's voices at its first take.
-          const shown = credits
+          const onBoard = credits
             ? await boardVoice(projectFile, id, voice, languageOf(request))
             : undefined
           const result = await whileGoing('character', id, () =>
@@ -1892,10 +1909,12 @@ export function startServer({
                   void (await recordSpent(projectFile, id, dollars, languageOf(request))),
                 elevenlabs: elevenFor,
                 elevenLimiter: elevenWork,
-                ...(shown?.library && {
+                ...(onBoard?.library && {
                   speakAs: async (client: ElevenLabsClient) => {
-                    const spoken = await voiceToSpeak(projectFile, async () => client, shown, id)
+                    const spoken = await voiceToSpeak(projectFile, async () => client, onBoard, id)
                     await voiceAdded(projectFile, id, voice, languageOf(request))
+                    // It may have taken a voice slot: the board asks for the account afresh.
+                    shown = null
                     return spoken
                   },
                 }),
