@@ -252,7 +252,12 @@ an id and a title.
 - `refreshDialog` is optional. When set, the UI offers **Refresh dialog**, which runs it in the
   project root and reloads the script. This is how the studio stays generic: the game owns how its
   dialog is extracted.
-- `env` names the file holding `FISH_AUDIO_API_KEY`. The environment variable wins if set.
+- `env` names the file holding `FISH_AUDIO_API_KEY` (and `ELEVENLABS_API_KEY`), read each time a
+  key is needed. The environment variable wins if set, except a value Bun itself loaded at start
+  from this same file (it loads the `.env` files of the folder it is started in), which the studio
+  forgets, so editing the file takes effect without a restart. To see which values Bun loaded, the
+  studio reads the start folder's `.env` files once, at start, and only when one of them is the
+  project's env file.
 - `characters` is one file for the whole project, not a per-part path (see §6).
 - `models` names the Fish model for each stage (see §8.4). Each stage, `audition` too, may name
   any model whose price the studio knows (a paid audition model is paid from a budget per sitting,
@@ -1433,7 +1438,8 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   in the JSON, and what is wrong (from zod), instead of failing on the command line.
 - Missing tools and a missing API key are shown on the **Setup** page (`GET /api/setup`, built):
   ffmpeg, uv for Whisper (off when `quality.transcriber` is `none`; a problem off Apple silicon),
-  the Fish key in the environment or the env file, whether Fish answers (the server's credit
+  the Fish key in the environment or the env file (read on every check, as `env` above says), whether
+  Fish answers (the server's credit
   lookup, only with a key), Requests at once (`quality.parallel` against the Fish account's limit
   from `quality.fishTier`: ready up to 5 with no tier, a problem above it until the tier is
   chosen, and above the chosen tier's limit; off without a key; saving the tier checks again,
