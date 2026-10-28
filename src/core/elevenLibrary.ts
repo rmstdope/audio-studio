@@ -27,7 +27,23 @@ const AGES: Record<string, 'young' | 'middle_aged' | 'old'> = {
   'middle-aged': 'middle_aged',
   old: 'old',
   elderly: 'old',
-  aged: 'old',
+}
+
+/** The keywords' words, lower case, "middle aged" kept as one. */
+function keywordWords(keywords: string[]): string[] {
+  return keywords.flatMap(
+    (k) =>
+      k
+        .toLowerCase()
+        .replace(/middle\s+aged/gu, 'middle-aged')
+        .match(/[\p{L}-]+/gu) ?? [],
+  )
+}
+
+/** The gender or age in `table` the words name, if they name exactly one. */
+function namedOnce<T>(words: string[], table: Record<string, T>): T | undefined {
+  const named = new Set(words.flatMap((w) => (table[w] ? [table[w]] : [])))
+  return named.size === 1 ? [...named][0] : undefined
 }
 
 /**
@@ -35,14 +51,22 @@ const AGES: Record<string, 'young' | 'middle_aged' | 'old'> = {
  * keywords name exactly one (as whole words: "human" names no man).
  */
 export function libraryFilters(keywords: string[]): LibraryFilters {
-  const words = keywords.flatMap((k) => k.toLowerCase().match(/[\p{L}-]+/gu) ?? [])
-  const one = <T>(table: Record<string, T>): T | undefined => {
-    const named = new Set(words.flatMap((w) => (table[w] ? [table[w]] : [])))
-    return named.size === 1 ? [...named][0] : undefined
-  }
-  const gender = one(GENDERS)
-  const age = one(AGES)
+  const words = keywordWords(keywords)
+  const gender = namedOnce(words, GENDERS)
+  const age = namedOnce(words, AGES)
   return { ...(gender && { gender }), ...(age && { age }) }
+}
+
+/**
+ * The words of the keywords that asked for the library's gender and age (see `libraryFilters`),
+ * split as `rankVoices` reads words: every voice found was asked for with them, so each has them,
+ * though its own words may not say so.
+ */
+export function libraryWords(keywords: string[]): string[] {
+  const words = keywordWords(keywords)
+  const { gender, age } = libraryFilters(keywords)
+  const asked = words.filter((w) => (gender && GENDERS[w] === gender) || (age && AGES[w] === age))
+  return [...new Set(asked.flatMap((w) => w.split('-')))]
 }
 
 /**

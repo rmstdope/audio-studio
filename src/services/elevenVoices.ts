@@ -3,7 +3,7 @@ import { addedVoiceFor, ElevenVoicesSchema, type ElevenVoices } from '../core/el
 import { resolveInRoot } from '../core/paths'
 import type { Voice } from '../core/voiceSearch'
 import { elevenVoice, providerId } from '../core/voices'
-import type { ElevenLabsClient } from './elevenlabs'
+import { NO_ELEVENLABS_KEY, type ElevenLabsClient } from './elevenlabs'
 import { readJson, writeAtomic } from './files'
 import { createSerial } from './serial'
 
@@ -21,23 +21,28 @@ export async function readAddedVoices(projectFile: string): Promise<ElevenVoices
 }
 
 /**
- * The ElevenLabs voice to speak or cast `voice` with (the studio's id): a voice of the library
- * not on the user's voices yet is added first, taking one of the plan's voice slots, and
+ * The ElevenLabs voice to speak or cast `voice` with (the studio's id): a voice of the library the
+ * studio added is the voice it became; one not on the user's voices yet is added first (with the
+ * client `clientFor` gives, null meaning no key), taking one of the plan's voice slots, and
  * remembered with `character`, so it is added once; any other is itself.
  */
 export async function voiceToSpeak(
   projectFile: string,
-  client: ElevenLabsClient,
+  clientFor: () => Promise<ElevenLabsClient | null>,
   voice: Voice,
   character: string,
   at: Date = new Date(),
 ): Promise<string> {
   const library = voice.library
-  if (!library || library.added) return voice.id
+  if (!library) return voice.id
   return writes.run(projectFile, async () => {
     const before = await readAddedVoices(projectFile)
+    // Read first: ElevenLabs says a voice the studio added is the user's, under its library id.
     const known = addedVoiceFor(before, voice.id)
     if (known) return known
+    if (library.added) return voice.id
+    const client = await clientFor()
+    if (!client) throw new Error(NO_ELEVENLABS_KEY)
     const id = elevenVoice(
       await client.addSharedVoice(library.owner, providerId(voice.id), voice.title),
     )

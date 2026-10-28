@@ -87,6 +87,7 @@ import { allowVoices, ruledOutVoices, type RuledOutResult } from '../services/ru
 import {
   addVoiceById,
   auditionMoney,
+  boardVoice,
   castOwnVoice,
   castVoice,
   discardSession,
@@ -98,8 +99,8 @@ import {
   startAudition,
   undoLastDrop,
   viewOf,
+  voiceAdded,
   type SessionResult,
-  boardVoice,
 } from '../services/sessions'
 import { voiceToSpeak } from '../services/elevenVoices'
 import type { Voice } from '../core/voiceSearch'
@@ -753,14 +754,19 @@ export function startServer({
     cacheNameFor(projectFile, characterId, languageOf(request))
 
   /**
-   * A voice of ElevenLabs' library, added to the user's voices to be cast, as its first take adds
-   * it (once); the id it has on the account.
+   * The id a shortlisted voice of ElevenLabs' library is cast as: the voice it became when the
+   * studio added it, added now if it was not (once).
    */
   async function saveToAccount(voice: Voice, characterId: string): Promise<string> {
-    const opened = await openProject(projectFile)
-    const client = opened.ok ? await elevenFor(dirname(projectFile), opened.project) : null
-    if (!client) throw new Error(NO_ELEVENLABS_KEY)
-    return voiceToSpeak(projectFile, client, voice, characterId)
+    return voiceToSpeak(
+      projectFile,
+      async () => {
+        const opened = await openProject(projectFile)
+        return opened.ok ? elevenFor(dirname(projectFile), opened.project) : null
+      },
+      voice,
+      characterId,
+    )
   }
 
   /** Ends a character's sitting: what was left is not kept, and the credit is free again. */
@@ -1855,8 +1861,11 @@ export function startServer({
                 elevenlabs: elevenFor,
                 elevenLimiter: elevenWork,
                 ...(shown?.library && {
-                  speakAs: (client: ElevenLabsClient) =>
-                    voiceToSpeak(projectFile, client, shown, id),
+                  speakAs: async (client: ElevenLabsClient) => {
+                    const spoken = await voiceToSpeak(projectFile, async () => client, shown, id)
+                    await voiceAdded(projectFile, id, voice, languageOf(request))
+                    return spoken
+                  },
                 }),
                 ...(credits && {
                   credits,

@@ -7,8 +7,10 @@ import {
   addSpent,
   bringFound,
   bringMore,
+  markAdded,
   drop,
   placeOf,
+  seen,
   queueMore,
   setOwnVoices,
   shortlist,
@@ -25,7 +27,13 @@ import type { Appearance } from '../core/summary'
 import type { AuditionText } from '../core/takes'
 import type { Candidate, Voice } from '../core/voiceSearch'
 import { providerOf, type VoiceProvider } from '../core/voices'
-import { elevenVoiceFor, findCandidates, setVoice, type FishFactory } from './auditions'
+import {
+  elevenVoiceFor,
+  findCandidates,
+  searchLanguage,
+  setVoice,
+  type FishFactory,
+} from './auditions'
 import { designTakes, readDesigns } from './designStore'
 import { characterFile, readJson, writeAtomic } from './files'
 import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
@@ -34,6 +42,7 @@ import { ruledOutIds, updateRuledOut } from './ruledOut'
 import { createSerial } from './serial'
 import { auditionIn, auditionTakes, castProblems, elevenTakeCost } from './takes'
 import { searchLibrary } from './voiceSearch'
+import { readAddedVoices } from './elevenVoices'
 import {
   cacheNameFor,
   knownCharacter,
@@ -339,14 +348,19 @@ async function moreFromLibrary(
   }
   const client = await elevenFor(dirname(projectFile), project)
   if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+  const character = summary.characters.find((c) => c.id === characterId)!
+  const castIds = new Set(Object.values(character.languages).map((l) => l.voice))
   let found: Candidate[]
   try {
     found = await searchLibrary(client, snapshot.keywords, {
-      language:
-        language === project.narration.languages[0]
-          ? project.narration.audition.language
-          : language,
-      exclude: new Set(await ruledOutIds(projectFile, characterId, language)),
+      language: searchLanguage(project, language),
+      exclude: new Set([
+        ...(await ruledOutIds(projectFile, characterId, language)),
+        // A voice the studio added is on the board, or cast, as the voice it became.
+        ...(await readAddedVoices(projectFile)).added
+          .filter((a) => seen(snapshot, a.voice) || castIds.has(a.voice))
+          .map((a) => a.library),
+      ]),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -617,7 +631,25 @@ export async function viewOf(
   }
 }
 
-/** The saved session; none if there is no file, or it does not fit (an older version, a hand edit). */
+/**
+ * Marks a voice of ElevenLabs' library on the character's board as among the user's voices, once
+ * the studio added it, so the board no longer says its take or cast will add it.
+ */
+export function voiceAdded(
+  projectFile: string,
+  characterId: string,
+  voiceId: string,
+  language?: string,
+): Promise<SessionResult> {
+  return changeSession(
+    projectFile,
+    characterId,
+    (session) => markAdded(session, voiceId),
+    undefined,
+    language,
+  )
+}
+
 /** A voice as the character's audition in progress shows it; undefined if it is not in one. */
 export async function boardVoice(
   projectFile: string,
@@ -628,6 +660,7 @@ export async function boardVoice(
   return (await readSession(projectFile, characterId, language))?.voices[voiceId]
 }
 
+/** The saved session; none if there is no file, or it does not fit (an older version, a hand edit). */
 async function readSession(
   projectFile: string,
   characterId: string,

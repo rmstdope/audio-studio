@@ -4750,9 +4750,10 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     },
   )
   const added: string[] = []
-  eleven.client.sharedVoices = async () => [
-    { ...elevenVoiceOf('l1', 'Warm Gravel'), library: { owner: 'o1', added: false } },
-  ]
+  eleven.client.sharedVoices = async () => ({
+    voices: [{ ...elevenVoiceOf('l1', 'Warm Gravel'), library: { owner: 'o1', added: false } }],
+    more: false,
+  })
   eleven.client.addSharedVoice = async (owner, id) => {
     added.push(`${owner}/${id}`)
     return `own-${id}`
@@ -4798,6 +4799,8 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     expect(await take.json()).toMatchObject({ ok: true })
     expect(added).toEqual(['o1/l1'])
     expect(eleven.spoken.map((s) => s.voice)).toEqual(['own-l1'])
+    const board = await (await fetch(new URL('/api/auditions/gran', server.url))).json()
+    expect(board.session.voices['eleven:l1'].library).toEqual({ owner: 'o1', added: true })
     expect(
       JSON.parse(readFileSync(join(root, '.audio-studio/eleven-voices.json'), 'utf8')),
     ).toMatchObject({

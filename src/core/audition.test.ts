@@ -3,6 +3,7 @@ import {
   addSpent,
   addVoice,
   bringFound,
+  markAdded,
   bringMore,
   drop,
   queueMore,
@@ -155,6 +156,14 @@ describe('more voices', () => {
     expect(next.queue).toEqual(['d', 'e', 'f', 'g'])
     expect(next.voices.g?.title).toBe('G')
     expect(queueMore(next, candidates('a'))).toBe(next)
+  })
+
+  it('marks a library voice as added to the user’s voices, and leaves any other voice alone', () => {
+    const lib = { ...voice('l'), library: { owner: 'o', added: false } }
+    const session = bringFound(start(), [{ voice: lib, matched: ['x'] }], 1)
+    expect(markAdded(session, 'l').voices.l?.library).toEqual({ owner: 'o', added: true })
+    expect(markAdded(markAdded(session, 'l'), 'l')).toEqual(markAdded(session, 'l'))
+    expect(markAdded(session, 'a')).toBe(session)
   })
 
   it('brings found voices straight in to hear, leaving the queue and every voice seen alone', () => {

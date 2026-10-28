@@ -261,6 +261,19 @@ export function addVoice(session: AuditionSession, voice: Voice): AuditionSessio
   }
 }
 
+/** The session with a library voice marked as being among the user's voices, once added. */
+export function markAdded(session: AuditionSession, voice: string): AuditionSession {
+  const shown = session.voices[voice]
+  if (!shown?.library || shown.library.added) return session
+  return {
+    ...session,
+    voices: {
+      ...session.voices,
+      [voice]: { ...shown, library: { ...shown.library, added: true } },
+    },
+  }
+}
+
 /** Where a voice is on the board, or null if it is not on it. */
 export function placeOf(session: AuditionSession, voice: string): Place | null {
   if (session.yours.includes(voice)) return 'yours'

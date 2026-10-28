@@ -1,5 +1,5 @@
 import { rankVoices, searchTerms, type Candidate, type Voice } from '../core/voiceSearch'
-import { libraryFilters } from '../core/elevenLibrary'
+import { libraryFilters, libraryWords } from '../core/elevenLibrary'
 import type { ElevenLabsClient } from './elevenlabs'
 import type { FishClient } from './fish'
 
@@ -41,24 +41,40 @@ export async function searchVoices(
 
 /**
  * Voices in ElevenLabs' shared library for an audition: every search term (see `searchTerms`) is
- * searched once, in the language and for the gender and age the keywords name, two at a time,
- * and the pooled results ranked as Fish's are.
+ * searched, two pages at most, in the language and for the gender and age the keywords name, two
+ * terms at a time, and the pooled results ranked as Fish's are. The words that asked for the
+ * gender and age count as matched by every voice found, which ElevenLabs filtered by them.
  */
 export async function searchLibrary(
   client: ElevenLabsClient,
   keywords: string[],
-  { language, exclude }: Pick<SearchOptions, 'language' | 'exclude'>,
+  { language, exclude, pages = 2 }: Pick<SearchOptions, 'language' | 'exclude' | 'pages'>,
 ): Promise<Candidate[]> {
   const terms = searchTerms(keywords)
   const filters = libraryFilters(keywords)
   const pooled: Voice[] = []
-  for (let i = 0; i < terms.length; i += 2) {
-    const pages = await Promise.all(
-      terms
-        .slice(i, i + 2)
-        .map((search) => client.sharedVoices({ search, language, ...filters, pageSize: 100 })),
-    )
-    pooled.push(...pages.flat())
+  const searchTerm = async (search: string) => {
+    for (let page = 0; page < pages; page++) {
+      const found = await client.sharedVoices({
+        search,
+        language,
+        ...filters,
+        pageSize: 100,
+        page,
+      })
+      pooled.push(...found.voices)
+      if (!found.more) break
+    }
   }
-  return rankVoices(pooled, keywords, exclude)
+  for (let i = 0; i < terms.length; i += 2) {
+    await Promise.all(terms.slice(i, i + 2).map(searchTerm))
+  }
+  const asked = libraryWords(keywords)
+  const shown = new Map(pooled.map((voice) => [voice.id, voice]))
+  const ranked = rankVoices(
+    pooled.map((voice) => ({ ...voice, tags: [...voice.tags, ...asked] })),
+    keywords,
+    exclude,
+  )
+  return ranked.map((c) => ({ ...c, voice: shown.get(c.voice.id)! }))
 }

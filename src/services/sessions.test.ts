@@ -258,7 +258,10 @@ describe('moreVoices from ElevenLabs’ library', () => {
     const asked: string[] = []
     client.sharedVoices = async (query) => {
       asked.push(`${query.search}/${query.language}`)
-      return [shared('l1', 5), shared('l2', 50), shared('l3', 9), shared('l4', 1)]
+      return {
+        voices: [shared('l1', 5), shared('l2', 50), shared('l3', 9), shared('l4', 1)],
+        more: false,
+      }
     }
     await ruleOutVoices(projectFile, 'mira', [{ id: 'eleven:l3', title: 'Warm l3' }])
     const result = await moreVoices(projectFile, 'mira', fishFor, undefined, {
@@ -282,6 +285,29 @@ describe('moreVoices from ElevenLabs’ library', () => {
       elevenFor: async () => client,
     })
     expect(again).toMatchObject({ ok: false, reason: 'exhausted' })
+  })
+
+  it('leaves out a library voice the studio added that is cast or on the board as its own id', async () => {
+    const { root, projectFile } = await started()
+    writeFileSync(
+      join(root, '.audio-studio/eleven-voices.json'),
+      JSON.stringify({
+        version: 1,
+        added: [
+          { library: 'eleven:l1', voice: 'cur', name: 'Old', character: 'mira', at: '' },
+          { library: 'eleven:l2', voice: 'eleven:gone', name: 'Gone', character: 'x', at: '' },
+        ],
+      }),
+    )
+    const { client } = fakeEleven()
+    client.sharedVoices = async () => ({ voices: [shared('l1', 50), shared('l2', 5)], more: false })
+    const result = await moreVoices(projectFile, 'mira', fishFor, undefined, {
+      provider: 'elevenlabs',
+      elevenFor: async () => client,
+    })
+    expect(result?.ok && result.session.toHear.filter((id) => id.startsWith('eleven:'))).toEqual([
+      'eleven:l2',
+    ])
   })
 
   it('says so without a key, or when ElevenLabs refuses', async () => {
@@ -500,9 +526,10 @@ describe('castVoice', () => {
   it('casts a library voice as the voice `saveAs` gives, and nothing when it cannot be added', async () => {
     const { projectFile } = await started()
     const { client } = fakeEleven()
-    client.sharedVoices = async () => [
-      { ...voice('eleven:l1', 'Warm l1'), library: { owner: 'o', added: false } },
-    ]
+    client.sharedVoices = async () => ({
+      voices: [{ ...voice('eleven:l1', 'Warm l1'), library: { owner: 'o', added: false } }],
+      more: false,
+    })
     await moreVoices(projectFile, 'mira', fishFor, undefined, {
       provider: 'elevenlabs',
       elevenFor: async () => client,

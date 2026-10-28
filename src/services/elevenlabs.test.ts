@@ -313,15 +313,17 @@ describe('searching the library', () => {
   }
 
   it('asks for the words, language, gender and age, and gives voices as the studio shows them', async () => {
-    const { fetch, asked } = fakeFetch({ voices: [shared], has_more: false })
+    const { fetch, asked } = fakeFetch({ voices: [shared], has_more: true })
     const found = await createElevenLabsClient('k', { fetch }).sharedVoices({
       search: 'old wizard',
       language: 'en',
       gender: 'male',
       age: 'old',
       pageSize: 100,
+      page: 1,
     })
-    expect(found).toEqual([
+    expect(found.more).toBe(true)
+    expect(found.voices).toEqual([
       {
         id: 'eleven:lib1',
         title: 'Gravel',
@@ -343,6 +345,7 @@ describe('searching the library', () => {
       gender: 'male',
       age: 'old',
       page_size: '100',
+      page: '1',
     })
   })
 
@@ -351,13 +354,14 @@ describe('searching the library', () => {
       voices: [
         { ...shared, voice_id: 'a', rate: 2 },
         { ...shared, voice_id: 'b', fiat_rate: 0.3 },
-        { ...shared, voice_id: 'c', rate: null, is_added_by_user: true },
+        { ...shared, voice_id: 'c', rate: null, is_added_by_user: true, cloned_by_count: null },
       ],
       has_more: false,
     })
     const found = await createElevenLabsClient('k', { fetch }).sharedVoices({ search: 'x' })
-    expect(found.map((v) => [v.id, v.library])).toEqual([
-      ['eleven:c', { owner: 'owner1', added: true }],
+    expect(found.more).toBe(false)
+    expect(found.voices.map((v) => [v.id, v.library, v.uses])).toEqual([
+      ['eleven:c', { owner: 'owner1', added: true }, 0],
     ])
   })
 })

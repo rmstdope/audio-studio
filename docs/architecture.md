@@ -1230,13 +1230,18 @@ audition still starts from Fish's library, and ElevenLabs' voices come in a roun
 straight to hear, leaving Fish's queue as it is). ElevenLabs' search is its shared voice library (`GET /v1/shared-voices`: the
 keywords, the board's language, gender and age when the character's brief names them), shown as
 `Voice` cards with ElevenLabs' preview and its popularity (`cloned_by_count`, "added by 1.2k"),
-each search term once, pooled and ranked as Fish's are. Voices at a rate of their own (`rate` other
+each search term, two pages at most, pooled and ranked as Fish's are (the words that asked for the
+gender and age count as matched by every voice found, since ElevenLabs filtered by them; "middle
+aged" is one age). A library voice the studio added that is cast, or on the board under the id it
+became, is not brought in again. Voices at a rate of their own (`rate` other
 than 1, or a `fiat_rate`) are left out: they cost more credits than the studio counts. A library voice must
 be among the user's own voices to speak, which takes one of the plan's voice slots, so it is added
 (`POST /v1/voices/add/{public_owner_id}/{voice_id}`) only when the user makes its first audition
 take, and the card says so before. Casting one not yet added adds it too (the confirm says so),
 and the cast names the id ElevenLabs gave it. A voice the user had added already
-(`is_added_by_user`) is spoken and cast by its library id and not added again. When ElevenLabs
+(`is_added_by_user`) is spoken and cast by its library id and not added again, unless the studio
+added it, when it is the id it became; once added, the board marks it so and no longer says a take
+or cast will add it. When ElevenLabs
 will not add one, its take fails with ElevenLabs' answer and its credits are given back, or it is
 not cast. The studio remembers which voices it added (`.audio-studio/eleven-voices.json`: the
 library id, the id on the account, its name, the character and when), so each is added once. Coming in 14.11b: one ruled out, or not cast when its character is, is offered

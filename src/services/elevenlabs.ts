@@ -28,7 +28,7 @@ export interface ElevenLabsClient {
    * studio shows voices, each with its owner's public id; voices at a rate of their own are left
    * out, since they cost more credits than the studio counts.
    */
-  sharedVoices(query: LibraryQuery): Promise<Voice[]>
+  sharedVoices(query: LibraryQuery): Promise<{ voices: Voice[]; more: boolean }>
   /**
    * Adds a library voice to the user's voices (taking one of the plan's voice slots), named
    * `name`, and gives its id on the account.
@@ -43,6 +43,8 @@ export interface LibraryQuery extends LibraryFilters {
   language?: string
   /** Voices to give at most (ElevenLabs allows up to 100). */
   pageSize?: number
+  /** The page, from 0. */
+  page?: number
 }
 
 /** The ElevenLabs client for a project, or null when it has no key. Replaced in tests. */
@@ -129,7 +131,7 @@ const ApiSharedVoiceSchema = z.looseObject({
   language: z.string().nullish(),
   description: z.string().nullish(),
   preview_url: z.string().nullish(),
-  cloned_by_count: z.number().default(0),
+  cloned_by_count: z.number().nullish(),
   rate: z.number().nullish(),
   fiat_rate: z.number().nullish(),
   verified_languages: z.array(z.looseObject({ language: z.string() })).nullish(),
@@ -137,7 +139,10 @@ const ApiSharedVoiceSchema = z.looseObject({
 })
 
 /** A page of the shared library. */
-const ApiSharedVoicesSchema = z.looseObject({ voices: z.array(ApiSharedVoiceSchema) })
+const ApiSharedVoicesSchema = z.looseObject({
+  voices: z.array(ApiSharedVoiceSchema),
+  has_more: z.boolean().nullish(),
+})
 
 /** What adding a library voice answers. */
 const ApiAddedSchema = z.looseObject({ voice_id: z.string() })
@@ -173,7 +178,7 @@ export function createElevenLabsClient(
    * A GET (or, given a `body`, a POST of it as JSON) whose whole answer, the body included, gives
    * up after `waitMs`, saying so.
    */
-  async function get(path: string, waitMs: number, body?: unknown): Promise<unknown> {
+  async function call(path: string, waitMs: number, body?: unknown): Promise<unknown> {
     try {
       const response = await fetch(new URL(path, baseUrl), {
         ...(body === undefined
@@ -266,7 +271,7 @@ export function createElevenLabsClient(
 
     async voice(id) {
       const parsed = ApiVoiceSchema.safeParse(
-        await get(`/v1/voices/${encodeURIComponent(id)}`, Math.min(timeoutMs, LOOKUP_TIMEOUT_MS)),
+        await call(`/v1/voices/${encodeURIComponent(id)}`, Math.min(timeoutMs, LOOKUP_TIMEOUT_MS)),
       )
       if (!parsed.success) throw new Error(UNREADABLE)
       const api = parsed.data
@@ -284,17 +289,18 @@ export function createElevenLabsClient(
       }
     },
 
-    async sharedVoices({ search, language, gender, age, pageSize }) {
+    async sharedVoices({ search, language, gender, age, pageSize, page }) {
       const query = new URLSearchParams({ search })
       if (language) query.set('language', language)
       if (gender) query.set('gender', gender)
       if (age) query.set('age', age)
       if (pageSize) query.set('page_size', String(pageSize))
+      if (page) query.set('page', String(page))
       const parsed = ApiSharedVoicesSchema.safeParse(
-        await get(`/v1/shared-voices?${query}`, Math.min(timeoutMs, SEARCH_TIMEOUT_MS)),
+        await call(`/v1/shared-voices?${query}`, Math.min(timeoutMs, SEARCH_TIMEOUT_MS)),
       )
       if (!parsed.success) throw new Error(UNREADABLE)
-      return parsed.data.voices
+      const voices = parsed.data.voices
         .filter((api) => (api.rate ?? 1) === 1 && api.fiat_rate == null)
         .map((api) => ({
           id: elevenVoice(api.voice_id),
@@ -310,17 +316,18 @@ export function createElevenLabsClient(
             ]),
           ],
           // How many have added it: the library's measure of popularity.
-          uses: api.cloned_by_count,
+          uses: api.cloned_by_count ?? 0,
           likes: 0,
           author: '',
           sample: api.preview_url ? { text: '', audio: api.preview_url } : null,
           library: { owner: api.public_owner_id, added: api.is_added_by_user === true },
         }))
+      return { voices, more: parsed.data.has_more === true }
     },
 
     async addSharedVoice(owner, id, name) {
       const parsed = ApiAddedSchema.safeParse(
-        await get(
+        await call(
           `/v1/voices/add/${encodeURIComponent(owner)}/${encodeURIComponent(id)}`,
           Math.min(timeoutMs, LOOKUP_TIMEOUT_MS),
           { new_name: name },
@@ -332,7 +339,7 @@ export function createElevenLabsClient(
 
     async subscription() {
       const parsed = ApiSubscriptionSchema.safeParse(
-        await get('/v1/user/subscription', Math.min(timeoutMs, ACCOUNT_TIMEOUT_MS)),
+        await call('/v1/user/subscription', Math.min(timeoutMs, ACCOUNT_TIMEOUT_MS)),
       )
       if (!parsed.success) throw new Error(UNREADABLE)
       const api = parsed.data

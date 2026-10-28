@@ -37,11 +37,13 @@ describe('voiceToSpeak', () => {
     const { root, projectFile, client, added } = setUp()
     const at = new Date('2026-10-28T10:00:00.000Z')
     const [first, second] = await Promise.all([
-      voiceToSpeak(projectFile, client, gravel, 'wizard', at),
-      voiceToSpeak(projectFile, client, gravel, 'wizard', at),
+      voiceToSpeak(projectFile, async () => client, gravel, 'wizard', at),
+      voiceToSpeak(projectFile, async () => client, gravel, 'wizard', at),
     ])
     expect([first, second]).toEqual(['eleven:own-lib1', 'eleven:own-lib1'])
-    expect(await voiceToSpeak(projectFile, client, gravel, 'witch')).toBe('eleven:own-lib1')
+    expect(await voiceToSpeak(projectFile, async () => client, gravel, 'witch')).toBe(
+      'eleven:own-lib1',
+    )
     expect(added).toEqual(['owner1/lib1/Gravel'])
     expect(await readAddedVoices(projectFile)).toEqual({
       version: 1,
@@ -61,11 +63,11 @@ describe('voiceToSpeak', () => {
   it('adds nothing for a voice of the user’s own, or a library voice the user added already', async () => {
     const { projectFile, client, added } = setUp()
     const { library: _, ...own } = gravel
-    expect(await voiceToSpeak(projectFile, client, own, 'wizard')).toBe('eleven:lib1')
+    expect(await voiceToSpeak(projectFile, async () => client, own, 'wizard')).toBe('eleven:lib1')
     expect(
       await voiceToSpeak(
         projectFile,
-        client,
+        async () => client,
         { ...gravel, library: { owner: 'owner1', added: true } },
         'wizard',
       ),
@@ -74,11 +76,32 @@ describe('voiceToSpeak', () => {
     expect(await readAddedVoices(projectFile)).toEqual({ version: 1, added: [] })
   })
 
+  it('speaks a voice it added as the voice it became, also once ElevenLabs says it is added', async () => {
+    const { projectFile, client, added } = setUp()
+    await voiceToSpeak(projectFile, async () => client, gravel, 'wizard')
+    const later = { ...gravel, library: { owner: 'owner1', added: true } }
+    expect(await voiceToSpeak(projectFile, async () => null, later, 'witch')).toBe(
+      'eleven:own-lib1',
+    )
+    expect(added).toHaveLength(1)
+  })
+
+  it('needs the client only to add a voice, and says so without it', async () => {
+    const { projectFile } = setUp()
+    const { library: _, ...own } = gravel
+    expect(await voiceToSpeak(projectFile, async () => null, own, 'wizard')).toBe('eleven:lib1')
+    await expect(voiceToSpeak(projectFile, async () => null, gravel, 'wizard')).rejects.toThrow(
+      'ELEVENLABS_API_KEY',
+    )
+  })
+
   it('remembers nothing when ElevenLabs will not add it', async () => {
     const { projectFile, client } = setUp()
     client.addSharedVoice = () =>
       Promise.reject(new Error('ElevenLabs answered 400: You have reached your voice limit.'))
-    await expect(voiceToSpeak(projectFile, client, gravel, 'wizard')).rejects.toThrow('voice limit')
+    await expect(voiceToSpeak(projectFile, async () => client, gravel, 'wizard')).rejects.toThrow(
+      'voice limit',
+    )
     expect(await readAddedVoices(projectFile)).toEqual({ version: 1, added: [] })
   })
 })

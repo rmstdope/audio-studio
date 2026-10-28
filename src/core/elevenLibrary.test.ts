@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { addedVoiceFor, ElevenVoicesSchema, libraryFilters } from './elevenLibrary'
+import { addedVoiceFor, ElevenVoicesSchema, libraryFilters, libraryWords } from './elevenLibrary'
 
 describe('libraryFilters', () => {
   it('asks for the gender and age the keywords name', () => {
@@ -15,6 +15,16 @@ describe('libraryFilters', () => {
   it('asks for neither when the keywords name none, or name two', () => {
     expect(libraryFilters(['warm', 'storyteller'])).toEqual({})
     expect(libraryFilters(['man', 'woman', 'young', 'old'])).toEqual({})
+  })
+
+  it('reads middle aged with or without its hyphen, and aged alone as nothing', () => {
+    expect(libraryFilters(['middle aged woman'])).toEqual({ gender: 'female', age: 'middle_aged' })
+    expect(libraryFilters(['aged'])).toEqual({})
+  })
+
+  it('names the words of the keywords that asked for them', () => {
+    expect(libraryWords(['gruff', 'old man'])).toEqual(['old', 'man'])
+    expect(libraryWords(['Middle aged', 'man', 'woman'])).toEqual(['middle', 'aged'])
   })
 
   it('reads whole words only', () => {
