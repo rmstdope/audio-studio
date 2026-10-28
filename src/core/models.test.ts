@@ -4,6 +4,9 @@ import {
   elevenChangeOf,
   elevenOptions,
   elevenQuestionWords,
+  elevenSettingsChangeOf,
+  elevenSettingsWords,
+  STABILITY,
   busyWords,
   changeOf,
   failureHeading,
@@ -319,6 +322,72 @@ describe('ElevenLabs’ stages on the Models panel', () => {
       keep: 'Keep Eleven v3',
       confirm: 'Switch to Flash v2.5',
     })
+  })
+})
+
+describe('ElevenLabs’ voice settings on the Models panel', () => {
+  const eleven = { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_flash_v2_5' }
+  const recorded = {
+    eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 },
+    eleven_flash_v2_5: { lines: 4, bytes: 90, characters: 100, bare: 80 },
+    eleven_multilingual_v2: { lines: 5, bytes: 90, characters: 100, bare: 80 },
+    's2.1-pro-free': { lines: 3, bytes: 90, characters: 90, bare: 90 },
+  }
+  const saved = { stability: 0.5 as const, similarityBoost: 0.75, style: 0 }
+
+  it('offers stability as Eleven v3’s three steps', () => {
+    expect(STABILITY.map((s) => [s.value, s.name])).toEqual([
+      [0, 'Creative'],
+      [0.5, 'Natural'],
+      [1, 'Robust'],
+    ])
+  })
+
+  it('asks when lines recorded on ElevenLabs’ models in use go out of date, with their credits', () => {
+    expect(elevenSettingsChangeOf(saved, saved, eleven, recorded)).toEqual({ kind: 'none' })
+    expect(elevenSettingsChangeOf(saved, { ...saved, style: 0.3 }, eleven, recorded)).toEqual({
+      kind: 'ask',
+      lines: 16,
+      // v3's lines with their cues at a credit, Flash's without them at half; not Multilingual's.
+      credits: 380 + 40,
+    })
+    expect(
+      elevenSettingsChangeOf(saved, { ...saved, style: 0.3 }, eleven, {
+        's2.1-pro-free': recorded['s2.1-pro-free'],
+      }),
+    ).toEqual({ kind: 'save' })
+  })
+
+  it('asks in its own words, naming each setting that changes', () => {
+    expect(
+      elevenSettingsWords(
+        saved,
+        { stability: 0, similarityBoost: 0.75, style: 0.3 },
+        { lines: 40, credits: 1250 },
+        'audio-studio.json',
+      ),
+    ).toEqual({
+      heading: 'Change how ElevenLabs voices speak?',
+      items: [
+        'Stability: Natural → Creative',
+        'Style: 0.00 → 0.30',
+        '40 lines recorded with ElevenLabs become out of date: they are recorded again with these settings next time, about 1,250 credits.',
+        'Saved in audio-studio.json; nothing else in it changes.',
+      ],
+      keep: 'Keep the saved settings',
+      confirm: 'Save and put them out of date',
+    })
+    expect(
+      elevenSettingsWords(
+        saved,
+        { ...saved, similarityBoost: 0.4 },
+        { lines: 1, credits: 9 },
+        'p.json',
+      ).items.slice(0, 2),
+    ).toEqual([
+      'Similarity: 0.75 → 0.40',
+      '1 line recorded with ElevenLabs becomes out of date: it is recorded again with these settings next time, about 9 credits.',
+    ])
   })
 })
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { DEFAULT_ELEVEN_MODEL, isElevenModel } from './elevenSpeech'
+import { DEFAULT_ELEVEN_MODEL, ELEVEN_TTS, isElevenModel } from './elevenSpeech'
 import { knownLanguage } from './languages'
 import { MUSIC_MODEL_IDS } from './musicModels'
 import { isPriced } from './prices'
@@ -119,12 +119,22 @@ const NarrationSchema = z
       .prefault({}),
     /**
      * ElevenLabs' side of the stages, for characters cast with an ElevenLabs voice: each stage's
-     * model, saved from the Models panel.
+     * model, and the voice settings every stage speaks with, saved from the Models panel.
      */
     elevenlabs: z
       .object({
         models: z
           .object({ audition: elevenModel, draft: elevenModel, final: elevenModel })
+          .prefault({}),
+        tts: z
+          .object({
+            // Eleven v3 takes only these three (Creative, Natural, Robust).
+            stability: z
+              .union([z.literal(0), z.literal(0.5), z.literal(1)])
+              .default(ELEVEN_TTS.stability),
+            similarityBoost: z.number().min(0).max(1).default(ELEVEN_TTS.similarityBoost),
+            style: z.number().min(0).max(1).default(ELEVEN_TTS.style),
+          })
           .prefault({}),
       })
       .prefault({}),
@@ -287,6 +297,9 @@ export const ProjectSchema = z.object({
 
 /** A validated project file, with defaults filled in. */
 export type Project = z.infer<typeof ProjectSchema>
+
+/** The voice settings every ElevenLabs voice speaks with (`narration.elevenlabs.tts`). */
+export type ElevenTts = Project['narration']['elevenlabs']['tts']
 
 /** The validated `music` section of a project file. */
 export type MusicConfig = z.infer<typeof MusicSchema>

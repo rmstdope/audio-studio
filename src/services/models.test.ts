@@ -2,7 +2,13 @@ import { describe, expect, it } from 'bun:test'
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { setElevenModel, setMusicModel, setStageModel, switchRetiredModels } from './models'
+import {
+  setElevenModel,
+  setElevenSettings,
+  setMusicModel,
+  setStageModel,
+  switchRetiredModels,
+} from './models'
 import { setSoundAlike } from './soundAlike'
 
 function projectWith(models: Record<string, string>) {
@@ -305,5 +311,38 @@ describe('setElevenModel, a file written by hand', () => {
         final: 'eleven_multilingual_v2',
       },
     })
+  })
+})
+
+describe('setElevenSettings', () => {
+  const defaults = { stability: 0.5, similarityBoost: 0.75, style: 0 }
+  const tuned = { stability: 1, similarityBoost: 0.4, style: 0.3 }
+
+  it('writes all three voice settings beside the models, and nothing else', async () => {
+    const { projectFile, read } = repo(projectJson(), 4)
+    expect(await setElevenSettings(projectFile, tuned, defaults)).toEqual({ ok: true })
+    const saved = JSON.parse(read())
+    expect(saved.narration.elevenlabs).toEqual({ tts: tuned })
+    expect(read()).toBe(
+      `${JSON.stringify({ ...projectJson(), narration: { ...(projectJson().narration as object), elevenlabs: { tts: tuned } } }, null, 4)}\n`,
+    )
+  })
+
+  it('refuses, writing nothing, settings out of range, or a file changed meanwhile', async () => {
+    const { projectFile, read } = repo(projectJson())
+    const before = read()
+    expect(
+      await setElevenSettings(projectFile, { ...tuned, stability: 0.3 }, defaults),
+    ).toMatchObject({ ok: false, problems: [{ path: 'narration.elevenlabs.tts.stability' }] })
+    expect(await setElevenSettings(projectFile, defaults, tuned)).toMatchObject({
+      ok: false,
+      problems: [
+        {
+          path: 'narration.elevenlabs.tts',
+          message: 'the settings in the file changed since the page was read; reload the studio',
+        },
+      ],
+    })
+    expect(read()).toBe(before)
   })
 })

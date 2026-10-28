@@ -1,5 +1,5 @@
 import { basename } from 'node:path'
-import { ProjectSchema, problemsFrom, type Problem } from '../core/project'
+import { ProjectSchema, problemsFrom, type ElevenTts, type Problem } from '../core/project'
 import type { Stage } from '../core/models'
 import { MUSIC_MODEL_IDS, DEFAULT_MUSIC_MODEL } from '../core/musicModels'
 import { isElevenModel } from '../core/elevenSpeech'
@@ -162,3 +162,47 @@ export function setElevenModel(
     return saveProject(projectFile, opened, path, (indent) => projectJson(opened.raw, indent))
   })
 }
+
+/**
+ * Saves the voice settings every ElevenLabs voice speaks with (`narration.elevenlabs.tts` in the
+ * project file), all three written. `was` is what the page showed (ElevenLabs' defaults when the
+ * file names none): if the file holds others, someone changed it meanwhile and nothing is written.
+ * Settings the project file does not take (a stability other than Eleven v3's three, or a
+ * similarity or style outside 0 to 1) are refused with their path. The rest of the file stays as it was, in its
+ * own indentation and line endings.
+ */
+export function setElevenSettings(
+  projectFile: string,
+  tts: Record<keyof ElevenTts, number>,
+  was: Record<keyof ElevenTts, number>,
+): Promise<ModelsChange> {
+  return projectWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const file = basename(projectFile)
+    const path = 'narration.elevenlabs.tts'
+    const { tts: now } = opened.project.narration.elevenlabs
+    if (KEYS.some((key) => now[key] !== was[key])) {
+      return {
+        ok: false,
+        problems: [
+          {
+            file,
+            path,
+            message: 'the settings in the file changed since the page was read; reload the studio',
+          },
+        ],
+      }
+    }
+    const narration = (opened.raw as { narration: { elevenlabs?: object } }).narration
+    narration.elevenlabs = {
+      ...narration.elevenlabs,
+      tts: { stability: tts.stability, similarityBoost: tts.similarityBoost, style: tts.style },
+    }
+    const parsed = ProjectSchema.safeParse(opened.raw)
+    if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
+    return saveProject(projectFile, opened, path, (indent) => projectJson(opened.raw, indent))
+  })
+}
+
+const KEYS = ['stability', 'similarityBoost', 'style'] as const

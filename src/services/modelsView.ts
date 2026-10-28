@@ -2,6 +2,7 @@ import { basename, dirname } from 'node:path'
 import type { Dialog, Recorded, StageModels } from '../core/models'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS, type MusicModelId } from '../core/musicModels'
 import { planPart } from '../core/planner'
+import type { ElevenTts } from '../core/project'
 import { sentPieces, spokenPieces } from '../core/spoken'
 import { providerOf } from '../core/voices'
 import { readMusic } from './musicLists'
@@ -15,6 +16,8 @@ export type ModelsView =
       models: StageModels
       /** ElevenLabs' stage models, for characters with ElevenLabs voices. */
       elevenlabs: StageModels
+      /** The voice settings every ElevenLabs voice speaks with. */
+      elevenTts: ElevenTts
       /** Whether any character has an ElevenLabs voice, in any language. */
       castsEleven: boolean
       dialog: Dialog
@@ -98,6 +101,7 @@ export async function modelsView(
     file: basename(projectFile),
     models: project.narration.models,
     elevenlabs: project.narration.elevenlabs.models,
+    elevenTts: project.narration.elevenlabs.tts,
     castsEleven,
     dialog,
     recorded,

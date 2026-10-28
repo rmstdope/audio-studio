@@ -1348,6 +1348,23 @@ describe('recordLine with an ElevenLabs voice', () => {
     expect(lock.k4).toMatchObject({ voice: 'eleven:abc', model: 'eleven_v3' })
   })
 
+  it('speaks with the project’s ElevenLabs voice settings when it names them', async () => {
+    const root = elevenRoot()
+    const tuned = structuredClone(project)
+    ;(tuned.narration as { elevenlabs?: unknown }).elevenlabs = {
+      tts: { stability: 1, similarityBoost: 0.4, style: 0.3 },
+    }
+    writeFileSync(join(root, 'audio-studio.json'), JSON.stringify(tuned))
+    const { client, requests } = fakeEleven()
+    expect(await recordEleven(root, client)).toMatchObject({ ok: true })
+    expect(requests[0]!.settings).toEqual({
+      stability: 1,
+      similarityBoost: 0.4,
+      style: 0.3,
+      speed: 1.1,
+    })
+  })
+
   it('charges the confirmed credits a character, refusing what goes past them', async () => {
     const root = elevenRoot()
     expect(await recordEleven(root, fakeEleven().client, 3)).toMatchObject({

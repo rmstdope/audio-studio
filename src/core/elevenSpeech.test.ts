@@ -100,6 +100,30 @@ describe('ElevenLabs’ stages, from the project file', () => {
     })
   })
 
+  it('take the voice settings from narration.elevenlabs.tts, ElevenLabs’ own defaults when unnamed', () => {
+    expect(narration.elevenlabs.tts).toEqual(ELEVEN_TTS)
+    const tuned = ProjectSchema.parse(
+      projectJson({
+        narration: {
+          ...(projectJson().narration as object),
+          elevenlabs: { tts: { stability: 1, style: 0.25 } },
+        },
+      }),
+    ).narration.elevenlabs.tts
+    expect(tuned).toEqual({ stability: 1, similarityBoost: 0.75, style: 0.25 })
+  })
+
+  it('refuses a stability other than 0, 0.5 or 1, and a similarity or style outside 0 to 1', () => {
+    for (const tts of [{ stability: 0.3 }, { similarityBoost: 1.2 }, { style: -0.1 }]) {
+      const parsed = ProjectSchema.safeParse(
+        projectJson({
+          narration: { ...(projectJson().narration as object), elevenlabs: { tts } },
+        }),
+      )
+      expect(parsed.success).toBe(false)
+    }
+  })
+
   it('refuses a model that is not one of ElevenLabs’ speech models', () => {
     const parsed = ProjectSchema.safeParse(
       projectJson({

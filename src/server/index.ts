@@ -52,6 +52,7 @@ import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import {
   setElevenModel,
+  setElevenSettings,
   setMusicModel,
   setStageModel,
   switchRetiredModels,
@@ -210,6 +211,14 @@ const StageParam = z.enum(['audition', 'draft', 'final'])
 
 /** The model the page chose for a stage or for the music, and the one it showed. */
 const StageModelBody = z.object({ model: z.string().min(1), was: z.string().min(1) }).strict()
+
+/** ElevenLabs' voice settings as numbers; their ranges are the project file's to check. */
+const ElevenTtsShape = z
+  .object({ stability: z.number(), similarityBoost: z.number(), style: z.number() })
+  .strict()
+
+/** The body of a voice settings save: the new settings, and the ones the page showed. */
+const ElevenTtsBody = z.object({ tts: ElevenTtsShape, was: ElevenTtsShape }).strict()
 
 /** Where an orphaned cue goes: a line key, or null to remove it. */
 const MoveCueBody = z.object({ to: z.string().min(1).max(200).nullable() }).strict()
@@ -816,24 +825,26 @@ export function startServer({
     if (!body.success) {
       return Response.json({ error: 'expected { model, was }' }, { status: 400 })
     }
-    const busy = await busyNow()
-    if (busy) {
-      return Response.json(
-        {
-          ok: false,
-          problems: [
-            {
-              file: basename(projectFile),
-              path: `${path}.${stage.data}`,
-              message: `${busy.name} is ${busy.kind}`,
-            },
-          ],
-        },
-        { status: 409 },
-      )
-    }
+    const busy = await busyRefusal(`${path}.${stage.data}`)
+    if (busy) return busy
     const result = await save(projectFile, stage.data, body.data.model, body.data.was)
     return Response.json(result, { status: result.ok ? 200 : 409 })
+  }
+
+  /**
+   * The refusal of a save at `path` while a part records or a character auditions, naming it, so
+   * no recording changes what it records with under its feet; null when nothing is going on.
+   */
+  async function busyRefusal(path: string): Promise<Response | null> {
+    const busy = await busyNow()
+    if (!busy) return null
+    return Response.json(
+      {
+        ok: false,
+        problems: [{ file: basename(projectFile), path, message: `${busy.name} is ${busy.kind}` }],
+      },
+      { status: 409 },
+    )
   }
 
   /** Only requests addressed to the studio itself reach `handler`. */
@@ -1429,6 +1440,18 @@ export function startServer({
             setElevenModel,
           ),
         ),
+      },
+      '/api/elevenlabs/tts': {
+        PUT: fromOwnPage(async (request) => {
+          const body = ElevenTtsBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { tts, was }' }, { status: 400 })
+          }
+          const busy = await busyRefusal('narration.elevenlabs.tts')
+          if (busy) return busy
+          const result = await setElevenSettings(projectFile, body.data.tts, body.data.was)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
       },
       '/api/parts/:part/lines/:key/takes': {
         GET: guard(async (request) => {

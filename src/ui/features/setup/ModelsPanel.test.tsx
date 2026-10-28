@@ -32,6 +32,7 @@ const answer = (music: Extract<ModelsAnswer, { ok: true }>['music']): ModelsAnsw
   file: 'audio-studio.json',
   models: { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 's2.1-pro-free' },
   elevenlabs: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_v3' },
+  elevenTts: { stability: 0.5, similarityBoost: 0.75, style: 0 },
   castsEleven: false,
   dialog: { lines: 0, bytes: 0 },
   recorded: {},
@@ -242,6 +243,7 @@ describe('the ElevenLabs rows of the Models panel', () => {
       'Final',
       'ElevenLabs draft',
       'ElevenLabs final',
+      'ElevenLabs voice',
     ])
     const menu = elevenMenu(page.container, 'draft')
     expect(menu.value).toBe('eleven_v3')
@@ -307,5 +309,130 @@ describe('the ElevenLabs rows of the Models panel', () => {
     expect(alert).toContain('Could not switch ElevenLabs drafts to Flash v2.5')
     expect(alert).toContain('Keep Eleven v3')
     expect(alert).toContain('Try again')
+  })
+})
+
+describe('the ElevenLabs voice row of the Models panel', () => {
+  const defaults = { stability: 0.5 as const, similarityBoost: 0.75, style: 0 }
+  const withEleven = (
+    recorded: Record<
+      string,
+      { lines: number; bytes: number; characters: number; bare: number }
+    > = {},
+    elevenTts: Extract<ModelsAnswer, { ok: true }>['elevenTts'] = defaults,
+  ) => ({
+    ...(answer(null) as Extract<ModelsAnswer, { ok: true }>),
+    castsEleven: true,
+    recorded,
+    elevenTts,
+  })
+  const sent: { url: string; body: unknown }[] = []
+  beforeEach(() => {
+    sent.length = 0
+    globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PUT')
+        sent.push({ url: String(url), body: JSON.parse(String(init.body)) })
+      return new Response(JSON.stringify({ ok: true }))
+    }) as typeof fetch
+  })
+  const field = <T extends HTMLElement>(container: HTMLElement, name: string) =>
+    container.querySelector<T>(`[aria-label="ElevenLabs ${name}"]`)!
+  /** Moves a slider as a person does: React only hears a value set through the element's own setter. */
+  const slide = (container: HTMLElement, name: string, value: string) =>
+    act(async () => {
+      const input = field<HTMLInputElement>(container, name)
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  const button = (container: HTMLElement, text: string) =>
+    [...container.querySelectorAll('button')].find((b) => b.textContent === text)
+
+  it('shows the saved settings: stability by name, similarity and style as numbers, nothing to save', () => {
+    const page = render(withEleven())
+    const stability = field<HTMLSelectElement>(page.container, 'stability')
+    expect(stability.value).toBe('0.5')
+    expect([...stability.options].map((o) => o.textContent)).toEqual([
+      'Creative · more expressive, less steady',
+      "Natural · ElevenLabs' default",
+      'Robust · steady, less expressive',
+    ])
+    expect(field<HTMLInputElement>(page.container, 'similarity').value).toBe('0.75')
+    expect(page.container.textContent).toContain(
+      'How every ElevenLabs voice speaks, at every stage.',
+    )
+    expect(page.container.textContent).toContain('0.75')
+    expect(button(page.container, 'Save voice settings')).toBeUndefined()
+    expect(button(page.container, "Use ElevenLabs' defaults")).toBeUndefined()
+  })
+
+  it('saves a change at once when no ElevenLabs line goes out of date, and Undo puts it back', async () => {
+    const page = render(withEleven())
+    await slide(page.container, 'style', '0.3')
+    expect(page.container.textContent).toContain('0.30')
+    await act(async () => button(page.container, 'Undo changes')!.click())
+    expect(field<HTMLInputElement>(page.container, 'style').value).toBe('0')
+    await slide(page.container, 'style', '0.3')
+    await act(async () => button(page.container, 'Save voice settings')!.click())
+    expect(sent).toEqual([
+      { url: '/api/elevenlabs/tts', body: { tts: { ...defaults, style: 0.3 }, was: defaults } },
+    ])
+  })
+
+  it('asks first when recorded lines go out of date, naming each change and the credits', async () => {
+    const page = render(
+      withEleven({ eleven_v3: { lines: 12, bytes: 400, characters: 380, bare: 300 } }),
+    )
+    await act(async () => {
+      const stability = field<HTMLSelectElement>(page.container, 'stability')
+      stability.value = '0'
+      stability.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await act(async () => button(page.container, 'Save voice settings')!.click())
+    expect(sent).toEqual([])
+    const text = page.container.textContent!
+    expect(text).toContain('Change how ElevenLabs voices speak?')
+    expect(text).toContain('Stability: Natural → Creative')
+    expect(text).toContain('about 380 credits')
+    await act(async () => button(page.container, 'Save and put them out of date')!.click())
+    expect(sent).toEqual([
+      { url: '/api/elevenlabs/tts', body: { tts: { ...defaults, stability: 0 }, was: defaults } },
+    ])
+  })
+
+  it('offers ElevenLabs’ defaults when the settings are not them', async () => {
+    const page = render(withEleven({}, { stability: 1, similarityBoost: 0.4, style: 0.3 }))
+    await act(async () => button(page.container, "Use ElevenLabs' defaults")!.click())
+    expect(field<HTMLSelectElement>(page.container, 'stability').value).toBe('0.5')
+    expect(field<HTMLInputElement>(page.container, 'similarity').value).toBe('0.75')
+    expect(button(page.container, "Use ElevenLabs' defaults")).toBeUndefined()
+    expect(button(page.container, 'Save voice settings')).toBeDefined()
+  })
+
+  it('says a save failed, with Keep the saved settings and Try again', async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ ok: false, problems: [{ message: 'Act I is recording' }] }), {
+        status: 409,
+      })) as unknown as typeof fetch
+    const page = render(withEleven())
+    await slide(page.container, 'similarity', '0.4')
+    await act(async () => button(page.container, 'Save voice settings')!.click())
+    for (let i = 0; i < 50 && !page.container.querySelector('[role="alert"]'); i++) {
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+    const alert = page.container.querySelector('[role="alert"]')!.textContent
+    expect(alert).toContain("Could not save ElevenLabs' voice settings")
+    expect(alert).toContain('Act I is recording')
+    expect(alert).toContain('Try again')
+    await act(async () => button(page.container, 'Keep the saved settings')!.click())
+    expect(field<HTMLInputElement>(page.container, 'similarity').value).toBe('0.75')
+  })
+
+  it('is locked while a part records', () => {
+    const page = render({
+      ...withEleven(),
+      busy: { kind: 'recording', name: 'Act I' },
+    } as ModelsAnswer)
+    expect(field<HTMLSelectElement>(page.container, 'stability').disabled).toBe(true)
+    expect(field<HTMLInputElement>(page.container, 'style').disabled).toBe(true)
   })
 })

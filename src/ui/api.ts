@@ -32,7 +32,7 @@ import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
-import type { Problem } from '../core/project'
+import type { ElevenTts, Problem } from '../core/project'
 import type { SpendingAnswer } from '../core/spending'
 import type { JobState } from '../services/jobs'
 import type { HeardResult } from '../services/heard'
@@ -265,6 +265,29 @@ export function useSetElevenModel() {
       })
       if (!response.ok && response.status !== 409) {
         throw new Error(`saving the model answered ${response.status}`)
+      }
+      return (await response.json()) as ModelsChange
+    },
+    onSettled: () => client.invalidateQueries(),
+  })
+}
+
+/**
+ * Saves ElevenLabs' voice settings in the project file (`was` is what the page showed), then
+ * reloads everything, as a model's save does: every ElevenLabs line's state depends on them.
+ */
+export function useSetElevenTts() {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: 'models' },
+    mutationFn: async ({ tts, was }: { tts: ElevenTts; was: ElevenTts }) => {
+      const response = await fetch('/api/elevenlabs/tts', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tts, was }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the voice settings answered ${response.status}`)
       }
       return (await response.json()) as ModelsChange
     },

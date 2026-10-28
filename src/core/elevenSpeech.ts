@@ -29,7 +29,7 @@ export function elevenModelName(model: string): string {
 /** The ElevenLabs model every stage records with until the project names its own (§8.6). */
 export const DEFAULT_ELEVEN_MODEL = 'eleven_v3'
 
-/** ElevenLabs' voice settings a line is spoken with: its own defaults. */
+/** ElevenLabs' own voice settings, which a project speaks with until it names its own. */
 export const ELEVEN_TTS = { stability: 0.5, similarityBoost: 0.75, style: 0 } as const
 
 /** The pace ElevenLabs speaks at, as a share of the voice's own: it takes nothing outside this. */

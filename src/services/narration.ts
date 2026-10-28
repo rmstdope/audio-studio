@@ -44,7 +44,6 @@ import { NO_KEY } from './fish'
 import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
 import {
   DEFAULT_ELEVEN_MODEL,
-  ELEVEN_TTS,
   modelForStage,
   requestsAtOnce,
   speedProblem,
@@ -162,7 +161,7 @@ export async function speakerFor({
     if (slow) return { ok: false, reason: 'speed', message: slow }
     const client = await elevenlabs(root, project)
     if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
-    const settings = { ...ELEVEN_TTS, speed: tts.speed }
+    const settings = { ...project.narration.elevenlabs.tts, speed: tts.speed }
     return {
       ok: true,
       speak: (text) =>
