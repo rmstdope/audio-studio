@@ -1,7 +1,9 @@
 import { FREE_MODELS } from '../core/project'
 import { providerOf } from '../core/voices'
 import type { TakeLineResult } from '../services/lineTakes'
-import { agreedOf, type Agreed } from './agreed'
+import { agreedOf, credits, type Agreed } from './agreed'
+import { elevenModelName } from '../core/elevenSpeech'
+import type { ElevenSpoken } from '../services/takes'
 
 /** The part of an answer about the board that takes belong to. */
 interface WithTakes {
@@ -16,9 +18,9 @@ interface WithTakes {
 export function withTake<T extends WithTakes>(
   candidates: T,
   voice: string,
-  take: { key: string; spoken: string },
+  take: { key: string; spoken: string; asked?: string },
 ): T {
-  if (take.spoken !== candidates.audition.spoken) return candidates
+  if ((take.asked ?? take.spoken) !== candidates.audition.spoken) return candidates
   return { ...candidates, takes: { ...candidates.takes, [voice]: take.key } }
 }
 
@@ -47,14 +49,14 @@ interface VoiceTake {
 
 /**
  * The cast voice's answer with a newly recorded take of it, if the take is of that voice and of
- * the phrase shown.
+ * the phrase shown (`asked`, for an ElevenLabs take said without its style).
  */
 export function withVoiceTake<T extends VoiceTake>(
   answer: T,
   voice: string,
-  take: { key: string; spoken: string },
+  take: { key: string; spoken: string; asked?: string },
 ): T {
-  if (voice !== answer.id || take.spoken !== answer.audition.spoken) return answer
+  if (voice !== answer.id || (take.asked ?? take.spoken) !== answer.audition.spoken) return answer
   return { ...answer, take: take.key }
 }
 
@@ -62,7 +64,7 @@ export function withVoiceTake<T extends VoiceTake>(
  * What the character page asks to record by itself: the cast voice's take of the phrase shown,
  * when there is none, as a key to ask for it once by (phrase and voice). Nothing for an answer
  * about another voice than `castId` (an older one), without an API key, or for an ElevenLabs
- * voice (no takes with one until §12 step 14.10).
+ * voice, whose take costs credits and so waits for Record.
  */
 export function takeToRecord(answer: VoiceTake, castId: string | null): string | null {
   if (
@@ -114,4 +116,21 @@ export function takeAnswerState(answer: NonNullable<TakeLineResult>): {
     return { toConfirm: null, refusal: answer.message }
   }
   return { toConfirm: null, refusal: null }
+}
+
+/**
+ * What a try or take with an ElevenLabs voice says beneath it: the model, the credits it cost (or
+ * none, kept from before), and that its cues were left out when the model would speak them. Null
+ * for a Fish voice's, which is free.
+ */
+export function triedNote(result: ElevenSpoken): string | null {
+  if (!result.model) return null
+  const name = elevenModelName(result.model)
+  const cost =
+    result.credits === undefined
+      ? `Said with ${name}, already kept: no credits.`
+      : `Said with ${name}: ${credits(Math.ceil(result.credits))}.`
+  return result.cuesLeftOut
+    ? `${cost} ${name} speaks cues aloud, so it was said without them.`
+    : cost
 }

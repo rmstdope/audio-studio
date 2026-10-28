@@ -230,7 +230,10 @@ describe('characterVoice', () => {
       voice: { title: 'George' },
       lookup: null,
       take: null,
+      // The standard phrase on ElevenLabs' audition model, a credit a character.
+      eleven: { model: 'eleven_v3', cuesLeftOut: false },
     })
+    expect((result as { eleven: { credits: number } }).eleven.credits).toBeGreaterThan(10)
     expect(asked).toEqual(['g1'])
     expect(await characterVoice(projectFile, 'grandmother', noFish)).toMatchObject({
       voice: null,

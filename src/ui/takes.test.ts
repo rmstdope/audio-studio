@@ -4,6 +4,7 @@ import {
   isAbout,
   takeAnswerState,
   takeToRecord,
+  triedNote,
   withAuditionTakes,
   withTake,
   withVoiceTake,
@@ -59,6 +60,12 @@ const voiced = {
 describe('withVoiceTake', () => {
   it('adds a take of the cast voice saying the phrase shown', () => {
     expect(withVoiceTake(voiced, 'v1', { key: 'k', spoken: '[warm] New.' }).take).toBe('k')
+  })
+
+  it('adds an ElevenLabs take said without the style, by the phrase it was asked for', () => {
+    const bare = { key: 'k', spoken: 'New.', asked: '[warm] New.' }
+    expect(withVoiceTake(voiced, 'v1', bare).take).toBe('k')
+    expect(withTake(candidates, 'b', bare).takes.b).toBe('k')
   })
 
   it('leaves out a take of another voice, or of a phrase changed meanwhile', () => {
@@ -148,5 +155,20 @@ describe('takeAnswerState', () => {
       refusal: null,
     })
     expect(takeAnswerState({ ok: false, problems: [] })).toEqual({ toConfirm: null, refusal: null })
+  })
+})
+
+describe('triedNote', () => {
+  it('says what an ElevenLabs try cost, and when its cues were left out; nothing for Fish', () => {
+    expect(triedNote({})).toBeNull()
+    expect(triedNote({ model: 'eleven_v3', credits: 21, cuesLeftOut: false })).toBe(
+      'Said with Eleven v3: 21 credits.',
+    )
+    expect(triedNote({ model: 'eleven_v3', cuesLeftOut: false })).toBe(
+      'Said with Eleven v3, already kept: no credits.',
+    )
+    expect(triedNote({ model: 'eleven_flash_v2_5', credits: 7.5, cuesLeftOut: true })).toBe(
+      'Said with Flash v2.5: 8 credits. Flash v2.5 speaks cues aloud, so it was said without them.',
+    )
   })
 })

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { Project } from './project'
+import type { ElevenTts, Project } from './project'
 import type { Character } from './resources'
 import { spokenText } from './spoken'
 
@@ -59,6 +59,10 @@ export interface TakeInputs {
   voice: string
   spoken: string
   tts: Project['narration']['tts']
+  /** An ElevenLabs take's voice settings (its speed is `tts.speed`); none for a Fish take. */
+  eleven?: ElevenTts
+  /** The language an ElevenLabs model was told, for one that is told it. */
+  language?: string
 }
 
 /**
@@ -68,7 +72,7 @@ export interface TakeInputs {
 const TAKE_FORMAT = 'mp3/normal/volume0'
 
 /** A take's cache key: a short hash of everything that changes its audio. */
-export function takeKey({ model, voice, spoken, tts }: TakeInputs): string {
+export function takeKey({ model, voice, spoken, tts, eleven, language }: TakeInputs): string {
   const value = JSON.stringify([
     TAKE_FORMAT,
     model,
@@ -77,6 +81,9 @@ export function takeKey({ model, voice, spoken, tts }: TakeInputs): string {
     tts.temperature,
     tts.topP,
     tts.speed,
+    // Only an ElevenLabs take has them, so a Fish take's key stays as it always was.
+    ...(eleven ? [eleven.stability, eleven.similarityBoost, eleven.style] : []),
+    ...(language !== undefined ? [language] : []),
   ])
   return createHash('sha256').update(value).digest('hex').slice(0, 16)
 }

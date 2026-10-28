@@ -19,9 +19,20 @@ import { clipInputs } from '../core/fingerprint'
 import { spokenPieces } from '../core/spoken'
 import type { FishFactory } from './auditions'
 import { writeAtomic } from './files'
-import type { Limiter } from './limit'
+import { createLimiter, type Limiter } from './limit'
 import { loadWorkspace, readPart, type ProjectFailure } from './workspace'
-import { providerOf } from '../core/voices'
+import { providerId, providerOf } from '../core/voices'
+import {
+  elevenCredits,
+  readsCues,
+  requestsAtOnce,
+  speedProblem,
+  takesLanguage,
+} from '../core/elevenSpeech'
+import { spokenText } from '../core/spoken'
+import { NO_ELEVENLABS_KEY, type ElevenLabsFactory } from './elevenlabs'
+import { appendTry } from './spending'
+import { randomUUID } from 'node:crypto'
 import { NO_KEY } from './fish'
 
 /** Where audition takes are kept, in the project's tool cache (gitignored by the consumer). */
@@ -29,14 +40,42 @@ export const TAKES_DIR = '.audio-studio/takes'
 
 /** A recorded take (its key, and the text it is of), or why there is none. Null for an unknown character. */
 export type TakeResult =
-  | { ok: true; key: string; spoken: string; cached: boolean }
+  | ({ ok: true; key: string; spoken: string; cached: boolean } & ElevenSpoken)
   | {
       ok: false
-      reason: 'no-key' | 'fish' | 'not-yet' | 'no-sitting' | 'waits' | 'no-phrase'
+      reason:
+        | 'no-key'
+        | 'fish'
+        | 'elevenlabs'
+        | 'speed'
+        | 'not-yet'
+        | 'no-sitting'
+        | 'waits'
+        | 'no-phrase'
       message: string
     }
   | { ok: false; problems: Problem[] }
   | null
+
+/**
+ * What a take or try with an ElevenLabs voice adds: the model it was spoken with, the credits it
+ * cost (none when it came from the cache), and whether its cues were left out because the model
+ * would have spoken them. Nothing for a Fish voice.
+ */
+export interface ElevenSpoken {
+  model?: string
+  credits?: number
+  cuesLeftOut?: boolean
+  /** The text as the page shows it, cues and all, when it may differ from what was sent. */
+  asked?: string
+}
+
+/** What a take or try with an ElevenLabs voice is spoken by: the client, and where it waits. */
+export interface ElevenTakeOptions {
+  elevenlabs?: ElevenLabsFactory
+  /** The limiter ElevenLabs' requests wait in (a fresh one when absent). */
+  elevenLimiter?: Limiter
+}
 
 /** A line tried with a cue: a take of it, or why there is none. Null for an unknown part or line. */
 export type TryResult =
@@ -46,9 +85,10 @@ export type TryResult =
  * Who a take is for and what pays for it. A take of the audition board uses the audition model,
  * which may be paid: it is then charged to `budget` (the audition's sitting) just before it is
  * sent, and `charged` hears what it cost once Fish has made it. Any other take (the cast voice's
- * on its page, a try with a cue) is on the free model, whatever the audition model is.
+ * on its page, a try with a cue) is on the free model, whatever the audition model is; with an
+ * ElevenLabs voice it is on ElevenLabs' audition model, not confirmed, and logged.
  */
-export interface TakeOptions {
+export interface TakeOptions extends ElevenTakeOptions {
   board?: boolean
   budget?: Budget
   charged?: (dollars: number) => void | Promise<void>
@@ -104,7 +144,23 @@ export async function recordTake(
     const file = text.from === 'own' ? project.narration.characters : basename(projectFile)
     return { ok: false, problems: [{ file, path: where, message: tooLong }] }
   }
-  const tts = ttsFor(project.narration.tts, seen.speakers[characterId])
+  const character = seen.speakers[characterId]
+  const tts = ttsFor(project.narration.tts, character)
+  if (providerOf(voiceId) === 'elevenlabs') {
+    if (options.board) {
+      return {
+        ok: false,
+        reason: 'not-yet',
+        message: 'Auditions with ElevenLabs voices come in a later step.',
+      }
+    }
+    return speakEleven(projectFile, project, voiceId, tts, options, {
+      kind: 'take',
+      character: characterId,
+      language,
+      ...pageText(text, seen, characterId),
+    })
+  }
   const model = options.board ? project.narration.models.audition : FREE_MODELS[0]
   return speak(root, project, voiceId, text.spoken, tts, model, fishFor, limiter, options)
 }
@@ -125,6 +181,7 @@ export async function tryLine(
   limiter: Limiter,
   language?: string,
   at?: number,
+  eleven: ElevenTakeOptions = {},
 ): Promise<TryResult> {
   const read = await readPart(projectFile, partId, language)
   if (!read || !read.ok) return read
@@ -186,6 +243,18 @@ export async function tryLine(
     spoken = spokenPieces(line.text, inputs.cue, cast.pronounce, Infinity, inside)[0]!
   }
   const tts = ttsFor(read.project.narration.tts, character)
+  if (providerOf(character.voice) === 'elevenlabs') {
+    const bare = spokenPieces(line.text, '', cast.pronounce, Infinity)[0]!
+    return speakEleven(projectFile, read.project, character.voice, tts, eleven, {
+      kind: 'try',
+      character: line.speaker,
+      part: partId,
+      language: read.language,
+      withCues: spoken,
+      bare,
+      cued: spoken !== bare,
+    })
+  }
   return speak(
     dirname(projectFile),
     read.project,
@@ -214,14 +283,6 @@ async function speak(
   limiter: Limiter,
   options: TakeOptions = {},
 ): Promise<TakeResult> {
-  // Fish's free model makes takes; ElevenLabs has none, and its takes come with §12 step 14.10.
-  if (providerOf(voice) !== 'fish') {
-    return {
-      ok: false,
-      reason: 'not-yet',
-      message: 'Takes and tries are not made with ElevenLabs voices yet.',
-    }
-  }
   const { quality } = project.narration
   const key = takeKey({ model, voice, spoken, tts })
   const file = resolveInRoot(root, takePath(key))
@@ -303,6 +364,108 @@ async function speak(
   }
 }
 
+/** What an ElevenLabs take or try is of, for the text sent and the spending record. */
+interface ElevenText {
+  kind: 'take' | 'try'
+  character: string
+  /** A try's part. */
+  part?: string
+  language: string
+  /** The text with its cues, as a model that reads them is sent it, and as the page shows it. */
+  withCues: string
+  /** The text without them, for a model that would speak them. */
+  bare: string
+  /** Whether the text has cues at all, so leaving them out is worth saying. */
+  cued: boolean
+}
+
+/** The page take's text with and without the character's style, as `ElevenText` wants it. */
+function pageText(
+  text: AuditionText,
+  cast: Cast,
+  characterId: string,
+): Pick<ElevenText, 'withCues' | 'bare' | 'cued'> {
+  return {
+    withCues: text.spoken,
+    bare: text.phrase === null ? '' : spokenText(text.phrase, '', cast.pronounce),
+    cued: Boolean(cast.speakers[characterId]?.style?.trim()),
+  }
+}
+
+/**
+ * `voice`, an ElevenLabs one, saying a take or try with the audition model and the project's
+ * voice settings at the character's speed, kept in the tool cache under its take key (ElevenLabs'
+ * WAV, which the take route serves as such). Nothing is confirmed first: a take or try is a line's
+ * worth of characters. What it cost is added to the spending record; one already kept costs and
+ * logs nothing.
+ */
+async function speakEleven(
+  projectFile: string,
+  project: Project,
+  voice: string,
+  tts: Project['narration']['tts'],
+  options: ElevenTakeOptions,
+  text: ElevenText,
+): Promise<TakeResult> {
+  const root = dirname(projectFile)
+  const { narration } = project
+  const { model, spoken, key, cues } = elevenTake(project, voice, tts, text, text.language)
+  // `asked` is the text as the page shows it, by which it knows the take for its own.
+  const said = { model, cuesLeftOut: !cues && text.cued, asked: text.withCues }
+  const settings = narration.elevenlabs.tts
+  const file = resolveInRoot(root, takePath(key))
+  if (existsSync(file)) return { ok: true, key, spoken, cached: true, ...said }
+  const slow = speedProblem(tts.speed)
+  if (slow) return { ok: false, reason: 'speed', message: slow }
+  const client = await (options.elevenlabs ?? (async () => null))(root, project)
+  if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
+  const limiter = options.elevenLimiter ?? createLimiter()
+  const credits = elevenCredits(model, spoken)!
+  try {
+    const cached = await limiter.run(
+      key,
+      requestsAtOnce(narration.quality.parallel, voice),
+      async () => {
+        // Another request may have made it while this one waited: never pay for it twice.
+        if (existsSync(file)) return true
+        const audio = await client.tts({
+          text: spoken,
+          voice: providerId(voice),
+          model,
+          settings: { ...settings, speed: tts.speed },
+          ...(takesLanguage(model) && { language: text.language }),
+        })
+        if (!audio.length) throw new Error('ElevenLabs sent no audio')
+        // Logged as soon as ElevenLabs made it: it is paid for even if it cannot be kept.
+        try {
+          await appendTry(projectFile, {
+            id: randomUUID(),
+            at: new Date().toISOString(),
+            kind: text.kind,
+            character: text.character,
+            ...(text.part !== undefined && { part: text.part }),
+            language: text.language,
+            model,
+            characters: [...spoken].length,
+            credits,
+          })
+        } catch {
+          // Only the record of what it cost is lost; the take stays.
+        }
+        await writeAtomic(root, takePath(key), audio)
+        return false
+      },
+    )
+    return { ok: true, key, spoken, cached, ...said, ...(!cached && { credits }) }
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'elevenlabs',
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
 /** The audition phrase and the takes already recorded for it, by voice, or why not. */
 export type AuditionTakesResult =
   | { ok: true; audition: AuditionText; takes: Record<string, string> }
@@ -365,8 +528,9 @@ export function auditionIn(
 }
 
 /**
- * The keys of the takes already recorded, by voice, for the character's current phrase, on
- * `model` (the audition model, the board's; the free one for the cast voice's on its page).
+ * The keys of the takes already recorded, by voice, for the character's current phrase in
+ * `language`, on `model` (the audition model, the board's; the free one for the cast voice's on its
+ * page; ElevenLabs' audition model for an ElevenLabs voice's).
  */
 export function recordedTakes(
   root: string,
@@ -376,10 +540,11 @@ export function recordedTakes(
   text: AuditionText,
   voiceIds: string[],
   model: string = project.narration.models.audition,
+  language: string = project.narration.languages[0]!,
 ): Record<string, string> {
   const takes: Record<string, string> = {}
   for (const voice of voiceIds) {
-    const key = takeOf(project, voice, text, cast, characterId, model)
+    const key = takeOf(project, voice, text, cast, characterId, model, language)
     if (existsSync(resolveInRoot(root, takePath(key)))) takes[voice] = key
   }
   return takes
@@ -418,12 +583,57 @@ function takeOf(
   cast: Cast,
   characterId: string,
   model: string,
+  language: string,
 ): string {
   const { tts } = project.narration
-  return takeKey({
+  const settings = ttsFor(tts, cast.speakers[characterId])
+  if (providerOf(voice) === 'elevenlabs') {
+    // An ElevenLabs voice's page take, as `speakEleven` keeps it.
+    return elevenTake(project, voice, settings, pageText(text, cast, characterId), language).key
+  }
+  return takeKey({ model, voice, spoken: text.spoken, tts: settings })
+}
+
+/**
+ * What the cast voice's page take costs with an ElevenLabs voice, before it is recorded: the
+ * audition model, its credits, and whether the character's style is left out because the model
+ * would speak it.
+ */
+export function elevenPageTake(
+  project: Project,
+  cast: Cast,
+  characterId: string,
+  text: AuditionText,
+  voice: string,
+  language: string,
+): { model: string; credits: number; cuesLeftOut: boolean } {
+  const tts = ttsFor(project.narration.tts, cast.speakers[characterId])
+  const page = pageText(text, cast, characterId)
+  const { model, spoken, cues } = elevenTake(project, voice, tts, page, language)
+  return { model, credits: elevenCredits(model, spoken)!, cuesLeftOut: !cues && page.cued }
+}
+
+/**
+ * What an ElevenLabs take or try is made of: the audition model, the text it is sent (`withCues`,
+ * or `bare` for a model that would speak them) and its take key with the project's voice settings
+ * and, for a model told the language, the language.
+ */
+function elevenTake(
+  project: Project,
+  voice: string,
+  tts: Project['narration']['tts'],
+  { withCues, bare }: Pick<ElevenText, 'withCues' | 'bare'>,
+  language: string,
+): { model: string; spoken: string; key: string; cues: boolean } {
+  const { elevenlabs } = project.narration
+  const model = elevenlabs.models.audition
+  const cues = readsCues(model)
+  const spoken = cues ? withCues : bare
+  const told = takesLanguage(model) ? { language } : {}
+  return {
     model,
-    voice,
-    spoken: text.spoken,
-    tts: ttsFor(tts, cast.speakers[characterId]),
-  })
+    spoken,
+    cues,
+    key: takeKey({ model, voice, spoken, tts, eleven: elevenlabs.tts, ...told }),
+  }
 }

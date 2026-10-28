@@ -14,8 +14,9 @@ import {
 
 /**
  * What was spent: a total for everything and for each part (dollars, and ElevenLabs credits when
- * any were used), and every paid recording and music take, newest first. Read only; the running
- * ones update as lines are recorded.
+ * any were used), and every paid recording and music take, newest first; takes and tries with
+ * ElevenLabs voices in a tile of their own. Read only; the running ones update as lines are
+ * recorded.
  */
 export function SpendingView({ summary }: { summary: ProjectSummary }) {
   return (
@@ -27,8 +28,8 @@ export function SpendingView({ summary }: { summary: ProjectSummary }) {
           <span className="muted">
             Every recording and music take made with a paid model, newest first. A recording’s cost
             is worked out as each line is sent, at Fish’s prices or in your ElevenLabs plan’s
-            credits; a music take’s at its model’s price a minute. The bills themselves can differ
-            slightly.
+            credits; a music take’s at its model’s price a minute. Takes and tries with ElevenLabs
+            voices are counted in the totals, not listed. The bills themselves can differ slightly.
           </span>
         </div>
       </header>
@@ -65,7 +66,7 @@ function SpendingBody({ summary }: { summary: ProjectSummary }) {
       </div>
     )
   }
-  if (answer.count === 0 && answer.takes === 0) {
+  if (answer.count === 0 && answer.takes === 0 && answer.tries.count === 0) {
     return (
       <div className="empty-state">
         <strong>No paid recordings yet.</strong>
@@ -78,8 +79,16 @@ function SpendingBody({ summary }: { summary: ProjectSummary }) {
       <div className="spending-tiles">
         <div className="spending-tile all">
           <b>{amountText(answer.total, answer.credits)}</b>
-          <span>{totalsLabel(answer.count, summary.partLabel, answer.takes)}</span>
+          <span>
+            {totalsLabel(answer.count, summary.partLabel, answer.takes, answer.tries.count)}
+          </span>
         </div>
+        {answer.tries.count > 0 && (
+          <div className="spending-tile">
+            <b>{amountText(0, answer.tries.credits)}</b>
+            <span>Takes and tries with ElevenLabs voices</span>
+          </div>
+        )}
         {answer.acts.map((act) => (
           <div className="spending-tile" key={act.part}>
             <b>{amountText(act.total, act.credits)}</b>
@@ -91,25 +100,29 @@ function SpendingBody({ summary }: { summary: ProjectSummary }) {
         ))}
       </div>
       <h2 className="spending-heading">Recordings</h2>
-      <div className="table-box">
-        <table className="table spending-table">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>{summary.partLabel}</th>
-              {answer.languages > 1 && <th>Language</th>}
-              <th>Model</th>
-              <th className="right">Lines</th>
-              <th className="right">Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            {answer.rows.map((row) => (
-              <Row key={row.id} row={row} acts={answer.acts} languages={answer.languages} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {answer.rows.length === 0 ? (
+        <p className="muted">No paid recordings or music takes yet.</p>
+      ) : (
+        <div className="table-box">
+          <table className="table spending-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>{summary.partLabel}</th>
+                {answer.languages > 1 && <th>Language</th>}
+                <th>Model</th>
+                <th className="right">Lines</th>
+                <th className="right">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {answer.rows.map((row) => (
+                <Row key={row.id} row={row} acts={answer.acts} languages={answer.languages} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

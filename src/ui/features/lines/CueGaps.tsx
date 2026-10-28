@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { triedNote } from '../../takes'
 import {
   WORDS_CHANGED,
   normalizeCue,
@@ -277,7 +278,7 @@ function CueBox({
           <button
             className="btn"
             type="button"
-            title="Hear the whole line said with this cue, without saving anything (a free take)"
+            title="Hear the whole line said with this cue, without saving anything (free with a Fish voice, a few credits with an ElevenLabs one)"
             disabled={hear.isPending || (placed === null && !cue)}
             onClick={tryIt}
           >
@@ -285,6 +286,7 @@ function CueBox({
           </button>
         </div>
         {heard && playing === tryId && <span className="muted cue-tried mono">{heard.spoken}</span>}
+        {heard && triedNote(heard) && <span className="muted">{triedNote(heard)}</span>}
         {!changed && problems.length > 0 && (
           <Problems title="The cue could not be saved" problems={problems} />
         )}

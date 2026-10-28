@@ -79,6 +79,29 @@ describe('takeKey', () => {
 
   const base = { model: 's2.1-pro-free', voice: 'v1', spoken: '[warm] Hello.', tts: narration.tts }
 
+  it('keeps a Fish take’s key as it was, so takes already cached are found', () => {
+    expect(takeKey(base)).toBe('07a90e3cc871d96f')
+  })
+
+  it('changes with an ElevenLabs take’s voice settings', () => {
+    const eleven = { ...base, model: 'eleven_v3', voice: 'eleven:abc' }
+    const settings = { stability: 0.5 as const, similarityBoost: 0.75, style: 0 }
+    expect(takeKey({ ...eleven, eleven: settings })).not.toBe(takeKey(eleven))
+    expect(takeKey({ ...eleven, eleven: { ...settings, style: 0.3 } })).not.toBe(
+      takeKey({ ...eleven, eleven: settings }),
+    )
+  })
+
+  it('changes with the language an ElevenLabs model was told', () => {
+    const eleven = {
+      ...base,
+      model: 'eleven_v3',
+      voice: 'eleven:abc',
+      eleven: { stability: 0.5 as const, similarityBoost: 0.75, style: 0 },
+    }
+    expect(takeKey({ ...eleven, language: 'sv' })).not.toBe(takeKey({ ...eleven, language: 'en' }))
+  })
+
   it('is sixteen hex characters, the same for the same inputs', () => {
     expect(takeKey(base)).toMatch(/^[0-9a-f]{16}$/)
     expect(takeKey(base)).toBe(takeKey({ ...base }))

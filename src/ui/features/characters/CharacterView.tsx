@@ -55,7 +55,8 @@ import { isAbout, takeToRecord } from '../../takes'
 import { needsResumeBox } from '../../sitting'
 import { providerWords, voiceUrl } from '../../voiceId'
 import { providerOf } from '../../../core/voices'
-import { speedProblem } from '../../../core/elevenSpeech'
+import { elevenModelName, speedProblem } from '../../../core/elevenSpeech'
+import { credits } from '../../agreed'
 import { DesignVoice } from '../audition/DesignVoice'
 import { RuledOutPanel } from '../audition/RuledOutPanel'
 import { SittingBox, sittingFailure } from '../audition/SittingBox'
@@ -561,7 +562,7 @@ function VoicePanel({
   const sample = voice?.sample ?? null
   const take = answer?.take ?? null
   const page = voiceUrl(id)
-  // An ElevenLabs voice makes no takes yet (§12 step 14.10); ElevenLabs' preview is how it is heard.
+  // An ElevenLabs voice's take is on ElevenLabs' audition model, which costs credits.
   const eleven = providerOf(id) === 'elevenlabs'
   const words = providerWords(id)
   return (
@@ -626,44 +627,50 @@ function VoicePanel({
         </p>
       )}
       <div className="voice-listen">
-        {eleven ? (
-          <div className="listen-box">
-            <span className="muted">No takes with ElevenLabs voices yet: hear its preview.</span>
-          </div>
-        ) : (
-          <div className="listen-box">
-            {take ? (
-              <button
-                type="button"
-                className="icon-btn take-play"
-                aria-label={playing === takeClip(id) ? 'Stop' : 'Play the take'}
-                onClick={() => toggle(takeClip(id), takeUrl(take))}
-              >
-                {playing === takeClip(id) ? <PauseIcon /> : <PlayIcon />}
-              </button>
-            ) : (
-              <button
-                className="btn btn-small"
-                type="button"
-                disabled={
-                  recorder.recording.has(id) || !answer || answer.lookup?.reason === 'no-key'
-                }
-                onClick={() => void record(id)}
-              >
-                {recorder.recording.has(id) ? 'Recording…' : 'Record'}
-              </button>
-            )}
-            <span>
-              <strong>Take {paidModel && <span className="chip">free model</span>}</strong>
-              <span className="muted">The audition phrase, in {character.name}’s style</span>
-              {paidModel && (
+        <div className="listen-box">
+          {take ? (
+            <button
+              type="button"
+              className="icon-btn take-play"
+              aria-label={playing === takeClip(id) ? 'Stop' : 'Play the take'}
+              onClick={() => toggle(takeClip(id), takeUrl(take))}
+            >
+              {playing === takeClip(id) ? <PauseIcon /> : <PlayIcon />}
+            </button>
+          ) : (
+            <button
+              className="btn btn-small"
+              type="button"
+              disabled={recorder.recording.has(id) || !answer || answer.lookup?.reason === 'no-key'}
+              onClick={() => void record(id)}
+            >
+              {recorder.recording.has(id) ? 'Recording…' : 'Record'}
+            </button>
+          )}
+          <span>
+            <strong>Take {!eleven && paidModel && <span className="chip">free model</span>}</strong>
+            <span className="muted">The audition phrase, in {character.name}’s style</span>
+            {eleven && answer?.eleven && (
+              <>
                 <span className="muted">
-                  Recorded with {FREE_MODELS[0]}. Auditions use {paidModel}.
+                  Recorded with {elevenModelName(answer.eleven.model)}, without asking first: about{' '}
+                  {credits(Math.ceil(answer.eleven.credits))}.
                 </span>
-              )}
-            </span>
-          </div>
-        )}
+                {answer.eleven.cuesLeftOut && (
+                  <span className="muted">
+                    {elevenModelName(answer.eleven.model)} speaks cues aloud, so the take is without
+                    the style.
+                  </span>
+                )}
+              </>
+            )}
+            {!eleven && paidModel && (
+              <span className="muted">
+                Recorded with {FREE_MODELS[0]}. Auditions use {paidModel}.
+              </span>
+            )}
+          </span>
+        </div>
         <div className="listen-box">
           {sample && (
             <button

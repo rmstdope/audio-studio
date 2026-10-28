@@ -48,7 +48,7 @@ export function VoiceCard({
   const sample = voice.sample
   // Fish's design, not yet on the account: its preview is its take, and it has no sample or id.
   const designed = voice.design !== undefined
-  // An ElevenLabs voice makes no takes yet (§12 step 14.10); ElevenLabs' preview is how it is heard.
+  // An ElevenLabs voice makes no board takes yet (§12 step 14.10b); its preview is how it is heard.
   const eleven = providerOf(voice.id) === 'elevenlabs'
   const words = providerWords(voice.id)
   return (

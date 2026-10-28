@@ -43,9 +43,30 @@ const MusicSpendSchema = z.object({
 })
 
 /**
+ * One take or try spoken by an ElevenLabs voice that cost credits: the cast voice's take on its
+ * character's page, or a line tried with a cue. Neither is confirmed first; each is kept here.
+ */
+const TrySpendSchema = z.object({
+  id: z.string(),
+  /** When it was made (ISO 8601). */
+  at: z.string(),
+  kind: z.enum(['take', 'try']),
+  character: z.string(),
+  /** A try's part; a take has none. */
+  part: z.string().optional(),
+  language: z.string(),
+  /** The ElevenLabs model it was spoken with. */
+  model: z.string(),
+  /** The characters sent. */
+  characters: z.number().int().min(0),
+  credits: z.number().min(0),
+})
+
+/**
  * What the studio remembers of what it spent, kept in `.audio-studio/spending.json`: one entry per
  * recording that cost money, added when the recording ends, and in version 2 the ElevenLabs
- * credits of a recording and a row per paid music take. A record holding nothing of version 2's
+ * credits of a recording, a row per paid music take, and a row per take or try with an ElevenLabs
+ * voice (`tries`, none in a version 2 record written before them). A record holding nothing of version 2's
  * is written as version 1, which an older studio reads. Saved files are checked against this
  * schema when read back.
  */
@@ -55,6 +76,7 @@ export const SpendingSchema = z.discriminatedUnion('version', [
     version: z.literal(2),
     recordings: z.array(RecordingSchema),
     music: z.array(MusicSpendSchema),
+    tries: z.array(TrySpendSchema).default([]),
   }),
 ])
 
@@ -66,6 +88,9 @@ export type Recording = z.infer<typeof RecordingSchema>
 
 /** One paid music take. */
 export type MusicSpend = z.infer<typeof MusicSpendSchema>
+
+/** One take or try with an ElevenLabs voice that cost credits. */
+export type TrySpend = z.infer<typeof TrySpendSchema>
 
 /** How a recording ended: all done, stopped by the user, or with a line that failed. */
 export type Outcome = Recording['outcome']
@@ -85,9 +110,13 @@ export type Running = Pick<
   | 'elevenModel'
 >
 
-/** Whether a record needs version 2 to be written: ElevenLabs credits, or a music take. */
-export function needsVersion2(recordings: Recording[], music: MusicSpend[]): boolean {
-  return music.length > 0 || recordings.some((r) => r.credits !== undefined)
+/** Whether a record needs version 2 to be written: ElevenLabs credits, a music take, or a try. */
+export function needsVersion2(
+  recordings: Recording[],
+  music: MusicSpend[],
+  tries: TrySpend[] = [],
+): boolean {
+  return music.length > 0 || tries.length > 0 || recordings.some((r) => r.credits !== undefined)
 }
 
 /** How a job ended: cancelled is stopped, any failed line is an error (even when cancelled). */
@@ -136,6 +165,8 @@ export interface SpendingSummary {
   count: number
   /** Music takes. */
   takes: number
+  /** Takes and tries with ElevenLabs voices: how many, and their credits (in `credits` too). */
+  tries: { count: number; credits: number }
   /** One total per act: the project's own, in order, then those no longer in the project. */
   acts: { part: string; title: string; total: number; credits: number; removed: boolean }[]
   rows: SpendingRow[]
@@ -143,13 +174,15 @@ export interface SpendingSummary {
 
 /**
  * The recordings, the running ones and the music takes as the page shows them: running first,
- * then the rest newest first; the totals count them all, dollars and credits apart.
+ * then the rest newest first; the totals count them all, dollars and credits apart, and the takes
+ * and tries with ElevenLabs voices too, which have no rows.
  */
 export function summariseSpending(
   recordings: Recording[],
   running: Running[],
   parts: { id: string; title: string }[],
   music: MusicSpend[] = [],
+  tries: TrySpend[] = [],
 ): SpendingSummary {
   const known = new Set(parts.map((p) => p.id))
   const rowOf = (r: Running | Recording, state: SpendingRow['state']): SpendingRow => ({
@@ -198,11 +231,14 @@ export function summariseSpending(
   }
   const gone = [...totals.keys()].filter((id) => !known.has(id)).sort()
   const of = (id: string) => totals.get(id) ?? { total: 0, credits: 0 }
+  // Takes and tries are many and small: counted in all, never as rows or in an act.
+  const triedCredits = tries.reduce((sum, t) => sum + t.credits, 0)
   return {
     total: rows.reduce((sum, row) => sum + row.cost, 0),
-    credits: rows.reduce((sum, row) => sum + row.credits, 0),
+    credits: rows.reduce((sum, row) => sum + row.credits, 0) + triedCredits,
     count: rows.filter((row) => row.kind === 'narration').length,
     takes: rows.filter((row) => row.kind === 'music').length,
+    tries: { count: tries.length, credits: triedCredits },
     acts: [
       ...parts.map((p) => ({ part: p.id, title: p.title, ...of(p.id), removed: false })),
       ...gone.map((id) => ({ part: id, title: id, ...of(id), removed: true })),

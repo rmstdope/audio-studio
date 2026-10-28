@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { triedNote } from '../../takes'
 import { unspokenCueNote } from '../../cueTargets'
 import { payWords } from '../../agreed'
 import type { LineState, LineStatus } from '../../../core/planner'
@@ -903,7 +904,7 @@ function CueCell({
         <button
           className="btn"
           type="button"
-          title="Hear the line said with this cue, without saving anything (a free take)"
+          title="Hear the line said with this cue, without saving anything (free with a Fish voice, a few credits with an ElevenLabs one)"
           disabled={hear.isPending}
           onClick={tryIt}
         >
@@ -912,6 +913,7 @@ function CueCell({
       </div>
       {unspokenCueNote(line) && <span className="muted">{unspokenCueNote(line)}</span>}
       {heard && playing === tryId && <span className="muted cue-tried mono">{heard.spoken}</span>}
+      {heard && triedNote(heard) && <span className="muted">{triedNote(heard)}</span>}
       {problems.length > 0 && <Problems title="The cue could not be saved" problems={problems} />}
       {save.isError && <span className="adopt-error">{save.error.message}</span>}
       {refused && 'problems' in refused && (

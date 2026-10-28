@@ -83,6 +83,13 @@ describe('totalsLabel', () => {
     expect(totalsLabel(1, 'Act')).toBe('All acts · 1 recording')
     expect(totalsLabel(2, 'Chapter')).toBe('All chapters · 2 recordings')
   })
+
+  it('counts ElevenLabs takes and tries too, and leaves out recordings when there are none', () => {
+    expect(totalsLabel(2, 'Act', 1, 5)).toBe(
+      'All acts · 2 recordings · 1 music take · 5 takes and tries',
+    )
+    expect(totalsLabel(0, 'Act', 0, 1)).toBe('All acts · 1 take or try')
+  })
 })
 
 describe('languageText', () => {
