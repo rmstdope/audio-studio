@@ -26,7 +26,7 @@ const george: Voice = {
 }
 
 /** The card's text, rendered without a take. */
-async function rendered(voice: Voice) {
+async function rendered(voice: Voice, waits?: 'money' | 'credits' | 'more-credits') {
   const container = document.createElement('div')
   const page = createRoot(container)
   await act(() =>
@@ -39,6 +39,7 @@ async function rendered(voice: Voice) {
         recording: false,
         error: null,
         onRecord: () => {},
+        waits,
       }),
     ),
   )
@@ -51,13 +52,22 @@ async function rendered(voice: Voice) {
 }
 
 describe('VoiceCard, an ElevenLabs voice', () => {
-  it('says whose it is, offers no take and plays ElevenLabs’ preview', async () => {
+  it('says whose it is, records a take and plays ElevenLabs’ preview', async () => {
     const { text, buttons } = await rendered(george)
     expect(text).toContain('ElevenLabs voice')
     expect(text).not.toContain('uses')
-    expect(text).toContain('No takes with ElevenLabs voices yet: hear its preview.')
     expect(text).toContain('ElevenLabs preview')
-    expect(buttons).toEqual(['Play ElevenLabs’ preview of George'])
+    expect(buttons).toEqual(['Record take', 'Play ElevenLabs’ preview of George'])
+  })
+
+  it('says its take waits for credits, or for more of them, and offers no Record take', async () => {
+    const first = await rendered(george, 'credits')
+    expect(first.text).toContain('Take waits for credits')
+    expect(first.buttons).toEqual(['Play ElevenLabs’ preview of George'])
+    expect((await rendered(george, 'more-credits')).text).toContain('Take waits for more credits')
+    expect((await rendered({ ...george, id: 'g1' }, 'money')).text).toContain(
+      'Take waits for more money',
+    )
   })
 
   it('keeps a Fish voice’s popularity, take and sample', async () => {

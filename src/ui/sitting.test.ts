@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import {
   boxState,
+  creditsLabel,
+  creditsMeterLine,
+  creditsPoints,
+  creditsUsedUpLine,
+  creditsWaitLine,
   meterLine,
+  planLeftLine,
   needsResumeBox,
   takeCaches,
   payLabel,
@@ -112,5 +118,58 @@ describe('takeCaches', () => {
   it('keeps board takes and the cast voice’s page takes apart, whatever the model', () => {
     expect(takeCaches(true)).toEqual({ voice: false, session: true })
     expect(takeCaches(false)).toEqual({ voice: true, session: false })
+  })
+})
+
+describe('the words of an audition’s credits', () => {
+  const money = { dollars: 2100, spent: 420, left: 1680, takesLeft: 40, usedUp: false }
+
+  it('meter: what is used of what was given, and how many takes are left', () => {
+    expect(creditsMeterLine(money)).toBe('420 of 2,100 credits used · about 40 takes left')
+  })
+
+  it('used up: the credits are used, and how many voices wait', () => {
+    expect(creditsUsedUpLine(2100, 2)).toBe(
+      'The 2,100 credits for this audition are used. 2 voices on the board have no take yet.',
+    )
+    expect(creditsUsedUpLine(100, 0)).toBe('The 100 credits for this audition are used.')
+  })
+
+  it('the bar: how many ElevenLabs voices wait for credits', () => {
+    expect(creditsWaitLine(1)).toBe('1 ElevenLabs voice on the board waits for credits')
+    expect(creditsWaitLine(2)).toBe('2 ElevenLabs voices on the board wait for credits')
+  })
+
+  it('the bar’s points: a take’s credits on the model, and that recorded and failed takes are free', () => {
+    expect(creditsPoints('eleven_v3', 42)).toEqual([
+      'A take with Eleven v3 is about 42 credits, charged to your plan as it is sent.',
+      'A take already recorded is free; one that fails is given back.',
+    ])
+  })
+
+  it('the button follows the credits typed', () => {
+    expect(creditsLabel('2100')).toBe('Use up to 2,100 credits')
+    expect(creditsLabel('2,100')).toBe('Use up to 2,100 credits')
+    expect(creditsLabel('1.5')).toBe('Use up to … credits')
+    expect(creditsLabel('500', true)).toBe('Use up to 500 more credits')
+  })
+
+  it('what is left on the plan, beside what running recordings and auditions hold', () => {
+    const account = {
+      tier: 'creator',
+      charactersUsed: 1000,
+      characterLimit: 50_000,
+      renewsAt: null,
+      overage: 0 as const,
+      voiceSlots: { used: 0, limit: 30 },
+    }
+    expect(planLeftLine({ ok: true, account }, 0)).toBe('49,000 credits left on your plan')
+    expect(planLeftLine({ ok: true, account }, 800)).toBe(
+      '48,200 credits left on your plan, besides what recordings and auditions running now hold',
+    )
+    expect(planLeftLine({ ok: false, reason: 'elevenlabs', message: 'Down.' }, 0)).toBe(
+      'What is left on your plan is unknown: Down.',
+    )
+    expect(planLeftLine(undefined, 0)).toBe('Reading your plan…')
   })
 })

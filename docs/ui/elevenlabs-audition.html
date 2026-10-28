@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ElevenLabs credits on the audition board</title>
+    <style>
+      body {
+        background: #07080b;
+        color: #eceef3;
+        font:
+          14px/1.45 system-ui,
+          sans-serif;
+        padding: 24px 16px;
+        margin: 0;
+      }
+      section {
+        max-width: 820px;
+        margin: 0 auto 24px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      h2 {
+        font-size: 15px;
+      }
+      .panel {
+        background: #12141a;
+        border: 1px solid #1f232d;
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 8px;
+      }
+      .ask {
+        border-color: #3a4a7a;
+        background: #141a2a;
+      }
+      .muted {
+        color: #a9b0bd;
+      }
+      .btn {
+        background: #0d0f14;
+        color: #eceef3;
+        border: 1px solid #1f232d;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      .primary {
+        background: #7aa2ff;
+        color: #0b0c10;
+        border-color: #7aa2ff;
+      }
+      input {
+        background: #0d0f14;
+        color: #eceef3;
+        border: 1px solid #1f232d;
+        border-radius: 8px;
+        padding: 6px 10px;
+        width: 90px;
+        font: inherit;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .chip {
+        border: 1px solid #1f232d;
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 12px;
+        color: #a9b0bd;
+      }
+      .bar {
+        flex: 1 1 160px;
+        height: 8px;
+        border-radius: 4px;
+        background: #1f232d;
+        overflow: hidden;
+      }
+      .bar span {
+        display: block;
+        height: 100%;
+        width: 20%;
+        background: #3ddc97;
+      }
+      .card {
+        border: 1px solid #1f232d;
+        border-radius: 12px;
+        padding: 10px;
+        width: 240px;
+        display: inline-block;
+        margin: 8px 8px 0 0;
+      }
+      .error {
+        color: #ff6b6b;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>ElevenLabs credits on the audition board (14.10b-3)</h1>
+      <p class="muted">
+        Start audition is as before: no box on a free Fish model, the dollars box on a paid one.
+        When an ElevenLabs voice is on the board (the cast voice, one added by id, later search
+        results) and the audition has no credits, a bar above the voices asks for them. Giving them
+        leaves Fish's dollars as they are. Pause, Stop or Cast end them; after a resume the bar asks
+        again.
+      </p>
+    </section>
+    <section>
+      <h2>1 · Credits wanted</h2>
+      <form class="panel ask">
+        <strong>2 ElevenLabs voices on the board wait for credits</strong>
+        <ul>
+          <li>A take with Eleven v3 is about 42 credits, charged to your plan as it is sent.</li>
+          <li>A take already recorded is free; one that fails is given back.</li>
+        </ul>
+        <div class="row">
+          <label>Use up to</label><input value="2100" /> credits
+          <span class="muted">48,200 credits left on your plan</span>
+          <button class="btn primary" type="button">Use up to 2,100 credits</button>
+        </div>
+        <p class="error">
+          Errors: "Enter whole credits, like 500." · the server's reason (too few left, ElevenLabs
+          unreachable).
+        </p>
+      </form>
+      <div class="card">
+        <strong>George</strong><br /><span class="muted">ElevenLabs voice</span><br />Take waits for
+        credits
+      </div>
+      <div class="card">
+        <strong>Old Wizard</strong><br /><span class="muted">by Sam · 1.2k uses</span><br />▶ Take:
+        the audition phrase in character
+      </div>
+    </section>
+    <section>
+      <h2>2 · Credits given</h2>
+      <div class="panel row">
+        <span class="chip">Eleven v3</span> 420 of 2,100 credits used · about 40 takes left
+        <span class="bar"><span></span></span>
+      </div>
+      <p class="muted">With a paid Fish model the dollars' meter is shown above it, as before.</p>
+    </section>
+    <section>
+      <h2>3 · Credits used up</h2>
+      <form class="panel ask row">
+        <span class="chip">Eleven v3</span>
+        <strong
+          >The 2,100 credits for this audition are used. 2 voices on the board have no take
+          yet.</strong
+        >
+        <label>Add</label><input value="2100" /> credits
+        <button class="btn primary" type="button">Use up to 2,100 more credits</button>
+      </form>
+      <div class="card">
+        <strong>George</strong><br /><span class="muted">ElevenLabs voice</span><br />Take waits for
+        more credits
+      </div>
+    </section>
+  </body>
+</html>

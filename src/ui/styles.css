@@ -2197,7 +2197,8 @@ button.cue-chip[aria-expanded='true'] {
   pointer-events: none;
 }
 
-/* A paid audition: its confirm box, the meter above the voices, the bar when the money is used */
+/* A paid audition: its confirm box, the meters above the voices, the bar when the money is used,
+   and the bar that asks for ElevenLabs credits */
 
 .spend-field {
   display: flex;
@@ -2221,10 +2222,15 @@ button.cue-chip[aria-expanded='true'] {
   line-height: 1.5;
 }
 
-.sitting-meter {
+.sitting-meters {
   position: sticky;
   top: 0;
   z-index: 5;
+  display: grid;
+  gap: 8px;
+}
+
+.sitting-meter {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
@@ -2238,6 +2244,19 @@ button.cue-chip[aria-expanded='true'] {
 .sitting-meter.used-up {
   border-color: var(--accent-soft-line);
   background: var(--accent-soft-bg);
+}
+
+.credits-ask {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--accent-soft-line);
+  background: var(--accent-soft-bg);
+}
+
+.credits-ask .confirm-effects {
+  margin: 0;
 }
 
 .sitting-words {

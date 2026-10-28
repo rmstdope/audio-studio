@@ -1698,6 +1698,20 @@ export function useLineTakeActions(partId: string, key: string, language?: strin
   return { take, use, drop, refused, toConfirm, refusal, cancel: () => setToConfirm(null) }
 }
 
+/** The ElevenLabs plan's account, and the credits running recordings and auditions hold of it. */
+export interface ElevenAccountAnswer {
+  account: ElevenAnswer
+  held: number
+}
+
+/** The ElevenLabs plan and what is held of it, for the board's bar that asks for credits. */
+export function useElevenAccount() {
+  return useQuery({
+    queryKey: ['eleven-account'],
+    queryFn: () => getJson<ElevenAccountAnswer>('/api/elevenlabs/account'),
+  })
+}
+
 /** The money of a character's audition, or why it cannot be shown. */
 export type SittingAnswer =
   ({ ok: true } & SittingView) | { ok: false; message?: string; problems?: Problem[] }
@@ -1717,18 +1731,22 @@ export function useSitting(characterId: string, enabled = true, language?: strin
   })
 }
 
+/** What is given to a sitting: Fish's dollars or ElevenLabs' credits. */
+export type SittingGiven = { amount: number } | { credits: number }
+
 /**
  * Changes a character's sitting: `resume` opens a fresh one with an amount, `add` tops the one
- * going on up, `end` ends it (Pause). Each answers with the sitting's money, or why it was refused.
+ * going on up with dollars or credits (the first credits give it its ElevenLabs half), `end` ends
+ * it (Pause). Each answers with the sitting's money, or why it was refused.
  */
 export function useSittingActions(characterId: string, language?: string) {
   const client = useQueryClient()
   const base = `/api/auditions/${encodeURIComponent(characterId)}/sitting`
-  const send = async (method: string, path: string, amount?: number) => {
+  const send = async (method: string, path: string, body?: SittingGiven) => {
     const response = await fetch(path, {
       method,
-      headers: amount === undefined ? {} : { 'content-type': 'application/json' },
-      body: amount === undefined ? undefined : JSON.stringify({ amount }),
+      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
     })
     if (!response.ok && response.status !== 409) {
       throw new Error(`the sitting answered ${response.status}`)
@@ -1744,11 +1762,11 @@ export function useSittingActions(characterId: string, language?: string) {
   }
   const resume = useMutation({
     ...options,
-    mutationFn: (amount: number) => send('POST', inLanguage(base, language), amount),
+    mutationFn: (amount: number) => send('POST', inLanguage(base, language), { amount }),
   })
   const add = useMutation({
     ...options,
-    mutationFn: (amount: number) => send('POST', inLanguage(`${base}/add`, language), amount),
+    mutationFn: (given: SittingGiven) => send('POST', inLanguage(`${base}/add`, language), given),
   })
   const end = useMutation({
     ...options,

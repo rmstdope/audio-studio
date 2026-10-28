@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { designGroups, quoted } from '../../../core/design'
 import type { AuditionSession } from '../../../core/audition'
 import type { CharacterSummary } from '../../../core/summary'
-import type { VoiceProvider } from '../../../core/voices'
+import { providerOf, type VoiceProvider } from '../../../core/voices'
 import type { SessionView } from '../../../services/sessions'
 import { castInLanguage, shortlistNote, type Language } from '../../castLanguages'
 import {
@@ -26,6 +26,7 @@ import {
   stopEffectsFor,
   takesToRecord,
   undoFor,
+  waitingForCredits,
 } from '../../board'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { DesignVoice } from './DesignVoice'
@@ -34,6 +35,7 @@ import { Confirm } from '../../components/Confirm'
 import { Failure } from '../../components/Failure'
 import { routeHref } from '../../route'
 import { voiceIdFrom } from '../../voiceId'
+import { CreditsAsk } from './CreditsAsk'
 import { SittingBox, sittingFailure } from './SittingBox'
 import { SittingMeter } from './SittingMeter'
 import { VoiceCard } from './VoiceCard'
@@ -108,11 +110,14 @@ export function ShortlistBoard({
 
   // Every take is asked for once per phrase, so a take the cache cannot show is not asked again.
   const asked = useRef(new Set<string>())
-  const onBoard = recordable(session)
   // The money of a paid audition: takes wait for its sitting (a read of it, once known).
   const money = sittingQuery.data?.ok ? sittingQuery.data : null
   const paid = money?.paid ?? false
   const sitting = money?.sitting ?? null
+  // ElevenLabs voices' takes are paid in credits: without them they wait, and the board asks.
+  const credits = money?.eleven.sitting ?? null
+  const onBoard = recordable(session, credits !== null)
+  const wantCredits = money && !credits ? waitingForCredits(session, takes) : []
   // Unknown money counts as free: the server refuses a paid take that has no sitting anyway.
   const ready = !sittingQuery.isPending && (!paid || sitting !== null)
   const missing =
@@ -131,9 +136,11 @@ export function ShortlistBoard({
 
   // Money added to the sitting: the voices that waited for it get their takes.
   useEffect(() => {
-    if (sitting && !sitting.usedUp) recorder.retryWaiting()
-    // Only a change of the sitting's total is new money.
-  }, [sitting?.dollars])
+    if ((sitting && !sitting.usedUp) || (credits && !credits.usedUp)) recorder.retryWaiting()
+    // Only a change of a total is new money.
+  }, [sitting?.dollars, credits?.dollars])
+  const waitingIn = (provider: VoiceProvider) =>
+    [...recorder.waiting].filter((v) => providerOf(v) === provider).length
   // The account's own voices are fetched when the board opens (a start, or a resume).
   useEffect(() => own.fetch(), [])
 
@@ -209,7 +216,15 @@ export function ShortlistBoard({
         take={takes[id] ?? null}
         recording={recorder.recording.has(id)}
         onRecord={() => void recorder.record(id)}
-        waiting={recorder.waiting.has(id)}
+        waits={
+          wantCredits.includes(id)
+            ? 'credits'
+            : recorder.waiting.has(id)
+              ? providerOf(id) === 'elevenlabs'
+                ? 'more-credits'
+                : 'money'
+              : undefined
+        }
         listed={listed}
         error={saveFailed ? saveFailedLine(saveFailed) : (recorder.errors[id] ?? null)}
         actions={
@@ -263,6 +278,11 @@ export function ShortlistBoard({
     )
   }
 
+  // A failed add is shown by the meter (or bar) it was asked from.
+  const creditsFailure =
+    sittingActions.add.variables && 'credits' in sittingActions.add.variables
+      ? sittingFailure(sittingActions.add.data)
+      : undefined
   const ownState = ownSectionState(session, own)
   const designs = designGroups(session)
   const casting = asking?.kind === 'cast' ? asking.voice : null
@@ -300,7 +320,7 @@ export function ShortlistBoard({
           className="btn btn-ghost"
           href={page}
           // A paused audition keeps no money: Resume asks again.
-          onClick={() => sitting && sittingActions.end.mutate()}
+          onClick={() => (sitting || credits) && sittingActions.end.mutate()}
         >
           Pause
         </a>
@@ -309,16 +329,47 @@ export function ShortlistBoard({
         </button>
       </div>
 
-      {money && paid && sitting && (
-        <SittingMeter
-          model={money.model}
-          money={sitting}
-          waiting={recorder.waiting.size}
-          suggested={money.suggested}
-          busy={sittingActions.add.isPending}
-          failure={sittingFailure(sittingActions.add.data)}
-          onAdd={(amount) => sittingActions.add.mutate(amount)}
-        />
+      {money && ((paid && sitting) || credits || wantCredits.length > 0) && (
+        <div className="sitting-meters">
+          {paid && sitting && (
+            <SittingMeter
+              model={money.model}
+              money={sitting}
+              waiting={waitingIn('fish')}
+              suggested={money.suggested}
+              busy={sittingActions.add.isPending}
+              failure={
+                sittingActions.add.variables && 'amount' in sittingActions.add.variables
+                  ? sittingFailure(sittingActions.add.data)
+                  : undefined
+              }
+              onAdd={(amount) => sittingActions.add.mutate({ amount })}
+            />
+          )}
+          {credits && (
+            <SittingMeter
+              unit="credits"
+              model={money.eleven.model}
+              money={credits}
+              waiting={waitingIn('elevenlabs')}
+              suggested={money.eleven.suggested}
+              busy={sittingActions.add.isPending}
+              failure={creditsFailure}
+              onAdd={(given) => sittingActions.add.mutate({ credits: given })}
+            />
+          )}
+          {!credits && wantCredits.length > 0 && (
+            <CreditsAsk
+              model={money.eleven.model}
+              perTake={money.eleven.perTake}
+              suggested={money.eleven.suggested}
+              waiting={wantCredits.length}
+              busy={sittingActions.add.isPending}
+              failure={creditsFailure}
+              onGive={(given) => sittingActions.add.mutate({ credits: given })}
+            />
+          )}
+        </div>
       )}
       {money && paid && !sitting && (
         // Reached without a sitting (the studio was closed meanwhile): it asks again.

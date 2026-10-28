@@ -13,6 +13,7 @@ import {
   takeClip,
   takesToRecord,
   undoFor,
+  waitingForCredits,
 } from './board'
 
 describe('takesToRecord', () => {
@@ -271,18 +272,39 @@ describe('recordable', () => {
       designed: ['d2'],
       voices: { d1: designed, d2: designed },
     }
-    expect(recordable(session as never)).toEqual(['s', 'y', 'h'])
+    expect(recordable(session as never, true)).toEqual(['s', 'y', 'h'])
   })
 
-  it('leaves out ElevenLabs voices, which make no takes yet', () => {
+  const mixed = {
+    shortlist: ['eleven:s'],
+    yours: [],
+    toHear: ['h', 'eleven:h'],
+    designed: [],
+    voices: {},
+  }
+
+  it('leaves out ElevenLabs voices while the audition has no credits for them', () => {
+    expect(recordable(mixed as never, false)).toEqual(['h'])
+  })
+
+  it('takes in ElevenLabs voices once it has', () => {
+    expect(recordable(mixed as never, true)).toEqual(['eleven:s', 'h', 'eleven:h'])
+  })
+})
+
+describe('waitingForCredits', () => {
+  it('counts the ElevenLabs voices on the board that have no take', () => {
     const session = {
       shortlist: ['eleven:s'],
       yours: [],
-      toHear: ['h', 'eleven:h'],
+      toHear: ['h', 'eleven:h', 'eleven:t'],
       designed: [],
       voices: {},
     }
-    expect(recordable(session as never)).toEqual(['h'])
+    expect(waitingForCredits(session as never, { 'eleven:t': 'k' })).toEqual([
+      'eleven:s',
+      'eleven:h',
+    ])
   })
 })
 

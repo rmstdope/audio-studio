@@ -463,7 +463,8 @@ const ELEVEN_STAGES = [
     stage: 'audition',
     name: 'ElevenLabs audition',
     made: 'auditions',
-    purpose: 'Takes and tries of ElevenLabs voices, on a character’s page and with Hear it.',
+    purpose:
+      'Takes, tries and auditions of ElevenLabs voices, on a character’s page, with Hear it and on the audition board.',
   },
   {
     stage: 'draft',

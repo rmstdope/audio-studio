@@ -44,6 +44,16 @@ export function parseAmount(text: string): number | null {
   return amount > 0 ? amount : null
 }
 
+/** The most credits a sitting is given at once (as the server takes them). */
+const MOST_CREDITS = 10_000_000
+
+/** Credits as typed: whole credits, thousands commas allowed, more than none; null for anything else. */
+export function parseCredits(text: string): number | null {
+  const match = /^(\d{1,3}(?:,\d{3})+|\d+)$/.exec(text.trim())
+  const credits = match ? Number(match[1]!.replaceAll(',', '')) : NaN
+  return credits > 0 && credits <= MOST_CREDITS ? credits : null
+}
+
 /** Why the amount typed cannot be paid (a line for the box), or null when it can. */
 export function amountProblem(text: string, credit: number): string | null {
   const amount = parseAmount(text)

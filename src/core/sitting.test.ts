@@ -4,6 +4,7 @@ import {
   cantStart,
   isPaid,
   parseAmount,
+  parseCredits,
   perTakeCost,
   suggestedAmount,
   suggestedCredits,
@@ -100,5 +101,17 @@ describe('isPaid', () => {
     expect(isPaid('s2.1-pro', at)).toBe(true)
     expect(isPaid('mystery', at)).toBe(true)
     expect(isPaid('s2.1-pro-free', at)).toBe(false)
+  })
+})
+
+describe('parseCredits', () => {
+  it('reads whole credits, with or without thousands commas', () => {
+    expect(parseCredits('2100')).toBe(2100)
+    expect(parseCredits(' 2,100 ')).toBe(2100)
+  })
+  it('refuses nothing, fractions, words and more than ten million', () => {
+    for (const text of ['', '0', '1.5', 'abc', '-5', '10000001', '2,10']) {
+      expect(parseCredits(text)).toBeNull()
+    }
   })
 })
