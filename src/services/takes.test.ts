@@ -577,6 +577,7 @@ describe('takes and tries with an ElevenLabs voice', () => {
     expect(await take(root, eleven.client)).toMatchObject({
       ok: true,
       spoken: 'El-ee-or, dear.',
+      asked: '[warm] El-ee-or, dear.',
       model: 'eleven_flash_v2_5',
       credits: 7.5,
       cuesLeftOut: true,
@@ -610,6 +611,13 @@ describe('takes and tries with an ElevenLabs voice', () => {
     })
     expect(spending(root)).toBeNull()
     expect(existsSync(join(root, '.audio-studio/takes'))).toBe(false)
+  })
+
+  it('logs what ElevenLabs made even when the take cannot be kept', async () => {
+    const root = tempRepo({ ...elevenFiles(), '.audio-studio/takes': 'not a folder' })
+    const eleven = fakeEleven({}, { speak: wav })
+    expect(await take(root, eleven.client)).toMatchObject({ ok: false, reason: 'elevenlabs' })
+    expect(spending(root).tries).toMatchObject([{ kind: 'take', credits: 22 }])
   })
 
   it('tries a line with its cue on the audition model, logging the try with its part', async () => {

@@ -62,7 +62,13 @@ export type TakeResult =
  * cost (none when it came from the cache), and whether its cues were left out because the model
  * would have spoken them. Nothing for a Fish voice.
  */
-export type ElevenSpoken = { model?: string; credits?: number; cuesLeftOut?: boolean }
+export interface ElevenSpoken {
+  model?: string
+  credits?: number
+  cuesLeftOut?: boolean
+  /** The text as the page shows it, cues and all, when it may differ from what was sent. */
+  asked?: string
+}
 
 /** What a take or try with an ElevenLabs voice is spoken by: the client, and where it waits. */
 export interface ElevenTakeOptions {
@@ -148,14 +154,11 @@ export async function recordTake(
         message: 'Auditions with ElevenLabs voices come in a later step.',
       }
     }
-    const style = character?.style ?? ''
     return speakEleven(projectFile, project, voiceId, tts, options, {
       kind: 'take',
       character: characterId,
       language,
-      withCues: text.spoken,
-      bare: spokenText(text.phrase, '', seen.pronounce),
-      cued: Boolean(style.trim()),
+      ...pageText(text, seen, characterId),
     })
   }
   const model = options.board ? project.narration.models.audition : FREE_MODELS[0]
@@ -368,12 +371,25 @@ interface ElevenText {
   /** A try's part. */
   part?: string
   language: string
-  /** The text with its cues, as a model that reads them is sent it. */
+  /** The text with its cues, as a model that reads them is sent it, and as the page shows it. */
   withCues: string
   /** The text without them, for a model that would speak them. */
   bare: string
   /** Whether the text has cues at all, so leaving them out is worth saying. */
   cued: boolean
+}
+
+/** The page take's text with and without the character's style, as `ElevenText` wants it. */
+function pageText(
+  text: AuditionText,
+  cast: Cast,
+  characterId: string,
+): Pick<ElevenText, 'withCues' | 'bare' | 'cued'> {
+  return {
+    withCues: text.spoken,
+    bare: text.phrase === null ? '' : spokenText(text.phrase, '', cast.pronounce),
+    cued: Boolean(cast.speakers[characterId]?.style?.trim()),
+  }
 }
 
 /**
@@ -393,8 +409,9 @@ async function speakEleven(
 ): Promise<TakeResult> {
   const root = dirname(projectFile)
   const { narration } = project
-  const { model, spoken, key, cues } = elevenTake(project, voice, tts, text.withCues, text.bare)
-  const said = { model, cuesLeftOut: !cues && text.cued }
+  const { model, spoken, key, cues } = elevenTake(project, voice, tts, text, text.language)
+  // `asked` is the text as the page shows it, by which it knows the take for its own.
+  const said = { model, cuesLeftOut: !cues && text.cued, asked: text.withCues }
   const settings = narration.elevenlabs.tts
   const file = resolveInRoot(root, takePath(key))
   if (existsSync(file)) return { ok: true, key, spoken, cached: true, ...said }
@@ -419,7 +436,7 @@ async function speakEleven(
           ...(takesLanguage(model) && { language: text.language }),
         })
         if (!audio.length) throw new Error('ElevenLabs sent no audio')
-        await writeAtomic(root, takePath(key), audio)
+        // Logged as soon as ElevenLabs made it: it is paid for even if it cannot be kept.
         try {
           await appendTry(projectFile, {
             id: randomUUID(),
@@ -435,6 +452,7 @@ async function speakEleven(
         } catch {
           // Only the record of what it cost is lost; the take stays.
         }
+        await writeAtomic(root, takePath(key), audio)
         return false
       },
     )
@@ -510,8 +528,9 @@ export function auditionIn(
 }
 
 /**
- * The keys of the takes already recorded, by voice, for the character's current phrase, on
- * `model` (the audition model, the board's; the free one for the cast voice's on its page).
+ * The keys of the takes already recorded, by voice, for the character's current phrase in
+ * `language`, on `model` (the audition model, the board's; the free one for the cast voice's on its
+ * page; ElevenLabs' audition model for an ElevenLabs voice's).
  */
 export function recordedTakes(
   root: string,
@@ -521,10 +540,11 @@ export function recordedTakes(
   text: AuditionText,
   voiceIds: string[],
   model: string = project.narration.models.audition,
+  language: string = project.narration.languages[0]!,
 ): Record<string, string> {
   const takes: Record<string, string> = {}
   for (const voice of voiceIds) {
-    const key = takeOf(project, voice, text, cast, characterId, model)
+    const key = takeOf(project, voice, text, cast, characterId, model, language)
     if (existsSync(resolveInRoot(root, takePath(key)))) takes[voice] = key
   }
   return takes
@@ -563,13 +583,13 @@ function takeOf(
   cast: Cast,
   characterId: string,
   model: string,
+  language: string,
 ): string {
   const { tts } = project.narration
   const settings = ttsFor(tts, cast.speakers[characterId])
   if (providerOf(voice) === 'elevenlabs') {
     // An ElevenLabs voice's page take, as `speakEleven` keeps it.
-    const bare = text.phrase === null ? '' : spokenText(text.phrase, '', cast.pronounce)
-    return elevenTake(project, voice, settings, text.spoken, bare).key
+    return elevenTake(project, voice, settings, pageText(text, cast, characterId), language).key
   }
   return takeKey({ model, voice, spoken: text.spoken, tts: settings })
 }
@@ -585,37 +605,35 @@ export function elevenPageTake(
   characterId: string,
   text: AuditionText,
   voice: string,
+  language: string,
 ): { model: string; credits: number; cuesLeftOut: boolean } {
-  const character = cast.speakers[characterId]
-  const bare = text.phrase === null ? '' : spokenText(text.phrase, '', cast.pronounce)
-  const tts = ttsFor(project.narration.tts, character)
-  const { model, spoken, cues } = elevenTake(project, voice, tts, text.spoken, bare)
-  return {
-    model,
-    credits: elevenCredits(model, spoken)!,
-    cuesLeftOut: !cues && Boolean(character?.style?.trim()),
-  }
+  const tts = ttsFor(project.narration.tts, cast.speakers[characterId])
+  const page = pageText(text, cast, characterId)
+  const { model, spoken, cues } = elevenTake(project, voice, tts, page, language)
+  return { model, credits: elevenCredits(model, spoken)!, cuesLeftOut: !cues && page.cued }
 }
 
 /**
  * What an ElevenLabs take or try is made of: the audition model, the text it is sent (`withCues`,
- * or `bare` for a model that would speak them) and its take key with the project's voice settings.
+ * or `bare` for a model that would speak them) and its take key with the project's voice settings
+ * and, for a model told the language, the language.
  */
 function elevenTake(
   project: Project,
   voice: string,
   tts: Project['narration']['tts'],
-  withCues: string,
-  bare: string,
+  { withCues, bare }: Pick<ElevenText, 'withCues' | 'bare'>,
+  language: string,
 ): { model: string; spoken: string; key: string; cues: boolean } {
   const { elevenlabs } = project.narration
   const model = elevenlabs.models.audition
   const cues = readsCues(model)
   const spoken = cues ? withCues : bare
+  const told = takesLanguage(model) ? { language } : {}
   return {
     model,
     spoken,
     cues,
-    key: takeKey({ model, voice, spoken, tts, eleven: elevenlabs.tts }),
+    key: takeKey({ model, voice, spoken, tts, eleven: elevenlabs.tts, ...told }),
   }
 }

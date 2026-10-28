@@ -247,10 +247,11 @@ export async function characterVoice(
       audition,
       [id],
       FREE_MODELS[0],
+      seen.language,
     )[id] ?? null
   if (providerOf(id) === 'elevenlabs') {
     const found = await elevenVoiceFor(elevenFor, dirname(projectFile), project, id)
-    const eleven = elevenPageTake(project, seen.cast, characterId, audition, id)
+    const eleven = elevenPageTake(project, seen.cast, characterId, audition, id, seen.language)
     return found.ok
       ? { ...answer, take, eleven, voice: found.voice }
       : { ...answer, take, eleven, lookup: found }

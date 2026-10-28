@@ -92,6 +92,16 @@ describe('takeKey', () => {
     )
   })
 
+  it('changes with the language an ElevenLabs model was told', () => {
+    const eleven = {
+      ...base,
+      model: 'eleven_v3',
+      voice: 'eleven:abc',
+      eleven: { stability: 0.5 as const, similarityBoost: 0.75, style: 0 },
+    }
+    expect(takeKey({ ...eleven, language: 'sv' })).not.toBe(takeKey({ ...eleven, language: 'en' }))
+  })
+
   it('is sixteen hex characters, the same for the same inputs', () => {
     expect(takeKey(base)).toMatch(/^[0-9a-f]{16}$/)
     expect(takeKey(base)).toBe(takeKey({ ...base }))

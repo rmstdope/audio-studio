@@ -62,6 +62,12 @@ describe('withVoiceTake', () => {
     expect(withVoiceTake(voiced, 'v1', { key: 'k', spoken: '[warm] New.' }).take).toBe('k')
   })
 
+  it('adds an ElevenLabs take said without the style, by the phrase it was asked for', () => {
+    const bare = { key: 'k', spoken: 'New.', asked: '[warm] New.' }
+    expect(withVoiceTake(voiced, 'v1', bare).take).toBe('k')
+    expect(withTake(candidates, 'b', bare).takes.b).toBe('k')
+  })
+
   it('leaves out a take of another voice, or of a phrase changed meanwhile', () => {
     expect(withVoiceTake(voiced, 'v2', { key: 'k', spoken: '[warm] New.' })).toBe(voiced)
     expect(withVoiceTake(voiced, 'v1', { key: 'k', spoken: '[warm] Old.' })).toBe(voiced)

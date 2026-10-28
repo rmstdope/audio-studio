@@ -18,9 +18,9 @@ interface WithTakes {
 export function withTake<T extends WithTakes>(
   candidates: T,
   voice: string,
-  take: { key: string; spoken: string },
+  take: { key: string; spoken: string; asked?: string },
 ): T {
-  if (take.spoken !== candidates.audition.spoken) return candidates
+  if ((take.asked ?? take.spoken) !== candidates.audition.spoken) return candidates
   return { ...candidates, takes: { ...candidates.takes, [voice]: take.key } }
 }
 
@@ -49,14 +49,14 @@ interface VoiceTake {
 
 /**
  * The cast voice's answer with a newly recorded take of it, if the take is of that voice and of
- * the phrase shown.
+ * the phrase shown (`asked`, for an ElevenLabs take said without its style).
  */
 export function withVoiceTake<T extends VoiceTake>(
   answer: T,
   voice: string,
-  take: { key: string; spoken: string },
+  take: { key: string; spoken: string; asked?: string },
 ): T {
-  if (voice !== answer.id || take.spoken !== answer.audition.spoken) return answer
+  if (voice !== answer.id || (take.asked ?? take.spoken) !== answer.audition.spoken) return answer
   return { ...answer, take: take.key }
 }
 
@@ -64,7 +64,7 @@ export function withVoiceTake<T extends VoiceTake>(
  * What the character page asks to record by itself: the cast voice's take of the phrase shown,
  * when there is none, as a key to ask for it once by (phrase and voice). Nothing for an answer
  * about another voice than `castId` (an older one), without an API key, or for an ElevenLabs
- * voice (no takes with one until §12 step 14.10).
+ * voice, whose take costs credits and so waits for Record.
  */
 export function takeToRecord(answer: VoiceTake, castId: string | null): string | null {
   if (

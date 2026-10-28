@@ -1163,9 +1163,11 @@ only, the fingerprint needs no provider of its own.
   sent without them (the style, the opening cue and the cues inside) and the page says so. The
   page take's model and credits are on the Voice panel before it is recorded (`elevenPageTake`);
   a try says after it what it was said with and cost (`triedNote`). Each kept in the take cache
-  under a key that adds the voice settings to Fish's (a Fish take's key is as it was), as
+  under a key that adds the voice settings, and the language for a model told it, to Fish's (a
+  Fish take's key is as it was), as
   ElevenLabs' WAV: `GET /api/takes/:file` serves a file that starts with `RIFF` as `audio/wav`. One
-  already kept costs nothing. What one costs is added to the spending record's `tries`. Board
+  already kept costs nothing. What one costs is added to the spending record's `tries` as soon as
+  ElevenLabs has made it, even if it then cannot be kept. Board
   takes with an ElevenLabs voice are refused until 14.10b: an audition sitting on ElevenLabs is
   budgeted in characters, as a paid Fish sitting is in dollars (§8.1).
 
@@ -1183,6 +1185,8 @@ nothing and is not listed). Only credits spent are kept, so a recording given cr
 spending none stays a version 1 row. Takes and tries with ElevenLabs voices (14.10a) are a list
 of their own too (`tries`: when, `take` or `try`, the character, a try's part, the language, the
 model, the characters sent and the credits), absent from a version 2 log written before them. A
+studio from before 14.10a reads such a log but drops `tries` when it next writes it; tries are
+small and the bills are ElevenLabs', so this is accepted rather than a version 3. A
 version 1 log is read with no credits, no music and no tries.
 The Spending page and the sidebar total dollars and credits apart (`$0.78 · 1,200 credits`), for
 all and per act, music takes in their act and stingers on a tile of their own once one cost
@@ -1674,15 +1678,15 @@ Small, independently useful increments:
           fixed defaults, and saved from the Models panel's ElevenLabs voice row, asking first
           when recorded lines go out of date. The consumer rules in CLAUDE.md name the key.
     10. **Page takes, tries and auditions with an ElevenLabs voice**, in two steps:
-    11. **The page take and cue tries** (built): on ElevenLabs' audition model, not confirmed,
-        their credits shown and kept in the spending record's `tries` (totals and a tile of
-        their own on the Spending page); a try on a model that reads no cues says so rather
-        than sending the line's cues or dropping them unseen.
-    12. **Auditions on ElevenLabs**: board takes with ElevenLabs voices, the sitting budgeted
-        in credits, and the ElevenLabs audition row on the Models panel.
-    13. **Find a voice in ElevenLabs' library**: the provider switch on the audition board, library
+        1. **The page take and cue tries** (built): on ElevenLabs' audition model, not
+           confirmed, their credits shown and kept in the spending record's `tries` (totals and
+           a tile of their own on the Spending page); a try on a model that reads no cues says
+           so rather than sending the line's cues or dropping them unseen.
+        2. **Auditions on ElevenLabs**: board takes with ElevenLabs voices, the sitting budgeted
+           in credits, and the ElevenLabs audition row on the Models panel.
+    11. **Find a voice in ElevenLabs' library**: the provider switch on the audition board, library
         cards and previews, adding a voice on its first take, voice slots shown and freed.
-    14. **Design a voice with ElevenLabs**: previews kept as design takes, saved as a voice when
+    12. **Design a voice with ElevenLabs**: previews kept as design takes, saved as a voice when
         cast.
 
 ---

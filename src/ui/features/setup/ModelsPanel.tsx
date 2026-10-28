@@ -455,8 +455,8 @@ function Question({
 }
 
 /**
- * ElevenLabs' side of the stages the panel shows: draft and final. Its audition model is used
- * first by page takes and auditions with an ElevenLabs voice (§12 step 14.10).
+ * ElevenLabs' side of the stages the panel shows: draft and final. Its audition model, which page
+ * takes and tries already use, gets its row with auditions on ElevenLabs (§12 step 14.10b).
  */
 const ELEVEN_STAGES = [
   {

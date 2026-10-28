@@ -1030,7 +1030,9 @@ export function useSetCue(partId: string, language?: string) {
  * Records audition takes: `record(voice)` asks the server for the take and adds it to the board
  * and the cast voice in the cache, without asking Fish for anything else. `board` says the takes
  * are the audition board's (on the audition model, paid from the sitting); the cast voice's on
- * its page are on the free model; each goes only to its own cached answer (`takeCaches`). `recording` holds the voices in progress, `errors` what went
+ * its page are on the free model (ElevenLabs' audition model for an ElevenLabs voice, whose
+ * credits the Spending page then reads again); each goes only to its own cached answer
+ * (`takeCaches`). `recording` holds the voices in progress, `errors` what went
  * wrong per voice, `waiting` the voices whose take waits for more money (`retryWaiting` asks for
  * them again).
  */
@@ -1080,6 +1082,10 @@ export function useTakes(characterId: string, board = false, language?: string) 
         }
         // A paid take spent money: the meter reads it again.
         if (board) void client.invalidateQueries({ queryKey: ['sitting', characterId] })
+        // An ElevenLabs take spent credits: the Spending page and the sidebar read them again.
+        if (result.ok && result.credits !== undefined) {
+          void client.invalidateQueries({ queryKey: ['spending'] })
+        }
       } catch (error) {
         setErrors((now) => ({
           ...now,
@@ -1504,6 +1510,7 @@ export function useSetInsideCue(partId: string, language?: string) {
  * (empty: the character's style) and answers with the take to play, or why there is none.
  */
 export function useTryCue(partId: string, language?: string) {
+  const client = useQueryClient()
   return useMutation({
     mutationFn: async ({ key, cue, at }: { key: string; cue: string; at?: number }) => {
       const response = await fetch(
@@ -1521,6 +1528,12 @@ export function useTryCue(partId: string, language?: string) {
         throw new Error(`trying the cue answered ${response.status}`)
       }
       return (await response.json()) as NonNullable<TryResult>
+    },
+    // A try with an ElevenLabs voice spent credits: the Spending page and the sidebar read them again.
+    onSuccess: (result) => {
+      if (result.ok && result.credits !== undefined) {
+        void client.invalidateQueries({ queryKey: ['spending'] })
+      }
     },
   })
 }
