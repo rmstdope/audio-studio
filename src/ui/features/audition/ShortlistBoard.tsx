@@ -655,8 +655,9 @@ export function ShortlistBoard({
           type="button"
           disabled={act.isPending}
           onClick={() => {
-            setNoKeywords(session.keywords.length === 0)
-            if (session.keywords.length === 0) return
+            const none = session.keywords.length === 0
+            setNoKeywords(none)
+            if (none) return
             run({ action: 'more', body: { provider: from } }, () => setDroppedHere(null))
           }}
         >
