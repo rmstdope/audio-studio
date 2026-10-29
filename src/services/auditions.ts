@@ -76,7 +76,8 @@ export interface SearchOptions {
 
 /**
  * Searches Fish's library with a character's audition keywords, leaving out its current voice and
- * the voices ruled out for it (or, with `search: false`, finds her voices and no candidates).
+ * the voices ruled out for it (or, with `search: false`, finds her voices and no candidates). Only
+ * a search needs a Fish key; without one, her Fish voices are known by their ids.
  */
 export async function findCandidates(
   projectFile: string,
@@ -93,7 +94,10 @@ export async function findCandidates(
   // Without the cast the phrase, style and pronunciations are unknown: say so, don't guess.
   if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
   const fish = await fishFor(dirname(projectFile), project)
-  if (!fish) {
+  const keywords = options.keywords ?? character.keywords
+  const searching = keywords.length > 0 && options.search !== false
+  // Only a search needs Fish: without a key, Fish's voices are shown by their ids.
+  if (!fish && searching) {
     return {
       ok: false,
       reason: 'no-key',
@@ -103,16 +107,18 @@ export async function findCandidates(
   const seen = auditionIn(project, cast, summary, characterId, asked)
   const language = searchLanguage(project, seen.language)
   const own = character.languages[seen.language]
-  const keywords = options.keywords ?? character.keywords
   const eleven = (await options.elevenFor?.(dirname(projectFile), project)) ?? null
-  // Each voice is asked of its own provider: Fish is never asked about an ElevenLabs one.
-  const lookUp = (id: string): Promise<Voice | null> =>
+  // Each voice is asked of its own provider: Fish is never asked about an ElevenLabs one, and
+  // without a Fish key a Fish voice is known by its id and the name the cast gives it.
+  const lookUp = (id: string, name: string | null): Promise<Voice | null> =>
     (providerOf(id) === 'elevenlabs'
       ? (eleven?.voice(providerId(id)) ?? Promise.resolve(null))
-      : fish.getVoice(id)
+      : fish
+        ? fish.getVoice(id)
+        : Promise.resolve(unknownVoice(id, name))
     ).catch(() => null)
   try {
-    const current = own?.voice ? await lookUp(own.voice) : null
+    const current = own?.voice ? await lookUp(own.voice, own.voiceName) : null
     const others = await otherVoices(lookUp, character, seen.language)
     // Left out before the list is cut, so a later search reaches voices past the first ones.
     const exclude = new Set([
@@ -122,7 +128,7 @@ export async function findCandidates(
       ...(options.exclude ?? []),
     ])
     const found =
-      keywords.length && options.search !== false
+      fish && searching
         ? await searchVoices(fish, keywords, {
             language,
             exclude,
@@ -159,6 +165,21 @@ export async function findCandidates(
   }
 }
 
+/** A voice known only by its id (and the name the cast gives it), when Fish does not answer. */
+export function unknownVoice(id: string, name: string | null): Voice {
+  return {
+    id,
+    title: name ?? '',
+    description: '',
+    tags: [],
+    languages: [],
+    uses: 0,
+    likes: 0,
+    author: '',
+    sample: null,
+  }
+}
+
 /** The language a library is searched in for voices of `language`: the source language as the project says, another by its code. */
 export function searchLanguage(project: Project, language: string): string {
   return language === project.narration.languages[0]
@@ -172,16 +193,17 @@ export function searchLanguage(project: Project, language: string): string {
  * in `language` itself.
  */
 async function otherVoices(
-  lookUp: (id: string) => Promise<Voice | null>,
+  lookUp: (id: string, name: string | null) => Promise<Voice | null>,
   character: CharacterSummary,
   language: string,
 ): Promise<Voice[]> {
-  const ids = Object.entries(character.languages)
-    .filter(([id]) => id !== language)
-    .map(([, casting]) => casting.voice)
-    .filter((id): id is string => id !== null && id !== character.languages[language]?.voice)
-  const unique = [...new Set(ids)]
-  const found = await Promise.all(unique.map(lookUp))
+  const names = new Map<string, string | null>()
+  for (const [code, casting] of Object.entries(character.languages)) {
+    if (code === language || casting.voice === null) continue
+    if (casting.voice === character.languages[language]?.voice) continue
+    if (!names.has(casting.voice)) names.set(casting.voice, casting.voiceName)
+  }
+  const found = await Promise.all([...names].map(([id, name]) => lookUp(id, name)))
   return found.filter((voice): voice is Voice => voice !== null)
 }
 

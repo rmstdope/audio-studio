@@ -33,6 +33,7 @@ import {
   findCandidates,
   searchLanguage,
   setVoice,
+  unknownVoice,
   type FishFactory,
 } from './auditions'
 import { designTakes, readDesigns } from './designStore'
@@ -133,21 +134,6 @@ export async function startAudition(
     await writeSession(projectFile, characterId, session, language)
     return { ok: true, session }
   })
-}
-
-/** A voice known only by its id (and the name the cast gives it), when Fish does not answer. */
-function unknownVoice(id: string, name: string | null): Voice {
-  return {
-    id,
-    title: name ?? '',
-    description: '',
-    tags: [],
-    languages: [],
-    uses: 0,
-    likes: 0,
-    author: '',
-    sample: null,
-  }
 }
 
 /**
