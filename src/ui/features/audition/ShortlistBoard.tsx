@@ -112,6 +112,8 @@ export function ShortlistBoard({
   // Whose library Bring in more searches.
   const [from, setFrom] = useState<VoiceProvider>('fish')
   const [idError, setIdError] = useState<string | null>(null)
+  // Bring in more was pressed with no keywords to search: it asks nothing and says so.
+  const [noKeywords, setNoKeywords] = useState(false)
   const [designing, setDesigning] = useState(false)
   const designButton = useRef<HTMLButtonElement>(null)
   const moreButton = useRef<HTMLButtonElement>(null)
@@ -652,9 +654,12 @@ export function ShortlistBoard({
           className="btn"
           type="button"
           disabled={act.isPending}
-          onClick={() =>
+          onClick={() => {
+            const none = session.keywords.length === 0
+            setNoKeywords(none)
+            if (none) return
             run({ action: 'more', body: { provider: from } }, () => setDroppedHere(null))
-          }
+          }}
         >
           {searching
             ? `Searching ${searching === 'elevenlabs' ? 'ElevenLabs' : 'Fish Audio'}…`
@@ -700,6 +705,12 @@ export function ShortlistBoard({
           </button>
         </form>
         {idError && <span className="adopt-error">{idError}</span>}
+        {noKeywords && (
+          <span className="adopt-error">
+            {name} has no search keywords. Add some on <a href={page}>{name}’s page</a>, then stop
+            this audition and start again.
+          </span>
+        )}
         {showsSlots && (
           <VoiceSlots
             slots={slots}

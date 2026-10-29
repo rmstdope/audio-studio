@@ -180,6 +180,40 @@ describe('ShortlistBoard', () => {
     await act(() => page.unmount())
   })
 
+  it('answers Bring in more with the no-keywords line, asking nothing, when there are no keywords', async () => {
+    const asked: string[] = []
+    globalThis.fetch = (async (url: unknown) => {
+      asked.push(String(url))
+      return new Response('', { status: 404 })
+    }) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board, { keywords: [] }),
+        ),
+      ),
+    )
+    const more = () =>
+      [...container.querySelectorAll('button')].find((b) => b.textContent === 'Bring in more')!
+    const libraries = [...container.querySelectorAll('[aria-label="Whose library"] input')]
+    for (const library of libraries) {
+      await act(() => (library as HTMLInputElement).click())
+      await act(() => more().click())
+      const line = container.querySelector('.board-more .adopt-error')!
+      expect(line.textContent).toContain('Keeper has no search keywords.')
+      expect(line.querySelector('a')!.getAttribute('href')).toBe(
+        routeHref({ view: 'character', character: 'keeper' }),
+      )
+    }
+    expect(asked.filter((u) => u.includes('more'))).toEqual([])
+    await act(() => page.unmount())
+  })
+
   it('says plainly that no voices are to hear when an audition that had some is emptied', async () => {
     globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch
     const container = document.createElement('div')

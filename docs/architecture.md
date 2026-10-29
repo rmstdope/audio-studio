@@ -581,7 +581,8 @@ An audition is for a character, not for a part: the result applies to every part
   more searches, it reads "Searching Fish Audio…" or "Searching ElevenLabs…"; keyboard focus
   starts on it when the board opens with nothing heard.
 - **To hear** holds the candidates being listened to, best match first. **Bring in more** adds
-  the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
+  the next ones (`audition.candidatesPerRound`), searching again when the queue runs short (with no search keywords it asks neither library, and
+  says the character has none, with a link to their page);
   **Bring in a specific voice** adds one by its Fish id or URL, or, with ElevenLabs chosen in the
   menu beside it, by the bare id of one of the user's ElevenLabs voices (§8.6), looked up there.
 - **Drop** takes a voice out of the audition at once and rules it out for the character: no later
