@@ -382,7 +382,8 @@ export function ShortlistBoard({
         </button>
       </div>
 
-      {money && ((paid && sitting) || credits || wantCredits.length > 0) && (
+      {money && ((paid && sitting) || credits) && (
+        // The meters stay at the top as the board scrolls; the taller credits bar below does not.
         <div className="sitting-meters">
           {paid && sitting && (
             <SittingMeter
@@ -411,18 +412,18 @@ export function ShortlistBoard({
               onAdd={(given) => sittingActions.add.mutate({ credits: given })}
             />
           )}
-          {!credits && wantCredits.length > 0 && (
-            <CreditsAsk
-              model={money.eleven.model}
-              perTake={money.eleven.perTake}
-              suggested={money.eleven.suggested}
-              waiting={wantCredits.length}
-              busy={sittingActions.add.isPending}
-              failure={creditsFailure}
-              onGive={(given) => sittingActions.add.mutate({ credits: given })}
-            />
-          )}
         </div>
+      )}
+      {money && !credits && wantCredits.length > 0 && (
+        <CreditsAsk
+          model={money.eleven.model}
+          perTake={money.eleven.perTake}
+          suggested={money.eleven.suggested}
+          waiting={wantCredits.length}
+          busy={sittingActions.add.isPending}
+          failure={creditsFailure}
+          onGive={(given) => sittingActions.add.mutate({ credits: given })}
+        />
       )}
       {money && paid && !sitting && (
         // Reached without a sitting (the studio was closed meanwhile): it asks again.

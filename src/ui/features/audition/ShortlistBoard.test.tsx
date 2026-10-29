@@ -728,6 +728,18 @@ describe('ShortlistBoard', () => {
     await act(() => page.unmount())
   })
 
+  it('scrolls the credits bar away with the board, out of the meters that stay in view', async () => {
+    // The meters stay at the top of the board as it scrolls (styles.css: .sitting-meters is
+    // sticky); the bar asking for credits is tall, and pinned there it hid the cards beneath it.
+    studio()
+    const { container, page, button } = await boardOf(george)
+    await until(() => button('Use up to 2,100 credits') !== undefined)
+    const bar = container.querySelector('[aria-label="Credits for ElevenLabs voices"]')
+    expect(bar).not.toBeNull()
+    expect(bar!.closest('.sitting-meters')).toBeNull()
+    await act(() => page.unmount())
+  })
+
   it('never asks for credits with only Fish voices on the board', async () => {
     const asked = studio()
     const { container, page } = await boardOf({ ...george, id: 'f1', title: 'Old Wizard' })
