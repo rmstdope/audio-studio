@@ -1207,8 +1207,9 @@ only, the fingerprint needs no provider of its own.
   a paid model's dollars are asked for (the resume box), the bar waits until they are given,
   since that box's fresh sitting would end credits given before it. Once
   given, those voices record by themselves, and a second meter shows the credits (model, used of
-  given, about N takes left) with Add when they are used up, as the dollars' meter does. A resume
-  asks for them again the same way.
+  given, about N takes left) with Add when they are used up, as the dollars' meter does. The
+  meters stay at the top of the board as it scrolls; the bar, much taller, scrolls away with the
+  voices, so it never hides a card's title. A resume asks for them again the same way.
 
 **Spending** (built in 14.7d). The log (`.audio-studio/spending.json`) moves to version 2 when it
 first needs to, with its first ElevenLabs credits or music take (`needsVersion2`), so a Fish-only
