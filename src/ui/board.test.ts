@@ -267,6 +267,27 @@ describe('ownSectionState', () => {
   })
 })
 
+describe('ownSectionState without a Fish key', () => {
+  it('says the key is missing when there are no voices to show', () => {
+    expect(
+      ownSectionState({ yours: [], mine: [] }, { fetched: false, error: null, noKey: true }),
+    ).toBe('noKey')
+  })
+  it('says all are used up, not that the key is missing, when the account had voices', () => {
+    expect(
+      ownSectionState({ yours: [], mine: ['m1'] }, { fetched: false, error: null, noKey: true }),
+    ).toBe('allUsed')
+  })
+  it('keeps the voices already on the board', () => {
+    expect(
+      ownSectionState(
+        { yours: ['m1'], mine: ['m1'] },
+        { fetched: false, error: null, noKey: true },
+      ),
+    ).toBe('cards')
+  })
+})
+
 describe('recordable', () => {
   it('leaves out designed voices: their preview is their take, kept when they were made', () => {
     const designed = { design: { n: 1, description: 'd', at: 't' } }

@@ -551,7 +551,7 @@ export function ShortlistBoard({
       <section className="section" aria-label="Your voices">
         <div className="section-head">
           <h2 className="section-title">Your voices</h2>
-          {ownState !== 'none' && (
+          {ownState !== 'none' && ownState !== 'noKey' && (
             <span className="muted">
               The voices on your own Fish account. They’re here whatever the keywords.
             </span>
@@ -571,6 +571,12 @@ export function ShortlistBoard({
               Try again
             </button>
           </div>
+        )}
+        {ownState === 'noKey' && (
+          <p className="muted">
+            Your voices come from your Fish account, and there is no Fish key yet. Add
+            FISH_AUDIO_API_KEY in <a href={routeHref({ view: 'setup' })}>Setup</a>.
+          </p>
         )}
         {ownState === 'loading' && <p className="muted">Getting your voices from Fish…</p>}
         {ownState === 'none' && (

@@ -1277,13 +1277,20 @@ export function useOwnVoices(characterId: string, language?: string) {
     },
   })
   const failure = mutation.data && !mutation.data.ok ? mutation.data : null
+  const noKey = failure !== null && 'reason' in failure && failure.reason === 'no-key'
   const error =
     mutation.error?.message ??
-    (failure ? ('message' in failure ? failure.message : 'the project’s files need fixing') : null)
+    (failure && !noKey
+      ? 'message' in failure
+        ? failure.message
+        : 'the project’s files need fixing'
+      : null)
   return {
     fetch: () => mutation.mutate(),
     pending: mutation.isPending,
     fetched: mutation.isSuccess && !failure,
+    /** True when there is no Fish key, which Try again cannot mend. */
+    noKey,
     error,
   }
 }

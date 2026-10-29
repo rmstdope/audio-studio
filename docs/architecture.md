@@ -516,7 +516,8 @@ offers to start one.
 Fish account (`GET /model?self=true`, `listOwnVoices`), whatever the keywords, never ranked and
 never in To hear. They are fetched by their own request (`POST /api/auditions/:id/own`) when a
 board opens, on a start or a resume, and again on Try again, so the board does not wait for Fish;
-a failure leaves the session as it was. The session keeps them in `yours` (the section) and
+a failure leaves the session as it was. Without a Fish key the section says so, with a link to
+Setup, and offers no Try again (the answer is `no-key`, which trying again cannot mend). The session keeps them in `yours` (the section) and
 `mine` (the whole account, for the "none" and "all used up" lines); a voice marked `own` keeps its
 "Yours" badge and blue border on the shortlist and as the cast voice. Shortlist, Unlist (back to
 Your voices) and Drop (ruled out like any voice) work as elsewhere; an own voice ruled out is not
