@@ -117,13 +117,15 @@ describe('VoiceCard, the provider on the muted line', () => {
     )
   })
 
-  it('names the provider before Designed · not saved', async () => {
-    const design = { designId: 'd', preview: 'p' } as unknown as Voice['design']
-    expect((await rendered({ ...fish, design })).text).toContain(
-      'Fish Audio · Designed · not saved',
-    )
-    expect((await rendered({ ...george, design })).text).toContain(
-      'ElevenLabs · Designed · not saved',
-    )
+  it('names the provider before Designed · not saved, as a design’s own id does not say it', async () => {
+    const design = { n: 1, description: 'a gruff voice', at: '2026-01-01T00:00:00Z' }
+    const fishDesign: Voice = { ...fish, id: 'design-0123456789ab', design }
+    const elevenDesign: Voice = {
+      ...george,
+      id: 'design-ba9876543210',
+      design: { ...design, generated: 'eleven:g2' },
+    }
+    expect((await rendered(fishDesign)).text).toContain('Fish Audio · Designed · not saved')
+    expect((await rendered(elevenDesign)).text).toContain('ElevenLabs · Designed · not saved')
   })
 })
