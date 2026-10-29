@@ -380,7 +380,10 @@ export function ownSectionState(
   session: Pick<AuditionSession, 'yours' | 'mine'>,
   fetch: { fetched: boolean; error: string | null; noKey?: boolean },
 ): 'loading' | 'error' | 'noKey' | 'none' | 'allUsed' | 'cards' {
-  if (fetch.noKey) return session.yours.length > 0 ? 'cards' : 'noKey'
+  if (fetch.noKey) {
+    if (session.yours.length > 0) return 'cards'
+    return session.mine.length > 0 ? 'allUsed' : 'noKey'
+  }
   if (fetch.error) return session.yours.length > 0 ? 'cards' : 'error'
   if (!fetch.fetched) return 'loading'
   if (session.yours.length > 0) return 'cards'

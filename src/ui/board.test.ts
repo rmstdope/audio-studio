@@ -273,6 +273,11 @@ describe('ownSectionState without a Fish key', () => {
       ownSectionState({ yours: [], mine: [] }, { fetched: false, error: null, noKey: true }),
     ).toBe('noKey')
   })
+  it('says all are used up, not that the key is missing, when the account had voices', () => {
+    expect(
+      ownSectionState({ yours: [], mine: ['m1'] }, { fetched: false, error: null, noKey: true }),
+    ).toBe('allUsed')
+  })
   it('keeps the voices already on the board', () => {
     expect(
       ownSectionState(

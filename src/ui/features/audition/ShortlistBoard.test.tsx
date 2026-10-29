@@ -214,6 +214,36 @@ describe('ShortlistBoard', () => {
     await act(() => page.unmount())
   })
 
+  it('says Your voices needs a Fish key, with a link to Setup and no Try again, when there is none', async () => {
+    globalThis.fetch = (async (path: string) =>
+      path.endsWith('/own')
+        ? Response.json({
+            ok: false,
+            reason: 'no-key',
+            message: 'Set FISH_AUDIO_API_KEY in the project’s env file, or in the environment.',
+          })
+        : new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board, {}),
+        ),
+      ),
+    )
+    const section = () => container.querySelector('[aria-label="Your voices"]')!
+    await until(() => section().textContent!.includes('no Fish key yet'))
+    expect(section().textContent).toContain('FISH_AUDIO_API_KEY')
+    expect(section().querySelector('a')!.getAttribute('href')).toBe(routeHref({ view: 'setup' }))
+    expect(section().querySelector('[role="alert"]')).toBeNull()
+    expect(section().textContent).not.toContain('Try again')
+    await act(() => page.unmount())
+  })
+
   it('says plainly that no voices are to hear when an audition that had some is emptied', async () => {
     globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch
     const container = document.createElement('div')
