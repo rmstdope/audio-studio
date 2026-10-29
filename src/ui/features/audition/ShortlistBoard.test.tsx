@@ -11,6 +11,7 @@ const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider, useQuery } = await import('@tanstack/react-query')
 const { useCast } = await import('../../api')
 const { ShortlistBoard } = await import('./ShortlistBoard')
+const { routeHref } = await import('../../route')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -174,7 +175,8 @@ describe('ShortlistBoard', () => {
     expect(toHear.textContent).not.toContain('Choose where they come from')
     const link = toHear.querySelector('a')!
     expect(link.textContent).toBe('Keeper’s page')
-    expect(link.getAttribute('href')).toContain('keeper')
+    expect(link.getAttribute('href')).toBe(routeHref({ view: 'character', character: 'keeper' }))
+    expect(toHear.textContent).toContain('then stop this audition and start again')
     await act(() => page.unmount())
   })
 

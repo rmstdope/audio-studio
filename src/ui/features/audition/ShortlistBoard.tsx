@@ -598,8 +598,8 @@ export function ShortlistBoard({
             <strong>{session.heard ? 'No voices to hear' : 'No voices to hear yet'}</strong>
             {!session.heard && session.keywords.length === 0 ? (
               <span>
-                {name} has no search keywords. Add some on <a href={page}>{name}’s page</a>, or
-                bring in a specific voice or a design below.
+                {name} has no search keywords. Add some on <a href={page}>{name}’s page</a>, then
+                stop this audition and start again; or bring in a specific voice or a design below.
               </span>
             ) : (
               <span>
