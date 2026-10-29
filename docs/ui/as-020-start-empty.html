@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Audition starts empty</title>
+    <style>
+      body {
+        background: #07080b;
+        color: #eceef3;
+        font:
+          14px/1.45 system-ui,
+          sans-serif;
+        padding: 24px 16px;
+        margin: 0;
+      }
+      section {
+        max-width: 860px;
+        margin: 0 auto 28px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 18px 0 6px;
+      }
+      .panel {
+        background: #12141a;
+        border: 1px solid #1f232d;
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 8px;
+      }
+      .muted {
+        color: #a9b0bd;
+      }
+      .btn {
+        background: #0d0f14;
+        color: #eceef3;
+        border: 1px solid #1f232d;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      .primary {
+        background: #7aa2ff;
+        color: #0b0c10;
+        border-color: #7aa2ff;
+      }
+      input,
+      select {
+        background: #0d0f14;
+        color: #eceef3;
+        border: 1px solid #1f232d;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+      }
+      input {
+        width: 170px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .chip {
+        border: 1px solid #1f232d;
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 12px;
+        color: #a9b0bd;
+      }
+      .ok {
+        color: #3ddc97;
+        border-color: #24533f;
+      }
+      .card {
+        border: 1px solid #1f232d;
+        border-radius: 12px;
+        padding: 10px;
+        width: 210px;
+        display: inline-block;
+        margin: 8px 8px 0 0;
+        vertical-align: top;
+      }
+      .yours {
+        border-color: #3a4a7a;
+      }
+      .empty {
+        border: 1px dashed #2a2f3b;
+        border-radius: 12px;
+        padding: 22px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+      }
+      .cta {
+        border: 1px solid #3a4a7a;
+        background: #141a2a;
+        border-radius: 12px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .switch {
+        display: inline-flex;
+        border: 1px solid #1f232d;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .switch span {
+        padding: 6px 10px;
+      }
+      .switch .on {
+        background: #1f2a44;
+        color: #7aa2ff;
+      }
+      .sec {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      .error {
+        color: #ff6b6b;
+      }
+      .note {
+        font-size: 12px;
+        color: #7aa2ff;
+        border-left: 2px solid #7aa2ff;
+        padding-left: 8px;
+        margin: 6px 0;
+      }
+      .focus {
+        outline: 2px solid #7aa2ff;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>An audition starts with nothing to hear (as-020)</h1>
+      <p class="muted">
+        Starting an audition puts the cast voice on the shortlist and shows Your voices and designs
+        as before, but brings no voices into To hear. They come in only when asked: Bring in more
+        (Fish Audio or ElevenLabs), a specific voice, or a design.
+      </p>
+    </section>
+    <section>
+      <h2>1 · The audition page before an audition starts</h2>
+      <div class="empty">
+        <strong>No audition in progress for Brom</strong
+        ><span class="muted"
+          >Start one: the current voice goes on the shortlist. You choose where the voices to hear
+          come from.</span
+        >
+        <div class="row">
+          <button class="btn">Brom’s page</button
+          ><button class="btn primary">Start audition</button>
+        </div>
+      </div>
+      <p class="note">A paid audition model still opens its “Spend up to” box first, unchanged.</p>
+    </section>
+
+    <section>
+      <h2>
+        2 · Just started (the same after a reload, or a resume, of an audition that never had voices
+        to hear)
+      </h2>
+      <div class="panel">
+        <span class="muted">Searching for</span> <span class="chip">gruff</span>
+        <span class="chip">old</span> <span class="chip">sailor</span><br /><span class="muted"
+          >What Bring in more searches for. Change them on Brom’s page for the next audition.</span
+        >
+      </div>
+      <div class="panel row">
+        <span class="chip ok">1 shortlisted</span><span class="chip">0 to hear</span
+        ><span style="flex: 1"></span><button class="btn">Pause</button
+        ><button class="btn">Stop audition</button>
+      </div>
+      <h2>Shortlist</h2>
+      <div class="card">
+        <b>Grizzled Captain</b> <span class="chip">cast now</span><br /><span class="muted"
+          >▶ take · sample</span
+        ><br /><button class="btn">Cast</button> <button class="btn">Unlist</button>
+      </div>
+      <h2>Your voices</h2>
+      <div class="card yours">
+        <b>Narrator (mine)</b> <span class="chip">Yours</span><br /><span class="muted">▶ take</span
+        ><br /><button class="btn">Shortlist</button> <button class="btn">Drop</button>
+      </div>
+      <h2>Designed for Brom</h2>
+      <div class="card">
+        <b>Design 1</b><br /><span class="muted">▶ take</span><br /><button class="btn">
+          Shortlist
+        </button>
+        <button class="btn">Drop</button>
+      </div>
+
+      <h2>To hear</h2>
+      <div class="empty">
+        <strong>No voices to hear yet</strong
+        ><span class="muted"
+          >Choose where they come from below: the keywords in Fish Audio’s or ElevenLabs’ library, a
+          specific voice, or a design.</span
+        >
+      </div>
+      <div class="panel row">
+        <span class="muted">Bring in more from</span
+        ><span class="switch"><span class="on">Fish Audio</span><span>ElevenLabs</span></span
+        ><button class="btn focus">Bring in more</button
+        ><button class="btn">✦ Design a voice…</button><span style="flex: 1"></span
+        ><span class="muted">Bring in a specific voice</span
+        ><select>
+          <option>Fish Audio</option></select
+        ><input placeholder="Fish voice id or URL" /><button class="btn">Bring in</button>
+      </div>
+
+      <p class="note">The keyboard lands on Bring in more once the board opens after Start.</p>
+    </section>
+
+    <section>
+      <h2>3 · Searching, after Bring in more</h2>
+      <div class="panel row">
+        <span class="muted">Bring in more from</span
+        ><span class="switch"><span class="on">Fish Audio</span><span>ElevenLabs</span></span
+        ><button class="btn" disabled>Searching Fish Audio…</button
+        ><button class="btn">✦ Design a voice…</button>
+      </div>
+      <p class="note">
+        “Searching ElevenLabs…” with ElevenLabs chosen. Greyed out until the search answers, then
+        back to “Bring in more”.
+      </p>
+    </section>
+
+    <section>
+      <h2>4 · The search found nothing, or failed</h2>
+      <div class="empty">
+        <strong>No voices to hear yet</strong
+        ><span class="muted">Choose where they come from below…</span>
+      </div>
+      <div class="panel row">
+        <span class="muted">Bring in more from</span
+        ><span class="switch"><span class="on">Fish Audio</span><span>ElevenLabs</span></span
+        ><button class="btn">Bring in more</button><button class="btn">✦ Design a voice…</button
+        ><span style="flex: 1"></span><span class="muted">Bring in a specific voice</span
+        ><select>
+          <option>Fish Audio</option></select
+        ><input placeholder="Fish voice id or URL" /><button class="btn">Bring in</button>
+      </div>
+
+      <div class="panel">
+        <b class="error">The audition could not go on</b><br /><span class="muted"
+          >No more voices found for these keywords. Try other keywords, or bring in a specific
+          voice.</span
+        >
+      </div>
+      <p class="note">Today’s messages, unchanged.</p>
+    </section>
+
+    <section>
+      <h2>5 · Later, To hear emptied by drops and shortlisting</h2>
+      <div class="empty">
+        <strong>No voices to hear</strong
+        ><span class="muted">Bring in more voices matching the keywords, or a specific voice.</span>
+      </div>
+      <div class="panel row">
+        <span class="muted">Bring in more from</span
+        ><span class="switch"><span class="on">Fish Audio</span><span>ElevenLabs</span></span
+        ><button class="btn">Bring in more</button><button class="btn">✦ Design a voice…</button
+        ><span style="flex: 1"></span><span class="muted">Bring in a specific voice</span
+        ><select>
+          <option>Fish Audio</option></select
+        ><input placeholder="Fish voice id or URL" /><button class="btn">Bring in</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>6 · Resumed after a pause</h2>
+      <p class="muted">
+        Exactly what it had: its voices to hear, or the empty line of 2 or 5. Nothing new comes into
+        To hear by itself. Your voices and designs as today.
+      </p>
+    </section>
+  </body>
+</html>
