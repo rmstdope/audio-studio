@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Voice cards name their provider</title>
+    <style>
+      body {
+        background: #07080b;
+        color: #eceef3;
+        font:
+          14px/1.45 system-ui,
+          sans-serif;
+        padding: 24px 16px;
+        margin: 0;
+      }
+      section {
+        max-width: 860px;
+        margin: 0 auto 28px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 18px 0 8px;
+      }
+      .muted {
+        color: #a9b0bd;
+      }
+      .note {
+        color: #a9b0bd;
+        font-size: 13px;
+        margin: 4px 0 10px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 10px;
+      }
+      .card {
+        background: #0d0f14;
+        border: 1px solid #1f232d;
+        border-radius: 12px;
+        padding: 12px 14px;
+        min-width: 0;
+      }
+      .card.kept {
+        background: #12141a;
+        border-color: #4f8a5f;
+      }
+      .card.yours {
+        border-color: #7a6a3a;
+      }
+      .card.designed {
+        border-color: #6a4a8a;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .title {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .title strong {
+        overflow-wrap: anywhere;
+      }
+      .meta {
+        font-size: 12.5px;
+        color: #a9b0bd;
+      }
+      .badges {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .badge {
+        font-size: 11px;
+        border-radius: 999px;
+        padding: 1px 8px;
+        white-space: nowrap;
+      }
+      .ok {
+        background: #1d3a26;
+        color: #9fe0b0;
+      }
+      .yb {
+        background: #3a3220;
+        color: #e8cf8a;
+      }
+      .db {
+        background: #2e2240;
+        color: #cbb0f0;
+      }
+      .prov {
+        border: 1px solid #2c3242;
+        color: #c8cedb;
+        background: #151925;
+      }
+      .desc {
+        color: #a9b0bd;
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      .chips {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin: 6px 0;
+      }
+      .chip {
+        border: 1px solid #1f232d;
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 12px;
+        color: #a9b0bd;
+      }
+      .take {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 8px;
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid #1f232d;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+      }
+      .bar {
+        flex: 1;
+        height: 6px;
+        background: #1f232d;
+        border-radius: 3px;
+      }
+      .narrow {
+        max-width: 300px;
+      }
+      .new {
+        outline: 1px dashed #7aa2ff;
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>Voice cards name their provider</h1>
+      <p class="note">
+        The line under each voice name starts with Fish Audio or ElevenLabs, as ElevenLabs voices
+        already do. Nothing else on the card moves. New words are outlined in dashed blue (the
+        outline is only for this drawing).
+      </p>
+      <h2>To hear</h2>
+      <div class="grid">
+        <article class="card">
+          <div class="head">
+            <div class="title">
+              <strong>Gravelly Old Sailor</strong
+              ><span class="meta"
+                ><span class="new">Fish Audio</span> · by seawolf · 12k uses · 340 likes</span
+              >
+            </div>
+            <span class="badges"><span class="chip">3/4 keywords</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+        <article class="card">
+          <div class="head">
+            <div class="title">
+              <strong>Warm Narrator</strong
+              ><span class="meta">ElevenLabs library · added by 8.1k</span>
+            </div>
+            <span class="badges"><span class="chip">3/4 keywords</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+        <article class="card">
+          <div class="head">
+            <div class="title">
+              <strong>Voice 3f9a…</strong><span class="meta">ElevenLabs voice</span>
+            </div>
+            <span class="badges"><span class="chip">3/4 keywords</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+      </div>
+      <h2>Shortlist</h2>
+      <div class="grid">
+        <article class="card kept">
+          <div class="head">
+            <div class="title">
+              <strong
+                >Captain Morgan — deep, rough, slightly amused, with a long title that wraps</strong
+              ><span class="meta"
+                ><span class="new">Fish Audio</span> · by seawolf · 12k uses · 340 likes</span
+              >
+            </div>
+            <span class="badges"><span class="badge ok">Kept</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+        <article class="card kept">
+          <div class="head">
+            <div class="title">
+              <strong>Brisk Butler</strong
+              ><span class="meta">ElevenLabs library · added by 8.1k</span>
+            </div>
+            <span class="badges"><span class="badge ok">Kept</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+      </div>
+      <h2>Your voices</h2>
+      <div class="grid">
+        <article class="card yours">
+          <div class="head">
+            <div class="title">
+              <strong>My clone of Anna</strong
+              ><span class="meta"><span class="new">Fish Audio</span> · Your voice · private</span>
+            </div>
+            <span class="badges"><span class="badge yb">Yours</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+        <article class="card yours">
+          <div class="head">
+            <div class="title">
+              <strong>Studio Henrik</strong
+              ><span class="meta"><span class="new">ElevenLabs</span> · Your voice · private</span>
+            </div>
+            <span class="badges"><span class="badge yb">Yours</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+      </div>
+      <h2>Designs</h2>
+      <div class="grid">
+        <article class="card designed">
+          <div class="head">
+            <div class="title">
+              <strong>Stormy pirate 1</strong
+              ><span class="meta"><span class="new">Fish Audio</span> · Designed · not saved</span>
+            </div>
+            <span class="badges"><span class="badge db">Designed</span></span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+        <article class="card designed">
+          <div class="head">
+            <div class="title">
+              <strong>Stormy pirate 2</strong
+              ><span class="meta"><span class="new">ElevenLabs</span> · Designed · not saved</span>
+            </div>
+            <span class="badges"><span class="badge db">Designed</span></span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+      </div>
+      <h2>A narrow window (300 px)</h2>
+      <div class="narrow grid">
+        <article class="card kept">
+          <div class="head">
+            <div class="title">
+              <strong
+                >Captain Morgan — deep, rough, slightly amused, with a long title that wraps</strong
+              ><span class="meta"
+                ><span class="new">Fish Audio</span> · by seawolf · 12k uses · 340 likes</span
+              >
+            </div>
+            <span class="badges"><span class="badge ok">Kept</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+        <article class="card yours">
+          <div class="head">
+            <div class="title">
+              <strong>Studio Henrik</strong
+              ><span class="meta"><span class="new">ElevenLabs</span> · Your voice · private</span>
+            </div>
+            <span class="badges"><span class="badge yb">Yours</span></span>
+          </div>
+          <p class="desc">A weathered, slightly hoarse male voice.</p>
+          <div class="chips">
+            <span class="chip">male</span><span class="chip">old</span
+            ><span class="chip">english</span>
+          </div>
+          <div class="take">
+            <span class="play">▶</span><span class="bar"></span><span class="meta">0:04</span>
+          </div>
+        </article>
+      </div>
+      <h2>Today, for comparison</h2>
+      <div class="grid">
+        <article class="card">
+          <div class="head">
+            <div class="title">
+              <strong>Gravelly Old Sailor</strong
+              ><span class="meta">by seawolf · 12k uses · 340 likes</span>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="head">
+            <div class="title">
+              <strong>My clone of Anna</strong><span class="meta">Your voice · private</span>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="head">
+            <div class="title">
+              <strong>Studio Henrik</strong><span class="meta">Your voice · private</span>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="head">
+            <div class="title">
+              <strong>Stormy pirate 1</strong><span class="meta">Designed · not saved</span>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <div class="head">
+            <div class="title">
+              <strong>Stormy pirate 2</strong><span class="meta">Designed · not saved</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </body>
+</html>
