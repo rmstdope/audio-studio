@@ -180,8 +180,13 @@ On top of verify-bead's *Look*, check what the acceptance touches:
   `docs/ui/` (`docs/ui/<bead>-<slug>.html`). Open it from the tree in a second tab
   (`file://<absolute path of the tree>/docs/ui/<file>.html`), compare it with the studio side by
   side, and screenshot both. If Chrome refuses the `file://` URL, the extension lacks file access:
-  that is a blocker question to the navigator (allow file URLs for the extension), not a reason to
-  skip the comparison.
+  that is not a question to the navigator and not a reason to skip the comparison. Serve the
+  tree's `docs/ui` over http yourself: take the first free port from 4327 up (`lsof -nP
+  -iTCP:<port> -sTCP:LISTEN`, so the studio's 4317 to 4326 stay clear), start `python3 -m
+  http.server <port> --bind 127.0.0.1 --directory <absolute path of the tree>/docs/ui` in the
+  background, open `http://127.0.0.1:<port>/<file>.html` in the second tab, and compare as above.
+  Stop that server, and only that one, when the look is done, and say in one line in each report
+  that the mockup was served on that port because Chrome refused `file://`.
 - **Wide and narrow.** The studio is a desktop tool. Its layout changes at 1100 and 900 pixels and
   wider (the audition brief becomes a side column at 1100) and below 720, 640 and 600. Look at a
   window at least 1100 wide first, then resize to about 600×900 and look again. A bead that changes
