@@ -161,6 +161,30 @@ describe('startAudition', () => {
   })
 })
 
+describe('startAudition, with only an ElevenLabs key', () => {
+  it('starts without Fish, and brings voices in from ElevenLabs', async () => {
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    const noFish = async () => null
+    const { client } = fakeEleven()
+    client.sharedVoices = async () => ({
+      voices: [{ ...voice('eleven:l1', 'Warm l1'), library: { owner: 'o', added: false } }],
+      more: false,
+    })
+    const elevenFor = async () => client
+    const result = await startAudition(projectFile, 'mira', noFish, undefined, elevenFor)
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    // Fish cannot be asked about the cast voice, so it is shown by its id.
+    expect(result.session.shortlist).toEqual(['cur'])
+    expect(result.session.toHear).toEqual([])
+    const more = await moreVoices(projectFile, 'mira', noFish, undefined, {
+      provider: 'elevenlabs',
+      elevenFor,
+    })
+    expect(more?.ok && more.session.toHear).toEqual(['eleven:l1'])
+  })
+})
+
 describe('startAudition, for a character cast with an ElevenLabs voice', () => {
   it('shows its voice as ElevenLabs knows it, and asks Fish nothing about it', async () => {
     const root = tempRepo({

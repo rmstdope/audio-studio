@@ -93,7 +93,10 @@ export async function findCandidates(
   // Without the cast the phrase, style and pronunciations are unknown: say so, don't guess.
   if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
   const fish = await fishFor(dirname(projectFile), project)
-  if (!fish) {
+  const keywords = options.keywords ?? character.keywords
+  const searching = keywords.length > 0 && options.search !== false
+  // Only a search needs Fish: without a key, Fish's voices are shown by their ids.
+  if (!fish && searching) {
     return {
       ok: false,
       reason: 'no-key',
@@ -103,13 +106,12 @@ export async function findCandidates(
   const seen = auditionIn(project, cast, summary, characterId, asked)
   const language = searchLanguage(project, seen.language)
   const own = character.languages[seen.language]
-  const keywords = options.keywords ?? character.keywords
   const eleven = (await options.elevenFor?.(dirname(projectFile), project)) ?? null
   // Each voice is asked of its own provider: Fish is never asked about an ElevenLabs one.
   const lookUp = (id: string): Promise<Voice | null> =>
     (providerOf(id) === 'elevenlabs'
       ? (eleven?.voice(providerId(id)) ?? Promise.resolve(null))
-      : fish.getVoice(id)
+      : (fish?.getVoice(id) ?? Promise.resolve(null))
     ).catch(() => null)
   try {
     const current = own?.voice ? await lookUp(own.voice) : null
@@ -122,7 +124,7 @@ export async function findCandidates(
       ...(options.exclude ?? []),
     ])
     const found =
-      keywords.length && options.search !== false
+      fish && searching
         ? await searchVoices(fish, keywords, {
             language,
             exclude,

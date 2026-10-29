@@ -1209,7 +1209,9 @@ describe('server, with problems', () => {
 describe('server, without an API key', () => {
   const keyless = tempRepo({
     'audio-studio.json': projectJson(),
-    'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
+    'tts/cast.json': {
+      speakers: { narrator: { voice: 'v1', audition: { keywords: ['warm'] } } },
+    },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const other = startServer({
@@ -1220,12 +1222,17 @@ describe('server, without an API key', () => {
   })
   afterAll(() => other.stop(true))
 
-  it('says there is no API key', async () => {
+  it('starts an audition, and says there is no API key when Fish is needed', async () => {
     const started = await fetch(new URL('/api/auditions/narrator/start', other.url), {
       method: 'POST',
       headers: { origin: other.url.origin },
     })
-    expect(await started.json()).toMatchObject({ ok: false, reason: 'no-key' })
+    expect(await started.json()).toMatchObject({ ok: true, session: { shortlist: ['v1'] } })
+    const more = await fetch(new URL('/api/auditions/narrator/more', other.url), {
+      method: 'POST',
+      headers: { origin: other.url.origin },
+    })
+    expect(await more.json()).toMatchObject({ ok: false, reason: 'no-key' })
     const voice = await (await fetch(new URL('/api/characters/narrator/voice', other.url))).json()
     expect(voice).toMatchObject({ ok: true, voice: null })
     expect(voice.lookup).toMatchObject({ reason: 'no-key' })
