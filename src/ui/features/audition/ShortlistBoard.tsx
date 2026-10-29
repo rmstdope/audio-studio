@@ -550,7 +550,8 @@ export function ShortlistBoard({
           <h2 className="section-title">Your voices</h2>
           {ownState !== 'none' && (
             <span className="muted">
-              The voices on your own Fish account. They’re here whatever the keywords.
+              The voices on your own Fish account and your ElevenLabs voices. They’re here whatever
+              the keywords.
             </span>
           )}
         </div>

@@ -152,6 +152,27 @@ describe('ShortlistBoard', () => {
     await act(() => page.unmount())
   })
 
+  it('names both Fish and ElevenLabs in the Your voices heading, as both are listed there', async () => {
+    globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board, {}),
+        ),
+      ),
+    )
+    const section = () => container.querySelector('[aria-label="Your voices"] .section-head')!
+    await until(() => (section().textContent ?? '').includes('They’re here whatever the keywords'))
+    expect(section().textContent).toContain('your own Fish account and your ElevenLabs voices')
+
+    await act(() => page.unmount())
+  })
+
   it('says plainly that no voices are to hear when an audition that had some is emptied', async () => {
     globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch
     const container = document.createElement('div')
