@@ -124,8 +124,8 @@ export function AuditionView({
                 {board.session.keywords.length === 0 && <span className="muted">No keywords</span>}
               </div>
               <span className="muted brief-hint">
-                The keywords the audition started with. Change them on{' '}
-                <a href={page}>{character.name}’s page</a> for the next one.
+                What Bring in more searches for. Change them on{' '}
+                <a href={page}>{character.name}’s page</a> for the next audition.
               </span>
             </div>
             {board.audition && (
@@ -181,7 +181,7 @@ export function AuditionView({
               <span>
                 {casted
                   ? `Back on ${character.name}’s page you can hear the new voice.`
-                  : 'Start one: the current voice goes on the shortlist, and the voices best matching the keywords come up to hear.'}
+                  : 'Start one: the current voice goes on the shortlist. You choose where the voices to hear come from.'}
               </span>
               <span className="chips" style={{ justifyContent: 'center' }}>
                 <a className="btn" href={page}>

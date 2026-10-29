@@ -342,3 +342,35 @@ describe('designed voices', () => {
     expect(AuditionSessionSchema.parse(old).designed).toEqual([])
   })
 })
+
+describe('whether the audition has had voices to hear', () => {
+  const empty = () =>
+    startSession({
+      character: 'mira',
+      keywords: ['warm'],
+      current: voice('cur'),
+      candidates: [],
+      perRound: 3,
+    })
+
+  it('has not when it starts with no candidates, and has when it starts with some', () => {
+    expect(empty().heard).toBe(false)
+    expect(start().heard).toBe(true)
+  })
+
+  it('has once a specific voice, a round from the queue or found voices come in', () => {
+    expect(addVoice(empty(), voice('x')).heard).toBe(true)
+    expect(bringFound(empty(), candidates('x'), 3).heard).toBe(true)
+    expect(bringMore(queueMore(empty(), candidates('x', 'y')), 3).heard).toBe(true)
+  })
+
+  it('has once a shortlisted voice is taken off the shortlist into To hear', () => {
+    expect(unlist(empty(), 'cur').heard).toBe(true)
+  })
+
+  it('stays as it was when nothing comes in, and a saved audition from before counts as having had', () => {
+    expect(bringFound(empty(), [], 3).heard).toBe(false)
+    const { heard: _heard, ...old } = start()
+    expect(AuditionSessionSchema.parse(old).heard).toBe(true)
+  })
+})

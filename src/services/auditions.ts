@@ -70,11 +70,13 @@ export interface SearchOptions {
   exclude?: Iterable<string>
   /** Where the character's ElevenLabs voices are looked up; without it they are shown by id only. */
   elevenFor?: ElevenLabsFactory
+  /** Whether to search Fish's library at all; false finds the voices she has and no candidates. */
+  search?: boolean
 }
 
 /**
  * Searches Fish's library with a character's audition keywords, leaving out its current voice and
- * the voices ruled out for it.
+ * the voices ruled out for it (or, with `search: false`, finds her voices and no candidates).
  */
 export async function findCandidates(
   projectFile: string,
@@ -119,13 +121,14 @@ export async function findCandidates(
       ...(await ruledOutIds(projectFile, characterId, seen.language)),
       ...(options.exclude ?? []),
     ])
-    const found = keywords.length
-      ? await searchVoices(fish, keywords, {
-          language,
-          exclude,
-          parallel: project.narration.quality.parallel,
-        })
-      : []
+    const found =
+      keywords.length && options.search !== false
+        ? await searchVoices(fish, keywords, {
+            language,
+            exclude,
+            parallel: project.narration.quality.parallel,
+          })
+        : []
     const candidates = found.slice(0, CANDIDATE_LIMIT)
     const root = dirname(projectFile)
     const { audition } = seen

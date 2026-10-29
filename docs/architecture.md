@@ -509,7 +509,7 @@ and status, as the game plays them, one by one or all in turn (the first five sh
 for all; any other play stops the list; a clip that fails is skipped). An audition is started,
 resumed and stopped from there; the page shows no candidates. The **audition page**
 (`#/characters/<id>/audition`) shows the board, with the phrase and style the takes are recorded
-with beside it and the keywords the audition started with; with no audition in progress, it
+with beside it and the keywords Bring in more searches for; with no audition in progress, it
 offers to start one.
 
 **Your voices** sit on the board between the Shortlist and To hear: every voice on the user's own
@@ -572,6 +572,11 @@ removes the design from the store. If Fish cannot save it nothing is cast and th
 
 An audition is for a character, not for a part: the result applies to every part it speaks in.
 
+- **Starting an audition searches nothing.** The cast voice, her voices in other languages, Your
+  voices and earlier designs come to the board; To hear starts empty (`heard: false` in the
+  session, until a voice is brought in), with a line pointing to the bar below. The user chooses
+  where voices come from. While Bring in more searches, it reads "Searching Fish Audio…" or
+  "Searching ElevenLabs…"; keyboard focus starts on it when the board opens with nothing heard.
 - **To hear** holds the candidates being listened to, best match first. **Bring in more** adds
   the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
   **Bring in a specific voice** adds one by its Fish id or URL, or, with ElevenLabs chosen in the
@@ -1404,7 +1409,7 @@ DELETE /api/characters/:id/ruled-out             forget them all
 DELETE /api/characters/:id/ruled-out/:voice      allow one again
 GET    /api/auditions/:id                        the audition in progress, with phrase and takes
 DELETE /api/auditions/:id                        stop it without casting
-POST   /api/auditions/:id/start                  an audition from a fresh search
+POST   /api/auditions/:id/start                  an audition: cast voice on the shortlist, nothing to hear
 POST   /api/auditions/:id/move                   shortlist, unlist or drop a voice
 POST   /api/auditions/:id/undo                   undo the last drop
 POST   /api/auditions/:id/more                   more candidates to hear ({ provider? }: Fish's library or ElevenLabs')
