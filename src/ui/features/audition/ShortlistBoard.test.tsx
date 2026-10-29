@@ -11,6 +11,7 @@ const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider, useQuery } = await import('@tanstack/react-query')
 const { useCast } = await import('../../api')
 const { ShortlistBoard } = await import('./ShortlistBoard')
+const { routeHref } = await import('../../route')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -51,7 +52,10 @@ function Board({
   current = null,
   hear = [],
   emptied = false,
+  keywords = ['sea'],
 }: {
+  /** The keywords the audition searches with. */
+  keywords?: string[]
   current?: Voice | null
   hear?: Voice[]
   /** Whether the voices to hear have all gone again (dropped), as later in an audition. */
@@ -59,7 +63,7 @@ function Board({
 }) {
   const started = startSession({
     character: 'keeper',
-    keywords: [],
+    keywords,
     current,
     candidates: hear.map((voice) => ({ voice, matched: [] })),
     perRound: 4,
@@ -149,6 +153,30 @@ describe('ShortlistBoard', () => {
     await act(() => button('Bring in more')!.click())
     await until(() => button('Searching ElevenLabs…')?.disabled === true)
 
+    await act(() => page.unmount())
+  })
+
+  it('says there are no keywords, with a link to the character’s page, when Start finds none', async () => {
+    globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board, { keywords: [] }),
+        ),
+      ),
+    )
+    const toHear = container.querySelector('[aria-label="To hear"]')!
+    expect(toHear.textContent).toContain('Keeper has no search keywords.')
+    expect(toHear.textContent).not.toContain('Choose where they come from')
+    const link = toHear.querySelector('a')!
+    expect(link.textContent).toBe('Keeper’s page')
+    expect(link.getAttribute('href')).toBe(routeHref({ view: 'character', character: 'keeper' }))
+    expect(toHear.textContent).toContain('then stop this audition and start again')
     await act(() => page.unmount())
   })
 
