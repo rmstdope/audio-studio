@@ -364,6 +364,10 @@ describe('whether the audition has had voices to hear', () => {
     expect(bringMore(queueMore(empty(), candidates('x', 'y')), 3).heard).toBe(true)
   })
 
+  it('has once a shortlisted voice is taken off the shortlist into To hear', () => {
+    expect(unlist(empty(), 'cur').heard).toBe(true)
+  })
+
   it('stays as it was when nothing comes in, and a saved audition from before counts as having had', () => {
     expect(bringFound(empty(), [], 3).heard).toBe(false)
     const { heard: _heard, ...old } = start()

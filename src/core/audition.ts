@@ -170,6 +170,7 @@ export function unlist(session: AuditionSession, voice: string): AuditionSession
     shortlist: session.shortlist.filter((v) => v !== voice),
     yours: own ? [voice, ...session.yours] : session.yours,
     designed: designed ? [voice, ...session.designed] : session.designed,
+    heard: session.heard || !(own || designed),
     toHear: own || designed ? session.toHear : [voice, ...session.toHear],
   }
 }

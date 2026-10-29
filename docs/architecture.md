@@ -1409,7 +1409,7 @@ DELETE /api/characters/:id/ruled-out             forget them all
 DELETE /api/characters/:id/ruled-out/:voice      allow one again
 GET    /api/auditions/:id                        the audition in progress, with phrase and takes
 DELETE /api/auditions/:id                        stop it without casting
-POST   /api/auditions/:id/start                  an audition from a fresh search
+POST   /api/auditions/:id/start                  an audition: cast voice on the shortlist, nothing to hear
 POST   /api/auditions/:id/move                   shortlist, unlist or drop a voice
 POST   /api/auditions/:id/undo                   undo the last drop
 POST   /api/auditions/:id/more                   more candidates to hear ({ provider? }: Fish's library or ElevenLabs')

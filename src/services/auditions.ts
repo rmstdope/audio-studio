@@ -76,7 +76,7 @@ export interface SearchOptions {
 
 /**
  * Searches Fish's library with a character's audition keywords, leaving out its current voice and
- * the voices ruled out for it.
+ * the voices ruled out for it (or, with `search: false`, finds her voices and no candidates).
  */
 export async function findCandidates(
   projectFile: string,
