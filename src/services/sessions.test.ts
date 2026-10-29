@@ -946,6 +946,18 @@ describe('an audition per language', () => {
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
   })
 
+  it('keeps her Fish voice in another language on the shortlist, by its id, without a Fish key', async () => {
+    const root = tempRepo(several)
+    const result = await startAudition(
+      join(root, 'audio-studio.json'),
+      'mira',
+      async () => null,
+      'sv',
+    )
+    expect(result?.ok && result.session.shortlist).toEqual(['cur'])
+    expect(result?.ok && result.session.voices['cur']?.id).toBe('cur')
+  })
+
   it('keeps one audition for each language, so one can wait while another is started', async () => {
     const { projectFile } = await begin()
     const en = await startAudition(projectFile, 'mira', fishFor)

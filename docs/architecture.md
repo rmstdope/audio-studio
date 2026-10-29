@@ -575,9 +575,11 @@ An audition is for a character, not for a part: the result applies to every part
 - **Starting an audition searches nothing.** The cast voice, her voices in other languages, Your
   voices and earlier designs come to the board; To hear starts empty (`heard: false` in the
   session, until a voice is brought in), with a line pointing to the bar below. The user chooses
-  where voices come from, so starting needs no Fish key: without one, a Fish voice on the board
-  is shown by its id, and only Bring in more from Fish says the key is missing. While Bring in more searches, it reads "Searching Fish Audio…" or
-  "Searching ElevenLabs…"; keyboard focus starts on it when the board opens with nothing heard.
+  where voices come from, so starting needs no Fish key: without one, her Fish voices on the
+  board are shown by their ids (and the names the cast gives them), and what needs Fish (Your
+  voices, Bring in more or a specific voice from Fish) says the key is missing. While Bring in
+  more searches, it reads "Searching Fish Audio…" or "Searching ElevenLabs…"; keyboard focus
+  starts on it when the board opens with nothing heard.
 - **To hear** holds the candidates being listened to, best match first. **Bring in more** adds
   the next ones (`audition.candidatesPerRound`), searching again when the queue runs short;
   **Bring in a specific voice** adds one by its Fish id or URL, or, with ElevenLabs chosen in the
