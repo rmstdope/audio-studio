@@ -92,8 +92,40 @@ describe('VoiceCard, an ElevenLabs voice', () => {
 
   it('keeps a Fish voice’s popularity, take and sample', async () => {
     const { text, buttons } = await rendered({ ...george, id: 'g1', uses: 1200, likes: 3 })
-    expect(text).toContain('1.2k uses · 3 likes')
+    expect(text).toContain('Fish Audio · 1.2k uses · 3 likes')
     expect(text).toContain('Fish sample')
     expect(buttons).toEqual(['Record take', 'Play Fish’s sample of George'])
+  })
+})
+
+describe('VoiceCard, the provider on the muted line', () => {
+  const fish: Voice = { ...george, id: 'g1', uses: 12000, likes: 340 }
+
+  it('names Fish Audio first on a library voice, with or without an author', async () => {
+    expect((await rendered({ ...fish, author: 'seawolf' })).text).toContain(
+      'Fish Audio · by seawolf · 12k uses · 340 likes',
+    )
+    expect((await rendered(fish)).text).toContain('Fish Audio · 12k uses · 340 likes')
+  })
+
+  it('names the provider before Your voice · private', async () => {
+    expect((await rendered({ ...fish, own: true })).text).toContain(
+      'Fish Audio · Your voice · private',
+    )
+    expect((await rendered({ ...george, own: true })).text).toContain(
+      'ElevenLabs · Your voice · private',
+    )
+  })
+
+  it('names the provider before Designed · not saved, as a design’s own id does not say it', async () => {
+    const design = { n: 1, description: 'a gruff voice', at: '2026-01-01T00:00:00Z' }
+    const fishDesign: Voice = { ...fish, id: 'design-0123456789ab', design }
+    const elevenDesign: Voice = {
+      ...george,
+      id: 'design-ba9876543210',
+      design: { ...design, generated: 'eleven:g2' },
+    }
+    expect((await rendered(fishDesign)).text).toContain('Fish Audio · Designed · not saved')
+    expect((await rendered(elevenDesign)).text).toContain('ElevenLabs · Designed · not saved')
   })
 })

@@ -58,10 +58,16 @@ export function VoiceCard({
   actions?: ReactNode
 }) {
   const sample = voice.sample
-  // Fish's design, not yet on the account: its preview is its take, and it has no sample or id.
+  // A design (Fish's or ElevenLabs'), not yet on the account: its preview is its take, and it has no sample or id.
   const designed = voice.design !== undefined
   const eleven = providerOf(voice.id) === 'elevenlabs'
   const words = providerWords(voice.id)
+  // A design's id does not say whose it is: ElevenLabs' carry `generated`.
+  const provider = designed
+    ? voice.design?.generated !== undefined
+      ? 'ElevenLabs'
+      : 'Fish Audio'
+    : words.name
   return (
     <article
       className={`card voice-card${listed ? ' kept' : ''}${voice.own ? ' yours' : ''}${designed ? ' designed' : ''}`}
@@ -72,16 +78,16 @@ export function VoiceCard({
           <strong>{voice.title || 'Untitled voice'}</strong>
           <span className="muted voice-meta">
             {designed ? (
-              'Designed · not saved'
+              `${provider} · Designed · not saved`
             ) : voice.own ? (
-              'Your voice · private'
+              `${provider} · Your voice · private`
             ) : voice.library ? (
               `ElevenLabs library · ${voice.library.added ? 'in your voices' : `added by ${compact(voice.uses)}`}`
             ) : eleven ? (
               'ElevenLabs voice'
             ) : (
               <>
-                {voice.author ? `by ${voice.author} · ` : ''}
+                {provider} · {voice.author ? `by ${voice.author} · ` : ''}
                 {compact(voice.uses)} uses · {compact(voice.likes)} likes
               </>
             )}
