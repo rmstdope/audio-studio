@@ -84,9 +84,9 @@ export async function sessionFor(
 }
 
 /**
- * Starts (or starts over) a character's audition from a fresh search with its keywords: the
- * current voice on the shortlist (an ElevenLabs one looked up with `elevenFor`), the top
- * candidates to hear, the rest queued.
+ * Starts (or starts over) a character's audition: the current voice on the shortlist (an
+ * ElevenLabs one looked up with `elevenFor`), her voices in other languages, her designs. Nothing
+ * is searched and nothing is to hear: the user brings voices in (more, a specific one, a design).
  */
 export async function startAudition(
   projectFile: string,
@@ -97,7 +97,13 @@ export async function startAudition(
 ): Promise<SessionResult> {
   const name = await cacheNameFor(projectFile, characterId, language)
   return sessionWrites.run(key(projectFile, name), async () => {
-    const found = await findCandidates(projectFile, characterId, fishFor, { elevenFor }, language)
+    const found = await findCandidates(
+      projectFile,
+      characterId,
+      fishFor,
+      { elevenFor, search: false },
+      language,
+    )
     if (!found || !found.ok) return found
     if (found.audition.phrase === null) {
       return {

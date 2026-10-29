@@ -33,6 +33,8 @@ export const AuditionSessionSchema = z.object({
   toHear: z.array(z.string()),
   /** Voices dropped in this audition, the latest last, and where each was. */
   dropped: z.array(z.object({ id: z.string(), from: PlaceSchema })),
+  /** Whether any voice has been brought in to hear (false for an audition started with none). */
+  heard: z.boolean().default(true),
   /** Ranked candidates not brought in yet. */
   queue: z.array(z.string()),
   voices: z.record(z.string(), VoiceSchema),
@@ -77,6 +79,7 @@ export function startSession(options: {
     yours: [],
     mine: [],
     designed: [],
+    heard: ids.length > 0,
     toHear: ids.slice(0, perRound),
     dropped: [],
     queue: ids.slice(perRound),
@@ -198,6 +201,7 @@ export function bringMore(session: AuditionSession, count: number): AuditionSess
   if (!session.queue.length || count < 1) return session
   return {
     ...session,
+    heard: true,
     toHear: [...session.toHear, ...session.queue.slice(0, count)],
     queue: session.queue.slice(count),
   }
@@ -234,6 +238,7 @@ export function bringFound(
   if (!fresh.length) return session
   return {
     ...session,
+    heard: true,
     toHear: [...session.toHear, ...fresh.map((c) => c.voice.id)],
     voices: { ...session.voices, ...Object.fromEntries(fresh.map((c) => [c.voice.id, c.voice])) },
     matched: {
@@ -254,6 +259,7 @@ export function addVoice(session: AuditionSession, voice: Voice): AuditionSessio
   return {
     ...session,
     yours: own ? [voice.id, ...session.yours] : session.yours,
+    heard: session.heard || !own,
     toHear: own ? session.toHear : [voice.id, ...session.toHear],
     queue: session.queue.filter((id) => id !== voice.id),
     dropped: session.dropped.filter((d) => d.id !== voice.id),

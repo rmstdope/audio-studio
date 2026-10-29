@@ -47,14 +47,24 @@ const george: Voice = {
  * The keeper's audition board, just started with nothing to hear; `current` is cast and on the
  * shortlist, and a phrase is given when `current` is.
  */
-function Board({ current = null, hear = [] }: { current?: Voice | null; hear?: Voice[] }) {
-  const session = startSession({
+function Board({
+  current = null,
+  hear = [],
+  emptied = false,
+}: {
+  current?: Voice | null
+  hear?: Voice[]
+  /** Whether the voices to hear have all gone again (dropped), as later in an audition. */
+  emptied?: boolean
+}) {
+  const started = startSession({
     character: 'keeper',
     keywords: [],
     current,
     candidates: hear.map((voice) => ({ voice, matched: [] })),
     perRound: 4,
   })
+  const session = emptied ? { ...started, toHear: [], heard: true } : started
   const audition = current
     ? { phrase: 'Hello there.', from: 'own' as const, standard: false, spoken: 'Hello there.' }
     : null
@@ -97,6 +107,72 @@ describe('ShortlistBoard', () => {
   afterEach(() => {
     globalThis.fetch = realFetch
     document.body.innerHTML = ''
+  })
+
+  it('says no voices have been brought in yet, focuses Bring in more, and names the library while searching', async () => {
+    let answer: (response: Response) => void = () => {}
+    globalThis.fetch = (async (path: string) =>
+      path.endsWith('/more')
+        ? new Promise<Response>((resolve) => (answer = resolve))
+        : new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board, {}),
+        ),
+      ),
+    )
+    const button = (label: string) =>
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.includes(label))
+    const toHear = () => container.querySelector('[aria-label="To hear"]')!.textContent
+    expect(toHear()).toContain('No voices to hear yet')
+    expect(toHear()).toContain(
+      'Choose where they come from below: the keywords in Fish Audio’s or ElevenLabs’ library, a specific voice, or a design.',
+    )
+    expect(document.activeElement).toBe(button('Bring in more') ?? null)
+
+    await act(() => button('Bring in more')!.click())
+    await until(() => button('Searching Fish Audio…')?.disabled === true)
+    expect(toHear()).toContain('No voices to hear yet')
+    await act(async () =>
+      answer(Response.json({ ok: false, reason: 'exhausted', message: 'None.' })),
+    )
+    await until(() => button('Bring in more')?.disabled === false)
+
+    const eleven = [...container.querySelectorAll('[aria-label="Whose library"] input')][1]!
+    await act(() => (eleven as HTMLInputElement).click())
+    await act(() => button('Bring in more')!.click())
+    await until(() => button('Searching ElevenLabs…')?.disabled === true)
+
+    await act(() => page.unmount())
+  })
+
+  it('says plainly that no voices are to hear when an audition that had some is emptied', async () => {
+    globalThis.fetch = (async () => new Response('', { status: 404 })) as unknown as typeof fetch
+    const container = document.createElement('div')
+    document.body.append(container)
+    const page = createRoot(container)
+    await act(() =>
+      page.render(
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(Board, { hear: [george], emptied: true }),
+        ),
+      ),
+    )
+    const text = container.querySelector('[aria-label="To hear"]')!.textContent!
+    expect(text).toContain('No voices to hear')
+    expect(text).not.toContain('yet')
+    expect(document.activeElement).not.toBe(
+      [...container.querySelectorAll('button')].find((b) => b.textContent === 'Bring in more'),
+    )
+    await act(() => page.unmount())
   })
 
   it('gives focus back to Design a voice… when Escape closes the design box', async () => {

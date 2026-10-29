@@ -457,6 +457,7 @@ describe('server', () => {
     const listed = async () => await (await fetch(url('/api/characters/narrator/ruled-out'))).json()
     expect(await listed()).toEqual({ ok: true, voices: [] })
     await send('POST', '/api/auditions/narrator/start')
+    await send('POST', '/api/auditions/narrator/more')
     await send('POST', '/api/auditions/narrator/move', { voice: 'w1', move: 'drop' })
     expect(await listed()).toMatchObject({ ok: true, voices: [{ id: 'w1', title: 'Warm' }] })
     const one = await send('DELETE', '/api/characters/narrator/ruled-out/w1')
@@ -501,7 +502,9 @@ describe('server', () => {
       takes: {},
       recorded: [],
     })
-    const started = await (await post('/api/auditions/narrator/start')).json()
+    const empty = await (await post('/api/auditions/narrator/start')).json()
+    expect(empty.session.toHear).toEqual([])
+    const started = await (await post('/api/auditions/narrator/more')).json()
     const own = await (await post('/api/auditions/narrator/own')).json()
     expect(own).toMatchObject({ ok: true, session: { yours: [], mine: [] } })
     expect(started.session.toHear).toEqual(['w1'])
@@ -746,6 +749,8 @@ describe('server, a character per language', () => {
     const started = await call('POST', '/api/auditions/narrator/start?language=sv')
     expect(started.session.shortlist).toEqual(['w1'])
     expect(started.audition).toMatchObject({ phrase: 'Kom in.', from: 'standard' })
+    expect(asked).toEqual([])
+    await call('POST', '/api/auditions/narrator/more?language=sv')
     expect(asked).toEqual(['sv'])
     expect((await call('GET', '/api/auditions/narrator')).session).toBeNull()
     expect((await call('GET', '/api/auditions/narrator?language=sv')).session).not.toBeNull()
@@ -754,6 +759,8 @@ describe('server, a character per language', () => {
   it('serves the voice cast in the language, and the ruled-out voices of it', async () => {
     expect((await call('GET', '/api/characters/narrator/voice?language=sv')).id).toBeNull()
     expect((await call('GET', '/api/characters/narrator/voice')).id).toBe('w1')
+    await call('POST', '/api/auditions/narrator/start?language=sv')
+    await call('POST', '/api/auditions/narrator/more?language=sv')
     await call('POST', '/api/auditions/narrator/move?language=sv', { voice: 'w2', move: 'drop' })
     expect(
       (await call('GET', '/api/characters/narrator/ruled-out?language=sv')).voices,

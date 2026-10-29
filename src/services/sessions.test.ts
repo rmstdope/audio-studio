@@ -101,7 +101,16 @@ const files = {
   'tts/act2/script.json': [{ key: 'b1', speaker: 'mira', text: 'Later.' }],
 }
 
+/** An audition just started, then Bring in more pressed once: a, b, c to hear and d to g queued. */
 async function started() {
+  const { root, projectFile } = await startedEmpty()
+  const result = await moreVoices(projectFile, 'mira', fishFor)
+  if (!result?.ok) throw new Error(JSON.stringify(result))
+  return { root, projectFile, session: result.session }
+}
+
+/** An audition just started: nothing to hear. */
+async function startedEmpty() {
   const root = tempRepo(files)
   const projectFile = join(root, 'audio-studio.json')
   const result = await startAudition(projectFile, 'mira', fishFor)
@@ -110,12 +119,29 @@ async function started() {
 }
 
 describe('startAudition', () => {
-  it('starts from the search, the current voice on the shortlist, and saves it', async () => {
-    const { projectFile, session } = await started()
+  it('starts with the current voice on the shortlist and nothing to hear, and saves it', async () => {
+    const { projectFile, session } = await startedEmpty()
     expect(session.shortlist).toEqual(['cur'])
-    expect(session.toHear).toEqual(['a', 'b', 'c'])
-    expect(session.queue).toEqual(['d', 'e', 'f', 'g'])
+    expect(session.toHear).toEqual([])
+    expect(session.queue).toEqual([])
+    expect(session.heard).toBe(false)
+    expect(session.keywords).toEqual(['warm'])
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session })
+  })
+
+  it('does not search Fish to start, and Bring in more searches afterwards', async () => {
+    const searched: unknown[] = []
+    const watching: FishClient = {
+      ...fish,
+      listVoices: (query) => (searched.push(query), fish.listVoices(query)),
+    }
+    const root = tempRepo(files)
+    const projectFile = join(root, 'audio-studio.json')
+    await startAudition(projectFile, 'mira', async () => watching)
+    expect(searched).toEqual([])
+    const more = await moreVoices(projectFile, 'mira', async () => watching)
+    expect(more?.ok && more.session.toHear).toEqual(['a', 'b', 'c'])
+    expect(searched.length).toBeGreaterThan(0)
   })
 
   it('has no session before one is started', async () => {
@@ -694,10 +720,11 @@ describe('ruled-out voices in an audition', () => {
       { id: 'a', title: 'Warm a' },
       { id: 'e', title: 'Warm e' },
     ])
-    const result = await startAudition(projectFile, 'mira', fishFor)
-    if (!result?.ok) throw new Error(JSON.stringify(result))
-    expect(result.session.toHear).toEqual(['b', 'c', 'd'])
-    expect(result.session.queue).toEqual(['f', 'g'])
+    await startAudition(projectFile, 'mira', fishFor)
+    const first = await moreVoices(projectFile, 'mira', fishFor)
+    if (!first?.ok) throw new Error(JSON.stringify(first))
+    expect(first.session.toHear).toEqual(['b', 'c', 'd'])
+    expect(first.session.queue).toEqual(['f', 'g'])
     const more = await moreVoices(projectFile, 'mira', fishFor)
     expect(more?.ok && more.session.toHear).toEqual(['b', 'c', 'd', 'f', 'g'])
   })
@@ -872,7 +899,9 @@ describe('an audition per language', () => {
   const begin = async (language = 'sv') => {
     const root = tempRepo(several)
     const projectFile = join(root, 'audio-studio.json')
-    const result = await startAudition(projectFile, 'mira', fishFor, language)
+    const first = await startAudition(projectFile, 'mira', fishFor, language)
+    if (!first?.ok) throw new Error(JSON.stringify(first))
+    const result = await moreVoices(projectFile, 'mira', fishFor, language)
     if (!result?.ok) throw new Error(JSON.stringify(result))
     return { root, projectFile, session: result.session }
   }

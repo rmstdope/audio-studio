@@ -114,6 +114,18 @@ export function ShortlistBoard({
   const [idError, setIdError] = useState<string | null>(null)
   const [designing, setDesigning] = useState(false)
   const designButton = useRef<HTMLButtonElement>(null)
+  const moreButton = useRef<HTMLButtonElement>(null)
+  // The library Bring in more is searching, while it does.
+  const searching =
+    act.isPending && act.variables?.action === 'more'
+      ? ((act.variables.body as { provider?: VoiceProvider } | undefined)?.provider ?? 'fish')
+      : null
+  // An audition with nothing to hear yet opens on the way to bring voices in.
+  useEffect(() => {
+    if (!session.heard) moreButton.current?.focus()
+    // Once, when the board opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const refocusDesign = useFocusWhenClosed(designing, designButton)
 
   // Every take is asked for once per phrase, so a take the cache cannot show is not asked again.
@@ -582,8 +594,12 @@ export function ShortlistBoard({
           <div className="cards">{session.toHear.map((id) => card(id, false))}</div>
         ) : (
           <div className="empty-state">
-            <strong>No voices to hear</strong>
-            <span>Bring in more voices matching the keywords, or a specific voice.</span>
+            <strong>{session.heard ? 'No voices to hear' : 'No voices to hear yet'}</strong>
+            <span>
+              {session.heard
+                ? 'Bring in more voices matching the keywords, or a specific voice.'
+                : 'Choose where they come from below: the keywords in Fish Audio’s or ElevenLabs’ library, a specific voice, or a design.'}
+            </span>
           </div>
         )}
       </section>
@@ -624,6 +640,7 @@ export function ShortlistBoard({
           ))}
         </div>
         <button
+          ref={moreButton}
           className="btn"
           type="button"
           disabled={act.isPending}
@@ -631,7 +648,9 @@ export function ShortlistBoard({
             run({ action: 'more', body: { provider: from } }, () => setDroppedHere(null))
           }
         >
-          Bring in more
+          {searching
+            ? `Searching ${searching === 'elevenlabs' ? 'ElevenLabs' : 'Fish Audio'}…`
+            : 'Bring in more'}
         </button>
         <button
           ref={designButton}
