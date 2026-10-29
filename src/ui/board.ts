@@ -372,13 +372,15 @@ export function stopEffectsFor(
 
 /**
  * What Your voices shows: `loading` until Fish has answered (also on a resume), `error` when
- * it could not list them and there are none to show, `none` when the account has none, `allUsed`
+ * it could not list them and there are none to show, `noKey` when there is no Fish key to ask
+ * with and none to show, `none` when the account has none, `allUsed`
  * when all of them are shortlisted or ruled out, else the `cards`.
  */
 export function ownSectionState(
   session: Pick<AuditionSession, 'yours' | 'mine'>,
-  fetch: { fetched: boolean; error: string | null },
-): 'loading' | 'error' | 'none' | 'allUsed' | 'cards' {
+  fetch: { fetched: boolean; error: string | null; noKey?: boolean },
+): 'loading' | 'error' | 'noKey' | 'none' | 'allUsed' | 'cards' {
+  if (fetch.noKey) return session.yours.length > 0 ? 'cards' : 'noKey'
   if (fetch.error) return session.yours.length > 0 ? 'cards' : 'error'
   if (!fetch.fetched) return 'loading'
   if (session.yours.length > 0) return 'cards'
