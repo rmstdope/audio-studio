@@ -34,6 +34,7 @@ import {
 import {
   IMAGE_MODEL_IDS,
   imageMenuEntry,
+  imageWarning,
   imageModel,
   imageSaveFailureBody,
   imageSaveFailureHeading,
@@ -304,13 +305,15 @@ function ImagesRow({ file, images }: { file: string; images: NonNullable<View['i
             }
           >
             {IMAGE_MODEL_IDS.map((id) => (
-              <option key={id} value={id} disabled={!images.installed[id]}>
-                {imageMenuEntry(id, images.installed[id])}
+              <option key={id} value={id} disabled={images.states[id].download !== 'whole'}>
+                {imageMenuEntry(id, images.states[id])}
               </option>
             ))}
           </select>
           <span className="free">Free</span>
-          {!images.installed[shown] && <span className="warnline">not on this computer</span>}
+          {imageWarning(images.states[shown]) && (
+            <span className="warnline">{imageWarning(images.states[shown])}</span>
+          )}
           {pending && <span className="muted">Saving…</span>}
         </div>
         {state.phase === 'failed' && (

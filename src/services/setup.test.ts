@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { ElevenAnswer } from '../core/setup'
 import type { CreditResult } from './fish'
+import type { ImageDownload, ImageModelId } from '../core/imageModels'
+import { createImageHealth } from './imageHealth'
 import { mfluxReady } from './images'
 import { checkSetup, type Machine } from './setup'
 
@@ -286,8 +288,21 @@ describe('checkSetup of the image models', () => {
     images: Record<string, unknown> | undefined,
     machine: Machine,
     here: (model: string) => boolean,
+    extra: Record<string, unknown> = {},
+    download?: (model: ImageModelId) => ImageDownload,
   ) => {
-    const root = tempRepo({ 'content-studio.json': projectJson(images ? { images } : {}) })
+    const root = tempRepo({
+      'content-studio.json': projectJson(images ? { images } : {}),
+      ...extra,
+    })
+    return checkIn(root, machine, here, download)
+  }
+  const checkIn = async (
+    root: string,
+    machine: Machine,
+    here: (model: string) => boolean,
+    download?: (model: ImageModelId) => ImageDownload,
+  ) => {
     const result = await checkSetup(
       join(root, 'content-studio.json'),
       credit,
@@ -295,7 +310,7 @@ describe('checkSetup of the image models', () => {
       {},
       undefined,
       noAccount,
-      { installed: here, ready: () => mfluxReady(machine) },
+      { installed: here, ready: () => mfluxReady(machine), ...(download ? { download } : {}) },
     )
     if (!result.ok) throw new Error('expected checks')
     return result.checks.find((c) => c.id === 'imageModels')!
@@ -316,6 +331,53 @@ describe('checkSetup of the image models', () => {
       state: 'problem',
       detail: "Images can't be made: mflux, which runs the image models, is not installed.",
     })
+  })
+
+  it('says a partly downloaded model is incomplete, and a model is absent when it has no folder', async () => {
+    const partly = await check(
+      imagesSection,
+      mac,
+      (m) => m === 'z-image-turbo',
+      {},
+      (m) => (m === 'klein' ? 'partial' : 'whole'),
+    )
+    expect(partly).toMatchObject({ state: 'problem' })
+    expect(partly.detail).toContain('only partly downloaded')
+    expect(partly.steps!.list[0]!.parts[0]).toBe(
+      'Finish the download (it picks up where it stopped):',
+    )
+  })
+
+  it('remembers a failed take across a restart, naming the image while it is in the game', async () => {
+    const list = [
+      { id: 'bridge', title: 'Bridge at dusk', description: 'a bridge', width: 320, height: 200 },
+    ]
+    const root = tempRepo({
+      'content-studio.json': projectJson({ images: imagesSection }),
+      'tts/act1/images.json': list,
+      'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+    })
+    const file = join(root, 'content-studio.json')
+    // Setup does not know it is the same studio: a new store on the same project is a restart.
+    await createImageHealth().record(file, 'z-image-turbo', {
+      image: 'bridge',
+      take: 2,
+      error: 'FileNotFoundError: x',
+    })
+    const found = await checkIn(root, mac, () => true)
+    expect(found).toMatchObject({ state: 'off', label: 'Not set up' })
+    expect(found.failures![0]).toMatchObject({
+      error: 'FileNotFoundError: x',
+      link: { text: 'Open Bridge at dusk', href: '#/images/items/bridge' },
+    })
+    await createImageHealth().record(file, 'z-image-turbo', {
+      image: 'gone',
+      take: 2,
+      error: 'FileNotFoundError: x',
+    })
+    const gone = await checkIn(root, mac, () => true)
+    expect(gone.failures![0]!.link).toBeUndefined()
+    expect(gone.failures![0]!.sentence).not.toContain(' on ')
   })
 
   it('is not used without an images section', async () => {

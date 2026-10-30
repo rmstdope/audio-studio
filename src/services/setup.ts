@@ -4,7 +4,16 @@ import { elevenLabsApiKey, fishApiKey } from './env'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS } from '../core/musicModels'
 import { missingStableAudio, STABLE_AUDIO_DIR } from './stableAudio'
 import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_IDS } from '../core/imageModels'
-import { HUB_DIR, imageModelInstalled, mfluxReady, type ImageGenerator } from './images'
+import { createImageHealth, type ImageHealthStore } from './imageHealth'
+import { readImages } from './imageLists'
+import {
+  downloadOf,
+  HUB_DIR,
+  imageModelDownload,
+  imageModelInstalled,
+  mfluxReady,
+  type ImageGenerator,
+} from './images'
 import { aceStepCheckpoints, aceStepReady } from './music'
 import { accountOf, createElevenLabsClient } from './elevenlabs'
 import type { CreditResult } from './fish'
@@ -46,10 +55,13 @@ export async function checkSetup(
   account: (apiKey: string) => Promise<ElevenAnswer> = (apiKey) =>
     accountOf(createElevenLabsClient(apiKey)),
   /** What says whether mflux can run and an image model's weights are on this computer. */
-  images: Pick<ImageGenerator, 'installed' | 'ready'> = {
+  images: Pick<ImageGenerator, 'installed' | 'ready' | 'download'> = {
     installed: (model) => imageModelInstalled(HUB_DIR, model),
+    download: (model) => imageModelDownload(HUB_DIR, model),
     ready: () => mfluxReady(machine),
   },
+  /** What remembers the image models whose last take failed. */
+  health: Pick<ImageHealthStore, 'read'> = createImageHealth(),
 ): Promise<SetupResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -86,18 +98,48 @@ export async function checkSetup(
           ).map(({ id }) => id),
         }
       : null,
-    images: project.images
-      ? {
-          mflux: await images.ready(),
-          model: project.images.model ?? DEFAULT_IMAGE_MODEL,
-          missing: (
-            await Promise.all(
-              IMAGE_MODEL_IDS.map(async (id) => ((await images.installed(id)) ? null : id)),
-            )
-          ).filter((id) => id !== null),
-        }
-      : null,
+    images: project.images ? await imageFacts(projectFile, project, images, health) : null,
     elevenlabs: elevenAnswer,
   }
   return { ok: true, checks: setupChecks(facts) }
+}
+
+/** The image models' facts: mflux, and for each model its download and its failed last take, if any. */
+async function imageFacts(
+  projectFile: string,
+  project: Parameters<typeof readImages>[1],
+  images: Pick<ImageGenerator, 'installed' | 'ready' | 'download'>,
+  health: Pick<ImageHealthStore, 'read'>,
+): Promise<NonNullable<SetupFacts['images']>> {
+  const failures = await health.read(projectFile)
+  // The lists are read only to name the image of a failure.
+  const lists = Object.keys(failures).length
+    ? await readImages(dirname(projectFile), project, [])
+    : null
+  const titles = new Map(lists?.acts.flatMap((a) => a.rows).map((r) => [r.id, r.title]))
+  const models = Object.fromEntries(
+    await Promise.all(
+      IMAGE_MODEL_IDS.map(async (id) => {
+        const failure = failures[id]
+        const title = failure ? titles.get(failure.image) : undefined
+        return [
+          id,
+          {
+            download: await downloadOf(images, id),
+            failure: failure
+              ? {
+                  error: failure.error,
+                  image: title === undefined ? null : { id: failure.image, title },
+                }
+              : null,
+          },
+        ]
+      }),
+    ),
+  ) as NonNullable<SetupFacts['images']>['models']
+  return {
+    mflux: await images.ready(),
+    model: project.images?.model ?? DEFAULT_IMAGE_MODEL,
+    models,
+  }
 }

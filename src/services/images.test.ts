@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createGpuWorkers, GPU } from './gpu'
 import {
   createMfluxGenerator,
   hubDirOf,
+  ImageToolError,
+  imageModelDownload,
   imageModelInstalled,
   makeImageTake,
   mfluxArguments,
@@ -172,6 +174,15 @@ describe('createMfluxGenerator', () => {
       'FLUX.2 klein 4B could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B, then Try again.',
     )
     expect(logged.join('\n')).toContain('weight_loader.py')
+    expect(failure).toBeInstanceOf(ImageToolError)
+    expect((failure as ImageToolError).lastLine).toBe('FileNotFoundError: No safetensors found')
+  })
+
+  it('has an empty last line when the tool said nothing', async () => {
+    const generator = createMfluxGenerator({ build: fake(`process.exit(3)`), log: () => {} })
+    const failure = await generator.generate(request).catch((e: unknown) => e as ImageToolError)
+    expect(failure).toBeInstanceOf(ImageToolError)
+    expect((failure as ImageToolError).lastLine).toBe('')
   })
 
   it('says the computer ran out of memory when the system killed it', async () => {
@@ -348,5 +359,63 @@ describe('makeImageTake', () => {
       ),
     ).rejects.toThrow(/prompt/)
     expect(log).toEqual([])
+  })
+})
+
+describe('imageModelDownload', () => {
+  const KLEIN = 'models--black-forest-labs--FLUX.2-klein-4B'
+  const hub = () => mkdtempSync(join(tmpdir(), 'hub-'))
+  /** A Hugging Face folder: blobs, and a snapshot whose files are links to them. */
+  const whole = (dir: string, folder = KLEIN) => {
+    const blobs = join(dir, folder, 'blobs')
+    const snapshot = join(dir, folder, 'snapshots', 'abc')
+    mkdirSync(blobs, { recursive: true })
+    mkdirSync(snapshot, { recursive: true })
+    writeFileSync(join(blobs, 'h1'), 'weights')
+    symlinkSync(join('..', '..', 'blobs', 'h1'), join(snapshot, 'model.safetensors'))
+    return { blobs, snapshot }
+  }
+
+  it('is absent with no folder, whole with weights and nothing unfinished', () => {
+    const dir = hub()
+    expect(imageModelDownload(dir, 'klein')).toBe('absent')
+    whole(dir)
+    expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  it('is partial for a folder with no weights, or with an unfinished blob', () => {
+    const dir = hub()
+    mkdirSync(join(dir, KLEIN, 'blobs'), { recursive: true })
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+    const { blobs } = whole(dir)
+    writeFileSync(join(blobs, 'h2.incomplete'), 'half')
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+  })
+
+  it('is partial when a snapshot link points at nothing', () => {
+    const dir = hub()
+    const { snapshot } = whole(dir)
+    symlinkSync(join('..', '..', 'blobs', 'gone'), join(snapshot, 'other.safetensors'))
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+  })
+
+  it('is partial when a shard the index names is not there', () => {
+    const dir = hub()
+    const { snapshot } = whole(dir)
+    writeFileSync(
+      join(snapshot, 'model.safetensors.index.json'),
+      JSON.stringify({ weight_map: { a: 'model.safetensors', b: 'model-2.safetensors' } }),
+    )
+    expect(imageModelDownload(dir, 'klein')).toBe('partial')
+    writeFileSync(join(snapshot, 'model-2.safetensors'), 'x')
+    expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  it('only a whole download counts as installed', () => {
+    const dir = hub()
+    mkdirSync(join(dir, KLEIN, 'blobs'), { recursive: true })
+    expect(imageModelInstalled(dir, 'klein')).toBe(false)
+    whole(dir)
+    expect(imageModelInstalled(dir, 'klein')).toBe(true)
   })
 })

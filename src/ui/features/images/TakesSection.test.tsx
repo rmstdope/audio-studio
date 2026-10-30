@@ -64,8 +64,8 @@ const view = (over: Partial<ImageTakesView> = {}): ImageTakesView => ({
   generator: { ok: true },
   projectModel: 'klein',
   models: [
-    { id: 'klein', installed: true },
-    { id: 'z-image-turbo', installed: true },
+    { id: 'klein', installed: true, download: 'whole', failed: false },
+    { id: 'z-image-turbo', installed: true, download: 'whole', failed: false },
   ],
   takes: [],
   making: [],
@@ -445,9 +445,14 @@ describe('what can go wrong', () => {
 
 describe('the Takes section’s model menu', () => {
   const only = (id: 'klein' | 'z-image-turbo') => [
-    { id: 'klein' as const, installed: id === 'klein' },
-    { id: 'z-image-turbo' as const, installed: id === 'z-image-turbo' },
+    model('klein', id === 'klein' ? 'whole' : 'absent'),
+    model('z-image-turbo', id === 'z-image-turbo' ? 'whole' : 'absent'),
   ]
+  const model = (
+    id: 'klein' | 'z-image-turbo',
+    download: 'whole' | 'partial' | 'absent',
+    failed = false,
+  ) => ({ id, installed: download === 'whole', download, failed })
   const modelMenu = (s: { container: HTMLElement }) =>
     s.container.querySelector<HTMLSelectElement>('select[aria-label="Model for new takes"]')!
   const pick = (s: { container: HTMLElement }, value: string) =>
@@ -504,6 +509,58 @@ describe('the Takes section’s model menu', () => {
     expect(s.calls.at(-1)).toMatchObject({ body: { count: 2, model: 'z-image-turbo' } })
   })
 
+  it('marks a model whose last take failed, which can still be picked', async () => {
+    const s = await show(
+      view({
+        takes: three,
+        models: [model('klein', 'whole'), model('z-image-turbo', 'whole', true)],
+      }),
+    )
+    const z = modelMenu(s).options[1]!
+    expect(z.textContent).toBe('Z-Image-Turbo — about 1 min a take — last take failed')
+    expect(z.disabled).toBe(false)
+    expect(modelMenu(s).value).toBe('klein')
+  })
+
+  it('marks a partly downloaded model, which cannot be picked', async () => {
+    const s = await show(
+      view({ takes: three, models: [model('klein', 'whole'), model('z-image-turbo', 'partial')] }),
+    )
+    const z = modelMenu(s).options[1]!
+    expect(z.textContent).toBe('Z-Image-Turbo — about 1 min a take — download incomplete')
+    expect(z.disabled).toBe(true)
+  })
+
+  it('starts on the other model when the main one failed its last take, and says so', async () => {
+    const s = await show(
+      view({
+        takes: three,
+        models: [model('klein', 'whole', true), model('z-image-turbo', 'whole')],
+      }),
+    )
+    expect(modelMenu(s).value).toBe('z-image-turbo')
+    expect(s.text()).toContain(
+      "FLUX.2 klein, the project's image model, failed on its last take, so these takes use Z-Image-Turbo. Setup says what went wrong.",
+    )
+    expect(modelMenu(s).options[0]!.disabled).toBe(false)
+    await pick(s, 'klein')
+    expect(modelMenu(s).value).toBe('klein')
+    await s.click(s.button('Make 2 more takes'))
+    expect(s.calls.at(-1)).toMatchObject({ body: { count: 2, model: 'klein' } })
+  })
+
+  it('stays on the failed main model when the other is not in place', async () => {
+    const s = await show(
+      view({
+        takes: three,
+        models: [model('klein', 'whole', true), model('z-image-turbo', 'partial')],
+      }),
+    )
+    expect(modelMenu(s).value).toBe('klein')
+    expect(s.text()).not.toContain('failed on its last take')
+    expect(modelMenu(s).options[0]!.textContent).toContain('last take failed')
+  })
+
   it('waits while takes are being made', async () => {
     const s = await show(
       view({ takes: three, making: [{ n: 4, state: 'making', elapsed: 1, expected: 8 }] }),
@@ -538,10 +595,7 @@ describe('the Takes section’s model menu', () => {
       view({
         takes: three,
         generator: { ok: false, message: 'Neither image model is on this computer.', fix: 'x' },
-        models: [
-          { id: 'klein', installed: false },
-          { id: 'z-image-turbo', installed: false },
-        ],
+        models: [model('klein', 'absent'), model('z-image-turbo', 'absent')],
       }),
     )
     expect(s.text()).toContain("Images can't be made yet.")

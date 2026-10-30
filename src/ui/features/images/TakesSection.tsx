@@ -14,6 +14,7 @@ import {
   imageMenuEntry,
   imageModel,
   imageShortEntry,
+  imageSwitchedLine,
   type ImageModelId,
 } from '../../../core/imageModels'
 import {
@@ -161,11 +162,15 @@ export function TakesSection({ row }: { row: ImageRow }) {
   if (!ready) return <section className="panel">The takes could not be listed.</section>
 
   const { generator, takes, making, failed, lockUnread, lookError } = ready
+  const states = Object.fromEntries(ready.models.map((m) => [m.id, m])) as Record<
+    ImageModelId,
+    ImageTakesView['models'][number]
+  >
   const installed = Object.fromEntries(ready.models.map((m) => [m.id, m.installed])) as Record<
     ImageModelId,
     boolean
   >
-  const fallback = defaultTakeModel(ready.projectModel, installed)
+  const fallback = defaultTakeModel(ready.projectModel, states)
   // A pick that has since gone missing falls back; the pick is this page's and is never saved.
   const model = picked && installed[picked] ? picked : fallback
   const otherInUse = fallback !== ready.projectModel
@@ -242,7 +247,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
             label={id === model && !modelOpen ? imageShortEntry(id) : undefined}
             disabled={!installed[id]}
           >
-            {imageMenuEntry(id, installed[id])}
+            {imageMenuEntry(id, states[id])}
           </option>
         ))}
       </select>
@@ -328,9 +333,11 @@ export function TakesSection({ row }: { row: ImageRow }) {
         </div>
         {otherInUse && generator.ok && (
           <span className="takes-missing small" role="status">
-            {imageModel(ready.projectModel).short}, the project&apos;s image model, isn&apos;t on
-            this computer, so these takes use {imageModel(fallback).short}. Setup says how to
-            download it.
+            {states[ready.projectModel].installed
+              ? imageSwitchedLine(ready.projectModel, fallback)
+              : states[ready.projectModel].download === 'partial'
+                ? `${imageModel(ready.projectModel).short}, the project's image model, is only partly downloaded, so these takes use ${imageModel(fallback).short}. Setup says how to finish it.`
+                : `${imageModel(ready.projectModel).short}, the project's image model, isn't on this computer, so these takes use ${imageModel(fallback).short}. Setup says how to download it.`}
           </span>
         )}
         {lockUnread && !none && (

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { readdirSync, statSync } from 'node:fs'
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +8,7 @@ import {
   IMAGE_MODEL_IDS,
   imageFailureReason,
   imageModel,
+  type ImageDownload,
   type ImageModelId,
 } from '../core/imageModels'
 import { freeGpu, gpuQueue, GPU } from './gpu'
@@ -49,8 +50,31 @@ export interface ImageGenerator {
   ready(): ImageReady | Promise<ImageReady>
   /** Whether this model's weights are on this computer. */
   installed(model: ImageModelId): boolean | Promise<boolean>
+  /** How much of this model's download is here; a generator without it is whole or absent by `installed`. */
+  download?(model: ImageModelId): ImageDownload | Promise<ImageDownload>
   /** One take; the model loads for it and leaves memory when it is made. Aborting ends it, and it rejects. */
   generate(request: ImageRequest, signal?: AbortSignal): Promise<GeneratedImage>
+}
+
+/** How much of a model's download the generator says is here. */
+export async function downloadOf(
+  generator: Pick<ImageGenerator, 'installed' | 'download'>,
+  model: ImageModelId,
+): Promise<ImageDownload> {
+  if (generator.download) return generator.download(model)
+  return (await generator.installed(model)) ? 'whole' : 'absent'
+}
+
+/** A take that the image tool (mflux) ended with an error: the sentence for the page, and the tool's own last line. */
+export class ImageToolError extends Error {
+  constructor(
+    message: string,
+    /** The last line of the tool's error output, verbatim. */
+    readonly lastLine: string,
+  ) {
+    super(message)
+    this.name = 'ImageToolError'
+  }
 }
 
 /** Where Hugging Face keeps its downloads, where mflux finds and puts the models' weights. */
@@ -63,26 +87,65 @@ export function hubDirOf(env: Record<string, string | undefined>, home: string):
 /** Where the Hugging Face downloads are on this computer. */
 export const HUB_DIR = hubDirOf(process.env, homedir())
 
-/** Whether a folder holds a weights file (`.safetensors`) at any depth; anything unreadable counts as none. */
-function hasWeights(dir: string): boolean {
+/** What a folder's snapshot holds: whether there is a weights file, and whether anything in it is unfinished. */
+function inspectSnapshots(dir: string): { weights: boolean; broken: boolean } {
+  const found = { weights: false, broken: false }
+  const visit = (folder: string) => {
+    for (const name of readdirSync(folder)) {
+      const path = join(folder, name)
+      // A link to a blob that is not there (a download stopped) cannot be followed.
+      if (!existsSync(path)) {
+        if (lstatSync(path).isSymbolicLink()) found.broken = true
+        continue
+      }
+      if (statSync(path).isDirectory()) visit(path)
+      else if (name.endsWith('.safetensors')) found.weights = true
+      else if (name.endsWith('.safetensors.index.json')) {
+        // The shards the index names must all be there.
+        try {
+          const map = (
+            JSON.parse(readFileSync(path, 'utf8')) as { weight_map?: Record<string, string> }
+          ).weight_map
+          for (const shard of new Set(Object.values(map ?? {})))
+            if (!existsSync(join(folder, shard))) found.broken = true
+        } catch {
+          found.broken = true
+        }
+      }
+    }
+  }
   try {
-    return readdirSync(dir).some((name) => {
-      const path = join(dir, name)
-      return statSync(path).isDirectory() ? hasWeights(path) : name.endsWith('.safetensors')
-    })
+    visit(dir)
+  } catch {
+    // Unreadable counts as having nothing.
+  }
+  return found
+}
+
+/** Whether a folder holds a file ending `.incomplete` (Hugging Face's mark on a blob still downloading). */
+function hasUnfinishedBlob(dir: string): boolean {
+  try {
+    return readdirSync(dir).some((name) => name.endsWith('.incomplete'))
   } catch {
     return false
   }
 }
 
 /**
- * Whether a model's weights are in the Hugging Face cache `hubDir`: a snapshot of its folder holds
- * a weights file, so a download stopped after its configs does not count.
+ * How much of a model's download is in the Hugging Face cache `hubDir`: `absent` with no folder
+ * for it, `whole` when a snapshot holds weights and nothing is unfinished (no `.incomplete` blob, no
+ * link to a missing blob, every shard an index names), `partial` otherwise.
  */
+export function imageModelDownload(hubDir: string, model: ImageModelId): ImageDownload {
+  const folder = join(hubDir, `models--${imageModel(model).repo.replace('/', '--')}`)
+  if (!existsSync(folder)) return 'absent'
+  const { weights, broken } = inspectSnapshots(join(folder, 'snapshots'))
+  return weights && !broken && !hasUnfinishedBlob(join(folder, 'blobs')) ? 'whole' : 'partial'
+}
+
+/** Whether a model's whole download is in the Hugging Face cache `hubDir`. */
 export function imageModelInstalled(hubDir: string, model: ImageModelId): boolean {
-  return hasWeights(
-    join(hubDir, `models--${imageModel(model).repo.replace('/', '--')}`, 'snapshots'),
-  )
+  return imageModelDownload(hubDir, model) === 'whole'
 }
 
 /** Whether mflux can run here, and the first thing that stops it if not. */
@@ -163,6 +226,7 @@ export function createMfluxGenerator({
   return {
     ready: () => mfluxReady(machine),
     installed: (model) => imageModelInstalled(hubDir, model),
+    download: (model) => imageModelDownload(hubDir, model),
     async generate(request, signal) {
       const problem = checkImageRequest(request)
       if (problem) throw new Error(problem)
@@ -197,7 +261,10 @@ export function createMfluxGenerator({
           if (code !== 0) {
             const output = quietLines(stderr).trim()
             log(`Content Studio: ${command[0]} failed (exit code ${code}):\n${output}`)
-            throw new Error(imageFailureReason(request.model, code, output))
+            throw new ImageToolError(
+              imageFailureReason(request.model, code, output),
+              output.split('\n').at(-1) ?? '',
+            )
           }
         } finally {
           clearTimeout(timer)

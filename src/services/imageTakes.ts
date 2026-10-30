@@ -7,6 +7,7 @@ import {
   imageByMflux,
   imageModel,
   type ImageModelId,
+  type ImageModelState,
 } from '../core/imageModels'
 import { bringToLook, isCropped } from '../core/imagePixels'
 import {
@@ -32,7 +33,8 @@ import type { Problem } from '../core/project'
 import { readResource, writeAtomic } from './files'
 import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
-import { makeImageTake, type ImageGenerator } from './images'
+import { createImageHealth, type ImageHealthStore } from './imageHealth'
+import { downloadOf, ImageToolError, makeImageTake, type ImageGenerator } from './images'
 import { decodePng, encodePng } from './png'
 import { choices, sorted } from './musicClips'
 import { gameFilePath } from './musicLists'
@@ -127,6 +129,7 @@ export function createImageTakes({
   free = freeGpu,
   now = Date.now,
   newSeed = () => Math.floor(Math.random() * 2 ** 31),
+  health = createImageHealth(),
 }: {
   generator: ImageGenerator
   queue?: Serial
@@ -134,6 +137,8 @@ export function createImageTakes({
   free?: () => void | Promise<void>
   now?: () => number
   newSeed?: () => number
+  /** Where the models whose last take failed are remembered (tests). */
+  health?: ImageHealthStore
 }): ImageTakes {
   const shared = globalThis as {
     contentStudioImageTakes?: Map<string, Map<number, Entry>>
@@ -175,8 +180,20 @@ export function createImageTakes({
   /** Every image model, and whether this computer has its weights. */
   async function installedModels() {
     return Promise.all(
-      IMAGE_MODEL_IDS.map(async (id) => ({ id, installed: await generator.installed(id) })),
+      IMAGE_MODEL_IDS.map(async (id) => {
+        const download = await downloadOf(generator, id)
+        return { id, installed: download === 'whole', download }
+      }),
     )
+  }
+
+  /** Every image model's download and whether its last take failed. */
+  async function modelStates(projectFile: string) {
+    const failures = await health.read(projectFile)
+    const states = {} as Record<ImageModelId, ImageModelState>
+    for (const m of await installedModels())
+      states[m.id] = { download: m.download, failed: Boolean(failures[m.id]) }
+    return states
   }
 
   async function readBoard(found: Found): Promise<ImageBoard | ProjectFailure> {
@@ -342,7 +359,21 @@ export function createImageTakes({
           entry.state = 'making'
           entry.startedAt = now()
         },
-      )
+      ).catch(async (error: unknown) => {
+        // Only a take the model failed to make is the model's failure; saving it is not.
+        if (!stop.signal.aborted) {
+          const message = describeFailure(error)
+          const line = error instanceof ImageToolError ? error.lastLine.trim() : ''
+          await health
+            .record(found.projectFile, entry.model, {
+              image: found.id,
+              take: entry.n,
+              error: line || message,
+            })
+            .catch(() => {})
+        }
+        throw error
+      })
       if (stop.signal.aborted) return
       const take: ImageBoardTake = {
         n: entry.n,
@@ -371,6 +402,7 @@ export function createImageTakes({
         throw new Error(`${saved.file} cannot be used`)
       }
       entries.delete(entry.n)
+      await health.clear(found.projectFile, entry.model).catch(() => {})
       await bringTake(found, take.n)
     } catch (error) {
       if (stop.signal.aborted) return
@@ -465,6 +497,7 @@ export function createImageTakes({
         .filter((e) => e.state === 'failed')
         .map((e) => ({ n: e.n, message: e.message }))
       const models = await installedModels()
+      const failures = await health.read(projectFile)
       const mflux = await generator.ready()
       return {
         ok: true,
@@ -478,7 +511,7 @@ export function createImageTakes({
                 fix: 'See Setup for how to download them.',
               },
         projectModel: found.config.model ?? DEFAULT_IMAGE_MODEL,
-        models,
+        models: models.map((m) => ({ ...m, failed: Boolean(failures[m.id]) })),
         takes,
         making,
         failed,
@@ -507,11 +540,12 @@ export function createImageTakes({
         failed.state = 'waiting'
         queued.push(failed)
       } else {
+        const states = await modelStates(projectFile)
         const installed = Object.fromEntries(
-          (await installedModels()).map((m) => [m.id, m.installed]),
+          IMAGE_MODEL_IDS.map((id) => [id, states[id].download === 'whole']),
         ) as Record<ImageModelId, boolean>
         const model =
-          request.model ?? defaultTakeModel(found.config.model ?? DEFAULT_IMAGE_MODEL, installed)
+          request.model ?? defaultTakeModel(found.config.model ?? DEFAULT_IMAGE_MODEL, states)
         if (!installed[model]) return notHere(model)
         // The numbers are reserved at once, so none is used twice, even by a take that fails or is stopped.
         const reserved = await changeBoard(found, (board) => {

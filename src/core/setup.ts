@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { IMAGE_MODEL_IDS, imageModel, type ImageModelId } from './imageModels'
+import { IMAGE_MODEL_IDS, imageModel, type ImageDownload, type ImageModelId } from './imageModels'
 import { MUSIC_MODELS, musicModel, type MusicModelId } from './musicModels'
 import type { FishTierSchema } from './project'
 
@@ -85,8 +85,19 @@ export interface SetupFacts {
     mflux: { ok: true } | { ok: false; reason: 'platform' | 'mflux'; message: string; fix: string }
     /** The project's main image model. */
     model: ImageModelId
-    /** The image models whose weights are not on this computer. */
-    missing: ImageModelId[]
+    /** Each image model: how much of its download is here, and its last take if that failed. */
+    models: Record<
+      ImageModelId,
+      {
+        download: ImageDownload
+        failure: {
+          /** The last line of the image tool's error. */
+          error: string
+          /** The image the take was made on, or null once it is not in the game's lists. */
+          image: { id: string; title: string } | null
+        } | null
+      }
+    >
   } | null
   /** What asking ElevenLabs for the account gave (not asked without its key). */
   elevenlabs: ElevenAnswer
@@ -123,6 +134,13 @@ export interface SetupCheck {
   fix?: string
   /** Replaces the state's own word ("Not used") on the row, when another says it better. */
   label?: string
+  /** Image models whose last take failed: a sentence, the tool's error line, a link to the image, and what clears it. */
+  failures?: {
+    sentence: string
+    error: string
+    link?: { text: string; href: string }
+    clears: string
+  }[]
   /** Further lines under the detail, each a sentence. */
   notes?: string[]
   /** Numbered steps to put it right, with the note under them. */
@@ -426,6 +444,14 @@ function downloadStep(ids: ImageModelId[]): SetupStep {
   }
 }
 
+/** The step that finishes an interrupted download; the same command picks up where it stopped. */
+function finishStep(id: ImageModelId): SetupStep {
+  return {
+    parts: ['Finish the download (it picks up where it stopped):'],
+    commands: [`uvx --from huggingface_hub hf download ${imageModel(id).repo}`],
+  }
+}
+
 function imageModels(facts: SetupFacts): SetupCheck {
   const title = 'Image models'
   if (!facts.images) {
@@ -437,9 +463,19 @@ function imageModels(facts: SetupFacts): SetupCheck {
       detail: 'The project has no images section.',
     }
   }
-  const { mflux, model, missing } = facts.images
-  const [first, second] = IMAGE_MODEL_IDS.map((id) => imageModel(id).name)
+  const { mflux, model, models } = facts.images
+  const name = (id: ImageModelId) => imageModel(id).name
   const noteSteps = (list: SetupStep[]) => ({ list, note: 'Then press Check again.' })
+  // A download that is not whole beats a failed take: it is the thing to fix.
+  const absent = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'absent')
+  const partial = IMAGE_MODEL_IDS.filter((id) => models[id].download === 'partial')
+  const failed = IMAGE_MODEL_IDS.filter(
+    (id) => models[id].download === 'whole' && models[id].failure,
+  )
+  const downloadSteps = [
+    ...partial.map(finishStep),
+    ...(absent.length ? [downloadStep(absent)] : []),
+  ]
   const installMflux: SetupStep = {
     parts: ['Install mflux:'],
     commands: ['uv tool install --upgrade mflux'],
@@ -454,47 +490,94 @@ function imageModels(facts: SetupFacts): SetupCheck {
         ? "Images can't be made: mflux, which runs the image models, is not installed."
         : mflux.message,
       ...(isMissingMflux
-        ? {
-            steps: noteSteps([installMflux, ...(missing.length ? [downloadStep(missing)] : [])]),
-          }
+        ? { steps: noteSteps([installMflux, ...downloadSteps]) }
         : { fix: mflux.fix }),
     }
   }
-  if (missing.length === IMAGE_MODEL_IDS.length) {
-    return {
-      id: 'imageModels',
-      title,
-      state: 'problem',
-      detail: "Images can't be made: neither image model is on this computer.",
-      steps: noteSteps([downloadStep(missing)]),
-    }
-  }
-  if (!missing.length) {
+  const broken = absent.length + partial.length
+  if (!broken && !failed.length) {
     return {
       id: 'imageModels',
       title,
       state: 'ok',
-      detail: `${first} and ${second} are on this computer; a model loads on its first take.`,
+      detail: `${name('klein')} and ${name('z-image-turbo')} are fully downloaded on this computer; a model loads on its first take.`,
     }
   }
-  const lacking = missing[0]!
-  const present = IMAGE_MODEL_IDS.find((id) => id !== lacking)!
-  if (lacking === model) {
+  const cannot = (id: ImageModelId) =>
+    models[id].download === 'absent'
+      ? `${name(id)} is not on this computer`
+      : `${name(id)}'s download is incomplete`
+  if (broken === IMAGE_MODEL_IDS.length) {
     return {
       id: 'imageModels',
       title,
       state: 'problem',
-      detail: `The project's image model, ${imageModel(model).name}, is not on this computer. ${imageModel(present).name} is in place: an image's takes can use it meanwhile.`,
-      steps: noteSteps([downloadStep(missing)]),
+      detail:
+        absent.length === IMAGE_MODEL_IDS.length
+          ? "Images can't be made: neither image model is on this computer."
+          : `Images can't be made: ${IMAGE_MODEL_IDS.map(cannot).join(' and ')}.`,
+      steps: noteSteps(downloadSteps),
     }
   }
+  // One model or both are affected, and at least one can still run.
+  const affected = IMAGE_MODEL_IDS.filter(
+    (id) => models[id].download !== 'whole' || models[id].failure,
+  )
+  const single = affected.length === 1
+  const mainAffected = affected.includes(model)
+  const link = (failure: NonNullable<typeof models.klein.failure>) =>
+    failure.image
+      ? {
+          text: `Open ${failure.image.title}`,
+          href: `#/images/items/${encodeURIComponent(failure.image.id)}`,
+        }
+      : undefined
+  /** The model that is in place, to close a sentence about the only affected one. */
+  const tail = (id: ImageModelId) => {
+    const other = IMAGE_MODEL_IDS.find((o) => o !== id)!
+    return id === model
+      ? ` ${name(other)} is in place: an image's takes can use it meanwhile.`
+      : ` ${name(other)} is in place.`
+  }
+  /** What is wrong with a model's download, in a sentence. */
+  const downloadSentence = (id: ImageModelId) => {
+    const main = id === model
+    const optional = single && !main ? 'Optional: ' : ''
+    if (models[id].download === 'absent')
+      return main
+        ? `The project's image model, ${name(id)}, is not on this computer.`
+        : `${optional}${name(id)} is not on this computer.`
+    return main
+      ? `The project's image model, ${name(id)}, is only partly downloaded, so it can't run.`
+      : `${optional}${name(id)}'s download is incomplete, so it can't run.`
+  }
+  const detail = affected
+    .filter((id) => models[id].download !== 'whole')
+    .map((id) => downloadSentence(id) + (single ? tail(id) : ''))
+    .join(' ')
+  const failures = failed.map((id) => {
+    const failure = models[id].failure!
+    const on = failure.image ? ` on ${failure.image.title}` : ''
+    const head =
+      id === model
+        ? `The last take with ${name(id)}, the project's image model, failed${on}.`
+        : `${single ? 'Optional: the' : 'The'} last take with ${name(id)} failed${on}.`
+    return {
+      sentence: head + (single ? tail(id) : ''),
+      error: failure.error,
+      ...(link(failure) ? { link: link(failure) } : {}),
+      clears: `This clears when a take with ${name(id)} works.`,
+    }
+  })
   return {
     id: 'imageModels',
     title,
-    state: 'off',
-    label: 'Not set up',
-    detail: `Optional: ${imageModel(lacking).name} is not on this computer. ${imageModel(present).name} is in place.`,
-    steps: noteSteps([downloadStep(missing)]),
+    ...(mainAffected
+      ? { state: 'problem' as const }
+      : { state: 'off' as const, label: 'Not set up' }),
+    detail,
+    ...(failures.length ? { failures } : {}),
+    ...(downloadSteps.length ? { steps: noteSteps(downloadSteps) } : {}),
   }
 }
 

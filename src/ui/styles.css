@@ -2119,6 +2119,16 @@ button.cue-chip[aria-expanded='true'] {
   border: 1px solid var(--line);
   width: fit-content;
 }
+.setup-failure {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.setup-failure .setup-fix {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .setup-notes {
   margin: 0;
   padding-left: 18px;

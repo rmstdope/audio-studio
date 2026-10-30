@@ -121,8 +121,15 @@ export interface ImageTakesView {
   generator: ImageGeneratorView
   /** The project's main image model (Setup's). */
   projectModel: ImageModelId
-  /** Every image model, and whether this computer has its weights. */
-  models: { id: ImageModelId; installed: boolean }[]
+  /** Every image model: whether this computer has its whole download, and whether its last take failed. */
+  models: {
+    id: ImageModelId
+    installed: boolean
+    /** How much of its download is here. */
+    download: 'whole' | 'partial' | 'absent'
+    /** Its last take failed (Setup says how). */
+    failed: boolean
+  }[]
   takes: ImageTakeView[]
   making: ImageMakingView[]
   failed: ImageFailedView[]

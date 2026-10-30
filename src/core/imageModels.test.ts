@@ -10,6 +10,7 @@ import {
   imageModel,
   imageSaveFailureHeading,
   imageShortEntry,
+  imageSwitchedLine,
   perTake,
 } from './imageModels'
 
@@ -41,9 +42,23 @@ describe('imageModels', () => {
   it('words the time of a take and the menu entries', () => {
     expect(perTake('klein')).toBe('about 8 s a take')
     expect(perTake('z-image-turbo')).toBe('about 1 min a take')
-    expect(imageMenuEntry('klein', true)).toBe('FLUX.2 klein 4B — about 8 s a take')
-    expect(imageMenuEntry('z-image-turbo', false)).toBe(
+    const entry = (
+      id: 'klein' | 'z-image-turbo',
+      download: 'whole' | 'partial' | 'absent',
+      failed = false,
+    ) => imageMenuEntry(id, { download, failed })
+    expect(entry('klein', 'whole')).toBe('FLUX.2 klein 4B — about 8 s a take')
+    expect(entry('z-image-turbo', 'absent')).toBe(
       'Z-Image-Turbo — about 1 min a take — not on this computer',
+    )
+    expect(entry('z-image-turbo', 'whole', true)).toBe(
+      'Z-Image-Turbo — about 1 min a take — last take failed',
+    )
+    expect(entry('klein', 'partial')).toBe(
+      'FLUX.2 klein 4B — about 8 s a take — download incomplete',
+    )
+    expect(entry('klein', 'partial', true)).toBe(
+      'FLUX.2 klein 4B — about 8 s a take — download incomplete',
     )
     expect(imageShortEntry('klein')).toBe('FLUX.2 klein — about 8 s a take')
     expect(imageSaveFailureHeading('z-image-turbo')).toBe(
@@ -57,13 +72,28 @@ describe('imageModels', () => {
     expect(imageByMflux('flux1-schnell')).toBeNull()
   })
 
-  it('starts takes on the main model, else on the other one that is here', () => {
-    const both = { klein: true, 'z-image-turbo': true }
-    expect(defaultTakeModel('klein', both)).toBe('klein')
-    expect(defaultTakeModel('z-image-turbo', both)).toBe('z-image-turbo')
-    expect(defaultTakeModel('klein', { klein: false, 'z-image-turbo': true })).toBe('z-image-turbo')
-    expect(defaultTakeModel('z-image-turbo', { klein: true, 'z-image-turbo': false })).toBe('klein')
-    expect(defaultTakeModel('klein', { klein: false, 'z-image-turbo': false })).toBe('klein')
+  it('starts takes on the main model, else on the other that is whole and has not failed', () => {
+    const ok = { download: 'whole', failed: false } as const
+    const failed = { download: 'whole', failed: true } as const
+    const partial = { download: 'partial', failed: false } as const
+    const absent = { download: 'absent', failed: false } as const
+    expect(defaultTakeModel('klein', { klein: ok, 'z-image-turbo': ok })).toBe('klein')
+    expect(defaultTakeModel('z-image-turbo', { klein: ok, 'z-image-turbo': ok })).toBe(
+      'z-image-turbo',
+    )
+    expect(defaultTakeModel('klein', { klein: absent, 'z-image-turbo': ok })).toBe('z-image-turbo')
+    expect(defaultTakeModel('klein', { klein: partial, 'z-image-turbo': ok })).toBe('z-image-turbo')
+    expect(defaultTakeModel('klein', { klein: failed, 'z-image-turbo': ok })).toBe('z-image-turbo')
+    // The other is not in place: the main model stays, failed or not.
+    expect(defaultTakeModel('klein', { klein: failed, 'z-image-turbo': partial })).toBe('klein')
+    expect(defaultTakeModel('klein', { klein: failed, 'z-image-turbo': failed })).toBe('klein')
+    expect(defaultTakeModel('klein', { klein: absent, 'z-image-turbo': absent })).toBe('klein')
+  })
+
+  it('words the faint line of an image whose main model failed', () => {
+    expect(imageSwitchedLine('klein', 'z-image-turbo')).toBe(
+      "FLUX.2 klein, the project's image model, failed on its last take, so these takes use Z-Image-Turbo. Setup says what went wrong.",
+    )
   })
 })
 
