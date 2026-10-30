@@ -1341,8 +1341,8 @@ adds its new modules to the layout in §4.
 The images workspace shows the game's **images**: what each is called, its size and the words it is
 made from, beside the game's **style**. As with music, the game says which it needs; the studio
 never writes the game's lists. This section is the reading, the studio's own words and staleness
-(as-yag.3); making and choosing takes come with as-yag.2 and as-yag.4. The screens are drawn in
-`docs/ui/as-yag.3-images.html`.
+(as-yag.3), and the takes: making, comparing and choosing them (as-yag.2 and as-yag.4). The
+screens are drawn in `docs/ui/as-yag.3-images.html` and `docs/ui/as-yag.4-image-takes.html`.
 
 **Project file.** An optional `images` section beside `narration` and `music`, its acts the
 narration's parts. No `{language}` in any path: images are the same in every language. Refresh from
@@ -1361,8 +1361,13 @@ the game on an act's page runs `narration.refreshDialog`, as on Music's act page
 }
 ```
 
+`clips` is the folder the chosen pictures are written to (`<id>.png`, the studio's own folder) and
+`manifest` what the game reads there. Both are required.
+
 **The game's files** (read only, `core/images.ts`). `list` holds an act's images in the game's order:
-`{ id, title, description, width, height }`, the id a slug and unique across the game (a repeated
+`{ id, title, description, width, height, file? }`, `file` the picture the game shows for it now when
+the studio did not make it (a path inside the project root to a `.png`, `.jpg`, `.gif` or `.webp`;
+read only, never moved or written, shown as "The game's own image" until a take is chosen); the id a slug and unique across the game (a repeated
 id is a problem with both files, and neither image is shown). `style` holds `{ look, keepOut,
 palette, acts }`: `palette` is `#rrggbb` colours and `acts` an optional addition per part id (an
 id the project does not have is a problem). A list that is not there yet is not a problem (the game
@@ -1390,10 +1395,43 @@ a change leaves no chosen image out of date (there is then no notice to put away
 style, every Images page shows one notice naming what changed. The user's own change to the style
 shows no notice; the images made with the old style are marked out of date.
 
+**Takes** (`services/imageTakes.ts`, `core/imageTakes.ts`). A take is the image's whole prompt made
+with `DEFAULT_IMAGE_MODEL` at the take size (`takeSize`: the listed shape with the longer side 1024,
+each side a multiple of 16; the listed sizes are not multiples of 16, and bringing a take to them
+and to the palette is as-yag.5) and a new seed, on the GPU queue (`makeImageTake`). The board is
+`.audio-studio/images/<id>.json`, `{ next, takes: [{ n, seed, model, width, height, madeFrom, seen }] }`
+(`madeFrom` is what it was made from, as in the lock), the pictures `.audio-studio/image-takes/<id>/<n>.png`;
+a take is on the board only once its picture is written, numbers are per image and never reused
+(reserved at once), and what waits, is made or failed is in memory (`globalThis`), polled by the
+page. **Stop** ends the one being made and drops those waiting; a failed take stays with its reason
+until **Try again** makes the same number. A take is "earlier" when its words differ from the image's
+now (the style and the size are not marked on a take); "new" until it has been shown on the right
+once (`seen`, saved on the board).
+
+**Choosing.** **Choose** (in the image's board turn and the project's choice turn, with both the
+manifest and the lock readable, or nothing is changed) writes the picture to `<clips>/<id>.png`, the
+manifest entry `{ file, width, height }` (the picture's own size) and last the lock entry
+`{ chosen: { words, style, width, height, take, seed, model, at } }`; other keys of the lock are kept
+and images are written one per line. **Un-choose** (asked first in the page) removes the manifest entry,
+then the picture, then the lock entry, so a failure can be pressed again; the take stays on the board.
+**Drop** removes a take that is not chosen, with no question, and refuses while the lock cannot be
+read. The game's own `file` is never written or deleted. Where the pictures of the chosen image and of
+the game's own are served from: `GET /api/images/:id/current` (the chosen clip, else the game's file).
+
+**The Takes section** (an image's page, under the Prompt panel): the image the game uses on the left,
+one other take on the right, a strip of the others; Choose moves the right-hand take left and the
+take chosen before comes to the right, marked "was chosen" for that visit. The right-hand take is the
+page's own state (after a reload the newest) and does not move when a take finishes; ← / → step
+through the strip while focus is in the section but not in a menu or field. The status of an image
+on its act's list says "making 2 takes · about 1 min" while takes are made.
+
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
-`PATCH /api/image-style` (`{ look }` or `{ keepOut }`) and `POST /api/image-style/seen`; all from the
-studio's own page only.
+`PATCH /api/image-style` (`{ look }` or `{ keepOut }`) and `POST /api/image-style/seen`; for takes
+`GET` and `POST /api/images/:id/takes` (`{ count }` 1 to 4, or `{ retry }`), `GET /api/images/:id/takes/:n`
+(the picture), `DELETE` it (drop), `POST …/takes/:n/seen`, `POST /api/images/:id/choose` (`{ n }`),
+`/unchoose`, `/stop`, `GET /api/images/:id/current` and `GET /api/images/making`; every change from
+the studio's own page only.
 
 ---
 
@@ -1854,8 +1892,8 @@ Small, independently useful increments:
        keep about ten RetroQuest rooms one set.
     2. **The game's image list and style** (as-yag.3, done: §8.7), read-only, with the studio's own
        prompt overrides.
-    3. **An image take** (as-yag.2, built: a service, no screen yet) with either model, on the GPU queue with music and Whisper.
-    4. **Takes and choosing** (as-yag.4): an image's takes compared with the chosen one.
+    3. **An image take** (as-yag.2, done) with either model, on the GPU queue with music and Whisper.
+    4. **Takes and choosing** (as-yag.4, done: §8.7): an image's takes compared with the chosen one.
     5. **The game's look** (as-yag.5): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.
     6. **Two models** (as-yag.7): Setup says which are installed and chooses the main one; takes
        can be made with the other.

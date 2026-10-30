@@ -220,6 +220,7 @@ describe('choosing', () => {
     expect(JSON.parse(read('web/images/manifest.json'))).toEqual({
       inn: { file: 'inn.png', width: 1024, height: 640 },
     })
+    expect(read('web/images/manifest.json')).toContain('"width": 1024,')
     const lock = JSON.parse(read('images/images.lock.json'))
     expect(lock.images.inn.chosen).toMatchObject({
       words: 'a low inn',

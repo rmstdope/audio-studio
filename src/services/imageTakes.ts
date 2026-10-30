@@ -20,7 +20,6 @@ import {
 import type { ImageRow } from '../core/images'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
-import { pythonJson } from '../core/pyjson'
 import { readResource, writeAtomic } from './files'
 import { freeGpu, gpuQueue } from './gpu'
 import { readImages } from './imageLists'
@@ -386,7 +385,7 @@ export function createImageTakes({
             await writeAtomic(
               found.root,
               found.config.paths.manifest,
-              `${pythonJson(sorted(manifest))}\n`,
+              `${JSON.stringify(sorted(manifest), null, 2)}\n`,
             )
             await writeAtomic(found.root, found.config.paths.lock, formatLock(lock))
             if (!take.seen) {
@@ -416,7 +415,7 @@ export function createImageTakes({
             await writeAtomic(
               found.root,
               found.config.paths.manifest,
-              `${pythonJson(sorted(manifest))}\n`,
+              `${JSON.stringify(sorted(manifest), null, 2)}\n`,
             )
           }
           await rm(resolveInRoot(found.root, join(found.config.paths.clips, `${id}.png`)), {
