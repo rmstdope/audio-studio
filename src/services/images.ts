@@ -3,7 +3,12 @@ import { readdirSync, statSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkImageRequest, imageModel, type ImageModelId } from '../core/imageModels'
+import {
+  checkImageRequest,
+  IMAGE_MODEL_IDS,
+  imageModel,
+  type ImageModelId,
+} from '../core/imageModels'
 import { freeGpu, gpuQueue, GPU } from './gpu'
 import { quietLines } from './lineWorker'
 import type { Serial } from './serial'
@@ -89,12 +94,15 @@ export function mfluxReady(machine: Machine): ImageReady {
       fix: 'Images are made on a Mac with Apple silicon; there is nothing to install on this computer.',
     }
   }
-  if (!machine.which('mflux-generate')) {
+  const missing = IMAGE_MODEL_IDS.map((id) => imageModel(id).command).filter(
+    (command) => !machine.which(command),
+  )
+  if (missing.length > 0) {
     return {
       ok: false,
       reason: 'mflux',
-      message: 'mflux is not on the PATH; it makes the image takes.',
-      fix: 'uv tool install mflux (then start the studio again if it is still not found)',
+      message: `mflux is not on the PATH, or is too old to have ${missing.join(' and ')}; mflux makes the image takes.`,
+      fix: 'uv tool install --upgrade mflux (then start the studio again if it is still not found)',
     }
   }
   return { ok: true }
@@ -102,16 +110,20 @@ export function mfluxReady(machine: Machine): ImageReady {
 
 /** The command line of a take, and the file it writes. */
 export interface MfluxCommand {
-  /** The arguments after `mflux-generate`. */
+  /** The mflux command that makes this model's images. */
+  program: string
+  /** The arguments after it. */
   args: string[]
   out: string
 }
 
-/** The arguments of `mflux-generate` for a take written to `out`; steps are the model's own. */
+/** The command and arguments of mflux for a take written to `out`; steps are the model's own. */
 export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand {
+  const model = imageModel(request.model)
   return {
+    program: model.command,
     args: [
-      '--model', imageModel(request.model).mflux,
+      '--model', model.mflux,
       '--prompt', request.prompt,
       '--width', String(request.width),
       '--height', String(request.height),
@@ -122,13 +134,18 @@ export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand
   }
 }
 
+/** The process to start for a take: the model's command, then its arguments. */
+export function mfluxCommandLine(c: MfluxCommand): { command: string[]; out: string } {
+  return { command: [c.program, ...c.args], out: c.out }
+}
+
 /**
- * Image takes through `mflux-generate`, one process per take: the model loads for the take and
+ * Image takes through mflux's command for the model, one process per take: the model loads for the take and
  * leaves memory with the process, so it never sits beside ACE-Step, Whisper or the other image
  * model, and every take starts with a clean MLX cache. `build` replaces the command (tests).
  */
 export function createMfluxGenerator({
-  build = (c: MfluxCommand) => ({ command: ['mflux-generate', ...c.args], out: c.out }),
+  build = mfluxCommandLine,
   machine = { which: (c) => Bun.which(c) !== null, platform: process.platform, arch: process.arch },
   timeoutMs = 30 * 60_000,
   hubDir = HUB_DIR,

@@ -17,8 +17,10 @@ export interface ImageModel {
   repo: string
   /** About how many GB the weights take on disk. */
   gigabytes: number
-  /** The `--model` value of `mflux-generate`. */
+  /** The `--model` value of the model's mflux command. */
   mflux: string
+  /** The mflux command that makes this model's images (mflux has one per model family). */
+  command: string
   /** About how long one take takes, in seconds (a guess from the spike's timings and the model's load). */
   seconds: number
 }
@@ -32,6 +34,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     repo: 'black-forest-labs/FLUX.2-klein-4B',
     gigabytes: 15,
     mflux: 'flux2-klein-4b',
+    command: 'mflux-generate-flux2',
     seconds: 8,
   },
   'z-image-turbo': {
@@ -41,6 +44,7 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
     repo: 'Tongyi-MAI/Z-Image-Turbo',
     gigabytes: 31,
     mflux: 'z-image-turbo',
+    command: 'mflux-generate-z-image-turbo',
     seconds: 60,
   },
 }

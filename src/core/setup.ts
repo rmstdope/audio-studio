@@ -442,7 +442,7 @@ function imageModels(facts: SetupFacts): SetupCheck {
   const noteSteps = (list: SetupStep[]) => ({ list, note: 'Then press Check again.' })
   const installMflux: SetupStep = {
     parts: ['Install mflux:'],
-    commands: ['uv tool install mflux'],
+    commands: ['uv tool install --upgrade mflux'],
   }
   if (!mflux.ok) {
     const isMissingMflux = mflux.reason === 'mflux'
