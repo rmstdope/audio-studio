@@ -1419,8 +1419,10 @@ and a new seed, on the GPU queue (`makeImageTake`). The board is
 a take is on the board only once its picture is written, numbers are per image and never reused
 (reserved at once), and what waits, is made or failed is in memory (`globalThis`), polled by the
 page. **Stop** ends the one being made and drops those waiting; a failed take stays with its reason
-until **Try again** makes the same number. A take is "earlier" when its words differ from the image's
-now (the style and the size are not marked on a take); "new" until it has been shown on the right
+until **Try again** makes the same number. The reason is one plain sentence naming the model and the
+cause (`imageFailureReason`: missing or incomplete weights, with the download command; a model or
+argument the installed mflux does not know; or else the exit code); mflux's own output goes to the
+server's log only. A take is "earlier" when its words differ from the image's now (the style and the size are not marked on a take); "new" until it has been shown on the right
 once (`seen`, saved on the board). `model` on the board is the mflux name of the model that made it; the
 view gives it as an id, and the two takes side by side name it after the take. A model that is not on this
 computer (`ImageGenerator.installed`: its weights are in the Hugging Face cache) is refused at the server,
