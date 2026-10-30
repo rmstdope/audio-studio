@@ -2,7 +2,7 @@ import { writeWav } from '../core/wav'
 import type { MusicGenerator } from './music'
 
 /**
- * A stand-in generator for working on the studio's own pages (`AUDIO_STUDIO_FAKE_MUSIC=1`): a
+ * A stand-in generator for working on the studio's own pages (`CONTENT_STUDIO_FAKE_MUSIC=1`): a
  * tone as long as asked after a few seconds, a failure for a brief that says "fail", and not
  * ready for one that says "unready". It makes no music.
  */
