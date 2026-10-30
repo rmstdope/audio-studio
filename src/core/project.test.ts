@@ -363,6 +363,46 @@ describe('the music section', () => {
   })
 })
 
+describe('the images section', () => {
+  const images = (paths: Record<string, string> = {}) =>
+    projectJson({
+      images: {
+        paths: {
+          list: 'tts/{part}/images.json',
+          style: 'images/style.json',
+          prompts: 'images/prompts.json',
+          lock: 'images/images.lock.json',
+          ...paths,
+        },
+      },
+    })
+
+  it('is optional', () => {
+    expect(parse(projectJson()).data!.images).toBeUndefined()
+  })
+
+  it('accepts the four paths', () => {
+    const result = parse(images())
+    expect(result.success).toBe(true)
+    expect(result.data!.images!.paths.prompts).toBe('images/prompts.json')
+  })
+
+  it('needs {part} in the list path', () => {
+    expect(problems(images({ list: 'tts/images.json' }))).toEqual([
+      {
+        file: 'audio-studio.json',
+        path: 'images.paths.list',
+        message: 'must contain {part}, or every part would share one file',
+      },
+    ])
+  })
+
+  it('refuses {language} in any images path', () => {
+    const found = problems(images({ style: '{language}/style.json' }))
+    expect(found.map((p) => p.path)).toEqual(['images.paths.style'])
+  })
+})
+
 describe('narration.sceneCueSpeakers', () => {
   it('is the narrator alone unless the project names speakers', () => {
     expect(parse(projectJson()).data!.narration.sceneCueSpeakers).toEqual(['narrator'])

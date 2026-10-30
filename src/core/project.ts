@@ -280,6 +280,30 @@ const MusicSchema = z.object({
   }),
 })
 
+/** An images path: the same in every language, so it may not contain `{language}`. */
+const imagesPath = z
+  .string()
+  .min(1)
+  .refine((path) => !path.includes('{language}'), {
+    error: 'must not contain {language}: images are the same in every language',
+  })
+
+/** The optional `images` section: where the game lists its images and style, and the studio's own files. */
+const ImagesSchema = z.object({
+  paths: z.object({
+    /** An act's images, written by the game. */
+    list: imagesPath.refine((path) => path.includes('{part}'), {
+      error: 'must contain {part}, or every part would share one file',
+    }),
+    /** The game's style file, written by the game. */
+    style: imagesPath,
+    /** The studio's own words for images and style, over the game's. */
+    prompts: imagesPath,
+    /** Where the chosen take of each image is recorded (written by take-making). */
+    lock: imagesPath,
+  }),
+})
+
 /** The project file, `audio-studio.json`, in the consumer repository's root. */
 export const ProjectSchema = z.object({
   $schema: z.string().optional(),
@@ -288,6 +312,7 @@ export const ProjectSchema = z.object({
   env: z.string().default('.env'),
   narration: NarrationSchema,
   music: MusicSchema.optional(),
+  images: ImagesSchema.optional(),
   /**
    * How long a take fades in and out when played in the studio, in seconds (0: no fade); absent is
    * 0.2. Saved from Setup's Playing takes panel; the game's own file never fades.
@@ -303,6 +328,9 @@ export type ElevenTts = Project['narration']['elevenlabs']['tts']
 
 /** The validated `music` section of a project file. */
 export type MusicConfig = z.infer<typeof MusicSchema>
+
+/** The validated `images` section of a project file. */
+export type ImagesConfig = z.infer<typeof ImagesSchema>
 
 /** One part of the game (RetroQuest: an act). */
 export type Part = z.infer<typeof PartSchema>
