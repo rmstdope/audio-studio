@@ -8,6 +8,7 @@ import {
   IMAGE_MODEL_IDS,
   imageFailureReason,
   imageModel,
+  type ImageDownload,
   type ImageModelId,
 } from '../core/imageModels'
 import { freeGpu, gpuQueue, GPU } from './gpu'
@@ -43,9 +44,6 @@ export type ImageReady =
       fix: string
     }
 
-/** How much of a model's download is on this computer. */
-export type ImageDownload = 'whole' | 'partial' | 'absent'
-
 /** Makes images from a prompt. Behind an interface, so tests use a fake. */
 export interface ImageGenerator {
   /** Whether a take can be made now: Apple silicon and mflux are there. */
@@ -65,6 +63,18 @@ export async function downloadOf(
 ): Promise<ImageDownload> {
   if (generator.download) return generator.download(model)
   return (await generator.installed(model)) ? 'whole' : 'absent'
+}
+
+/** A take that the image tool (mflux) ended with an error: the sentence for the page, and the tool's own last line. */
+export class ImageToolError extends Error {
+  constructor(
+    message: string,
+    /** The last line of the tool's error output, verbatim. */
+    readonly lastLine: string,
+  ) {
+    super(message)
+    this.name = 'ImageToolError'
+  }
 }
 
 /** Where Hugging Face keeps its downloads, where mflux finds and puts the models' weights. */
@@ -251,7 +261,10 @@ export function createMfluxGenerator({
           if (code !== 0) {
             const output = quietLines(stderr).trim()
             log(`Content Studio: ${command[0]} failed (exit code ${code}):\n${output}`)
-            throw new Error(imageFailureReason(request.model, code, output))
+            throw new ImageToolError(
+              imageFailureReason(request.model, code, output),
+              output.split('\n').at(-1) ?? '',
+            )
           }
         } finally {
           clearTimeout(timer)

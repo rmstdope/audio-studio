@@ -6,6 +6,7 @@ import { createGpuWorkers, GPU } from './gpu'
 import {
   createMfluxGenerator,
   hubDirOf,
+  ImageToolError,
   imageModelDownload,
   imageModelInstalled,
   makeImageTake,
@@ -173,6 +174,8 @@ describe('createMfluxGenerator', () => {
       'FLUX.2 klein 4B could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B, then Try again.',
     )
     expect(logged.join('\n')).toContain('weight_loader.py')
+    expect(failure).toBeInstanceOf(ImageToolError)
+    expect((failure as ImageToolError).lastLine).toBe('FileNotFoundError: No safetensors found')
   })
 
   it('says the computer ran out of memory when the system killed it', async () => {

@@ -6,7 +6,8 @@ import { setImageWords } from './imageEdits'
 import { readImages } from './imageLists'
 import { createImageTakes } from './imageTakes'
 import type { ImageModelId } from '../core/imageModels'
-import type { ImageGenerator, ImageReady, ImageRequest } from './images'
+import { ImageToolError, type ImageGenerator, type ImageReady, type ImageRequest } from './images'
+import { createImageHealth } from './imageHealth'
 import { decodePng } from './png'
 import { fakePng } from './imagesFake'
 import { createSerial } from './serial'
@@ -40,6 +41,8 @@ function fakeGenerator(
       requests.push(request)
       await gate
       if (signal?.aborted) throw new Error('The image generator was stopped.')
+      if (request.prompt.includes('tool'))
+        throw new ImageToolError('Klein could not load.', 'FileNotFoundError: model.safetensors')
       if (request.prompt.includes('fail')) throw new Error('The image generator: out of memory')
       return { png: fakePng(request.width, request.height, request.seed), seed: request.seed }
     },
@@ -713,3 +716,53 @@ async function openProjectOk(file: string) {
   if (!opened.ok) throw new Error('project')
   return opened.project
 }
+
+describe('the failure of a model’s last take', () => {
+  const words = (w: string) => ({
+    'images/prompts.json': { images: { inn: { words: w, gameWas: 'a low inn' } }, style: {} },
+  })
+  const health = (file: string) => createImageHealth().read(file)
+
+  it('remembers the last line of the tool’s error, the image and the take, and a working take clears it', async () => {
+    const { takes, file, settled } = setup(undefined, words('tool now'))
+    await takes.make(file, 'inn', { count: 1 })
+    await settled('inn')
+    expect((await health(file)).klein).toMatchObject({
+      image: 'inn',
+      take: 1,
+      error: 'FileNotFoundError: model.safetensors',
+    })
+    const view = await takes.view(file, 'inn')
+    if (!view || !('models' in view)) throw new Error('no view')
+    expect(view.models.find((m) => m.id === 'klein')).toMatchObject({
+      download: 'whole',
+      failed: true,
+    })
+    // Another model's working take leaves it; the model's own working take clears it.
+    await takes.make(file, 'hall', { count: 1, model: 'z-image-turbo' })
+    await settled('hall')
+    expect((await health(file)).klein).toBeDefined()
+    await takes.make(file, 'hall', { count: 1, model: 'klein' })
+    await settled('hall')
+    expect(await health(file)).toEqual({})
+  })
+
+  it('keeps a failure the page shows as a sentence for a take that did not end in the tool’s error', async () => {
+    const { takes, file, settled } = setup(undefined, words('fail now'))
+    await takes.make(file, 'inn', { count: 1 })
+    await settled('inn')
+    expect((await health(file)).klein?.error).toBe('The image generator: out of memory.')
+  })
+
+  it('records nothing for a take that was stopped', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { takes, file } = setup(undefined, words('tool now'), gate)
+    await takes.make(file, 'inn', { count: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await takes.stop(file, 'inn')
+    release()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(await health(file)).toEqual({})
+  })
+})

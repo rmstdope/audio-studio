@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
+import { createImageHealth } from './imageHealth'
 import { modelsView } from './modelsView'
 
 const entry = (model: string) => ({
@@ -148,13 +149,23 @@ describe('modelsView, with images', () => {
 
   it('gives the main image model, which models are here', async () => {
     const root = tempRepo({ 'content-studio.json': projectJson({ images: imagesSection }) })
-    const view = await modelsView(join(root, 'content-studio.json'), undefined, {
+    const file = join(root, 'content-studio.json')
+    await createImageHealth().record(file, 'z-image-turbo', {
+      image: 'inn',
+      take: 1,
+      error: 'FileNotFoundError: x',
+    })
+    const view = await modelsView(file, undefined, {
       installed: (model) => model === 'z-image-turbo',
+      download: (model) => (model === 'klein' ? 'partial' : 'whole'),
     })
     if (!view.ok) throw new Error('expected a view')
     expect(view.images).toEqual({
       model: 'klein',
-      installed: { klein: false, 'z-image-turbo': true },
+      states: {
+        klein: { download: 'partial', failed: false },
+        'z-image-turbo': { download: 'whole', failed: true },
+      },
     })
   })
 

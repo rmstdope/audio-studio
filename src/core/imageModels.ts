@@ -82,10 +82,25 @@ export function perTake(id: ImageModelId): string {
   return `about ${seconds >= 60 ? `${Math.round(seconds / 60)} min` : `${seconds} s`} a take`
 }
 
-/** A model's entry in an open menu: its name and time, and "not on this computer" when it is missing. */
-export function imageMenuEntry(id: ImageModelId, installed: boolean): string {
+/** How much of a model's download is on this computer. */
+export type ImageDownload = 'whole' | 'partial' | 'absent'
+
+/** What a model's menu entry needs to know: its download, and whether its last take failed. */
+export interface ImageModelState {
+  download: ImageDownload
+  failed: boolean
+}
+
+/**
+ * A model's entry in an open menu: its name and time, then what is wrong with it, if anything:
+ * "not on this computer", "download incomplete" or "last take failed" (a model that is not whole
+ * is marked by its download, not by a failure).
+ */
+export function imageMenuEntry(id: ImageModelId, state: ImageModelState): string {
   const entry = `${IMAGE_MODELS[id].name} — ${perTake(id)}`
-  return installed ? entry : `${entry} — not on this computer`
+  if (state.download === 'absent') return `${entry} — not on this computer`
+  if (state.download === 'partial') return `${entry} — download incomplete`
+  return state.failed ? `${entry} — last take failed` : entry
 }
 
 /** A model's entry in an image's closed menu: its short name and time. */
@@ -104,15 +119,22 @@ export function imageSaveFailureBody(file: string, reason: string): string {
 }
 
 /**
- * The model an image's new takes start on: the project's main model, or, when it is not on this
- * computer and the other is, the other one.
+ * The model an image's new takes start on: the project's main model when it is whole and its last
+ * take did not fail; else the other when that is in place; else a whole model even if its last take
+ * failed (the main one first); else the main model.
  */
 export function defaultTakeModel(
   main: ImageModelId,
-  installed: Record<ImageModelId, boolean>,
+  states: Record<ImageModelId, ImageModelState>,
 ): ImageModelId {
-  if (installed[main]) return main
-  return IMAGE_MODEL_IDS.find((id) => installed[id]) ?? main
+  const order = [main, ...IMAGE_MODEL_IDS.filter((id) => id !== main)]
+  const whole = order.filter((id) => states[id].download === 'whole')
+  return whole.find((id) => !states[id].failed) ?? whole[0] ?? main
+}
+
+/** The faint line on an image's page when new takes start on the other model because the main one failed its last take. */
+export function imageSwitchedLine(main: ImageModelId, to: ImageModelId): string {
+  return `${IMAGE_MODELS[main].short}, the project's image model, failed on its last take, so these takes use ${IMAGE_MODELS[to].name}. Setup says what went wrong.`
 }
 
 /** The largest side of an image take, in pixels. */

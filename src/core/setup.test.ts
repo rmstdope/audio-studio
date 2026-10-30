@@ -14,7 +14,7 @@ const ready: SetupFacts = {
   parallel: 4,
   fishTier: null,
   music: { ready: { ok: true }, checkpoints: '/models', model: 'balanced', stableAudioMissing: [] },
-  images: { mflux: { ok: true }, model: 'klein', missing: [] },
+  images: imageFacts({}),
   elevenlabs: { ok: false, reason: 'no-key', message: 'x' },
 }
 
@@ -29,6 +29,23 @@ const starter: ElevenAccount = {
 }
 
 const byId = (facts: SetupFacts) => Object.fromEntries(setupChecks(facts).map((c) => [c.id, c]))
+
+/** The image facts of a project whose models are whole and well, with these changes. */
+function imageFacts(change: {
+  mflux?: NonNullable<SetupFacts['images']>['mflux']
+  model?: 'klein' | 'z-image-turbo'
+  klein?: Partial<NonNullable<SetupFacts['images']>['models']['klein']>
+  'z-image-turbo'?: Partial<NonNullable<SetupFacts['images']>['models']['z-image-turbo']>
+}): NonNullable<SetupFacts['images']> {
+  return {
+    mflux: change.mflux ?? { ok: true },
+    model: change.model ?? 'klein',
+    models: {
+      klein: { download: 'whole', failure: null, ...change.klein },
+      'z-image-turbo': { download: 'whole', failure: null, ...change['z-image-turbo'] },
+    },
+  }
+}
 
 describe('setupChecks', () => {
   it('finds everything in place on a ready machine', () => {
@@ -397,6 +414,10 @@ describe('the image models check', () => {
     message: 'mflux is not on the PATH; it makes the image takes.',
     fix: 'uv tool install mflux',
   } as const
+  const bridge = { id: 'bridge', title: 'Bridge at dusk' }
+  const KLEIN = 'uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B'
+  const ZIMAGE = 'uvx --from huggingface_hub hf download Tongyi-MAI/Z-Image-Turbo'
+  const failure = { error: 'FileNotFoundError: No safetensors', image: bridge }
 
   it('is not used by a project with no images section', () => {
     expect(row(null)).toMatchObject({
@@ -407,49 +428,173 @@ describe('the image models check', () => {
     })
   })
 
-  it('is ready with both models here', () => {
-    expect(row({ mflux: here, model: 'klein', missing: [] })).toMatchObject({
+  it('is ready with both models whole and no failed take', () => {
+    expect(row(imageFacts({}))).toMatchObject({
       state: 'ok',
       detail:
-        'FLUX.2 klein 4B and Z-Image-Turbo are on this computer; a model loads on its first take.',
+        'FLUX.2 klein 4B and Z-Image-Turbo are fully downloaded on this computer; a model loads on its first take.',
     })
   })
 
-  it('is optional when only the other model is missing, saying how to get it', () => {
-    const found = row({ mflux: here, model: 'klein', missing: ['z-image-turbo'] })
-    expect(found).toMatchObject({
+  it('is optional when only the other model is missing or incomplete, saying how to get it', () => {
+    const missing = row(imageFacts({ 'z-image-turbo': { download: 'absent' } }))
+    expect(missing).toMatchObject({
       state: 'off',
       label: 'Not set up',
       detail: 'Optional: Z-Image-Turbo is not on this computer. FLUX.2 klein 4B is in place.',
       steps: { note: 'Then press Check again.' },
     })
-    expect(found.steps!.list).toEqual([
-      {
-        parts: ['Download it, once (about 31 GB):'],
-        commands: ['uvx --from huggingface_hub hf download Tongyi-MAI/Z-Image-Turbo'],
-      },
+    expect(missing.steps!.list).toEqual([
+      { parts: ['Download it, once (about 31 GB):'], commands: [ZIMAGE] },
     ])
-    expect(row({ mflux: here, model: 'z-image-turbo', missing: ['klein'] })).toMatchObject({
+    const partial = row(imageFacts({ 'z-image-turbo': { download: 'partial' } }))
+    expect(partial).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+      detail:
+        "Optional: Z-Image-Turbo's download is incomplete, so it can't run. FLUX.2 klein 4B is in place.",
+    })
+    expect(partial.steps!.list).toEqual([
+      { parts: ['Finish the download (it picks up where it stopped):'], commands: [ZIMAGE] },
+    ])
+    expect(
+      row(imageFacts({ klein: { download: 'absent' }, model: 'z-image-turbo' })),
+    ).toMatchObject({
       state: 'off',
       detail: 'Optional: FLUX.2 klein 4B is not on this computer. Z-Image-Turbo is in place.',
     })
   })
 
-  it('needs attention when the project’s model is missing and the other is here', () => {
-    const found = row({ mflux: here, model: 'klein', missing: ['klein'] })
-    expect(found).toMatchObject({
+  it('needs attention when the project’s model is missing or incomplete and the other is whole', () => {
+    const missing = row(imageFacts({ klein: { download: 'absent' } }))
+    expect(missing).toMatchObject({
       state: 'problem',
       detail:
         "The project's image model, FLUX.2 klein 4B, is not on this computer. Z-Image-Turbo is in place: an image's takes can use it meanwhile.",
     })
-    expect(found.steps!.list[0]).toEqual({
+    expect(missing.steps!.list[0]).toEqual({
       parts: ['Download it, once (about 15 GB):'],
-      commands: ['uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B'],
+      commands: [KLEIN],
+    })
+    const partial = row(imageFacts({ klein: { download: 'partial' } }))
+    expect(partial).toMatchObject({
+      state: 'problem',
+      detail:
+        "The project's image model, FLUX.2 klein 4B, is only partly downloaded, so it can't run. Z-Image-Turbo is in place: an image's takes can use it meanwhile.",
+    })
+    expect(partial.steps!.list).toEqual([
+      { parts: ['Finish the download (it picks up where it stopped):'], commands: [KLEIN] },
+    ])
+  })
+
+  it('says images can’t be made when neither model can run, one step per model', () => {
+    const found = row(
+      imageFacts({ klein: { download: 'partial' }, 'z-image-turbo': { download: 'absent' } }),
+    )
+    expect(found).toMatchObject({
+      state: 'problem',
+      detail:
+        "Images can't be made: FLUX.2 klein 4B's download is incomplete and Z-Image-Turbo is not on this computer.",
+    })
+    expect(found.steps!.list).toEqual([
+      { parts: ['Finish the download (it picks up where it stopped):'], commands: [KLEIN] },
+      { parts: ['Download it, once (about 31 GB):'], commands: [ZIMAGE] },
+    ])
+    expect(
+      row(imageFacts({ klein: { download: 'partial' }, 'z-image-turbo': { download: 'partial' } }))
+        .detail,
+    ).toBe(
+      "Images can't be made: FLUX.2 klein 4B's download is incomplete and Z-Image-Turbo's download is incomplete.",
+    )
+    expect(
+      row(imageFacts({ klein: { download: 'absent' }, 'z-image-turbo': { download: 'absent' } })),
+    ).toMatchObject({
+      state: 'problem',
+      detail: "Images can't be made: neither image model is on this computer.",
+      steps: { list: [{ parts: ['Download the models, once (about 15 GB and 31 GB):'] }] },
     })
   })
 
+  it('says the other model’s failed last take is optional, with the error, the link and what clears it', () => {
+    const found = row(imageFacts({ 'z-image-turbo': { failure } }))
+    expect(found).toMatchObject({ state: 'off', label: 'Not set up', detail: '' })
+    expect(found.failures).toEqual([
+      {
+        sentence:
+          'Optional: the last take with Z-Image-Turbo failed on Bridge at dusk. FLUX.2 klein 4B is in place.',
+        error: 'FileNotFoundError: No safetensors',
+        link: { text: 'Open Bridge at dusk', href: '#/images/items/bridge' },
+        clears: 'This clears when a take with Z-Image-Turbo works.',
+      },
+    ])
+    expect(found.steps).toBeUndefined()
+  })
+
+  it('needs attention when the main model’s last take failed', () => {
+    const found = row(imageFacts({ klein: { failure } }))
+    expect(found.state).toBe('problem')
+    expect(found.failures).toEqual([
+      {
+        sentence:
+          "The last take with FLUX.2 klein 4B, the project's image model, failed on Bridge at dusk. Z-Image-Turbo is in place: an image's takes can use it meanwhile.",
+        error: 'FileNotFoundError: No safetensors',
+        link: { text: 'Open Bridge at dusk', href: '#/images/items/bridge' },
+        clears: 'This clears when a take with FLUX.2 klein 4B works.',
+      },
+    ])
+  })
+
+  it('names each model whose last take failed, one sentence each', () => {
+    const found = row(
+      imageFacts({ klein: { failure }, 'z-image-turbo': { failure: { ...failure, image: null } } }),
+    )
+    expect(found.state).toBe('problem')
+    expect(found.failures!.map((f) => f.sentence)).toEqual([
+      "The last take with FLUX.2 klein 4B, the project's image model, failed on Bridge at dusk.",
+      'The last take with Z-Image-Turbo failed.',
+    ])
+    expect(found.failures![1]!.link).toBeUndefined()
+    expect(found.failures!.map((f) => f.clears)).toEqual([
+      'This clears when a take with FLUX.2 klein 4B works.',
+      'This clears when a take with Z-Image-Turbo works.',
+    ])
+  })
+
+  it('leaves out the image’s name and link once the image is gone', () => {
+    const found = row(imageFacts({ 'z-image-turbo': { failure: { ...failure, image: null } } }))
+    expect(found.failures![0]).toMatchObject({
+      sentence: 'Optional: the last take with Z-Image-Turbo failed. FLUX.2 klein 4B is in place.',
+      error: 'FileNotFoundError: No safetensors',
+    })
+    expect(found.failures![0]!.link).toBeUndefined()
+  })
+
+  it('says the incomplete download, not the failure, for a model that is both', () => {
+    const found = row(imageFacts({ klein: { download: 'partial', failure } }))
+    expect(found.detail).toContain('only partly downloaded')
+    expect(found.failures).toBeUndefined()
+  })
+
+  it('says an incomplete model and a failed one each', () => {
+    const found = row(imageFacts({ klein: { download: 'partial' }, 'z-image-turbo': { failure } }))
+    expect(found.state).toBe('problem')
+    expect(found.detail).toBe(
+      "The project's image model, FLUX.2 klein 4B, is only partly downloaded, so it can't run.",
+    )
+    expect(found.failures!.map((f) => f.sentence)).toEqual([
+      'The last take with Z-Image-Turbo failed on Bridge at dusk.',
+    ])
+    expect(found.steps!.list).toHaveLength(1)
+  })
+
   it('says images can’t be made without mflux, with the steps to install it and get the models', () => {
-    const found = row({ mflux: noMflux, model: 'klein', missing: ['klein', 'z-image-turbo'] })
+    const found = row(
+      imageFacts({
+        mflux: noMflux,
+        klein: { download: 'absent' },
+        'z-image-turbo': { download: 'absent' },
+      }),
+    )
     expect(found).toMatchObject({
       state: 'problem',
       detail: "Images can't be made: mflux, which runs the image models, is not installed.",
@@ -461,22 +606,17 @@ describe('the image models check', () => {
     expect(found.steps!.list[0]!.commands).toEqual(['uv tool install --upgrade mflux'])
   })
 
-  it('names the machine when mflux cannot run at all, and both missing models when mflux is here', () => {
+  it('names the machine when mflux cannot run at all', () => {
     const noMac = {
       ok: false,
       reason: 'platform',
       message: 'Image takes are made on macOS with Apple silicon only.',
       fix: 'nothing to install',
     } as const
-    expect(row({ mflux: noMac, model: 'klein', missing: [] })).toMatchObject({
+    expect(row(imageFacts({ mflux: noMac }))).toMatchObject({
       state: 'problem',
       detail: 'Image takes are made on macOS with Apple silicon only.',
     })
-    expect(row({ mflux: here, model: 'klein', missing: ['klein', 'z-image-turbo'] })).toMatchObject(
-      {
-        state: 'problem',
-        detail: "Images can't be made: neither image model is on this computer.",
-      },
-    )
+    void here
   })
 })

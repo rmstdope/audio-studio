@@ -1,12 +1,18 @@
 import { basename, dirname } from 'node:path'
 import type { Dialog, Recorded, StageModels } from '../core/models'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS, type MusicModelId } from '../core/musicModels'
-import { IMAGE_MODEL_IDS, DEFAULT_IMAGE_MODEL, type ImageModelId } from '../core/imageModels'
+import {
+  IMAGE_MODEL_IDS,
+  DEFAULT_IMAGE_MODEL,
+  type ImageModelId,
+  type ImageModelState,
+} from '../core/imageModels'
 import { planPart } from '../core/planner'
 import type { ElevenTts } from '../core/project'
 import { sentPieces, spokenPieces } from '../core/spoken'
 import { providerOf } from '../core/voices'
-import type { ImageGenerator } from './images'
+import { createImageHealth, type ImageHealthStore } from './imageHealth'
+import { downloadOf, type ImageGenerator } from './images'
 import { readMusic } from './musicLists'
 import { openProject, readPart, type ProjectFailure } from './workspace'
 
@@ -40,7 +46,8 @@ export interface MusicModels {
 /** The project's main image model, which models this computer has; null for a project with no images. */
 export interface ImageModels {
   model: ImageModelId
-  installed: Record<ImageModelId, boolean>
+  /** Each model's download, and whether its last take failed. */
+  states: Record<ImageModelId, ImageModelState>
 }
 
 const encoder = new TextEncoder()
@@ -54,7 +61,8 @@ const encoder = new TextEncoder()
 export async function modelsView(
   projectFile: string,
   installed: (model: MusicModelId) => boolean | Promise<boolean> = () => true,
-  images: Pick<ImageGenerator, 'installed'> = { installed: () => true },
+  images: Pick<ImageGenerator, 'installed' | 'download'> = { installed: () => true },
+  health: Pick<ImageHealthStore, 'read'> = createImageHealth(),
 ): Promise<ModelsView> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -129,10 +137,25 @@ export async function modelsView(
     images: project.images
       ? {
           model: project.images.model ?? DEFAULT_IMAGE_MODEL,
-          installed: Object.fromEntries(
-            await Promise.all(IMAGE_MODEL_IDS.map(async (id) => [id, await images.installed(id)])),
-          ) as Record<ImageModelId, boolean>,
+          states: await imageStates(projectFile, images, health),
         }
       : null,
   }
+}
+
+/** Each image model's download, and whether its last take failed. */
+async function imageStates(
+  projectFile: string,
+  images: Pick<ImageGenerator, 'installed' | 'download'>,
+  health: Pick<ImageHealthStore, 'read'>,
+): Promise<Record<ImageModelId, ImageModelState>> {
+  const failures = await health.read(projectFile)
+  return Object.fromEntries(
+    await Promise.all(
+      IMAGE_MODEL_IDS.map(async (id) => [
+        id,
+        { download: await downloadOf(images, id), failed: Boolean(failures[id]) },
+      ]),
+    ),
+  ) as Record<ImageModelId, ImageModelState>
 }
