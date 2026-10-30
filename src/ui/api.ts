@@ -732,6 +732,7 @@ export function useSetTrackBrief(trackId: string) {
 function useImageEdit<V>(
   scope: string,
   request: (value: V) => { method: string; path: string; body: unknown },
+  afterSaved?: () => void,
 ) {
   const client = useQueryClient()
   return useMutation({
@@ -751,11 +752,14 @@ function useImageEdit<V>(
       }
       return (await response.json()) as NonNullable<ImageEditResult>
     },
-    onSettled: () =>
-      Promise.all([
+    onSettled: async (_data, error) => {
+      await Promise.all([
         client.invalidateQueries({ queryKey: ['project'] }),
         client.invalidateQueries({ queryKey: ['changes'] }),
-      ]),
+      ])
+      // Run here, not in a `mutate` callback: those are dropped when the page that asked has gone.
+      if (!error) afterSaved?.()
+    },
   })
 }
 
@@ -788,11 +792,12 @@ export function useSetStyleField(field: StyleField) {
 
 /** Puts the style-changed notice away. */
 export function useStyleSeen() {
-  return useImageEdit<void>('image-style-seen', () => ({
-    method: 'POST',
-    path: '/api/image-style/seen',
-    body: {},
-  }))
+  return useImageEdit<void>(
+    'image-style-seen',
+    () => ({ method: 'POST', path: '/api/image-style/seen', body: {} }),
+    // The notice goes away with the reload; focus must not be lost with it.
+    () => document.querySelector<HTMLElement>('h1')?.focus(),
+  )
 }
 
 /** A track's takes as its page shows them; polled while any is being made. */

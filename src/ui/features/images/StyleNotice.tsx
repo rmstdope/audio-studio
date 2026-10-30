@@ -22,12 +22,7 @@ export function StyleNotice({ notice }: { notice: NonNullable<ImagesSummary['sty
           className="btn"
           type="button"
           disabled={seen.isPending}
-          onClick={() =>
-            seen.mutate(undefined, {
-              // The notice goes away with the reload; focus must not be lost with it.
-              onSuccess: () => document.querySelector<HTMLElement>('h1')?.focus(),
-            })
-          }
+          onClick={() => seen.mutate()}
         >
           Seen
         </button>
