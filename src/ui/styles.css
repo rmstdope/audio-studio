@@ -3475,9 +3475,12 @@ button.cue-chip[aria-expanded='true'] {
   .images-table tbody {
     display: block;
   }
+  .images-table {
+    min-width: 0;
+  }
   .images-table tr {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px 12px;
     padding: 12px;
     border-bottom: 1px solid var(--line);

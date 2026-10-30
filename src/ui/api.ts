@@ -728,10 +728,13 @@ export function useSetTrackBrief(trackId: string) {
 /**
  * Sends one change to the studio's own image words (`PATCH`/`POST` with a JSON body), then reloads
  * the project, whose Images pages show the result. A 404 means the game no longer lists the image.
+ * `afterSaved` runs once the reload is done and only when the request did not fail; it is given
+ * here, not to `mutate`, whose callbacks are dropped when the page that asked has gone.
  */
 function useImageEdit<V>(
   scope: string,
   request: (value: V) => { method: string; path: string; body: unknown },
+  afterSaved?: () => void,
 ) {
   const client = useQueryClient()
   return useMutation({
@@ -751,11 +754,13 @@ function useImageEdit<V>(
       }
       return (await response.json()) as NonNullable<ImageEditResult>
     },
-    onSettled: () =>
-      Promise.all([
+    onSettled: async (_data, error) => {
+      await Promise.all([
         client.invalidateQueries({ queryKey: ['project'] }),
         client.invalidateQueries({ queryKey: ['changes'] }),
-      ]),
+      ])
+      if (!error) afterSaved?.()
+    },
   })
 }
 
@@ -786,13 +791,13 @@ export function useSetStyleField(field: StyleField) {
   }))
 }
 
-/** Puts the style-changed notice away. */
-export function useStyleSeen() {
-  return useImageEdit<void>('image-style-seen', () => ({
-    method: 'POST',
-    path: '/api/image-style/seen',
-    body: {},
-  }))
+/** Puts the style-changed notice away, then runs `afterSeen` (the notice is gone by then). */
+export function useStyleSeen(afterSeen: () => void) {
+  return useImageEdit<void>(
+    'image-style-seen',
+    () => ({ method: 'POST', path: '/api/image-style/seen', body: {} }),
+    afterSeen,
+  )
 }
 
 /** A track's takes as its page shows them; polled while any is being made. */

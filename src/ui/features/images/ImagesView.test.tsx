@@ -412,6 +412,44 @@ describe('the game’s style changed', () => {
     expect(document.activeElement?.tagName).toBe('H1')
   })
 
+  it('keeps focus on the heading when Seen takes the notice away with it', async () => {
+    // Earlier tests leave their pages (and focus) behind: start from this page alone.
+    document.body.replaceChildren()
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => act(() => root.unmount()))
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, enabled: false } },
+    })
+    client.setQueryData(['image-making'], {})
+    client.setQueryData(['look-run'], null)
+    const show = (shown: ProjectSummary) =>
+      act(() =>
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client },
+            createElement(ImagesView, {
+              summary: shown,
+              route: { view: 'images', page: 'act', part: 'act1' },
+            }),
+          ),
+        ),
+      )
+    show(changed())
+    // The studio answers, and the page now shows the project without the notice.
+    globalThis.fetch = (async () => {
+      show(summary())
+      return Response.json({ ok: true })
+    }) as unknown as typeof fetch
+    expect(document.activeElement).toBe(document.body)
+    await act(async () => button(container, 'Seen').click())
+    await flush()
+    expect(container.querySelector('.notice')).toBeNull()
+    expect(document.activeElement).toBe(container.querySelector('h1'))
+  })
+
   it('is not shown when nothing changed', () => {
     expect(render({ view: 'images', page: 'style' }).querySelector('.notice')).toBeNull()
   })
