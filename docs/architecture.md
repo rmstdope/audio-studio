@@ -1793,7 +1793,7 @@ Small, independently useful increments:
        keep about ten RetroQuest rooms one set.
     2. **The game's image list and style** (as-yag.3), read-only, with the studio's own prompt
        overrides.
-    3. **An image take** (as-yag.2) with either model, on the GPU queue with music and Whisper.
+    3. **An image take** (as-yag.2, built: a service, no screen yet) with either model, on the GPU queue with music and Whisper.
     4. **Takes and choosing** (as-yag.4): an image's takes compared with the chosen one.
     5. **The game's look** (as-yag.5): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.
     6. **Two models** (as-yag.7): Setup says which are installed and chooses the main one; takes
@@ -1866,7 +1866,7 @@ Small, independently useful increments:
    costs nothing.
 
    **Memory beside the other workers.** With ACE-Step and Whisper both loaded, 42 of the 48 GB were in use (§8.5), so an image worker cannot stay loaded beside them, nor the two image models beside each
-   other (57 GB). Image takes wait on the GPU queue, and either the image worker is loaded only for its takes or the other workers are stopped first, as the music router stops the other music family (as-yag.2).
+   other (57 GB). So an image take (`services/images.ts`, as-yag.2) is one `mflux-generate` process, started for the take and gone when it ends, which also gives every take a clean MLX cache (the cache clearing above). It waits its turn on the GPU queue with music and Whisper (`makeImageTake`), and when its turn comes `freeGpu` closes the idle Whisper and music workers (registered with `onGpuFree`), as the music router closes the other music family; they start again with their next request, so the cost of an image take is the reload of whatever is used next. The two image models never share memory, being separate processes one after the other.
 
    **One look holds across a set through the shared style text**, not through the palette. Klein's
    and Z-Image-Turbo's ten rooms each read as one set from the same style text. The text is the

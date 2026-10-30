@@ -1,0 +1,167 @@
+import { randomUUID } from 'node:crypto'
+import { readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { checkImageRequest, imageModel, type ImageModelId } from '../core/imageModels'
+import { freeGpu, gpuQueue, GPU } from './gpu'
+import { quietLines } from './lineWorker'
+import type { Serial } from './serial'
+import type { Machine } from './setup'
+
+/** What an image take is made from. */
+export interface ImageRequest {
+  prompt: string
+  /** Pixels; a multiple of 16. */
+  width: number
+  height: number
+  seed: number
+  /** The model to make it with. */
+  model: ImageModelId
+}
+
+/** One take as generated: a PNG, and the seed it was made from. */
+export interface GeneratedImage {
+  png: Uint8Array
+  seed: number
+}
+
+/** Whether image takes can be made on this computer, and what is missing if not. */
+export type ImageReady = { ok: true } | { ok: false; message: string; fix: string }
+
+/** Makes images from a prompt. Behind an interface, so tests use a fake. */
+export interface ImageGenerator {
+  /** Whether a take can be made now: Apple silicon and mflux are there. */
+  ready(): ImageReady | Promise<ImageReady>
+  /** One take; the model loads for it and leaves memory when it is made. Aborting ends it, and it rejects. */
+  generate(request: ImageRequest, signal?: AbortSignal): Promise<GeneratedImage>
+}
+
+/** Whether mflux can run here, and the first thing that stops it if not. */
+export function mfluxReady(machine: Machine): ImageReady {
+  if (!(machine.platform === 'darwin' && machine.arch === 'arm64')) {
+    return {
+      ok: false,
+      message: 'Image takes are made on macOS with Apple silicon only.',
+      fix: 'Images are made on a Mac with Apple silicon; there is nothing to install on this computer.',
+    }
+  }
+  if (!machine.which('mflux-generate')) {
+    return {
+      ok: false,
+      message: 'mflux is not on the PATH; it makes the image takes.',
+      fix: 'uv tool install mflux (then start the studio again if it is still not found)',
+    }
+  }
+  return { ok: true }
+}
+
+/** The command line of a take, and the file it writes. */
+export interface MfluxCommand {
+  /** The arguments after `mflux-generate`. */
+  args: string[]
+  out: string
+}
+
+/** The arguments of `mflux-generate` for a take written to `out`; steps are the model's own. */
+export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand {
+  return {
+    args: [
+      '--model', imageModel(request.model).mflux,
+      '--prompt', request.prompt,
+      '--width', String(request.width),
+      '--height', String(request.height),
+      '--seed', String(request.seed),
+      '--output', out,
+    ], // prettier-ignore
+    out,
+  }
+}
+
+/**
+ * Image takes through `mflux-generate`, one process per take: the model loads for the take and
+ * leaves memory with the process, so it never sits beside ACE-Step, Whisper or the other image
+ * model, and every take starts with a clean MLX cache. `build` replaces the command (tests).
+ */
+export function createMfluxGenerator({
+  build = (c: MfluxCommand) => ({ command: ['mflux-generate', ...c.args], out: c.out }),
+  machine = { which: (c) => Bun.which(c) !== null, platform: process.platform, arch: process.arch },
+  timeoutMs = 30 * 60_000,
+}: {
+  build?: (c: MfluxCommand) => { command: string[]; out: string }
+  machine?: Machine
+  timeoutMs?: number
+} = {}): ImageGenerator {
+  return {
+    ready: () => mfluxReady(machine),
+    async generate(request, signal) {
+      const problem = checkImageRequest(request)
+      if (problem) throw new Error(problem)
+      if (signal?.aborted) throw new Error('The image generator was stopped.')
+      const { command, out } = build(
+        mfluxArguments(request, join(tmpdir(), `audio-studio-image-${randomUUID()}.png`)),
+      )
+      try {
+        const proc = Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe' })
+        let stopped = ''
+        const stop = (why: string) => {
+          stopped = why
+          proc.kill()
+        }
+        const onAbort = () => stop('The image generator was stopped.')
+        signal?.addEventListener('abort', onAbort, { once: true })
+        const timer = setTimeout(
+          () =>
+            stop(
+              `The image generator took longer than ${Math.round(timeoutMs / 60_000)} minutes and was stopped.`,
+            ),
+          timeoutMs,
+        )
+        try {
+          const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+          if (stopped) throw new Error(stopped)
+          if (code === 137 || proc.signalCode === 'SIGKILL') {
+            throw new Error(
+              'The image generator was stopped by the computer, most likely because it ran out of memory. Close other programs, then Try again.',
+            )
+          }
+          if (code !== 0) {
+            const why = quietLines(stderr).trim().split('\n').slice(-3).join(' ')
+            throw new Error(`The image generator failed (exit code ${code}): ${why}`)
+          }
+        } finally {
+          clearTimeout(timer)
+          signal?.removeEventListener('abort', onAbort)
+        }
+        const png = await readFile(out).catch(() => null)
+        if (!png) throw new Error('The image generator made no image.')
+        return { png: new Uint8Array(png), seed: request.seed }
+      } finally {
+        await rm(out, { force: true })
+      }
+    },
+  }
+}
+
+/**
+ * One image take, in its turn on the GPU queue with music and Whisper: when it is its turn the idle
+ * workers are closed and gone (`free`, by default `freeGpu`), so the model has the memory, and they start
+ * again on their next request. A request that cannot be made is refused before it takes a turn.
+ */
+export async function makeImageTake(
+  {
+    generator,
+    queue = gpuQueue(),
+    free = freeGpu,
+  }: { generator: ImageGenerator; queue?: Serial; free?: () => void | Promise<void> },
+  request: ImageRequest,
+  signal?: AbortSignal,
+): Promise<GeneratedImage> {
+  const problem = checkImageRequest(request)
+  if (problem) throw new Error(problem)
+  return queue.run(GPU, async () => {
+    // A take stopped while it waited must not cost the other workers their models.
+    if (signal?.aborted) throw new Error('The image generator was stopped.')
+    await free()
+    return generator.generate(request, signal)
+  })
+}

@@ -9,8 +9,8 @@ export interface Transcriber {
    * `language` is the code of the language spoken; without it Whisper recognises it itself.
    */
   transcribe(model: string, path: string, language?: string): Promise<HeardSegment[]>
-  /** Stops the worker, if one is running. */
-  close(): void
+  /** Stops the worker, if one is running; a promise settles when its memory is free. */
+  close(): void | Promise<void>
 }
 
 /** The worker script, run with uv (which installs mlx-whisper the first time). */

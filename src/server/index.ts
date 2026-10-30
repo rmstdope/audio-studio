@@ -117,7 +117,7 @@ import { freeableVoices } from '../core/elevenLibrary'
 import type { Voice } from '../core/voiceSearch'
 import { fishFromEnv, NO_KEY, type CreditResult, type FishClient } from '../services/fish'
 import { heardFor } from '../services/heard'
-import { onGpu } from '../services/gpu'
+import { onGpu, onGpuFree } from '../services/gpu'
 import { createAceStepWorker, createMusicRouter, type MusicGenerator } from '../services/music'
 import { createStableAudioWorker } from '../services/stableAudio'
 import { createFakeMusic } from '../services/musicFake'
@@ -164,7 +164,10 @@ export interface ServerOptions {
  */
 function sharedWhisper(): Transcriber {
   const state = globalThis as { audioStudioWhisper?: Transcriber }
-  state.audioStudioWhisper ??= createWhisperWorker()
+  if (!state.audioStudioWhisper) {
+    state.audioStudioWhisper = createWhisperWorker()
+    onGpuFree(() => state.audioStudioWhisper?.close())
+  }
   return state.audioStudioWhisper
 }
 
@@ -176,19 +179,23 @@ function sharedWhisper(): Transcriber {
  */
 function sharedMusic(projectFile: string): MusicGenerator {
   const state = globalThis as { audioStudioMusic?: MusicGenerator }
-  state.audioStudioMusic ??=
-    process.env.AUDIO_STUDIO_FAKE_MUSIC === '1'
-      ? createFakeMusic()
-      : createMusicRouter({
-          acestep: createAceStepWorker(),
-          'stable-audio': createStableAudioWorker(),
-          elevenlabs: createElevenMusic({
-            apiKey: async () => {
-              const opened = await openProject(projectFile)
-              return opened.ok ? elevenLabsApiKey(dirname(projectFile), opened.project.env) : null
-            },
-          }),
-        })
+  if (!state.audioStudioMusic) {
+    state.audioStudioMusic =
+      process.env.AUDIO_STUDIO_FAKE_MUSIC === '1'
+        ? createFakeMusic()
+        : createMusicRouter({
+            acestep: createAceStepWorker(),
+            'stable-audio': createStableAudioWorker(),
+            elevenlabs: createElevenMusic({
+              apiKey: async () => {
+                const opened = await openProject(projectFile)
+                return opened.ok ? elevenLabsApiKey(dirname(projectFile), opened.project.env) : null
+              },
+            }),
+          })
+    // An image take closes the music workers first (they come back with the next take).
+    onGpuFree(() => state.audioStudioMusic?.close())
+  }
   return state.audioStudioMusic
 }
 

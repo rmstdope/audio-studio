@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { createSerial } from './serial'
-import { GPU, onGpu } from './gpu'
+import { GPU, createGpuWorkers, onGpu } from './gpu'
 import type { Transcriber } from './transcriber'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -43,5 +43,40 @@ describe('onGpu', () => {
     )
     await expect(whisper.transcribe('tiny', 'a.wav')).rejects.toThrow('bad')
     expect(await whisper.transcribe('tiny', 'b.wav')).toEqual([])
+  })
+})
+
+describe('createGpuWorkers', () => {
+  it('closes every registered worker when the GPU is freed, and only then', async () => {
+    const log: string[] = []
+    const workers = createGpuWorkers()
+    workers.add(() => void log.push('music'))
+    workers.add(() => void log.push('whisper'))
+    expect(log).toEqual([])
+    await workers.free()
+    expect(log).toEqual(['music', 'whisper'])
+  })
+
+  it('waits for workers that close late', async () => {
+    const log: string[] = []
+    const workers = createGpuWorkers()
+    workers.add(async () => {
+      await wait(20)
+      log.push('late')
+    })
+    workers.add(() => void log.push('now'))
+    await await workers.free()
+    expect(log).toEqual(['now', 'late'])
+  })
+
+  it('frees with nothing registered, and registers a worker once', async () => {
+    const log: string[] = []
+    const workers = createGpuWorkers()
+    await workers.free()
+    const close = () => void log.push('x')
+    workers.add(close)
+    workers.add(close)
+    await workers.free()
+    expect(log).toEqual(['x'])
   })
 })

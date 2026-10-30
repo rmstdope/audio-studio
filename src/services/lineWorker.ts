@@ -6,6 +6,14 @@ import { join } from 'node:path'
  */
 export const WORKERS_DIR = join(import.meta.dir, '../../worker')
 
+/** The lines of a process's stderr without its progress bars (carriage returns, "%|"), which are noise in a message. */
+export function quietLines(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => line.trim() && !line.includes('\r') && !line.includes('%|'))
+    .join('\n')
+}
+
 /** A request to a worker: anything, plus the `id` the worker answers it by (added here). */
 type Payload = Record<string, unknown>
 
@@ -16,8 +24,8 @@ export interface LineWorker {
    * with an `error` rejects, saying the worker's name and the error.
    */
   request(payload: Payload): Promise<Record<string, unknown>>
-  /** Stops the worker, if one is running. */
-  close(): void
+  /** Stops the worker, if one is running; resolves once its process is gone and its memory free. */
+  close(): Promise<void>
 }
 
 interface Pending {
@@ -80,11 +88,7 @@ export function createLineWorker({
     const current: Running = { proc, pending: new Map(), stoppedBecause: null }
     let stderr = ''
     const note = (text: string) => {
-      // Progress bars (carriage returns, "%|") are noise in a message; keep the rest, briefly.
-      const kept = text
-        .split('\n')
-        .filter((line) => line.trim() && !line.includes('\r') && !line.includes('%|'))
-        .join('\n')
+      const kept = quietLines(text)
       if (kept) stderr = `${stderr}\n${kept}`.slice(-2000)
     }
     void (async () => {
@@ -167,9 +171,11 @@ export function createLineWorker({
         void current.proc.stdin.flush()
       })
     },
-    close() {
-      worker?.proc.kill()
+    async close() {
+      const closing = worker
       worker = null
+      closing?.proc.kill()
+      await closing?.proc.exited
     },
   }
 }
