@@ -9,6 +9,7 @@ const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { TakesSection } = await import('./TakesSection')
+const { useSetImageWords } = await import('../../api')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -240,8 +241,45 @@ describe('comparing takes', () => {
     }) as typeof s.client.cancelQueries
     await s.click(s.button('Choose'))
     expect(cancelled).toEqual([{ queryKey: ['image-takes', 'inn'] }])
+    await act(async () => await new Promise((r) => setTimeout(r, 20)))
     await s.click(s.button('Drop'))
     expect(cancelled).toHaveLength(2)
+  })
+
+  it('after Choose, focus is on the right side’s Choose button, once the change is done', async () => {
+    const s = await show(view({ takes: [take(1), take(2, { chosen: true }), take(3)] }), {
+      chosenTake: 2,
+    })
+    s.button('Choose').focus()
+    await s.click(s.button('Choose'))
+    await act(async () => {})
+    expect(document.activeElement).toBe(s.button('Choose'))
+  })
+
+  it('after the first Choose from nothing, focus is on the right side’s Choose button', async () => {
+    const s = await show(view({ takes: three }))
+    s.button('Choose').focus()
+    await s.click(s.button('Choose'))
+    await act(async () => {})
+    expect(document.activeElement).toBe(s.button('Choose'))
+  })
+
+  it('asks for the game’s picture of the chosen take only after the choice is saved', async () => {
+    const s = await show(view({ takes: three }))
+    let release: () => void = () => {}
+    globalThis.fetch = (async () => {
+      await new Promise<void>((resolve) => (release = resolve))
+      return Response.json({ ok: true })
+    }) as unknown as typeof fetch
+    const current = () =>
+      [...s.container.querySelectorAll<HTMLImageElement>('img')].filter((i) =>
+        i.src.includes('/current'),
+      )
+    await s.click(s.button('Choose'))
+    expect(current()).toHaveLength(0)
+    await act(async () => release())
+    for (let i = 0; i < 5; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)))
+    expect(current().length).toBeGreaterThan(0)
   })
 
   it('keeps the arrow keys from also scrolling the strip', async () => {
@@ -582,5 +620,33 @@ describe('a take’s two pictures', () => {
     const s = await show(view({ takes: [take(3)] }))
     expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(false)
     expect(s.text()).not.toContain('Fix the game')
+  })
+})
+
+describe('saving an image’s words', () => {
+  it('reloads its takes, so earlier ones are marked at once', async () => {
+    const s = await show(view({ takes: three }))
+    const asked: unknown[] = []
+    const real = s.client.invalidateQueries.bind(s.client)
+    s.client.invalidateQueries = ((filters: { queryKey?: unknown[] }) => {
+      asked.push(filters?.queryKey?.[0])
+      return real(filters as never)
+    }) as typeof s.client.invalidateQueries
+    function Saver() {
+      const save = useSetImageWords('inn')
+      return createElement('button', { onClick: () => save.mutate('new words') }, 'Save')
+    }
+    const holder = document.createElement('div')
+    document.body.append(holder)
+    const root = createRoot(holder)
+    cleanups.push(() => act(() => root.unmount()))
+    act(() =>
+      root.render(createElement(QueryClientProvider, { client: s.client }, createElement(Saver))),
+    )
+    await act(async () => {
+      holder.querySelector('button')!.click()
+    })
+    await act(async () => {})
+    expect(asked).toContain('image-takes')
   })
 })
