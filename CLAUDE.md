@@ -51,7 +51,7 @@ text when needed) instead of guessing.
 ## Layout
 
 ```
-bin/content-studio.ts   CLI: find the project file, start the server, open the browser
+bin/content-studio.ts CLI: find the project file, start the server, open the browser
 src/core/             pure logic: schemas, fingerprint, planner, text rules (no I/O)
 src/services/         I/O: reading and writing the consumer's files, later Fish, Whisper, ffmpeg
 src/server/           Bun.serve: JSON API and the UI
@@ -108,7 +108,7 @@ bun run typecheck      # tsc --noEmit
 bun run format         # prettier --write; format:check is what CI runs
 bun run check          # format:check, typecheck and tests: run before every commit
 bun run dev            # the studio on test/fixtures/sample, reloading on changes
-content-studio --dev     # in a consumer repository, reloading on changes (after `bun link`)
+content-studio --dev   # in a consumer repository, reloading on changes (after `bun link`)
 ```
 
 ## Code conventions

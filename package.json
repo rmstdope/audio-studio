@@ -1,7 +1,7 @@
 {
   "name": "content-studio",
   "version": "0.1.0",
-  "description": "Audio tool for narratives and music used in games",
+  "description": "Narration, music and images for games",
   "type": "module",
   "private": true,
   "bin": {

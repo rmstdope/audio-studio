@@ -64,11 +64,13 @@ mv .audio-studio .content-studio
 # and in .gitignore, change .audio-studio/ to .content-studio/
 ```
 
+If you linked the old command, remove it: `rm ~/.bun/bin/audio-studio`.
+
 ## Use
 
 ```sh
-cd ~/repos/retroquest   # any repository with an content-studio.json
-content-studio            # opens the studio in your browser
+cd ~/repos/retroquest   # any repository with a content-studio.json
+content-studio          # opens the studio in your browser
 ```
 
 Options: `--project <file>` to use a specific project file, `--port <n>`, `--no-open`, `--help`.

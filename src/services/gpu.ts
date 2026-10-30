@@ -10,9 +10,9 @@ export const GPU = 'gpu'
  * times slower and the machine's memory filled).
  */
 export function gpuQueue(): Serial {
-  const state = globalThis as { audioStudioGpu?: Serial }
-  state.audioStudioGpu ??= createSerial()
-  return state.audioStudioGpu
+  const state = globalThis as { contentStudioGpu?: Serial }
+  state.contentStudioGpu ??= createSerial()
+  return state.contentStudioGpu
 }
 
 /** A transcriber whose checks wait their turn on the GPU queue. */
@@ -45,9 +45,9 @@ export function createGpuWorkers(): GpuWorkers {
 
 /** The process's GPU workers, kept across `--dev` reloads like the queue. */
 function sharedGpuWorkers(): GpuWorkers {
-  const state = globalThis as { audioStudioGpuWorkers?: GpuWorkers }
-  state.audioStudioGpuWorkers ??= createGpuWorkers()
-  return state.audioStudioGpuWorkers
+  const state = globalThis as { contentStudioGpuWorkers?: GpuWorkers }
+  state.contentStudioGpuWorkers ??= createGpuWorkers()
+  return state.contentStudioGpuWorkers
 }
 
 /** Registers a worker that holds GPU memory while idle (Whisper, the music generators). */

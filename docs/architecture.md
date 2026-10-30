@@ -47,9 +47,9 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 
 ```
 retroquest/                      ← user runs `content-studio` here
-├── content-studio.json            ← project file (committed)
+├── content-studio.json          ← project file (committed)
 ├── .env                         ← FISH_AUDIO_API_KEY (gitignored, already exists)
-├── .content-studio/               ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard
+├── .content-studio/             ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard
 ├── tts/cast.json                ← character resource, shared by all parts (read + written)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
@@ -120,7 +120,7 @@ A native window (Electrobun) can wrap the same web UI later; nothing in the desi
 
 ```
 audio-studio/
-├── bin/content-studio.ts          CLI entry: find project, start server, open browser
+├── bin/content-studio.ts     CLI entry: find project, start server, open browser
 ├── src/
 │   ├── core/                    pure logic, no I/O; most of the tests
 │   │   ├── project.ts           project file schema, path templates ({part})

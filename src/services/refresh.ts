@@ -126,9 +126,9 @@ export function isRefreshingShared(projectFile: string): boolean {
  * whether the studio's exit is watched. Kept on `globalThis`, as `--dev` reruns this module: one
  * set and one set of handlers for the process.
  */
-const studio = globalThis as { audioStudioRefreshes?: { running: Set<number>; watched: boolean } }
-studio.audioStudioRefreshes ??= { running: new Set(), watched: false }
-const { running } = studio.audioStudioRefreshes
+const studio = globalThis as { contentStudioRefreshes?: { running: Set<number>; watched: boolean } }
+studio.contentStudioRefreshes ??= { running: new Set(), watched: false }
+const { running } = studio.contentStudioRefreshes
 
 /**
  * Stops every refresh command running now, with everything it started. The commands run in their
@@ -136,7 +136,7 @@ const { running } = studio.audioStudioRefreshes
  * when it exits.
  */
 export function stopRefreshes(): void {
-  for (const pid of studio.audioStudioRefreshes!.running) killGroup(pid)
+  for (const pid of studio.contentStudioRefreshes!.running) killGroup(pid)
 }
 
 function killGroup(pid: number): void {
@@ -149,7 +149,7 @@ function killGroup(pid: number): void {
 
 /** Makes sure the running commands are stopped when the studio exits or is interrupted. */
 function stopWithStudio(): void {
-  const state = studio.audioStudioRefreshes!
+  const state = studio.contentStudioRefreshes!
   if (state.watched) return
   state.watched = true
   process.once('exit', stopRefreshes)

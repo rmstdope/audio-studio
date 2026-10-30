@@ -136,14 +136,14 @@ export function createImageTakes({
   newSeed?: () => number
 }): ImageTakes {
   const shared = globalThis as {
-    audioStudioImageTakes?: Map<string, Map<number, Entry>>
-    audioStudioImageBringing?: Set<string>
-    audioStudioLookRuns?: Map<string, LookRunView>
+    contentStudioImageTakes?: Map<string, Map<number, Entry>>
+    contentStudioImageBringing?: Set<string>
+    contentStudioLookRuns?: Map<string, LookRunView>
   }
-  const active = (shared.audioStudioImageTakes ??= new Map())
+  const active = (shared.contentStudioImageTakes ??= new Map())
   /** Takes being brought to the look right now (`<image key>\0<n>`). */
-  const bringing = (shared.audioStudioImageBringing ??= new Set())
-  const lookRuns = (shared.audioStudioLookRuns ??= new Map())
+  const bringing = (shared.contentStudioImageBringing ??= new Set())
+  const lookRuns = (shared.contentStudioLookRuns ??= new Map())
   const boards = boardQueue()
 
   async function resolve(projectFile: string, id: string) {

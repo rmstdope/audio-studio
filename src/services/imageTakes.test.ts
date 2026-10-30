@@ -495,10 +495,10 @@ describe('the game’s look', () => {
 
   it('shows a take as being brought until the game’s version is there', async () => {
     const s = await made()
-    const globals = globalThis as unknown as { audioStudioImageBringing: Set<string> }
-    globals.audioStudioImageBringing.add(`${s.file}\0inn\0${1}`)
+    const globals = globalThis as unknown as { contentStudioImageBringing: Set<string> }
+    globals.contentStudioImageBringing.add(`${s.file}\0inn\0${1}`)
     expect((await takesOf(s)).takes.map((t) => t.look)).toEqual(['bringing', 'ready'])
-    globals.audioStudioImageBringing.clear()
+    globals.contentStudioImageBringing.clear()
   })
 
   it('is the same game’s version every time it is made from the same picture and look', async () => {

@@ -178,12 +178,12 @@ export interface ServerOptions {
  * the studio does.
  */
 function sharedWhisper(): Transcriber {
-  const state = globalThis as { audioStudioWhisper?: Transcriber }
-  if (!state.audioStudioWhisper) {
-    state.audioStudioWhisper = createWhisperWorker()
-    onGpuFree(() => state.audioStudioWhisper?.close())
+  const state = globalThis as { contentStudioWhisper?: Transcriber }
+  if (!state.contentStudioWhisper) {
+    state.contentStudioWhisper = createWhisperWorker()
+    onGpuFree(() => state.contentStudioWhisper?.close())
   }
-  return state.audioStudioWhisper
+  return state.contentStudioWhisper
 }
 
 /**
@@ -193,9 +193,9 @@ function sharedWhisper(): Transcriber {
  * them for a stand-in that makes tones, for working on the pages.
  */
 function sharedMusic(projectFile: string): MusicGenerator {
-  const state = globalThis as { audioStudioMusic?: MusicGenerator }
-  if (!state.audioStudioMusic) {
-    state.audioStudioMusic =
+  const state = globalThis as { contentStudioMusic?: MusicGenerator }
+  if (!state.contentStudioMusic) {
+    state.contentStudioMusic =
       process.env.AUDIO_STUDIO_FAKE_MUSIC === '1'
         ? createFakeMusic()
         : createMusicRouter({
@@ -209,9 +209,9 @@ function sharedMusic(projectFile: string): MusicGenerator {
             }),
           })
     // An image take closes the music workers first (they come back with the next take).
-    onGpuFree(() => state.audioStudioMusic?.close())
+    onGpuFree(() => state.contentStudioMusic?.close())
   }
-  return state.audioStudioMusic
+  return state.contentStudioMusic
 }
 
 /**

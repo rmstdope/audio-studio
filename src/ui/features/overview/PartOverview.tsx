@@ -220,7 +220,8 @@ function StatusPanel({ part, language }: { part: PartDetail; language?: string }
   )
 }
 
-function AdoptBanner({ part, language }: { part: PartDetail; language?: string }) {
+/** The banner offering to adopt the clips of a part that the studio did not make. */
+export function AdoptBanner({ part, language }: { part: PartDetail; language?: string }) {
   const adopt = useAdopt(part.id, language)
   const result = adopt.data
   const count = part.counts.untracked

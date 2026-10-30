@@ -84,8 +84,8 @@ export type TakesResult = MusicTakesView | ProjectFailure | null
 
 /** Changes to one track's board, one after another, keyed `<project file>\0<track id>`. */
 export function boardQueue(): Serial {
-  const shared = globalThis as { audioStudioBoardQueue?: Serial }
-  return (shared.audioStudioBoardQueue ??= createSerial())
+  const shared = globalThis as { contentStudioBoardQueue?: Serial }
+  return (shared.contentStudioBoardQueue ??= createSerial())
 }
 
 /** Whether a track id is safe as the name of its board and takes folder. */
@@ -210,8 +210,8 @@ export function createMusicTakes({
   spent?: (projectFile: string, take: MusicSpend) => void | Promise<void>
 }): MusicTakes {
   // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
-  const shared = globalThis as { audioStudioMakingTakes?: Map<string, Map<number, Entry>> }
-  const active = (shared.audioStudioMakingTakes ??= new Map())
+  const shared = globalThis as { contentStudioMakingTakes?: Map<string, Map<number, Entry>> }
+  const active = (shared.contentStudioMakingTakes ??= new Map())
   // Changes to one track's board, one after another: a take finishing and a drop lose neither.
   const boards = boardQueue()
 
