@@ -5037,6 +5037,8 @@ describe('the images routes', () => {
           style: 'images/style.json',
           prompts: 'images/prompts.json',
           lock: 'images/images.lock.json',
+          clips: 'web/public/images/generated',
+          manifest: 'web/public/images/generated/manifest.json',
         },
       },
     }),
@@ -5096,5 +5098,107 @@ describe('the images routes', () => {
     expect((await send('POST', '/api/images/inn/compare', { choice: 'game' })).status).toBe(200)
     expect((await summary()).acts[0].rows[0].changed).toBe(false)
     expect((await send('POST', '/api/image-style/seen', {})).status).toBe(200)
+  })
+})
+
+describe('the image takes routes', () => {
+  const root = tempRepo({
+    'audio-studio.json': projectJson({
+      images: {
+        paths: {
+          list: 'tts/{part}/images.json',
+          style: 'images/style.json',
+          prompts: 'images/prompts.json',
+          lock: 'images/images.lock.json',
+          clips: 'web/images',
+          manifest: 'web/images/manifest.json',
+        },
+      },
+    }),
+    'tts/act1/images.json': [
+      { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
+    ],
+    'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+  })
+  const studio = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    transcriber: null,
+    images: {
+      ready: () => ({ ok: true }),
+      generate: async (request) => ({
+        png: new TextEncoder().encode(`png-${request.seed}`),
+        seed: request.seed,
+      }),
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const send = (method: string, path: string, body?: unknown, origin = studio.url.origin) =>
+    fetch(new URL(path, studio.url), {
+      method,
+      headers: { origin, 'content-type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+  const view = async () => (await fetch(new URL('/api/images/inn/takes', studio.url))).json()
+  async function settled() {
+    for (let i = 0; i < 200; i++) {
+      const v = await view()
+      if (!v.making.length) return v
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    throw new Error('never finished')
+  }
+
+  it('takes changes from the studio’s own page only', async () => {
+    for (const [method, path, body] of [
+      ['POST', '/api/images/inn/takes', { count: 1 }],
+      ['DELETE', '/api/images/inn/takes/1', undefined],
+      ['POST', '/api/images/inn/choose', { n: 1 }],
+      ['POST', '/api/images/inn/unchoose', undefined],
+      ['POST', '/api/images/inn/stop', undefined],
+      ['POST', '/api/images/inn/takes/1/seen', undefined],
+    ] as const) {
+      expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
+    }
+  })
+
+  it('makes takes, serves their pictures, chooses one and shows it as the current image', async () => {
+    expect((await send('POST', '/api/images/inn/takes', { count: 2 })).status).toBe(200)
+    const made = await settled()
+    expect(made.takes.map((t: { n: number }) => t.n)).toEqual([1, 2])
+    const picture = await fetch(new URL('/api/images/inn/takes/2', studio.url))
+    expect(picture.status).toBe(200)
+    expect((await picture.text()).startsWith('png-')).toBe(true)
+    expect((await fetch(new URL('/api/images/inn/takes/9', studio.url))).status).toBe(404)
+    expect((await fetch(new URL('/api/images/inn/current', studio.url))).status).toBe(404)
+    expect(await (await send('POST', '/api/images/inn/choose', { n: 2 })).json()).toEqual({
+      ok: true,
+    })
+    expect((await fetch(new URL('/api/images/inn/current', studio.url))).status).toBe(200)
+    expect(existsSync(join(root, 'web/images/inn.png'))).toBe(true)
+    expect((await view()).takes.find((t: { n: number }) => t.n === 2).chosen).toBe(true)
+    const project = await (await fetch(new URL('/api/project', studio.url))).json()
+    expect(project.summary.images.acts[0].rows[0]).toMatchObject({
+      status: 'chosen',
+      chosenTake: 2,
+    })
+  })
+
+  it('marks a take seen, drops one, refuses to drop the chosen one, and un-chooses', async () => {
+    expect((await send('POST', '/api/images/inn/takes/1/seen')).status).toBe(200)
+    expect((await view()).takes[0].isNew).toBe(false)
+    expect((await send('DELETE', '/api/images/inn/takes/2')).status).toBe(409)
+    expect((await send('DELETE', '/api/images/inn/takes/1')).status).toBe(200)
+    expect((await send('POST', '/api/images/inn/unchoose')).status).toBe(200)
+    expect((await send('POST', '/api/images/inn/unchoose')).status).toBe(409)
+    expect((await send('POST', '/api/images/inn/stop')).status).toBe(200)
+    expect(await (await fetch(new URL('/api/images/making', studio.url))).json()).toEqual({})
+  })
+
+  it('refuses a bad body and answers 404 for an image the game does not list', async () => {
+    expect((await send('POST', '/api/images/inn/takes', { count: 9 })).status).toBe(400)
+    expect((await send('POST', '/api/images/inn/choose', { n: 'x' })).status).toBe(400)
+    expect((await send('POST', '/api/images/ghost/takes', { count: 1 })).status).toBe(404)
+    expect((await fetch(new URL('/api/images/ghost/takes', studio.url))).status).toBe(404)
   })
 })

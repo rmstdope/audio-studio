@@ -372,6 +372,8 @@ describe('the images section', () => {
           style: 'images/style.json',
           prompts: 'images/prompts.json',
           lock: 'images/images.lock.json',
+          clips: 'web/public/images/generated',
+          manifest: 'web/public/images/generated/manifest.json',
           ...paths,
         },
       },
@@ -381,10 +383,19 @@ describe('the images section', () => {
     expect(parse(projectJson()).data!.images).toBeUndefined()
   })
 
-  it('accepts the four paths', () => {
+  it('accepts the six paths', () => {
     const result = parse(images())
     expect(result.success).toBe(true)
     expect(result.data!.images!.paths.prompts).toBe('images/prompts.json')
+    expect(result.data!.images!.paths.clips).toBe('web/public/images/generated')
+    expect(result.data!.images!.paths.manifest).toBe('web/public/images/generated/manifest.json')
+  })
+
+  it('needs the clips folder and the manifest, where chosen images are written', () => {
+    const base = images().images as { paths: Record<string, string> }
+    const { clips: _clips, manifest: _manifest, ...rest } = base.paths
+    const found = problems(projectJson({ images: { paths: rest } }))
+    expect(found.map((p) => p.path).sort()).toEqual(['images.paths.clips', 'images.paths.manifest'])
   })
 
   it('needs {part} in the list path', () => {

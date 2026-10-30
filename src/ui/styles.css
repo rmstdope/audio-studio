@@ -3504,3 +3504,94 @@ button.cue-chip[aria-expanded='true'] {
     max-width: none;
   }
 }
+
+/* Images: the Takes section, the image the game uses beside one other take */
+.image-stage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.image-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.image-side .take-row {
+  flex-wrap: wrap;
+}
+.image-take-picture {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--inset);
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+.image-take-empty {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  color: var(--faint);
+}
+.image-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px;
+}
+.image-thumb {
+  width: 120px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-soft);
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.image-thumb[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft-bg);
+}
+.image-thumb-making {
+  cursor: default;
+  border-style: dashed;
+}
+.image-thumb .image-take-picture {
+  border-radius: 4px;
+}
+.image-thumb-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+.image-thumb-label .faint {
+  font-size: 11px;
+}
+.chip-new {
+  color: var(--accent-soft-ink);
+  background: var(--accent-soft-bg);
+  border-color: var(--accent-soft-line);
+}
+@media (max-width: 700px) {
+  .image-stage {
+    grid-template-columns: 1fr;
+  }
+}

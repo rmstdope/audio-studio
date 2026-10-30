@@ -18,6 +18,7 @@ import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
+import type { ImageMakingSummary, ImageTakesView } from '../core/imageTakes'
 import type { MakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
 import type {
@@ -32,6 +33,7 @@ import type { BriefChangeResult } from '../services/briefs'
 import type { StyleField } from '../core/images'
 import type { ImageEditResult } from '../services/imageEdits'
 import type { RemoveResult } from '../services/musicOrphans'
+import type { ImageMakeRequest, ImageTakesAnswer } from '../services/imageTakes'
 import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
@@ -953,6 +955,108 @@ export function useMusicMaking() {
     queryFn: () => getJson<Record<string, MakingSummary>>('/api/music/making'),
     refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length ? 3000 : false),
   })
+}
+
+/** An image's takes as its page shows them; polled while any is being made. */
+export function useImageTakes(imageId: string) {
+  return useQuery({
+    queryKey: ['image-takes', imageId],
+    queryFn: () =>
+      getJson<ImageTakesView | ProjectFailure>(`/api/images/${encodeURIComponent(imageId)}/takes`),
+    refetchInterval: (query) => {
+      const view = query.state.data
+      return view && 'making' in view && takesAreBeingMade(view.making) ? 3000 : false
+    },
+  })
+}
+
+/** What is being made for each image of the project, for the lists' status; polled meanwhile. */
+export function useImageMaking() {
+  return useQuery({
+    queryKey: ['image-making'],
+    queryFn: () => getJson<Record<string, ImageMakingSummary>>('/api/images/making'),
+    refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length ? 3000 : false),
+  })
+}
+
+/**
+ * A change to an image's takes: sends `request` to the image's route, answers what the server
+ * said (a refusal is an answer, not an error), then reloads its takes, what is being made and,
+ * when `project` is set, the project, whose Images pages show the image's status.
+ */
+function useImageTakesChange<Input>(
+  imageId: string,
+  request: (input: Input) => { path: string; method: string; body?: unknown },
+  project: boolean,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: Input) => {
+      const { path, method, body } = request(input)
+      const response = await fetch(`/api/images/${encodeURIComponent(imageId)}${path}`, {
+        method,
+        ...(body === undefined
+          ? {}
+          : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`changing the takes answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<ImageTakesAnswer>
+    },
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['image-takes', imageId] }),
+        client.invalidateQueries({ queryKey: ['image-making'] }),
+        ...(project ? [client.invalidateQueries({ queryKey: ['project'] })] : []),
+      ]),
+  })
+}
+
+/** Asks for takes of an image (new ones, or a failed one again). */
+export function useMakeImageTakes(imageId: string) {
+  return useImageTakesChange<ImageMakeRequest>(
+    imageId,
+    (body) => ({ path: '/takes', method: 'POST', body }),
+    false,
+  )
+}
+
+/** Makes a take the image the game uses. */
+export function useChooseImageTake(imageId: string) {
+  return useImageTakesChange<number>(
+    imageId,
+    (n) => ({ path: '/choose', method: 'POST', body: { n } }),
+    true,
+  )
+}
+
+/** Takes the image's chosen take back (its picture is deleted from the game). */
+export function useUnchooseImageTake(imageId: string) {
+  return useImageTakesChange<void>(imageId, () => ({ path: '/unchoose', method: 'POST' }), true)
+}
+
+/** Takes a take off the image's board. */
+export function useDropImageTake(imageId: string) {
+  return useImageTakesChange<number>(
+    imageId,
+    (n) => ({ path: `/takes/${n}`, method: 'DELETE' }),
+    false,
+  )
+}
+
+/** Stops the image's takes (the one being made and those waiting). */
+export function useStopImageTakes(imageId: string) {
+  return useImageTakesChange<void>(imageId, () => ({ path: '/stop', method: 'POST' }), false)
+}
+
+/** Records that a take has been shown on the right once. */
+export function useMarkImageTakeSeen(imageId: string) {
+  return useImageTakesChange<number>(
+    imageId,
+    (n) => ({ path: `/takes/${n}/seen`, method: 'POST' }),
+    false,
+  )
 }
 
 /** Gives an orphaned cue to a line (`to`), or removes it (null), then reloads the part. */

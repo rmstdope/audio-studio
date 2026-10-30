@@ -13,6 +13,7 @@ import type { Encoder } from '../services/audio'
 import { createLimiter } from '../services/limit'
 import { costCeiling, creditCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
+import { ChooseImageTakeBody, MakeImageTakesBody } from '../core/imageTakes'
 import { BriefChangeBody } from '../core/music'
 import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
@@ -131,6 +132,9 @@ import { createStableAudioWorker } from '../services/stableAudio'
 import { createFakeMusic } from '../services/musicFake'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
+import { createImageTakes, type ImageTakesAnswer } from '../services/imageTakes'
+import { createMfluxGenerator, type ImageGenerator } from '../services/images'
+import { createFakeImages } from '../services/imagesFake'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
 import { declaredLanguage } from '../core/project'
 import {
@@ -163,6 +167,8 @@ export interface ServerOptions {
   music?: MusicGenerator
   /** The ElevenLabs client to use (tests); by default one is made from the project's API key. */
   elevenlabs?: ElevenLabsClient | null
+  /** The image generator to use (tests); by default mflux, or a stand-in when `AUDIO_STUDIO_FAKE_IMAGES=1`. */
+  images?: ImageGenerator
 }
 
 /**
@@ -246,7 +252,7 @@ const ModelsBody = z
 const StageParam = z.enum(['audition', 'draft', 'final'])
 
 /** The answer to a change of the studio's image words: 404 for an unknown image, 409 with the reason. */
-function imageAnswer(result: ImageEditResult): Response {
+function imageAnswer(result: ImageEditResult | ImageTakesAnswer): Response {
   if (!result) return Response.json({ error: 'not found' }, { status: 404 })
   return Response.json(result, { status: result.ok ? 200 : 409 })
 }
@@ -454,7 +460,13 @@ export function startServer({
   transcriber,
   music,
   elevenlabs,
+  images,
 }: ServerOptions) {
+  const imageTakes = createImageTakes({
+    generator:
+      images ??
+      (process.env.AUDIO_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator()),
+  })
   const musicGenerator = music ?? sharedMusic(projectFile)
   const musicTakes = createMusicTakes({
     generator: musicGenerator,
@@ -1466,6 +1478,64 @@ export function startServer({
           return imageAnswer(
             await resolveImageCompare(projectFile, request.params.id, body.data.choice),
           )
+        }),
+      },
+      '/api/images/making': {
+        GET: guard(async () => Response.json(await imageTakes.making(projectFile))),
+      },
+      '/api/images/:id/takes': {
+        GET: guard(async (request) => {
+          const view = await imageTakes.view(projectFile, request.params.id)
+          return view ? Response.json(view) : notFound()
+        }),
+        POST: fromOwnPage(async (request) => {
+          const body = MakeImageTakesBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { count } or { retry }' }, { status: 400 })
+          }
+          return imageAnswer(await imageTakes.make(projectFile, request.params.id, body.data))
+        }),
+      },
+      '/api/images/:id/takes/:n': {
+        GET: guard(async (request) => {
+          const file = await imageTakes.takeFile(projectFile, request.params.id, request.params.n)
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
+        DELETE: fromOwnPage(async (request) =>
+          imageAnswer(
+            await imageTakes.drop(projectFile, request.params.id, Number(request.params.n)),
+          ),
+        ),
+      },
+      '/api/images/:id/takes/:n/seen': {
+        POST: fromOwnPage(async (request) =>
+          imageAnswer(
+            await imageTakes.markSeen(projectFile, request.params.id, Number(request.params.n)),
+          ),
+        ),
+      },
+      '/api/images/:id/choose': {
+        POST: fromOwnPage(async (request) => {
+          const body = ChooseImageTakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { n }' }, { status: 400 })
+          return imageAnswer(await imageTakes.choose(projectFile, request.params.id, body.data.n))
+        }),
+      },
+      '/api/images/:id/unchoose': {
+        POST: fromOwnPage(async (request) =>
+          imageAnswer(await imageTakes.unchoose(projectFile, request.params.id)),
+        ),
+      },
+      '/api/images/:id/stop': {
+        POST: fromOwnPage(async (request) => {
+          const result = await imageTakes.stop(projectFile, request.params.id)
+          return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/images/:id/current': {
+        GET: guard(async (request) => {
+          const file = await imageTakes.currentFile(projectFile, request.params.id)
+          return file ? new Response(Bun.file(file)) : notFound()
         }),
       },
       '/api/image-style': {

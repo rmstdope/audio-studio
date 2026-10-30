@@ -14,6 +14,8 @@ const images = {
     style: 'images/style.json',
     prompts: 'images/prompts.json',
     lock: 'images/images.lock.json',
+    clips: 'web/public/images/generated',
+    manifest: 'web/public/images/generated/manifest.json',
   },
 }
 const inn = { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 }

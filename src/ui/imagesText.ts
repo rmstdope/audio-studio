@@ -42,3 +42,18 @@ export function currentAct(images: ImagesSummary, route: ImagesRoute): string | 
   }
   return images.acts[0]?.id ?? null
 }
+
+/** The count menu's entry: "1 take", "2 takes". */
+export function takeCountText(n: number): string {
+  return `${n} ${n === 1 ? 'take' : 'takes'}`
+}
+
+/** The make button: "Make 2 takes", or "Make 2 more takes" once the image has some. */
+export function makeTakesText(count: number, hasTakes: boolean): string {
+  return `Make ${count}${hasTakes ? ' more' : ''} ${count === 1 ? 'take' : 'takes'}`
+}
+
+/** What the Un-choose question says will happen. */
+export function unchooseNote(take: number): string {
+  return `The game shows no image here until you choose another. Take ${take} stays among the takes.`
+}

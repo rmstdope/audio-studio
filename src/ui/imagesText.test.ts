@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'bun:test'
-import { chosenLine, joined, outOfDateText, paletteText, styleNoticeText } from './imagesText'
+import {
+  chosenLine,
+  joined,
+  makeTakesText,
+  outOfDateText,
+  paletteText,
+  styleNoticeText,
+  takeCountText,
+  unchooseNote,
+} from './imagesText'
 import { parseRoute, routeHref } from './route'
 import { openWorkspace } from './sidebarActs'
 
@@ -48,5 +57,21 @@ describe('the images routes', () => {
   })
   it('opens the images workspace in the sidebar', () => {
     expect(openWorkspace({ view: 'images', page: 'style' })).toBe('images')
+  })
+})
+
+describe('the image takes words', () => {
+  it('counts takes in the menu', () => {
+    expect([1, 2, 4].map(takeCountText)).toEqual(['1 take', '2 takes', '4 takes'])
+  })
+  it('names the make button after the count, and says "more" once there are takes', () => {
+    expect(makeTakesText(2, false)).toBe('Make 2 takes')
+    expect(makeTakesText(2, true)).toBe('Make 2 more takes')
+    expect(makeTakesText(1, true)).toBe('Make 1 more take')
+  })
+  it('asks what un-choosing does', () => {
+    expect(unchooseNote(2)).toBe(
+      'The game shows no image here until you choose another. Take 2 stays among the takes.',
+    )
   })
 })

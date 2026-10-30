@@ -1,7 +1,8 @@
 import type { ImagesAct, ImageRow, ImagesSummary } from '../../../core/images'
-import { useRefreshDialog } from '../../api'
+import { useImageMaking, useRefreshDialog } from '../../api'
 import { shortTitle } from '../../format'
 import { chosenLine } from '../../imagesText'
+import { makingStatusText } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { FailedPanel, RefreshPanel } from '../music/MusicView'
 
@@ -16,6 +17,7 @@ const STATUS_CHIP: Record<ImageRow['status'], string> = {
 export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary }) {
   const name = shortTitle(act.title)
   const run = useRefreshDialog(act.id)
+  const making = useImageMaking().data ?? {}
   const result = run.outcome?.result
   let panel: React.ReactNode = null
   if (run.outcome) {
@@ -114,7 +116,11 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
                     {row.width} × {row.height}
                   </td>
                   <td className="images-status">
-                    <span className={STATUS_CHIP[row.status]}>{row.status}</span>
+                    {making[row.id] ? (
+                      <span className="chip chip-warn">{makingStatusText(making[row.id]!)}</span>
+                    ) : (
+                      <span className={STATUS_CHIP[row.status]}>{row.status}</span>
+                    )}
                   </td>
                 </tr>
               ))}

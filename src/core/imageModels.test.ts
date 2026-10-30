@@ -9,6 +9,8 @@ describe('imageModels', () => {
     expect(DEFAULT_IMAGE_MODEL).toBe('klein')
     expect(imageModel('klein').mflux).toBe('flux2-klein-4b')
     expect(imageModel('z-image-turbo').mflux).toBe('z-image-turbo')
+    expect(imageModel('klein').seconds).toBe(30)
+    expect(imageModel('z-image-turbo').seconds).toBe(60)
   })
 
   it('accepts a prompt, dimensions in steps of 16 and a seed', () => {

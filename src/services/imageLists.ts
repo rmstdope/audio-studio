@@ -7,11 +7,12 @@ import {
   type GameStyle,
   type ImageListState,
   type ImagesSummary,
-  type MadeFrom,
+  type ChosenEntry,
   type Prompts,
 } from '../core/images'
 import { partPathFor, type Problem, type Project } from '../core/project'
 import { readResource, writeAtomic } from './files'
+import { gameFilePath } from './musicLists'
 
 /** Where the game's style as the user last saw it is kept, in the studio's own folder. */
 export const STYLE_SEEN_FILE = '.audio-studio/images-style-seen.json'
@@ -68,7 +69,7 @@ export async function readImages(
   const style = styleRead === 'missing' || styleRead === 'invalid' ? null : styleRead
   const prompts = await readPrompts(root, images.paths.prompts, problems)
   const lock = await readResource(root, images.paths.lock, ChosenSchema, problems)
-  const chosen: Record<string, MadeFrom> = {}
+  const chosen: Record<string, ChosenEntry> = {}
   if (lock !== 'missing' && lock !== 'invalid') {
     for (const [id, entry] of Object.entries(lock.images)) {
       if (entry.chosen) chosen[id] = entry.chosen
@@ -79,7 +80,15 @@ export async function readImages(
     seen = style
     await writeStyleSeen(root, style).catch(() => {})
   }
+  const gameFiles: Record<string, boolean> = {}
+  for (const list of lists) {
+    if (list.state.status !== 'ok') continue
+    for (const image of list.state.images) {
+      if (image.file) gameFiles[image.id] = (await gameFilePath(root, image.file)) !== null
+    }
+  }
   const summary = summarizeImages({
+    gameFiles,
     styleInvalid: styleRead === 'invalid',
     parts: narration.parts,
     lists,
