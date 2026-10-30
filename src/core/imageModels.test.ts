@@ -5,6 +5,7 @@ import {
   checkImageRequest,
   defaultTakeModel,
   imageByMflux,
+  imageFailureReason,
   imageMenuEntry,
   imageModel,
   imageSaveFailureHeading,
@@ -63,5 +64,41 @@ describe('imageModels', () => {
     expect(defaultTakeModel('klein', { klein: false, 'z-image-turbo': true })).toBe('z-image-turbo')
     expect(defaultTakeModel('z-image-turbo', { klein: true, 'z-image-turbo': false })).toBe('klein')
     expect(defaultTakeModel('klein', { klein: false, 'z-image-turbo': false })).toBe('klein')
+  })
+})
+
+describe('imageFailureReason', () => {
+  const traceback = [
+    'Traceback (most recent call last):',
+    '  File "/Users/x/mflux/weight_loader.py", line 341, in _load_mlx_native',
+    '    raise FileNotFoundError(f"No safetensors found in {path}")',
+    'FileNotFoundError: No safetensors found in /Users/x/.cache/huggingface/hub',
+  ].join('\n')
+
+  it('names the model and the missing weights, without the traceback', () => {
+    const reason = imageFailureReason('klein', 1, traceback)
+    expect(reason).toBe(
+      'FLUX.2 klein 4B could not load its weights: they are missing or incomplete on this computer, and Setup says how to download them.',
+    )
+  })
+
+  it('names the model and a command the installed mflux does not know', () => {
+    const stderr =
+      "usage: mflux-generate [-h] ...\nmflux-generate: error: argument --model: invalid choice: 'z-image-turbo'"
+    expect(imageFailureReason('z-image-turbo', 2, stderr)).toBe(
+      'The installed mflux cannot make Z-Image-Turbo images; update it with uv tool upgrade mflux, then Try again.',
+    )
+    expect(
+      imageFailureReason('klein', 2, 'mflux-generate: error: unrecognized arguments: --seed 4'),
+    ).toBe(
+      'The installed mflux cannot make FLUX.2 klein images; update it with uv tool upgrade mflux, then Try again.',
+    )
+  })
+
+  it('says only the model and the exit code for anything else, pointing at the log', () => {
+    const reason = imageFailureReason('klein', 1, 'Traceback ...\nValueError: something odd')
+    expect(reason).toBe(
+      "FLUX.2 klein 4B could not make the image (mflux stopped with exit code 1); the details are in the studio's log.",
+    )
   })
 })

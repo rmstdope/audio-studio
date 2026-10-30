@@ -156,11 +156,22 @@ describe('createMfluxGenerator', () => {
     expect(existsSync(out)).toBe(false)
   })
 
-  it('says why a take failed', async () => {
+  it('says why a take failed in plain words, keeping the raw output for the log', async () => {
+    const logged: string[] = []
     const generator = createMfluxGenerator({
-      build: fake(`console.error('bad model');process.exit(2)`),
+      build: fake(
+        `console.error('Traceback (most recent call last):');console.error('  File "/x/weight_loader.py", line 341, in _load_mlx_native');console.error('FileNotFoundError: No safetensors found');process.exit(1)`,
+      ),
+      log: (line) => logged.push(line),
     })
-    await expect(generator.generate(request)).rejects.toThrow(/bad model/)
+    const failure: Error = await generator.generate(request).then(
+      () => new Error('made an image'),
+      (e: unknown) => e as Error,
+    )
+    expect(failure.message).toBe(
+      'FLUX.2 klein 4B could not load its weights: they are missing or incomplete on this computer, and Setup says how to download them.',
+    )
+    expect(logged.join('\n')).toContain('weight_loader.py')
   })
 
   it('says the computer ran out of memory when the system killed it', async () => {
@@ -175,13 +186,22 @@ describe('createMfluxGenerator', () => {
     await expect(generator.generate(request)).rejects.toThrow(/no image/)
   })
 
-  it('keeps the error, not the progress bars, in the message', async () => {
+  it('logs the error, not the progress bars, and keeps both out of the message', async () => {
+    const logged: string[] = []
     const generator = createMfluxGenerator({
       build: fake(
         `console.error('error line');for(let i=0;i<3;i++)console.error('50%|#####| 2/4\\r50%|#####| 3/4');process.exit(2)`,
       ),
+      log: (line) => logged.push(line),
     })
-    await expect(generator.generate(request)).rejects.toThrow(/error line/)
+    const failure: Error = await generator.generate(request).then(
+      () => new Error('made an image'),
+      (e: unknown) => e as Error,
+    )
+    expect(failure.message).toContain('exit code 2')
+    expect(failure.message).not.toContain('error line')
+    expect(logged.join('\n')).toContain('error line')
+    expect(logged.join('\n')).not.toContain('50%')
   })
 
   it('stops the process when aborted', async () => {

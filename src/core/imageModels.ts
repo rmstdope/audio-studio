@@ -59,6 +59,21 @@ export function imageByMflux(name: string): ImageModelId | null {
   return IMAGE_MODEL_IDS.find((id) => IMAGE_MODELS[id].mflux === name) ?? null
 }
 
+/**
+ * Why a take failed, as one plain sentence naming the model and the cause, from mflux's exit code
+ * and its error output (which itself belongs in the studio's log, not in front of the user).
+ */
+export function imageFailureReason(id: ImageModelId, code: number, stderr: string): string {
+  const { name, short } = IMAGE_MODELS[id]
+  if (/FileNotFoundError|No such file|safetensors/i.test(stderr)) {
+    return `${name} could not load its weights: they are missing or incomplete on this computer, and Setup says how to download them.`
+  }
+  if (/invalid choice|unrecognized arguments|error: argument/i.test(stderr)) {
+    return `The installed mflux cannot make ${short} images; update it with uv tool upgrade mflux, then Try again.`
+  }
+  return `${name} could not make the image (mflux stopped with exit code ${code}); the details are in the studio's log.`
+}
+
 /** How long a take takes, as a person reads it: "about 8 s a take", "about 1 min a take". */
 export function perTake(id: ImageModelId): string {
   const { seconds } = IMAGE_MODELS[id]

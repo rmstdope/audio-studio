@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import {
   checkImageRequest,
   IMAGE_MODEL_IDS,
+  imageFailureReason,
   imageModel,
   type ImageModelId,
 } from '../core/imageModels'
@@ -149,12 +150,15 @@ export function createMfluxGenerator({
   machine = { which: (c) => Bun.which(c) !== null, platform: process.platform, arch: process.arch },
   timeoutMs = 30 * 60_000,
   hubDir = HUB_DIR,
+  log = (line: string) => console.error(line),
 }: {
   build?: (c: MfluxCommand) => { command: string[]; out: string }
   machine?: Machine
   timeoutMs?: number
   /** The folder of the Hugging Face downloads (tests). */
   hubDir?: string
+  /** Where mflux's own error output goes when a take fails: the server's log (tests). */
+  log?: (line: string) => void
 } = {}): ImageGenerator {
   return {
     ready: () => mfluxReady(machine),
@@ -191,8 +195,9 @@ export function createMfluxGenerator({
             )
           }
           if (code !== 0) {
-            const why = quietLines(stderr).trim().split('\n').slice(-3).join(' ')
-            throw new Error(`The image generator failed (exit code ${code}): ${why}`)
+            const output = quietLines(stderr).trim()
+            log(`Content Studio: mflux-generate failed (exit code ${code}):\n${output}`)
+            throw new Error(imageFailureReason(request.model, code, output))
           }
         } finally {
           clearTimeout(timer)
