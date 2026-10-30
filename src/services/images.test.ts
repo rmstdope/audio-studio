@@ -9,6 +9,7 @@ import {
   imageModelInstalled,
   makeImageTake,
   mfluxArguments,
+  mfluxCommandLine,
   mfluxReady,
   type ImageGenerator,
   type ImageRequest,
@@ -52,8 +53,18 @@ describe('mfluxArguments', () => {
   })
 })
 
+describe('mfluxCommandLine', () => {
+  it("starts with the model's own command", () => {
+    const line = mfluxCommandLine(
+      mfluxArguments({ ...request, model: 'z-image-turbo' }, '/tmp/x.png'),
+    )
+    expect(line.command[0]).toBe('mflux-generate-z-image-turbo')
+    expect(line.out).toBe('/tmp/x.png')
+  })
+})
+
 describe('mfluxReady', () => {
-  it('needs Apple silicon and both of mflux image commands', () => {
+  it("needs Apple silicon and both of mflux's image commands", () => {
     expect(mfluxReady(mac)).toEqual({ ok: true })
     expect(mfluxReady({ ...mac, which: (c) => c === 'mflux-generate-flux2' })).toMatchObject({
       ok: false,

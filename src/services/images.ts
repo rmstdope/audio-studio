@@ -119,10 +119,11 @@ export interface MfluxCommand {
 
 /** The command and arguments of mflux for a take written to `out`; steps are the model's own. */
 export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand {
+  const model = imageModel(request.model)
   return {
-    program: imageModel(request.model).command,
+    program: model.command,
     args: [
-      '--model', imageModel(request.model).mflux,
+      '--model', model.mflux,
       '--prompt', request.prompt,
       '--width', String(request.width),
       '--height', String(request.height),
@@ -133,13 +134,18 @@ export function mfluxArguments(request: ImageRequest, out: string): MfluxCommand
   }
 }
 
+/** The process to start for a take: the model's command, then its arguments. */
+export function mfluxCommandLine(c: MfluxCommand): { command: string[]; out: string } {
+  return { command: [c.program, ...c.args], out: c.out }
+}
+
 /**
  * Image takes through mflux's command for the model, one process per take: the model loads for the take and
  * leaves memory with the process, so it never sits beside ACE-Step, Whisper or the other image
  * model, and every take starts with a clean MLX cache. `build` replaces the command (tests).
  */
 export function createMfluxGenerator({
-  build = (c: MfluxCommand) => ({ command: [c.program, ...c.args], out: c.out }),
+  build = mfluxCommandLine,
   machine = { which: (c) => Bun.which(c) !== null, platform: process.platform, arch: process.arch },
   timeoutMs = 30 * 60_000,
   hubDir = HUB_DIR,

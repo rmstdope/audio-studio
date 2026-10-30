@@ -458,7 +458,7 @@ describe('the image models check', () => {
       'Install mflux:',
       'Download the models, once (about 15 GB and 31 GB):',
     ])
-    expect(found.steps!.list[0]!.commands).toEqual(['uv tool install mflux'])
+    expect(found.steps!.list[0]!.commands).toEqual(['uv tool install --upgrade mflux'])
   })
 
   it('names the machine when mflux cannot run at all, and both missing models when mflux is here', () => {
