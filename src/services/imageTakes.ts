@@ -186,14 +186,17 @@ export function createImageTakes({
 
   /** The lock as text: its keys as they were, the images one per line. */
   function formatLock(lock: ImageLockFile): string {
-    const parts = Object.entries(lock).map(([key, value]) => {
-      if (key !== 'images') return ` ${JSON.stringify(key)}: ${JSON.stringify(value)}`
-      const entries = sorted(lock.images)
-      const lines = Object.keys(entries).map(
-        (id) => `  ${JSON.stringify(id)}: ${JSON.stringify(entries[id])}`,
-      )
-      return ` "images": ${lines.length ? `{\n${lines.join(',\n')}\n }` : '{}'}`
-    })
+    const parts = Object.keys(lock)
+      .sort()
+      .map((key) => [key, lock[key]] as const)
+      .map(([key, value]) => {
+        if (key !== 'images') return ` ${JSON.stringify(key)}: ${JSON.stringify(value)}`
+        const entries = sorted(lock.images)
+        const lines = Object.keys(entries).map(
+          (id) => `  ${JSON.stringify(id)}: ${JSON.stringify(entries[id])}`,
+        )
+        return ` "images": ${lines.length ? `{\n${lines.join(',\n')}\n }` : '{}'}`
+      })
     return `{\n${parts.join(',\n')}\n}\n`
   }
 
@@ -239,7 +242,10 @@ export function createImageTakes({
         await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
         return
       }
-      if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
+      if (saved && 'ok' in saved) {
+        await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
+        throw new Error(`${saved.file} cannot be used`)
+      }
       entries.delete(entry.n)
     } catch (error) {
       if (stop.signal.aborted) return
@@ -370,6 +376,8 @@ export function createImageTakes({
                 message: `Take ${n} could not be chosen: the images ${unread} could not be read. Nothing was changed.`,
               }
             }
+            // Nothing to do: the game already shows this take.
+            if (lock.images[id]?.chosen?.take === n) return { ok: true }
             manifest[id] = { file, width: take.width, height: take.height }
             lock.images[id] = {
               ...lock.images[id],

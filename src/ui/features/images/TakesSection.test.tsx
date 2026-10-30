@@ -108,7 +108,7 @@ async function show(data: ImageTakesView, over: Partial<ImageRow> = {}) {
   /** The take on the right, from the heading of its side. */
   const right = () => container.querySelector('[data-side="right"] b')?.textContent
   const left = () => container.querySelector('[data-side="left"] b')?.textContent
-  return { container, calls, buttons, button, click, key, text, right, left }
+  return { client, container, calls, buttons, button, click, key, text, right, left }
 }
 
 const three = [take(1), take(2), take(3)]
@@ -211,6 +211,35 @@ describe('comparing takes', () => {
     expect(s.right()).toBe('Take 2')
     const thumbs = [...s.container.querySelectorAll('[data-strip] button')]
     expect(thumbs.some((t) => t.textContent?.includes('was chosen'))).toBe(true)
+  })
+
+  it('stops a poll that is on its way before showing a choice, so it cannot undo it', async () => {
+    const s = await show(view({ takes: [take(1), take(2, { chosen: true }), take(3)] }), {
+      chosenTake: 2,
+    })
+    const cancelled: unknown[] = []
+    const real = s.client.cancelQueries.bind(s.client)
+    s.client.cancelQueries = ((filters: unknown) => {
+      cancelled.push(filters)
+      return real(filters as never)
+    }) as typeof s.client.cancelQueries
+    await s.click(s.button('Choose'))
+    expect(cancelled).toEqual([{ queryKey: ['image-takes', 'inn'] }])
+    await s.click(s.button('Drop'))
+    expect(cancelled).toHaveLength(2)
+  })
+
+  it('keeps the arrow keys from also scrolling the strip', async () => {
+    const s = await show(view({ takes: three }))
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      s.container.querySelector('[data-strip] button')!.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented).toBe(true)
   })
 
   it('Drop removes the take on the right at once, and the next one comes to the right', async () => {
@@ -321,6 +350,27 @@ describe('what can go wrong', () => {
     expect(s.button('Choose').disabled).toBe(true)
     expect(s.button('Drop').disabled).toBe(true)
     expect(s.button('Un-choose').disabled).toBe(true)
+  })
+
+  it('shows only the latest action’s refusal', async () => {
+    const s = await show(view({ takes: three }))
+    globalThis.fetch = (async (_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE'
+        ? Response.json({ ok: true })
+        : Response.json(
+            { ok: false, message: 'No choosing now.' },
+            { status: 409 },
+          )) as unknown as typeof fetch
+    await s.click(s.button('Choose'))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(s.text()).toContain('No choosing now.')
+    await s.click(s.button('Drop'))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(s.text()).not.toContain('No choosing now.')
   })
 
   it('shows a refusal under the buttons', async () => {

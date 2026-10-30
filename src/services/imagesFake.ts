@@ -64,7 +64,7 @@ export function createFakeImages(delayMs = 3000): ImageGenerator {
       await new Promise((resolve) => setTimeout(resolve, delayMs))
       if (request.prompt.includes('fail')) throw new Error('The image generator: out of memory')
       return {
-        png: fakePng(request.width / 4, request.height / 4, request.seed),
+        png: fakePng(request.width, request.height, request.seed),
         seed: request.seed,
       }
     },

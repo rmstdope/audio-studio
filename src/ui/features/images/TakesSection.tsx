@@ -96,11 +96,12 @@ export function TakesSection({ row }: { row: ImageRow }) {
   const [wasChosen, setWasChosen] = useState<number | null>(null)
   const [count, setCount] = useState(2)
   const [asking, setAsking] = useState(false)
-  const [pendingFocus, setPendingFocus] = useState<'choose' | number | null>(null)
+  const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
   const asked = useRef(new Set<number>())
   const chooseButton = useRef<HTMLButtonElement>(null)
   const unchooseButton = useRef<HTMLButtonElement>(null)
   const leftHeading = useRef<HTMLSpanElement>(null)
+  const rightHeading = useRef<HTMLSpanElement>(null)
   const thumbs = useRef(new Map<number, HTMLButtonElement>())
   const refocusUnchoose = useFocusWhenClosed(asking, unchooseButton)
   const focusLeft = useFocusWhenClosed(asking, leftHeading)
@@ -124,9 +125,16 @@ export function TakesSection({ row }: { row: ImageRow }) {
   })
   useEffect(() => {
     if (pendingFocus === null) return
-    ;(pendingFocus === 'choose' ? chooseButton.current : thumbs.current.get(pendingFocus))?.focus()
-    setPendingFocus(null)
-  }, [pendingFocus, ready])
+    const target =
+      pendingFocus === 'choose'
+        ? chooseButton.current
+        : pendingFocus === 'right'
+          ? rightHeading.current
+          : thumbs.current.get(pendingFocus)
+    target?.focus()
+    // A button that is off while its change is under way takes focus once it is on again.
+    if (!target || document.activeElement === target) setPendingFocus(null)
+  }, [pendingFocus, ready, choose.isPending, drop.isPending])
 
   if (!view) {
     return (
@@ -149,8 +157,14 @@ export function TakesSection({ row }: { row: ImageRow }) {
       v && 'takes' in v ? update(v) : v,
     )
 
+  /** Stops a poll on its way (it would bring back what is about to change), and clears older refusals. */
+  const beforeChange = () => {
+    void client.cancelQueries({ queryKey: ['image-takes', id] })
+    for (const mutation of [make, choose, drop, unchoose]) mutation.reset()
+  }
   const onChoose = (n: number) => {
     const before = chosen?.n ?? null
+    beforeChange()
     // The page shows the choice at once; a refusal puts it back when the takes are read again.
     set((v) => ({
       ...v,
@@ -158,14 +172,15 @@ export function TakesSection({ row }: { row: ImageRow }) {
     }))
     setWasChosen(before)
     setRight(before ?? rightAfterDrop(strip, n))
-    setPendingFocus('choose')
+    setPendingFocus(before !== null || strip.length > 1 ? 'choose' : 'right')
     choose.mutate(n)
   }
   const onDrop = (n: number) => {
     const next = rightAfterDrop(strip, n)
+    beforeChange()
     set((v) => ({ ...v, takes: v.takes.filter((t) => t.n !== n) }))
     setRight(next)
-    if (next !== null) setPendingFocus(next)
+    setPendingFocus(next ?? 'right')
     drop.mutate(n)
   }
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -178,6 +193,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
       return
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       const next = stepRight(strip, onRight, event.key === 'ArrowLeft' ? -1 : 1)
+      event.preventDefault()
       if (next !== null) setRight(next)
     }
   }
@@ -325,7 +341,9 @@ export function TakesSection({ row }: { row: ImageRow }) {
           </div>
           <div className="image-side" data-side="right">
             <div className="take-row">
-              <span className="lbl">Comparing</span>
+              <span className="lbl" ref={rightHeading} tabIndex={-1}>
+                Comparing
+              </span>
               {rightTake ? (
                 <>
                   <b>Take {rightTake.n}</b>
@@ -334,7 +352,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
                   <button
                     type="button"
                     className="btn btn-ghost btn-small"
-                    disabled={lockUnread || drop.isPending}
+                    disabled={lockUnread || drop.isPending || choose.isPending}
                     onClick={() => onDrop(rightTake.n)}
                   >
                     Drop
@@ -343,7 +361,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
                     type="button"
                     ref={chooseButton}
                     className="btn btn-primary btn-small"
-                    disabled={lockUnread || choose.isPending}
+                    disabled={lockUnread || choose.isPending || drop.isPending}
                     onClick={() => onChoose(rightTake.n)}
                   >
                     Choose

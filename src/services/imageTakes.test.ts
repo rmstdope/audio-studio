@@ -242,6 +242,15 @@ describe('choosing', () => {
     expect(await takes.currentFile(file, 'inn')).toBe(join(root, 'web/images/inn.png'))
   })
 
+  it('choosing the take that is already chosen changes nothing', async () => {
+    const { takes, file, read } = await made()
+    await takes.choose(file, 'inn', 1)
+    const before = read('images/images.lock.json')
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(await takes.choose(file, 'inn', 1)).toEqual({ ok: true })
+    expect(read('images/images.lock.json')).toBe(before)
+  })
+
   it('goes out of date when the words change, and choosing another replaces the picture', async () => {
     const { takes, file, read, row } = await made()
     await takes.choose(file, 'inn', 1)
@@ -256,6 +265,7 @@ describe('choosing', () => {
   it('keeps the other images, the other manifest entries and the lock’s other keys', async () => {
     const { takes, file, read } = await made({
       'images/images.lock.json': {
+        zeta: 1,
         images: { hall: { chosen: { words: 'w', style: 's', width: 1, height: 2, take: 4 } } },
         other: [1],
       },
@@ -265,6 +275,8 @@ describe('choosing', () => {
     const lock = JSON.parse(read('images/images.lock.json'))
     expect(Object.keys(lock.images)).toEqual(['hall', 'inn'])
     expect(lock.other).toEqual([1])
+    // The top-level keys are sorted, whatever order the file had them in.
+    expect(Object.keys(lock)).toEqual(['images', 'other', 'zeta'])
     expect(Object.keys(JSON.parse(read('web/images/manifest.json')))).toEqual(['hall', 'inn'])
   })
 
