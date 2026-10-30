@@ -1794,12 +1794,11 @@ Small, independently useful increments:
     2. **The game's image list and style** (as-yag.3), read-only, with the studio's own prompt
        overrides.
     3. **An image take** (as-yag.2) with either model, on the GPU queue with music and Whisper.
-    4. **The game's look** (as-yag.5): each take brought to the image's size, and to a palette or
-       colour depth when the style file asks.
-    5. **Takes and choosing** (as-yag.4): an image's takes compared with the chosen one.
+    4. **Takes and choosing** (as-yag.4): an image's takes compared with the chosen one.
+    5. **The game's look** (as-yag.5): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.
     6. **Two models** (as-yag.7): Setup says which are installed and chooses the main one; takes
        can be made with the other.
-    7. **The rename** to Content Studio (as-yag.6).
+    7. **The rename** to Content Studio (as-yag.6), with §1 and the opening of this document, which still speak of a game's audio.
 
 ---
 
@@ -1847,8 +1846,7 @@ Small, independently useful increments:
    within ElevenLabs' indie-game limits; Setup says so.
 8. **Images are made locally with FLUX.2 klein 4B and Z-Image-Turbo, through mflux** (the spike,
    15.1, on a MacBook M5 Pro with 48 GB, MLX, mflux 0.20.0). Ten Act I rooms of RetroQuest, each
-   made at 1024×576 with seed 42 from the game's style text and the room's description, the model
-   loaded once and MLX's cache cleared after each take:
+   made at 1024×576 with seed 42 from a style text and the room's description, the model loaded once and MLX's cache cleared after each take (klein's times are with the reworded style text below; schnell's without clearing the cache):
 
    | Model                     | Steps | Time per take | Memory (MLX peak) | On disk | Licence           |
    | ------------------------- | ----- | ------------- | ----------------- | ------- | ----------------- |
@@ -1856,8 +1854,7 @@ Small, independently useful increments:
    | Z-Image-Turbo             | 9     | 33–66 s       | 37 GB             | 31 GB   | Apache-2.0        |
    | FLUX.1 schnell (not used) | 4     | 13–19 s       | 41 GB             | 31 GB   | Apache-2.0, gated |
 
-   Without clearing the cache, klein took 7–13 s and Z-Image-Turbo about 80 s. Z-Image-Turbo's
-   first take takes about 33 s; every later one stalls 14–25 s on its first step, not explained.
+   Clearing the cache matters for Z-Image-Turbo, which took about 80 s a take without it, and makes no clear difference to klein (5–10 s without it, same text). Even so, Z-Image-Turbo's first step takes 14–25 s on every take after the first, against about 7 s on the first, not explained.
    Klein follows each description most closely (the Dream's man lifting the child and the faceless
    figure, the field's withered crops) and is by far the fastest; Z-Image-Turbo paints the cleanest
    gouache but leaves out parts of a description; schnell's rooms do not hold together as a set
@@ -1868,11 +1865,8 @@ Small, independently useful increments:
    downloaded once, outside the studio. No free image API is kept as a fallback, since a local take
    costs nothing.
 
-   **Memory beside the other workers.** ACE-Step and Whisper together already hold 42 of the 48 GB
-   (§8.5), so an image worker cannot stay loaded beside them, nor the two image models beside each
-   other (57 GB). Image takes wait on the GPU queue and the image worker is loaded only while it
-   is used, or the other workers are stopped first, as the music router stops the other music
-   family (as-yag.2).
+   **Memory beside the other workers.** With ACE-Step and Whisper both loaded, 42 of the 48 GB were in use (§8.5), so an image worker cannot stay loaded beside them, nor the two image models beside each
+   other (57 GB). Image takes wait on the GPU queue, and either the image worker is loaded only for its takes or the other workers are stopped first, as the music router stops the other music family (as-yag.2).
 
    **One look holds across a set through the shared style text**, not through the palette. Klein's
    and Z-Image-Turbo's ten rooms each read as one set from the same style text. The text is the
