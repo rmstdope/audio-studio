@@ -758,6 +758,8 @@ function useImageEdit<V>(
       await Promise.all([
         client.invalidateQueries({ queryKey: ['project'] }),
         client.invalidateQueries({ queryKey: ['changes'] }),
+        // Takes made from other words are marked "earlier words" by the server.
+        client.invalidateQueries({ queryKey: ['image-takes'] }),
       ])
       if (!error) afterSaved?.()
     },

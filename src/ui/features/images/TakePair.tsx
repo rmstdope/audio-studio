@@ -19,7 +19,8 @@ function tag(text: string): string {
  * stack, in the same order, when the window is too narrow. `current` shows the picture the game
  * has now instead of the take's own game version (the chosen take, whose version the game may
  * still have under an old look). The right side says so while the take is being brought to the
- * look, and says what to fix when the style file cannot be used.
+ * look, and says what to fix when the style file cannot be used. While the choice of the take
+ * shown as `current` is still being saved the game has no such picture yet, so none is asked for.
  */
 export function TakePair({
   id,
@@ -27,12 +28,14 @@ export function TakePair({
   row,
   lookError,
   current = false,
+  saving = false,
 }: {
   id: string
   take: ImageTakeView
   row: ImageRow
   lookError: string | null
   current?: boolean
+  saving?: boolean
 }) {
   const box = useRef<HTMLDivElement>(null)
   const [available, setAvailable] = useState(0)
@@ -53,7 +56,9 @@ export function TakePair({
     ? `${base}/current?v=${version}`
     : `${base}/takes/${take.n}/game?v=${version}`
   const state = current
-    ? 'ready'
+    ? saving
+      ? 'saving'
+      : 'ready'
     : lookError
       ? 'error'
       : take.look === 'bringing' || take.look === 'missing'
@@ -88,13 +93,17 @@ export function TakePair({
           >
             {state === 'error'
               ? lookError
-              : state === 'missing'
-                ? "Not brought to the game's look yet."
-                : "Bringing to the game's look…"}
+              : state === 'saving'
+                ? 'Saving the choice…'
+                : state === 'missing'
+                  ? "Not brought to the game's look yet."
+                  : "Bringing to the game's look…"}
           </div>
         )}
         <span className="faint small">
-          {state === 'bringing' || state === 'missing' ? '' : `${row.width} × ${row.height}`}
+          {state === 'bringing' || state === 'missing' || state === 'saving'
+            ? ''
+            : `${row.width} × ${row.height}`}
         </span>
       </div>
     </div>

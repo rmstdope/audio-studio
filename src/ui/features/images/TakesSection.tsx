@@ -145,7 +145,9 @@ export function TakesSection({ row }: { row: ImageRow }) {
           : thumbs.current.get(pendingFocus)
     target?.focus()
     // A button that is off while its change is under way takes focus once it is on again.
-    if (!target || document.activeElement === target) setPendingFocus(null)
+    // A target not drawn yet is waited for while the change is under way, and given up on after.
+    if (target ? document.activeElement === target : !choose.isPending && !drop.isPending)
+      setPendingFocus(null)
   }, [pendingFocus, ready, choose.isPending, drop.isPending])
 
   if (!view) {
@@ -380,6 +382,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
                 heading={leftHeading}
                 opener={unchooseButton}
                 unchoosing={unchoose.isPending}
+                saving={choose.isPending}
                 onUnchoose={() => {
                   unchoose.reset()
                   setAsking(true)
@@ -517,6 +520,7 @@ function LeftSide({
   heading,
   opener,
   unchoosing,
+  saving,
   onUnchoose,
   size,
   id,
@@ -528,6 +532,7 @@ function LeftSide({
   heading: React.RefObject<HTMLSpanElement | null>
   opener: React.RefObject<HTMLButtonElement | null>
   unchoosing: boolean
+  saving: boolean
   onUnchoose: () => void
   size: { width: number; height: number }
   id: string
@@ -558,7 +563,7 @@ function LeftSide({
             Un-choose
           </button>
         </div>
-        <TakePair id={id} take={chosen} row={row} lookError={lookError} current />
+        <TakePair id={id} take={chosen} row={row} lookError={lookError} current saving={saving} />
       </>
     )
   }
