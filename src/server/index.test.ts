@@ -5027,3 +5027,74 @@ describe('server, designing voices with ElevenLabs', () => {
     expect(await cast.json()).toMatchObject({ ok: true, voice: { id: 'eleven:v-g1' } })
   })
 })
+
+describe('the images routes', () => {
+  const imagesRoot = tempRepo({
+    'audio-studio.json': projectJson({
+      images: {
+        paths: {
+          list: 'tts/{part}/images.json',
+          style: 'images/style.json',
+          prompts: 'images/prompts.json',
+          lock: 'images/images.lock.json',
+        },
+      },
+    }),
+    'tts/act1/images.json': [
+      { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
+    ],
+    'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+  })
+  const studio = startServer({
+    projectFile: join(imagesRoot, 'audio-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => studio.stop(true))
+  const send = (method: string, path: string, body: unknown, origin = studio.url.origin) =>
+    fetch(new URL(path, studio.url), {
+      method,
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  const summary = async () =>
+    (await (await fetch(new URL('/api/project', studio.url))).json()).summary.images
+
+  it('shows the images in the project summary', async () => {
+    expect((await summary()).acts[0].rows[0]).toMatchObject({ id: 'inn', status: 'none yet' })
+  })
+
+  it('takes changes from the studio’s own page only', async () => {
+    for (const [method, path, body] of [
+      ['PATCH', '/api/images/inn', { words: 'x' }],
+      ['PATCH', '/api/image-style', { look: 'x' }],
+      ['POST', '/api/images/inn/compare', { choice: 'keep' }],
+      ['POST', '/api/image-style/seen', {}],
+    ] as const) {
+      expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
+    }
+  })
+
+  it('saves the user’s words, and the summary shows them', async () => {
+    expect(await (await send('PATCH', '/api/images/inn', { words: 'a cosy inn' })).json()).toEqual({
+      ok: true,
+    })
+    expect((await summary()).acts[0].rows[0]).toMatchObject({ words: 'a cosy inn', changed: true })
+  })
+
+  it('refuses a body that is not words, and answers 404 for an unknown image', async () => {
+    expect((await send('PATCH', '/api/images/inn', { words: 3 })).status).toBe(400)
+    expect((await send('PATCH', '/api/images/ghost', { words: 'x' })).status).toBe(404)
+    expect((await send('POST', '/api/images/inn/compare', { choice: 'maybe' })).status).toBe(400)
+  })
+
+  it('saves a style field, settles a compare and puts the style notice away', async () => {
+    expect((await send('PATCH', '/api/image-style', { look: 'oil' })).status).toBe(200)
+    expect((await summary()).style.look).toMatchObject({ words: 'oil', changed: true })
+    expect((await send('POST', '/api/images/inn/compare', { choice: 'game' })).status).toBe(200)
+    expect((await summary()).acts[0].rows[0].changed).toBe(false)
+    expect((await send('POST', '/api/image-style/seen', {})).status).toBe(200)
+  })
+})

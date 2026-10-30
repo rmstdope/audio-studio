@@ -210,7 +210,8 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
   )
 }
 
-function RefreshPanel({
+/** The outcome of a refresh from the game, with what was added and removed. */
+export function RefreshPanel({
   title,
   headline,
   added,
@@ -241,7 +242,7 @@ function RefreshPanel({
 }
 
 /** The failure of a refresh: the message, the problems with the new list, and what the command said. */
-function FailedPanel({
+export function FailedPanel({
   result,
   error,
   onClose,

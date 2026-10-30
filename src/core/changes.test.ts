@@ -205,3 +205,40 @@ describe('the music files in the changes', () => {
     expect(projectPaths(project, 'audio-studio.json').music).toBeNull()
   })
 })
+
+describe('the images files in the changes', () => {
+  const withImages = ProjectSchema.parse(
+    projectJson({
+      images: {
+        paths: {
+          list: 'tts/{part}/images.json',
+          style: 'images/style.json',
+          prompts: 'images/prompts.json',
+          lock: 'images/images.lock.json',
+        },
+      },
+    }),
+  )
+
+  it('lists the images files by role', () => {
+    const groups = groupChanges(withImages, 'audio-studio.json', [
+      { path: 'tts/act1/images.json', change: 'modified' },
+      { path: 'images/style.json', change: 'new' },
+      { path: 'images/prompts.json', change: 'modified' },
+      { path: 'images/images.lock.json', change: 'modified' },
+      { path: 'images/other.json', change: 'new' },
+    ])
+    expect(groups.total).toBe(4)
+    expect(groups.images?.files.map((f) => [f.path, f.role])).toEqual([
+      ['tts/act1/images.json', 'images'],
+      ['images/style.json', 'style'],
+      ['images/prompts.json', 'words'],
+      ['images/images.lock.json', 'lock'],
+    ])
+  })
+
+  it('has no images group without changes or without an images section', () => {
+    expect(groupChanges(withImages, 'audio-studio.json', []).images).toBeNull()
+    expect(groupChanges(project, 'audio-studio.json', []).images).toBeNull()
+  })
+})

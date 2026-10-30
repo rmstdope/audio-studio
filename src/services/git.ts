@@ -35,6 +35,7 @@ export async function gitChanges(
     ...paths.own,
     ...paths.parts.flatMap((part) => [...Object.keys(part.files), ...part.clips]),
     ...(paths.music ? [...Object.keys(paths.music.files), paths.music.clips] : []),
+    ...Object.keys(paths.images ?? {}),
   ]
   const status = await run(git, root, [
     'status',

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "silver-stag-inn",
+    "title": "The Silver Stag Inn",
+    "description": "A low timber inn at dusk, lantern light in every window, a silver stag on the sign.",
+    "width": 320,
+    "height": 200
+  },
+  {
+    "id": "lantern-hall",
+    "title": "The lantern hall",
+    "description": "A long stone hall hung with lanterns, a table set for one.",
+    "width": 320,
+    "height": 200
+  },
+  {
+    "id": "cellar-door",
+    "title": "The cellar door",
+    "description": "A heavy iron-banded door at the foot of a stair.",
+    "width": 160,
+    "height": 200
+  },
+  {
+    "id": "old-map",
+    "title": "The old map",
+    "description": "A creased map of the valley on a wooden table.",
+    "width": 160,
+    "height": 100
+  }
+]

@@ -29,6 +29,8 @@ import type {
   StopResult,
 } from '../services/musicTakes'
 import type { BriefChangeResult } from '../services/briefs'
+import type { StyleField } from '../core/images'
+import type { ImageEditResult } from '../services/imageEdits'
 import type { RemoveResult } from '../services/musicOrphans'
 import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
 import { useCallback, useState } from 'react'
@@ -696,6 +698,76 @@ export function useSetTrackBrief(trackId: string) {
     // Saved or not (a 404 means the list changed), the page shows the project as it is now.
     onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
   })
+}
+
+/**
+ * Sends one change to the studio's own image words (`PATCH`/`POST` with a JSON body), then reloads
+ * the project, whose Images pages show the result. A 404 means the game no longer lists the image.
+ */
+function useImageEdit<V>(
+  scope: string,
+  request: (value: V) => { method: string; path: string; body: unknown },
+) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: scope },
+    mutationFn: async (value: V) => {
+      const { method, path, body } = request(value)
+      const response = await fetch(path, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (response.status === 404) {
+        throw new Error('The game no longer lists this image; the page shows it as it is now.')
+      }
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<ImageEditResult>
+    },
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['changes'] }),
+      ]),
+  })
+}
+
+/** Saves the user's own words for an image (null takes them back). */
+export function useSetImageWords(imageId: string) {
+  return useImageEdit<string | null>(`image-${imageId}`, (words) => ({
+    method: 'PATCH',
+    path: `/api/images/${encodeURIComponent(imageId)}`,
+    body: { words },
+  }))
+}
+
+/** Settles an image whose game description changed under the user's words. */
+export function useImageCompare(imageId: string) {
+  return useImageEdit<'keep' | 'game'>(`image-${imageId}`, (choice) => ({
+    method: 'POST',
+    path: `/api/images/${encodeURIComponent(imageId)}/compare`,
+    body: { choice },
+  }))
+}
+
+/** Saves the user's own words for the look or what is kept out (null takes them back). */
+export function useSetStyleField(field: StyleField) {
+  return useImageEdit<string | null>(`image-style-${field}`, (words) => ({
+    method: 'PATCH',
+    path: '/api/image-style',
+    body: { [field]: words },
+  }))
+}
+
+/** Puts the style-changed notice away. */
+export function useStyleSeen() {
+  return useImageEdit<void>('image-style-seen', () => ({
+    method: 'POST',
+    path: '/api/image-style/seen',
+    body: {},
+  }))
 }
 
 /** A track's takes as its page shows them; polled while any is being made. */

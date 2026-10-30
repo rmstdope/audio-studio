@@ -1,4 +1,5 @@
 import { languageName } from './languages'
+import type { ImagesSummary } from './images'
 import type { MusicSummary } from './music'
 import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } from './project'
 import type { Pronunciation } from './pronounce'
@@ -129,6 +130,8 @@ export interface ProjectSummary {
   projectFile: string
   /** The Music pages; null when the project file has no `music` section. */
   music: MusicSummary | null
+  /** The Images pages; null when the project file has no `images` section. */
+  images: ImagesSummary | null
   problems: Problem[]
 }
 
@@ -144,6 +147,8 @@ export interface SummaryInput {
   cast: Cast | null
   /** The Music pages, from `summarizeMusic`; absent or null without a `music` section. */
   music?: MusicSummary | null
+  /** The Images pages, from `summarizeImages`; absent or null without an `images` section. */
+  images?: ImagesSummary | null
   problems: Problem[]
 }
 
@@ -164,6 +169,7 @@ export function summarize({
   languageDialogs = {},
   cast,
   music = null,
+  images = null,
   problems,
 }: SummaryInput): ProjectSummary {
   const { narration } = project
@@ -281,6 +287,7 @@ export function summarize({
     takeFade: project.takeFade ?? DEFAULT_TAKE_FADE,
     projectFile,
     music,
+    images,
     problems,
   }
 }
