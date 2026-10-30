@@ -1,8 +1,10 @@
 import type { ProjectSummary } from '../../core/summary'
 import { useChanges, useCredit, useSetup, useSpending } from '../api'
+import { currentAct } from '../imagesText'
 import { listFor } from '../musicText'
 import { routeHref, type Route } from '../route'
 import {
+  ImageIcon,
   MicIcon,
   MusicIcon,
   PeopleIcon,
@@ -114,6 +116,39 @@ export function Sidebar({
               </a>
             )
           })}
+        <a
+          className="nav-item nav-workspace"
+          href={routeHref({ view: 'images', page: null })}
+          aria-current={route.view === 'images' && !summary.images ? 'page' : undefined}
+        >
+          <ImageIcon /> <span className="grow">Images</span>
+        </a>
+        {open === 'images' && summary.images && (
+          <>
+            {summary.images.acts.map((act) => (
+              <a
+                key={act.id}
+                className="nav-item music-subnav"
+                href={routeHref({ view: 'images', page: 'act', part: act.id })}
+                aria-current={
+                  route.view === 'images' && currentAct(summary.images!, route) === act.id
+                    ? 'page'
+                    : undefined
+                }
+              >
+                <span className="grow">{shortTitle(act.title)}</span>
+                {act.state === 'ok' && <span className="meta">{act.rows.length}</span>}
+              </a>
+            ))}
+            <a
+              className="nav-item music-subnav"
+              href={routeHref({ view: 'images', page: 'style' })}
+              aria-current={route.view === 'images' && route.page === 'style' ? 'page' : undefined}
+            >
+              <span className="grow">Style</span>
+            </a>
+          </>
+        )}
         <span className="nav-item" aria-disabled="true">
           <SpeakerIcon /> <span className="grow">Sound effects</span>{' '}
           <span className="meta">Soon</span>

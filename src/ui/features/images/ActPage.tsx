@@ -1,0 +1,127 @@
+import type { ImagesAct, ImageRow, ImagesSummary } from '../../../core/images'
+import { useRefreshDialog } from '../../api'
+import { shortTitle } from '../../format'
+import { chosenLine } from '../../imagesText'
+import { routeHref } from '../../route'
+import { FailedPanel, RefreshPanel } from '../music/MusicView'
+
+/** The chip class of each status: muted until chosen, green when chosen, amber when out of date. */
+const STATUS_CHIP: Record<ImageRow['status'], string> = {
+  'none yet': 'chip',
+  chosen: 'chip chip-ok',
+  'out of date': 'chip chip-warn',
+}
+
+/** An act's page: its images with the words they are made from, their size and status. */
+export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary }) {
+  const name = shortTitle(act.title)
+  const run = useRefreshDialog(act.id)
+  const result = run.outcome?.result
+  let panel: React.ReactNode = null
+  if (run.outcome) {
+    panel = result?.ok ? (
+      <RefreshPanel
+        title="Refreshed from the game"
+        headline="The game's lists were read again"
+        added={[]}
+        removed={[]}
+        onClose={run.dismiss}
+      />
+    ) : (
+      <FailedPanel result={result ?? null} error={run.outcome.error} onClose={run.dismiss} />
+    )
+  }
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <span className="crumbs">Images</span>
+          <h1 tabIndex={-1}>{name}</h1>
+          {act.state === 'ok' && (
+            <span className="muted">{chosenLine(name, act.rows.length, act.chosen)}</span>
+          )}
+        </div>
+        {act.canRefresh && (
+          <div className="header-actions">
+            <button className="btn" type="button" disabled={run.pending} onClick={run.start}>
+              {run.pending ? 'Refreshing from the game…' : 'Refresh from the game'}
+            </button>
+          </div>
+        )}
+      </header>
+      {act.state === 'ok' && images.style.present && (
+        <p className="muted images-style-line">
+          Every prompt ends with the game&apos;s style
+          {act.addition !== null && (
+            <>
+              , and for {name}: <em>{act.addition}</em>
+            </>
+          )}
+          . <a href={routeHref({ view: 'images', page: 'style' })}>Style ›</a>
+        </p>
+      )}
+      {panel}
+      {act.state === 'missing' ? (
+        <section className="panel">
+          <p className="muted music-notice">
+            The game has not listed the images for {name} yet. Refresh from the game.
+          </p>
+        </section>
+      ) : act.state === 'invalid' ? (
+        <section className="panel">
+          <p className="muted music-notice">
+            The list of images for {name} cannot be read; see the problems above.
+          </p>
+        </section>
+      ) : act.rows.length === 0 ? (
+        <section className="panel">
+          <p className="muted music-notice">The game asks for no images in {name}.</p>
+        </section>
+      ) : (
+        <div className="table-box">
+          <table className="table images-table">
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Prompt</th>
+                <th>Size</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {act.rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="images-name">
+                    <a
+                      className="music-track-link"
+                      href={routeHref({ view: 'images', page: 'image', image: row.id })}
+                    >
+                      <strong>{row.title}</strong>
+                    </a>
+                    <div className="mono muted music-id">{row.id}</div>
+                  </td>
+                  <td className="images-prompt">
+                    <div>{row.words}</div>
+                    {row.changed && (
+                      <div className="chg">
+                        {row.gameChanged
+                          ? 'changed here · the game’s words changed too'
+                          : 'changed here'}
+                      </div>
+                    )}
+                  </td>
+                  <td className="images-size">
+                    {row.width} × {row.height}
+                  </td>
+                  <td className="images-status">
+                    <span className={STATUS_CHIP[row.status]}>{row.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}

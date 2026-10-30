@@ -1,4 +1,5 @@
-import type { ImageRow } from '../core/images'
+import type { ImageRow, ImagesSummary } from '../core/images'
+import type { ImagesRoute } from './route'
 
 /** The line under an act's heading: how many of its images have a chosen one. */
 export function chosenLine(name: string, total: number, chosen: number): string {
@@ -27,4 +28,17 @@ export function styleNoticeText(count: number): string {
   return count === 1
     ? '1 chosen image across all acts was made with the old style and is out of date. The game shows it until you choose a new one.'
     : `${count} chosen images across all acts were made with the old style and are out of date. The game shows them until you choose new ones.`
+}
+
+/**
+ * The act whose page the route shows: the act asked for, the act of the image asked for, else the
+ * first. Null on the Style page.
+ */
+export function currentAct(images: ImagesSummary, route: ImagesRoute): string | null {
+  if (route.page === 'style') return null
+  if (route.page === 'act') return route.part
+  if (route.page === 'image') {
+    return images.acts.find((act) => act.rows.some((row) => row.id === route.image))?.id ?? null
+  }
+  return images.acts[0]?.id ?? null
 }
