@@ -1,0 +1,1439 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Images — every state and word</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --raised-hover: #20242e;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --text-soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --accent-soft-line: #5a3218;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --info: #7aa7ff;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --miss: #8fb5ff;
+        --miss-bg: #142033;
+        --kept-bg: #0f1a16;
+        --kept-line: #1f5a40;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1180px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        max-width: 1180px;
+        margin: 22px auto 8px;
+        color: var(--text-soft);
+      }
+      .frame {
+        max-width: 1180px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        min-height: 560px;
+        background: var(--bg);
+      }
+      .side {
+        width: 220px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: none;
+      }
+      .brand {
+        font-weight: 600;
+      }
+      .lbl {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .pbox {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 13px;
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .ni {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 8px;
+        border-radius: 8px;
+        color: var(--text-soft);
+        font-size: 13px;
+      }
+      .ni.on {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .main {
+        flex: 1;
+        padding: 22px 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .crumbs a {
+        color: var(--faint);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn.p {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.g {
+        background: transparent;
+        border-color: transparent;
+        color: var(--muted);
+      }
+      .btn.s {
+        padding: 4px 9px;
+        font-size: 12.5px;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .wrap {
+        flex-wrap: wrap;
+      }
+      .grow {
+        flex: 1;
+        min-width: 0;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .chip {
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .c-ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .c-st {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .c-mi {
+        background: var(--miss-bg);
+        color: var(--miss);
+      }
+      .c-k {
+        background: var(--chip);
+        color: var(--text-soft);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        color: var(--faint);
+        font-weight: 500;
+        font-size: 12px;
+        padding: 4px 6px;
+      }
+      td {
+        padding: 9px 6px;
+        border-top: 1px solid var(--line);
+        vertical-align: middle;
+      }
+      tr.sel td {
+        background: var(--raised);
+      }
+      .brief {
+        color: var(--muted);
+        font-size: 12.5px;
+        max-width: 420px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 99px;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        flex: none;
+      }
+      .wave {
+        height: 34px;
+        flex: 1;
+        min-width: 120px;
+        background: repeating-linear-gradient(90deg, #3a4150 0 2px, transparent 2px 4px);
+        mask: linear-gradient(180deg, transparent 0, #000 20%, #000 80%, transparent 100%);
+        border-radius: 4px;
+        position: relative;
+        opacity: 0.9;
+      }
+      .wave.short {
+        max-width: 140px;
+      }
+      .seam {
+        position: absolute;
+        top: -4px;
+        bottom: -4px;
+        width: 2px;
+        background: var(--accent);
+        right: 6%;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      input,
+      textarea,
+      select {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 7px 9px;
+        font: inherit;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 64px;
+        width: 100%;
+      }
+      .grid4 {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .takes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .take {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .take.chosen {
+        background: var(--kept-bg);
+        border-color: var(--kept-line);
+      }
+      .take.gen {
+        border-style: dashed;
+        color: var(--muted);
+      }
+      .bar {
+        height: 6px;
+        border-radius: 99px;
+        background: var(--line-strong);
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        width: 40%;
+        background: var(--accent);
+      }
+      .warnbox {
+        background: var(--warn-bg);
+        border: 1px solid #5a4a1e;
+        border-radius: 12px;
+        padding: 10px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .warnbox strong {
+        color: var(--warn);
+      }
+      .errbox {
+        background: var(--danger-bg);
+        border: 1px solid #6a2a3a;
+        border-radius: 12px;
+        padding: 10px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .errbox strong {
+        color: var(--danger-ink);
+      }
+      .split {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .list {
+        width: 300px;
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .li {
+        padding: 8px 10px;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        border: 1px solid transparent;
+      }
+      .li.on {
+        background: var(--raised);
+        border-color: var(--line-strong);
+      }
+      .grp {
+        margin-top: 8px;
+      }
+      .tag {
+        display: inline-block;
+        background: var(--warn);
+        color: #1a1200;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        margin-right: 8px;
+      }
+      .dialog {
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-radius: 14px;
+        padding: 18px 20px;
+        width: 520px;
+        max-width: 100%;
+        box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .scrim {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgb(0 0 0 / 45%);
+        padding: 30px;
+      }
+      .decided {
+        border-left: 3px solid var(--info);
+        padding-left: 10px;
+        color: var(--text-soft);
+      }
+      .narrow {
+        max-width: 420px;
+      }
+      .narrow .side {
+        display: none;
+      }
+      .narrow .takes,
+      .narrow .grid4 {
+        grid-template-columns: 1fr;
+      }
+      .saved {
+        color: var(--ok);
+        font-size: 12.5px;
+      }
+      input.inl {
+        width: 100%;
+      }
+    </style>
+    <style>
+      .sw {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1px solid var(--line-strong);
+        margin-right: 3px;
+        vertical-align: middle;
+      }
+      .dims {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .ph {
+        background: repeating-linear-gradient(
+          45deg,
+          var(--inset),
+          var(--inset) 8px,
+          var(--raised) 8px,
+          var(--raised) 16px
+        );
+        border: 1px dashed var(--line-strong);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      textarea {
+        width: 100%;
+        background: var(--inset);
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        padding: 9px 11px;
+        font: inherit;
+        resize: vertical;
+      }
+      .ro {
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 9px 11px;
+        color: var(--text-soft);
+      }
+      .chg {
+        color: var(--warn);
+        font-size: 12.5px;
+      }
+      .notice {
+        background: var(--warn-bg);
+        border: 1px solid #5a4818;
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+      .cmp {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      details summary {
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .exp td {
+        background: var(--raised);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Images — every state and word</h1>
+      <p class="muted">
+        The game lists its images and style; the studio keeps your own words for them. Every word
+        here is what would ship.
+      </p>
+    </div>
+    <div class="intro decided">
+      <b>Agreed:</b> Images is a workspace beside Narration and Music; it opens into the acts and
+      one Style page. Each act's page lists its images (Image, Prompt, Size, Status); pressing one
+      opens its own page, where its words are edited and, later, its takes are made. Your words save
+      as you leave the field, are marked “changed here” with “use the game's”, and never reach the
+      game; an empty field or the game's words typed back is the same as use the game's. The Style
+      page: the look and what is kept out can be changed (marked the same way); the palette and each
+      act's addition are the game's. Without a style file each prompt is its own words only. A
+      changed game description under your words: compare and choose (Keep mine / Use the game's),
+      and the act's row says so until you choose. A changed game style: one notice on every Images
+      page until Seen, remembered across reloads, back on the next change; out-of-date marks stay.
+      Statuses: none yet, chosen, out of date (the image's page says what changed).
+    </div>
+    <p class="note">
+      <b
+        >1 — An act's images. Size and description are the game's; a row with your words says
+        “changed here”. Statuses: none yet, chosen, out of date.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Images</span>
+            <h1>Act I</h1>
+            <span class="muted">The images the game asks for in Act I. 1 of 4 chosen.</span>
+          </div>
+          <button class="btn">Refresh from the game</button>
+        </div>
+        <div class="small muted">
+          Every prompt ends with the game's style, and for Act I:
+          <i>early autumn, low warm evening light</i>.
+          <a href="#" style="color: var(--accent-soft-ink)">Style ›</a>
+        </div>
+        <section class="panel">
+          <table>
+            <tr>
+              <th>Image</th>
+              <th>Prompt</th>
+              <th>Size</th>
+              <th>Status</th>
+            </tr>
+            <tr>
+              <td>
+                <b>Willowbrook square</b>
+                <div class="mono faint">willowbrook-square</div>
+              </td>
+              <td>
+                <div class="brief">
+                  the village square of Willowbrook at dusk, a stone well in the middle, timber
+                  houses with lit windows, a cart by the inn
+                </div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-mi">none yet</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Silver Stag Inn</b>
+                <div class="mono faint">silver-stag-inn</div>
+              </td>
+              <td>
+                <div class="brief">
+                  the Silver Stag Inn's taproom, a long oak bar on the left, a roaring hearth on the
+                  right, barrels stacked under a window, a sleeping dog
+                </div>
+                <div class="chg">changed here</div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-ok">chosen</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Old mill</b>
+                <div class="mono faint">old-mill</div>
+              </td>
+              <td>
+                <div class="brief">
+                  a wooden water mill by a stream at the edge of the village, the wheel turning
+                </div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-st">out of date</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Elder Thom</b>
+                <div class="mono faint">elder-thom-portrait</div>
+              </td>
+              <td>
+                <div class="brief">portrait of Elder Thom, white beard, green hood, kind eyes</div>
+              </td>
+              <td class="dims">96 × 96</td>
+              <td><span class="chip c-mi">none yet</span></td>
+            </tr>
+          </table>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>2 — An image with the game's words (nothing changed here).</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Willowbrook square</h1>
+          <span class="mono faint">willowbrook-square</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 10px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <textarea rows="3">
+the village square of Willowbrook at dusk, a stone well in the middle, timber houses with lit windows, a cart by the inn</textarea>
+          <details>
+            <summary class="small">The whole prompt the model gets</summary>
+            <div class="ro small" style="margin-top: 6px">
+              the village square of Willowbrook at dusk, a stone well in the middle, timber houses
+              with lit windows, a cart by the inn. early autumn, low warm evening light. 16-colour
+              EGA pixel art, hard pixel edges, no anti-aliasing, flat side view, like a 1990
+              point-and-click adventure.<br /><span class="faint"
+                >Kept out: text, lettering, watermark, blur, photo, 3D render, gradients</span
+              >
+            </div>
+          </details>
+        </section>
+        <section class="panel">
+          <h2>Takes</h2>
+          <div class="ph" style="height: 80px">Takes come here (a later piece of work)</div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >3 — Your words, saved as you leave the field. Emptying the field, or typing the game's
+        words back, is the same as “use the game's”.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 10px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Prompt</h2>
+            <span class="small" style="color: var(--ok)">Saved</span>
+          </div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="chg"
+              >changed here · <a href="#" style="color: var(--warn)">use the game's</a></span
+            >
+          </div>
+          <textarea rows="3">
+the Silver Stag Inn's taproom, a long oak bar on the left, a roaring hearth on the right, barrels stacked under a window, a sleeping dog</textarea>
+          <div class="small faint">
+            The game's words: inside the Silver Stag Inn, a long oak bar, a fire in the hearth,
+            barrels along the wall
+          </div>
+          <details>
+            <summary class="small">The whole prompt the model gets</summary>
+            <div class="ro small" style="margin-top: 6px">
+              the Silver Stag Inn's taproom, a long oak bar on the left, a roaring hearth on the
+              right, barrels stacked under a window, a sleeping dog. early autumn, low warm evening
+              light. 16-colour EGA pixel art, hard pixel edges, no anti-aliasing, flat side view,
+              like a 1990 point-and-click adventure.<br /><span class="faint"
+                >Kept out: text, lettering, watermark, blur, photo, 3D render, gradients</span
+              >
+            </div>
+          </details>
+        </section>
+        <section class="panel">
+          <h2>Takes</h2>
+          <div class="ph" style="height: 80px">Takes come here (a later piece of work)</div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >4 — Out of date: the page says what changed (the words, the size, the style, or several:
+        “the words and the size”).</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Old mill</h1>
+          <span class="mono faint">old-mill</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <div class="notice">
+          <strong>Out of date since it was chosen: the size.</strong>
+          <span class="muted">The game shows the chosen image until you choose another.</span>
+        </div>
+        <section class="panel col" style="gap: 10px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <textarea rows="3">
+a wooden water mill by a stream at the edge of the village, the wheel turning</textarea>
+          <details>
+            <summary class="small">The whole prompt the model gets</summary>
+            <div class="ro small" style="margin-top: 6px">
+              a wooden water mill by a stream at the edge of the village, the wheel turning. early
+              autumn, low warm evening light. 16-colour EGA pixel art, hard pixel edges, no
+              anti-aliasing, flat side view, like a 1990 point-and-click adventure.<br /><span
+                class="faint"
+                >Kept out: text, lettering, watermark, blur, photo, 3D render, gradients</span
+              >
+            </div>
+          </details>
+        </section>
+        <section class="panel">
+          <h2>Takes</h2>
+          <div class="ph" style="height: 80px">Takes come here (a later piece of work)</div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>5 — An act whose list is there and empty.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni on" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Images</span>
+            <h1>Act IV</h1>
+            <span class="muted">The images the game asks for in Act IV.</span>
+          </div>
+          <button class="btn">Refresh from the game</button>
+        </div>
+        <section class="panel">
+          <div class="muted" style="padding: 18px 0; text-align: center">
+            The game asks for no images in Act IV.
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>6 — An act the game has not listed images for yet.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni on" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Images</span>
+            <h1>Act IV</h1>
+            <span class="muted">The images the game asks for in Act IV.</span>
+          </div>
+          <button class="btn">Refresh from the game</button>
+        </div>
+        <section class="panel">
+          <div class="muted" style="padding: 18px 0; text-align: center">
+            The game has not listed the images for Act IV yet. Refresh from the game.
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>7 — No images section in the project file.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images</span>
+          <h1>Images</h1>
+        </div>
+        <section class="panel col" style="gap: 6px; align-items: flex-start">
+          <b>This project has no images yet</b
+          ><span class="muted"
+            >Add an images section to <span class="mono">audio-studio.json</span> to say where the
+            game lists its images and its style, then reload.</span
+          ><button class="btn s">How to set it up</button>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>8 — No style file yet (option A of question 1).</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni on" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Images</span>
+            <h1>Style</h1>
+          </div>
+        </div>
+        <section class="panel col" style="gap: 6px">
+          <b>The game has no style file yet</b
+          ><span class="muted"
+            >Until it has one, each image's prompt is only its own words. Images made before the
+            style arrives go out of date when it does.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >9 — A narrow window: the list becomes one card per image; the image page stacks as it
+        is.</b
+      >
+    </p>
+    <div
+      style="
+        max-width: 380px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 16px;
+      "
+      class="col"
+    >
+      <span class="crumbs">Images</span>
+      <h1 style="font-size: 19px">Act I</h1>
+      <span class="muted small">1 of 4 chosen.</span
+      ><button class="btn" style="align-self: flex-start">Refresh from the game</button>
+      <div class="small muted">
+        Every prompt ends with the game's style, and for Act I:
+        <i>early autumn, low warm evening light</i>.
+        <a href="#" style="color: var(--accent-soft-ink)">Style ›</a>
+      </div>
+      <div class="panel col" style="gap: 4px; padding: 10px 12px">
+        <div class="row">
+          <b class="grow">Willowbrook square</b><span class="chip c-mi">none yet</span>
+        </div>
+        <span class="dims">320 × 200</span>
+        <div class="brief small">
+          the village square of Willowbrook at dusk, a stone well in the middle, timber houses with
+          lit windows, a cart by the inn
+        </div>
+      </div>
+      <div class="panel col" style="gap: 4px; padding: 10px 12px">
+        <div class="row">
+          <b class="grow">Silver Stag Inn</b><span class="chip c-ok">chosen</span>
+        </div>
+        <span class="dims">320 × 200</span>
+        <div class="brief small">
+          the Silver Stag Inn's taproom, a long oak bar on the left, a roaring hearth on the right,
+          barrels stacked under a window, a sleeping dog
+        </div>
+        <div class="chg">changed here</div>
+      </div>
+      <div class="panel col" style="gap: 4px; padding: 10px 12px">
+        <div class="row">
+          <b class="grow">Old mill</b><span class="chip c-st">out of date</span>
+        </div>
+        <span class="dims">320 × 200</span>
+        <div class="brief small">
+          a wooden water mill by a stream at the edge of the village, the wheel turning
+        </div>
+      </div>
+    </div>
+    <p class="note"><b>10 — The Style page.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni on" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Images</span>
+            <h1>Style</h1>
+            <span class="muted"
+              >Added to every image's prompt. From the game's style file; your changes stay in the
+              studio.</span
+            >
+          </div>
+        </div>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <label class="small muted grow">The look</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <textarea rows="2">
+16-colour EGA pixel art, hard pixel edges, no anti-aliasing, flat side view, like a 1990 point-and-click adventure</textarea>
+          <div class="row">
+            <label class="small muted grow">Kept out of every image</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <textarea rows="1">
+text, lettering, watermark, blur, photo, 3D render, gradients</textarea>
+          <div>
+            <label class="small muted">Palette</label>
+            <div style="margin-top: 6px">
+              <span class="sw" style="background: #000000"></span
+              ><span class="sw" style="background: #0000aa"></span
+              ><span class="sw" style="background: #00aa00"></span
+              ><span class="sw" style="background: #00aaaa"></span
+              ><span class="sw" style="background: #aa0000"></span
+              ><span class="sw" style="background: #aa00aa"></span
+              ><span class="sw" style="background: #aa5500"></span
+              ><span class="sw" style="background: #aaaaaa"></span
+              ><span class="sw" style="background: #555555"></span
+              ><span class="sw" style="background: #5555ff"></span
+              ><span class="sw" style="background: #55ff55"></span
+              ><span class="sw" style="background: #55ffff"></span
+              ><span class="sw" style="background: #ff5555"></span
+              ><span class="sw" style="background: #ff55ff"></span
+              ><span class="sw" style="background: #ffff55"></span
+              ><span class="sw" style="background: #ffffff"></span>
+              <span class="small faint">16 colours · set by the game</span>
+            </div>
+          </div>
+        </section>
+        <section class="panel col" style="gap: 8px">
+          <h2 style="margin: 0">Added per act</h2>
+          <table>
+            <tr>
+              <th>Act</th>
+              <th>Added to its images</th>
+            </tr>
+            <tr>
+              <td>Act I</td>
+              <td>early autumn, low warm evening light</td>
+            </tr>
+            <tr>
+              <td>Act II</td>
+              <td>deep forest, cold blue morning mist</td>
+            </tr>
+            <tr>
+              <td>Act III</td>
+              <td class="faint">nothing</td>
+            </tr>
+            <tr>
+              <td>Act IV</td>
+              <td class="faint">nothing</td>
+            </tr>
+          </table>
+          <span class="small faint">Set by the game.</span>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >11 — The game changed an image's description since you wrote your own words: compare and
+        choose. Your words stay in use until you choose; the image is not out of date because of
+        it.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <div class="notice col" style="gap: 10px">
+          <strong>The game changed this image's description since you wrote your own.</strong>
+          <div class="cmp">
+            <div>
+              <div class="small muted">Your words (used now)</div>
+              <div class="ro small">
+                the Silver Stag Inn's taproom, a long oak bar on the left, a roaring hearth on the
+                right, barrels stacked under a window, a sleeping dog
+              </div>
+            </div>
+            <div>
+              <div class="small muted">The game's new words</div>
+              <div class="ro small">
+                inside the Silver Stag Inn by night, a long oak bar, a fire in the hearth, barrels
+                along the wall, a bard on a stool
+              </div>
+              <div class="small faint" style="margin-top: 4px">
+                Before: inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels
+                along the wall
+              </div>
+            </div>
+          </div>
+          <div class="row" style="justify-content: flex-end">
+            <button class="btn">Use the game's</button><button class="btn p">Keep mine</button>
+          </div>
+        </div>
+        <section class="panel col" style="gap: 10px">
+          <h2 style="margin: 0">Prompt</h2>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="chg"
+              >changed here · <a href="#" style="color: var(--warn)">use the game's</a></span
+            >
+          </div>
+          <textarea rows="3">
+the Silver Stag Inn's taproom, a long oak bar on the left, a roaring hearth on the right, barrels stacked under a window, a sleeping dog</textarea>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>12 — The act's row until you choose.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Images</span>
+            <h1>Act I</h1>
+            <span class="muted">The images the game asks for in Act I. 1 of 4 chosen.</span>
+          </div>
+          <button class="btn">Refresh from the game</button>
+        </div>
+        <section class="panel">
+          <table>
+            <tr>
+              <th>Image</th>
+              <th>Prompt</th>
+              <th>Size</th>
+              <th>Status</th>
+            </tr>
+            <tr>
+              <td>
+                <b>Willowbrook square</b>
+                <div class="mono faint">willowbrook-square</div>
+              </td>
+              <td>
+                <div class="brief">
+                  the village square of Willowbrook at dusk, a stone well in the middle, timber
+                  houses with lit windows, a cart by the inn
+                </div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-mi">none yet</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Silver Stag Inn</b>
+                <div class="mono faint">silver-stag-inn</div>
+              </td>
+              <td>
+                <div class="brief">
+                  the Silver Stag Inn's taproom, a long oak bar on the left, a roaring hearth on the
+                  right, barrels stacked under a window, a sleeping dog
+                </div>
+                <div class="chg">changed here · the game's words changed too</div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-ok">chosen</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Old mill</b>
+                <div class="mono faint">old-mill</div>
+              </td>
+              <td>
+                <div class="brief">
+                  a wooden water mill by a stream at the edge of the village, the wheel turning
+                </div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-st">out of date</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Elder Thom</b>
+                <div class="mono faint">elder-thom-portrait</div>
+              </td>
+              <td>
+                <div class="brief">portrait of Elder Thom, white beard, green hood, kind eyes</div>
+              </td>
+              <td class="dims">96 × 96</td>
+              <td><span class="chip c-mi">none yet</span></td>
+            </tr>
+          </table>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >13 — The game's style changed: one notice on every Images page (each act and Style) until
+        Seen.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Act IV<span class="muted"></span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="row">
+          <div class="grow">
+            <span class="crumbs">Images</span>
+            <h1>Act I</h1>
+            <span class="muted">The images the game asks for in Act I. 1 of 4 chosen.</span>
+          </div>
+          <button class="btn">Refresh from the game</button>
+        </div>
+        <div class="notice row">
+          <div class="grow">
+            <strong>The game's style changed.</strong>
+            <span class="muted"
+              >3 chosen images across all acts were made with the old style and are out of date. The
+              game shows them until you choose new ones.</span
+            >
+            <div class="small faint" style="margin-top: 4px">Changed: the look.</div>
+          </div>
+          <button class="btn s">Seen</button>
+        </div>
+        <section class="panel">
+          <table>
+            <tr>
+              <th>Image</th>
+              <th>Prompt</th>
+              <th>Size</th>
+              <th>Status</th>
+            </tr>
+            <tr>
+              <td>
+                <b>Willowbrook square</b>
+                <div class="mono faint">willowbrook-square</div>
+              </td>
+              <td>
+                <div class="brief">
+                  the village square of Willowbrook at dusk, a stone well in the middle, timber
+                  houses with lit windows, a cart by the inn
+                </div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-mi">none yet</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Silver Stag Inn</b>
+                <div class="mono faint">silver-stag-inn</div>
+              </td>
+              <td>
+                <div class="brief">
+                  the Silver Stag Inn's taproom, a long oak bar on the left, a roaring hearth on the
+                  right, barrels stacked under a window, a sleeping dog
+                </div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-st">out of date</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Old mill</b>
+                <div class="mono faint">old-mill</div>
+              </td>
+              <td>
+                <div class="brief">
+                  a wooden water mill by a stream at the edge of the village, the wheel turning
+                </div>
+              </td>
+              <td class="dims">320 × 200</td>
+              <td><span class="chip c-st">out of date</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Elder Thom</b>
+                <div class="mono faint">elder-thom-portrait</div>
+              </td>
+              <td>
+                <div class="brief">portrait of Elder Thom, white beard, green hood, kind eyes</div>
+              </td>
+              <td class="dims">96 × 96</td>
+              <td><span class="chip c-mi">none yet</span></td>
+            </tr>
+          </table>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
