@@ -301,6 +301,10 @@ const ImagesSchema = z.object({
     prompts: imagesPath,
     /** Where the chosen take of each image is recorded (written by take-making). */
     lock: imagesPath,
+    /** The folder the game's chosen images are written to, one `<id>.png` each. */
+    clips: imagesPath,
+    /** What the game reads: `{ image: { file, width, height } }`, in the clips folder. */
+    manifest: imagesPath,
   }),
 })
 

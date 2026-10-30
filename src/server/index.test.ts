@@ -5037,6 +5037,8 @@ describe('the images routes', () => {
           style: 'images/style.json',
           prompts: 'images/prompts.json',
           lock: 'images/images.lock.json',
+          clips: 'web/public/images/generated',
+          manifest: 'web/public/images/generated/manifest.json',
         },
       },
     }),

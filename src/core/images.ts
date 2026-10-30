@@ -1,6 +1,17 @@
 import { z } from 'zod'
 import type { Problem } from './project'
 
+/** The path of the picture the game shows for an image now: inside the project root, and a picture. */
+const GameFile = z
+  .string()
+  .min(1)
+  .refine((file) => !/^([/\\]|[a-z]:)/i.test(file) && !file.split(/[/\\]/).includes('..'), {
+    error: 'use a path inside the project (no leading / and no ..)',
+  })
+  .refine((file) => /\.(png|jpe?g|gif|webp)$/i.test(file), {
+    error: 'use a picture (.png, .jpg, .gif or .webp)',
+  })
+
 /** An image as the game lists it. The id names the image everywhere, so it is a slug. */
 export const ImageSchema = z.object({
   id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lower-case letters, digits and - only'),
@@ -8,6 +19,8 @@ export const ImageSchema = z.object({
   description: z.string().min(1),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
+  /** The picture the game shows for it now, when it is not one the studio made. Read only. */
+  file: GameFile.optional(),
 })
 
 /** An act's images, in the game's order (a list that is there and empty means the game asks for none). */
@@ -38,9 +51,19 @@ const MadeFromSchema = z.object({
   height: z.number(),
 })
 
-/** The lock: the chosen take of each image. Take-making writes more here; only this is read. */
+/** What the lock keeps of the chosen take: what it was made from, and which take it is. */
+export const ChosenEntrySchema = MadeFromSchema.extend({
+  /** The number of the take on the image's board. */
+  take: z.number().int().positive().optional(),
+  seed: z.number().optional(),
+  model: z.string().optional(),
+  /** When it was chosen (ISO time). */
+  at: z.string().optional(),
+})
+
+/** The lock: the chosen take of each image. Other keys are ignored here, and kept when it is written. */
 export const ChosenSchema = z.object({
-  images: z.record(z.string(), z.object({ chosen: MadeFromSchema.optional() })).default({}),
+  images: z.record(z.string(), z.object({ chosen: ChosenEntrySchema.optional() })).default({}),
 })
 
 /** An image of a game-written list. */
@@ -51,6 +74,8 @@ export type GameStyle = z.infer<typeof StyleSchema>
 export type Prompts = z.infer<typeof PromptsSchema>
 /** What a take was made from, or what a new one would be made from. */
 export type MadeFrom = z.infer<typeof MadeFromSchema>
+/** An image's chosen take in the lock. */
+export type ChosenEntry = z.infer<typeof ChosenEntrySchema>
 /** A style field the user may write over. */
 export type StyleField = 'look' | 'keepOut'
 
@@ -198,6 +223,10 @@ export interface ImageRow {
   gameWas: string | null
   /** The whole prompt. */
   prompt: string
+  /** The number of the chosen take on the image's board; null when none is chosen. */
+  chosenTake: number | null
+  /** The picture the game itself shows for it, and whether it is on disk; null when it names none. */
+  gameFile: { file: string; exists: boolean } | null
   /** What a new take would be made from. */
   madeFrom: MadeFrom
   status: ImageStatus
@@ -255,8 +284,10 @@ export interface ImagesInput {
   styleInvalid?: boolean
   style: GameStyle | null
   prompts: Prompts
-  /** What each image's chosen take was made from. */
-  chosen: Record<string, MadeFrom>
+  /** What each image's chosen take was made from, and which take it is. */
+  chosen: Record<string, ChosenEntry>
+  /** Whether the file each image names as the game's own is there, by image id. */
+  gameFiles?: Record<string, boolean>
   /** The game's style when the user last saw it; null before the first sight. */
   seen: GameStyle | null
 }
@@ -322,6 +353,10 @@ export function summarizeImages(input: ImagesInput): {
         gameChanged: Boolean(own) && own!.gameWas !== image.description,
         gameWas: own?.gameWas ?? null,
         prompt: assemblePrompt(words, eff),
+        chosenTake: made?.take ?? null,
+        gameFile: image.file
+          ? { file: image.file, exists: input.gameFiles?.[image.id] ?? false }
+          : null,
         madeFrom,
         status: !made ? 'none yet' : reasons.length ? 'out of date' : 'chosen',
         reasons,

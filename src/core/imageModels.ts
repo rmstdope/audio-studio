@@ -13,12 +13,14 @@ export interface ImageModel {
   name: string
   /** The `--model` value of `mflux-generate`. */
   mflux: string
+  /** About how long one take takes, in seconds (a guess from the spike's timings and the model's load). */
+  seconds: number
 }
 
 /** The image models, by id. */
 export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
-  klein: { id: 'klein', name: 'FLUX.2 klein 4B', mflux: 'flux2-klein-4b' },
-  'z-image-turbo': { id: 'z-image-turbo', name: 'Z-Image-Turbo', mflux: 'z-image-turbo' },
+  klein: { id: 'klein', name: 'FLUX.2 klein 4B', mflux: 'flux2-klein-4b', seconds: 30 },
+  'z-image-turbo': { id: 'z-image-turbo', name: 'Z-Image-Turbo', mflux: 'z-image-turbo', seconds: 60 },
 }
 
 /** The image model with this id. */

@@ -1,0 +1,136 @@
+import { z } from 'zod'
+import type { MadeFrom } from './images'
+import { MAX_IMAGE_SIDE } from './imageModels'
+
+/** The longer side of a take as the model makes it, in pixels. */
+const TAKE_LONG_SIDE = 1024
+
+/**
+ * The size a take is made at: the image's shape with the longer side 1024, each side a multiple of
+ * 16 (the models' rule) and at least 16. The game's listed sizes are not multiples of 16; bringing
+ * a take to the listed size is as-yag.5's.
+ */
+export function takeSize(image: { width: number; height: number }): {
+  width: number
+  height: number
+} {
+  const scale = TAKE_LONG_SIDE / Math.max(image.width, image.height)
+  const side = (pixels: number) =>
+    Math.min(MAX_IMAGE_SIDE, Math.max(16, Math.round((pixels * scale) / 16) * 16))
+  return { width: side(image.width), height: side(image.height) }
+}
+
+/** A take on an image's board: made, its picture a PNG beside the board. */
+export const BoardTakeSchema = z.object({
+  /** Per image, never reused. */
+  n: z.number().int().positive(),
+  seed: z.number().int().nonnegative(),
+  /** The `--model` name of the model that made it. */
+  model: z.string(),
+  /** The size of the picture the model made. */
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  /** What it was made from: the words, the style and the size asked for. */
+  madeFrom: z.object({
+    words: z.string(),
+    style: z.string(),
+    width: z.number(),
+    height: z.number(),
+  }),
+  /** It has been shown on the right once; a take that has not shows "new". */
+  seen: z.boolean().default(false),
+})
+
+/** An image's board, `.audio-studio/images/<id>.json`: the takes made, and the next number. */
+export const ImageBoardSchema = z.object({
+  next: z.number().int().positive().default(1),
+  takes: z.array(BoardTakeSchema).default([]),
+})
+
+/** A take on a board. */
+export type ImageBoardTake = z.infer<typeof BoardTakeSchema>
+/** An image's board. */
+export type ImageBoard = z.infer<typeof ImageBoardSchema>
+
+/** Whether a take was made from other words than the image has now. */
+export function takeIsEarlier(made: MadeFrom, wordsNow: string): boolean {
+  return made.words !== wordsNow
+}
+
+/** The body of asking for takes: this many new ones (1 to 4), or the failed take with this number again. */
+export const MakeImageTakesBody = z.union([
+  z.object({ count: z.number().int().min(1).max(4) }).strict(),
+  z.object({ retry: z.number().int().positive() }).strict(),
+])
+
+/** The body of choosing a take. */
+export const ChooseImageTakeBody = z.object({ n: z.number().int().positive() }).strict()
+
+/** A take as the page shows it. */
+export interface ImageTakeView {
+  n: number
+  width: number
+  height: number
+  /** Made from words that have since changed. */
+  earlier: boolean
+  /** The game uses it. */
+  chosen: boolean
+  /** Not yet shown on the right. */
+  isNew: boolean
+}
+
+/** A take waiting or being made. */
+export interface ImageMakingView {
+  n: number
+  state: 'waiting' | 'making'
+  /** Seconds since it started; 0 while it waits. */
+  elapsed: number
+  /** Seconds a take of this model is expected to take (a guess). */
+  expected: number
+}
+
+/** A take that failed, kept until it is made again. */
+export interface ImageFailedView {
+  n: number
+  message: string
+}
+
+/** Whether takes can be made on this computer, and what is missing if not. */
+export type ImageGeneratorView = { ok: true } | { ok: false; message: string; fix: string }
+
+/** An image's takes as its page shows them. */
+export interface ImageTakesView {
+  ok: true
+  generator: ImageGeneratorView
+  takes: ImageTakeView[]
+  making: ImageMakingView[]
+  failed: ImageFailedView[]
+  /** The lock cannot be read, so which take is chosen is not known. */
+  lockUnread: boolean
+}
+
+/** What is being made for an image, for the act's list. */
+export interface ImageMakingSummary {
+  takes: number
+  /** Seconds left, all together (a guess). */
+  left: number
+}
+
+/**
+ * The take one step along the strip from `current` (-1 earlier, 1 later), stopping at its ends.
+ * With none on the right the newest comes first. Null when the strip is empty.
+ */
+export function stepRight(strip: number[], current: number | null, delta: -1 | 1): number | null {
+  if (!strip.length) return null
+  const at = current === null ? -1 : strip.indexOf(current)
+  if (at === -1) return strip[strip.length - 1]!
+  return strip[Math.min(strip.length - 1, Math.max(0, at + delta))]!
+}
+
+/** The take that comes right after `n` is dropped: the next in the strip, else the previous, else none. */
+export function rightAfterDrop(strip: number[], n: number): number | null {
+  const at = strip.indexOf(n)
+  const rest = strip.filter((m) => m !== n)
+  if (!rest.length) return null
+  return rest[Math.min(Math.max(at, 0), rest.length - 1)]!
+}

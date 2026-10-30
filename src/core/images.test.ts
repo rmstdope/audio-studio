@@ -39,6 +39,13 @@ describe('the game files', () => {
     expect(ImageListSchema.safeParse([{ ...inn, id: 'Silver Stag' }]).success).toBe(false)
     expect(ImageListSchema.safeParse([{ ...inn, width: 0 }]).success).toBe(false)
   })
+  it('takes the game’s own image file, inside the project and a picture', () => {
+    const file = (f: string) => ImageListSchema.safeParse([{ ...inn, file: f }]).success
+    expect(file('web/public/images/inn.png')).toBe(true)
+    expect(file('../inn.png')).toBe(false)
+    expect(file('/inn.png')).toBe(false)
+    expect(file('web/inn.mp3')).toBe(false)
+  })
   it('accepts a style and refuses a palette that is not hex colours', () => {
     expect(StyleSchema.safeParse(style).success).toBe(true)
     expect(StyleSchema.safeParse({ ...style, palette: ['red'] }).success).toBe(false)
@@ -178,6 +185,26 @@ describe('summarizeImages', () => {
     expect(row.prompt).toContain('Kept out: text, modern things')
     expect(images.acts[0]!.addition).toBe('warm lantern light')
     expect(images.acts[0]!.chosen).toBe(0)
+  })
+  it('says which take is chosen, and the game’s own image file and whether it is there', () => {
+    const withFile = { ...inn, file: 'web/inn.png' }
+    const lists = input().lists.map((l) => ({
+      ...l,
+      state: { status: 'ok' as const, images: [withFile] },
+    }))
+    const first = summarizeImages(input({ lists })).images.acts[0]!.rows[0]!
+    expect(first.chosenTake).toBeNull()
+    expect(first.gameFile).toEqual({ file: 'web/inn.png', exists: false })
+    const row = summarizeImages(
+      input({
+        lists,
+        gameFiles: { [inn.id]: true },
+        chosen: { [inn.id]: { ...first.madeFrom, take: 3 } },
+      }),
+    ).images.acts[0]!.rows[0]!
+    expect(row.chosenTake).toBe(3)
+    expect(row.gameFile).toEqual({ file: 'web/inn.png', exists: true })
+    expect(summarizeImages(input()).images.acts[0]!.rows[0]!.gameFile).toBeNull()
   })
   it('marks changed words, and the game’s words changed under them', () => {
     const prompts: Prompts = {
