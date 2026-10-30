@@ -1,0 +1,25 @@
+{
+  "look": "Flat 16-colour pixel art, hard edges, no dithering, a limited warm palette.",
+  "keepOut": "text, letters, modern objects, gradients, photographic detail",
+  "palette": [
+    "#0d0d1a",
+    "#1f1f3d",
+    "#3b2f4f",
+    "#6b3f5e",
+    "#a1485c",
+    "#d4684a",
+    "#e8a33d",
+    "#f2d16b",
+    "#f7efc7",
+    "#2c5e4a",
+    "#4f8f5b",
+    "#9bc46a",
+    "#2b4f7a",
+    "#4c86b8",
+    "#8fc3d9",
+    "#d8e9ef"
+  ],
+  "acts": {
+    "act1": "warm lantern light, evening"
+  }
+}

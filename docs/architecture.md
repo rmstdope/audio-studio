@@ -1336,6 +1336,65 @@ adds its new modules to the layout in §4.
 
 ---
 
+### 8.7 Images
+
+The images workspace shows the game's **images**: what each is called, its size and the words it is
+made from, beside the game's **style**. As with music, the game says which it needs; the studio
+never writes the game's lists. This section is the reading, the studio's own words and staleness
+(as-yag.3); making and choosing takes come with as-yag.2 and as-yag.4. The screens are drawn in
+`docs/ui/as-yag.3-images.html`.
+
+**Project file.** An optional `images` section beside `narration` and `music`, its acts the
+narration's parts. No `{language}` in any path: images are the same in every language. Refresh from
+the game on an act's page runs `narration.refreshDialog`, as on Music's act pages.
+
+```json
+"images": {
+  "paths": {
+    "list": "tts/{part}/images.json",
+    "style": "images/style.json",
+    "prompts": "images/prompts.json",
+    "lock": "images/images.lock.json"
+  }
+}
+```
+
+**The game's files** (read only, `core/images.ts`). `list` holds an act's images in the game's order:
+`{ id, title, description, width, height }`, the id a slug and unique across the game (a repeated
+id is a problem with both files, and neither image is shown). `style` holds `{ look, keepOut,
+palette, acts }`: `palette` is `#rrggbb` colours and `acts` an optional addition per part id (an
+id the project does not have is a problem). A list that is not there yet is not a problem (the game
+has not written it); a missing style file means each prompt is only its words.
+
+**The prompt.** The image's words (the user's own, else the game's description), then the act's
+addition, the look, and `Kept out: …`, on separate lines; an empty part is left out.
+
+**The studio's own words** are `paths.prompts`, committed like `briefs.json` and joining the Changes
+panel: `{ images: { <id>: { words, gameWas } }, style: { look?, keepOut? } }`. `gameWas` is the game's
+text when the words were written; a game description that differs from it raises the compare notice
+(**Keep mine** moves `gameWas`, **Use the game's** removes the words). Emptied words, or the game's
+own typed back, remove the entry. The palette and the acts' additions are never changed here.
+
+**Staleness.** A chosen take records what it was made from, `{ words, style, width, height }`
+(`style` is the look, what is kept out, the palette and the act's addition as one string), in
+`paths.lock` (`{ images: { <id>: { chosen } } }`; written by take-making, only read here; other keys
+are ignored). An image is out of date when what a new take would be made from differs: the words
+(the user's included), the size or the style. The game changing a description under the user's own
+words changes nothing the prompt uses, so it does not make an image out of date.
+
+**The style notice.** The studio keeps the game's style as the user last saw it in
+`.audio-studio/images-style-seen.json`, written the first time a style is read and moved only by
+**Seen**. When the game's style differs from it and at least one chosen image was made with the old
+style, every Images page shows one notice naming what changed. The user's own change to the style
+shows no notice; the images made with the old style are marked out of date.
+
+**API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
+(`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
+`PATCH /api/image-style` (`{ look }` or `{ keepOut }`) and `POST /api/image-style/seen`; all from the
+studio's own page only.
+
+---
+
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's status),
@@ -1791,8 +1850,8 @@ Small, independently useful increments:
     1. **Spike** (done: §13, decision 8): FLUX.2 klein 4B and Z-Image-Turbo through mflux, their
        time, memory and licence on the M5 Pro, and whether one style text and the game's colours
        keep about ten RetroQuest rooms one set.
-    2. **The game's image list and style** (as-yag.3), read-only, with the studio's own prompt
-       overrides.
+    2. **The game's image list and style** (as-yag.3, done: §8.7), read-only, with the studio's own
+       prompt overrides.
     3. **An image take** (as-yag.2, built: a service, no screen yet) with either model, on the GPU queue with music and Whisper.
     4. **Takes and choosing** (as-yag.4): an image's takes compared with the chosen one.
     5. **The game's look** (as-yag.5): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.

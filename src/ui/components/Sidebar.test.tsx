@@ -45,6 +45,12 @@ const summary = {
       { id: 'stingers', kind: 'stingers', title: 'Stingers', state: 'ok', tracks: [1] },
     ],
   },
+  images: {
+    acts: [
+      { id: 'act1', title: 'Act I: The Lantern', state: 'ok', rows: [1, 2, 3, 4] },
+      { id: 'act2', title: 'Act II: The Road', state: 'missing', rows: [] },
+    ],
+  },
 } as unknown as ProjectSummary
 
 /** The sidebar's links as `[text, href, current]`, in reading order. */
@@ -110,6 +116,21 @@ describe('the sidebar on a Narration page', () => {
 })
 
 describe('the sidebar elsewhere', () => {
+  it('lists Images, its acts and Style only while an Images page is open', () => {
+    const open = render({ view: 'images', page: 'style' }).links.map((l) => l.text)
+    expect(open).toContain('Images')
+    expect(open.slice(open.indexOf('Images'), open.indexOf('Images') + 4)).toEqual([
+      'Images',
+      'Act I 4',
+      'Act II',
+      'Style',
+    ])
+    const links = render({ view: 'images', page: 'image', image: 'x' }).links
+    expect(links.filter((l) => l.current).map((l) => l.text)).toEqual([])
+    const closed = render({ view: 'setup' }).links.map((l) => l.text)
+    expect(closed).not.toContain('Style')
+  })
+
   it('lists Music, its acts and Stingers on a Music page, and folds Narration', () => {
     const { links } = render({ view: 'music', page: 'stingers' })
     const texts = links.map((l) => l.text)

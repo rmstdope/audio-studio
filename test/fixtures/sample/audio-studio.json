@@ -42,5 +42,13 @@
       "clips": "audio/music",
       "manifest": "audio/music/manifest.json"
     }
+  },
+  "images": {
+    "paths": {
+      "list": "tts/{part}/images.json",
+      "style": "images/style.json",
+      "prompts": "images/prompts.json",
+      "lock": "images/images.lock.json"
+    }
   }
 }
