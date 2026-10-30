@@ -413,6 +413,8 @@ describe('the game’s style changed', () => {
   })
 
   it('keeps focus on the heading when Seen takes the notice away with it', async () => {
+    // Earlier tests leave their pages (and focus) behind: start from this page alone.
+    document.body.replaceChildren()
     const container = document.createElement('div')
     document.body.append(container)
     const root = createRoot(container)
@@ -441,10 +443,11 @@ describe('the game’s style changed', () => {
       show(summary())
       return Response.json({ ok: true })
     }) as unknown as typeof fetch
+    expect(document.activeElement).toBe(document.body)
     await act(async () => button(container, 'Seen').click())
     await flush()
     expect(container.querySelector('.notice')).toBeNull()
-    expect(document.activeElement?.tagName).toBe('H1')
+    expect(document.activeElement).toBe(container.querySelector('h1'))
   })
 
   it('is not shown when nothing changed', () => {

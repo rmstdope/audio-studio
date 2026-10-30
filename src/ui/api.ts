@@ -728,6 +728,8 @@ export function useSetTrackBrief(trackId: string) {
 /**
  * Sends one change to the studio's own image words (`PATCH`/`POST` with a JSON body), then reloads
  * the project, whose Images pages show the result. A 404 means the game no longer lists the image.
+ * `afterSaved` runs once the reload is done and only when the request did not fail; it is given
+ * here, not to `mutate`, whose callbacks are dropped when the page that asked has gone.
  */
 function useImageEdit<V>(
   scope: string,
@@ -757,7 +759,6 @@ function useImageEdit<V>(
         client.invalidateQueries({ queryKey: ['project'] }),
         client.invalidateQueries({ queryKey: ['changes'] }),
       ])
-      // Run here, not in a `mutate` callback: those are dropped when the page that asked has gone.
       if (!error) afterSaved?.()
     },
   })
@@ -790,13 +791,12 @@ export function useSetStyleField(field: StyleField) {
   }))
 }
 
-/** Puts the style-changed notice away. */
-export function useStyleSeen() {
+/** Puts the style-changed notice away, then runs `afterSeen` (the notice is gone by then). */
+export function useStyleSeen(afterSeen: () => void) {
   return useImageEdit<void>(
     'image-style-seen',
     () => ({ method: 'POST', path: '/api/image-style/seen', body: {} }),
-    // The notice goes away with the reload; focus must not be lost with it.
-    () => document.querySelector<HTMLElement>('h1')?.focus(),
+    afterSeen,
   )
 }
 

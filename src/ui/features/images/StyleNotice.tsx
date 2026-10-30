@@ -8,7 +8,8 @@ import { joined, styleNoticeText } from '../../imagesText'
  * images it left out of date, what changed, and Seen, which puts it away on every page.
  */
 export function StyleNotice({ notice }: { notice: NonNullable<ImagesSummary['styleNotice']> }) {
-  const seen = useStyleSeen()
+  // The notice goes away with the reload; focus must not be lost with it.
+  const seen = useStyleSeen(() => document.querySelector<HTMLElement>('h1')?.focus())
   return (
     <section className="notice notice-warn" aria-label="The game's style changed">
       <div className="notice-text">
