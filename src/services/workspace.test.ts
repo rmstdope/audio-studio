@@ -4,10 +4,11 @@ import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { clipInputs, fingerprint } from '../core/fingerprint'
 import { ProjectSchema } from '../core/project'
+import { noProjectMessage, renameNotice } from '../core/renames'
 import {
   adoptPart,
   clipFile,
-  findProjectFile,
+  locateProject,
   loadPart,
   loadProject,
   projectFileProblem,
@@ -19,28 +20,89 @@ const script = [
   { key: 'b', speaker: 'mira', text: 'Welcome.' },
 ]
 
-describe('findProjectFile', () => {
+describe('locateProject', () => {
   it('finds the project file in a parent directory', () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
+    const root = tempRepo({ 'content-studio.json': projectJson() })
     const deep = join(root, 'web', 'src')
     mkdirSync(deep, { recursive: true })
-    expect(findProjectFile(deep)).toBe(join(root, 'audio-studio.json'))
+    expect(locateProject(deep)).toEqual({ ok: true, file: join(root, 'content-studio.json') })
   })
 
-  it('returns null when no directory up to the filesystem root has one', () => {
+  it('says no project when no directory up to the filesystem root has one', () => {
     const root = tempRepo({ 'README.md': 'no project here' })
-    expect(findProjectFile(root)).toBeNull()
+    expect(locateProject(root)).toEqual({ ok: false, message: noProjectMessage(root) })
+  })
+
+  it('opens when everything is renamed', () => {
+    const root = tempRepo({ 'content-studio.json': projectJson(), '.content-studio/x.json': {} })
+    expect(locateProject(root)).toEqual({ ok: true, file: join(root, 'content-studio.json') })
+  })
+
+  it('stops with every rename left when the file and the folder are old', () => {
+    const root = tempRepo({ 'audio-studio.json': projectJson(), '.audio-studio/x.json': {} })
+    expect(locateProject(root)).toEqual({
+      ok: false,
+      message: renameNotice({ oldFile: true, newFile: false, oldFolder: true })!,
+    })
+  })
+
+  it('stops with the file rename alone when only the file is old, from a folder below', () => {
+    const root = tempRepo({ 'audio-studio.json': projectJson() })
+    const deep = join(root, 'web')
+    mkdirSync(deep, { recursive: true })
+    expect(locateProject(deep)).toEqual({
+      ok: false,
+      message: renameNotice({ oldFile: true, newFile: false, oldFolder: false })!,
+    })
+  })
+
+  it('stops with the folder rename alone when only the folder is old', () => {
+    const root = tempRepo({ 'content-studio.json': projectJson(), '.audio-studio/x.json': {} })
+    expect(locateProject(root)).toEqual({
+      ok: false,
+      message: renameNotice({ oldFile: false, newFile: true, oldFolder: true })!,
+    })
+  })
+
+  it('stops with the both-files message when both project files exist', () => {
+    const root = tempRepo({
+      'audio-studio.json': projectJson(),
+      'content-studio.json': projectJson(),
+    })
+    const found = locateProject(root)
+    expect(found.ok).toBe(false)
+    expect(found.ok ? '' : found.message).toContain('This game has both')
+  })
+
+  it('does not count a leftover .audio-studio that is a file, or a folder named like a project file', () => {
+    const root = tempRepo({
+      'content-studio.json': projectJson(),
+      '.audio-studio': 'x',
+      'audio-studio.json/x': 'x',
+    })
+    expect(locateProject(root)).toEqual({ ok: true, file: join(root, 'content-studio.json') })
+  })
+
+  it('uses the named file, and still checks the old folder in its folder', () => {
+    const root = tempRepo({ 'game/other.json': projectJson() })
+    const file = join(root, 'game', 'other.json')
+    expect(locateProject('/', file)).toEqual({ ok: true, file })
+    mkdirSync(join(root, 'game', '.audio-studio'))
+    expect(locateProject('/', file)).toEqual({
+      ok: false,
+      message: renameNotice({ oldFile: false, newFile: true, oldFolder: true })!,
+    })
   })
 })
 
 describe('loadProject', () => {
   it('summarises the project from its resources', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson(),
+      'content-studio.json': projectJson(),
       'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
       'tts/act1/script.json': script,
     })
-    const result = await loadProject(join(root, 'audio-studio.json'))
+    const result = await loadProject(join(root, 'content-studio.json'))
     if (!result.ok) throw new Error(JSON.stringify(result.problems))
     expect(result.summary.problems).toEqual([])
     expect(result.summary.parts.map((p) => [p.id, p.dialog, p.lineCount])).toEqual([
@@ -54,18 +116,18 @@ describe('loadProject', () => {
   })
 
   it('treats a missing cast as nobody cast yet', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson(), 'tts/act1/script.json': script })
-    const result = await loadProject(join(root, 'audio-studio.json'))
+    const root = tempRepo({ 'content-studio.json': projectJson(), 'tts/act1/script.json': script })
+    const result = await loadProject(join(root, 'content-studio.json'))
     expect(result.ok && result.summary.problems).toEqual([])
   })
 
   it('reports broken resources as problems but still loads', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson(),
+      'content-studio.json': projectJson(),
       'tts/cast.json': '{ not json',
       'tts/act1/script.json': [{ key: 'a', text: 'no speaker' }],
     })
-    const result = await loadProject(join(root, 'audio-studio.json'))
+    const result = await loadProject(join(root, 'content-studio.json'))
     if (!result.ok) throw new Error('expected the project to load')
     expect(result.summary.parts[0]!.dialog).toBe('invalid')
     expect(result.summary.problems.map((p) => [p.file, p.path])).toEqual([
@@ -76,29 +138,29 @@ describe('loadProject', () => {
   })
 
   it('fails on an invalid project file, naming what is wrong', async () => {
-    const root = tempRepo({ 'audio-studio.json': { name: '' } })
-    const result = await loadProject(join(root, 'audio-studio.json'))
+    const root = tempRepo({ 'content-studio.json': { name: '' } })
+    const result = await loadProject(join(root, 'content-studio.json'))
     if (result.ok) throw new Error('expected the project file to be rejected')
-    expect(result.file).toBe('audio-studio.json')
+    expect(result.file).toBe('content-studio.json')
     expect(result.problems.map((p) => p.path)).toEqual(['name', 'narration'])
   })
 
   it('fails when the project file is not JSON', async () => {
-    const root = tempRepo({ 'audio-studio.json': '{' })
-    const result = await loadProject(join(root, 'audio-studio.json'))
+    const root = tempRepo({ 'content-studio.json': '{' })
+    const result = await loadProject(join(root, 'content-studio.json'))
     expect(!result.ok && result.problems[0]!.message).toStartWith('not valid JSON')
   })
 
   it('refuses paths outside the project folder', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson({
+      'content-studio.json': projectJson({
         narration: { ...(projectJson().narration as object), characters: '../elsewhere/cast.json' },
       }),
     })
-    const result = await loadProject(join(root, 'audio-studio.json'))
+    const result = await loadProject(join(root, 'content-studio.json'))
     expect(!result.ok && result.problems).toEqual([
       {
-        file: 'audio-studio.json',
+        file: 'content-studio.json',
         path: 'narration.characters',
         message: '../elsewhere/cast.json is outside the project folder',
       },
@@ -108,7 +170,7 @@ describe('loadProject', () => {
 
 describe('loadPart', () => {
   const files = {
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
     'tts/act1/script.json': script,
     'audio/act1/manifest.json': {
@@ -120,7 +182,7 @@ describe('loadPart', () => {
 
   it('plans every line of the part', async () => {
     const root = tempRepo(files)
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     if (!result?.ok) throw new Error('expected the part to load')
     const { part } = result
     expect(part).toMatchObject({
@@ -139,12 +201,12 @@ describe('loadPart', () => {
 
   it('returns null for a part the project does not have', async () => {
     const root = tempRepo(files)
-    expect(await loadPart(join(root, 'audio-studio.json'), 'act9')).toBeNull()
+    expect(await loadPart(join(root, 'content-studio.json'), 'act9')).toBeNull()
   })
 
   it('shows a part without dialog as having no lines', async () => {
     const root = tempRepo(files)
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act2')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act2')
     expect(result?.ok && [result.part.dialog, result.part.lines.length]).toEqual(['missing', 0])
   })
 
@@ -154,7 +216,7 @@ describe('loadPart', () => {
       'tts/act1/script.json': '[not json',
       'tts/act1/cues.json': { a: '[softly]' },
     })
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     if (!result?.ok) throw new Error('expected the part to load')
     const { part } = result
     expect(part.dialog).toBe('invalid')
@@ -165,10 +227,10 @@ describe('loadPart', () => {
 
 describe('loadPart, a dialog that is gone', () => {
   const entry = { file: 'a.mp3', speaker: 'narrator' }
-  const base = { 'audio-studio.json': projectJson(), 'tts/cast.json': { speakers: {} } }
+  const base = { 'content-studio.json': projectJson(), 'tts/cast.json': { speakers: {} } }
   const load = async (files: Record<string, unknown>) => {
     const root = tempRepo(files)
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     if (!result?.ok) throw new Error('expected the part to load')
     return result.part
   }
@@ -225,11 +287,11 @@ describe('loadPart, a dialog that is gone', () => {
       },
     }
     const root = tempRepo({
-      'audio-studio.json': project,
+      'content-studio.json': project,
       'tts/act1/en/script.json': script,
       'audio/act1/sv/manifest.json': { a: entry },
     })
-    const file = join(root, 'audio-studio.json')
+    const file = join(root, 'content-studio.json')
     const result = await loadPart(file, 'act1', 'sv')
     if (!result?.ok) throw new Error('expected the part to load')
     expect(result.part.dialog).toBe('gone')
@@ -247,7 +309,7 @@ describe('loadPart, a dialog that is gone', () => {
       ...base,
       'audio/act1/manifest.json': { a: entry },
     })
-    const result = await loadProject(join(root, 'audio-studio.json'))
+    const result = await loadProject(join(root, 'content-studio.json'))
     expect(result.ok && result.summary.parts[0]).toMatchObject({
       dialog: 'gone',
       recorded: { clips: 1, cues: 0 },
@@ -257,7 +319,7 @@ describe('loadPart, a dialog that is gone', () => {
 
 describe('adoptPart', () => {
   const files = {
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': script,
     'audio/act1/manifest.json': { a: { file: 'a.mp3' } },
@@ -266,7 +328,7 @@ describe('adoptPart', () => {
 
   it('writes the lock for untracked clips, after which they are up to date', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const result = await adoptPart(projectFile, 'act1', new Date('2026-10-23T12:00:00Z'))
     expect(result).toEqual({ ok: true, adopted: 1, lockPath: 'tts/act1/narration.lock.json' })
     const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
@@ -277,14 +339,14 @@ describe('adoptPart', () => {
 
   it('writes nothing when there is nothing to adopt', async () => {
     const root = tempRepo({ ...files, 'audio/act1/manifest.json': {} })
-    const result = await adoptPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await adoptPart(join(root, 'content-studio.json'), 'act1')
     expect(result).toMatchObject({ ok: true, adopted: 0 })
     expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
   })
 
   it('refuses while a file of the part is broken', async () => {
     const root = tempRepo({ ...files, 'tts/act1/narration.lock.json': '{ broken' })
-    const result = await adoptPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await adoptPart(join(root, 'content-studio.json'), 'act1')
     expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
       'tts/act1/narration.lock.json',
     )
@@ -294,7 +356,7 @@ describe('adoptPart', () => {
 
 describe('review fixes', () => {
   const files = {
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': script,
     'audio/act1/manifest.json': { a: { file: 'a.mp3' }, b: { file: 'b.mp3' } },
@@ -317,7 +379,7 @@ describe('review fixes', () => {
         },
       },
     })
-    const result = await adoptPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await adoptPart(join(root, 'content-studio.json'), 'act1')
     expect(result).toMatchObject({ ok: true, adopted: 1 })
     const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
     expect(lock.a.future).toBe(42)
@@ -325,13 +387,13 @@ describe('review fixes', () => {
 
   it('gives the project’s quality bar with the part', async () => {
     const root = tempRepo(files)
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(result?.ok && result.part.minHeard).toBe(0.9)
   })
 
   it('gives the draft model, which a line’s extra takes are made with', async () => {
     const root = tempRepo(files)
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(result?.ok && result.part.draftModel).toBe('s2.1-pro-free')
   })
 
@@ -344,11 +406,11 @@ describe('review fixes', () => {
     })
     // A project whose ElevenLabs stages differ, but whose part has Fish voices alone.
     const fishPart = await loadPart(
-      join(tempRepo({ ...files, 'audio-studio.json': elevenFinal }), 'audio-studio.json'),
+      join(tempRepo({ ...files, 'content-studio.json': elevenFinal }), 'content-studio.json'),
       'act1',
     )
     expect(fishPart?.ok && fishPart.part.stages.finalStep).toBe(false)
-    const fishOnly = await loadPart(join(tempRepo(files), 'audio-studio.json'), 'act1')
+    const fishOnly = await loadPart(join(tempRepo(files), 'content-studio.json'), 'act1')
     expect(fishOnly?.ok && fishOnly.part.stages).toEqual({
       draft: 's2.1-pro-free',
       final: 's2.1-pro-free',
@@ -357,10 +419,10 @@ describe('review fixes', () => {
     })
     const root = tempRepo({
       ...files,
-      'audio-studio.json': elevenFinal,
+      'content-studio.json': elevenFinal,
       'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1' } } },
     })
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(result?.ok && result.part.stages).toEqual({
       draft: 's2.1-pro-free · Eleven v3',
       final: 's2.1-pro-free · Multilingual v2',
@@ -374,7 +436,7 @@ describe('review fixes', () => {
       ...files,
       'tts/act1/script.json': [{ key: '../../x', speaker: 'narrator', text: 'Escape.' }],
     })
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(result?.ok && result.part.problems.map((p) => p.path)).toEqual(['[0].key'])
   })
 
@@ -383,7 +445,7 @@ describe('review fixes', () => {
       ...files,
       'tts/act1/script.json': [...script, { key: 'a', speaker: 'mira', text: 'Again.' }],
     })
-    const result = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(result?.ok && result.part.problems.map((p) => [p.file, p.message])).toEqual([
       ['tts/act1/script.json', 'line keys must be unique; used more than once: a'],
     ])
@@ -406,7 +468,7 @@ describe('review fixes', () => {
       'outside.txt': 'secret',
     })
     symlinkSync(join(root, 'outside.txt'), join(root, 'audio/act1/link.mp3'))
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await clipFile(projectFile, 'act1', 'a.mp3')).toBe(join(root, 'audio/act1/a.mp3'))
     expect(await clipFile(projectFile, 'act1', 'sub.d')).toBeNull()
     expect(await clipFile(projectFile, 'act1', 'link.mp3')).toBeNull()
@@ -416,15 +478,10 @@ describe('review fixes', () => {
 
 describe('projectFileProblem', () => {
   it('accepts a file, and explains a missing file or a folder', () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
-    expect(projectFileProblem(join(root, 'audio-studio.json'))).toBeNull()
+    const root = tempRepo({ 'content-studio.json': projectJson() })
+    expect(projectFileProblem(join(root, 'content-studio.json'))).toBeNull()
     expect(projectFileProblem(join(root, 'nope.json'))).toContain('does not exist')
     expect(projectFileProblem(root)).toContain('is a folder')
-  })
-
-  it('does not take a folder named like the project file for one', () => {
-    const root = tempRepo({ 'audio-studio.json/x': 'x' })
-    expect(findProjectFile(root)).not.toBe(join(root, 'audio-studio.json'))
   })
 })
 
@@ -441,7 +498,7 @@ describe('a part in several languages', () => {
     return { ...base, narration: { ...(base.narration as object), languages, paths } }
   }
   const files = {
-    'audio-studio.json': project(['en', 'sv', 'de']),
+    'content-studio.json': project(['en', 'sv', 'de']),
     'tts/cast.json': {
       speakers: {
         narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } },
@@ -459,7 +516,7 @@ describe('a part in several languages', () => {
   }
   const open = async (language?: string, part = 'act1', extra = {}) => {
     const root = tempRepo({ ...files, ...extra })
-    const result = await loadPart(join(root, 'audio-studio.json'), part, language)
+    const result = await loadPart(join(root, 'content-studio.json'), part, language)
     if (!result?.ok) throw new Error(JSON.stringify(result))
     return { root, part: result.part }
   }
@@ -490,7 +547,7 @@ describe('a part in several languages', () => {
 
   it('reads every language’s dialog into the summary, a missing one is no problem', async () => {
     const root = tempRepo(files)
-    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected a summary')
     const narrator = loaded.summary.characters.find((c) => c.id === 'narrator')!
     expect(narrator.languages.sv).toMatchObject({ voice: 'v1-sv', totalLines: 1 })
@@ -500,7 +557,7 @@ describe('a part in several languages', () => {
 
   it('reports a broken dialog of another language, as one of the source language', async () => {
     const root = tempRepo({ ...files, 'tts/act1/sv/script.json': '[not json' })
-    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected a summary')
     expect(loaded.summary.problems.map((p) => p.file)).toContain('tts/act1/sv/script.json')
   })
@@ -579,8 +636,8 @@ describe('a part in several languages', () => {
         },
       },
     }
-    const root = tempRepo({ ...files, 'audio-studio.json': withGroups })
-    const projectFile = join(root, 'audio-studio.json')
+    const root = tempRepo({ ...files, 'content-studio.json': withGroups })
+    const projectFile = join(root, 'content-studio.json')
     const alike = async (language: string) => {
       const read = await readPart(projectFile, 'act1', language)
       if (!read?.ok) throw new Error('no part')
@@ -603,8 +660,8 @@ describe('a part in several languages', () => {
   })
 
   it('hears German as a language that capitalises its nouns, and no other', async () => {
-    const root = tempRepo({ ...files, 'audio-studio.json': project(['en', 'sv', 'de']) })
-    const projectFile = join(root, 'audio-studio.json')
+    const root = tempRepo({ ...files, 'content-studio.json': project(['en', 'sv', 'de']) })
+    const projectFile = join(root, 'content-studio.json')
     const nouns = async (language: string) => {
       const read = await readPart(projectFile, 'act1', language)
       if (!read?.ok) throw new Error('no part')
@@ -633,7 +690,7 @@ describe('a part in several languages', () => {
 
   it('serves a clip from the language’s folder', async () => {
     const { root } = await open()
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await clipFile(projectFile, 'act1', 'a.mp3', 'sv')).toBe(
       join(root, 'audio/act1/sv/a.mp3'),
     )
@@ -663,21 +720,21 @@ describe('loadProject with a music section', () => {
   })
 
   it('has no music pages without a section', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
-    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    const root = tempRepo({ 'content-studio.json': projectJson() })
+    const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected the project to load')
     expect(loaded.summary.music).toBeNull()
   })
 
   it('lists each act’s loops and the stingers, and tells a missing list from an empty one', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson({ music: musicSection }),
+      'content-studio.json': projectJson({ music: musicSection }),
       'tts/act1/music.json': [loop('a'), loop('b')],
       'tts/act2/music.json': [],
       'tts/stingers.json': [loop('victory', { seconds: 5 })],
       'music/briefs.json': { a: { brief: 'ours' } },
     })
-    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected the project to load')
     const lists = loaded.summary.music!.lists
     expect(lists.map((l) => [l.id, l.kind, l.state, l.tracks.length, l.canRefresh])).toEqual([
@@ -690,8 +747,8 @@ describe('loadProject with a music section', () => {
   })
 
   it('shows an act without a list as missing', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson({ music: musicSection }) })
-    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    const root = tempRepo({ 'content-studio.json': projectJson({ music: musicSection }) })
+    const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected the project to load')
     expect(loaded.summary.music!.lists.map((l) => l.state)).toEqual([
       'missing',
@@ -703,12 +760,12 @@ describe('loadProject with a music section', () => {
 
   it('reports a broken list with its file and JSON path, and the rest still loads', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson({ music: musicSection }),
+      'content-studio.json': projectJson({ music: musicSection }),
       'tts/act1/music.json': [loop('a'), { id: 'Bad Id', title: 'x', brief: 'x', seconds: 1 }],
       'tts/stingers.json': [loop('long', { seconds: 30 })],
       'music/briefs.json': '{ broken',
     })
-    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected the project to load')
     expect(loaded.summary.music!.lists.map((l) => l.state)).toEqual([
       'invalid',
@@ -724,11 +781,11 @@ describe('loadProject with a music section', () => {
 
   it('reports an id used in two lists at both places', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson({ music: musicSection }),
+      'content-studio.json': projectJson({ music: musicSection }),
       'tts/act1/music.json': [loop('x'), loop('a')],
       'tts/stingers.json': [loop('x', { seconds: 5 })],
     })
-    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('expected the project to load')
     expect(loaded.summary.music!.lists.map((l) => l.tracks.map((t) => t.id))).toEqual([
       ['a'],

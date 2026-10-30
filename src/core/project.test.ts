@@ -10,7 +10,7 @@ function parse(value: unknown) {
 function problems(value: unknown) {
   const result = parse(value)
   if (result.success) throw new Error('expected the project to be invalid')
-  return problemsFrom('audio-studio.json', result.error)
+  return problemsFrom('content-studio.json', result.error)
 }
 
 describe('ProjectSchema', () => {
@@ -51,7 +51,7 @@ describe('ProjectSchema', () => {
     })
     expect(found).toEqual([
       {
-        file: 'audio-studio.json',
+        file: 'content-studio.json',
         path: 'narration.models.audition',
         message: '"mystery-9" has no known price, so its cost cannot be shown',
       },
@@ -349,7 +349,7 @@ describe('the music section', () => {
   it('needs {part} in the loops path', () => {
     expect(problems(music({ loops: 'tts/music.json' }))).toEqual([
       {
-        file: 'audio-studio.json',
+        file: 'content-studio.json',
         path: 'music.paths.loops',
         message: 'must contain {part}, or every part would share one file',
       },
@@ -411,7 +411,7 @@ describe('the images section', () => {
   it('needs {part} in the list path', () => {
     expect(problems(images({ list: 'tts/images.json' }))).toEqual([
       {
-        file: 'audio-studio.json',
+        file: 'content-studio.json',
         path: 'images.paths.list',
         message: 'must contain {part}, or every part would share one file',
       },

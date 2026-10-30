@@ -77,7 +77,7 @@ export function libraryWords(keywords: string[]): string[] {
 
 /**
  * The voices the studio added to the user's ElevenLabs voices from the library
- * (`.audio-studio/eleven-voices.json`): each library voice, the voice it became on the account,
+ * (`.content-studio/eleven-voices.json`): each library voice, the voice it became on the account,
  * its name, and the character whose audition added it and when.
  */
 export const ElevenVoicesSchema = z.object({

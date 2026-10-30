@@ -4,9 +4,9 @@ import { resolve } from 'node:path'
 import { PROJECT_FILE } from '../src/core/project'
 import { startServer } from '../src/server/index'
 import { forgetLoadedKeys } from '../src/services/env'
-import { findProjectFile, projectFileProblem } from '../src/services/workspace'
+import { locateProject, projectFileProblem } from '../src/services/workspace'
 
-const HELP = `audio-studio: cast and record a game's narration.
+const HELP = `content-studio: make a game's narration, music and images.
 
 Run it from inside a game repository that has an ${PROJECT_FILE}.
 
@@ -41,14 +41,12 @@ if (values.dev && !process.execArgv.includes('--hot')) {
   process.exit(await child.exited)
 }
 
-const projectFile = values.project ? resolve(values.project) : findProjectFile(process.cwd())
-if (!projectFile) {
-  console.error(
-    `No ${PROJECT_FILE} in ${process.cwd()} or any folder above it.\n` +
-      `Run audio-studio from the game repository that has one, or pass --project <file>.`,
-  )
+const located = locateProject(process.cwd(), values.project ? resolve(values.project) : undefined)
+if (!located.ok) {
+  console.error(located.message)
   process.exit(1)
 }
+const projectFile = located.file
 const problem = projectFileProblem(projectFile)
 if (problem) {
   console.error(problem)
@@ -68,12 +66,12 @@ forgetLoadedKeys(process.cwd(), projectFile)
 const server = startServer({ projectFile, port, development: values.dev })
 
 // Under --hot this module reruns on every change; greet and open the browser only once.
-const state = globalThis as { audioStudioStarted?: boolean }
-if (state.audioStudioStarted) {
+const state = globalThis as { contentStudioStarted?: boolean }
+if (state.contentStudioStarted) {
   console.log('Reloaded.')
 } else {
-  state.audioStudioStarted = true
-  console.log(`Audio Studio: ${projectFile}`)
+  state.contentStudioStarted = true
+  console.log(`Content Studio: ${projectFile}`)
   if (!Bun.which('ffmpeg')) {
     console.warn('Note: ffmpeg is not installed; recording lines needs it (brew install ffmpeg).')
   }

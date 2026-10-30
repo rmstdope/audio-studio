@@ -15,7 +15,7 @@ import { readResource, writeAtomic } from './files'
 import { createSerial } from './serial'
 
 /** Where paid recordings are remembered, in the project's tool state. */
-export const SPENDING_FILE = '.audio-studio/spending.json'
+export const SPENDING_FILE = '.content-studio/spending.json'
 
 /** What the record holds (a version 1 record has no music takes), or what is wrong with the file. */
 export type SpendingRead = ({ ok: true } & Saved) | { ok: false; problems: Problem[] }
@@ -157,13 +157,13 @@ export function createSpendLog(projectFile: string): SpendLog {
               })
               if (!saved.ok) {
                 console.error(
-                  'Audio Studio: a paid recording was not saved: the spending record is damaged.',
+                  'Content Studio: a paid recording was not saved: the spending record is damaged.',
                 )
               }
             }
           } catch (error) {
             console.error(
-              'Audio Studio: could not save a paid recording to the spending record:',
+              'Content Studio: could not save a paid recording to the spending record:',
               error,
             )
           } finally {

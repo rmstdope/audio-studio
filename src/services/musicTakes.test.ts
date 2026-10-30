@@ -74,12 +74,12 @@ function setup(
   seedless = false,
 ) {
   const root = tempRepo({
-    'audio-studio.json': projectJson({ music }),
+    'content-studio.json': projectJson({ music }),
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
     'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 }],
     ...extra,
   })
-  const file = join(root, 'audio-studio.json')
+  const file = join(root, 'content-studio.json')
   const { generator, requests } = fakeGenerator(ready, failOn, gate, missing, seedless)
   let seed = 100
   const encode: Encoder = async (_wav, out) => {
@@ -162,7 +162,7 @@ describe('createMusicTakes', () => {
     if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
     expect(view.takes.map((t) => t.n)).toEqual([1, 2])
     const path = await takes.takeFile(file, 'hall', view.takes[1]!.file)
-    expect(path).toStartWith(join(root, '.audio-studio/music-takes/hall/'))
+    expect(path).toStartWith(join(root, '.content-studio/music-takes/hall/'))
     expect(wavSeconds(readWav(new Uint8Array(readFileSync(path!))))).toBe(30)
   })
 
@@ -197,11 +197,11 @@ describe('createMusicTakes', () => {
     const { root, file, takes, settled } = setup()
     await takes.make(file, 'hall', { count: 2 })
     await settled('hall')
-    const board = JSON.parse(readFileSync(join(root, '.audio-studio/music/hall.json'), 'utf8'))
+    const board = JSON.parse(readFileSync(join(root, '.content-studio/music/hall.json'), 'utf8'))
     expect(board.next).toBe(3)
     expect(board.takes.map((t: { n: number }) => t.n)).toEqual([1, 2])
     expect(
-      readdirSync(join(root, '.audio-studio/music-takes/hall')).some((f) => f.endsWith('.json')),
+      readdirSync(join(root, '.content-studio/music-takes/hall')).some((f) => f.endsWith('.json')),
     ).toBe(false)
     const again = createMusicTakes({
       generator: fakeGenerator().generator,
@@ -223,10 +223,10 @@ describe('createMusicTakes', () => {
   })
 
   it('reports a broken board file instead of overwriting it', async () => {
-    const { file, takes } = setup(undefined, { '.audio-studio/music/hall.json': '{ nope' })
+    const { file, takes } = setup(undefined, { '.content-studio/music/hall.json': '{ nope' })
     const view = await takes.view(file, 'hall')
     expect(view).toMatchObject({ ok: false })
-    expect(JSON.stringify(view)).toContain('.audio-studio/music/hall.json')
+    expect(JSON.stringify(view)).toContain('.content-studio/music/hall.json')
     expect(await takes.make(file, 'hall', { count: 1 })).toMatchObject({ ok: false })
   })
 
@@ -238,7 +238,7 @@ describe('createMusicTakes', () => {
     const [first, second] = view.takes
     expect(await takes.drop(file, 'hall', first!.file)).toEqual({ ok: true })
     expect(await takes.takeFile(file, 'hall', first!.file)).toBeNull()
-    expect(existsSync(join(root, '.audio-studio/music-takes/hall', first!.file))).toBe(false)
+    expect(existsSync(join(root, '.content-studio/music-takes/hall', first!.file))).toBe(false)
     expect(await takes.view(file, 'hall')).toMatchObject({ takes: [{ n: second!.n }] })
   })
 
@@ -248,12 +248,12 @@ describe('createMusicTakes', () => {
       ok: false,
       message: 'That take is not on the board.',
     })
-    expect(await takes.drop(file, 'hall', '../../audio-studio.json')).toEqual({
+    expect(await takes.drop(file, 'hall', '../../content-studio.json')).toEqual({
       ok: false,
       message: 'That take is not on the board.',
     })
     expect(await takes.drop(file, 'nope', 'aaaaaaaaaaaaaaaa.1.wav')).toBeNull()
-    expect(existsSync(join(root, '.audio-studio/music/hall.json'))).toBe(false)
+    expect(existsSync(join(root, '.content-studio/music/hall.json'))).toBe(false)
   })
 
   it('stops every take: the one being made ends and is discarded, the waiting ones never start', async () => {
@@ -299,7 +299,7 @@ describe('createMusicTakes', () => {
       making: [],
       failed: [],
     })
-    expect(readdirSync(join(root, '.audio-studio/music-takes/hall'))).toHaveLength(1)
+    expect(readdirSync(join(root, '.content-studio/music-takes/hall'))).toHaveLength(1)
     expect(signals).toHaveLength(1)
     expect(await takes.making(file)).toEqual({})
     expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 0 })
@@ -318,7 +318,7 @@ describe('createMusicTakes', () => {
     // The track's board turn is held, so the finished take waits there to be saved.
     let release: () => void = () => {}
     const held = boardQueue().run(`${file}\0hall`, () => new Promise<void>((r) => (release = r)))
-    const folder = join(root, '.audio-studio/music-takes/hall')
+    const folder = join(root, '.content-studio/music-takes/hall')
     for (let i = 0; i < 200 && !(existsSync(folder) && readdirSync(folder).length); i++) {
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
@@ -483,7 +483,7 @@ describe('createMusicTakes', () => {
 
   it('refuses the project’s own model too when it cannot make the track', async () => {
     const { file, takes } = setup(undefined, {
-      'audio-studio.json': projectJson({ music: { ...music, model: 'short' } }),
+      'content-studio.json': projectJson({ music: { ...music, model: 'short' } }),
     })
     expect(await takes.make(file, 'hall', { count: 1 })).toMatchObject({ ok: false })
     expect(await takes.make(file, 'victory', { count: 1 })).toEqual({ ok: true })
@@ -491,7 +491,7 @@ describe('createMusicTakes', () => {
 
   it('uses the project’s model when none is asked for', async () => {
     const { file, takes, requests, settled } = setup(undefined, {
-      'audio-studio.json': projectJson({ music: { ...music, model: 'quickest' } }),
+      'content-studio.json': projectJson({ music: { ...music, model: 'quickest' } }),
     })
     await takes.make(file, 'hall', { count: 1 })
     const view = await settled('hall')
@@ -504,7 +504,7 @@ describe('createMusicTakes', () => {
     const { root, file, takes, settled } = setup()
     await takes.make(file, 'hall', { count: 1 })
     await settled('hall')
-    const board = join(root, '.audio-studio/music/hall.json')
+    const board = join(root, '.content-studio/music/hall.json')
     const saved = JSON.parse(readFileSync(board, 'utf8'))
     delete saved.takes[0].model
     writeFileSync(board, JSON.stringify(saved))
@@ -516,7 +516,7 @@ describe('createMusicTakes', () => {
     /** Takes for a project whose model is Eleven Music, every model installed as `installed` says. */
     function elevenProject(installed: (model: string) => boolean, localReady: MusicReady) {
       const root = tempRepo({
-        'audio-studio.json': projectJson({ music: { ...music, model: 'eleven' } }),
+        'content-studio.json': projectJson({ music: { ...music, model: 'eleven' } }),
         'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 }],
         'tts/stingers.json': [],
       })
@@ -531,7 +531,7 @@ describe('createMusicTakes', () => {
             : localReady,
       }
       const takes = createMusicTakes({ generator, queue: createSerial(), newSeed: () => 1 })
-      return { file: join(root, 'audio-studio.json'), takes }
+      return { file: join(root, 'content-studio.json'), takes }
     }
     const noUv: MusicReady = { ok: false, message: 'uv is not on the PATH.', fix: '' }
 
@@ -771,19 +771,19 @@ describe('createMusicTakes', () => {
     expect(await takes.view(file, 'nope')).toBeNull()
     expect(await takes.make(file, 'nope', { count: 2 })).toBeNull()
     expect(await takes.takeFile(file, 'nope', 'aaaaaaaaaaaaaaaa.1.wav')).toBeNull()
-    const bare = tempRepo({ 'audio-studio.json': projectJson() })
-    expect(await takes.view(join(bare, 'audio-studio.json'), 'hall')).toBeNull()
+    const bare = tempRepo({ 'content-studio.json': projectJson() })
+    expect(await takes.view(join(bare, 'content-studio.json'), 'hall')).toBeNull()
   })
 
   it('serves only a take’s own file name', async () => {
     const { file, takes, settled } = setup()
     await takes.make(file, 'hall', { count: 1 })
     await settled('hall')
-    expect(await takes.takeFile(file, 'hall', '../../../audio-studio.json')).toBeNull()
+    expect(await takes.takeFile(file, 'hall', '../../../content-studio.json')).toBeNull()
     expect(await takes.takeFile(file, 'hall', 'aaaaaaaaaaaaaaaa.1.wav')).toBeNull()
   })
 
-  it('writes under .audio-studio/music-takes and nowhere else', async () => {
+  it('writes under .content-studio/music-takes and nowhere else', async () => {
     const { root, file, takes, settled } = setup()
     const before = readdirSync(root, { recursive: true }).map(String)
     await takes.make(file, 'hall', { count: 2 })
@@ -791,9 +791,9 @@ describe('createMusicTakes', () => {
     const added = readdirSync(root, { recursive: true })
       .map(String)
       .filter((f) => !before.includes(f))
-      .filter((f) => !f.startsWith('.audio-studio'))
+      .filter((f) => !f.startsWith('.content-studio'))
     expect(added).toEqual([])
-    expect(existsSync(join(root, '.audio-studio/music-takes/hall'))).toBe(true)
+    expect(existsSync(join(root, '.content-studio/music-takes/hall'))).toBe(true)
   })
 })
 
@@ -814,7 +814,7 @@ describe('choosing a take', () => {
     if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
     expect(view.takes).toHaveLength(1)
     expect(view.takes[0]).not.toHaveProperty('seed')
-    const board = JSON.parse(readFileSync(join(root, '.audio-studio/music/hall.json'), 'utf8'))
+    const board = JSON.parse(readFileSync(join(root, '.content-studio/music/hall.json'), 'utf8'))
     expect(board.takes[0]).not.toHaveProperty('seed')
     expect(await takes.choose(file, 'hall', view.takes[0]!.file)).toEqual({ ok: true })
     expect(lockOf(root).hall).toMatchObject({ take: 1, list: 'act1' })
@@ -882,7 +882,7 @@ describe('choosing a take', () => {
     const [one, two] = view.takes
     await takes.choose(file, 'hall', one!.file)
     expect(await takes.drop(file, 'hall', one!.file)).toMatchObject({ ok: false })
-    expect(existsSync(join(root, '.audio-studio/music-takes/hall', one!.file))).toBe(true)
+    expect(existsSync(join(root, '.content-studio/music-takes/hall', one!.file))).toBe(true)
     expect(await takes.drop(file, 'hall', two!.file)).toEqual({ ok: true })
   })
 
@@ -1001,7 +1001,7 @@ describe('moving a take', () => {
     expect(await m.takes.move(m.file, 'hall', two!.file, 'hut')).toEqual({ ok: true, n: 2 })
     const hall = await viewOf(m, 'hall')
     expect(hall.takes.map((t) => t.n)).toEqual([one!.n])
-    expect(existsSync(join(m.root, '.audio-studio/music-takes/hall', two!.file))).toBe(false)
+    expect(existsSync(join(m.root, '.content-studio/music-takes/hall', two!.file))).toBe(false)
     const hut = await viewOf(m, 'hut')
     expect(hut.takes.map((t) => t.n)).toEqual([1, 2])
     const moved = hut.takes[1]!
@@ -1013,7 +1013,7 @@ describe('moving a take', () => {
       chosen: false,
       movedFrom: { title: 'Hall', n: 2 },
     })
-    expect(existsSync(join(m.root, '.audio-studio/music-takes/hut', moved.file))).toBe(true)
+    expect(existsSync(join(m.root, '.content-studio/music-takes/hut', moved.file))).toBe(true)
     expect(hut.takes[0]!.movedFrom).toBeUndefined()
   })
 
@@ -1093,9 +1093,9 @@ describe('moving a take', () => {
     const m = await made()
     const [one] = (await viewOf(m, 'hall')).takes
     // Board entry kept, file removed behind the studio's back.
-    const board = join(m.root, '.audio-studio/music/hall.json')
+    const board = join(m.root, '.content-studio/music/hall.json')
     const text = readFileSync(board, 'utf8')
-    const gone = join(m.root, '.audio-studio/music-takes/hall', one!.file)
+    const gone = join(m.root, '.content-studio/music-takes/hall', one!.file)
     rmSync(gone)
     expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toMatchObject({ ok: false })
     expect(readFileSync(board, 'utf8')).toBe(text)
@@ -1104,7 +1104,7 @@ describe('moving a take', () => {
   it('refuses while the destination’s list is being refreshed from the game', async () => {
     const json = projectJson({ music })
     ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
-    const m = await made(2, { 'audio-studio.json': json })
+    const m = await made(2, { 'content-studio.json': json })
     const [one] = (await viewOf(m, 'hall')).takes
     const refreshing = refreshDialog(m.file, 'act2')
     try {
@@ -1122,7 +1122,7 @@ describe('moving a take', () => {
   it('refuses while the source’s list is being refreshed, and while the stingers are', async () => {
     const json = projectJson({ music: { ...music, refreshShared: 'sleep 1' } })
     ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
-    const m = await made(2, { 'audio-studio.json': json })
+    const m = await made(2, { 'content-studio.json': json })
     const [one] = (await viewOf(m, 'hall')).takes
     const refreshing = refreshDialog(m.file, 'act1')
     try {
@@ -1154,8 +1154,8 @@ describe('moving a take', () => {
     const m = await made()
     const [one] = (await viewOf(m, 'hall')).takes
     // The destination's takes folder is a file: its sound cannot be written.
-    mkdirSync(join(m.root, '.audio-studio/music-takes'), { recursive: true })
-    writeFileSync(join(m.root, '.audio-studio/music-takes/hut'), 'in the way')
+    mkdirSync(join(m.root, '.content-studio/music-takes'), { recursive: true })
+    writeFileSync(join(m.root, '.content-studio/music-takes/hut'), 'in the way')
     await expect(m.takes.move(m.file, 'hall', one!.file, 'hut')).rejects.toThrow()
     expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
   })
@@ -1163,7 +1163,7 @@ describe('moving a take', () => {
   it('never loses the take when the boards cannot be written: it stays on the first', async () => {
     const m = await made()
     const [one] = (await viewOf(m, 'hall')).takes
-    const folder = join(m.root, '.audio-studio/music')
+    const folder = join(m.root, '.content-studio/music')
     chmodSync(folder, 0o555)
     try {
       await expect(m.takes.move(m.file, 'hall', one!.file, 'hut')).rejects.toThrow()
@@ -1188,7 +1188,7 @@ describe('moving a take', () => {
     expect((await viewOf(m, 'hut')).takes).toHaveLength(1)
   })
 
-  it('writes under .audio-studio only', async () => {
+  it('writes under .content-studio only', async () => {
     const m = await made()
     const [one] = (await viewOf(m, 'hall')).takes
     const before = readdirSync(m.root).sort()

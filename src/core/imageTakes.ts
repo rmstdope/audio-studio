@@ -43,7 +43,7 @@ export const BoardTakeSchema = z.object({
   seen: z.boolean().default(false),
 })
 
-/** An image's board, `.audio-studio/images/<id>.json`: the takes made, and the next number. */
+/** An image's board, `.content-studio/images/<id>.json`: the takes made, and the next number. */
 export const ImageBoardSchema = z.object({
   next: z.number().int().positive().default(1),
   takes: z.array(BoardTakeSchema).default([]),

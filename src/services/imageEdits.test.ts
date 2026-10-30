@@ -28,12 +28,12 @@ const style = {
 
 function repo(extra: Record<string, unknown> = {}) {
   const root = tempRepo({
-    'audio-studio.json': projectJson({ images }),
+    'content-studio.json': projectJson({ images }),
     'tts/act1/images.json': [inn],
     'images/style.json': style,
     ...extra,
   })
-  const file = join(root, 'audio-studio.json')
+  const file = join(root, 'content-studio.json')
   const read = (path: string) => readFileSync(join(root, path), 'utf8')
   const summary = async () => {
     const opened = await openProject(file)
@@ -46,8 +46,8 @@ function repo(extra: Record<string, unknown> = {}) {
 
 describe('readImages', () => {
   it('is null without an images section', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
-    const opened = await openProject(join(root, 'audio-studio.json'))
+    const root = tempRepo({ 'content-studio.json': projectJson() })
+    const opened = await openProject(join(root, 'content-studio.json'))
     if (!opened.ok) throw new Error('project')
     expect(await readImages(root, opened.project, [])).toBeNull()
   })
@@ -87,7 +87,7 @@ describe('readImages', () => {
   it('remembers the style it first saw in the studio’s own folder', async () => {
     const { summary, read } = repo()
     await summary()
-    expect(JSON.parse(read('.audio-studio/images-style-seen.json'))).toEqual(style)
+    expect(JSON.parse(read('.content-studio/images-style-seen.json'))).toEqual(style)
   })
 
   it('moves the remembered style along when a change leaves nothing out of date', async () => {
@@ -95,7 +95,7 @@ describe('readImages', () => {
     await summary()
     writeFileSync(join(root, 'images/style.json'), JSON.stringify({ ...style, look: 'oil' }))
     await summary()
-    expect(JSON.parse(read('.audio-studio/images-style-seen.json')).look).toBe('oil')
+    expect(JSON.parse(read('.content-studio/images-style-seen.json')).look).toBe('oil')
   })
 
   it('tells a style the game could not be read from one it has not written yet', async () => {

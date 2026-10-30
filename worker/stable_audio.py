@@ -4,7 +4,7 @@
 # [tool.uv]
 # exclude-newer = "2026-10-27T00:00:00Z"
 # ///
-"""Audio Studio's Stable Audio Open worker: makes one take of a track, the model loaded once.
+"""Content Studio's Stable Audio Open worker: makes one take of a track, the model loaded once.
 
 Reads one JSON request per line on stdin: {"id": "...", "brief": "...", "kind": "loop|stinger",
 "seconds": 20, "bpm": 84 | null, "key": "D major" | null, "seed": 123,

@@ -147,7 +147,7 @@ export function createMfluxGenerator({
       if (problem) throw new Error(problem)
       if (signal?.aborted) throw new Error('The image generator was stopped.')
       const { command, out } = build(
-        mfluxArguments(request, join(tmpdir(), `audio-studio-image-${randomUUID()}.png`)),
+        mfluxArguments(request, join(tmpdir(), `content-studio-image-${randomUUID()}.png`)),
       )
       try {
         const proc = Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe' })

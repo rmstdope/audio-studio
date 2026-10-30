@@ -19,7 +19,7 @@ import { FishError } from './fish'
 import { discardSession, moveVoice, sessionFor, startAudition, viewOf } from './sessions'
 
 const files = {
-  'audio-studio.json': projectJson(),
+  'content-studio.json': projectJson(),
   'tts/cast.json': {
     speakers: { mira: { voice: 'cur', style: '[low]', audition: { keywords: ['warm'] } } },
     pronounce: {},
@@ -93,7 +93,7 @@ const encode: Encoder = async (wav, file) => {
 
 function setup() {
   const root = tempRepo(files)
-  return { root, projectFile: join(root, 'audio-studio.json') }
+  return { root, projectFile: join(root, 'content-studio.json') }
 }
 
 describe('designVoices', () => {
@@ -316,7 +316,7 @@ describe('designs per language', () => {
   const base = projectJson()
   const several = {
     ...files,
-    'audio-studio.json': {
+    'content-studio.json': {
       ...base,
       narration: {
         ...(base.narration as object),
@@ -336,7 +336,7 @@ describe('designs per language', () => {
   }
 
   it('keeps the designs and the last description of each language apart', async () => {
-    const projectFile = join(tempRepo(several), 'audio-studio.json')
+    const projectFile = join(tempRepo(several), 'content-studio.json')
     const { fishFor, designed } = fishThat()
     await designVoices(projectFile, 'mira', 'en voice', fishFor, encode, 'en')
     await designVoices(projectFile, 'mira', 'sv voice', fishFor, encode, 'sv')
@@ -362,7 +362,7 @@ describe('designs with ElevenLabs', () => {
   ]
   function elevenSetup(script = lines) {
     const root = tempRepo({ ...files, 'tts/act1/script.json': script })
-    return { root, projectFile: join(root, 'audio-studio.json') }
+    return { root, projectFile: join(root, 'content-studio.json') }
   }
   /** ElevenLabs designing three previews saying what it is given, and saving them as `v-<id>`. */
   function elevenThat() {
@@ -419,7 +419,7 @@ describe('designs with ElevenLabs', () => {
         Buffer.from([Number(v.design!.generated!.slice(1))]),
       )
     }
-    const spending = JSON.parse(readFileSync(join(root, '.audio-studio/spending.json'), 'utf8'))
+    const spending = JSON.parse(readFileSync(join(root, '.content-studio/spending.json'), 'utf8'))
     expect(spending.tries).toMatchObject([
       { kind: 'design', character: 'mira', model: 'eleven_ttv_v3', credits: plan.credits },
     ])

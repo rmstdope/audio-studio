@@ -54,14 +54,14 @@ function setup(
   options: { here?: Partial<Record<ImageModelId, boolean>>; model?: ImageModelId } = {},
 ) {
   const root = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       images: options.model ? { ...images, model: options.model } : images,
     }),
     'tts/act1/images.json': [inn, { ...inn, id: 'hall', title: 'Hall' }],
     'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
     ...extra,
   })
-  const file = join(root, 'audio-studio.json')
+  const file = join(root, 'content-studio.json')
   const { generator, requests } = fakeGenerator(ready, gate, options.here)
   let seed = 100
   const takes = createImageTakes({
@@ -105,9 +105,9 @@ describe('making takes', () => {
     expect(requests).toHaveLength(2)
     expect(requests[0]).toMatchObject({ width: 1024, height: 640, seed: 100, model: 'klein' })
     expect(requests[0]!.prompt).toBe((await row()).prompt)
-    expect(read('.audio-studio/image-takes/inn/1.png')).toBe(bytes(fakePng(1024, 640, 100)))
-    expect(read('.audio-studio/image-takes/inn/2.png')).toBe(bytes(fakePng(1024, 640, 101)))
-    const board = JSON.parse(read('.audio-studio/images/inn.json'))
+    expect(read('.content-studio/image-takes/inn/1.png')).toBe(bytes(fakePng(1024, 640, 100)))
+    expect(read('.content-studio/image-takes/inn/2.png')).toBe(bytes(fakePng(1024, 640, 101)))
+    const board = JSON.parse(read('.content-studio/images/inn.json'))
     expect(board.next).toBe(3)
     expect(board.takes[0].madeFrom).toEqual((await row()).madeFrom)
   })
@@ -170,7 +170,7 @@ describe('making takes', () => {
     expect(view.takes).toEqual([])
     expect(view.making).toEqual([])
     expect(requests).toHaveLength(1)
-    expect(existsSync(join(root, '.audio-studio/image-takes/inn/1.png'))).toBe(false)
+    expect(existsSync(join(root, '.content-studio/image-takes/inn/1.png'))).toBe(false)
   })
 
   it('refuses when images cannot be made here, and says what the view shows', async () => {
@@ -216,7 +216,7 @@ describe('making takes', () => {
     await takes.make(file, 'inn', { count: 1 })
     await settled('inn')
     expect(await takes.takeFile(file, 'inn', '1')).toBe(
-      join(root, '.audio-studio/image-takes/inn/1.png'),
+      join(root, '.content-studio/image-takes/inn/1.png'),
     )
     expect(await takes.takeFile(file, 'inn', '2')).toBeNull()
     expect(await takes.takeFile(file, 'inn', '../1')).toBeNull()
@@ -234,7 +234,7 @@ describe('choosing', () => {
   it('writes the picture, the manifest and the lock, and the image is then chosen', async () => {
     const { takes, file, root, read, row } = await made()
     expect(await takes.choose(file, 'inn', 2)).toEqual({ ok: true })
-    expect(read('web/images/inn.png')).toBe(read('.audio-studio/image-takes/inn/2.game.png'))
+    expect(read('web/images/inn.png')).toBe(read('.content-studio/image-takes/inn/2.game.png'))
     expect(JSON.parse(read('web/images/manifest.json'))).toEqual({
       inn: { file: 'inn.png', width: 320, height: 200 },
     })
@@ -275,7 +275,7 @@ describe('choosing', () => {
     await setImageWords(file, 'inn', 'a high inn')
     expect((await row()).status).toBe('out of date')
     expect(await takes.choose(file, 'inn', 2)).toEqual({ ok: true })
-    expect(read('web/images/inn.png')).toBe(read('.audio-studio/image-takes/inn/2.game.png'))
+    expect(read('web/images/inn.png')).toBe(read('.content-studio/image-takes/inn/2.game.png'))
     expect((await row()).status).toBe('out of date')
     expect(JSON.parse(read('images/images.lock.json')).images.inn.chosen.take).toBe(2)
   })
@@ -322,7 +322,7 @@ describe('choosing', () => {
     expect(JSON.parse(read('web/images/manifest.json'))).toEqual({})
     expect(JSON.parse(read('images/images.lock.json')).images).toEqual({})
     expect((await row()).status).toBe('none yet')
-    expect(existsSync(join(root, '.audio-studio/image-takes/inn/1.png'))).toBe(true)
+    expect(existsSync(join(root, '.content-studio/image-takes/inn/1.png'))).toBe(true)
     expect(await takes.currentFile(file, 'inn')).toBeNull()
   })
 
@@ -331,7 +331,7 @@ describe('choosing', () => {
     await takes.choose(file, 'inn', 2)
     expect(await takes.drop(file, 'inn', 2)).toMatchObject({ ok: false })
     expect(await takes.drop(file, 'inn', 1)).toEqual({ ok: true })
-    expect(existsSync(join(root, '.audio-studio/image-takes/inn/1.png'))).toBe(false)
+    expect(existsSync(join(root, '.content-studio/image-takes/inn/1.png'))).toBe(false)
     const view = await takes.view(file, 'inn')
     if (!view || !('takes' in view)) throw new Error('no view')
     expect(view.takes.map((t) => t.n)).toEqual([2])
@@ -395,7 +395,9 @@ describe('image models', () => {
     const view = (await s.settled('inn')) as Awaited<ReturnType<typeof viewOf>>
     expect(s.requests[0]!.model).toBe('z-image-turbo')
     expect(view.takes[0]!.model).toBe('z-image-turbo')
-    expect(JSON.parse(s.read('.audio-studio/images/inn.json')).takes[0].model).toBe('z-image-turbo')
+    expect(JSON.parse(s.read('.content-studio/images/inn.json')).takes[0].model).toBe(
+      'z-image-turbo',
+    )
   })
 
   it('without a model asked for, uses the project’s, else the other one that is here', async () => {
@@ -474,12 +476,12 @@ describe('the game’s look', () => {
 
   it('brings a take to the listed size and the palette as soon as it is made, keeping the model’s picture', async () => {
     const s = await made()
-    const game = decode(s.root, '.audio-studio/image-takes/inn/1.game.png')
+    const game = decode(s.root, '.content-studio/image-takes/inn/1.game.png')
     expect([game.width, game.height]).toEqual([320, 200])
     for (const c of coloursOf(game)) {
       expect(['0,0,0', '255,255,255', '255,0,0']).toContain(c)
     }
-    const model = decode(s.root, '.audio-studio/image-takes/inn/1.png')
+    const model = decode(s.root, '.content-studio/image-takes/inn/1.png')
     expect([model.width, model.height]).toEqual([1024, 640])
     const view = await takesOf(s)
     expect(view.takes.map((t) => [t.look, t.cropped])).toEqual([
@@ -487,7 +489,7 @@ describe('the game’s look', () => {
       ['ready', false],
     ])
     expect(view.lookError).toBeNull()
-    const board = JSON.parse(s.read('.audio-studio/images/inn.json'))
+    const board = JSON.parse(s.read('.content-studio/images/inn.json'))
     expect(board.takes[0].look).toBe((await s.row()).look.key)
   })
 
@@ -501,9 +503,9 @@ describe('the game’s look', () => {
 
   it('is the same game’s version every time it is made from the same picture and look', async () => {
     const s = await made()
-    const first = s.read('.audio-studio/image-takes/inn/1.game.png')
+    const first = s.read('.content-studio/image-takes/inn/1.game.png')
     await takes_bringAll(s, { palette: warm, dithering: 'patterned' })
-    expect(s.read('.audio-studio/image-takes/inn/1.game.png')).toBe(first)
+    expect(s.read('.content-studio/image-takes/inn/1.game.png')).toBe(first)
   })
 
   it('keeps the take, as the model made it, when the style cannot be used, and says what to fix', async () => {
@@ -513,8 +515,8 @@ describe('the game’s look', () => {
     expect(view.lookError).toBe(
       "Can't bring this take to the game's look: the style file's palette has a colour that isn't one: palette 2, “#7fb0e”.",
     )
-    expect(existsSync(join(s.root, '.audio-studio/image-takes/inn/1.png'))).toBe(true)
-    expect(existsSync(join(s.root, '.audio-studio/image-takes/inn/1.game.png'))).toBe(false)
+    expect(existsSync(join(s.root, '.content-studio/image-takes/inn/1.png'))).toBe(true)
+    expect(existsSync(join(s.root, '.content-studio/image-takes/inn/1.game.png'))).toBe(false)
     expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({
       ok: false,
       message: view.lookError!,
@@ -524,24 +526,24 @@ describe('the game’s look', () => {
 
   it('tells a take that was never brought, or whose game version is gone, from one with an old look', async () => {
     const s = await made()
-    rmSync(join(s.root, '.audio-studio/image-takes/inn/1.game.png'))
+    rmSync(join(s.root, '.content-studio/image-takes/inn/1.game.png'))
     expect((await takesOf(s)).takes.map((t) => t.look)).toEqual(['missing', 'ready'])
     // the image counts as old, and Bring all makes the version again
     expect((await s.row()).looksOld).toBe(true)
     expect(await takes_bringAll(s, { palette: warm })).toBeNull()
-    expect(existsSync(join(s.root, '.audio-studio/image-takes/inn/1.game.png'))).toBe(true)
+    expect(existsSync(join(s.root, '.content-studio/image-takes/inn/1.game.png'))).toBe(true)
     expect((await takesOf(s)).takes.map((t) => t.look)).toEqual(['ready', 'ready'])
     // a version with no note on the board was brought to no known look
-    const board = JSON.parse(s.read('.audio-studio/images/inn.json'))
+    const board = JSON.parse(s.read('.content-studio/images/inn.json'))
     delete board.takes[0].look
-    writeFileSync(join(s.root, '.audio-studio/images/inn.json'), JSON.stringify(board))
+    writeFileSync(join(s.root, '.content-studio/images/inn.json'), JSON.stringify(board))
     expect((await takesOf(s)).takes.map((t) => t.look)).toEqual(['old', 'ready'])
   })
 
   it('serves the game’s version of a take by number only', async () => {
     const s = await made()
     expect(await s.takes.gameFile(s.file, 'inn', '1')).toBe(
-      join(s.root, '.audio-studio/image-takes/inn/1.game.png'),
+      join(s.root, '.content-studio/image-takes/inn/1.game.png'),
     )
     expect(await s.takes.gameFile(s.file, 'inn', '9')).toBeNull()
     expect(await s.takes.gameFile(s.file, 'inn', '../1')).toBeNull()
@@ -550,7 +552,7 @@ describe('the game’s look', () => {
   it('chooses the game’s version: clip, manifest at the listed size, and the look in the lock', async () => {
     const s = await made()
     expect(await s.takes.choose(s.file, 'inn', 2)).toEqual({ ok: true })
-    expect(s.read('web/images/inn.png')).toBe(s.read('.audio-studio/image-takes/inn/2.game.png'))
+    expect(s.read('web/images/inn.png')).toBe(s.read('.content-studio/image-takes/inn/2.game.png'))
     expect(JSON.parse(s.read('web/images/manifest.json')).inn).toEqual({
       file: 'inn.png',
       width: 320,
@@ -632,14 +634,14 @@ describe('bringing everything to a new look', () => {
     expect((await s.row('inn')).looksOld).toBe(true)
     // the game keeps what it has until the button is pressed
     expect(colours(s, 'web/images/inn.png')).not.toContain('0,255,0')
-    const model = s.read('.audio-studio/image-takes/inn/2.png')
+    const model = s.read('.content-studio/image-takes/inn/2.png')
 
     const run = await takes_bringAll(s, { palette: ['#00ff00', '#0000ff'] })
     expect(run).toBeNull()
     expect(s.requests).toHaveLength(made)
-    expect(s.read('.audio-studio/image-takes/inn/2.png')).toBe(model)
+    expect(s.read('.content-studio/image-takes/inn/2.png')).toBe(model)
     for (const c of colours(s, 'web/images/inn.png')) expect(['0,255,0', '0,0,255']).toContain(c)
-    for (const c of colours(s, '.audio-studio/image-takes/hall/1.game.png')) {
+    for (const c of colours(s, '.content-studio/image-takes/hall/1.game.png')) {
       expect(['0,255,0', '0,0,255']).toContain(c)
     }
     expect(JSON.parse(s.read('images/images.lock.json')).images.inn.chosen.look).toBe(
@@ -653,7 +655,7 @@ describe('bringing everything to a new look', () => {
 
   it('counts its progress, refuses a second run while one goes, and reports the images it could not bring', async () => {
     const s = await chosenImages()
-    rmSync(join(s.root, '.audio-studio/image-takes/inn/2.png'))
+    rmSync(join(s.root, '.content-studio/image-takes/inn/2.png'))
     writeFileSync(
       join(s.root, 'images/style.json'),
       JSON.stringify({ look: 'pixel art', keepOut: 'text', palette: ['#00ff00'], acts: {} }),

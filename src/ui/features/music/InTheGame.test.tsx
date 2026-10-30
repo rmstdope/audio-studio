@@ -302,12 +302,12 @@ describe('Un-choose', () => {
   })
 
   it('names the file of a refusal that carries no message, never the lock', async () => {
-    answer = { ok: false, file: 'audio-studio.json', problems: [] }
+    answer = { ok: false, file: 'content-studio.json', problems: [] }
     const page = chosen()
     await click(page.button('Un-choose'))
     await click(page.button('Un-choose'))
     expect(page.block()!.textContent).toContain(
-      'Take 3 could not be un-chosen: audio-studio.json could not be read. Nothing was changed.',
+      'Take 3 could not be un-chosen: content-studio.json could not be read. Nothing was changed.',
     )
   })
 

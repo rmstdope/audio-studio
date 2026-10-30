@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["ace-step @ git+https://github.com/ace-step/ACE-Step-1.5.git"]
 # ///
-"""Audio Studio's music worker: makes one take of a track with ACE-Step 1.5, the models loaded once.
+"""Content Studio's music worker: makes one take of a track with ACE-Step 1.5, the models loaded once.
 
 Reads one JSON request per line on stdin: {"id": "...", "brief": "...", "kind": "loop|stinger",
 "seconds": 100, "bpm": 84 | null, "key": "D major" | null, "seed": 123, "dit": "acestep-v15-xl-turbo", "lm": "acestep-5Hz-lm-4B", "out": "take.wav"}.
@@ -56,7 +56,7 @@ def load(dit_model: str, lm_model: str):
         # ACE-Step looks for its models in <project_root>/checkpoints: a folder that has one,
         # linking to wherever the models really are.
         if root is None:
-            root = tempfile.mkdtemp(prefix="audio-studio-ace-")
+            root = tempfile.mkdtemp(prefix="content-studio-ace-")
             os.symlink(CHECKPOINTS, os.path.join(root, "checkpoints"))
         dit = AceStepHandler()
         dit.initialize_service(project_root=root, config_path=dit_model, device="mps")

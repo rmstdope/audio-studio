@@ -28,7 +28,7 @@ describe('fishApiKey', () => {
   it('falls back to the project’s env file', async () => {
     const root = tempRepo({
       '.env': 'FISH_AUDIO_API_KEY=from-file\n',
-      'audio-studio.json': projectJson(),
+      'content-studio.json': projectJson(),
     })
     expect(await fishApiKey(root, '.env', {})).toBe('from-file')
   })
@@ -54,7 +54,7 @@ describe('elevenLabsApiKey', () => {
 describe('forgetLoadedKeys', () => {
   /** A project in a folder, its env file and the folder's other env files as given. */
   const project = (files: Record<string, unknown>, env?: string) =>
-    tempRepo({ 'audio-studio.json': projectJson(env ? { env } : {}), ...files })
+    tempRepo({ 'content-studio.json': projectJson(env ? { env } : {}), ...files })
 
   it('forgets the keys Bun loaded from the project’s env file in the start folder, so it is read live', () => {
     const dir = project({
@@ -66,14 +66,14 @@ describe('forgetLoadedKeys', () => {
       ELEVENLABS_API_KEY: 'eleven-local',
       OTHER: 'kept',
     }
-    forgetLoadedKeys(dir, join(dir, 'audio-studio.json'), environment)
+    forgetLoadedKeys(dir, join(dir, 'content-studio.json'), environment)
     expect(environment).toEqual({ OTHER: 'kept' })
   })
 
   it('keeps a key exported with another value', () => {
     const dir = project({ '.env': 'FISH_AUDIO_API_KEY=from-file\n' })
     const environment: Record<string, string | undefined> = { FISH_AUDIO_API_KEY: 'exported' }
-    forgetLoadedKeys(dir, join(dir, 'audio-studio.json'), environment)
+    forgetLoadedKeys(dir, join(dir, 'content-studio.json'), environment)
     expect(environment).toEqual({ FISH_AUDIO_API_KEY: 'exported' })
   })
 
@@ -81,11 +81,11 @@ describe('forgetLoadedKeys', () => {
     const parent = tempRepo({ '.env': 'FISH_AUDIO_API_KEY=parent\n' })
     const game = project({})
     const fromParent: Record<string, string | undefined> = { FISH_AUDIO_API_KEY: 'parent' }
-    forgetLoadedKeys(parent, join(game, 'audio-studio.json'), fromParent)
+    forgetLoadedKeys(parent, join(game, 'content-studio.json'), fromParent)
     expect(fromParent).toEqual({ FISH_AUDIO_API_KEY: 'parent' })
     const other = project({ '.env': 'FISH_AUDIO_API_KEY=root\n' }, 'config/keys.env')
     const fromRoot: Record<string, string | undefined> = { FISH_AUDIO_API_KEY: 'root' }
-    forgetLoadedKeys(other, join(other, 'audio-studio.json'), fromRoot)
+    forgetLoadedKeys(other, join(other, 'content-studio.json'), fromRoot)
     expect(fromRoot).toEqual({ FISH_AUDIO_API_KEY: 'root' })
   })
 })

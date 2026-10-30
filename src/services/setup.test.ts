@@ -27,12 +27,12 @@ describe('checkSetup', () => {
     let accountAsked!: () => void
     const asking = new Promise<void>((resolve) => (accountAsked = resolve))
     const root = tempRepo({
-      'audio-studio.json': projectJson(),
+      'content-studio.json': projectJson(),
       '.env': 'FISH_AUDIO_API_KEY=f\nELEVENLABS_API_KEY=k\n',
     })
     // Fish answers only once ElevenLabs has been asked: one after the other would never finish.
     const result = await checkSetup(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       async () => {
         await asking
         return { ok: true, credit: 3 }
@@ -65,9 +65,9 @@ describe('checkSetup', () => {
         },
       }
     }
-    const without = tempRepo({ 'audio-studio.json': projectJson() })
+    const without = tempRepo({ 'content-studio.json': projectJson() })
     const none = await checkSetup(
-      join(without, 'audio-studio.json'),
+      join(without, 'content-studio.json'),
       credit,
       mac,
       {},
@@ -78,11 +78,11 @@ describe('checkSetup', () => {
     expect(asked).toEqual([])
     expect(byId(none.checks)).toMatchObject({ elevenlabsKey: 'off', elevenlabs: 'off' })
     const withKey = tempRepo({
-      'audio-studio.json': projectJson(),
+      'content-studio.json': projectJson(),
       '.env': 'ELEVENLABS_API_KEY=k\n',
     })
     const some = await checkSetup(
-      join(withKey, 'audio-studio.json'),
+      join(withKey, 'content-studio.json'),
       credit,
       mac,
       {},
@@ -95,8 +95,11 @@ describe('checkSetup', () => {
   })
 
   it('finds the tools, the key in the env file, and asks Fish', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson(), '.env': 'FISH_AUDIO_API_KEY=k\n' })
-    const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {})
+    const root = tempRepo({
+      'content-studio.json': projectJson(),
+      '.env': 'FISH_AUDIO_API_KEY=k\n',
+    })
+    const result = await checkSetup(join(root, 'content-studio.json'), credit, mac, {})
     if (!result.ok) throw new Error('expected checks')
     expect(result.checks.find((c) => c.id === 'fish')).toMatchObject({ credit: 3 })
     expect(byId(result.checks)).toEqual({
@@ -115,11 +118,11 @@ describe('checkSetup', () => {
   })
 
   it('asks the machine for each tool, and Fish not at all without a key', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
+    const root = tempRepo({ 'content-studio.json': projectJson() })
     let asked = 0
     const machine: Machine = { which: (c) => c === 'uv', platform: 'linux', arch: 'x64' }
     const result = await checkSetup(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       async () => {
         asked++
         return { ok: true, credit: 3 }
@@ -145,13 +148,13 @@ describe('checkSetup', () => {
   })
 
   it('takes the key from the environment too, and reports Fish not answering', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
+    const root = tempRepo({ 'content-studio.json': projectJson() })
     const silent = async (): Promise<CreditResult> => ({
       ok: false,
       reason: 'fish',
       message: 'Fish Audio answered 401',
     })
-    const result = await checkSetup(join(root, 'audio-studio.json'), silent, mac, {
+    const result = await checkSetup(join(root, 'content-studio.json'), silent, mac, {
       FISH_AUDIO_API_KEY: 'k',
     })
     if (!result.ok) throw new Error('expected checks')
@@ -162,8 +165,8 @@ describe('checkSetup', () => {
   })
 
   it('says when the project file cannot be read', async () => {
-    const root = tempRepo({ 'audio-studio.json': { name: 3 } })
-    const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {})
+    const root = tempRepo({ 'content-studio.json': { name: 3 } })
+    const result = await checkSetup(join(root, 'content-studio.json'), credit, mac, {})
     expect(result.ok).toBe(false)
   })
 })
@@ -173,8 +176,8 @@ describe('checkSetup, requests at once', () => {
     const quality = (q: Record<string, unknown>) =>
       projectJson({ narration: { ...(projectJson().narration as object), quality: q } })
     const states = async (project: Record<string, unknown>) => {
-      const root = tempRepo({ 'audio-studio.json': project, '.env': 'FISH_AUDIO_API_KEY=k\n' })
-      const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {})
+      const root = tempRepo({ 'content-studio.json': project, '.env': 'FISH_AUDIO_API_KEY=k\n' })
+      const result = await checkSetup(join(root, 'content-studio.json'), credit, mac, {})
       if (!result.ok) throw new Error('expected checks')
       return result.checks.find((c) => c.id === 'requests')!
     }
@@ -193,11 +196,11 @@ describe('checkSetup, requests at once', () => {
 
   it('checks the music generator in a project with music, against the models folder', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson({ music: musicSection }),
+      'content-studio.json': projectJson({ music: musicSection }),
       'models/acestep-v15-xl-turbo/.keep': '',
     })
     const run = async () => {
-      const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {
+      const result = await checkSetup(join(root, 'content-studio.json'), credit, mac, {
         ACESTEP_CHECKPOINTS: join(root, 'models'),
       })
       if (!result.ok) throw new Error('expected checks')
@@ -213,11 +216,11 @@ describe('checkSetup, requests at once', () => {
 
   it('checks the model the project names, and says which one is missing', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson({ music: { ...musicSection, model: 'careful' } }),
+      'content-studio.json': projectJson({ music: { ...musicSection, model: 'careful' } }),
       'models/acestep-v15-xl-turbo/.keep': '',
       'models/acestep-5Hz-lm-4B/.keep': '',
     })
-    const result = await checkSetup(join(root, 'audio-studio.json'), credit, mac, {
+    const result = await checkSetup(join(root, 'content-studio.json'), credit, mac, {
       ACESTEP_CHECKPOINTS: join(root, 'models'),
     })
     if (!result.ok) throw new Error('expected checks')
@@ -231,18 +234,18 @@ describe('checkSetup, requests at once', () => {
 
   it('checks the Stable Audio models in their own folder, whatever else is set', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson({ music: musicSection }),
+      'content-studio.json': projectJson({ music: musicSection }),
       'stable/stable-audio-open-1.0/.keep': '',
     })
     const run = async (model?: string) => {
       if (model) {
         await Bun.write(
-          join(root, 'audio-studio.json'),
+          join(root, 'content-studio.json'),
           JSON.stringify(projectJson({ music: { ...musicSection, model } })),
         )
       }
       const result = await checkSetup(
-        join(root, 'audio-studio.json'),
+        join(root, 'content-studio.json'),
         credit,
         mac,
         { ACESTEP_CHECKPOINTS: join(root, 'models') },
@@ -284,9 +287,9 @@ describe('checkSetup of the image models', () => {
     machine: Machine,
     here: (model: string) => boolean,
   ) => {
-    const root = tempRepo({ 'audio-studio.json': projectJson(images ? { images } : {}) })
+    const root = tempRepo({ 'content-studio.json': projectJson(images ? { images } : {}) })
     const result = await checkSetup(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       credit,
       machine,
       {},

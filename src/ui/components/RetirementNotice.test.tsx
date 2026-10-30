@@ -24,7 +24,7 @@ describe('the s1 switch question', () => {
           { client: new QueryClient() },
           createElement(RetirementNotice, {
             takes: ['draft', 'final'],
-            file: 'audio-studio.json',
+            file: 'content-studio.json',
             now: new Date('2026-10-26T00:00:00Z'),
             onNotNow: () => {},
           }),
@@ -35,7 +35,7 @@ describe('the s1 switch question', () => {
       container.querySelector<HTMLButtonElement>('.notice-actions .btn-primary')!.click()
     })
     const mono = [...container.querySelectorAll('.confirm-effects .mono')].map((e) => e.textContent)
-    expect(mono).toEqual(['s1', 's2.1-pro', 's1', 's2.1-pro', 'audio-studio.json', 's1'])
+    expect(mono).toEqual(['s1', 's2.1-pro', 's1', 's2.1-pro', 'content-studio.json', 's1'])
     act(() => root.unmount())
   })
 })

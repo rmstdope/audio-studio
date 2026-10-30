@@ -654,7 +654,7 @@ async function transcribeWav(
   wav: Uint8Array,
   language?: string,
 ): Promise<HeardSegment[]> {
-  const file = join(tmpdir(), `audio-studio-heard-${randomUUID()}.wav`)
+  const file = join(tmpdir(), `content-studio-heard-${randomUUID()}.wav`)
   await writeFile(file, wav)
   try {
     return await transcriber.transcribe(model, file, language)

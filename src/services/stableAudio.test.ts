@@ -12,7 +12,7 @@ import {
 } from './stableAudio'
 
 const mac = { which: () => true, platform: 'darwin', arch: 'arm64' }
-const dir = mkdtempSync(join(tmpdir(), 'audio-studio-stable-'))
+const dir = mkdtempSync(join(tmpdir(), 'content-studio-stable-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 const fake = join(import.meta.dir, '../../test/fixtures/fake-acestep.ts')
 

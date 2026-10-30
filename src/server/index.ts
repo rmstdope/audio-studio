@@ -476,7 +476,7 @@ export function startServer({
       const saved = await appendMusic(file, take)
       if (!saved.ok) {
         console.error(
-          'Audio Studio: a paid music take was not saved to the spending record:',
+          'Content Studio: a paid music take was not saved to the spending record:',
           saved.problems,
         )
       }

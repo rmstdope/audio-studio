@@ -14,7 +14,7 @@ describe('parsePorcelain', () => {
       ' D audio/act1/old.mp3',
       'R  audio/act1/new.mp3',
       'audio/act1/was.mp3',
-      'MM audio-studio.json',
+      'MM content-studio.json',
       '',
     ].join('\0')
     expect(parsePorcelain(text)).toEqual([
@@ -23,7 +23,7 @@ describe('parsePorcelain', () => {
       { path: 'audio/act1/a.mp3', change: 'new' },
       { path: 'audio/act1/old.mp3', change: 'deleted' },
       { path: 'audio/act1/new.mp3', change: 'renamed', from: 'audio/act1/was.mp3' },
-      { path: 'audio-studio.json', change: 'modified' },
+      { path: 'content-studio.json', change: 'modified' },
     ])
   })
 
@@ -57,8 +57,8 @@ describe('parsePorcelain', () => {
 
 describe('groupChanges', () => {
   it('puts each changed file with the project, the cast or its part', () => {
-    const groups = groupChanges(project, 'audio-studio.json', [
-      { path: 'audio-studio.json', change: 'modified' },
+    const groups = groupChanges(project, 'content-studio.json', [
+      { path: 'content-studio.json', change: 'modified' },
       { path: 'tts/cast.json', change: 'modified' },
       { path: 'tts/act1/cues.json', change: 'new' },
       { path: 'tts/act1/narration.lock.json', change: 'modified' },
@@ -68,7 +68,7 @@ describe('groupChanges', () => {
       { path: 'audio/act2/c.mp3', change: 'deleted' },
     ])
     expect(groups.total).toBe(8)
-    expect(groups.project.map((c) => c.path)).toEqual(['audio-studio.json', 'tts/cast.json'])
+    expect(groups.project.map((c) => c.path)).toEqual(['content-studio.json', 'tts/cast.json'])
     expect(groups.parts[0]).toMatchObject({
       id: 'act1',
       files: [
@@ -94,7 +94,7 @@ describe('groupChanges', () => {
         },
       }),
     )
-    const groups = groupChanges(odd, 'audio-studio.json', [
+    const groups = groupChanges(odd, 'content-studio.json', [
       { path: 'tts/cast.json', change: 'modified' },
       { path: 'tts/act1/cues.json', change: 'new' },
     ])
@@ -102,14 +102,14 @@ describe('groupChanges', () => {
   })
 
   it('leaves out parts without changes', () => {
-    expect(groupChanges(project, 'audio-studio.json', []).parts).toEqual([])
+    expect(groupChanges(project, 'content-studio.json', []).parts).toEqual([])
   })
 })
 
 describe('projectPaths', () => {
   it('lists the project’s own paths, normalised, each part’s clips as a folder', () => {
-    const paths = projectPaths(project, 'audio-studio.json')
-    expect(paths.own).toEqual(['audio-studio.json', 'tts/cast.json'])
+    const paths = projectPaths(project, 'content-studio.json')
+    expect(paths.own).toEqual(['content-studio.json', 'tts/cast.json'])
     expect(paths.parts[0]).toEqual({
       id: 'act1',
       title: 'Act I',
@@ -141,7 +141,7 @@ describe('projectPaths with several languages', () => {
         },
       }),
     )
-    const part = projectPaths(many, 'audio-studio.json').parts[0]!
+    const part = projectPaths(many, 'content-studio.json').parts[0]!
     expect(part.clips).toEqual(['audio/act1/en/', 'audio/act1/sv/'])
     expect(Object.keys(part.files)).toContain('tts/act1/sv/script.json')
     expect(Object.keys(part.files)).toHaveLength(8)
@@ -165,7 +165,7 @@ describe('the music files in the changes', () => {
   )
 
   it('lists the music files by role and counts the music clips', () => {
-    const groups = groupChanges(withMusic, 'audio-studio.json', [
+    const groups = groupChanges(withMusic, 'content-studio.json', [
       { path: 'tts/act1/music.json', change: 'modified' },
       { path: 'tts/stingers.json', change: 'new' },
       { path: 'music/briefs.json', change: 'modified' },
@@ -187,22 +187,22 @@ describe('the music files in the changes', () => {
   })
 
   it('does not count the hidden file an encode is writing as a clip', () => {
-    const groups = groupChanges(withMusic, 'audio-studio.json', [
+    const groups = groupChanges(withMusic, 'content-studio.json', [
       { path: 'web/audio/music/.hall.1234.mp3', change: 'new' },
     ])
     expect(groups.music).toBeNull()
   })
 
   it('has no music group without changes or without a music section', () => {
-    expect(groupChanges(withMusic, 'audio-studio.json', []).music).toBeNull()
-    expect(groupChanges(project, 'audio-studio.json', []).music).toBeNull()
+    expect(groupChanges(withMusic, 'content-studio.json', []).music).toBeNull()
+    expect(groupChanges(project, 'content-studio.json', []).music).toBeNull()
   })
 
   it('names the music paths for git to ask about', () => {
-    const paths = projectPaths(withMusic, 'audio-studio.json')
+    const paths = projectPaths(withMusic, 'content-studio.json')
     expect(paths.music?.clips).toBe('web/audio/music/')
     expect(Object.keys(paths.music!.files)).toContain('music/music.lock.json')
-    expect(projectPaths(project, 'audio-studio.json').music).toBeNull()
+    expect(projectPaths(project, 'content-studio.json').music).toBeNull()
   })
 })
 
@@ -223,7 +223,7 @@ describe('the images files in the changes', () => {
   )
 
   it('lists the images files by role', () => {
-    const groups = groupChanges(withImages, 'audio-studio.json', [
+    const groups = groupChanges(withImages, 'content-studio.json', [
       { path: 'tts/act1/images.json', change: 'modified' },
       { path: 'images/style.json', change: 'new' },
       { path: 'images/prompts.json', change: 'modified' },
@@ -240,7 +240,7 @@ describe('the images files in the changes', () => {
   })
 
   it('has no images group without changes or without an images section', () => {
-    expect(groupChanges(withImages, 'audio-studio.json', []).images).toBeNull()
-    expect(groupChanges(project, 'audio-studio.json', []).images).toBeNull()
+    expect(groupChanges(withImages, 'content-studio.json', []).images).toBeNull()
+    expect(groupChanges(project, 'content-studio.json', []).images).toBeNull()
   })
 })

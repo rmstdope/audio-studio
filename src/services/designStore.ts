@@ -9,7 +9,7 @@ import { TAKES_DIR } from './takes'
 import { cacheNameFor } from './workspace'
 
 /** Where the voices designed per character are kept, in the project's tool cache. */
-export const DESIGNS_DIR = '.audio-studio/designs'
+export const DESIGNS_DIR = '.content-studio/designs'
 
 /** Changes to one character's designs, one at a time. */
 const writes = createSerial()

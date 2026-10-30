@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["mlx-whisper==0.4.3"]
 # ///
-"""Audio Studio's Whisper worker: transcribes clips with mlx-whisper, the model loaded once.
+"""Content Studio's Whisper worker: transcribes clips with mlx-whisper, the model loaded once.
 
 Reads one JSON request per line on stdin: {"id": "...", "path": "clip.wav", "model": "...", "language": "sv"}; the language is optional.
 Writes one JSON answer per line on stdout: {"id": "...", "segments": [{start, end, words:

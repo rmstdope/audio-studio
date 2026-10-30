@@ -15,7 +15,7 @@ import { createSerial } from './serial'
 import { cacheNameFor, knownCharacter, type ProjectFailure } from './workspace'
 
 /** Where the voices ruled out per character are kept, in the project's tool cache. */
-export const RULED_OUT_DIR = '.audio-studio/ruled-out'
+export const RULED_OUT_DIR = '.content-studio/ruled-out'
 
 /** A character's ruled-out voices, the latest first; null for an unknown character. */
 export type RuledOutResult = { ok: true; voices: RuledOutVoice[] } | ProjectFailure | null

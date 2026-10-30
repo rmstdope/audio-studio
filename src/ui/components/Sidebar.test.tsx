@@ -87,6 +87,18 @@ function render(route: Route) {
   }
 }
 
+describe('the sidebar brand', () => {
+  it('says Content Studio, with the two stacked layers as its mark and no sound wave', () => {
+    const { container } = render({ view: 'part', part: 'act1' })
+    expect(container.querySelector('.brand-name')!.textContent).toBe('Content Studio')
+    const mark = container.querySelector('.brand-mark svg')!
+    expect([...mark.querySelectorAll('path')].map((p) => p.getAttribute('d'))).toEqual([
+      'M12 3 3 8l9 5 9-5-9-5Z',
+      'm3 13 9 5 9-5',
+    ])
+  })
+})
+
 describe('the sidebar on a Narration page', () => {
   const { container, links } = render({ view: 'part', part: 'act1', language: 'sv' })
   const texts = links.map((l) => l.text)

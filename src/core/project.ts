@@ -27,7 +27,13 @@ export function phraseProblem(phrase: string, chunkLimit: number): string | null
 }
 
 /** The file name the CLI looks for, walking up from the current directory. */
-export const PROJECT_FILE = 'audio-studio.json'
+export const PROJECT_FILE = 'content-studio.json'
+
+/** The project file's name before the rename to Content Studio; never read, only reported. */
+export const OLD_PROJECT_FILE = 'audio-studio.json'
+
+/** The working folder's name before the rename; never read, only reported. */
+export const OLD_STATE_DIR = '.audio-studio'
 
 /**
  * A model for a stage: any whose price the studio knows, so a plan can say what it costs. The
@@ -311,7 +317,7 @@ const ImagesSchema = z.object({
   }),
 })
 
-/** The project file, `audio-studio.json`, in the consumer repository's root. */
+/** The project file, `content-studio.json`, in the consumer repository's root. */
 export const ProjectSchema = z.object({
   $schema: z.string().optional(),
   name: z.string().min(1),

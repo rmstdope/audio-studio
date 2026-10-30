@@ -1,7 +1,7 @@
-# audio-studio
+# Content Studio
 
-Audio tool for narratives and music used in games. Run it from inside a game repository: it reads
-the repository's `audio-studio.json`, and writes voice files and their metadata in place. Committing
+Narration, music and images for games. Run it from inside a game repository: it reads
+the repository's `content-studio.json`, and writes voice files and their metadata in place. Committing
 them is up to you.
 
 See [docs/architecture.md](docs/architecture.md) for the design.
@@ -30,7 +30,7 @@ does), and checking
 takes needs [uv](https://docs.astral.sh/uv/) on Apple silicon (mlx-whisper; the first take loads
 the model). Without them, set `"quality": { "transcriber": "none" }` in the project file.
 
-Audition takes and sessions are kept in `.audio-studio/` in the game repository; add it to that
+Audition takes and sessions are kept in `.content-studio/` in the game repository; add it to that
 repository's `.gitignore`.
 
 ## Install
@@ -39,7 +39,7 @@ Needs [Bun](https://bun.sh) 1.4 or later.
 
 ```sh
 bun install
-bun link          # puts `audio-studio` in ~/.bun/bin
+bun link          # puts `content-studio` in ~/.bun/bin
 ```
 
 `~/.bun/bin` must be on your `PATH`. Bun's own installer adds it; a Homebrew-installed Bun does
@@ -49,21 +49,33 @@ not, so add it to `~/.zshrc` yourself:
 export PATH="$HOME/.bun/bin:$PATH"
 ```
 
-There is no need to run `bun link audio-studio` in the game repository: the studio is not a
+There is no need to run `bun link content-studio` in the game repository: the studio is not a
 dependency of the game.
+
+## Renamed
+
+The tool was called Audio Studio and is now Content Studio. The command `audio-studio` is gone:
+use `content-studio`. A game set up for the old name needs three renames, which `content-studio`
+lists when it finds the old names and then stops (it never reads or renames them itself):
+
+```sh
+git mv audio-studio.json content-studio.json
+mv .audio-studio .content-studio
+# and in .gitignore, change .audio-studio/ to .content-studio/
+```
 
 ## Use
 
 ```sh
-cd ~/repos/retroquest   # any repository with an audio-studio.json
-audio-studio            # opens the studio in your browser
+cd ~/repos/retroquest   # any repository with an content-studio.json
+content-studio            # opens the studio in your browser
 ```
 
 Options: `--project <file>` to use a specific project file, `--port <n>`, `--no-open`, `--help`.
 
 ## Develop
 
-`audio-studio --dev` reloads on every change to the studio's own code: server changes are picked
+`content-studio --dev` reloads on every change to the studio's own code: server changes are picked
 up in place (same port, no restart) and UI changes are pushed to the open page. Use it in a game
 repository while working on the studio.
 

@@ -227,7 +227,7 @@ export const TakeInputsSchema = z.object({
 /** What a take was made from. */
 export type TakeInputs = z.infer<typeof TakeInputsSchema>
 
-/** A take on a track's board, saved in `.audio-studio/music/<track>.json`. */
+/** A take on a track's board, saved in `.content-studio/music/<track>.json`. */
 export const BoardTakeSchema = z.object({
   n: z.number().int().positive(),
   /** The hash of its inputs, which with `n` names its WAV. */

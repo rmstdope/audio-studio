@@ -7,7 +7,7 @@ import { inPartTurn } from './partFiles'
 
 const at = '2026-10-24T16:11:29.762Z'
 const files = {
-  'audio-studio.json': projectJson(),
+  'content-studio.json': projectJson(),
   'tts/cast.json': { speakers: { mira: { voice: 'v-m' } } },
   'tts/act1/script.json': [{ key: 'k1', speaker: 'mira', text: 'Welcome home.' }],
   'tts/act1/narration.lock.json': {
@@ -24,7 +24,7 @@ const files = {
 const line = { at, text: 'Welcome home.', words: ['Welcome'], missed: [1] }
 
 function project() {
-  return join(tempRepo(files), 'audio-studio.json')
+  return join(tempRepo(files), 'content-studio.json')
 }
 
 describe('what Whisper heard, kept', () => {

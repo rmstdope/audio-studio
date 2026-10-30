@@ -22,7 +22,7 @@ const models = { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 'dram
 describe('modelsView', () => {
   it('totals every line of every part, and what the recorded clips were made with', async () => {
     const root = tempRepo({
-      'audio-studio.json': project(models),
+      'content-studio.json': project(models),
       'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
       'tts/act1/script.json': [
         { key: 'a', speaker: 'narrator', text: 'Once.' },
@@ -33,9 +33,9 @@ describe('modelsView', () => {
       'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
       'tts/act1/narration.lock.json': { a: entry('s2.1-pro-free') },
     })
-    const view = await modelsView(join(root, 'audio-studio.json'))
+    const view = await modelsView(join(root, 'content-studio.json'))
     if (!view.ok) throw new Error(JSON.stringify(view.problems))
-    expect(view.file).toBe('audio-studio.json')
+    expect(view.file).toBe('content-studio.json')
     expect(view.models).toEqual(models)
     expect(view.castsEleven).toBe(false)
     expect(view.dialog.lines).toBe(3)
@@ -46,13 +46,13 @@ describe('modelsView', () => {
 
   it('counts the cues inside a line in the bytes it sends', async () => {
     const files = (cues: object) => ({
-      'audio-studio.json': project(models),
+      'content-studio.json': project(models),
       'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
       'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
       'tts/act1/cues.json': cues,
     })
     const bytes = async (cues: object) => {
-      const view = await modelsView(join(tempRepo(files(cues)), 'audio-studio.json'))
+      const view = await modelsView(join(tempRepo(files(cues)), 'content-studio.json'))
       if (!view.ok) throw new Error(JSON.stringify(view.problems))
       return view.dialog.bytes
     }
@@ -62,14 +62,14 @@ describe('modelsView', () => {
   })
 
   it('has no lines in a project without dialog', async () => {
-    const root = tempRepo({ 'audio-studio.json': project(models) })
-    const view = await modelsView(join(root, 'audio-studio.json'))
+    const root = tempRepo({ 'content-studio.json': project(models) })
+    const view = await modelsView(join(root, 'content-studio.json'))
     expect(view).toMatchObject({ ok: true, dialog: { lines: 0, bytes: 0 }, recorded: {} })
   })
 
   it('says why the project file cannot be read', async () => {
-    const root = tempRepo({ 'audio-studio.json': '{' })
-    expect(await modelsView(join(root, 'audio-studio.json'))).toMatchObject({ ok: false })
+    const root = tempRepo({ 'content-studio.json': '{' })
+    expect(await modelsView(join(root, 'content-studio.json'))).toMatchObject({ ok: false })
   })
 
   it('counts every language’s lines once each', async () => {
@@ -84,7 +84,7 @@ describe('modelsView', () => {
       manifest: 'audio/{part}/{language}/manifest.json',
     }
     const root = tempRepo({
-      'audio-studio.json': json,
+      'content-studio.json': json,
       'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
       'tts/act1/en/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
       'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'En gång.' }],
@@ -92,7 +92,7 @@ describe('modelsView', () => {
       'audio/act1/sv/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
       'tts/act1/sv/narration.lock.json': { a: entry('drama-3') },
     })
-    const view = await modelsView(join(root, 'audio-studio.json'))
+    const view = await modelsView(join(root, 'content-studio.json'))
     expect(view).toMatchObject({
       ok: true,
       dialog: { lines: 2 },
@@ -102,7 +102,7 @@ describe('modelsView', () => {
 
   it('lists the length of every loop in the project, for Setup’s line about a short model', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson({
+      'content-studio.json': projectJson({
         music: {
           paths: {
             loops: 'tts/{part}/music.json',
@@ -121,14 +121,14 @@ describe('modelsView', () => {
       'tts/stingers.json': [{ id: 'win', title: 'Win', brief: 'fanfare', seconds: 6 }],
       'music/briefs.json': { cave: { seconds: 25 } },
     })
-    const view = await modelsView(join(root, 'audio-studio.json'))
+    const view = await modelsView(join(root, 'content-studio.json'))
     if (!view.ok) throw new Error('expected a view')
     expect(view.music).toMatchObject({ model: 'balanced', loops: [90, 25] })
   })
 
   it('has no music for a project without a music section', async () => {
     const view = await modelsView(
-      join(tempRepo({ 'audio-studio.json': projectJson() }), 'audio-studio.json'),
+      join(tempRepo({ 'content-studio.json': projectJson() }), 'content-studio.json'),
     )
     expect(view).toMatchObject({ ok: true, music: null })
   })
@@ -147,8 +147,8 @@ describe('modelsView, with images', () => {
   }
 
   it('gives the main image model, which models are here', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson({ images: imagesSection }) })
-    const view = await modelsView(join(root, 'audio-studio.json'), undefined, {
+    const root = tempRepo({ 'content-studio.json': projectJson({ images: imagesSection }) })
+    const view = await modelsView(join(root, 'content-studio.json'), undefined, {
       installed: (model) => model === 'z-image-turbo',
     })
     if (!view.ok) throw new Error('expected a view')
@@ -160,7 +160,7 @@ describe('modelsView, with images', () => {
 
   it('has no images for a project without an images section', async () => {
     const view = await modelsView(
-      join(tempRepo({ 'audio-studio.json': projectJson() }), 'audio-studio.json'),
+      join(tempRepo({ 'content-studio.json': projectJson() }), 'content-studio.json'),
     )
     expect(view).toMatchObject({ ok: true, images: null })
   })
@@ -169,14 +169,14 @@ describe('modelsView, with images', () => {
 describe('modelsView, with ElevenLabs', () => {
   it('gives ElevenLabs’ stage models, and the characters each model’s recorded lines were sent', async () => {
     const root = tempRepo({
-      'audio-studio.json': project(models),
+      'content-studio.json': project(models),
       'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1', style: '[warm]' } } },
       'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
       'audio/act1/a.mp3': 'x',
       'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1 } },
       'tts/act1/narration.lock.json': { a: entry('eleven_v3') },
     })
-    const view = await modelsView(join(root, 'audio-studio.json'))
+    const view = await modelsView(join(root, 'content-studio.json'))
     if (!view.ok) throw new Error(JSON.stringify(view.problems))
     expect(view.elevenlabs).toEqual({
       audition: 'eleven_v3',

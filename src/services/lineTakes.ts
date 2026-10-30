@@ -29,7 +29,7 @@ import { openProject, readPart, type PartRead, type ProjectFailure } from './wor
 const NO_CREDITS = createBudget({ model: DEFAULT_ELEVEN_MODEL, dollars: 0 })
 
 /** Where a line's extra takes are kept, in the project's tool cache: a folder per part and line. */
-const LINE_TAKES_DIR = '.audio-studio/line-takes'
+const LINE_TAKES_DIR = '.content-studio/line-takes'
 
 /** A line's extra takes, newest first, or why they cannot be listed. Null for an unknown part or line. */
 export type LineTakesResult =

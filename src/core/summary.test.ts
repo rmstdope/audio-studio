@@ -13,7 +13,7 @@ function lines(...speakers: string[]): Line[] {
 function input(overrides: Partial<SummaryInput> = {}): SummaryInput {
   return {
     project,
-    projectFile: 'audio-studio.json',
+    projectFile: 'content-studio.json',
     root: '/repo',
     dialogs: {},
     cast: null,
@@ -140,7 +140,7 @@ describe('summarize, words that sound the same', () => {
     const own = ProjectSchema.parse(json)
     expect(summarize(input({ project: own }))).toMatchObject({
       soundAlike: [['Lyria', 'Liria']],
-      projectFile: 'audio-studio.json',
+      projectFile: 'content-studio.json',
     })
     expect(summarize(input()).soundAlike).toEqual([])
   })

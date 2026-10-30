@@ -11,7 +11,7 @@ import { recordLine } from '../services/narration'
 import { allowedHosts, startServer } from './index'
 
 const root = tempRepo({
-  'audio-studio.json': projectJson(),
+  'content-studio.json': projectJson(),
   'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
   'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   'audio/act1/manifest.json': { a: { file: 'a.mp3' } },
@@ -61,7 +61,7 @@ const encode = async (wav: Uint8Array, file: string) => {
   writeFileSync(file, wav)
 }
 const server = startServer({
-  projectFile: join(root, 'audio-studio.json'),
+  projectFile: join(root, 'content-studio.json'),
   port: 0,
   fish,
   encode,
@@ -621,14 +621,14 @@ describe('server', () => {
 
 describe('server, accepting a weak line', () => {
   const weakRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [
       { key: 'a', speaker: 'narrator', text: 'Once upon a time.' },
       { key: 'b', speaker: 'narrator', text: 'Twice.' },
     ],
   })
-  const projectFile = join(weakRoot, 'audio-studio.json')
+  const projectFile = join(weakRoot, 'content-studio.json')
   const halfHeard = {
     transcribe: async () => [{ start: 0, end: 0.9, words: [{ word: 'Once', start: 0, end: 0.3 }] }],
     close() {},
@@ -659,11 +659,11 @@ describe('server, accepting a weak line', () => {
 
 describe('server, words that sound the same', () => {
   const ownRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
   })
   const server = startServer({
-    projectFile: join(ownRoot, 'audio-studio.json'),
+    projectFile: join(ownRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -692,7 +692,7 @@ describe('server, words that sound the same', () => {
 describe('server, a character per language', () => {
   const base = projectJson()
   const languageRoot = tempRepo({
-    'audio-studio.json': {
+    'content-studio.json': {
       ...base,
       narration: {
         ...(base.narration as object),
@@ -724,7 +724,7 @@ describe('server, a character per language', () => {
   }
   const asked: (string | undefined)[] = []
   const languageServer = startServer({
-    projectFile: join(languageRoot, 'audio-studio.json'),
+    projectFile: join(languageRoot, 'content-studio.json'),
     port: 0,
     fish: {
       ...fish,
@@ -788,11 +788,11 @@ describe('server, retiring models', () => {
   const project = projectJson()
   ;(project.narration as { models?: unknown }).models = { draft: 's1', final: 's1' }
   const ownRoot = tempRepo({
-    'audio-studio.json': project,
+    'content-studio.json': project,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
   })
   const server = startServer({
-    projectFile: join(ownRoot, 'audio-studio.json'),
+    projectFile: join(ownRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -828,7 +828,7 @@ describe('server, choosing the stages’ models', () => {
     final: 's2.1-pro-free',
   }
   const modelsRoot = tempRepo({
-    'audio-studio.json': base,
+    'content-studio.json': base,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
@@ -842,7 +842,7 @@ describe('server, choosing the stages’ models', () => {
     },
   }
   const modelServer = startServer({
-    projectFile: join(modelsRoot, 'audio-studio.json'),
+    projectFile: join(modelsRoot, 'content-studio.json'),
     port: 0,
     fish: slow,
     encode,
@@ -861,7 +861,7 @@ describe('server, choosing the stages’ models', () => {
     const view = await (await fetch(at('/api/models'))).json()
     expect(view).toMatchObject({
       ok: true,
-      file: 'audio-studio.json',
+      file: 'content-studio.json',
       models: { draft: 's2.1-pro-free' },
       dialog: { lines: 1 },
       busy: null,
@@ -974,7 +974,7 @@ describe('server, choosing the stages’ models', () => {
 describe('server, models while a line or an audition take is going on', () => {
   const base = projectJson()
   const lineRoot = tempRepo({
-    'audio-studio.json': base,
+    'content-studio.json': base,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
@@ -991,7 +991,7 @@ describe('server, models while a line or an audition take is going on', () => {
     },
   }
   const lineServer = startServer({
-    projectFile: join(lineRoot, 'audio-studio.json'),
+    projectFile: join(lineRoot, 'content-studio.json'),
     port: 0,
     fish: slow,
     encode,
@@ -1035,7 +1035,7 @@ describe('server, models while a line or an audition take is going on', () => {
 describe('server, paid auditions in two languages', () => {
   const base = projectJson()
   const root = tempRepo({
-    'audio-studio.json': {
+    'content-studio.json': {
       ...base,
       narration: {
         ...(base.narration as object),
@@ -1056,7 +1056,7 @@ describe('server, paid auditions in two languages', () => {
     'tts/act1/sv/script.json': [{ key: 'a', speaker: 'gran', text: 'Hej.' }],
   })
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish: {
       ...fish,
@@ -1097,12 +1097,12 @@ describe('server, paid auditions in two languages', () => {
 
 describe('server, the Fish tier', () => {
   const ownRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     '.env': 'FISH_AUDIO_API_KEY=k\n',
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
   })
   const server = startServer({
-    projectFile: join(ownRoot, 'audio-studio.json'),
+    projectFile: join(ownRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -1134,9 +1134,9 @@ describe('server, the Fish tier', () => {
 })
 
 describe('server, the take fade', () => {
-  const ownRoot = tempRepo({ 'audio-studio.json': projectJson() })
+  const ownRoot = tempRepo({ 'content-studio.json': projectJson() })
   const server = startServer({
-    projectFile: join(ownRoot, 'audio-studio.json'),
+    projectFile: join(ownRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -1179,12 +1179,12 @@ describe('allowedHosts', () => {
 
 describe('server, with problems', () => {
   const broken = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': '{ broken',
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const other = startServer({
-    projectFile: join(broken, 'audio-studio.json'),
+    projectFile: join(broken, 'content-studio.json'),
     port: 0,
     fish: null,
     transcriber: null,
@@ -1210,14 +1210,14 @@ describe('server, with problems', () => {
 
 describe('server, without an API key', () => {
   const keyless = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': {
       speakers: { narrator: { voice: 'v1', audition: { keywords: ['warm'] } } },
     },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const other = startServer({
-    projectFile: join(keyless, 'audio-studio.json'),
+    projectFile: join(keyless, 'content-studio.json'),
     port: 0,
     fish: null,
     transcriber: null,
@@ -1242,7 +1242,7 @@ describe('server, without an API key', () => {
 
   it('says when Fish cannot tell the credit', async () => {
     const down = startServer({
-      projectFile: join(root, 'audio-studio.json'),
+      projectFile: join(root, 'content-studio.json'),
       port: 0,
       fish: {
         ...fish,
@@ -1270,7 +1270,7 @@ describe('server, without an API key', () => {
 
 describe('server, generating a part', () => {
   const genRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [
       { key: 'a', speaker: 'narrator', text: 'Once.' },
@@ -1282,7 +1282,7 @@ describe('server, generating a part', () => {
     'audio/act1/old.mp3': 'old',
   })
   const gen = startServer({
-    projectFile: join(genRoot, 'audio-studio.json'),
+    projectFile: join(genRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -1365,7 +1365,7 @@ describe('server, refreshing and generating', () => {
   const json = projectJson()
   ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 0.5'
   const busyRoot = tempRepo({
-    'audio-studio.json': json,
+    'content-studio.json': json,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
@@ -1377,7 +1377,7 @@ describe('server, refreshing and generating', () => {
     },
   }
   const busy = startServer({
-    projectFile: join(busyRoot, 'audio-studio.json'),
+    projectFile: join(busyRoot, 'content-studio.json'),
     port: 0,
     fish: slowFish,
     encode,
@@ -1413,14 +1413,14 @@ describe('server, refreshing and generating', () => {
 
 describe('server, generating a part whose dialog is gone', () => {
   const goneRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'audio/act1/manifest.json': {
       a: { file: 'a.mp3', speaker: 'narrator', duration: 1, words: [] },
     },
     'audio/act1/a.mp3': 'clip',
   })
   const gone = startServer({
-    projectFile: join(goneRoot, 'audio-studio.json'),
+    projectFile: join(goneRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -1443,7 +1443,7 @@ describe('server, generating a part whose dialog is gone', () => {
 
 describe('server, generating only what was shown', () => {
   const shownRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' }, mira: { voice: 'v2' } } },
     'tts/act1/script.json': [
       { key: 'a', speaker: 'narrator', text: 'Once.' },
@@ -1457,7 +1457,7 @@ describe('server, generating only what was shown', () => {
     'audio/act1/unseen.mp3': 'x',
   })
   const shown = startServer({
-    projectFile: join(shownRoot, 'audio-studio.json'),
+    projectFile: join(shownRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -1499,12 +1499,12 @@ describe('server, takes not checked', () => {
   const plain = projectJson()
   ;(plain.narration as { quality?: unknown }).quality = { transcriber: 'none' }
   const plainRoot = tempRepo({
-    'audio-studio.json': plain,
+    'content-studio.json': plain,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const server = startServer({
-    projectFile: join(plainRoot, 'audio-studio.json'),
+    projectFile: join(plainRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -1520,11 +1520,11 @@ describe('server, takes not checked', () => {
 
 describe.skipIf(!Bun.which('ffmpeg'))('server, measuring clips', () => {
   const measureRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
   })
-  const projectFile = join(measureRoot, 'audio-studio.json')
+  const projectFile = join(measureRoot, 'content-studio.json')
   /** Hears "Once upon" only, whatever the clip. */
   const halfHeard = {
     transcribe: async () => [
@@ -1636,7 +1636,7 @@ describe('server, a paid draft model', () => {
     narration: { ...(projectJson().narration as object), models: { draft: 's2-pro' } },
   })
   const paidRoot = tempRepo({
-    'audio-studio.json': paid,
+    'content-studio.json': paid,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
   })
@@ -1655,7 +1655,7 @@ describe('server, a paid draft model', () => {
     },
   }
   const server = startServer({
-    projectFile: join(paidRoot, 'audio-studio.json'),
+    projectFile: join(paidRoot, 'content-studio.json'),
     port: 0,
     fish: account,
     encode,
@@ -1819,7 +1819,7 @@ describe('server, paid recording and what changes meanwhile', () => {
   const freeProject = projectJson({ narration: oneAtATime })
   const paidProject = projectJson({ narration: { ...oneAtATime, models: { draft: 's2-pro' } } })
   const root = tempRepo({
-    'audio-studio.json': freeProject,
+    'content-studio.json': freeProject,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': ['a', 'b', 'c', 'd'].map((key) => ({
       key,
@@ -1827,7 +1827,7 @@ describe('server, paid recording and what changes meanwhile', () => {
       text: `Line ${key}.`,
     })),
   })
-  const projectFile = join(root, 'audio-studio.json')
+  const projectFile = join(root, 'content-studio.json')
   let credit = 10
   let creditGate: Promise<void> | null = null
   let creditCalls = 0
@@ -2036,7 +2036,7 @@ describe('server, a paid job refused for a refresh', () => {
   })
   ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
   const root = tempRepo({
-    'audio-studio.json': json,
+    'content-studio.json': json,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
   })
@@ -2050,7 +2050,7 @@ describe('server, a paid job refused for a refresh', () => {
     },
   }
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish: account,
     encode,
@@ -2092,7 +2092,7 @@ describe('server, the final recording', () => {
     narration: { ...(projectJson().narration as object), models: { final: 's2-pro' } },
   })
   const root = tempRepo({
-    'audio-studio.json': withFinal,
+    'content-studio.json': withFinal,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [
       { key: 'a', speaker: 'narrator', text: 'Once upon a time.' },
@@ -2113,7 +2113,7 @@ describe('server, the final recording', () => {
     },
   }
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish: account,
     encode,
@@ -2196,12 +2196,12 @@ describe('server, the final recording', () => {
 
 describe('server, a final stage without a final model', () => {
   const root = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -2223,7 +2223,7 @@ describe('server, a paid audition', () => {
     narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
   })
   const paidRoot = tempRepo({
-    'audio-studio.json': paid,
+    'content-studio.json': paid,
     'tts/cast.json': {
       speakers: { gran: { voice: 'cur', style: '[warm]' }, kid: { voice: 'k1' } },
     },
@@ -2245,7 +2245,7 @@ describe('server, a paid audition', () => {
     },
   }
   const server = startServer({
-    projectFile: join(paidRoot, 'audio-studio.json'),
+    projectFile: join(paidRoot, 'content-studio.json'),
     port: 0,
     fish: account,
     encode,
@@ -2397,7 +2397,7 @@ describe('server, a paid audition ended with takes queued', () => {
     },
   })
   const root = tempRepo({
-    'audio-studio.json': paid,
+    'content-studio.json': paid,
     'tts/cast.json': { speakers: { gran: { voice: 'cur' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
   })
@@ -2413,7 +2413,7 @@ describe('server, a paid audition ended with takes queued', () => {
     },
   }
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish: account,
     encode,
@@ -2448,7 +2448,7 @@ describe('server, a paid audition with a take in flight', () => {
     narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
   })
   const root = tempRepo({
-    'audio-studio.json': paid,
+    'content-studio.json': paid,
     'tts/cast.json': { speakers: { gran: { voice: 'cur' }, kid: { voice: 'k1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
   })
@@ -2465,7 +2465,7 @@ describe('server, a paid audition with a take in flight', () => {
     },
   }
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish: account,
     encode,
@@ -2496,7 +2496,7 @@ describe('server, a paid audition with a take in flight', () => {
 describe('server, a part in another language', () => {
   const base = projectJson()
   const many = tempRepo({
-    'audio-studio.json': {
+    'content-studio.json': {
       ...base,
       narration: {
         ...(base.narration as object),
@@ -2517,7 +2517,7 @@ describe('server, a part in another language', () => {
     'audio/act1/sv/manifest.json': { a: { file: 'a.mp3' } },
   })
   const swedish = startServer({
-    projectFile: join(many, 'audio-studio.json'),
+    projectFile: join(many, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -2545,13 +2545,13 @@ describe('server, a part in another language', () => {
 
 describe('cloning a voice', () => {
   const repo = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const made: { title: FormDataEntryValue | null; names: string[] }[] = []
   const cloning = startServer({
-    projectFile: join(repo, 'audio-studio.json'),
+    projectFile: join(repo, 'content-studio.json'),
     port: 0,
     fish: {
       ...fish,
@@ -2647,11 +2647,11 @@ describe('server, the spending record', () => {
   const paidProject = projectJson({ narration: { ...oneAtATime, models: { draft: 's2-pro' } } })
   const script = ['a', 'b', 'c'].map((key) => ({ key, speaker: 'narrator', text: `Line ${key}.` }))
   const repo = tempRepo({
-    'audio-studio.json': paidProject,
+    'content-studio.json': paidProject,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': script,
   })
-  const projectFile = join(repo, 'audio-studio.json')
+  const projectFile = join(repo, 'content-studio.json')
   const requests: ReturnType<typeof gate>[] = []
   let hold = false
   let failFrom = Infinity
@@ -2733,7 +2733,7 @@ describe('server, the spending record', () => {
     expect(now.rows[0].cost).toBeLessThan(line * 1.01)
     expect(now.acts[0]).toMatchObject({ part: 'act1', title: 'Act I' })
     expect(now.total).toBeCloseTo(now.rows[0].cost, 12)
-    expect(existsSync(join(repo, '.audio-studio/spending.json'))).toBe(true)
+    expect(existsSync(join(repo, '.content-studio/spending.json'))).toBe(true)
   })
 
   it('logs a whole-part job, and shows it live while it runs', async () => {
@@ -2777,23 +2777,23 @@ describe('server, the spending record', () => {
   })
 
   it('says so when the record is damaged', async () => {
-    const path = join(repo, '.audio-studio/spending.json')
+    const path = join(repo, '.content-studio/spending.json')
     const good = readFileSync(path, 'utf8')
     writeFileSync(path, '{ nope')
     const body = await spending()
     expect(body).toMatchObject({ ok: false })
-    expect(body.problems[0].file).toBe('.audio-studio/spending.json')
+    expect(body.problems[0].file).toBe('.content-studio/spending.json')
     writeFileSync(path, good)
   })
 
   it('logs nothing for a free model', async () => {
     const freeRepo = tempRepo({
-      'audio-studio.json': freeProject,
+      'content-studio.json': freeProject,
       'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
       'tts/act1/script.json': script,
     })
     const free = startServer({
-      projectFile: join(freeRepo, 'audio-studio.json'),
+      projectFile: join(freeRepo, 'content-studio.json'),
       port: 0,
       fish: account,
       encode,
@@ -2811,7 +2811,7 @@ describe('server, the spending record', () => {
         ok: true,
         count: 0,
       })
-      expect(existsSync(join(freeRepo, '.audio-studio/spending.json'))).toBe(false)
+      expect(existsSync(join(freeRepo, '.content-studio/spending.json'))).toBe(false)
     } finally {
       free.stop(true)
     }
@@ -2865,7 +2865,7 @@ describe('server, the spending record', () => {
 
 describe('designing a voice', () => {
   const repo = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
@@ -2873,7 +2873,7 @@ describe('designing a voice', () => {
   const saved: string[] = []
   let credit: number | Error = 25
   const designing = startServer({
-    projectFile: join(repo, 'audio-studio.json'),
+    projectFile: join(repo, 'content-studio.json'),
     port: 0,
     fish: {
       ...fish,
@@ -2982,7 +2982,7 @@ describe('designing a voice', () => {
 describe('server, generating per language', () => {
   const base = projectJson()
   const languageRoot = tempRepo({
-    'audio-studio.json': {
+    'content-studio.json': {
       ...base,
       narration: {
         ...(base.narration as object),
@@ -3015,7 +3015,7 @@ describe('server, generating per language', () => {
   })
   const spoken: string[] = []
   const server = startServer({
-    projectFile: join(languageRoot, 'audio-studio.json'),
+    projectFile: join(languageRoot, 'content-studio.json'),
     port: 0,
     fish: {
       ...fish,
@@ -3129,7 +3129,7 @@ describe('server, generating per language', () => {
         was: [],
       }),
     ).toEqual({ ok: true })
-    const project = JSON.parse(readFileSync(join(languageRoot, 'audio-studio.json'), 'utf8'))
+    const project = JSON.parse(readFileSync(join(languageRoot, 'content-studio.json'), 'utf8'))
     expect(project.narration.quality.soundAlikeByLanguage).toEqual({ sv: [['Lyria', 'Liria']] })
     const summary = (await get('/api/project')).summary
     expect(summary.perLanguage.sv).toEqual({
@@ -3149,7 +3149,7 @@ describe('server, generating per language', () => {
 describe('server, the music pages', () => {
   const list = JSON.stringify([{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5 }])
   const musicRoot = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       music: {
         refreshShared: `printf '%s' '${list}' > tts/stingers.json`,
         paths: {
@@ -3165,7 +3165,7 @@ describe('server, the music pages', () => {
     'tts/cast.json': { speakers: {} },
   })
   const studio = startServer({
-    projectFile: join(musicRoot, 'audio-studio.json'),
+    projectFile: join(musicRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -3243,7 +3243,7 @@ describe('server, the music pages', () => {
 
   it('refuses with a reason when the project has no shared command', async () => {
     const plain = startServer({
-      projectFile: join(root, 'audio-studio.json'),
+      projectFile: join(root, 'content-studio.json'),
       port: 0,
       fish,
       encode,
@@ -3264,7 +3264,7 @@ describe('server, the music pages', () => {
 
 describe('server, what music takes cost', () => {
   const musicRoot = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       music: {
         paths: {
           loops: 'tts/{part}/music.json',
@@ -3280,7 +3280,7 @@ describe('server, what music takes cost', () => {
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
   })
   const studio = startServer({
-    projectFile: join(musicRoot, 'audio-studio.json'),
+    projectFile: join(musicRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -3330,7 +3330,7 @@ describe('server, what music takes cost', () => {
 
 describe('server, a track’s takes', () => {
   const musicRoot = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       music: {
         paths: {
           loops: 'tts/{part}/music.json',
@@ -3348,7 +3348,7 @@ describe('server, a track’s takes', () => {
   let ready: { ok: true } | { ok: false; message: string; fix: string } = { ok: true }
   const made: string[] = []
   const studio = startServer({
-    projectFile: join(musicRoot, 'audio-studio.json'),
+    projectFile: join(musicRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -3477,7 +3477,7 @@ describe('server, a track’s takes', () => {
 
 describe('server, choosing a take', () => {
   const musicRoot = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       music: {
         paths: {
           loops: 'tts/{part}/music.json',
@@ -3493,7 +3493,7 @@ describe('server, choosing a take', () => {
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
   })
   const studio = startServer({
-    projectFile: join(musicRoot, 'audio-studio.json'),
+    projectFile: join(musicRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -3593,7 +3593,7 @@ describe('server, playing what a track plays now', () => {
     at: '2026-11-02T10:00:00.000Z',
   }
   const musicRoot = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       music: {
         paths: {
           loops: 'tts/{part}/music.json',
@@ -3622,7 +3622,7 @@ describe('server, playing what a track plays now', () => {
   })
   mkdirSync(join(musicRoot, 'game/dir.mp3'))
   const studio = startServer({
-    projectFile: join(musicRoot, 'audio-studio.json'),
+    projectFile: join(musicRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -3659,7 +3659,7 @@ describe('server, playing what a track plays now', () => {
 
 describe('server, removing music the game no longer asks for', () => {
   const musicRoot = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       music: {
         paths: {
           loops: 'tts/{part}/music.json',
@@ -3690,7 +3690,7 @@ describe('server, removing music the game no longer asks for', () => {
     'audio/music/castle-gates.mp3': 'mp3',
   })
   const studio = startServer({
-    projectFile: join(musicRoot, 'audio-studio.json'),
+    projectFile: join(musicRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -3738,13 +3738,13 @@ describe('server, the music model', () => {
     manifest: 'audio/music/manifest.json',
   }
   const root = tempRepo({
-    'audio-studio.json': projectJson({ music: { paths } }),
+    'content-studio.json': projectJson({ music: { paths } }),
     'tts/cast.json': { speakers: {} },
     'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
   })
   const asked: string[] = []
   const studio = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -3818,9 +3818,9 @@ describe('server, the music model', () => {
 
 describe('server, no music model without music', () => {
   it('has no music on the models view', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
+    const root = tempRepo({ 'content-studio.json': projectJson() })
     const studio = startServer({
-      projectFile: join(root, 'audio-studio.json'),
+      projectFile: join(root, 'content-studio.json'),
       port: 0,
       fish,
       encode,
@@ -3837,7 +3837,7 @@ describe('server, no music model without music', () => {
 
 describe('server, moving a take', () => {
   const musicRoot = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       music: {
         paths: {
           loops: 'tts/{part}/music.json',
@@ -3854,7 +3854,7 @@ describe('server, moving a take', () => {
     'tts/act2/music.json': [{ id: 'hut', title: 'Hut', brief: 'eerie', seconds: 5 }],
   })
   const studio = startServer({
-    projectFile: join(musicRoot, 'audio-studio.json'),
+    projectFile: join(musicRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -3906,7 +3906,7 @@ describe('server, moving a take', () => {
 
 describe('the ElevenLabs account on Setup', () => {
   const elevenRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     '.env': 'ELEVENLABS_API_KEY=k\n',
   })
   const starter = {
@@ -3922,7 +3922,7 @@ describe('the ElevenLabs account on Setup', () => {
   }
   const setupOf = async (elevenlabs: ElevenLabsClient) => {
     const server = startServer({
-      projectFile: join(elevenRoot, 'audio-studio.json'),
+      projectFile: join(elevenRoot, 'content-studio.json'),
       port: 0,
       fish,
       elevenlabs,
@@ -3956,7 +3956,7 @@ describe('the ElevenLabs account on Setup', () => {
 
   it('treats no ElevenLabs client as no key, and asks nothing', async () => {
     const server = startServer({
-      projectFile: join(elevenRoot, 'audio-studio.json'),
+      projectFile: join(elevenRoot, 'content-studio.json'),
       port: 0,
       fish,
       elevenlabs: null,
@@ -3994,13 +3994,13 @@ describe('the ElevenLabs account on Setup', () => {
 
 describe('casting an ElevenLabs voice', () => {
   const elevenRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const { client: eleven, asked } = fakeEleven({ g1: elevenVoiceOf('g1') })
   const elevenServer = startServer({
-    projectFile: join(elevenRoot, 'audio-studio.json'),
+    projectFile: join(elevenRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -4059,7 +4059,7 @@ describe('recording an ElevenLabs voice’s lines', () => {
     { gate, fishCredit, draft }: { gate?: Promise<void>; fishCredit?: number; draft?: string } = {},
   ) {
     const where = tempRepo({
-      'audio-studio.json': draft
+      'content-studio.json': draft
         ? projectJson({
             narration: {
               ...(projectJson().narration as object),
@@ -4103,7 +4103,7 @@ describe('recording an ElevenLabs voice’s lines', () => {
       subscription: () => (accountAsked++, eleven.client.subscription()),
     }
     const running = startServer({
-      projectFile: join(where, 'audio-studio.json'),
+      projectFile: join(where, 'content-studio.json'),
       port: 0,
       fish: watching,
       encode,
@@ -4316,7 +4316,7 @@ describe('recording an ElevenLabs voice’s lines', () => {
 
 describe('a final recording on ElevenLabs’ side only', () => {
   const where = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       narration: {
         ...(projectJson().narration as object),
         elevenlabs: { models: { final: 'eleven_multilingual_v2' } },
@@ -4326,7 +4326,7 @@ describe('a final recording on ElevenLabs’ side only', () => {
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const running = startServer({
-    projectFile: join(where, 'audio-studio.json'),
+    projectFile: join(where, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -4348,7 +4348,7 @@ describe('a final recording on ElevenLabs’ side only', () => {
 
   it('takes an up-to-date line again with its stage’s ElevenLabs model', async () => {
     const draftOnFlash = tempRepo({
-      'audio-studio.json': projectJson({
+      'content-studio.json': projectJson({
         narration: {
           ...(projectJson().narration as object),
           elevenlabs: { models: { draft: 'eleven_flash_v2_5', final: 'eleven_flash_v2_5' } },
@@ -4376,7 +4376,7 @@ describe('a final recording on ElevenLabs’ side only', () => {
       },
     )
     const flash = startServer({
-      projectFile: join(draftOnFlash, 'audio-studio.json'),
+      projectFile: join(draftOnFlash, 'content-studio.json'),
       port: 0,
       fish,
       encode,
@@ -4404,14 +4404,14 @@ describe('a final recording on ElevenLabs’ side only', () => {
 
 describe('takes and tries with an ElevenLabs voice', () => {
   const elevenRoot = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { narrator: { voice: 'eleven:g1', style: '[warm]' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'narrator', text: 'Once.' }],
   })
   const wav = new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2])
   const { client: eleven, spoken } = fakeEleven({ g1: elevenVoiceOf('g1') }, { speak: () => wav })
   const elevenServer = startServer({
-    projectFile: join(elevenRoot, 'audio-studio.json'),
+    projectFile: join(elevenRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -4449,7 +4449,7 @@ describe('takes and tries with an ElevenLabs voice', () => {
 
 describe('server, an audition paid in ElevenLabs credits', () => {
   const root = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': {
       speakers: { gran: { voice: 'eleven:g1', style: '[warm]' }, kid: { voice: 'k1' } },
     },
@@ -4473,7 +4473,7 @@ describe('server, an audition paid in ElevenLabs credits', () => {
     },
   )
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -4557,7 +4557,7 @@ describe('server, an audition’s dollars and credits together', () => {
     narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
   })
   const root = tempRepo({
-    'audio-studio.json': paid,
+    'content-studio.json': paid,
     'tts/cast.json': {
       speakers: { gran: { voice: 'eleven:g1', style: '[warm]' }, kid: { voice: 'k1' } },
     },
@@ -4586,7 +4586,7 @@ describe('server, an audition’s dollars and credits together', () => {
   )
   const account: FishClient = { ...fish, credit: async () => 4.82 }
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish: account,
     encode,
@@ -4690,7 +4690,7 @@ describe('server, an audition’s dollars and credits together', () => {
 
 describe('server, credits in flight when a sitting is replaced or ended', () => {
   const root = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { gran: { voice: 'eleven:g1', style: '[warm]' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'gran', text: 'Hello.' }],
   })
@@ -4710,7 +4710,7 @@ describe('server, credits in flight when a sitting is replaced or ended', () => 
     },
   )
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -4751,7 +4751,7 @@ describe('server, credits in flight when a sitting is replaced or ended', () => 
 
 describe('server, voices from ElevenLabs’ library on the board', () => {
   const root = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': {
       speakers: { gran: { style: '[warm]', audition: { keywords: ['warm'] } } },
     },
@@ -4781,7 +4781,7 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     return `own-${id}`
   }
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -4824,7 +4824,7 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     const board = await (await fetch(new URL('/api/auditions/gran', server.url))).json()
     expect(board.session.voices['eleven:l1'].library).toEqual({ owner: 'o1', added: true })
     expect(
-      JSON.parse(readFileSync(join(root, '.audio-studio/eleven-voices.json'), 'utf8')),
+      JSON.parse(readFileSync(join(root, '.content-studio/eleven-voices.json'), 'utf8')),
     ).toMatchObject({
       added: [{ library: 'eleven:l1', voice: 'eleven:own-l1', character: 'gran' }],
     })
@@ -4879,7 +4879,7 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     expect((await slots()).used).not.toBe(3)
     // ...but a free changes the slots, so it is.
     writeFileSync(
-      join(root, '.audio-studio/eleven-voices.json'),
+      join(root, '.content-studio/eleven-voices.json'),
       JSON.stringify({
         version: 1,
         added: [{ library: 'eleven:z', voice: 'eleven:z2', name: 'Z', character: 'gran', at: '' }],
@@ -4911,7 +4911,7 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
 
   it('offers and frees nothing while the cast cannot be read', async () => {
     writeFileSync(
-      join(root, '.audio-studio/eleven-voices.json'),
+      join(root, '.content-studio/eleven-voices.json'),
       JSON.stringify({
         version: 1,
         added: [{ library: 'eleven:y', voice: 'eleven:y2', name: 'Y', character: 'gran', at: '' }],
@@ -4924,13 +4924,13 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
     const refusal = await offered.json()
     expect([offered.status, refusal.reason]).toEqual([409, 'unknown-use'])
     expect(refusal.message).toStartWith(
-      'tts/cast.json or a saved audition in .audio-studio/auditions',
+      'tts/cast.json or a saved audition in .content-studio/auditions',
     )
     const freed = await send('POST', '/api/elevenlabs/voices/free', { voices: ['eleven:y2'] })
     expect([freed.status, (await freed.json()).reason]).toEqual([409, 'unknown-use'])
     expect(deleted).toEqual([])
     // With nothing the studio added there is nothing to offer, and nothing to say.
-    writeFileSync(join(root, '.audio-studio/eleven-voices.json'), '{"version": 1, "added": []}')
+    writeFileSync(join(root, '.content-studio/eleven-voices.json'), '{"version": 1, "added": []}')
     const none = await fetch(new URL('/api/elevenlabs/voices/freeable', server.url))
     expect([none.status, await none.json()]).toEqual([200, { ok: true, voices: [] }])
   })
@@ -4938,7 +4938,7 @@ describe('server, voices from ElevenLabs’ library on the board', () => {
 
 describe('server, designing voices with ElevenLabs', () => {
   const root = tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': {
       speakers: { gran: { style: '[warm]', audition: { keywords: ['warm'] } } },
     },
@@ -4970,7 +4970,7 @@ describe('server, designing voices with ElevenLabs', () => {
   }
   eleven.client.saveDesignedVoice = async ({ generated }) => `v-${generated}`
   const server = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -5032,7 +5032,7 @@ describe('server, designing voices with ElevenLabs', () => {
 
 describe('the images routes', () => {
   const imagesRoot = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       images: {
         paths: {
           list: 'tts/{part}/images.json',
@@ -5050,7 +5050,7 @@ describe('the images routes', () => {
     'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
   })
   const studio = startServer({
-    projectFile: join(imagesRoot, 'audio-studio.json'),
+    projectFile: join(imagesRoot, 'content-studio.json'),
     port: 0,
     fish,
     encode,
@@ -5105,7 +5105,7 @@ describe('the images routes', () => {
 
 describe('the image takes routes', () => {
   const root = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       images: {
         paths: {
           list: 'tts/{part}/images.json',
@@ -5123,7 +5123,7 @@ describe('the image takes routes', () => {
     'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
   })
   const studio = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     transcriber: null,
     images: {
@@ -5219,7 +5219,7 @@ describe('the image takes routes', () => {
 
 describe('the image model routes', () => {
   const root = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       images: {
         paths: {
           list: 'tts/{part}/images.json',
@@ -5238,7 +5238,7 @@ describe('the image model routes', () => {
   })
   const asked: string[] = []
   const studio = startServer({
-    projectFile: join(root, 'audio-studio.json'),
+    projectFile: join(root, 'content-studio.json'),
     port: 0,
     transcriber: null,
     images: {

@@ -227,7 +227,7 @@ function AdoptBanner({ part, language }: { part: PartDetail; language?: string }
   return (
     <div className="adopt">
       <div className="adopt-text">
-        <strong>{plural(count, 'clip')} recorded before Audio Studio</strong>
+        <strong>{plural(count, 'clip')} recorded outside the studio</strong>
         <span>
           Nothing says which voice, cue and settings {count === 1 ? 'it was' : 'they were'} made
           with. Adopt {count === 1 ? 'it' : 'them'} as made with today’s settings, so only lines

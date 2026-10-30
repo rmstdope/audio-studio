@@ -6,7 +6,7 @@ import { setSoundAlike } from './soundAlike'
 
 function repo(project: Record<string, unknown> = projectJson(), indent = 2) {
   const root = tempRepo({})
-  const projectFile = join(root, 'audio-studio.json')
+  const projectFile = join(root, 'content-studio.json')
   writeFileSync(projectFile, `${JSON.stringify(project, null, indent)}\n`)
   return { projectFile, read: () => readFileSync(projectFile, 'utf8') }
 }
@@ -68,7 +68,7 @@ describe('setSoundAlike', () => {
     const result = await setSoundAlike(projectFile, [['a', 'b']], [])
     expect(result).toMatchObject({
       ok: false,
-      problems: [{ file: 'audio-studio.json', path: 'narration.quality.soundAlike' }],
+      problems: [{ file: 'content-studio.json', path: 'narration.quality.soundAlike' }],
     })
     expect(read()).toBe(before)
   })
@@ -118,7 +118,7 @@ describe('setSoundAlike', () => {
 
   it('keeps the line endings, and a missing last newline', async () => {
     const root = tempRepo({})
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     writeFileSync(projectFile, JSON.stringify(projectJson(), null, 2).replace(/\n/g, '\r\n'))
     await setSoundAlike(projectFile, [['inn', 'Inne']], [])
     const text = readFileSync(projectFile, 'utf8')
@@ -144,7 +144,7 @@ describe('setSoundAlike', () => {
         ok: false,
         problems: [
           {
-            file: 'audio-studio.json',
+            file: 'content-studio.json',
             path: 'narration.quality.soundAlike',
             message: 'permission denied',
           },

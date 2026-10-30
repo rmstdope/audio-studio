@@ -76,7 +76,7 @@ const realWhisper =
 
 describe.skipIf(!realWhisper)('createWhisperWorker, with real Whisper (macOS)', () => {
   it('hears real speech, word by word', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'audio-studio-whisper-'))
+    const dir = mkdtempSync(join(tmpdir(), 'content-studio-whisper-'))
     Bun.spawnSync(['say', '-o', join(dir, 'speech.aiff'), 'The storm is gone.'])
     Bun.spawnSync([
       'ffmpeg',

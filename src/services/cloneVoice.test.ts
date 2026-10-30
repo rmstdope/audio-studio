@@ -7,7 +7,7 @@ import { FishError, type CreateVoiceRequest, type FishClient } from './fish'
 
 const root = () =>
   tempRepo({
-    'audio-studio.json': projectJson(),
+    'content-studio.json': projectJson(),
     'tts/cast.json': { speakers: { mira: { voice: 'cur' } } },
     'tts/act1/script.json': [{ key: 'a', speaker: 'mira', text: 'Hi.' }],
   })
@@ -36,7 +36,7 @@ describe('cloneVoice', () => {
     const asked: CreateVoiceRequest[] = []
     const dir = root()
     const result = await cloneVoice(
-      join(dir, 'audio-studio.json'),
+      join(dir, 'content-studio.json'),
       'mira',
       { title: '  Mira ', files: [file('a.wav'), file('b.wav')] },
       fishThat(async (request) => {
@@ -48,12 +48,12 @@ describe('cloneVoice', () => {
     expect(asked[0]?.title).toBe('Mira')
     expect(asked[0]?.files.length).toBe(2)
     // Nothing is written to the consumer.
-    expect(readdirSync(dir).sort()).toEqual(['audio-studio.json', 'tts'])
+    expect(readdirSync(dir).sort()).toEqual(['content-studio.json', 'tts'])
   })
 
   it('refuses no files, too many, and a blank name, without asking Fish', async () => {
     const never = fishThat(() => Promise.reject(new Error('asked')))
-    const projectFile = join(root(), 'audio-studio.json')
+    const projectFile = join(root(), 'content-studio.json')
     const many = Array.from({ length: 21 }, (_, i) => file(`${i}.wav`))
     for (const [title, files] of [
       ['Mira', []],
@@ -70,7 +70,7 @@ describe('cloneVoice', () => {
   })
 
   it('says when there is no key', async () => {
-    const projectFile = join(root(), 'audio-studio.json')
+    const projectFile = join(root(), 'content-studio.json')
     const result = await cloneVoice(
       projectFile,
       'mira',
@@ -81,7 +81,7 @@ describe('cloneVoice', () => {
   })
 
   it('gives Fish’s own message when it refuses', async () => {
-    const projectFile = join(root(), 'audio-studio.json')
+    const projectFile = join(root(), 'content-studio.json')
     const result = await cloneVoice(
       projectFile,
       'mira',
@@ -92,7 +92,7 @@ describe('cloneVoice', () => {
   })
 
   it('tells a failure that is not a refusal apart, as the voice may exist', async () => {
-    const projectFile = join(root(), 'audio-studio.json')
+    const projectFile = join(root(), 'content-studio.json')
     const result = await cloneVoice(
       projectFile,
       'mira',
@@ -107,7 +107,7 @@ describe('cloneVoice', () => {
   })
 
   it('knows no character it was not asked about', async () => {
-    const projectFile = join(root(), 'audio-studio.json')
+    const projectFile = join(root(), 'content-studio.json')
     expect(
       await cloneVoice(
         projectFile,

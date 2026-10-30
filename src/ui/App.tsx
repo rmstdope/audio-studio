@@ -32,7 +32,7 @@ export function App() {
         <div className="empty-state">
           <strong>The studio server did not answer</strong>
           <span>
-            Is <span className="mono">audio-studio</span> still running in the terminal?{' '}
+            Is <span className="mono">content-studio</span> still running in the terminal?{' '}
             {project.error.message}
           </span>
           <button className="btn" style={{ alignSelf: 'center' }} onClick={() => project.refetch()}>

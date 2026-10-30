@@ -1,15 +1,15 @@
 {
-  "name": "audio-studio",
+  "name": "content-studio",
   "version": "0.1.0",
   "description": "Audio tool for narratives and music used in games",
   "type": "module",
   "private": true,
   "bin": {
-    "audio-studio": "./bin/audio-studio.ts"
+    "content-studio": "./bin/content-studio.ts"
   },
   "scripts": {
-    "start": "bun bin/audio-studio.ts",
-    "dev": "bun bin/audio-studio.ts --dev --project test/fixtures/sample/audio-studio.json",
+    "start": "bun bin/content-studio.ts",
+    "dev": "bun bin/content-studio.ts --dev --project test/fixtures/sample/content-studio.json",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",

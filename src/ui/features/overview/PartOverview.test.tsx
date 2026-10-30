@@ -33,7 +33,7 @@ describe('the cast on a part’s overview', () => {
       for (const [id, speaker] of Object.entries(cast.speakers))
         speaker.languages = { sv: { voice: `sv-${id}`, voiceName: `Svensk ${id}` } }
       writeFileSync(castFile, JSON.stringify(cast, null, 2))
-      const file = join(root, 'audio-studio.json')
+      const file = join(root, 'content-studio.json')
       const project = await loadProject(file)
       const part = await loadPart(file, 'act1', 'sv')
       if (!project.ok || !part?.ok) throw new Error('the sample did not load')

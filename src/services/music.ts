@@ -167,7 +167,7 @@ export function createAceStepWorker({
     ready,
     installed: (model) => missingFolders(checkpoints, model).length === 0,
     async generate({ model, ...request }, signal) {
-      const out = join(tmpdir(), `audio-studio-music-${randomUUID()}.wav`)
+      const out = join(tmpdir(), `content-studio-music-${randomUUID()}.wav`)
       // The worker makes one take at a time, so ending this one means stopping the worker; the
       // next take starts it again.
       const stop = () => worker.close()

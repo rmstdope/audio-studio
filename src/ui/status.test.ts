@@ -133,3 +133,11 @@ describe('partLinesSummary', () => {
     expect(partLinesSummary({ missing: 14 })).toBe('0 up to date')
   })
 })
+
+describe('statusDetail of a clip the studio did not make', () => {
+  it('says it was recorded outside the studio', () => {
+    expect(statusDetail(line({ status: 'untracked' }), 0.8)).toBe(
+      'recorded outside the studio; adopt to track it',
+    )
+  })
+})

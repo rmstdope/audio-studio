@@ -26,8 +26,8 @@ export function NoImages() {
         <strong>This project has no images yet</strong>
         <span>
           Add an <span className="mono">images</span> section to{' '}
-          <span className="mono">audio-studio.json</span> to say where the game lists its images and
-          its style, then reload.
+          <span className="mono">content-studio.json</span> to say where the game lists its images
+          and its style, then reload.
         </span>
         <button className="btn" type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
           How to set it up

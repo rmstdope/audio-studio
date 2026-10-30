@@ -179,7 +179,7 @@ describe('questionWords', () => {
         's2.1-pro-free',
         's2.1-pro',
         { lines: 1412, cost: { now: 1.071, later: null } },
-        'audio-studio.json',
+        'content-studio.json',
         before,
       ),
     ).toEqual({
@@ -187,7 +187,7 @@ describe('questionWords', () => {
       items: [
         'Draft: s2.1-pro-free → s2.1-pro',
         '1,412 lines drafted with s2.1-pro-free become out of date: the next draft records them again, about $1.07.',
-        'Saved in audio-studio.json; nothing else in it changes.',
+        'Saved in content-studio.json; nothing else in it changes.',
       ],
       keep: 'Keep s2.1-pro-free',
       confirm: 'Switch to s2.1-pro',
@@ -200,7 +200,7 @@ describe('questionWords', () => {
       's2.1-pro',
       'drama-3',
       { lines: 1, cost: { now: 0.0004, later: 0.002 } },
-      'audio-studio.json',
+      'content-studio.json',
       before,
     )
     expect(words.items[1]).toBe(
@@ -215,7 +215,7 @@ describe('questionWords', () => {
       's2.1-pro',
       'drama-3',
       { lines: 640, cost: { now: 0.32, later: 1.6 } },
-      'audio-studio.json',
+      'content-studio.json',
       before,
     )
     expect(words.heading).toBe('Switch the final recording to drama-3?')
@@ -231,7 +231,7 @@ describe('questionWords', () => {
       's2.1-pro',
       's2.1-pro-free',
       { lines: 1, cost: { now: 0, later: null } },
-      'audio-studio.json',
+      'content-studio.json',
       before,
     )
     expect(words.items[1]).toBe(
@@ -309,7 +309,7 @@ describe('ElevenLabs’ stages on the Models panel', () => {
         'eleven_v3',
         'eleven_flash_v2_5',
         { lines: 12, credits: 190 },
-        'audio-studio.json',
+        'content-studio.json',
       ),
     ).toEqual({
       heading: 'Switch ElevenLabs drafts to Flash v2.5?',
@@ -317,7 +317,7 @@ describe('ElevenLabs’ stages on the Models panel', () => {
         'ElevenLabs draft: Eleven v3 → Flash v2.5',
         '12 lines drafted with Eleven v3 become out of date: the next draft records them again, about 190 credits.',
         'Flash v2.5 speaks cues aloud, so lines are sent without them; they stay in the cue files.',
-        'Saved in audio-studio.json; nothing else in it changes.',
+        'Saved in content-studio.json; nothing else in it changes.',
       ],
       keep: 'Keep Eleven v3',
       confirm: 'Switch to Flash v2.5',
@@ -364,7 +364,7 @@ describe('ElevenLabs’ voice settings on the Models panel', () => {
         saved,
         { stability: 0, similarityBoost: 0.75, style: 0.3 },
         { lines: 40, credits: 1250 },
-        'audio-studio.json',
+        'content-studio.json',
       ),
     ).toEqual({
       heading: 'Change how ElevenLabs voices speak?',
@@ -372,7 +372,7 @@ describe('ElevenLabs’ voice settings on the Models panel', () => {
         'Stability: Natural → Creative',
         'Style: 0.00 → 0.30',
         '40 lines recorded with ElevenLabs become out of date: they are recorded again with these settings next time, about 1,250 credits.',
-        'Saved in audio-studio.json; nothing else in it changes.',
+        'Saved in content-studio.json; nothing else in it changes.',
       ],
       keep: 'Keep the saved settings',
       confirm: 'Save and put them out of date',
