@@ -146,17 +146,15 @@ describe('modelsView, with images', () => {
     },
   }
 
-  it('gives the main image model, which models are here, and whether mflux runs', async () => {
+  it('gives the main image model, which models are here', async () => {
     const root = tempRepo({ 'audio-studio.json': projectJson({ images: imagesSection }) })
     const view = await modelsView(join(root, 'audio-studio.json'), undefined, {
       installed: (model) => model === 'z-image-turbo',
-      ready: () => ({ ok: false, message: 'no mflux', fix: 'uv tool install mflux' }),
     })
     if (!view.ok) throw new Error('expected a view')
     expect(view.images).toEqual({
       model: 'klein',
       installed: { klein: false, 'z-image-turbo': true },
-      mflux: { ok: false, message: 'no mflux', fix: 'uv tool install mflux' },
     })
   })
 

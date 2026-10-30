@@ -217,7 +217,6 @@ describe('the Images row of the Models panel', () => {
   const images = (model: 'klein' | 'z-image-turbo', installed = both): Images => ({
     model,
     installed,
-    mflux: { ok: true },
   })
   const imagePuts: unknown[] = []
   beforeEach(() => {

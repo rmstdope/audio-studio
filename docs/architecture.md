@@ -1575,7 +1575,7 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   optional Stable Audio Open models in `~/.cache/stable-audio` ("Not set up" until they are there,
   "Needs attention" only when the project's music model is one that is missing, with three numbered
   steps: accept the licence, make a read token, download), with an `images` section the image models
-  (**Image models**: mflux and the weights of FLUX.2 klein 4B and Z-Image-Turbo in the Hugging Face cache,
+  (**Image models**: mflux and the weights (a `.safetensors` file in a snapshot) of FLUX.2 klein 4B and Z-Image-Turbo in the Hugging Face cache,
   `HF_HUB_CACHE`, else `$HF_HOME/hub`, else `~/.cache/huggingface/hub`: "Ready" with both, "Not set up" when only the
   project's model is there, "Needs attention" when the project's model is missing, or mflux, or both models,
   each with numbered steps and the commands to get what is missing; "Not used" without an `images` section), and two optional ElevenLabs rows (§8.6):

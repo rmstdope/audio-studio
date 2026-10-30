@@ -172,6 +172,7 @@ describe('making takes', () => {
   it('refuses when images cannot be made here, and says what the view shows', async () => {
     const ready = {
       ok: false as const,
+      reason: 'mflux' as const,
       message: 'mflux is not on the PATH',
       fix: 'uv tool install mflux',
     }
@@ -373,7 +374,12 @@ describe('image models', () => {
       here: { klein: false, 'z-image-turbo': false },
     })
     expect(await viewOf(none)).toMatchObject({ generator: { ok: false } })
-    const noMflux = setup({ ok: false, message: 'mflux is not on the PATH', fix: 'x' })
+    const noMflux = setup({
+      ok: false,
+      reason: 'mflux',
+      message: 'mflux is not on the PATH',
+      fix: 'x',
+    })
     expect(await viewOf(noMflux)).toMatchObject({ generator: { ok: false } })
   })
 

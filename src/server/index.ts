@@ -1723,7 +1723,7 @@ export function startServer({
               undefined,
               undefined,
               elevenAccountOf,
-              (model) => imageGenerator.installed(model),
+              imageGenerator,
             ),
           ),
         ),

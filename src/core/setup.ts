@@ -82,7 +82,7 @@ export interface SetupFacts {
   /** The image models, or null when the project has no `images` section. */
   images: {
     /** Whether mflux, which runs them, can run here. */
-    mflux: { ok: true } | { ok: false; message: string; fix: string }
+    mflux: { ok: true } | { ok: false; reason: 'platform' | 'mflux'; message: string; fix: string }
     /** The project's main image model. */
     model: ImageModelId
     /** The image models whose weights are not on this computer. */
@@ -445,7 +445,7 @@ function imageModels(facts: SetupFacts): SetupCheck {
     commands: ['uv tool install mflux'],
   }
   if (!mflux.ok) {
-    const isMissingMflux = mflux.message.includes('mflux is not on the PATH')
+    const isMissingMflux = mflux.reason === 'mflux'
     return {
       id: 'imageModels',
       title,

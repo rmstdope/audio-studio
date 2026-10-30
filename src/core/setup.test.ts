@@ -393,6 +393,7 @@ describe('the image models check', () => {
   const here = { ok: true } as const
   const noMflux = {
     ok: false,
+    reason: 'mflux',
     message: 'mflux is not on the PATH; it makes the image takes.',
     fix: 'uv tool install mflux',
   } as const
@@ -463,6 +464,7 @@ describe('the image models check', () => {
   it('names the machine when mflux cannot run at all, and both missing models when mflux is here', () => {
     const noMac = {
       ok: false,
+      reason: 'platform',
       message: 'Image takes are made on macOS with Apple silicon only.',
       fix: 'nothing to install',
     } as const

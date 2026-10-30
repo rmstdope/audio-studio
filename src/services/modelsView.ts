@@ -6,7 +6,7 @@ import { planPart } from '../core/planner'
 import type { ElevenTts } from '../core/project'
 import { sentPieces, spokenPieces } from '../core/spoken'
 import { providerOf } from '../core/voices'
-import type { ImageGenerator, ImageReady } from './images'
+import type { ImageGenerator } from './images'
 import { readMusic } from './musicLists'
 import { openProject, readPart, type ProjectFailure } from './workspace'
 
@@ -37,11 +37,10 @@ export interface MusicModels {
   loops: number[]
 }
 
-/** The project's main image model, which models this computer has, and whether mflux can run; null for a project with no images. */
+/** The project's main image model, which models this computer has; null for a project with no images. */
 export interface ImageModels {
   model: ImageModelId
   installed: Record<ImageModelId, boolean>
-  mflux: ImageReady
 }
 
 const encoder = new TextEncoder()
@@ -55,10 +54,7 @@ const encoder = new TextEncoder()
 export async function modelsView(
   projectFile: string,
   installed: (model: MusicModelId) => boolean | Promise<boolean> = () => true,
-  images: Pick<ImageGenerator, 'installed' | 'ready'> = {
-    installed: () => true,
-    ready: () => ({ ok: true }),
-  },
+  images: Pick<ImageGenerator, 'installed'> = { installed: () => true },
 ): Promise<ModelsView> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -136,7 +132,6 @@ export async function modelsView(
           installed: Object.fromEntries(
             await Promise.all(IMAGE_MODEL_IDS.map(async (id) => [id, await images.installed(id)])),
           ) as Record<ImageModelId, boolean>,
-          mflux: await images.ready(),
         }
       : null,
   }

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { ElevenAnswer } from '../core/setup'
 import type { CreditResult } from './fish'
+import { mfluxReady } from './images'
 import { checkSetup, type Machine } from './setup'
 
 const musicSection = {
@@ -291,7 +292,7 @@ describe('checkSetup of the image models', () => {
       {},
       undefined,
       noAccount,
-      here,
+      { installed: here, ready: () => mfluxReady(machine) },
     )
     if (!result.ok) throw new Error('expected checks')
     return result.checks.find((c) => c.id === 'imageModels')!

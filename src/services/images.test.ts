@@ -58,7 +58,7 @@ describe('mfluxReady', () => {
 
 describe('imageModelInstalled', () => {
   const hub = () => mkdtempSync(join(tmpdir(), 'hub-'))
-  const download = (dir: string, folder: string, files = ['config.json']) => {
+  const download = (dir: string, folder: string, files = ['model.safetensors']) => {
     const snapshot = join(dir, folder, 'snapshots', 'abc')
     mkdirSync(snapshot, { recursive: true })
     for (const file of files) writeFileSync(join(snapshot, file), '{}')
@@ -77,6 +77,28 @@ describe('imageModelInstalled', () => {
     mkdirSync(join(dir, 'models--Tongyi-MAI--Z-Image-Turbo', 'blobs'), { recursive: true })
     expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
     download(dir, 'models--Tongyi-MAI--Z-Image-Turbo', [])
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
+  })
+
+  it('does not count a download stopped after its configs, and finds weights in a subfolder', () => {
+    const dir = hub()
+    download(dir, 'models--Tongyi-MAI--Z-Image-Turbo', ['model_index.json'])
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
+    const sub = join(dir, 'models--Tongyi-MAI--Z-Image-Turbo', 'snapshots', 'abc', 'transformer')
+    mkdirSync(sub)
+    writeFileSync(join(sub, 'part-1.safetensors'), 'x')
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(true)
+  })
+
+  it('is not thrown by a file among the snapshots, such as .DS_Store', () => {
+    const dir = hub()
+    download(dir, 'models--black-forest-labs--FLUX.2-klein-4B')
+    writeFileSync(
+      join(dir, 'models--black-forest-labs--FLUX.2-klein-4B', 'snapshots', '.DS_Store'),
+      'x',
+    )
+    expect(imageModelInstalled(dir, 'klein')).toBe(true)
+    writeFileSync(join(dir, 'models--Tongyi-MAI--Z-Image-Turbo'), 'not a folder')
     expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
   })
 

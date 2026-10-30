@@ -5252,7 +5252,6 @@ describe('the image model routes', () => {
     expect(view.images).toEqual({
       model: 'klein',
       installed: { klein: false, 'z-image-turbo': true },
-      mflux: { ok: true },
     })
     const setup = await (await fetch(at('/api/setup'))).json()
     expect(setup.checks.find((c: { id: string }) => c.id === 'imageModels')).toMatchObject({
