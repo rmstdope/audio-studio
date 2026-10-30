@@ -78,7 +78,7 @@ describe('imageFailureReason', () => {
   it('names the model and the missing weights, without the traceback', () => {
     const reason = imageFailureReason('klein', 1, traceback)
     expect(reason).toBe(
-      'FLUX.2 klein 4B could not load its weights: they are missing or incomplete on this computer, and Setup says how to download them.',
+      'FLUX.2 klein 4B could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B, then Try again.',
     )
   })
 
@@ -91,7 +91,18 @@ describe('imageFailureReason', () => {
     expect(
       imageFailureReason('klein', 2, 'mflux-generate: error: unrecognized arguments: --seed 4'),
     ).toBe(
-      'The installed mflux cannot make FLUX.2 klein images; update it with uv tool upgrade mflux, then Try again.',
+      'The installed mflux cannot make FLUX.2 klein 4B images; update it with uv tool upgrade mflux, then Try again.',
+    )
+  })
+
+  it('does not blame the weights for a missing file that is not one of them', () => {
+    const stderr = [
+      'Traceback (most recent call last):',
+      '  File "/Users/x/.local/share/uv/tools/mflux/lib/python3.12/site-packages/mflux/x.py", line 3',
+      "FileNotFoundError: [Errno 2] No such file or directory: '/Users/x/.local/share/uv/python/bin/python3.12'",
+    ].join('\n')
+    expect(imageFailureReason('klein', 1, stderr)).toBe(
+      "FLUX.2 klein 4B could not make the image (mflux stopped with exit code 1); the details are in the studio's log.",
     )
   })
 

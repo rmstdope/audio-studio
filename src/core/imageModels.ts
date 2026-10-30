@@ -64,12 +64,14 @@ export function imageByMflux(name: string): ImageModelId | null {
  * and its error output (which itself belongs in the studio's log, not in front of the user).
  */
 export function imageFailureReason(id: ImageModelId, code: number, stderr: string): string {
-  const { name, short } = IMAGE_MODELS[id]
-  if (/FileNotFoundError|No such file|safetensors/i.test(stderr)) {
-    return `${name} could not load its weights: they are missing or incomplete on this computer, and Setup says how to download them.`
+  const { name, repo } = IMAGE_MODELS[id]
+  // The exception is the last line; only a missing file of the downloaded weights is about them.
+  const last = stderr.trim().split('\n').at(-1) ?? ''
+  if (/safetensors|huggingface|snapshots/i.test(last)) {
+    return `${name} could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download ${repo}, then Try again.`
   }
   if (/invalid choice|unrecognized arguments|error: argument/i.test(stderr)) {
-    return `The installed mflux cannot make ${short} images; update it with uv tool upgrade mflux, then Try again.`
+    return `The installed mflux cannot make ${name} images; update it with uv tool upgrade mflux, then Try again.`
   }
   return `${name} could not make the image (mflux stopped with exit code ${code}); the details are in the studio's log.`
 }

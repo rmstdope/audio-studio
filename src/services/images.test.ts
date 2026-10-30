@@ -169,7 +169,7 @@ describe('createMfluxGenerator', () => {
       (e: unknown) => e as Error,
     )
     expect(failure.message).toBe(
-      'FLUX.2 klein 4B could not load its weights: they are missing or incomplete on this computer, and Setup says how to download them.',
+      'FLUX.2 klein 4B could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B, then Try again.',
     )
     expect(logged.join('\n')).toContain('weight_loader.py')
   })
