@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { fakePng } from '../services/imagesFake'
 import { dirname, join } from 'node:path'
 import { readWav, writeWav } from '../core/wav'
 import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
@@ -5129,7 +5130,7 @@ describe('the image takes routes', () => {
       ready: () => ({ ok: true }),
       installed: () => true,
       generate: async (request) => ({
-        png: new TextEncoder().encode(`png-${request.seed}`),
+        png: fakePng(request.width, request.height, request.seed),
         seed: request.seed,
       }),
     },
@@ -5145,7 +5146,8 @@ describe('the image takes routes', () => {
   async function settled() {
     for (let i = 0; i < 200; i++) {
       const v = await view()
-      if (!v.making.length) return v
+      if (!v.making.length && !v.takes.some((t: { look: string }) => t.look === 'bringing'))
+        return v
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
     throw new Error('never finished')
@@ -5159,6 +5161,7 @@ describe('the image takes routes', () => {
       ['POST', '/api/images/inn/unchoose', undefined],
       ['POST', '/api/images/inn/stop', undefined],
       ['POST', '/api/images/inn/takes/1/seen', undefined],
+      ['POST', '/api/images/bring-all', undefined],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
     }
@@ -5170,7 +5173,11 @@ describe('the image takes routes', () => {
     expect(made.takes.map((t: { n: number }) => t.n)).toEqual([1, 2])
     const picture = await fetch(new URL('/api/images/inn/takes/2', studio.url))
     expect(picture.status).toBe(200)
-    expect((await picture.text()).startsWith('png-')).toBe(true)
+    expect((await picture.arrayBuffer()).byteLength).toBeGreaterThan(100)
+    const game = await fetch(new URL('/api/images/inn/takes/2/game', studio.url))
+    expect(game.status).toBe(200)
+    expect((await game.arrayBuffer()).byteLength).toBeGreaterThan(50)
+    expect((await fetch(new URL('/api/images/inn/takes/9/game', studio.url))).status).toBe(404)
     expect((await fetch(new URL('/api/images/inn/takes/9', studio.url))).status).toBe(404)
     expect((await fetch(new URL('/api/images/inn/current', studio.url))).status).toBe(404)
     expect(await (await send('POST', '/api/images/inn/choose', { n: 2 })).json()).toEqual({
@@ -5195,6 +5202,11 @@ describe('the image takes routes', () => {
     expect((await send('POST', '/api/images/inn/unchoose')).status).toBe(409)
     expect((await send('POST', '/api/images/inn/stop')).status).toBe(200)
     expect(await (await fetch(new URL('/api/images/making', studio.url))).json()).toEqual({})
+  })
+
+  it('has nothing to bring to a new look while every picture is up to date', async () => {
+    expect(await (await fetch(new URL('/api/images/bring-all', studio.url))).json()).toBeNull()
+    expect(await (await send('POST', '/api/images/bring-all')).json()).toEqual({ ok: true })
   })
 
   it('refuses a bad body and answers 404 for an image the game does not list', async () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { lookKey, lookOf } from './imageLook'
 import {
   ChosenSchema,
   ImageListSchema,
@@ -134,18 +135,14 @@ describe('what changed in the game’s style', () => {
   it('is nothing when the same', () => {
     expect(styleChanges(style, { ...style }, parts)).toEqual([])
   })
-  it('names the look, what is kept out, the palette and an act’s addition', () => {
+  it('names the look, what is kept out and an act’s addition, but not the palette (the look notice owns it)', () => {
     const now = {
       ...style,
       look: 'x',
       palette: ['#000000'],
       acts: { act1: 'warm lantern light', act2: 'snow' },
     }
-    expect(styleChanges(style, now, parts)).toEqual([
-      'the look',
-      'the palette',
-      'the addition for Act II',
-    ])
+    expect(styleChanges(style, now, parts)).toEqual(['the look', 'the addition for Act II'])
     expect(styleChanges(style, { ...style, keepOut: 'y' }, parts)).toEqual(['what is kept out'])
   })
 })
@@ -303,5 +300,90 @@ describe('summarizeImages', () => {
     const result = summarizeImages(input({ prompts: mine, chosen }))
     expect(result.images.styleNotice).toBeNull()
     expect(result.images.acts[0]!.rows[0]!.reasons).toEqual(['the style'])
+  })
+})
+
+describe('the game’s look in the rows', () => {
+  const size = { width: inn.width, height: inn.height }
+  const nowKey = lookKey(lookOf(style), size)
+  const row = (over: Partial<ImagesInput> = {}) =>
+    summarizeImages(input({ look: lookOf(style), ...over })).images
+  const chosenAs = (look?: string): ImagesInput['chosen'] => {
+    const first = summarizeImages(input()).images.acts[0]!.rows[0]!
+    return { [inn.id]: { ...first.madeFrom, take: 1, ...(look ? { look } : {}) } }
+  }
+
+  it('gives the look line and what a picture is brought to', () => {
+    const { look, looksOld } = row().acts[0]!.rows[0]!
+    expect(look).toEqual({
+      line: "320 × 200 · the game's palette, 2 colours · patterned dithering",
+      key: nowKey,
+      error: null,
+    })
+    expect(looksOld).toBe(false)
+    expect(row().lookNotice).toBeNull()
+  })
+  it('is up to date when the chosen picture and the takes were brought to this look', () => {
+    const images = row({ chosen: chosenAs(nowKey), takeLooks: { [inn.id]: [nowKey, nowKey] } })
+    expect(images.acts[0]!.rows[0]!.looksOld).toBe(false)
+    expect(images.lookNotice).toBeNull()
+  })
+  it('marks an image old when its chosen picture or any take has another look, and counts it once', () => {
+    const other = lookKey(lookOf({ ...style, palette: ['#000000'] }), size)
+    const chosen = row({ chosen: chosenAs(other), takeLooks: { [inn.id]: [other, other] } })
+    expect(chosen.acts[0]!.rows[0]!.looksOld).toBe(true)
+    expect(chosen.lookNotice).toEqual({ count: 1, changed: ['its palette'] })
+    expect(row({ takeLooks: { [inn.id]: [nowKey, other] } }).acts[0]!.rows[0]!.looksOld).toBe(true)
+  })
+  it('names what changed: depth, dithering, size, and a picture that never had a look', () => {
+    const named = (then: string | null) =>
+      row({ chosen: chosenAs(undefined), takeLooks: { [inn.id]: [then] } }).lookNotice?.changed
+    const was = (raw: object, w = 320, h = 200) =>
+      lookKey(lookOf({ ...style, ...raw }), { width: w, height: h })
+    expect(named(was({ dithering: 'flat' }))).toContain('its dithering')
+    expect(named(was({}, 160, 100))).toContain("an image's size")
+    expect(named(was({ palette: [], colourDepth: '8-bit' }))).toContain('its palette')
+    expect(named(null)).toContain('its look')
+  })
+  it('has no look to compare, and no notice, while the style cannot be used', () => {
+    const images = row({ look: null, lookError: 'no', chosen: chosenAs(undefined) })
+    const { look, looksOld } = images.acts[0]!.rows[0]!
+    expect(look).toEqual({
+      line: "320 × 200 · the game's palette — can't be read",
+      key: null,
+      error: 'no',
+    })
+    expect(looksOld).toBe(false)
+    expect(images.lookNotice).toBeNull()
+  })
+  it('is full colour when the game has no style file', () => {
+    const { look } = summarizeImages(input({ style: null, seen: null, look: undefined })).images
+      .acts[0]!.rows[0]!
+    expect(look.line).toBe('320 × 200 · full colour')
+  })
+  it('keeps an image chosen before looks existed up to date: its style key had the palette in it', () => {
+    const eff = effectiveStyle(style, none, 'act1')!
+    const first = summarizeImages(input()).images.acts[0]!.rows[0]!
+    const legacy = {
+      ...first.madeFrom,
+      take: 1,
+      style: JSON.stringify([eff.look, eff.keepOut, eff.palette, eff.addition]),
+    }
+    const row = summarizeImages(input({ chosen: { [inn.id]: legacy } })).images.acts[0]!.rows[0]!
+    expect(row.status).toBe('chosen')
+    const changed = {
+      ...legacy,
+      style: JSON.stringify(['other', eff.keepOut, eff.palette, eff.addition]),
+    }
+    expect(
+      summarizeImages(input({ chosen: { [inn.id]: changed } })).images.acts[0]!.rows[0]!.reasons,
+    ).toEqual(['the style'])
+  })
+  it('does not make an image out of date when only the palette changes', () => {
+    const chosen = chosenAs(nowKey)
+    const changed = { ...style, palette: ['#ff0000'] }
+    const row2 = summarizeImages(input({ style: changed, seen: changed, chosen })).images.acts[0]!
+      .rows[0]!
+    expect(row2.status).toBe('chosen')
   })
 })

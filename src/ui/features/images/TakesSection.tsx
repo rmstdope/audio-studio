@@ -31,6 +31,7 @@ import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { makeTakesText, takeCountText, unchooseNote } from '../../imagesText'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
+import { TakePair } from './TakePair'
 
 /** How many takes one press can make. */
 const MAX_AT_ONCE = 4
@@ -156,7 +157,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
   }
   if (!ready) return <section className="panel">The takes could not be listed.</section>
 
-  const { generator, takes, making, failed, lockUnread } = ready
+  const { generator, takes, making, failed, lockUnread, lookError } = ready
   const installed = Object.fromEntries(ready.models.map((m) => [m.id, m.installed])) as Record<
     ImageModelId,
     boolean
@@ -385,6 +386,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
                 }}
                 size={size}
                 id={id}
+                lookError={lookError}
               />
             )}
           </div>
@@ -411,7 +413,13 @@ export function TakesSection({ row }: { row: ImageRow }) {
                     type="button"
                     ref={chooseButton}
                     className="btn btn-primary btn-small"
-                    disabled={lockUnread || choose.isPending || drop.isPending}
+                    disabled={
+                      lockUnread ||
+                      choose.isPending ||
+                      drop.isPending ||
+                      lookError !== null ||
+                      rightTake.look === 'bringing'
+                    }
                     onClick={() => onChoose(rightTake.n)}
                   >
                     Choose
@@ -421,13 +429,13 @@ export function TakesSection({ row }: { row: ImageRow }) {
                 <b>{chosen ? 'No other takes yet' : 'No takes yet'}</b>
               )}
             </div>
+            {rightTake && lookError !== null && (
+              <span className="faint small">
+                Fix the game&apos;s style file to choose this take.
+              </span>
+            )}
             {rightTake ? (
-              <Picture
-                src={`/api/images/${encodeURIComponent(id)}/takes/${rightTake.n}`}
-                alt={`Take ${rightTake.n}`}
-                width={rightTake.width}
-                height={rightTake.height}
-              />
+              <TakePair id={id} take={rightTake} row={row} lookError={lookError} />
             ) : (
               <EmptyFrame
                 title={
@@ -512,6 +520,7 @@ function LeftSide({
   onUnchoose,
   size,
   id,
+  lookError,
 }: {
   row: ImageRow
   chosen: ImageTakeView | undefined
@@ -522,6 +531,7 @@ function LeftSide({
   onUnchoose: () => void
   size: { width: number; height: number }
   id: string
+  lookError: string | null
 }) {
   const label = (
     <span className="lbl" ref={heading} tabIndex={-1}>
@@ -534,7 +544,8 @@ function LeftSide({
         <div className="take-row">
           {label}
           <b>Take {chosen.n}</b>
-          <span className="chip chip-ok">chosen</span>
+          <span className="chip chip-ok">Chosen</span>
+          {row.looksOld && <span className="chip chip-warn">Old look</span>}
           <ModelName id={chosen.model} />
           <span className="grow" />
           <button
@@ -547,12 +558,7 @@ function LeftSide({
             Un-choose
           </button>
         </div>
-        <Picture
-          src={`/api/images/${encodeURIComponent(id)}/takes/${chosen.n}`}
-          alt={`Take ${chosen.n}`}
-          width={chosen.width}
-          height={chosen.height}
-        />
+        <TakePair id={id} take={chosen} row={row} lookError={lookError} current />
       </>
     )
   }

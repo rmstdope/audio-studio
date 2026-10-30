@@ -7,9 +7,11 @@ import type { ProjectSummary } from '../../../core/summary'
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
 const { act, createElement } = await import('react')
+const act_ = act
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { summarizeImages } = await import('../../../core/images')
+const { lookKey, lookOf } = await import('../../../core/imageLook')
 const { ImagesView } = await import('./ImagesView')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -49,6 +51,8 @@ interface Options {
   seen?: GameStyle | null
   style?: GameStyle | null
   actTwo?: 'missing' | 'empty'
+  /** What the chosen pictures were brought to; the look now when absent. */
+  lookWas?: string
 }
 
 function summary(options: Options = {}): ProjectSummary {
@@ -76,7 +80,16 @@ function summary(options: Options = {}): ProjectSummary {
     styleFile: 'style.json',
     style: options.style === undefined ? style : options.style,
     prompts: options.prompts ?? { images: {}, style: {} },
-    chosen: options.chosen ?? {},
+    chosen: Object.fromEntries(
+      Object.entries(options.chosen ?? {}).map(([id, made]) => [
+        id,
+        {
+          ...made,
+          look: options.lookWas ?? lookKey(lookOf(style), id === 'inn' ? inn : barn),
+        },
+      ]),
+    ),
+    look: lookOf(style),
     seen: options.seen === undefined ? style : options.seen,
   })
   return { images } as unknown as ProjectSummary
@@ -86,9 +99,11 @@ function render(
   route: ImagesRoute,
   shown: ProjectSummary = summary(),
   making: Record<string, { takes: number; left: number }> = {},
+  run: unknown = null,
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   client.setQueryData(['image-making'], making)
+  client.setQueryData(['look-run'], run)
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
@@ -216,7 +231,10 @@ describe('an image’s page', () => {
     const page = render(route)
     expect(text(page.querySelector('.crumbs'))).toBe('Images › Act I')
     expect(text(page.querySelector('h1'))).toBe('The Inn')
-    expect(text(page.querySelector('.page-header .mono'))).toBe('inn · 320 × 200')
+    expect(text(page.querySelector('.page-header .mono'))).toBe('inn')
+    expect(text(page.querySelector('.images-look-line'))).toBe(
+      "320 × 200 · the game's palette, 2 colours · patterned dithering",
+    )
     const field = page.querySelector('textarea')!
     expect(field.value).toBe('a low inn')
     expect(text(page.querySelector('label'))).toBe('What the image shows')
@@ -396,5 +414,101 @@ describe('the game’s style changed', () => {
 
   it('is not shown when nothing changed', () => {
     expect(render({ view: 'images', page: 'style' }).querySelector('.notice')).toBeNull()
+  })
+})
+
+describe('the game’s look', () => {
+  const act = { view: 'images', page: 'act', part: 'act1' } as const
+  const old = lookKey(lookOf({ ...style, palette: ['#000000'] }), { width: 320, height: 200 })
+  const stale = () => {
+    const first = summary().images!.acts[0]!.rows
+    return summary({ chosen: { inn: first[0]!.madeFrom }, lookWas: old })
+  }
+
+  it('shows no notice and no tag while every picture has the game’s look', () => {
+    const first = summary().images!.acts[0]!.rows
+    const page = render(act, summary({ chosen: { inn: first[0]!.madeFrom } }))
+    expect(page.querySelector('[aria-label="The game\'s look changed"]')).toBeNull()
+    expect(text(page)).not.toContain('Old look')
+  })
+
+  it('says the look changed, tags the old images, and brings them all with one button', async () => {
+    const page = render(act, stale())
+    const notice = page.querySelector('[aria-label="The game\'s look changed"]')!
+    expect(text(notice)).toBe(
+      "The game's look changed (its palette). 1 image and its takes still have the old look. Nothing needs making again.Bring all to the new look",
+    )
+    expect(text(page.querySelector('.images-status'))).toContain('Old look')
+    act_(() => button(page, 'Bring all to the new look').click())
+    await flush()
+    expect(sent.find((c) => c.path === '/api/images/bring-all')).toMatchObject({ method: 'POST' })
+  })
+
+  it('counts while it brings them, and carries on after a reload', () => {
+    const run = { running: true, total: 14, done: 6, failed: [] }
+    const page = render(act, stale(), {}, run)
+    expect(text(page.querySelector('[role="status"]'))).toBe(
+      'Bringing images to the new look… 6 of 14',
+    )
+    expect(button(page, 'Bring all to the new look')).toBeUndefined()
+  })
+
+  it('turns red with the count and the reason when some could not be brought, and offers Try again', async () => {
+    const failed = Array.from({ length: 5 }, (_, i) => ({ id: `i${i}`, reason: 'missing' }))
+    const page = render(act, stale(), {}, { running: false, total: 14, done: 14, failed })
+    const notice = page.querySelector('.notice-err')!
+    expect(text(notice)).toBe(
+      "Brought 9 of 14 images to the new look. 5 couldn't be: the model's picture for each is missing. Their old look stays until you make new takes.Try again",
+    )
+    act_(() => button(page, 'Try again').click())
+    await flush()
+    expect(sent.find((c) => c.path === '/api/images/bring-all')).toMatchObject({ method: 'POST' })
+  })
+
+  it('puts a failure away once nothing is left with an old look', () => {
+    const failed = [{ id: 'i', reason: 'missing' }]
+    const first = summary().images!.acts[0]!.rows
+    const page = render(
+      act,
+      summary({ chosen: { inn: first[0]!.madeFrom } }),
+      {},
+      { running: false, total: 2, done: 2, failed },
+    )
+    expect(page.querySelector('.notice-err')).toBeNull()
+  })
+
+  it('shows the look line and the Old look tag on the image’s page', () => {
+    const page = render({ view: 'images', page: 'image', image: 'inn' }, stale())
+    expect(text(page.querySelector('.images-look-line'))).toBe(
+      "320 × 200 · the game's palette, 2 colours · patterned ditheringOld look",
+    )
+  })
+
+  it('says the palette can’t be read in the look line while the style cannot be used', () => {
+    const { images } = summarizeImages({
+      parts: [{ id: 'act1', title: 'Act I' }],
+      lists: [
+        {
+          id: 'act1',
+          title: 'Act I',
+          file: 'a1.json',
+          state: { status: 'ok', images: [inn] },
+          canRefresh: false,
+        },
+      ],
+      styleFile: 'style.json',
+      style: null,
+      look: null,
+      lookError: 'no',
+      prompts: { images: {}, style: {} },
+      chosen: {},
+      seen: null,
+    })
+    const page = render({ view: 'images', page: 'image', image: 'inn' }, {
+      images,
+    } as unknown as ProjectSummary)
+    expect(text(page.querySelector('.images-look-line'))).toBe(
+      "320 × 200 · the game's palette — can't be read",
+    )
   })
 })

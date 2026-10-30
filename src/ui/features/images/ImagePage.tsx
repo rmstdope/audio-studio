@@ -31,8 +31,10 @@ export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
             </a>
           </span>
           <h1 tabIndex={-1}>{row.title}</h1>
-          <span className="mono muted">
-            {row.id} · {row.width} × {row.height}
+          <span className="mono muted">{row.id}</span>
+          <span className="muted images-look-line">
+            {row.look.line}
+            {row.looksOld && <span className="chip chip-warn">Old look</span>}
           </span>
         </div>
       </header>

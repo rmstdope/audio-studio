@@ -57,3 +57,67 @@ export function makeTakesText(count: number, hasTakes: boolean): string {
 export function unchooseNote(take: number): string {
   return `The game shows no image here until you choose another. Take ${take} stays among the takes.`
 }
+
+/**
+ * How big the game's version is shown, and whether the two pictures stack: the largest whole number
+ * at which both fit side by side in `available` pixels; when not even ×1 fits they stack, each
+ * the largest whole number that fits alone. An unknown width (0) shows ×1 side by side.
+ */
+export function lookZoom(
+  available: number,
+  gap: number,
+  width: number,
+): { zoom: number; stacked: boolean } {
+  if (available <= 0 || width <= 0) return { zoom: 1, stacked: false }
+  const beside = Math.floor((available - gap) / (2 * width))
+  if (beside >= 1) return { zoom: beside, stacked: false }
+  return { zoom: Math.max(1, Math.floor(available / width)), stacked: true }
+}
+
+/** The caption under the model's picture: its size, and that its edges are cut when it is another shape. */
+export function modelCaption(width: number, height: number, cropped: boolean): string {
+  return `${width} × ${height}${cropped ? ' · cropped to fit' : ''}`
+}
+
+/** The notice when the game's look changed, in three parts: bold, what changed, the rest. */
+export function lookNoticeText(
+  count: number,
+  changed: string[],
+): { head: string; what: string; rest: string } {
+  const still =
+    count === 1
+      ? '1 image and its takes still have the old look.'
+      : `${count} images and their takes still have the old look.`
+  return {
+    head: "The game's look changed",
+    what: changed.length ? ` (${joined(changed)})` : '',
+    rest: `${still} Nothing needs making again.`,
+  }
+}
+
+/** The notice while images are being brought to the new look. */
+export function bringingText(done: number, total: number): string {
+  return `Bringing images to the new look… ${done} of ${total}`
+}
+
+/** The notice when some images could not be brought: what was done, and why the rest could not be. */
+export function bringFailureText(
+  total: number,
+  failed: { reason: string }[],
+): { head: string; rest: string } {
+  const reasons = [
+    ...new Set(
+      failed.map((f) =>
+        f.reason === 'missing'
+          ? failed.length === 1
+            ? "the model's picture is missing"
+            : "the model's picture for each is missing"
+          : f.reason,
+      ),
+    ),
+  ]
+  return {
+    head: `Brought ${total - failed.length} of ${total} images to the new look.`,
+    rest: `${failed.length} couldn't be: ${reasons.join('; ')}. ${failed.length === 1 ? 'Its' : 'Their'} old look stays until you make new takes.`,
+  }
+}

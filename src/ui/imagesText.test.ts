@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  bringFailureText,
+  bringingText,
   chosenLine,
   joined,
+  lookNoticeText,
+  lookZoom,
   makeTakesText,
+  modelCaption,
   outOfDateText,
   paletteText,
   styleNoticeText,
@@ -73,5 +78,38 @@ describe('the image takes words', () => {
     expect(unchooseNote(2)).toBe(
       'The game shows no image here until you choose another. Take 2 stays among the takes.',
     )
+  })
+})
+
+describe('the game’s look words', () => {
+  it('zooms by the largest whole number at which both pictures fit side by side', () => {
+    expect(lookZoom(1000, 10, 320)).toEqual({ zoom: 1, stacked: false })
+    expect(lookZoom(1380, 10, 320)).toEqual({ zoom: 2, stacked: false })
+    expect(lookZoom(2000, 10, 320)).toEqual({ zoom: 3, stacked: false })
+    expect(lookZoom(650, 10, 320)).toEqual({ zoom: 1, stacked: false })
+  })
+  it('stacks them in a window too narrow for side by side, each at the largest whole number', () => {
+    expect(lookZoom(640, 10, 320)).toEqual({ zoom: 2, stacked: true })
+    expect(lookZoom(300, 10, 320)).toEqual({ zoom: 1, stacked: true })
+    expect(lookZoom(0, 10, 320)).toEqual({ zoom: 1, stacked: false })
+  })
+  it('captions the model’s picture, adding that it is cropped', () => {
+    expect(modelCaption(1280, 720, false)).toBe('1280 × 720')
+    expect(modelCaption(1024, 1024, true)).toBe('1024 × 1024 · cropped to fit')
+  })
+  it('words the notices as agreed', () => {
+    expect(lookNoticeText(14, ['its palette'])).toEqual({
+      head: "The game's look changed",
+      what: ' (its palette)',
+      rest: '14 images and their takes still have the old look. Nothing needs making again.',
+    })
+    expect(lookNoticeText(1, ['its palette', 'its dithering']).rest).toBe(
+      '1 image and its takes still have the old look. Nothing needs making again.',
+    )
+    expect(bringingText(6, 14)).toBe('Bringing images to the new look… 6 of 14')
+    expect(bringFailureText(14, Array(5).fill({ reason: 'missing' }))).toEqual({
+      head: 'Brought 9 of 14 images to the new look.',
+      rest: "5 couldn't be: the model's picture for each is missing. Their old look stays until you make new takes.",
+    })
   })
 })

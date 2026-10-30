@@ -37,6 +37,12 @@ const row: ImageRow = {
   madeFrom: { words: 'a low inn', style: '', width: 320, height: 200 },
   status: 'none yet',
   reasons: [],
+  look: {
+    line: "320 × 200 · the game's palette, 2 colours · patterned dithering",
+    key: 'k',
+    error: null,
+  },
+  looksOld: false,
 }
 
 const take = (n: number, over: Partial<ImageTakeView> = {}): ImageTakeView => ({
@@ -47,6 +53,8 @@ const take = (n: number, over: Partial<ImageTakeView> = {}): ImageTakeView => ({
   earlier: false,
   chosen: false,
   isNew: false,
+  look: 'ready',
+  cropped: false,
   ...over,
 })
 
@@ -62,6 +70,7 @@ const view = (over: Partial<ImageTakesView> = {}): ImageTakesView => ({
   making: [],
   failed: [],
   lockUnread: false,
+  lookError: null,
   ...over,
 })
 
@@ -477,7 +486,7 @@ describe('the Takes section’s model menu', () => {
     )
     const side = (name: string) => s.container.querySelector(`[data-side="${name}"] .take-row`)!
     expect(side('left').textContent).toContain('Take 2')
-    expect(side('left').textContent).toContain('chosen')
+    expect(side('left').textContent).toContain('Chosen')
     expect(side('left').textContent).toContain('Z-Image-Turbo')
     expect(side('right').textContent).toContain('Take 4')
     expect(side('right').textContent).toContain('FLUX.2 klein')
@@ -509,5 +518,69 @@ describe('the Takes section’s model menu', () => {
     ).toBe(true)
     expect(s.button('Make 2 more takes').disabled).toBe(true)
     expect(s.text()).not.toContain("isn't on this computer")
+  })
+})
+
+describe('a take’s two pictures', () => {
+  const imgs = (s: { container: HTMLElement }, side: string) =>
+    [...s.container.querySelectorAll(`[data-side="${side}"] img`)].map((i) => ({
+      alt: i.getAttribute('alt'),
+      src: i.getAttribute('src'),
+    }))
+
+  it('shows what the model made, then what the game gets, each with its size', async () => {
+    const s = await show(view({ takes: [take(1, { width: 1280, height: 720 })] }))
+    const pair = s.container.querySelector('[data-side="right"] .look-pair')!
+    const labels = [...pair.querySelectorAll('.lbl')].map((l) => l.textContent)
+    expect(labels).toEqual(['What the model made', 'What the game gets'])
+    const captions = [...pair.querySelectorAll('.look-side > .small')].map((l) => l.textContent)
+    expect(captions).toEqual(['1280 × 720', '320 × 200'])
+    const sources = imgs(s, 'right').map((i) => i.src!.split('?')[0])
+    expect(sources).toEqual(['/api/images/inn/takes/1', '/api/images/inn/takes/1/game'])
+  })
+
+  it('says the model’s picture is cropped to fit when it has another shape', async () => {
+    const s = await show(view({ takes: [take(4, { width: 1024, height: 1024, cropped: true })] }))
+    expect(s.text()).toContain('1024 × 1024 · cropped to fit')
+  })
+
+  it('shows the picture the game has now for the chosen take, tagging an old look', async () => {
+    const s = await show(view({ takes: [take(1, { chosen: true })] }), { looksOld: true })
+    expect(imgs(s, 'left').map((i) => i.src!.split('?')[0])).toEqual([
+      '/api/images/inn/takes/1',
+      '/api/images/inn/current',
+    ])
+    expect(s.container.querySelector('[data-side="left"]')?.textContent).toContain('Chosen')
+    expect(s.container.querySelector('[data-side="left"]')?.textContent).toContain('Old look')
+  })
+
+  it('says it is bringing the take to the look, and cannot be chosen until it is done', async () => {
+    const s = await show(view({ takes: [take(5, { look: 'bringing' })] }))
+    expect(s.text()).toContain("Bringing to the game's look…")
+    expect(imgs(s, 'right')).toHaveLength(1)
+    expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows what to fix in place of the game’s version, and turns Choose off', async () => {
+    const message =
+      "Can't bring this take to the game's look: the style file's palette has a colour that isn't one: palette 3, “#7fb0e”."
+    const s = await show(view({ takes: [take(3, { look: 'old' })], lookError: message }))
+    expect(s.container.querySelector('[role="alert"]')?.textContent).toBe(message)
+    expect(imgs(s, 'right')).toHaveLength(1)
+    expect(s.text()).toContain("Fix the game's style file to choose this take.")
+    expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows a place for a take never brought to the look, instead of a missing picture', async () => {
+    const s = await show(view({ takes: [take(2, { look: 'missing' })] }))
+    expect(imgs(s, 'right')).toHaveLength(1)
+    expect(s.text()).toContain("Not brought to the game's look yet.")
+    expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('leaves Choose on when the game’s version is ready', async () => {
+    const s = await show(view({ takes: [take(3)] }))
+    expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(false)
+    expect(s.text()).not.toContain('Fix the game')
   })
 })
