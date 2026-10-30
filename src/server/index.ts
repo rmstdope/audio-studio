@@ -54,6 +54,14 @@ import { outcomeOf, summariseSpending } from '../core/spending'
 import { moveCue, moveSceneCue, setCue, setInsideCue, setSceneCue } from '../services/cues'
 import { gitChanges } from '../services/git'
 import { setTrackBrief } from '../services/briefs'
+import {
+  markStyleSeen,
+  resolveImageCompare,
+  setImageWords,
+  setStyleField,
+  type ImageEditResult,
+} from '../services/imageEdits'
+import { CompareBody, StyleFieldBody, WordsBody } from '../core/images'
 import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import {
@@ -236,6 +244,12 @@ const ModelsBody = z
 
 /** The stages whose model can be chosen. */
 const StageParam = z.enum(['audition', 'draft', 'final'])
+
+/** The answer to a change of the studio's image words: 404 for an unknown image, 409 with the reason. */
+function imageAnswer(result: ImageEditResult): Response {
+  if (!result) return Response.json({ error: 'not found' }, { status: 404 })
+  return Response.json(result, { status: result.ok ? 200 : 409 })
+}
 
 /** The model the page chose for a stage or for the music, and the one it showed. */
 const StageModelBody = z.object({ model: z.string().min(1), was: z.string().min(1) }).strict()
@@ -1433,6 +1447,42 @@ export function startServer({
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
+      },
+      '/api/images/:id': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = WordsBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { words: string | null }' }, { status: 400 })
+          }
+          return imageAnswer(await setImageWords(projectFile, request.params.id, body.data.words))
+        }),
+      },
+      '/api/images/:id/compare': {
+        POST: fromOwnPage(async (request) => {
+          const body = CompareBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: "expected { choice: 'keep' | 'game' }" }, { status: 400 })
+          }
+          return imageAnswer(
+            await resolveImageCompare(projectFile, request.params.id, body.data.choice),
+          )
+        }),
+      },
+      '/api/image-style': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = StyleFieldBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json(
+              { error: 'expected { look: string | null } or { keepOut: string | null }' },
+              { status: 400 },
+            )
+          }
+          const [field, text] = Object.entries(body.data)[0] as ['look' | 'keepOut', string | null]
+          return imageAnswer(await setStyleField(projectFile, field, text))
+        }),
+      },
+      '/api/image-style/seen': {
+        POST: fromOwnPage(async () => imageAnswer(await markStyleSeen(projectFile))),
       },
       '/api/music/stingers/refresh': {
         POST: fromOwnPage(async () => {

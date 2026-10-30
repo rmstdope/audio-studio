@@ -358,3 +358,15 @@ export function summarizeImages(input: ImagesInput): {
     problems,
   }
 }
+
+/** The body of a change to an image's own words; null takes them back. */
+export const WordsBody = z.object({ words: z.string().nullable() }).strict()
+
+/** The body of a change to one style field; null takes the user's words back. */
+export const StyleFieldBody = z.union([
+  z.object({ look: z.string().nullable() }).strict(),
+  z.object({ keepOut: z.string().nullable() }).strict(),
+])
+
+/** The body of settling an image whose game description changed. */
+export const CompareBody = z.object({ choice: z.enum(['keep', 'game']) }).strict()
