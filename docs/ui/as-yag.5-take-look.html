@@ -1,0 +1,82 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Every state, with the words</title><style>
+:root{--bg:#0b0c10;--panel:#12141a;--raised:#191c24;--inset:#0d0f14;--line:#1f232d;--line-strong:#2a2e39;--text:#eceef3;--text-soft:#c7ccd6;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--accent-ink:#1a0a02;--accent-soft-bg:#2a1b12;--accent-soft-ink:#ff9a6b;--ok:#3ddc97;--ok-bg:#10291f;--warn:#ffc24b;--warn-bg:#2d2412;--chip:#1a1d26;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:#07080b;color:var(--text);font:14px/1.45 system-ui,-apple-system,sans-serif;padding:24px}
+.intro{max-width:1100px;margin:0 auto 18px;color:var(--muted)}.intro h1{color:var(--text);font-size:20px;margin:0 0 6px}
+.note{max-width:1100px;margin:26px auto 8px;color:var(--text-soft);font-weight:600}
+.frame{max-width:1100px;margin:0 auto;border:1px solid var(--line-strong);border-radius:12px;background:var(--bg);padding:20px 22px}
+.crumb{color:var(--faint);font-size:12px;margin-bottom:4px}h2{margin:0 0 2px;font-size:18px}.sub{color:var(--muted);margin:0 0 14px}
+.takes{display:flex;flex-wrap:wrap;gap:16px}.take{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.take.chosen{border-color:#1f5a40;background:#0f1a16}.take h3{margin:0 0 8px;font-size:13px;color:var(--text-soft);display:flex;gap:8px;align-items:center}
+.tag{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--chip);color:var(--muted)}.tag.ok{background:var(--ok-bg);color:var(--ok)}.tag.warn{background:var(--warn-bg);color:var(--warn)}
+canvas{display:block;border-radius:4px;background:var(--inset)}.cap{color:var(--faint);font-size:12px;margin-top:6px}
+.btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}button{font:inherit;font-size:13px;padding:5px 11px;border-radius:7px;border:1px solid var(--line-strong);background:var(--raised);color:var(--text);cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;margin-bottom:14px}.seg button{border:0;border-radius:0;background:transparent;color:var(--muted)}.seg button.on{background:var(--raised);color:var(--text)}
+.pair{display:flex;gap:10px;align-items:flex-start}.pair .lbl{font-size:11px;color:var(--faint);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.banner{background:var(--warn-bg);border:1px solid #5a4a1c;color:var(--text);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}.banner p{margin:0;flex:1;min-width:240px}
+.list{border:1px solid var(--line);border-radius:10px;overflow:hidden}.row{display:flex;gap:14px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel);flex-wrap:wrap}.row:first-child{border-top:0}.row .name{flex:1;min-width:160px}.row .name small{display:block;color:var(--faint)}
+.dim{color:var(--faint)}
+@media (max-width:640px){body{padding:16px}.pair{flex-direction:column}}
+</style></head><body>
+<div class="intro"><h1>Every state, with the words</h1><p>Everything agreed so far, in every state, with every word as it would ship. Only the take and the notice are drawn; the rest of the image page is a separate piece of work. Pictures here are at ×1; the enlargement and the narrow-window order are the two open questions.</p></div><div class="note">1 · A listed palette (RetroQuest today)</div><div class="frame"><div class="crumb">Images › Act 1 · The village › Village green</div><h2>Village green</h2><p class="sub">320 × 180 · the game's palette, 6 colours · patterned dithering</p><div class="takes" style="flex-direction:column"><div class="take chosen"><h3>Take 2 <span class="tag ok">Chosen</span></h3><div class="pair"><div><div class="lbl">What the model made</div><canvas id="a1"></canvas><div class="cap">1280 × 720</div></div><div><div class="lbl">What the game gets</div><canvas id="a2"></canvas><div class="cap">320 × 180</div></div></div></div><div class="take"><h3>Take 3</h3><div class="pair"><div><div class="lbl">What the model made</div><canvas id="b1"></canvas><div class="cap">1280 × 720</div></div><div><div class="lbl">What the game gets</div><canvas id="b2"></canvas><div class="cap">320 × 180</div></div></div><div class="btns"><button>Choose</button></div></div></div></div><div class="note">2 · No palette, 8-bit colour</div><div class="frame"><div class="crumb">Images › Act 1 · The village › Village green</div><h2>Village green</h2><p class="sub">320 × 180 · 8-bit colour · patterned dithering</p><div class="takes" style="flex-direction:column"><div class="take"><h3>Take 3</h3><div class="pair"><div><div class="lbl">What the model made</div><canvas id="c1"></canvas><div class="cap">1280 × 720</div></div><div><div class="lbl">What the game gets</div><canvas id="c2"></canvas><div class="cap">320 × 180</div></div></div><div class="btns"><button>Choose</button></div></div></div></div><div class="note">3 · No palette, full colour</div><div class="frame"><div class="crumb">Images › Act 1 · The village › Village green</div><h2>Village green</h2><p class="sub">320 × 180 · full colour</p><div class="takes" style="flex-direction:column"><div class="take"><h3>Take 3</h3><div class="pair"><div><div class="lbl">What the model made</div><canvas id="d1"></canvas><div class="cap">1280 × 720</div></div><div><div class="lbl">What the game gets</div><canvas id="d2"></canvas><div class="cap">320 × 180</div></div></div><div class="btns"><button>Choose</button></div></div></div></div><div class="note">4 · The model's picture is another shape</div><div class="frame"><div class="crumb">Images › Act 1 · The village › Village green</div><h2>Village green</h2><p class="sub">320 × 180 · the game's palette, 6 colours · patterned dithering</p><div class="takes" style="flex-direction:column"><div class="take"><h3>Take 4</h3><div class="pair"><div><div class="lbl">What the model made</div><canvas id="e1"></canvas><div class="cap">1024 × 1024 · cropped to fit</div></div><div><div class="lbl">What the game gets</div><canvas id="e2"></canvas><div class="cap">320 × 180</div></div></div><div class="btns"><button>Choose</button></div></div></div></div><div class="note">5 · Just made, being brought to the look</div><div class="frame"><div class="crumb">Images › Act 1 · The village › Village green</div><h2>Village green</h2><p class="sub">320 × 180 · the game's palette, 6 colours · patterned dithering</p><div class="takes" style="flex-direction:column"><div class="take"><h3>Take 5</h3><div class="pair"><div><div class="lbl">What the model made</div><canvas id="f1"></canvas><div class="cap">1280 × 720</div></div><div><div class="lbl">What the game gets</div><div style="width:320px;height:180px;border-radius:4px;background:var(--inset);color:var(--muted);display:flex;align-items:center;justify-content:center">Bringing to the game's look…</div><div class="cap"></div></div></div><div class="btns"><button disabled style="opacity:.45">Choose</button></div></div></div></div><div class="note">6 · The style file can't be used</div><div class="frame"><div class="crumb">Images › Act 1 · The village › Village green</div><h2>Village green</h2><p class="sub">320 × 180 · the game's palette — can't be read</p><div class="takes" style="flex-direction:column"><div class="take"><h3>Take 3</h3><div class="pair"><div><div class="lbl">What the model made</div><canvas id="g1"></canvas><div class="cap">1280 × 720</div></div><div><div class="lbl">What the game gets</div><div style="width:320px;height:180px;border-radius:4px;background:#2e1720;color:#ff94a8;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:13px">Can't bring this take to the game's look: the style file's palette has a colour that isn't one: palette 3, “#7fb0e”.</div><div class="cap"></div></div></div><div class="btns"><button disabled style="opacity:.45">Choose</button><span class="dim" style="align-self:center">Fix the game's style file to choose this take.</span></div></div></div></div><div class="note">7 · The game's look changed — above the list of images</div><div class="frame"><div class="banner"><p><strong>The game's look changed</strong> (its palette). 14 images and their takes still have the old look. Nothing needs making again.</p><button class="primary">Bring all to the new look</button></div></div><div class="note">8 · While it runs (it carries on if the page is reloaded)</div><div class="frame"><div class="banner"><p>Bringing images to the new look… 6 of 14</p></div></div><div class="note">9 · Some couldn't be brought</div><div class="frame"><div class="banner" style="background:#2e1720;border-color:#5a2232"><p><strong>Brought 9 of 14 images to the new look.</strong> 5 couldn't be: the model's picture for each is missing. Their old look stays until you make new takes.</p><button>Try again</button></div></div><div class="note">10 · On each image, until it is brought</div><div class="frame"><div class="row" style="border-radius:10px"><div class="name">Village green<small>320 × 180</small></div><span class="tag warn">Old look</span></div></div><script>// Drawing helper: a procedural "painted" scene, resized and brought to RetroQuest's palette.
+const PALETTE = [[0x10,0x15,0x1a],[0xf5,0xf0,0xe6],[0xff,0xa9,0x14],[0x7f,0xb0,0xe6],[0x8f,0xcf,0x7a],[0xe8,0x89,0x6b]];
+function rnd(seed){let s=seed;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
+function makeScene(w,h,seed=1){
+  const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+  let sky=g.createLinearGradient(0,0,0,h*0.6);sky.addColorStop(0,'#2b3a55');sky.addColorStop(0.6,'#9a8fa8');sky.addColorStop(1,'#e9b98a');
+  g.fillStyle=sky;g.fillRect(0,0,w,h);
+  const r=rnd(seed);
+  g.fillStyle='#f3e9c8';g.beginPath();g.arc(w*0.78,h*0.22,h*0.07,0,7);g.fill();
+  const hills=[['#6b7f5a',0.55],['#4f6a45',0.66],['#3a4d35',0.78]];
+  hills.forEach(([col,y],i)=>{g.fillStyle=col;g.beginPath();g.moveTo(0,h);for(let x=0;x<=w;x+=w/40){g.lineTo(x,h*y+Math.sin(x/w*6+i*2+seed)*h*0.04+r()*h*0.01);}g.lineTo(w,h);g.fill();});
+  // cottage
+  const hx=w*0.32,hy=h*0.6,hw=w*0.18,hh=h*0.16;
+  g.fillStyle='#b9a07a';g.fillRect(hx,hy,hw,hh);
+  g.fillStyle='#7a3f2e';g.beginPath();g.moveTo(hx-hw*0.1,hy);g.lineTo(hx+hw/2,hy-hh*0.8);g.lineTo(hx+hw*1.1,hy);g.fill();
+  let glow=g.createRadialGradient(hx+hw*0.3,hy+hh*0.45,1,hx+hw*0.3,hy+hh*0.45,hw*0.6);glow.addColorStop(0,'rgba(255,190,80,0.95)');glow.addColorStop(1,'rgba(255,170,60,0)');
+  g.fillStyle=glow;g.fillRect(hx-hw,hy-hh,hw*3,hh*3);
+  g.fillStyle='#ffd27a';g.fillRect(hx+hw*0.22,hy+hh*0.35,hw*0.16,hh*0.22);
+  g.fillStyle='#4a3020';g.fillRect(hx+hw*0.6,hy+hh*0.4,hw*0.18,hh*0.6);
+  // trees
+  for(let i=0;i<7;i++){const tx=w*(0.05+r()*0.9),ty=h*(0.62+r()*0.15),s=h*(0.06+r()*0.06);g.fillStyle='#3b2a1e';g.fillRect(tx-s*0.08,ty,s*0.16,s*0.7);g.fillStyle=i%2?'#2f4a2c':'#45683a';g.beginPath();g.arc(tx,ty,s*0.55,0,7);g.fill();}
+  // path
+  g.fillStyle='#c9a77c';g.beginPath();g.moveTo(hx+hw*0.65,hy+hh);g.quadraticCurveTo(w*0.5,h*0.9,w*0.62,h);g.lineTo(w*0.42,h);g.quadraticCurveTo(w*0.44,h*0.88,hx+hw*0.6,hy+hh);g.fill();
+  // brush texture
+  const id=g.getImageData(0,0,w,h),d=id.data;for(let i=0;i<d.length;i+=4){const n=(r()-0.5)*22;d[i]+=n;d[i+1]+=n;d[i+2]+=n;}
+  return id;
+}
+function resize(src,tw,th,mode,fill=PALETTE[0]){
+  const s=document.createElement('canvas');s.width=src.width;s.height=src.height;s.getContext('2d').putImageData(src,0,0);
+  const c=document.createElement('canvas');c.width=tw;c.height=th;const g=c.getContext('2d');g.imageSmoothingQuality='high';
+  const sa=src.width/src.height,ta=tw/th;
+  if(mode==='fit'){g.fillStyle=`rgb(${fill})`;g.fillRect(0,0,tw,th);let w=tw,h=th;if(sa>ta)h=tw/sa;else w=th*sa;g.drawImage(s,(tw-w)/2,(th-h)/2,w,h);}
+  else if(mode==='stretch'){g.drawImage(s,0,0,tw,th);}
+  else{let sw=src.width,sh=src.height;if(sa>ta)sw=sh*ta;else sh=sw/ta;g.drawImage(s,(src.width-sw)/2,(src.height-sh)/2,sw,sh,0,0,tw,th);}
+  return g.getImageData(0,0,tw,th);
+}
+const BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+function nearest(r,g,b,pal){let best=0,bd=1e9;pal.forEach((p,i)=>{const d=(r-p[0])**2*0.3+(g-p[1])**2*0.59+(b-p[2])**2*0.11;if(d<bd){bd=d;best=i;}});return pal[best];}
+function quantise(img,dither='none',pal=PALETTE){
+  const w=img.width,h=img.height,out=new ImageData(w,h),d=Float32Array.from(img.data);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;let r=d[i],g=d[i+1],b=d[i+2];
+    if(dither==='ordered'){const t=(BAYER[y%4][x%4]/16-0.5)*64;r+=t;g+=t;b+=t;}
+    const p=nearest(r,g,b,pal);out.data[i]=p[0];out.data[i+1]=p[1];out.data[i+2]=p[2];out.data[i+3]=255;
+    if(dither==='diffuse'){const er=[r-p[0],g-p[1],b-p[2]];[[1,0,7],[-1,1,3],[0,1,5],[1,1,1]].forEach(([dx,dy,f])=>{const xx=x+dx,yy=y+dy;if(xx<0||xx>=w||yy>=h)return;const j=(yy*w+xx)*4;for(let k=0;k<3;k++)d[j+k]+=er[k]*f/16;});}
+  }return out;
+}
+function show(canvas,img,scale){canvas.width=img.width;canvas.height=img.height;canvas.getContext('2d').putImageData(img,0,0);canvas.style.width=img.width*scale+'px';canvas.style.height=img.height*scale+'px';canvas.style.imageRendering='pixelated';}
+function showSmooth(canvas,img,cssW){canvas.width=img.width;canvas.height=img.height;canvas.getContext('2d').putImageData(img,0,0);canvas.style.width=cssW+'px';canvas.style.height=(cssW*img.height/img.width)+'px';}
+// Fixed colour depths: snap each channel to its levels.
+function depthQuant(img,bits,dither='none'){
+  const lv=bits===16?[32,64,32]:[8,8,4];const w=img.width,h=img.height,out=new ImageData(w,h),d=Float32Array.from(img.data);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;for(let k=0;k<3;k++){const step=255/(lv[k]-1);let v=d[i+k];
+    if(dither==='ordered')v+=(BAYER[y%4][x%4]/16-0.5)*step;const q=Math.max(0,Math.min(255,Math.round(v/step)*step));out.data[i+k]=q;
+    if(dither==='diffuse'){const e=v-q;[[1,0,7],[-1,1,3],[0,1,5],[1,1,1]].forEach(([dx,dy,f])=>{const xx=x+dx,yy=y+dy;if(xx<0||xx>=w||yy>=h)return;d[(yy*w+xx)*4+k]+=e*f/16;});}}
+    out.data[i+3]=255;}
+  return out;
+}
+// Best 256 for this picture: popularity of 4-bit-per-channel buckets.
+function adaptivePalette(img,n=256){const m=new Map();for(let i=0;i<img.data.length;i+=4){const k=(img.data[i]>>4)<<8|(img.data[i+1]>>4)<<4|(img.data[i+2]>>4);m.set(k,(m.get(k)||0)+1);}
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k])=>[((k>>8)&15)*17,((k>>4)&15)*17,(k&15)*17]);}
+
+const src1=makeScene(1280,720,1),src2=makeScene(1280,720,4),src3=makeScene(1280,720,9);const sq=makeScene(1024,1024,1);const r1=resize(src1,320,180),r2=resize(src2,320,180),r3=resize(src3,320,180);showSmooth(a1,src1,320);show(a2,quantise(r1,'ordered'),1);showSmooth(b1,src2,320);show(b2,quantise(r2,'ordered'),1);showSmooth(c1,src3,320);show(c2,depthQuant(r3,8,'ordered'),1);showSmooth(d1,src3,320);show(d2,r3,1);showSmooth(e1,sq,180);show(e2,quantise(resize(sq,320,180),'ordered'),1);showSmooth(f1,src3,320);showSmooth(g1,src2,320);</script></body></html>
