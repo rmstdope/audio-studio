@@ -163,7 +163,7 @@ describe('summarizeImages', () => {
     const row = images.acts[0]!.rows[0]!
     expect(row).toMatchObject({
       id: 'silver-stag-inn',
-      words: 'a low inn',
+      words: 'a low inn at dusk',
       changed: false,
       gameChanged: false,
       status: 'none yet',
