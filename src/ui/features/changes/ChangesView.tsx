@@ -2,6 +2,8 @@ import type {
   Change,
   ChangeKind,
   FileRole,
+  ImagesChanges,
+  ImagesFileRole,
   MusicChanges,
   MusicFileRole,
   PartChanges,
@@ -18,13 +20,16 @@ const KIND: Record<ChangeKind, { label: string; color: string }> = {
   conflict: { label: 'Conflict', color: 'var(--accent)' },
 }
 
-const ROLE: Record<FileRole | MusicFileRole, string> = {
+const ROLE: Record<FileRole | MusicFileRole | ImagesFileRole, string> = {
   dialog: 'Dialog',
   cues: 'Cues',
   lock: 'Lock',
   manifest: 'Manifest',
   list: 'Tracks from the game',
   briefs: 'Briefs',
+  images: 'Images from the game',
+  style: 'Style from the game',
+  words: 'Words written here',
 }
 
 /**
@@ -79,6 +84,7 @@ function ChangesBody({ summary }: { summary: ProjectSummary }) {
       ? groups.music.clips.conflict +
         groups.music.files.filter((f) => f.change === 'conflict').length
       : 0) +
+    (groups.images?.files.filter((f) => f.change === 'conflict').length ?? 0) +
     groups.parts.reduce(
       (sum, part) =>
         sum + part.clips.conflict + part.files.filter((f) => f.change === 'conflict').length,
@@ -102,6 +108,7 @@ function ChangesBody({ summary }: { summary: ProjectSummary }) {
         <PartSection key={part.id} part={part} label={summary.partLabel} />
       ))}
       {groups.music && <MusicSection music={groups.music} />}
+      {groups.images && <ImagesSection images={groups.images} />}
     </div>
   )
 }
@@ -125,6 +132,16 @@ function MusicSection({ music }: { music: MusicChanges }) {
       <span className="label">Music</span>
       {music.files.length > 0 && <FileList files={music.files} />}
       <ClipCounts clips={music.clips} />
+    </section>
+  )
+}
+
+/** The images files together: they are committed together. */
+function ImagesSection({ images }: { images: ImagesChanges }) {
+  return (
+    <section className="panel" aria-label="Images">
+      <span className="label">Images</span>
+      <FileList files={images.files} />
     </section>
   )
 }
@@ -153,7 +170,11 @@ function ClipCounts({ clips: counts }: { clips: Record<ChangeKind, number> }) {
   )
 }
 
-function FileList({ files }: { files: (Change & { role?: FileRole | MusicFileRole })[] }) {
+function FileList({
+  files,
+}: {
+  files: (Change & { role?: FileRole | MusicFileRole | ImagesFileRole })[]
+}) {
   return (
     <ul className="change-files">
       {files.map((file) => (

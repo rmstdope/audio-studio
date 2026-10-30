@@ -24,6 +24,14 @@ export interface MusicChanges {
   clips: Record<ChangeKind, number>
 }
 
+/** What an images file is for: the game's list of images, the game's style, the studio's words, or the lock. */
+export type ImagesFileRole = 'images' | 'style' | 'words' | 'lock'
+
+/** The images files' changes. */
+export interface ImagesChanges {
+  files: (Change & { role: ImagesFileRole })[]
+}
+
 /** A part's changes: its own files one by one, its clips counted. */
 export interface PartChanges {
   id: string
@@ -40,6 +48,8 @@ export interface ChangeGroups {
   parts: PartChanges[]
   /** The music files and clips, when the project has music and any of them changed. */
   music: MusicChanges | null
+  /** The images files, when the project has images and any of them changed. */
+  images: ImagesChanges | null
 }
 
 /** A part's files by path (with their role) and its clips folders, one per language (ending in `/`). */
@@ -57,6 +67,8 @@ export interface ProjectPaths {
   parts: PartPaths[]
   /** The music files by path (with their role) and the clips folder (ending in `/`); null without music. */
   music: { files: Record<string, MusicFileRole>; clips: string } | null
+  /** The images files by path (with their role); null without images. */
+  images: Record<string, ImagesFileRole> | null
 }
 
 /** A path from the project file as git writes it: no `./`, no doubled or trailing slashes. */
@@ -66,8 +78,19 @@ function normal(path: string): string {
 
 /** The paths the studio reads and writes for a project: what git is asked about, and grouped by. */
 export function projectPaths(project: Project, projectPath: string): ProjectPaths {
-  const { narration, music } = project
+  const { narration, music, images } = project
   return {
+    images: images
+      ? Object.fromEntries([
+          ...narration.parts.map((part): [string, ImagesFileRole] => [
+            normal(partPathFor(images.paths.list, part.id)),
+            'images',
+          ]),
+          [normal(images.paths.style), 'style'],
+          [normal(images.paths.prompts), 'words'],
+          [normal(images.paths.lock), 'lock'],
+        ])
+      : null,
     music: music
       ? {
           files: Object.fromEntries([
@@ -191,7 +214,18 @@ export function groupChanges(
     total += count
     if (count) musicChanges = { files, clips }
   }
-  return { total, project: projectChanges, parts, music: musicChanges }
+  let imagesChanges: ImagesChanges | null = null
+  if (paths.images) {
+    const files: ImagesChanges['files'] = []
+    for (const change of changes) {
+      if (Object.hasOwn(paths.images, change.path)) {
+        files.push({ ...change, role: paths.images[change.path]! })
+      }
+    }
+    total += files.length
+    if (files.length) imagesChanges = { files }
+  }
+  return { total, project: projectChanges, parts, music: musicChanges, images: imagesChanges }
 }
 
 function noClips(): Record<ChangeKind, number> {
