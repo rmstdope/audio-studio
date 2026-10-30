@@ -391,6 +391,16 @@ describe('the images section', () => {
     expect(result.data!.images!.paths.manifest).toBe('web/public/images/generated/manifest.json')
   })
 
+  it('names the main image model, or none (FLUX.2 klein)', () => {
+    const withModel = (model: string) => {
+      const base = images().images as Record<string, unknown>
+      return projectJson({ images: { ...base, model } })
+    }
+    expect(parse(withModel('z-image-turbo')).data!.images!.model).toBe('z-image-turbo')
+    expect(parse(images()).data!.images!.model).toBeUndefined()
+    expect(problems(withModel('huge')).map((p) => p.path)).toEqual(['images.model'])
+  })
+
   it('needs the clips folder and the manifest, where chosen images are written', () => {
     const base = images().images as { paths: Record<string, string> }
     const { clips: _clips, manifest: _manifest, ...rest } = base.paths

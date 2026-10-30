@@ -27,7 +27,12 @@ const installed = {
   eleven: true,
 }
 
-const answer = (music: Extract<ModelsAnswer, { ok: true }>['music']): ModelsAnswer => ({
+type Images = Extract<ModelsAnswer, { ok: true }>['images']
+
+const answer = (
+  music: Extract<ModelsAnswer, { ok: true }>['music'],
+  images: Images = null,
+): ModelsAnswer => ({
   ok: true,
   file: 'audio-studio.json',
   models: { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 's2.1-pro-free' },
@@ -37,6 +42,7 @@ const answer = (music: Extract<ModelsAnswer, { ok: true }>['music']): ModelsAnsw
   dialog: { lines: 0, bytes: 0 },
   recorded: {},
   music,
+  images,
   busy: null,
 })
 
@@ -203,6 +209,106 @@ describe('the Music row of the Models panel', () => {
     expect(short.disabled).toBe(false)
     await page.pick('short')
     expect(put).toEqual([{ model: 'short', was: 'balanced' }])
+  })
+})
+
+describe('the Images row of the Models panel', () => {
+  const both = { klein: true, 'z-image-turbo': true }
+  const images = (model: 'klein' | 'z-image-turbo', installed = both): Images => ({
+    model,
+    installed,
+    mflux: { ok: true },
+  })
+  const imagePuts: unknown[] = []
+  beforeEach(() => {
+    imagePuts.length = 0
+    reply = async () => new Response(JSON.stringify({ ok: true }))
+    globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PUT' && String(url) === '/api/image-model') {
+        imagePuts.push(JSON.parse(String(init.body)))
+        return reply()
+      }
+      return new Response('{}')
+    }) as typeof fetch
+  })
+  const menuOf = (container: HTMLElement) =>
+    container.querySelector<HTMLSelectElement>('select[aria-label="Image model"]')!
+  const pickImage = (container: HTMLElement, value: string) =>
+    act(async () => {
+      menuOf(container).value = value
+      menuOf(container).dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+  it('is a row after Music with its purpose, a menu of both models with their times, and Free', () => {
+    const page = render(answer(null, images('klein')))
+    const rows = [...page.container.querySelectorAll('.mrow .mname')].map((n) => n.textContent)
+    expect(rows).toEqual(['Audition', 'Draft', 'Final', 'Images'])
+    const text = page.container.textContent!
+    expect(text).toContain(
+      "The game's images, made on this computer. An image's takes can use the other model.",
+    )
+    expect(text).toContain('Free')
+    expect(text).toContain(
+      'Which model records each stage of the voices, which makes the music, and which makes the images.',
+    )
+    expect([...menuOf(page.container).options].map((o) => o.textContent)).toEqual([
+      'FLUX.2 klein 4B — about 8 s a take',
+      'Z-Image-Turbo — about 1 min a take',
+    ])
+    expect(menuOf(page.container).value).toBe('klein')
+    expect(page.container.textContent).not.toContain('not on this computer')
+  })
+
+  it('is not shown in a project without images', () => {
+    expect(menuOf(render(answer(null)).container)).toBeNull()
+  })
+
+  it('lists a missing model as such, which cannot be picked, and warns when it is the chosen one', () => {
+    const page = render(answer(null, images('klein', { klein: false, 'z-image-turbo': true })))
+    const [klein, z] = [...menuOf(page.container).options]
+    expect(klein!.textContent).toBe('FLUX.2 klein 4B — about 8 s a take — not on this computer')
+    expect(klein!.disabled).toBe(true)
+    expect(z!.disabled).toBe(false)
+    expect(page.container.querySelector('.warnline')!.textContent).toBe('not on this computer')
+    const fine = render(answer(null, images('klein', { klein: true, 'z-image-turbo': false })))
+    expect(fine.container.querySelector('.warnline')).toBeNull()
+  })
+
+  it('saves a pick at once, with no question, and says Saving… while it does', async () => {
+    let finish: (r: Response) => void = () => {}
+    reply = () => new Promise((resolve) => (finish = resolve))
+    const page = render(answer(null, images('klein')))
+    await pickImage(page.container, 'z-image-turbo')
+    expect(imagePuts).toEqual([{ model: 'z-image-turbo', was: 'klein' }])
+    expect(menuOf(page.container).value).toBe('z-image-turbo')
+    expect(menuOf(page.container).disabled).toBe(true)
+    expect(page.container.textContent).toContain('Saving…')
+    await act(async () => finish(new Response(JSON.stringify({ ok: true }))))
+    expect(page.container.textContent).not.toContain('Saving…')
+  })
+
+  it('says a save failed, goes back to the saved model, and offers Keep and Try again', async () => {
+    reply = async () =>
+      new Response(
+        JSON.stringify({
+          ok: false,
+          problems: [{ file: 'a', path: 'images.model', message: 'disk full' }],
+        }),
+        { status: 409 },
+      )
+    const page = render(answer(null, images('klein')))
+    await pickImage(page.container, 'z-image-turbo')
+    const box = page.container.querySelector('[role="alert"]')!
+    expect(box.textContent).toContain('Z-Image-Turbo could not be saved as the image model.')
+    expect(box.textContent).toContain(
+      'audio-studio.json could not be written: disk full. Nothing was changed.',
+    )
+    expect(menuOf(page.container).value).toBe('klein')
+    const buttons = [...box.querySelectorAll('button')].map((b) => b.textContent)
+    expect(buttons).toEqual(['Keep FLUX.2 klein 4B', 'Try again'])
+    expect(document.activeElement).toBe(box.querySelectorAll('button')[1] ?? null)
+    await act(async () => box.querySelectorAll('button')[1]!.click())
+    expect(imagePuts).toHaveLength(2)
   })
 })
 

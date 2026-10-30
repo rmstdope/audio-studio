@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { changedLine } from '../../../core/musicChoose'
 import { trackFor, type MusicListSummary, type TrackRow } from '../../../core/music'
 import {
@@ -38,6 +38,7 @@ import {
   useStopTakes,
 } from '../../api'
 import { Failure } from '../../components/Failure'
+import { openTracking } from '../../components/openTracking'
 import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { clock } from '../../format'
@@ -45,26 +46,6 @@ import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { InTheGame, Wave } from './InTheGame'
 import { MoveTakeDialog } from './MoveTakeDialog'
-
-/**
- * The handlers that tell whether a menu's list is probably open, for a menu whose closed text is
- * shorter than its entries: a click or a key that opens it, and Escape or leaving that closes it.
- */
-function openTracking(setOpen: (open: boolean) => void) {
-  return {
-    onMouseDown: () => setOpen(true),
-    onKeyDown: (event: KeyboardEvent<HTMLSelectElement>) => {
-      if (event.key === 'Escape') setOpen(false)
-      else if (
-        [' ', 'Enter', 'F4', 'ArrowUp', 'ArrowDown'].includes(event.key) &&
-        // Alt+Arrow opens the list everywhere; a bare arrow does on macOS.
-        (event.key.startsWith('Arrow') || !event.altKey)
-      )
-        setOpen(true)
-    },
-    onBlur: () => setOpen(false),
-  }
-}
 
 /**
  * A track's Takes panel: the takes made, played from the start and, for a loop, around their

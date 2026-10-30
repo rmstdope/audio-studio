@@ -32,7 +32,16 @@ import {
   type MusicModelId,
 } from '../../../core/musicModels'
 import {
+  IMAGE_MODEL_IDS,
+  imageMenuEntry,
+  imageModel,
+  imageSaveFailureBody,
+  imageSaveFailureHeading,
+  type ImageModelId,
+} from '../../../core/imageModels'
+import {
   useModelsView,
+  useSetImageModel,
   useSetElevenModel,
   useSetElevenTts,
   useSetMusicModel,
@@ -85,9 +94,11 @@ export function ModelsPanel() {
         Models
       </h2>
       <span className="muted">
-        {view.data.music
-          ? 'Which model records each stage of the voices, and which makes the music.'
-          : 'Which Fish model records each stage.'}{' '}
+        {view.data.images
+          ? 'Which model records each stage of the voices, which makes the music, and which makes the images.'
+          : view.data.music
+            ? 'Which model records each stage of the voices, and which makes the music.'
+            : 'Which Fish model records each stage.'}{' '}
         Saved in <span className="mono">{view.data.file}</span> for everyone on the project.
       </span>
       {busy && (
@@ -119,6 +130,7 @@ export function ModelsPanel() {
         ))}
       {view.data.castsEleven && <ElevenVoiceRow view={view.data as View} locked={locked} />}
       {view.data.music && <MusicRow file={view.data.file} music={view.data.music} />}
+      {view.data.images && <ImagesRow file={view.data.file} images={view.data.images} />}
     </section>
   )
 }
@@ -217,6 +229,105 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
                 onClick={() => dispatch({ type: 'keep' })}
               >
                 Keep {musicModel(current).name}
+              </button>
+              <button
+                ref={retry}
+                className="btn btn-primary"
+                type="button"
+                onClick={() => dispatch({ type: 'retry' })}
+              >
+                Try again
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The Images row: the model an image's new takes start on, a menu of the two local models saved
+ * in the project file as soon as one is picked. A model this computer lacks is listed but cannot
+ * be picked. Failing is the Music row's box.
+ */
+function ImagesRow({ file, images }: { file: string; images: NonNullable<View['images']> }) {
+  const save = useSetImageModel()
+  const [state, dispatch] = useReducer(rowReducer, startRow)
+  const retry = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLSelectElement>(null)
+  const previous = useRef(state)
+  const lastRun = useRef('')
+  const current = images.model
+  const pending = state.phase === 'saving'
+
+  useEffect(() => {
+    const target = focusAfter(previous.current, state)
+    previous.current = state
+    if (target === 'menu') requestAnimationFrame(() => menu.current?.focus())
+    else if (target === 'retry') retry.current?.focus()
+  }, [state])
+
+  // The save runs from the state's own transition, so Try again and a first pick share one path.
+  useEffect(() => {
+    const key = state.phase === 'saving' ? state.to : ''
+    if (key && key !== lastRun.current) {
+      save.mutateAsync({ model: key, was: current }).then(
+        (result) =>
+          result.ok
+            ? dispatch({ type: 'saved' })
+            : dispatch({ type: 'failed', reason: result.problems?.[0]?.message ?? 'refused' }),
+        (error: Error) => dispatch({ type: 'failed', reason: error.message }),
+      )
+    }
+    lastRun.current = key
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
+
+  const shown = (state.phase === 'saving' ? state.to : current) as ImageModelId
+  return (
+    <div className="mrow">
+      <div className="mname">Images</div>
+      <div className="mtx">
+        <span className="muted">
+          The game&apos;s images, made on this computer. An image&apos;s takes can use the other
+          model.
+        </span>
+        <div className="mmenu">
+          <select
+            ref={menu}
+            aria-label="Image model"
+            value={shown}
+            disabled={pending}
+            onChange={(event) =>
+              dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
+            }
+          >
+            {IMAGE_MODEL_IDS.map((id) => (
+              <option key={id} value={id} disabled={!images.installed[id]}>
+                {imageMenuEntry(id, images.installed[id])}
+              </option>
+            ))}
+          </select>
+          <span className="free">Free</span>
+          {!images.installed[shown] && <span className="warnline">not on this computer</span>}
+          {pending && <span className="muted">Saving…</span>}
+        </div>
+        {state.phase === 'failed' && (
+          <section className="notice notice-err" role="alert">
+            <div className="notice-text">
+              <strong>{imageSaveFailureHeading(state.to as ImageModelId)}</strong>
+              <span className="muted">
+                <Mono text={imageSaveFailureBody(file, state.reason)} words={[file]} />
+              </span>
+            </div>
+            <div className="notice-actions">
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => dispatch({ type: 'keep' })}
+              >
+                Keep {imageModel(current).name}
               </button>
               <button
                 ref={retry}

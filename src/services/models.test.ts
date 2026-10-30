@@ -5,6 +5,7 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import {
   setElevenModel,
   setElevenSettings,
+  setImageModel,
   setMusicModel,
   setStageModel,
   switchRetiredModels,
@@ -245,6 +246,47 @@ describe('setMusicModel', () => {
       problems: [{ path: 'music' }],
     })
     expect(read()).toBe(`${JSON.stringify(withMusic(), null, 2)}\n`)
+  })
+})
+
+describe('setImageModel', () => {
+  const imagePaths = {
+    list: 'tts/{part}/images.json',
+    style: 'images/style.json',
+    prompts: 'images/prompts.json',
+    lock: 'images/images.lock.json',
+    clips: 'web/images',
+    manifest: 'web/images/manifest.json',
+  }
+  const withImages = (extra: Record<string, unknown> = {}) =>
+    projectJson({ images: { paths: imagePaths, ...extra } })
+
+  it('writes images.model and nothing else, in the file’s own indentation', async () => {
+    const { projectFile, read } = repo(withImages(), 4)
+    expect(await setImageModel(projectFile, 'z-image-turbo', 'klein')).toEqual({ ok: true })
+    expect(read()).toBe(`${JSON.stringify(withImages({ model: 'z-image-turbo' }), null, 4)}\n`)
+  })
+
+  it('refuses, writing nothing, when the file changed since the page read it', async () => {
+    const { projectFile, read } = repo(withImages({ model: 'z-image-turbo' }))
+    const before = read()
+    expect(await setImageModel(projectFile, 'klein', 'klein')).toMatchObject({
+      ok: false,
+      problems: [{ file: 'audio-studio.json', path: 'images.model' }],
+    })
+    expect(read()).toBe(before)
+  })
+
+  it('refuses a model it does not know, and a project with no images', async () => {
+    const { projectFile, read } = repo(withImages())
+    const before = read()
+    expect(await setImageModel(projectFile, 'huge', 'klein')).toMatchObject({ ok: false })
+    expect(read()).toBe(before)
+    const plain = repo(projectJson())
+    expect(await setImageModel(plain.projectFile, 'klein', 'klein')).toMatchObject({
+      ok: false,
+      problems: [{ path: 'images' }],
+    })
   })
 })
 

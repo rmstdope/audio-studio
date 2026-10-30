@@ -84,7 +84,7 @@ retroquest/                      ← user runs `audio-studio` here
    beyond reading the dialog, the loops or the stingers again.
    Besides those paths, the studio writes the project file itself in a few places only: the project's
    own words that sound the same (`narration.quality.soundAlike`), from the characters page (§8.3),
-   the models (`narration.models`, `narration.elevenlabs.models` and `music.model`) from Setup's
+   the models (`narration.models`, `narration.elevenlabs.models`, `music.model` and `images.model`) from Setup's
    Models panel, the retirement
    switch of `s1`, `narration.quality.fishTier`, and `takeFade` from Setup's Playing takes panel.
 5. The API answers only requests addressed to `127.0.0.1` or `localhost` on its port (against DNS
@@ -1357,9 +1357,14 @@ the game on an act's page runs `narration.refreshDialog`, as on Music's act page
     "lock": "images/images.lock.json",
     "clips": "web/public/images/generated",
     "manifest": "web/public/images/generated/manifest.json"
-  }
+  },
+  "model": "klein"
 }
 ```
+
+`model` is optional (`klein`, the default, or `z-image-turbo`): the image model an image's new takes
+start on. It is saved from the Images row of Setup's Models panel (`PUT /api/image-model`,
+`{ model, was }`, as `music.model` is), at once and with nothing asked, over a stale `was` refused.
 
 `clips` is the folder the chosen pictures are written to (`<id>.png`, the studio's own folder) and
 `manifest` what the game reads there. Both are required.
@@ -1396,7 +1401,9 @@ style, every Images page shows one notice naming what changed. The user's own ch
 shows no notice; the images made with the old style are marked out of date.
 
 **Takes** (`services/imageTakes.ts`, `core/imageTakes.ts`). A take is the image's whole prompt made
-with `DEFAULT_IMAGE_MODEL` at the take size (`takeSize`: the listed shape with the longer side 1024,
+with the model asked for (`ImageModelId`, `core/imageModels.ts`: `klein` or `z-image-turbo`; a request
+that names none starts on `defaultTakeModel`: the project's `images.model`, else the other model when that
+one is not on this computer) at the take size (`takeSize`: the listed shape with the longer side 1024,
 each side a multiple of 16; the listed sizes are not multiples of 16, and bringing a take to them
 and to the palette is as-yag.5) and a new seed, on the GPU queue (`makeImageTake`). The board is
 `.audio-studio/images/<id>.json`, `{ next, takes: [{ n, seed, model, width, height, madeFrom, seen }] }`
@@ -1406,7 +1413,11 @@ a take is on the board only once its picture is written, numbers are per image a
 page. **Stop** ends the one being made and drops those waiting; a failed take stays with its reason
 until **Try again** makes the same number. A take is "earlier" when its words differ from the image's
 now (the style and the size are not marked on a take); "new" until it has been shown on the right
-once (`seen`, saved on the board).
+once (`seen`, saved on the board). `model` on the board is the mflux name of the model that made it; the
+view gives it as an id, and the two takes side by side name it after the take. A model that is not on this
+computer (`ImageGenerator.installed`: its weights are in the Hugging Face cache) is refused at the server,
+and **Try again** remakes with the model the take was asked with. Takes cannot be made only when mflux is
+missing or neither model is installed.
 
 **Choosing.** **Choose** (in the image's board turn and the project's choice turn, with both the
 manifest and the lock readable, or nothing is changed) writes the picture to `<clips>/<id>.png`, the
@@ -1423,12 +1434,15 @@ one other take on the right, a strip of the others; Choose moves the right-hand 
 take chosen before comes to the right, marked "was chosen" for that visit. The right-hand take is the
 page's own state (after a reload the newest) and does not move when a take finishes; ← / → step
 through the strip while focus is in the section but not in a menu or field. The status of an image
-on its act's list says "making 2 takes · about 1 min" while takes are made.
+on its act's list says "making 2 takes · about 1 min" while takes are made. Its heading row has a menu
+"Model for new takes" before the count menu (closed: "FLUX.2 klein — about 8 s a take"; open: the full names),
+which starts on the project's model, or on the model that is here when that one is missing (with a faint line
+saying so); a pick holds only while the page is open. The screens are drawn in `docs/ui/as-yag.7-image-models.html`.
 
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
 `PATCH /api/image-style` (`{ look }` or `{ keepOut }`) and `POST /api/image-style/seen`; for takes
-`GET` and `POST /api/images/:id/takes` (`{ count }` 1 to 4, or `{ retry }`), `GET /api/images/:id/takes/:n`
+`GET` and `POST /api/images/:id/takes` (`{ count, model? }` 1 to 4, or `{ retry }`), `PUT /api/image-model`, `GET /api/images/:id/takes/:n`
 (the picture), `DELETE` it (drop), `POST …/takes/:n/seen`, `POST /api/images/:id/choose` (`{ n }`),
 `/unchoose`, `/stop`, `GET /api/images/:id/current` and `GET /api/images/making`; every change from
 the studio's own page only.
@@ -1560,7 +1574,11 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   the project's model is a Stable Audio one, only the machine and uv) and, in a row of its own, the
   optional Stable Audio Open models in `~/.cache/stable-audio` ("Not set up" until they are there,
   "Needs attention" only when the project's music model is one that is missing, with three numbered
-  steps: accept the licence, make a read token, download), and two optional ElevenLabs rows (§8.6):
+  steps: accept the licence, make a read token, download), with an `images` section the image models
+  (**Image models**: mflux and the weights of FLUX.2 klein 4B and Z-Image-Turbo in the Hugging Face cache,
+  `HF_HUB_CACHE`, else `$HF_HOME/hub`, else `~/.cache/huggingface/hub`: "Ready" with both, "Not set up" when only the
+  project's model is there, "Needs attention" when the project's model is missing, or mflux, or both models,
+  each with numbered steps and the commands to get what is missing; "Not used" without an `images` section), and two optional ElevenLabs rows (§8.6):
   its key ("Not set up" until there is one, saying where it goes) and its account (asked only with a
   key: the plan, the credits left of its allowance and when they renew, what may be billed
   beyond them, the voice slots used, and what the plan allows), each with what to do about it.
@@ -1895,8 +1913,8 @@ Small, independently useful increments:
     3. **An image take** (as-yag.2, done) with either model, on the GPU queue with music and Whisper.
     4. **Takes and choosing** (as-yag.4, done: §8.7): an image's takes compared with the chosen one.
     5. **The game's look** (as-yag.5): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.
-    6. **Two models** (as-yag.7): Setup says which are installed and chooses the main one; takes
-       can be made with the other.
+    6. **Two models** (as-yag.7, done: §8.7): Setup says which are installed and chooses the main one;
+       takes can be made with the other.
     7. **The rename** to Content Studio (as-yag.6), with §1 and the opening of this document, which still speak of a game's audio.
 
 ---

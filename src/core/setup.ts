@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import { IMAGE_MODEL_IDS, imageModel, type ImageModelId } from './imageModels'
 import { MUSIC_MODELS, musicModel, type MusicModelId } from './musicModels'
 import type { FishTierSchema } from './project'
 
@@ -78,6 +79,15 @@ export interface SetupFacts {
     /** The Stable Audio models that are not in `~/.cache/stable-audio`. */
     stableAudioMissing: MusicModelId[]
   } | null
+  /** The image models, or null when the project has no `images` section. */
+  images: {
+    /** Whether mflux, which runs them, can run here. */
+    mflux: { ok: true } | { ok: false; message: string; fix: string }
+    /** The project's main image model. */
+    model: ImageModelId
+    /** The image models whose weights are not on this computer. */
+    missing: ImageModelId[]
+  } | null
   /** What asking ElevenLabs for the account gave (not asked without its key). */
   elevenlabs: ElevenAnswer
 }
@@ -102,6 +112,7 @@ export interface SetupCheck {
     | 'refresh'
     | 'music'
     | 'stableAudio'
+    | 'imageModels'
     | 'elevenlabsKey'
     | 'elevenlabs'
   title: string
@@ -136,6 +147,7 @@ export function setupChecks(facts: SetupFacts): SetupCheck[] {
     refresh(facts),
     music(facts),
     stableAudio(facts),
+    imageModels(facts),
     elevenlabsKey(facts),
     elevenlabs(facts),
   ]
@@ -400,6 +412,90 @@ function stableAudio(facts: SetupFacts): SetupCheck {
             ' and ',
           )} is in place; ${missing.map((id) => musicModel(id).name).join(' and ')} is missing from ${STABLE_AUDIO_HOME}.`
   return { id: 'stableAudio', title, state: 'off', label: 'Not set up', detail, steps }
+}
+
+/** The step that downloads some image models, once, from Hugging Face. */
+function downloadStep(ids: ImageModelId[]): SetupStep {
+  const sizes = ids.map((id) => `${imageModel(id).gigabytes} GB`)
+  const about = `about ${sizes.join(' and ')}`
+  return {
+    parts: [
+      ids.length > 1 ? `Download the models, once (${about}):` : `Download it, once (${about}):`,
+    ],
+    commands: ids.map((id) => `uvx --from huggingface_hub hf download ${imageModel(id).repo}`),
+  }
+}
+
+function imageModels(facts: SetupFacts): SetupCheck {
+  const title = 'Image models'
+  if (!facts.images) {
+    return {
+      id: 'imageModels',
+      title,
+      state: 'off',
+      label: 'Not used',
+      detail: 'The project has no images section.',
+    }
+  }
+  const { mflux, model, missing } = facts.images
+  const [first, second] = IMAGE_MODEL_IDS.map((id) => imageModel(id).name)
+  const noteSteps = (list: SetupStep[]) => ({ list, note: 'Then press Check again.' })
+  const installMflux: SetupStep = {
+    parts: ['Install mflux:'],
+    commands: ['uv tool install mflux'],
+  }
+  if (!mflux.ok) {
+    const isMissingMflux = mflux.message.includes('mflux is not on the PATH')
+    return {
+      id: 'imageModels',
+      title,
+      state: 'problem',
+      detail: isMissingMflux
+        ? "Images can't be made: mflux, which runs the image models, is not installed."
+        : mflux.message,
+      ...(isMissingMflux
+        ? {
+            steps: noteSteps([installMflux, ...(missing.length ? [downloadStep(missing)] : [])]),
+          }
+        : { fix: mflux.fix }),
+    }
+  }
+  if (missing.length === IMAGE_MODEL_IDS.length) {
+    return {
+      id: 'imageModels',
+      title,
+      state: 'problem',
+      detail: "Images can't be made: neither image model is on this computer.",
+      steps: noteSteps([downloadStep(missing)]),
+    }
+  }
+  if (!missing.length) {
+    return {
+      id: 'imageModels',
+      title,
+      state: 'ok',
+      detail: `${first} and ${second} are on this computer; a model loads on its first take.`,
+    }
+  }
+  const lacking = missing[0]!
+  const present = IMAGE_MODEL_IDS.find((id) => id !== lacking)!
+  if (lacking === model) {
+    return {
+      id: 'imageModels',
+      title,
+      state: 'problem',
+      detail: `The project's image model, ${imageModel(model).name}, is not on this computer. ${imageModel(present).name} is in place: an image's takes can use it meanwhile.`,
+      steps: noteSteps([downloadStep(missing)]),
+    }
+  }
+  return {
+    id: 'imageModels',
+    title,
+    state: 'off',
+    label: 'Not set up',
+    detail: `Optional: ${imageModel(lacking).name} is not on this computer. ${imageModel(present).name} is in place.`,
+    steps: noteSteps([downloadStep(missing)]),
+  }
 }
 
 function elevenlabsKey(facts: SetupFacts): SetupCheck {

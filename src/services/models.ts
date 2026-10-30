@@ -1,6 +1,7 @@
 import { basename } from 'node:path'
 import { ProjectSchema, problemsFrom, type ElevenTts, type Problem } from '../core/project'
 import { sameSettings, type Stage } from '../core/models'
+import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_IDS } from '../core/imageModels'
 import { MUSIC_MODEL_IDS, DEFAULT_MUSIC_MODEL } from '../core/musicModels'
 import { isElevenModel } from '../core/elevenSpeech'
 import { isPriced } from '../core/prices'
@@ -117,6 +118,45 @@ export function setMusicModel(
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
     return saveProject(projectFile, opened, 'music.model', (indent) =>
+      projectJson(opened.raw, indent),
+    )
+  })
+}
+
+/**
+ * Saves the image model new takes are made with (`images.model` in the project file). `was` is the
+ * model the page showed (FLUX.2 klein when the file names none): if the file names another,
+ * someone changed it meanwhile and nothing is written. A project with no images section has no
+ * model to save. The rest of the file stays as it was, in its own indentation and line endings.
+ */
+export function setImageModel(
+  projectFile: string,
+  model: string,
+  was: string,
+): Promise<ModelsChange> {
+  return projectWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const file = basename(projectFile)
+    const refuse = (path: string, message: string): ModelsChange => ({
+      ok: false,
+      problems: [{ file, path, message }],
+    })
+    if (!opened.project.images) return refuse('images', 'the project has no images section')
+    if (!(IMAGE_MODEL_IDS as readonly string[]).includes(model)) {
+      return refuse('images.model', `${model} is not an image model the studio knows`)
+    }
+    if ((opened.project.images.model ?? DEFAULT_IMAGE_MODEL) !== was) {
+      return refuse(
+        'images.model',
+        'the model in the file changed since the page was read; reload the studio',
+      )
+    }
+    const images = (opened.raw as { images: Record<string, unknown> }).images
+    images.model = model
+    const parsed = ProjectSchema.safeParse(opened.raw)
+    if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
+    return saveProject(projectFile, opened, 'images.model', (indent) =>
       projectJson(opened.raw, indent),
     )
   })

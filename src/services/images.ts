@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { existsSync, readdirSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checkImageRequest, imageModel, type ImageModelId } from '../core/imageModels'
 import { freeGpu, gpuQueue, GPU } from './gpu'
@@ -32,8 +33,31 @@ export type ImageReady = { ok: true } | { ok: false; message: string; fix: strin
 export interface ImageGenerator {
   /** Whether a take can be made now: Apple silicon and mflux are there. */
   ready(): ImageReady | Promise<ImageReady>
+  /** Whether this model's weights are on this computer. */
+  installed(model: ImageModelId): boolean | Promise<boolean>
   /** One take; the model loads for it and leaves memory when it is made. Aborting ends it, and it rejects. */
   generate(request: ImageRequest, signal?: AbortSignal): Promise<GeneratedImage>
+}
+
+/** Where Hugging Face keeps its downloads, where mflux finds and puts the models' weights. */
+export function hubDirOf(env: Record<string, string | undefined>, home: string): string {
+  if (env.HF_HUB_CACHE) return env.HF_HUB_CACHE
+  if (env.HF_HOME) return join(env.HF_HOME, 'hub')
+  return join(home, '.cache', 'huggingface', 'hub')
+}
+
+/** Where the Hugging Face downloads are on this computer. */
+export const HUB_DIR = hubDirOf(process.env, homedir())
+
+/** Whether a model's weights are in the Hugging Face cache `hubDir`: its folder holds a snapshot with files. */
+export function imageModelInstalled(hubDir: string, model: ImageModelId): boolean {
+  const snapshots = join(
+    hubDir,
+    `models--${imageModel(model).repo.replace('/', '--')}`,
+    'snapshots',
+  )
+  if (!existsSync(snapshots)) return false
+  return readdirSync(snapshots).some((name) => readdirSync(join(snapshots, name)).length > 0)
 }
 
 /** Whether mflux can run here, and the first thing that stops it if not. */
@@ -86,13 +110,17 @@ export function createMfluxGenerator({
   build = (c: MfluxCommand) => ({ command: ['mflux-generate', ...c.args], out: c.out }),
   machine = { which: (c) => Bun.which(c) !== null, platform: process.platform, arch: process.arch },
   timeoutMs = 30 * 60_000,
+  hubDir = HUB_DIR,
 }: {
   build?: (c: MfluxCommand) => { command: string[]; out: string }
   machine?: Machine
   timeoutMs?: number
+  /** The folder of the Hugging Face downloads (tests). */
+  hubDir?: string
 } = {}): ImageGenerator {
   return {
     ready: () => mfluxReady(machine),
+    installed: (model) => imageModelInstalled(hubDir, model),
     async generate(request, signal) {
       const problem = checkImageRequest(request)
       if (problem) throw new Error(problem)

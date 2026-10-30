@@ -134,6 +134,40 @@ describe('modelsView', () => {
   })
 })
 
+describe('modelsView, with images', () => {
+  const imagesSection = {
+    paths: {
+      list: 'tts/{part}/images.json',
+      style: 'images/style.json',
+      prompts: 'images/prompts.json',
+      lock: 'images/images.lock.json',
+      clips: 'web/images',
+      manifest: 'web/images/manifest.json',
+    },
+  }
+
+  it('gives the main image model, which models are here, and whether mflux runs', async () => {
+    const root = tempRepo({ 'audio-studio.json': projectJson({ images: imagesSection }) })
+    const view = await modelsView(join(root, 'audio-studio.json'), undefined, {
+      installed: (model) => model === 'z-image-turbo',
+      ready: () => ({ ok: false, message: 'no mflux', fix: 'uv tool install mflux' }),
+    })
+    if (!view.ok) throw new Error('expected a view')
+    expect(view.images).toEqual({
+      model: 'klein',
+      installed: { klein: false, 'z-image-turbo': true },
+      mflux: { ok: false, message: 'no mflux', fix: 'uv tool install mflux' },
+    })
+  })
+
+  it('has no images for a project without an images section', async () => {
+    const view = await modelsView(
+      join(tempRepo({ 'audio-studio.json': projectJson() }), 'audio-studio.json'),
+    )
+    expect(view).toMatchObject({ ok: true, images: null })
+  })
+})
+
 describe('modelsView, with ElevenLabs', () => {
   it('gives ElevenLabs’ stage models, and the characters each model’s recorded lines were sent', async () => {
     const root = tempRepo({

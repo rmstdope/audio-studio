@@ -14,6 +14,7 @@ const ready: SetupFacts = {
   parallel: 4,
   fishTier: null,
   music: { ready: { ok: true }, checkpoints: '/models', model: 'balanced', stableAudioMissing: [] },
+  images: { mflux: { ok: true }, model: 'klein', missing: [] },
   elevenlabs: { ok: false, reason: 'no-key', message: 'x' },
 }
 
@@ -41,6 +42,7 @@ describe('setupChecks', () => {
       'refresh',
       'music',
       'stableAudio',
+      'imageModels',
       'elevenlabsKey',
       'elevenlabs',
     ])
@@ -383,5 +385,96 @@ describe('the ElevenLabs rows', () => {
       detail: 'Did not answer: ElevenLabs answered 401: invalid key',
       fix: 'Check the key, and that api.elevenlabs.io can be reached.',
     })
+  })
+})
+
+describe('the image models check', () => {
+  const row = (images: SetupFacts['images']) => byId({ ...ready, images }).imageModels!
+  const here = { ok: true } as const
+  const noMflux = {
+    ok: false,
+    message: 'mflux is not on the PATH; it makes the image takes.',
+    fix: 'uv tool install mflux',
+  } as const
+
+  it('is not used by a project with no images section', () => {
+    expect(row(null)).toMatchObject({
+      title: 'Image models',
+      state: 'off',
+      label: 'Not used',
+      detail: 'The project has no images section.',
+    })
+  })
+
+  it('is ready with both models here', () => {
+    expect(row({ mflux: here, model: 'klein', missing: [] })).toMatchObject({
+      state: 'ok',
+      detail:
+        'FLUX.2 klein 4B and Z-Image-Turbo are on this computer; a model loads on its first take.',
+    })
+  })
+
+  it('is optional when only the other model is missing, saying how to get it', () => {
+    const found = row({ mflux: here, model: 'klein', missing: ['z-image-turbo'] })
+    expect(found).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+      detail: 'Optional: Z-Image-Turbo is not on this computer. FLUX.2 klein 4B is in place.',
+      steps: { note: 'Then press Check again.' },
+    })
+    expect(found.steps!.list).toEqual([
+      {
+        parts: ['Download it, once (about 31 GB):'],
+        commands: ['uvx --from huggingface_hub hf download Tongyi-MAI/Z-Image-Turbo'],
+      },
+    ])
+    expect(row({ mflux: here, model: 'z-image-turbo', missing: ['klein'] })).toMatchObject({
+      state: 'off',
+      detail: 'Optional: FLUX.2 klein 4B is not on this computer. Z-Image-Turbo is in place.',
+    })
+  })
+
+  it('needs attention when the project’s model is missing and the other is here', () => {
+    const found = row({ mflux: here, model: 'klein', missing: ['klein'] })
+    expect(found).toMatchObject({
+      state: 'problem',
+      detail:
+        "The project's image model, FLUX.2 klein 4B, is not on this computer. Z-Image-Turbo is in place: an image's takes can use it meanwhile.",
+    })
+    expect(found.steps!.list[0]).toEqual({
+      parts: ['Download it, once (about 15 GB):'],
+      commands: ['uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B'],
+    })
+  })
+
+  it('says images can’t be made without mflux, with the steps to install it and get the models', () => {
+    const found = row({ mflux: noMflux, model: 'klein', missing: ['klein', 'z-image-turbo'] })
+    expect(found).toMatchObject({
+      state: 'problem',
+      detail: "Images can't be made: mflux, which runs the image models, is not installed.",
+    })
+    expect(found.steps!.list.map((step) => step.parts[0])).toEqual([
+      'Install mflux:',
+      'Download the models, once (about 15 GB and 31 GB):',
+    ])
+    expect(found.steps!.list[0]!.commands).toEqual(['uv tool install mflux'])
+  })
+
+  it('names the machine when mflux cannot run at all, and both missing models when mflux is here', () => {
+    const noMac = {
+      ok: false,
+      message: 'Image takes are made on macOS with Apple silicon only.',
+      fix: 'nothing to install',
+    } as const
+    expect(row({ mflux: noMac, model: 'klein', missing: [] })).toMatchObject({
+      state: 'problem',
+      detail: 'Image takes are made on macOS with Apple silicon only.',
+    })
+    expect(row({ mflux: here, model: 'klein', missing: ['klein', 'z-image-turbo'] })).toMatchObject(
+      {
+        state: 'problem',
+        detail: "Images can't be made: neither image model is on this computer.",
+      },
+    )
   })
 })

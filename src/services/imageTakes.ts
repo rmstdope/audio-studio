@@ -1,6 +1,13 @@
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { DEFAULT_IMAGE_MODEL, imageModel } from '../core/imageModels'
+import {
+  DEFAULT_IMAGE_MODEL,
+  IMAGE_MODEL_IDS,
+  defaultTakeModel,
+  imageByMflux,
+  imageModel,
+  type ImageModelId,
+} from '../core/imageModels'
 import {
   ImageBoardSchema,
   ImageLockFileSchema,
@@ -43,7 +50,7 @@ export type ImageTakesAnswer = { ok: true } | { ok: false; message: string } | P
 export type ImageTakesResult = ImageTakesView | ProjectFailure | null
 
 /** What to make: this many new takes, or the failed take with this number again. */
-export type ImageMakeRequest = { count: number } | { retry: number }
+export type ImageMakeRequest = { count: number; model?: ImageModelId } | { retry: number }
 
 /** A take waiting, being made, or failed, until it is made. */
 interface Entry {
@@ -51,6 +58,8 @@ interface Entry {
   state: 'waiting' | 'making' | 'failed'
   startedAt: number
   message: string
+  /** The model it is made with. */
+  model: ImageModelId
   /** Ends the take while it is being made (Stop). */
   stop?: AbortController
 }
@@ -85,6 +94,12 @@ export interface ImageTakes {
 /** A take's picture, relative to the project root. */
 const pictureOf = (id: string, n: number) => `${IMAGE_TAKES_DIR}/${id}/${n}.png`
 
+/** The answer to asking for a model whose weights are not on this computer. */
+const notHere = (model: ImageModelId): { ok: false; message: string } => ({
+  ok: false,
+  message: `${imageModel(model).name} is not on this computer. Setup says how to download it.`,
+})
+
 /** The reason a generator gave, as a sentence. */
 function describeFailure(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
@@ -115,7 +130,6 @@ export function createImageTakes({
   const shared = globalThis as { audioStudioImageTakes?: Map<string, Map<number, Entry>> }
   const active = (shared.audioStudioImageTakes ??= new Map())
   const boards = boardQueue()
-  const model = imageModel(DEFAULT_IMAGE_MODEL)
 
   async function resolve(projectFile: string, id: string) {
     if (!isSafeId(id)) return null
@@ -139,6 +153,13 @@ export function createImageTakes({
   type Found = Exclude<Awaited<ReturnType<typeof resolve>>, ProjectFailure | null>
 
   const turn = (found: Found) => `image\0${found.key}`
+
+  /** Every image model, and whether this computer has its weights. */
+  async function installedModels() {
+    return Promise.all(
+      IMAGE_MODEL_IDS.map(async (id) => ({ id, installed: await generator.installed(id) })),
+    )
+  }
 
   async function readBoard(found: Found): Promise<ImageBoard | ProjectFailure> {
     const problems: Problem[] = []
@@ -214,9 +235,10 @@ export function createImageTakes({
     entry.stop = stop
     try {
       const size = takeSize(found.row)
+      const model = imageModel(entry.model)
       const made = await makeImageTake(
         { generator, queue, free },
-        { prompt: request.prompt, ...size, seed: newSeed(), model: DEFAULT_IMAGE_MODEL },
+        { prompt: request.prompt, ...size, seed: newSeed(), model: entry.model },
         stop.signal,
         () => {
           entry.state = 'making'
@@ -271,6 +293,7 @@ export function createImageTakes({
           n: take.n,
           width: take.width,
           height: take.height,
+          model: imageByMflux(take.model),
           earlier: takeIsEarlier(take.madeFrom, found.row.words),
           chosen: chosen === take.n,
           isNew: !take.seen,
@@ -282,14 +305,26 @@ export function createImageTakes({
           n: e.n,
           state: e.state as 'waiting' | 'making',
           elapsed: e.state === 'making' ? Math.max(0, (now() - e.startedAt) / 1000) : 0,
-          expected: model.seconds,
+          expected: imageModel(e.model).seconds,
         }))
       const failed: ImageFailedView[] = entries
         .filter((e) => e.state === 'failed')
         .map((e) => ({ n: e.n, message: e.message }))
+      const models = await installedModels()
+      const mflux = await generator.ready()
       return {
         ok: true,
-        generator: await generator.ready(),
+        generator: !mflux.ok
+          ? mflux
+          : models.some((m) => m.installed)
+            ? mflux
+            : {
+                ok: false,
+                message: 'Neither image model is on this computer.',
+                fix: 'See Setup for how to download them.',
+              },
+        projectModel: found.config.model ?? DEFAULT_IMAGE_MODEL,
+        models,
         takes,
         making,
         failed,
@@ -313,9 +348,16 @@ export function createImageTakes({
             message: `Take ${request.retry} did not fail, so it is not made again.`,
           }
         }
+        if (!(await generator.installed(failed.model))) return notHere(failed.model)
         failed.state = 'waiting'
         queued.push(failed)
       } else {
+        const installed = Object.fromEntries(
+          (await installedModels()).map((m) => [m.id, m.installed]),
+        ) as Record<ImageModelId, boolean>
+        const model =
+          request.model ?? defaultTakeModel(found.config.model ?? DEFAULT_IMAGE_MODEL, installed)
+        if (!installed[model]) return notHere(model)
         // The numbers are reserved at once, so none is used twice, even by a take that fails or is stopped.
         const reserved = await changeBoard(found, (board) => {
           const first = Math.max(board.next, ...[...entries.values()].map((e) => e.n + 1))
@@ -324,7 +366,13 @@ export function createImageTakes({
         })
         if (typeof reserved !== 'number') return reserved
         for (let i = 0; i < request.count; i++) {
-          const entry: Entry = { n: reserved + i, state: 'waiting', startedAt: 0, message: '' }
+          const entry: Entry = {
+            n: reserved + i,
+            state: 'waiting',
+            startedAt: 0,
+            message: '',
+            model,
+          }
           entries.set(entry.n, entry)
           queued.push(entry)
         }
@@ -483,10 +531,11 @@ export function createImageTakes({
         for (const entry of entries.values()) {
           if (entry.state === 'failed') continue
           takes++
+          const { seconds } = imageModel(entry.model)
           left +=
             entry.state === 'waiting'
-              ? model.seconds
-              : Math.max(0, model.seconds - (now() - entry.startedAt) / 1000)
+              ? seconds
+              : Math.max(0, seconds - (now() - entry.startedAt) / 1000)
         }
         if (takes) summary[key.slice(prefix.length)] = { takes, left }
       }
