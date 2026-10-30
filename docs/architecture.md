@@ -1787,6 +1787,19 @@ Small, independently useful increments:
         phrase and the character's lines kept as designs, confirmed and held in credits, logged
         as `design` tries, and saved as a voice when cast (the client's `designVoices` and
         `saveDesignedVoice`).
+15. **Images** (epic as-yag), in small pull requests; the tool is renamed Content Studio last:
+    1. **Spike** (done: §13, decision 8): FLUX.2 klein 4B and Z-Image-Turbo through mflux, their
+       time, memory and licence on the M5 Pro, and whether one style text and the game's colours
+       keep about ten RetroQuest rooms one set.
+    2. **The game's image list and style** (as-yag.3), read-only, with the studio's own prompt
+       overrides.
+    3. **An image take** (as-yag.2) with either model, on the GPU queue with music and Whisper.
+    4. **The game's look** (as-yag.5): each take brought to the image's size, and to a palette or
+       colour depth when the style file asks.
+    5. **Takes and choosing** (as-yag.4): an image's takes compared with the chosen one.
+    6. **Two models** (as-yag.7): Setup says which are installed and chooses the main one; takes
+       can be made with the other.
+    7. **The rename** to Content Studio (as-yag.6).
 
 ---
 
@@ -1833,39 +1846,53 @@ Small, independently useful increments:
    free default. Music through the API needs a paid plan, and commercial use Starter or above,
    within ElevenLabs' indie-game limits; Setup says so.
 8. **Images are made locally with FLUX.2 klein 4B and Z-Image-Turbo, through mflux** (the spike,
-   as-yag.1, on a MacBook M5 Pro with 48 GB, MLX, mflux 0.20.0). Ten Act I rooms of RetroQuest,
-   each made at 1024×576 from the game's style text and the room's description, with the model
-   loaded once:
+   15.1, on a MacBook M5 Pro with 48 GB, MLX, mflux 0.20.0). Ten Act I rooms of RetroQuest, each
+   made at 1024×576 with seed 42 from the game's style text and the room's description, the model
+   loaded once and MLX's cache cleared after each take:
 
-   | Model                     | Steps | A take  | Memory (MLX peak) | On disk | Licence           |
-   | ------------------------- | ----- | ------- | ----------------- | ------- | ----------------- |
-   | FLUX.2 klein 4B           | 4     | 5–12 s  | 20 GB             | 15 GB   | Apache-2.0        |
-   | Z-Image-Turbo             | 9     | ~80 s   | 37 GB             | 31 GB   | Apache-2.0        |
-   | FLUX.1 schnell (not used) | 4     | 13–19 s | 41 GB             | 31 GB   | Apache-2.0, gated |
+   | Model                     | Steps | Time per take | Memory (MLX peak) | On disk | Licence           |
+   | ------------------------- | ----- | ------------- | ----------------- | ------- | ----------------- |
+   | FLUX.2 klein 4B           | 4     | 6–9 s         | 20 GB             | 15 GB   | Apache-2.0        |
+   | Z-Image-Turbo             | 9     | 33–66 s       | 37 GB             | 31 GB   | Apache-2.0        |
+   | FLUX.1 schnell (not used) | 4     | 13–19 s       | 41 GB             | 31 GB   | Apache-2.0, gated |
 
+   Without clearing the cache, klein took 7–13 s and Z-Image-Turbo about 80 s. Z-Image-Turbo's
+   first take takes about 33 s; every later one stalls 14–25 s on its first step, not explained.
    Klein follows each description most closely (the Dream's man lifting the child and the faceless
-   figure, the field's withered crops) and is the fastest by far; Z-Image-Turbo paints the cleanest
+   figure, the field's withered crops) and is by far the fastest; Z-Image-Turbo paints the cleanest
    gouache but leaves out parts of a description; schnell's rooms do not hold together as a set
-   (half flat poster on a cream ground, half painted). The navigator chose to have both klein and
-   Z-Image-Turbo: Setup says whether each is installed and which is the project's main model, and
-   an image's takes can be made with the other, as a track's can for music (as-yag.2, as-yag.7).
-   Klein 9B was left out: its weights are non-commercial. As with music, the weights are
-   downloaded once, outside the studio. No free image API is kept as a fallback: a local take
-   costs about ten seconds and nothing.
+   (half flat poster on a cream ground, half painted). Both klein and Z-Image-Turbo are kept, at
+   the navigator's choice: klein for speed and closeness to the brief, Z-Image-Turbo for its
+   painting. Which one is the project's main model, and making takes with the other, is planned in
+   as-yag.7. Klein 9B was left out: its weights are non-commercial. As with music, the weights are
+   downloaded once, outside the studio. No free image API is kept as a fallback, since a local take
+   costs nothing.
 
-   **One look holds across a set through the shared style text**, not through the palette. All
-   three models made ten rooms that read as one set from the same style text. The text is the
-   only way to say what not to draw: these turbo models take no negative prompt, so the game's
-   `avoid` list is not read. It also draws what it names: "gentle lantern light" put a lantern in
-   every room, and "like an old picture book" made klein paint an open book with a fold down the
-   middle, with lettering on signs (`docs/spike-images/klein-4b-game-style.jpg`). Reworded to say
-   "soft warm light", "one single full-bleed image with no fold, frame or border" and "no text or
-   lettering anywhere", the folds, lettering and stray lanterns went and the set still held
-   (`klein-4b-adjusted-style.jpg`; RetroQuest's rq-mh5r). The frayed corners remain.
+   **Memory beside the other workers.** ACE-Step and Whisper together already hold 42 of the 48 GB
+   (§8.5), so an image worker cannot stay loaded beside them, nor the two image models beside each
+   other (57 GB). Image takes wait on the GPU queue and the image worker is loaded only while it
+   is used, or the other workers are stopped first, as the music router stops the other music
+   family (as-yag.2).
 
-   **Colours are not limited unless the game asks** (as-yag.5). Bringing the rooms to RetroQuest's
-   six listed colours turned skies green and dark rooms black, and with dithering made them grainy
-   at 640×360; 256 colours and 16-bit look the same as full colour (`colours.jpg`). The navigator
-   chose full colour for RetroQuest (rq-qtbi); a game may still ask for a palette of at most 256
-   colours or for 16-bit. Not measured: quantised weights (`--quantize 8`), which would lower the
-   memory, and how far a set holds across acts rather than within one.
+   **One look holds across a set through the shared style text**, not through the palette. Klein's
+   and Z-Image-Turbo's ten rooms each read as one set from the same style text. The text is the
+   only place to say what not to draw: mflux runs none of these models with a negative prompt
+   (Z-Image-Turbo and schnell ignore one, FLUX.2 refuses it), so what the studio does with the
+   style file's `avoid` list is as-yag.3's to settle; written into the text as "no …", it worked.
+   The text also draws what it names: "gentle lantern light" put a lantern in most rooms, and
+   "like an old picture book" made klein paint an open book with a fold down the middle, with
+   lettering on signs. Reworded to "soft warm light", "one single full-bleed image with no fold,
+   frame or border" and "no text or lettering anywhere", the folds, lettering and stray lanterns
+   went and the set still held. The soft, worn-page edges remain; cropping to the game's size can
+   take them off. The sheets are in `docs/spike-images/`: `klein-4b-game-style.jpg`,
+   `klein-4b-adjusted-style.jpg` (RetroQuest's rq-mh5r rewords its text so), `z-image-turbo.jpg`
+   and `flux1-schnell.jpg`.
+
+   **Colours: RetroQuest keeps full colour.** as-yag.5's looks on three of klein's rooms
+   (`colours.jpg`, and `colours-detail.png` at full size): 16-bit looks the same as full colour;
+   the shared 8-bit set (8×8×4) with patterned dithering shows its pattern and a yellow-green cast,
+   a clear retro look; the game's six listed colours turn walls red and green, patterned or flat.
+   The navigator chose full colour for RetroQuest, so rq-qtbi removes the palette from its style
+   file; until then, as-yag.5 would bring its images to the six colours. Not measured: quantised
+   weights (`--quantize 8`), which would lower the memory, and how far a set holds across acts
+   rather than within one.
