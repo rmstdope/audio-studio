@@ -1832,3 +1832,40 @@ Small, independently useful increments:
    This reverses decision 4's reason for staying local, not its outcome: the local models stay the
    free default. Music through the API needs a paid plan, and commercial use Starter or above,
    within ElevenLabs' indie-game limits; Setup says so.
+8. **Images are made locally with FLUX.2 klein 4B and Z-Image-Turbo, through mflux** (the spike,
+   as-yag.1, on a MacBook M5 Pro with 48 GB, MLX, mflux 0.20.0). Ten Act I rooms of RetroQuest,
+   each made at 1024×576 from the game's style text and the room's description, with the model
+   loaded once:
+
+   | Model                     | Steps | A take  | Memory (MLX peak) | On disk | Licence           |
+   | ------------------------- | ----- | ------- | ----------------- | ------- | ----------------- |
+   | FLUX.2 klein 4B           | 4     | 5–12 s  | 20 GB             | 15 GB   | Apache-2.0        |
+   | Z-Image-Turbo             | 9     | ~80 s   | 37 GB             | 31 GB   | Apache-2.0        |
+   | FLUX.1 schnell (not used) | 4     | 13–19 s | 41 GB             | 31 GB   | Apache-2.0, gated |
+
+   Klein follows each description most closely (the Dream's man lifting the child and the faceless
+   figure, the field's withered crops) and is the fastest by far; Z-Image-Turbo paints the cleanest
+   gouache but leaves out parts of a description; schnell's rooms do not hold together as a set
+   (half flat poster on a cream ground, half painted). The navigator chose to have both klein and
+   Z-Image-Turbo: Setup says whether each is installed and which is the project's main model, and
+   an image's takes can be made with the other, as a track's can for music (as-yag.2, as-yag.7).
+   Klein 9B was left out: its weights are non-commercial. As with music, the weights are
+   downloaded once, outside the studio. No free image API is kept as a fallback: a local take
+   costs about ten seconds and nothing.
+
+   **One look holds across a set through the shared style text**, not through the palette. All
+   three models made ten rooms that read as one set from the same style text. The text is the
+   only way to say what not to draw: these turbo models take no negative prompt, so the game's
+   `avoid` list is not read. It also draws what it names: "gentle lantern light" put a lantern in
+   every room, and "like an old picture book" made klein paint an open book with a fold down the
+   middle, with lettering on signs (`docs/spike-images/klein-4b-game-style.jpg`). Reworded to say
+   "soft warm light", "one single full-bleed image with no fold, frame or border" and "no text or
+   lettering anywhere", the folds, lettering and stray lanterns went and the set still held
+   (`klein-4b-adjusted-style.jpg`; RetroQuest's rq-mh5r). The frayed corners remain.
+
+   **Colours are not limited unless the game asks** (as-yag.5). Bringing the rooms to RetroQuest's
+   six listed colours turned skies green and dark rooms black, and with dithering made them grainy
+   at 640×360; 256 colours and 16-bit look the same as full colour (`colours.jpg`). The navigator
+   chose full colour for RetroQuest (rq-qtbi); a game may still ask for a palette of at most 256
+   colours or for 16-bit. Not measured: quantised weights (`--quantize 8`), which would lower the
+   memory, and how far a set holds across acts rather than within one.
