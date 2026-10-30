@@ -5,6 +5,7 @@ import { useImageCompare, useSetImageWords } from '../../api'
 import { shortTitle } from '../../format'
 import { outOfDateText } from '../../imagesText'
 import { routeHref } from '../../route'
+import { TakesSection } from './TakesSection'
 import { WordsField } from './WordsField'
 
 /** An image's own page: its prompt (the words, editable), the whole prompt, and what is out of date. */
@@ -112,6 +113,7 @@ export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
           <pre className="images-ro mono">{row.prompt}</pre>
         </details>
       </section>
+      <TakesSection row={row} />
     </>
   )
 }

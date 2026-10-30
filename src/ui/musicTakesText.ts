@@ -1,7 +1,9 @@
 import type { MakingSummary, MakingView } from '../core/musicTake'
 
 /** What a take being made says beside its name: its wait, or about how long is left. */
-export function timeLeftText(making: MakingView): string {
+export function timeLeftText<T extends Pick<MakingView, 'state' | 'elapsed' | 'expected'>>(
+  making: T,
+): string {
   if (making.state === 'waiting') return 'waiting'
   const left = making.expected - making.elapsed
   if (left <= 0) return 'making · taking longer than usual'
@@ -9,7 +11,9 @@ export function timeLeftText(making: MakingView): string {
 }
 
 /** How far a take is, 0 to 1: its time over its model's expected time, never complete until it is. */
-export function progressOf(making: MakingView): number {
+export function progressOf<T extends Pick<MakingView, 'state' | 'elapsed' | 'expected'>>(
+  making: T,
+): number {
   if (making.state === 'waiting') return 0
   return Math.min(0.95, making.elapsed / making.expected)
 }
@@ -20,7 +24,7 @@ export function failureLine(message: string, otherTakes: boolean): string {
 }
 
 /** Whether any take waits or is being made, which the page polls for. */
-export function takesAreBeingMade(making: readonly MakingView[]): boolean {
+export function takesAreBeingMade(making: readonly unknown[]): boolean {
   return making.length > 0
 }
 

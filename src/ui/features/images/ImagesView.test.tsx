@@ -82,7 +82,13 @@ function summary(options: Options = {}): ProjectSummary {
   return { images } as unknown as ProjectSummary
 }
 
-function render(route: ImagesRoute, shown: ProjectSummary = summary()) {
+function render(
+  route: ImagesRoute,
+  shown: ProjectSummary = summary(),
+  making: Record<string, { takes: number; left: number }> = {},
+) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  client.setQueryData(['image-making'], making)
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
@@ -91,11 +97,7 @@ function render(route: ImagesRoute, shown: ProjectSummary = summary()) {
     root.render(
       createElement(
         QueryClientProvider,
-        {
-          client: new QueryClient({
-            defaultOptions: { queries: { retry: false, enabled: false } },
-          }),
-        },
+        { client },
         createElement(ImagesView, { summary: shown, route }),
       ),
     ),
@@ -155,6 +157,15 @@ describe('an act’s page', () => {
       summary({ style: null, seen: null }),
     )
     expect(none.querySelector('.images-style-line')).toBeNull()
+  })
+
+  it('shows the takes being made in an image’s status, as Music does', () => {
+    const page = render({ view: 'images', page: 'act', part: 'act1' }, summary(), {
+      inn: { takes: 2, left: 50 },
+    })
+    const rows = [...page.querySelectorAll('tbody tr')]
+    expect(text(rows[0]!.querySelector('.images-status'))).toBe('making 2 takes · about 1 min')
+    expect(text(rows[1]!.querySelector('.images-status'))).toBe('none yet')
   })
 
   it('says so when the game asks for no images in an act', () => {
