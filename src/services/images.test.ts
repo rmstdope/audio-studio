@@ -32,6 +32,13 @@ const fake = (script: string) => (a: ReturnType<typeof mfluxArguments>) => ({
 })
 
 describe('mfluxArguments', () => {
+  it('runs each model through its own mflux command', () => {
+    expect(mfluxArguments(request, '/tmp/x.png').program).toBe('mflux-generate-flux2')
+    expect(mfluxArguments({ ...request, model: 'z-image-turbo' }, '/tmp/x.png').program).toBe(
+      'mflux-generate-z-image-turbo',
+    )
+  })
+
   it('names the model mflux knows, the size and the seed', () => {
     const args = mfluxArguments({ ...request, model: 'z-image-turbo' }, '/tmp/x.png')
     expect(args.args).toEqual([
@@ -46,8 +53,12 @@ describe('mfluxArguments', () => {
 })
 
 describe('mfluxReady', () => {
-  it('needs Apple silicon and mflux-generate', () => {
+  it('needs Apple silicon and both of mflux image commands', () => {
     expect(mfluxReady(mac)).toEqual({ ok: true })
+    expect(mfluxReady({ ...mac, which: (c) => c === 'mflux-generate-flux2' })).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('mflux-generate-z-image-turbo'),
+    })
     expect(mfluxReady({ ...mac, platform: 'linux' })).toMatchObject({ ok: false })
     expect(mfluxReady({ ...mac, which: () => false })).toMatchObject({
       ok: false,
