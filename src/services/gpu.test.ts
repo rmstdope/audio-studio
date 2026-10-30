@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { createSerial } from './serial'
-import { GPU, onGpu } from './gpu'
+import { GPU, createGpuWorkers, onGpu } from './gpu'
 import type { Transcriber } from './transcriber'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -43,5 +43,28 @@ describe('onGpu', () => {
     )
     await expect(whisper.transcribe('tiny', 'a.wav')).rejects.toThrow('bad')
     expect(await whisper.transcribe('tiny', 'b.wav')).toEqual([])
+  })
+})
+
+describe('createGpuWorkers', () => {
+  it('closes every registered worker when the GPU is freed, and only then', () => {
+    const log: string[] = []
+    const workers = createGpuWorkers()
+    workers.add(() => log.push('music'))
+    workers.add(() => log.push('whisper'))
+    expect(log).toEqual([])
+    workers.free()
+    expect(log).toEqual(['music', 'whisper'])
+  })
+
+  it('frees with nothing registered, and registers a worker once', () => {
+    const log: string[] = []
+    const workers = createGpuWorkers()
+    workers.free()
+    const close = () => log.push('x')
+    workers.add(close)
+    workers.add(close)
+    workers.free()
+    expect(log).toEqual(['x'])
   })
 })
