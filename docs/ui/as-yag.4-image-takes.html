@@ -1,4 +1,42 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Image takes — every state and word</title><style>:root{--bg:#0b0c10;--sidebar:#0f1116;--panel:#12141a;--raised:#191c24;--raised-hover:#20242e;--inset:#0d0f14;--line:#1f232d;--line-strong:#2a2e39;--text:#eceef3;--text-soft:#c7ccd6;--muted:#a9b0bd;--faint:#8a91a0;--accent:#ff6b2c;--accent-ink:#1a0a02;--accent-soft-bg:#2a1b12;--accent-soft-ink:#ff9a6b;--accent-soft-line:#5a3218;--ok:#3ddc97;--ok-bg:#10291f;--warn:#ffc24b;--warn-bg:#2d2412;--info:#7aa7ff;--danger-bg:#2e1720;--danger-ink:#ff94a8;--miss:#8fb5ff;--miss-bg:#142033;--kept-bg:#0f1a16;--kept-line:#1f5a40;--chip:#1a1d26;color-scheme:dark}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Image takes — side by side, every state and word</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --raised-hover: #20242e;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --text-soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --accent-soft-line: #5a3218;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --info: #7aa7ff;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --miss: #8fb5ff;
+        --miss-bg: #142033;
+        --kept-bg: #0f1a16;
+        --kept-line: #1f5a40;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
       * {
         box-sizing: border-box;
       }
@@ -421,8 +459,6 @@
       input.inl {
         width: 100%;
       }
-    </style>
-    <style>
       .sw {
         display: inline-block;
         width: 16px;
@@ -492,64 +528,1254 @@
       .exp td {
         background: var(--raised);
       }
+      canvas.px {
+        image-rendering: pixelated;
+        width: 100%;
+        aspect-ratio: 8/5;
+        display: block;
+        border-radius: 6px;
+        background: #000;
+      }
+      .ingame {
+        border: 1px solid var(--kept-line);
+        background: var(--kept-bg);
+        border-radius: 14px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .card.sel {
+        outline: 2px solid var(--accent);
+      }
+      .stage {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .pane {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .strip {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 4px 2px;
+      }
+      .thumb {
+        width: 112px;
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 12px;
+        color: var(--text-soft);
+        padding: 4px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+      }
+      .thumb.on {
+        border-color: var(--accent);
+        background: var(--accent-soft-bg);
+      }
+      .bar2 {
+        height: 4px;
+        background: var(--line);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .bar2 i {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .ghost {
+        aspect-ratio: 8/5;
+        border: 1px dashed var(--line-strong);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      select.sel2 {
+        background: var(--raised);
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        padding: 6px 8px;
+        font: inherit;
+      }
+      kbd {
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        padding: 0 4px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .lightbox {
+        position: relative;
+        min-height: 560px;
+        flex: 1;
+        background: rgba(0, 0, 0, 0.82);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 18px 22px;
+      }
+      .move {
+      }
     </style>
   </head>
   <body>
     <div class="intro">
-      canvas.px { image-rendering: pixelated; width: 100%; aspect-ratio: 8/5; display:block; border-radius: 6px; background:#000 }
-      .ingame { border:1px solid var(--kept-line); background: var(--kept-bg); border-radius:14px; padding:12px 14px; display:flex; flex-direction:column; gap:8px }
-      .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(230px,1fr)); gap:12px }
-      .card { background: var(--raised); border:1px solid var(--line); border-radius:12px; padding:8px; display:flex; flex-direction:column; gap:6px }
-      .card.sel { outline:2px solid var(--accent); }
-      .stage { display:grid; grid-template-columns:1fr 1fr; gap:14px }
-      .pane { display:flex; flex-direction:column; gap:6px }
-      .strip { display:flex; gap:8px; overflow-x:auto; padding:4px 2px }
-      .thumb { width:112px; flex:none; display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--text-soft); padding:4px; border-radius:8px; border:1px solid var(--line) }
-      .thumb.on { border-color: var(--accent); background: var(--accent-soft-bg) }
-      .bar2 { height:4px; background: var(--line); border-radius:2px; overflow:hidden } .bar2 i{display:block;height:100%;background:var(--accent)}
-      .ghost { aspect-ratio:8/5; border:1px dashed var(--line-strong); border-radius:6px; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:12px }
-      select.sel2 { background: var(--raised); color: var(--text); border:1px solid var(--line-strong); border-radius:9px; padding:6px 8px; font:inherit }
-      kbd { border:1px solid var(--line-strong); border-radius:4px; padding:0 4px; font-size:11px; color: var(--muted) }
-      .lightbox { position:relative; min-height:560px; flex:1; background: rgba(0,0,0,.82); display:flex; flex-direction:column; gap:12px; padding:18px 22px }
-      .move { }
-</style></head><body><div class="intro"><h1>Image takes — every state and word</h1><p>The agreed shape: the chosen image in an In the game block, the other takes in a grid below it as on Music, and a large view beside the chosen image when a take’s picture is pressed.</p></div><p class="note"><b>1 — An image with a chosen take and four more. Take 3 was made before the words changed (“earlier words”).</b></p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span></div><div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span><span class="ni">Music</span><span class="ni">Images</span><span class="ni on" style="padding-left:20px">Act I<span class="muted">6</span></span><span class="ni" style="padding-left:20px">Act II<span class="muted">9</span></span><span class="ni" style="padding-left:20px">Act III<span class="muted">4</span></span><span class="ni" style="padding-left:20px">Style</span></div><div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni">Setup</span></div></aside><main class="main"><div><span class="crumbs">Images › Act I</span><h1>Silver Stag Inn</h1><span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span></div>
-<section class="panel col" style="gap:8px"><div class="row"><h2 class="grow" style="margin:0">Prompt</h2></div><div class="row"><label class="small muted grow">What the image shows</label><span class="small faint">from the game</span></div><div class="ro small">inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall</div><details><summary class="small">The whole prompt the model gets</summary></details></section><section class="ingame"><div class="row"><span class="lbl">In the game</span><b>Take 2</b><span class="chip c-ok">chosen</span><span class="grow"></span><button class="btn s">Un-choose</button></div><div style="max-width:420px"><canvas class="px" data-seed="2"></canvas></div><span class="faint small">The game shows this image. Choose another take below to replace it.</span></section><section class="panel col" style="gap:10px"><div class="row"><h2 class="grow" style="margin:0">Takes</h2><select class="sel2"><option>2 takes</option></select><button class="btn p">Make 2 more takes</button></div><div class="grid"><div class="card"><canvas class="px" data-seed="3"></canvas><div class="row"><b class="grow">Take 3</b><span class="faint small">earlier words</span></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div><div class="card"><canvas class="px" data-seed="4"></canvas><div class="row"><b class="grow">Take 4</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div><div class="card"><canvas class="px" data-seed="5"></canvas><div class="row"><b class="grow">Take 5</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div><div class="card"><canvas class="px" data-seed="6"></canvas><div class="row"><b class="grow">Take 6</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div></div></section></main></div><p class="note"><b>1a — Pressing a take’s picture opens it large, beside the chosen image. ← → step through the takes; Esc or ✕ closes and puts you back on that take’s card.</b></p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span></div><div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span><span class="ni">Music</span><span class="ni">Images</span><span class="ni on" style="padding-left:20px">Act I<span class="muted">6</span></span><span class="ni" style="padding-left:20px">Act II<span class="muted">9</span></span><span class="ni" style="padding-left:20px">Act III<span class="muted">4</span></span><span class="ni" style="padding-left:20px">Style</span></div><div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni">Setup</span></div></aside><div class="lightbox"><div class="row"><b class="grow">Silver Stag Inn · Take 4 of 5</b><span class="faint small"><kbd>←</kbd> <kbd>→</kbd> other takes · <kbd>Esc</kbd> closes</span><button class="btn s g">✕</button></div>
-<div class="stage"><div class="pane"><div class="row"><span class="lbl">In the game</span><b>Take 2</b><span class="chip c-ok">chosen</span></div><canvas class="px" data-seed="2"></canvas></div>
-<div class="pane"><div class="row"><b class="grow">Take 4</b><button class="btn s g">Drop</button><button class="btn s p">Choose</button></div><canvas class="px" data-seed="4"></canvas></div></div>
-<span class="faint small">The pictures are shown at a whole multiple of the image's size, so every pixel stays sharp.</span></div></div><p class="note"><b>1b — Takes being made appear as cards in the grid straight away, each with its progress, as on Music. Stop ends the ones not yet finished.</b></p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span></div><div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span><span class="ni">Music</span><span class="ni">Images</span><span class="ni on" style="padding-left:20px">Act I<span class="muted">6</span></span><span class="ni" style="padding-left:20px">Act II<span class="muted">9</span></span><span class="ni" style="padding-left:20px">Act III<span class="muted">4</span></span><span class="ni" style="padding-left:20px">Style</span></div><div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni">Setup</span></div></aside><main class="main"><div><span class="crumbs">Images › Act I</span><h1>Silver Stag Inn</h1><span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span></div>
-<section class="panel col" style="gap:8px"><div class="row"><h2 class="grow" style="margin:0">Prompt</h2></div><div class="row"><label class="small muted grow">What the image shows</label><span class="small faint">from the game</span></div><div class="ro small">inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall</div><details><summary class="small">The whole prompt the model gets</summary></details></section><section class="ingame"><div class="row"><span class="lbl">In the game</span><b>Take 2</b><span class="chip c-ok">chosen</span><span class="grow"></span><button class="btn s">Un-choose</button></div><div style="max-width:420px"><canvas class="px" data-seed="2"></canvas></div><span class="faint small">The game shows this image. Choose another take below to replace it.</span></section><section class="panel col" style="gap:10px"><div class="row"><h2 class="grow" style="margin:0">Takes</h2><button class="btn g">Stop</button><select class="sel2" disabled><option>2 takes</option></select><button class="btn p" disabled>Make 2 more takes</button></div><div class="grid"><div class="card"><canvas class="px" data-seed="3"></canvas><div class="row"><b class="grow">Take 3</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div><div class="card"><div class="ghost"></div><div class="row"><b class="grow">Take 4</b><span class="faint small">making · about 1 min left</span></div><div class="bar2"><i style="width:40%"></i></div></div><div class="card"><div class="ghost">waiting</div><div class="row"><b class="grow">Take 5</b><span class="faint small">waiting</span></div><div class="bar2"><i style="width:0%"></i></div></div></div></section></main></div><p class="note"><b>2 — Nothing chosen yet, no takes yet.</b></p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span></div><div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span><span class="ni">Music</span><span class="ni">Images</span><span class="ni on" style="padding-left:20px">Act I<span class="muted">6</span></span><span class="ni" style="padding-left:20px">Act II<span class="muted">9</span></span><span class="ni" style="padding-left:20px">Act III<span class="muted">4</span></span><span class="ni" style="padding-left:20px">Style</span></div><div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni">Setup</span></div></aside><main class="main"><div><span class="crumbs">Images › Act I</span><h1>Silver Stag Inn</h1><span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span></div>
-<section class="panel col" style="gap:8px"><div class="row"><h2 class="grow" style="margin:0">Prompt</h2></div><div class="row"><label class="small muted grow">What the image shows</label><span class="small faint">from the game</span></div><div class="ro small">inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall</div><details><summary class="small">The whole prompt the model gets</summary></details></section><section class="ingame" style="border-color:var(--line);background:var(--panel)"><span class="lbl">In the game</span><b>Nothing shows here yet</b><span class="faint small">Choose a take below and the game shows it.</span></section><section class="panel col" style="gap:10px"><h2 style="margin:0">Takes</h2><div class="col" style="align-items:center;text-align:center;padding:24px;gap:8px"><b>No takes yet</b><span class="muted">Each take is a new image made from the prompt.<br/>Make a few, compare them, and choose the one the game shows.</span><div class="row"><select class="sel2"><option>2 takes</option></select><button class="btn p">Make 2 takes</button></div></div></section></main></div><p class="note"><b>3 — The game already has its own picture here (not made in the studio). It is shown, and choosing a take replaces it.</b></p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span></div><div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span><span class="ni">Music</span><span class="ni">Images</span><span class="ni on" style="padding-left:20px">Act I<span class="muted">6</span></span><span class="ni" style="padding-left:20px">Act II<span class="muted">9</span></span><span class="ni" style="padding-left:20px">Act III<span class="muted">4</span></span><span class="ni" style="padding-left:20px">Style</span></div><div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni">Setup</span></div></aside><main class="main"><div><span class="crumbs">Images › Act I</span><h1>Silver Stag Inn</h1><span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span></div>
-<section class="panel col" style="gap:8px"><div class="row"><h2 class="grow" style="margin:0">Prompt</h2></div><div class="row"><label class="small muted grow">What the image shows</label><span class="small faint">from the game</span></div><div class="ro small">inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall</div><details><summary class="small">The whole prompt the model gets</summary></details></section><section class="ingame"><span class="lbl">In the game</span><div class="row"><div style="width:260px"><canvas class="px" data-seed="9"></canvas></div><div class="col"><b>The game's own image</b><span class="mono muted small">assets/rooms/silver-stag-inn.png</span></div></div><span class="faint small">Choose a take below and the game shows it instead.</span></section><section class="panel col" style="gap:10px"><div class="row"><h2 class="grow" style="margin:0">Takes</h2><select class="sel2"><option>2 takes</option></select><button class="btn p">Make 2 more takes</button></div><div class="grid"><div class="card"><canvas class="px" data-seed="11"></canvas><div class="row"><b class="grow">Take 1</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div><div class="card"><canvas class="px" data-seed="12"></canvas><div class="row"><b class="grow">Take 2</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div></div></section></main></div><p class="note"><b>4 — A chosen take that is out of date (words agreed in the previous piece of work), and one take that failed.</b></p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span></div><div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span><span class="ni">Music</span><span class="ni">Images</span><span class="ni on" style="padding-left:20px">Act I<span class="muted">6</span></span><span class="ni" style="padding-left:20px">Act II<span class="muted">9</span></span><span class="ni" style="padding-left:20px">Act III<span class="muted">4</span></span><span class="ni" style="padding-left:20px">Style</span></div><div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni">Setup</span></div></aside><main class="main"><div><span class="crumbs">Images › Act I</span><h1>Silver Stag Inn</h1><span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span></div>
-<section class="panel col" style="gap:8px"><div class="row"><h2 class="grow" style="margin:0">Prompt</h2></div><div class="row"><label class="small muted grow">What the image shows</label><span class="small faint">from the game</span></div><div class="ro small">inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall</div><details><summary class="small">The whole prompt the model gets</summary></details></section><div class="warnbox"><b>Out of date since it was chosen: the words.</b><span class="muted small">The game shows the chosen image until you choose another.</span></div><div class="errbox"><div class="col"><b>Take 7 could not be made.</b><span class="muted small">The image model stopped before the picture was finished. Your other takes are kept.</span></div><button class="btn">Try again</button></div><section class="ingame"><div class="row"><span class="lbl">In the game</span><b>Take 2</b><span class="chip c-ok">chosen</span><span class="grow"></span><button class="btn s">Un-choose</button></div><div style="max-width:420px"><canvas class="px" data-seed="2"></canvas></div><span class="faint small">The game shows this image. Choose another take below to replace it.</span></section><section class="panel col" style="gap:10px"><div class="row"><h2 class="grow" style="margin:0">Takes</h2><select class="sel2"><option>2 takes</option></select><button class="btn p">Make 2 more takes</button></div><div class="grid"><div class="card"><canvas class="px" data-seed="3"></canvas><div class="row"><b class="grow">Take 3</b><span class="faint small">earlier words</span></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div><div class="card"><canvas class="px" data-seed="4"></canvas><div class="row"><b class="grow">Take 4</b><span class="faint small">earlier words</span></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div></div></section></main></div><p class="note"><b>5 — Images can't be made on this machine yet (the image model is not set up). Takes already made can still be chosen and dropped.</b></p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span></div><div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span><span class="ni">Music</span><span class="ni">Images</span><span class="ni on" style="padding-left:20px">Act I<span class="muted">6</span></span><span class="ni" style="padding-left:20px">Act II<span class="muted">9</span></span><span class="ni" style="padding-left:20px">Act III<span class="muted">4</span></span><span class="ni" style="padding-left:20px">Style</span></div><div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni">Setup</span></div></aside><main class="main"><div><span class="crumbs">Images › Act I</span><h1>Silver Stag Inn</h1><span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span></div>
-<section class="panel col" style="gap:8px"><div class="row"><h2 class="grow" style="margin:0">Prompt</h2></div><div class="row"><label class="small muted grow">What the image shows</label><span class="small faint">from the game</span></div><div class="ro small">inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall</div><details><summary class="small">The whole prompt the model gets</summary></details></section><div class="errbox"><div class="col"><b>Images can't be made yet.</b><span class="muted small">The image model is not installed. Setup says what is missing.</span></div><button class="btn">Open Setup</button></div><section class="ingame"><div class="row"><span class="lbl">In the game</span><b>Take 2</b><span class="chip c-ok">chosen</span><span class="grow"></span><button class="btn s">Un-choose</button></div><div style="max-width:420px"><canvas class="px" data-seed="2"></canvas></div><span class="faint small">The game shows this image. Choose another take below to replace it.</span></section><section class="panel col" style="gap:10px"><div class="row"><h2 class="grow" style="margin:0">Takes</h2><select class="sel2" disabled><option>2 takes</option></select><button class="btn p" disabled>Make 2 more takes</button></div><div class="grid"><div class="card"><canvas class="px" data-seed="3"></canvas><div class="row"><b class="grow">Take 3</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div><div class="card"><canvas class="px" data-seed="4"></canvas><div class="row"><b class="grow">Take 4</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div></div></section></main></div><p class="note"><b>6 — Un-choose asks first, as on Music; the take goes back among the others and the game shows nothing (or its own image) again.</b></p><div class="frame"><aside class="side"><div class="brand">〰 Audio Studio</div><div class="pbox"><span class="lbl">Project</span><strong>RetroQuest</strong><span class="mono muted">retroquest</span></div><div class="nav"><span class="lbl">Workspace</span><span class="ni">Narration</span><span class="ni">Music</span><span class="ni">Images</span><span class="ni on" style="padding-left:20px">Act I<span class="muted">6</span></span><span class="ni" style="padding-left:20px">Act II<span class="muted">9</span></span><span class="ni" style="padding-left:20px">Act III<span class="muted">4</span></span><span class="ni" style="padding-left:20px">Style</span></div><div class="nav" style="margin-top:auto"><span class="ni">All characters <span class="muted">9</span></span><span class="ni">Changes <span class="muted">3</span></span><span class="ni">Setup</span></div></aside><main class="main"><div><span class="crumbs">Images › Act I</span><h1>Silver Stag Inn</h1><span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span></div>
-<section class="panel col" style="gap:8px"><div class="row"><h2 class="grow" style="margin:0">Prompt</h2></div><div class="row"><label class="small muted grow">What the image shows</label><span class="small faint">from the game</span></div><div class="ro small">inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall</div><details><summary class="small">The whole prompt the model gets</summary></details></section><div class="dialog" style="position:static;max-width:440px"><b>Un-choose take 2?</b><p class="muted small">The game shows no image here until you choose another. Take 2 stays among the takes.</p><div class="row"><span class="grow"></span><button class="btn g">Cancel</button><button class="btn p">Un-choose</button></div></div></main></div><p class="note"><b>7 — The act’s list while takes are made, and a narrow window (cards in one column; the In the game picture full width).</b></p><div class="frame" style="min-height:0"><main class="main"><table><tr><th>Image</th><th>Prompt</th><th>Size</th><th>Status</th></tr><tr><td><b>Silver Stag Inn</b><br/><span class="mono faint">silver-stag-inn</span></td><td class="small">inside the Silver Stag Inn, a long oak bar…</td><td>320 × 200</td><td><span class="chip c-k">making 2 takes · about 1 min</span></td></tr></table></main></div>
-<div class="frame" style="max-width:380px;min-height:0"><main class="main" style="padding:14px"><div><span class="crumbs">Images › Act I</span><h1>Silver Stag Inn</h1><span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span></div>
-<section class="panel col" style="gap:8px"><div class="row"><h2 class="grow" style="margin:0">Prompt</h2></div><div class="row"><label class="small muted grow">What the image shows</label><span class="small faint">from the game</span></div><div class="ro small">inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall</div><details><summary class="small">The whole prompt the model gets</summary></details></section><section class="ingame"><div class="row"><span class="lbl">In the game</span><b>Take 2</b><span class="chip c-ok">chosen</span><span class="grow"></span><button class="btn s">Un-choose</button></div><div style="max-width:420px"><canvas class="px" data-seed="2"></canvas></div><span class="faint small">The game shows this image. Choose another take below to replace it.</span></section><section class="panel col" style="gap:10px"><div class="row"><h2 class="grow" style="margin:0">Takes</h2><select class="sel2"><option>2 takes</option></select><button class="btn p">Make 2 more takes</button></div><div class="grid"><div class="card"><canvas class="px" data-seed="3"></canvas><div class="row"><b class="grow">Take 3</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div><div class="card"><canvas class="px" data-seed="4"></canvas><div class="row"><b class="grow">Take 4</b></div><div class="row"><span class="grow"></span><button class="btn s g">Drop</button><button class="btn s">Choose</button></div></div></div></section></main></div><script>
-(function(){
-  const P=['#000000','#0000aa','#00aa00','#00aaaa','#aa0000','#aa00aa','#aa5500','#aaaaaa','#555555','#5555ff','#55ff55','#55ffff','#ff5555','#ff55ff','#ffff55','#ffffff'];
-  function rng(s){return function(){s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff}}
-  document.querySelectorAll('canvas.px').forEach(c=>{
-    const W=80,H=50; c.width=W;c.height=H; const g=c.getContext('2d'); const r=rng(+c.dataset.seed*7919+11);
-    const wall=[6,8,4,1][Math.floor(r()*4)], floor=[6,8,0][Math.floor(r()*3)];
-    g.fillStyle=P[wall];g.fillRect(0,0,W,H);
-    // planks
-    g.fillStyle=P[0];for(let x=0;x<W;x+=6+Math.floor(r()*3))g.fillRect(x,0,1,32);
-    g.fillStyle=P[floor];g.fillRect(0,32,W,18);
-    g.fillStyle=P[8];for(let y=35;y<H;y+=4)g.fillRect(0,y,W,1);
-    // window
-    const wx=Math.floor(r()*50)+10; g.fillStyle=P[0];g.fillRect(wx-1,5,14,12);g.fillStyle=P[r()<.5?1:9];g.fillRect(wx,6,12,10);g.fillStyle=P[0];g.fillRect(wx+6,6,1,10);g.fillRect(wx,11,12,1);
-    // hearth
-    const hx=r()<.5?W-24:4; g.fillStyle=P[7];g.fillRect(hx,14,20,20);g.fillStyle=P[8];g.fillRect(hx+4,20,12,14);g.fillStyle=P[0];g.fillRect(hx+5,22,10,12);
-    g.fillStyle=P[12];g.fillRect(hx+7,26,6,8);g.fillStyle=P[14];g.fillRect(hx+8,29,4,5);
-    // bar
-    const bx=hx<20?40:6; g.fillStyle=P[6];g.fillRect(bx,26,30,8);g.fillStyle=P[0];g.fillRect(bx,25,30,1);g.fillStyle=P[14];g.fillRect(bx+4,23,2,2);g.fillRect(bx+12,23,2,2);
-    // barrels
-    const n=1+Math.floor(r()*3); for(let i=0;i<n;i++){const x=bx+8+i*7+Math.floor(r()*3);g.fillStyle=P[6];g.fillRect(x,36,6,8);g.fillStyle=P[0];g.fillRect(x,38,6,1);g.fillRect(x,41,6,1);}
-    // dog
-    if(r()<.6){const dx=hx+(hx<20?18:-10);g.fillStyle=P[7];g.fillRect(dx,41,7,3);g.fillRect(dx+6,40,2,2);}
-    // figure
-    if(r()<.5){const fx=bx+14;g.fillStyle=P[13];g.fillRect(fx,15,3,4);g.fillStyle=P[9];g.fillRect(fx-1,19,5,7);}
-  });
-})();
-</script>
-</body></html>
+      <h1>Image takes — side by side, every state and word</h1>
+      <p>
+        The chosen image (left, “In the game”) and one other take (right, “Comparing”) at the same
+        size, with a strip of the other takes beneath. Pressing a take in the strip, or ← →, puts it
+        on the right. Choose and Drop act on the take on the right. Pictures fill their half and
+        keep every pixel sharp.
+      </p>
+    </div>
+    <p class="note">
+      <b
+        >1 — A chosen take and four others; take 4 is beside it. Take 3 was made before the words
+        changed (“earlier words”). The chosen take is not in the strip: it is always on the left.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select class="sel2">
+              <option>2 takes</option></select
+            ><button class="btn p">Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">In the game</span><b>Take 2</b
+                ><span class="chip c-ok">chosen</span><span class="grow"></span
+                ><button class="btn s">Un-choose</button>
+              </div>
+              <canvas class="px" data-seed="2"></canvas>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 4</b><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="4"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb">
+              <canvas class="px" data-seed="3"></canvas
+              ><span class="row"
+                ><span class="grow">Take 3</span
+                ><span class="faint" style="font-size: 11px">earlier words</span></span
+              >
+            </div>
+            <div class="thumb on">
+              <canvas class="px" data-seed="4"></canvas
+              ><span class="row"><span class="grow">Take 4</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="5"></canvas
+              ><span class="row"><span class="grow">Take 5</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="6"></canvas
+              ><span class="row"><span class="grow">Take 6</span></span>
+            </div>
+          </div>
+          <span class="faint small"
+            >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >2 — After Choose on take 4: it moves to the left, and the take chosen before (take 2) comes
+        to the right, so you can still compare them and choose it back.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select class="sel2">
+              <option>2 takes</option></select
+            ><button class="btn p">Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">In the game</span><b>Take 4</b
+                ><span class="chip c-ok">chosen</span><span class="grow"></span
+                ><button class="btn s">Un-choose</button>
+              </div>
+              <canvas class="px" data-seed="4"></canvas>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 2</b><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="2"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb on">
+              <canvas class="px" data-seed="2"></canvas
+              ><span class="row"
+                ><span class="grow">Take 2</span
+                ><span class="faint" style="font-size: 11px">was chosen</span></span
+              >
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="3"></canvas
+              ><span class="row"><span class="grow">Take 3</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="5"></canvas
+              ><span class="row"><span class="grow">Take 5</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="6"></canvas
+              ><span class="row"><span class="grow">Take 6</span></span>
+            </div>
+          </div>
+          <span class="faint small"
+            >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >3 — While takes are made: each appears in the strip straight away with its progress, as on
+        Music; Stop ends the ones not yet finished, and the menus wait.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <button class="btn g">Stop</button
+            ><select class="sel2" disabled>
+              <option>2 takes</option></select
+            ><button class="btn p" disabled>Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">In the game</span><b>Take 2</b
+                ><span class="chip c-ok">chosen</span><span class="grow"></span
+                ><button class="btn s">Un-choose</button>
+              </div>
+              <canvas class="px" data-seed="2"></canvas>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 4</b><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="4"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb">
+              <canvas class="px" data-seed="3"></canvas
+              ><span class="row"><span class="grow">Take 3</span></span>
+            </div>
+            <div class="thumb on">
+              <canvas class="px" data-seed="4"></canvas
+              ><span class="row"><span class="grow">Take 4</span></span>
+            </div>
+            <div class="thumb">
+              <div class="ghost"></div>
+              <span>Take 5</span
+              ><span class="faint" style="font-size: 11px">making · about 1 min left</span>
+              <div class="bar2"><i style="width: 40%"></i></div>
+            </div>
+            <div class="thumb">
+              <div class="ghost">waiting</div>
+              <span>Take 6</span><span class="faint" style="font-size: 11px">waiting</span>
+              <div class="bar2"><i style="width: 0%"></i></div>
+            </div>
+          </div>
+          <span class="faint small"
+            >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >4 — A take finishes while you compare: the right side stays where you are; the new take is
+        marked “new” in the strip until you look at it.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <button class="btn g">Stop</button
+            ><select class="sel2" disabled>
+              <option>2 takes</option></select
+            ><button class="btn p" disabled>Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">In the game</span><b>Take 2</b
+                ><span class="chip c-ok">chosen</span><span class="grow"></span
+                ><button class="btn s">Un-choose</button>
+              </div>
+              <canvas class="px" data-seed="2"></canvas>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 4</b><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="4"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb">
+              <canvas class="px" data-seed="3"></canvas
+              ><span class="row"><span class="grow">Take 3</span></span>
+            </div>
+            <div class="thumb on">
+              <canvas class="px" data-seed="4"></canvas
+              ><span class="row"><span class="grow">Take 4</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="5"></canvas
+              ><span class="row"
+                ><span class="grow">Take 5</span
+                ><span class="chip c-mi" style="font-size: 10px; padding: 0 5px">new</span></span
+              >
+            </div>
+            <div class="thumb">
+              <div class="ghost"></div>
+              <span>Take 6</span
+              ><span class="faint" style="font-size: 11px">making · about 1 min left</span>
+              <div class="bar2"><i style="width: 30%"></i></div>
+            </div>
+          </div>
+          <span class="faint small"
+            >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>5 — Nothing chosen and no takes yet.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <h2 style="margin: 0">Takes</h2>
+          <div class="stage">
+            <div class="pane">
+              <span class="lbl">In the game</span>
+              <div class="ghost">Nothing shows here yet</div>
+              <span class="faint small">Choose a take and the game shows it.</span>
+            </div>
+            <div class="pane">
+              <span class="lbl">Comparing</span>
+              <div class="ghost">No takes yet</div>
+            </div>
+          </div>
+          <div class="col" style="align-items: center; text-align: center; gap: 8px">
+            <span class="muted"
+              >Each take is a new image made from the prompt.<br />Make a few, compare them, and
+              choose the one the game shows.</span
+            >
+            <div class="row">
+              <select class="sel2">
+                <option>2 takes</option></select
+              ><button class="btn p">Make 2 takes</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>6 — Takes but nothing chosen yet: the left says so; the first take is on the right.</b>
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select class="sel2">
+              <option>2 takes</option></select
+            ><button class="btn p">Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <span class="lbl">In the game</span>
+              <div class="ghost">Nothing shows here yet</div>
+              <span class="faint small">Choose a take and the game shows it.</span>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 1</b><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="11"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb on">
+              <canvas class="px" data-seed="11"></canvas
+              ><span class="row"><span class="grow">Take 1</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="12"></canvas
+              ><span class="row"><span class="grow">Take 2</span></span>
+            </div>
+          </div>
+          <span class="faint small"
+            >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>7 — A chosen take and no others: the right side invites more.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select class="sel2">
+              <option>2 takes</option></select
+            ><button class="btn p">Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">In the game</span><b>Take 2</b
+                ><span class="chip c-ok">chosen</span><span class="grow"></span
+                ><button class="btn s">Un-choose</button>
+              </div>
+              <canvas class="px" data-seed="2"></canvas>
+            </div>
+            <div class="pane">
+              <span class="lbl">Comparing</span>
+              <div class="ghost">
+                No other takes yet — make a few more to compare with the chosen one.
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >8 — The game already has its own picture here (not made in the studio): it is on the left
+        until a take is chosen.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select class="sel2">
+              <option>2 takes</option></select
+            ><button class="btn p">Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <div class="row"><span class="lbl">In the game</span><b>The game's own image</b></div>
+              <canvas class="px" data-seed="9"></canvas
+              ><span class="mono muted small">assets/rooms/silver-stag-inn.png</span
+              ><span class="faint small">Choose a take and the game shows it instead.</span>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 1</b><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="11"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb on">
+              <canvas class="px" data-seed="11"></canvas
+              ><span class="row"><span class="grow">Take 1</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="12"></canvas
+              ><span class="row"><span class="grow">Take 2</span></span>
+            </div>
+          </div>
+          <span class="faint small"
+            >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >9 — The chosen take is out of date (the words changed), and one take failed. Takes made
+        before the change say “earlier words”.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <div class="warnbox">
+          <b>Out of date since it was chosen: the words.</b
+          ><span class="muted small"
+            >The game shows the chosen image until you choose another.</span
+          >
+        </div>
+        <div class="errbox">
+          <div class="col">
+            <b>Take 7 could not be made.</b
+            ><span class="muted small"
+              >The image model stopped before the picture was finished. Your other takes are
+              kept.</span
+            >
+          </div>
+          <button class="btn">Try again</button>
+        </div>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select class="sel2">
+              <option>2 takes</option></select
+            ><button class="btn p">Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">In the game</span><b>Take 2</b
+                ><span class="chip c-ok">chosen</span><span class="grow"></span
+                ><button class="btn s">Un-choose</button>
+              </div>
+              <canvas class="px" data-seed="2"></canvas>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 4</b
+                ><span class="faint small">earlier words</span><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="4"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb">
+              <canvas class="px" data-seed="3"></canvas
+              ><span class="row"
+                ><span class="grow">Take 3</span
+                ><span class="faint" style="font-size: 11px">earlier words</span></span
+              >
+            </div>
+            <div class="thumb on">
+              <canvas class="px" data-seed="4"></canvas
+              ><span class="row"
+                ><span class="grow">Take 4</span
+                ><span class="faint" style="font-size: 11px">earlier words</span></span
+              >
+            </div>
+          </div>
+          <span class="faint small"
+            >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >10 — Images can't be made on this machine yet (the image model is not set up). Takes
+        already made can still be compared, chosen and dropped.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <div class="errbox">
+          <div class="col">
+            <b>Images can't be made yet.</b
+            ><span class="muted small"
+              >The image model is not installed. Setup says what is missing.</span
+            >
+          </div>
+          <button class="btn">Open Setup</button>
+        </div>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select class="sel2" disabled>
+              <option>2 takes</option></select
+            ><button class="btn p" disabled>Make 2 more takes</button>
+          </div>
+          <div class="stage">
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">In the game</span><b>Take 2</b
+                ><span class="chip c-ok">chosen</span><span class="grow"></span
+                ><button class="btn s">Un-choose</button>
+              </div>
+              <canvas class="px" data-seed="2"></canvas>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 4</b><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="4"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb">
+              <canvas class="px" data-seed="3"></canvas
+              ><span class="row"><span class="grow">Take 3</span></span>
+            </div>
+            <div class="thumb on">
+              <canvas class="px" data-seed="4"></canvas
+              ><span class="row"><span class="grow">Take 4</span></span>
+            </div>
+          </div>
+          <span class="faint small"
+            >Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.</span
+          >
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >11 — Un-choose asks first, as on Music. The take goes back into the strip, and the left
+        shows nothing (or the game's own image) again.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand">〰 Audio Studio</div>
+        <div class="pbox">
+          <span class="lbl">Project</span><strong>RetroQuest</strong
+          ><span class="mono muted">retroquest</span>
+        </div>
+        <div class="nav">
+          <span class="lbl">Workspace</span><span class="ni">Narration</span
+          ><span class="ni">Music</span><span class="ni">Images</span
+          ><span class="ni on" style="padding-left: 20px">Act I<span class="muted">6</span></span
+          ><span class="ni" style="padding-left: 20px">Act II<span class="muted">9</span></span
+          ><span class="ni" style="padding-left: 20px">Act III<span class="muted">4</span></span
+          ><span class="ni" style="padding-left: 20px">Style</span>
+        </div>
+        <div class="nav" style="margin-top: auto">
+          <span class="ni">All characters <span class="muted">9</span></span
+          ><span class="ni">Changes <span class="muted">3</span></span
+          ><span class="ni">Setup</span>
+        </div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <div class="dialog" style="position: static; max-width: 440px">
+          <b>Un-choose take 2?</b>
+          <p class="muted small">
+            The game shows no image here until you choose another. Take 2 stays among the takes.
+          </p>
+          <div class="row">
+            <span class="grow"></span><button class="btn g">Cancel</button
+            ><button class="btn p">Un-choose</button>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >12 — The act’s list while takes are made, and a narrow window: the two sides stack (In the
+        game above, Comparing below), and the strip scrolls sideways.</b
+      >
+    </p>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <table>
+          <tr>
+            <th>Image</th>
+            <th>Prompt</th>
+            <th>Size</th>
+            <th>Status</th>
+          </tr>
+          <tr>
+            <td><b>Silver Stag Inn</b><br /><span class="mono faint">silver-stag-inn</span></td>
+            <td class="small">inside the Silver Stag Inn, a long oak bar…</td>
+            <td>320 × 200</td>
+            <td><span class="chip c-k">making 2 takes · about 1 min</span></td>
+          </tr>
+        </table>
+      </main>
+    </div>
+    <div class="frame" style="max-width: 380px; min-height: 0">
+      <main class="main" style="padding: 14px">
+        <div>
+          <span class="crumbs">Images › Act I</span>
+          <h1>Silver Stag Inn</h1>
+          <span class="mono faint">silver-stag-inn</span> <span class="dims">· 320 × 200</span>
+        </div>
+        <section class="panel col" style="gap: 8px">
+          <div class="row"><h2 class="grow" style="margin: 0">Prompt</h2></div>
+          <div class="row">
+            <label class="small muted grow">What the image shows</label
+            ><span class="small faint">from the game</span>
+          </div>
+          <div class="ro small">
+            inside the Silver Stag Inn, a long oak bar, a fire in the hearth, barrels along the wall
+          </div>
+          <details><summary class="small">The whole prompt the model gets</summary></details>
+        </section>
+        <section class="panel col" style="gap: 12px">
+          <div class="row">
+            <h2 class="grow" style="margin: 0">Takes</h2>
+            <select class="sel2">
+              <option>2 takes</option></select
+            ><button class="btn p">Make 2 more takes</button>
+          </div>
+          <div class="col" style="gap: 12px">
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">In the game</span><b>Take 2</b
+                ><span class="chip c-ok">chosen</span><span class="grow"></span
+                ><button class="btn s">Un-choose</button>
+              </div>
+              <canvas class="px" data-seed="2"></canvas>
+            </div>
+            <div class="pane">
+              <div class="row">
+                <span class="lbl">Comparing</span><b>Take 4</b><span class="grow"></span
+                ><button class="btn s g">Drop</button><button class="btn s p">Choose</button>
+              </div>
+              <canvas class="px" data-seed="4"></canvas>
+            </div>
+          </div>
+          <div class="strip">
+            <div class="thumb">
+              <canvas class="px" data-seed="3"></canvas
+              ><span class="row"
+                ><span class="grow">Take 3</span
+                ><span class="faint" style="font-size: 11px">earlier words</span></span
+              >
+            </div>
+            <div class="thumb on">
+              <canvas class="px" data-seed="4"></canvas
+              ><span class="row"><span class="grow">Take 4</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="5"></canvas
+              ><span class="row"><span class="grow">Take 5</span></span>
+            </div>
+            <div class="thumb">
+              <canvas class="px" data-seed="6"></canvas
+              ><span class="row"><span class="grow">Take 6</span></span>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script>
+      ;(function () {
+        const P = [
+          '#000000',
+          '#0000aa',
+          '#00aa00',
+          '#00aaaa',
+          '#aa0000',
+          '#aa00aa',
+          '#aa5500',
+          '#aaaaaa',
+          '#555555',
+          '#5555ff',
+          '#55ff55',
+          '#55ffff',
+          '#ff5555',
+          '#ff55ff',
+          '#ffff55',
+          '#ffffff',
+        ]
+        function rng(s) {
+          return function () {
+            s = (s * 1103515245 + 12345) & 0x7fffffff
+            return s / 0x7fffffff
+          }
+        }
+        document.querySelectorAll('canvas.px').forEach((c) => {
+          const W = 80,
+            H = 50
+          c.width = W
+          c.height = H
+          const g = c.getContext('2d')
+          const r = rng(+c.dataset.seed * 7919 + 11)
+          const wall = [6, 8, 4, 1][Math.floor(r() * 4)],
+            floor = [6, 8, 0][Math.floor(r() * 3)]
+          g.fillStyle = P[wall]
+          g.fillRect(0, 0, W, H)
+          // planks
+          g.fillStyle = P[0]
+          for (let x = 0; x < W; x += 6 + Math.floor(r() * 3)) g.fillRect(x, 0, 1, 32)
+          g.fillStyle = P[floor]
+          g.fillRect(0, 32, W, 18)
+          g.fillStyle = P[8]
+          for (let y = 35; y < H; y += 4) g.fillRect(0, y, W, 1)
+          // window
+          const wx = Math.floor(r() * 50) + 10
+          g.fillStyle = P[0]
+          g.fillRect(wx - 1, 5, 14, 12)
+          g.fillStyle = P[r() < 0.5 ? 1 : 9]
+          g.fillRect(wx, 6, 12, 10)
+          g.fillStyle = P[0]
+          g.fillRect(wx + 6, 6, 1, 10)
+          g.fillRect(wx, 11, 12, 1)
+          // hearth
+          const hx = r() < 0.5 ? W - 24 : 4
+          g.fillStyle = P[7]
+          g.fillRect(hx, 14, 20, 20)
+          g.fillStyle = P[8]
+          g.fillRect(hx + 4, 20, 12, 14)
+          g.fillStyle = P[0]
+          g.fillRect(hx + 5, 22, 10, 12)
+          g.fillStyle = P[12]
+          g.fillRect(hx + 7, 26, 6, 8)
+          g.fillStyle = P[14]
+          g.fillRect(hx + 8, 29, 4, 5)
+          // bar
+          const bx = hx < 20 ? 40 : 6
+          g.fillStyle = P[6]
+          g.fillRect(bx, 26, 30, 8)
+          g.fillStyle = P[0]
+          g.fillRect(bx, 25, 30, 1)
+          g.fillStyle = P[14]
+          g.fillRect(bx + 4, 23, 2, 2)
+          g.fillRect(bx + 12, 23, 2, 2)
+          // barrels
+          const n = 1 + Math.floor(r() * 3)
+          for (let i = 0; i < n; i++) {
+            const x = bx + 8 + i * 7 + Math.floor(r() * 3)
+            g.fillStyle = P[6]
+            g.fillRect(x, 36, 6, 8)
+            g.fillStyle = P[0]
+            g.fillRect(x, 38, 6, 1)
+            g.fillRect(x, 41, 6, 1)
+          }
+          // dog
+          if (r() < 0.6) {
+            const dx = hx + (hx < 20 ? 18 : -10)
+            g.fillStyle = P[7]
+            g.fillRect(dx, 41, 7, 3)
+            g.fillRect(dx + 6, 40, 2, 2)
+          }
+          // figure
+          if (r() < 0.5) {
+            const fx = bx + 14
+            g.fillStyle = P[13]
+            g.fillRect(fx, 15, 3, 4)
+            g.fillStyle = P[9]
+            g.fillRect(fx - 1, 19, 5, 7)
+          }
+        })
+      })()
+    </script>
+  </body>
+</html>
