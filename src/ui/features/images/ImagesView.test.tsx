@@ -308,7 +308,10 @@ describe('an image’s page', () => {
     const prompts: Prompts = { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} }
     const page = render(route, summary({ prompts }))
     await act(async () => button(page, 'Keep mine').click())
-    await flush()
+    // The failure arrives after the request and the mutation have both settled.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
     expect(text(page.querySelector('.images-compare .adopt-error'))).toBe('saving answered 500')
   })
 })
