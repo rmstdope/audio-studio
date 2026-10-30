@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Image models check</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --sidebar: #0f1116;
+        --panel: #12141a;
+        --raised: #191c24;
+        --raised-hover: #20242e;
+        --inset: #0d0f14;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --text-soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --accent-soft-bg: #2a1b12;
+        --accent-soft-ink: #ff9a6b;
+        --accent-soft-line: #5a3218;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --info: #7aa7ff;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --miss: #8fb5ff;
+        --miss-bg: #142033;
+        --kept-bg: #0f1a16;
+        --kept-line: #1f5a40;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1180px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        max-width: 1180px;
+        margin: 22px auto 8px;
+        color: var(--text-soft);
+      }
+      .frame {
+        max-width: 1180px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        min-height: 560px;
+        background: var(--bg);
+      }
+      .side {
+        width: 220px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: none;
+      }
+      .brand {
+        font-weight: 600;
+      }
+      .lbl {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .pbox {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 13px;
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .ni {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 8px;
+        border-radius: 8px;
+        color: var(--text-soft);
+        font-size: 13px;
+      }
+      .ni.on {
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+      }
+      .main {
+        flex: 1;
+        padding: 22px 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .crumbs a {
+        color: var(--faint);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 9px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn.p {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.g {
+        background: transparent;
+        border-color: transparent;
+        color: var(--muted);
+      }
+      .btn.s {
+        padding: 4px 9px;
+        font-size: 12.5px;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .wrap {
+        flex-wrap: wrap;
+      }
+      .grow {
+        flex: 1;
+        min-width: 0;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .chip {
+        border-radius: 99px;
+        padding: 1px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .c-ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .c-st {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .c-mi {
+        background: var(--miss-bg);
+        color: var(--miss);
+      }
+      .c-k {
+        background: var(--chip);
+        color: var(--text-soft);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        color: var(--faint);
+        font-weight: 500;
+        font-size: 12px;
+        padding: 4px 6px;
+      }
+      td {
+        padding: 9px 6px;
+        border-top: 1px solid var(--line);
+        vertical-align: middle;
+      }
+      tr.sel td {
+        background: var(--raised);
+      }
+      .brief {
+        color: var(--muted);
+        font-size: 12.5px;
+        max-width: 420px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 99px;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        flex: none;
+      }
+      .wave {
+        height: 34px;
+        flex: 1;
+        min-width: 120px;
+        background: repeating-linear-gradient(90deg, #3a4150 0 2px, transparent 2px 4px);
+        mask: linear-gradient(180deg, transparent 0, #000 20%, #000 80%, transparent 100%);
+        border-radius: 4px;
+        position: relative;
+        opacity: 0.9;
+      }
+      .wave.short {
+        max-width: 140px;
+      }
+      .seam {
+        position: absolute;
+        top: -4px;
+        bottom: -4px;
+        width: 2px;
+        background: var(--accent);
+        right: 6%;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      input,
+      textarea,
+      select {
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 7px 9px;
+        font: inherit;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 64px;
+        width: 100%;
+      }
+      .grid4 {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .takes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .take {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .take.chosen {
+        background: var(--kept-bg);
+        border-color: var(--kept-line);
+      }
+      .take.gen {
+        border-style: dashed;
+        color: var(--muted);
+      }
+      .bar {
+        height: 6px;
+        border-radius: 99px;
+        background: var(--line-strong);
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        width: 40%;
+        background: var(--accent);
+      }
+      .warnbox {
+        background: var(--warn-bg);
+        border: 1px solid #5a4a1e;
+        border-radius: 12px;
+        padding: 10px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .warnbox strong {
+        color: var(--warn);
+      }
+      .errbox {
+        background: var(--danger-bg);
+        border: 1px solid #6a2a3a;
+        border-radius: 12px;
+        padding: 10px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .errbox strong {
+        color: var(--danger-ink);
+      }
+      .split {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      .list {
+        width: 300px;
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .li {
+        padding: 8px 10px;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        border: 1px solid transparent;
+      }
+      .li.on {
+        background: var(--raised);
+        border-color: var(--line-strong);
+      }
+      .grp {
+        margin-top: 8px;
+      }
+      .tag {
+        display: inline-block;
+        background: var(--warn);
+        color: #1a1200;
+        font-weight: 700;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        margin-right: 8px;
+      }
+      .dialog {
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-radius: 14px;
+        padding: 18px 20px;
+        width: 520px;
+        max-width: 100%;
+        box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .scrim {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgb(0 0 0 / 45%);
+        padding: 30px;
+      }
+      .decided {
+        border-left: 3px solid var(--info);
+        padding-left: 10px;
+        color: var(--text-soft);
+      }
+      .narrow {
+        max-width: 420px;
+      }
+      .narrow .side {
+        display: none;
+      }
+      .narrow .takes,
+      .narrow .grid4 {
+        grid-template-columns: 1fr;
+      }
+      .saved {
+        color: var(--ok);
+        font-size: 12.5px;
+      }
+      input.inl {
+        width: 100%;
+      }
+      .sw {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1px solid var(--line-strong);
+        margin-right: 3px;
+        vertical-align: middle;
+      }
+      .dims {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .ph {
+        background: repeating-linear-gradient(
+          45deg,
+          var(--inset),
+          var(--inset) 8px,
+          var(--raised) 8px,
+          var(--raised) 16px
+        );
+        border: 1px dashed var(--line-strong);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      textarea {
+        width: 100%;
+        background: var(--inset);
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        padding: 9px 11px;
+        font: inherit;
+        resize: vertical;
+      }
+      .ro {
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 9px 11px;
+        color: var(--text-soft);
+      }
+      .chg {
+        color: var(--warn);
+        font-size: 12.5px;
+      }
+      .notice {
+        background: var(--warn-bg);
+        border: 1px solid #5a4818;
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+      .cmp {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      details summary {
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .exp td {
+        background: var(--raised);
+      }
+      canvas.px {
+        image-rendering: pixelated;
+        width: 100%;
+        aspect-ratio: 8/5;
+        display: block;
+        border-radius: 6px;
+        background: #000;
+      }
+      .ingame {
+        border: 1px solid var(--kept-line);
+        background: var(--kept-bg);
+        border-radius: 14px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--raised);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .card.sel {
+        outline: 2px solid var(--accent);
+      }
+      .stage {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .pane {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .strip {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 4px 2px;
+      }
+      .thumb {
+        width: 112px;
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 12px;
+        color: var(--text-soft);
+        padding: 4px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+      }
+      .thumb.on {
+        border-color: var(--accent);
+        background: var(--accent-soft-bg);
+      }
+      .bar2 {
+        height: 4px;
+        background: var(--line);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .bar2 i {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+      }
+      .ghost {
+        aspect-ratio: 8/5;
+        border: 1px dashed var(--line-strong);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      select.sel2 {
+        background: var(--raised);
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        padding: 6px 8px;
+        font: inherit;
+      }
+      kbd {
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        padding: 0 4px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .lightbox {
+        position: relative;
+        min-height: 560px;
+        flex: 1;
+        background: rgba(0, 0, 0, 0.82);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 18px 22px;
+      }
+      .move {
+      }
+      .mrow {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 16px;
+        padding: 12px 0;
+        border-top: 1px solid var(--line);
+        align-items: start;
+      }
+      .mrow.first {
+        border-top: 0;
+      }
+      .mname {
+        font-weight: 600;
+      }
+      .mtx {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .free {
+        color: var(--ok);
+      }
+      .warnline {
+        color: var(--warn);
+        font-size: 12.5px;
+      }
+      .check {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .st {
+        font-size: 12.5px;
+        white-space: nowrap;
+        width: 130px;
+        flex: none;
+      }
+      .st.ok {
+        color: var(--ok);
+      }
+      .st.pr {
+        color: var(--warn);
+      }
+      .st.off {
+        color: var(--faint);
+      }
+      .fix {
+        display: block;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 6px 9px;
+        margin: 4px 0;
+        color: var(--text-soft);
+        white-space: pre-wrap;
+      }
+      ol.steps {
+        margin: 6px 0 4px;
+        padding-left: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .mlist {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 4px 0;
+      }
+      .mlist .r {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+      }
+      .opt {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 6px 10px;
+        border-radius: 7px;
+      }
+      .opt.dis {
+        color: var(--faint);
+      }
+      .opt.on {
+        background: var(--raised);
+      }
+      .rec {
+        display: inline-block;
+        background: var(--accent-soft-bg);
+        color: var(--accent-soft-ink);
+        border: 1px solid var(--accent-soft-line);
+        border-radius: 6px;
+        padding: 1px 7px;
+        font-size: 11.5px;
+        font-weight: 600;
+        margin-left: 8px;
+      }
+      .mby {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      a.l {
+        color: var(--info);
+      }
+      .ex {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .tag {
+        font-size: 11px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: 0 0 6px;
+      }
+      .btn.s {
+        margin-top: 4px;
+      }
+      .res {
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .res.bad {
+        color: var(--danger-ink);
+      }
+      .mline {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      .mline .m {
+        min-width: 120px;
+        color: var(--text-soft);
+      }
+      @media (max-width: 640px) {
+        body {
+          padding: 16px;
+        }
+        .check {
+          flex-direction: column;
+          gap: 6px;
+        }
+        .st {
+          width: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Image models check: Ready only when a model can run</h1>
+      Setup checks that every part of each model’s download is on this computer, and remembers on
+      this computer when a model’s last take failed, until a take with that model works. Nothing to
+      press and no wait: the check is instant.
+    </div>
+    <p class="note"><b>1 — Both whole, no failed take: Ready.</b></p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel check">
+          <span class="st ok">✓ Ready</span>
+          <div class="col" style="gap: 4px">
+            <strong>Image models</strong>
+            <span class="muted"
+              >FLUX.2 klein 4B and Z-Image-Turbo are fully downloaded on this computer; a model
+              loads on its first take.</span
+            >
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <p class="note">
+      <b>2 — The other model's download is incomplete.</b> Images can still be made with the main
+      one.
+    </p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel check">
+          <span class="st off">Not set up</span>
+          <div class="col" style="gap: 4px">
+            <strong>Image models</strong>
+            <span class="muted"
+              >Optional: Z-Image-Turbo's download is incomplete, so it can't run. FLUX.2 klein 4B is
+              in place.</span
+            >
+            <ol class="steps small">
+              <li>
+                Finish the download (it picks up where it stopped):<code class="fix"
+                  >uvx --from huggingface_hub hf download Tongyi-MAI/Z-Image-Turbo</code
+                >
+              </li>
+            </ol>
+            <span class="faint small">Then press Check again.</span>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="mrow first">
+            <div class="mname">Images</div>
+            <div class="mtx">
+              <span class="muted">Menu, open:</span>
+              <div class="opt on">
+                <span>FLUX.2 klein 4B</span><span class="faint small">about 8 s a take</span>
+              </div>
+              <div class="opt dis">
+                <span>Z-Image-Turbo</span
+                ><span class="small">about 1 min a take — download incomplete</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <p class="note"><b>3 — The main model's download is incomplete.</b></p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel check">
+          <span class="st pr">⚠ Needs attention</span>
+          <div class="col" style="gap: 4px">
+            <strong>Image models</strong>
+            <span class="muted"
+              >The project's image model, FLUX.2 klein 4B, is only partly downloaded, so it can't
+              run. Z-Image-Turbo is in place: an image's takes can use it meanwhile.</span
+            >
+            <ol class="steps small">
+              <li>
+                Finish the download (it picks up where it stopped):<code class="fix"
+                  >uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B</code
+                >
+              </li>
+            </ol>
+            <span class="faint small">Then press Check again.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <p class="note"><b>4 — Neither can run.</b> One incomplete, one never downloaded.</p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel check">
+          <span class="st pr">⚠ Needs attention</span>
+          <div class="col" style="gap: 4px">
+            <strong>Image models</strong>
+            <span class="muted"
+              >Images can't be made: FLUX.2 klein 4B's download is incomplete and Z-Image-Turbo is
+              not on this computer.</span
+            >
+            <ol class="steps small">
+              <li>
+                Finish the download (it picks up where it stopped):<code class="fix"
+                  >uvx --from huggingface_hub hf download black-forest-labs/FLUX.2-klein-4B</code
+                >
+              </li>
+              <li>
+                Download it, once (about 31 GB):<code class="fix"
+                  >uvx --from huggingface_hub hf download Tongyi-MAI/Z-Image-Turbo</code
+                >
+              </li>
+            </ol>
+            <span class="faint small">Then press Check again.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>5 — The other model’s last take failed.</b> Optional, as a missing other model is. The last
+      line of the error is shown in full, wrapped.
+    </p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel check">
+          <span class="st off">Not set up</span>
+          <div class="col" style="gap: 4px">
+            <strong>Image models</strong
+            ><span class="muted"
+              >Optional: the last take with Z-Image-Turbo failed on Bridge at dusk. FLUX.2 klein 4B
+              is in place.</span
+            ><code class="fix"
+              >FileNotFoundError: No safetensors files found in
+              …/Z-Image-Turbo/snapshots/f332072…/text_encoder_2</code
+            ><span class="small"><a class="l" href="#">Open Bridge at dusk</a></span
+            ><span class="faint small">This clears when a take with Z-Image-Turbo works.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>6 — The main model’s last take failed.</b></p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel check">
+          <span class="st pr">⚠ Needs attention</span>
+          <div class="col" style="gap: 4px">
+            <strong>Image models</strong
+            ><span class="muted"
+              >The last take with FLUX.2 klein 4B, the project's image model, failed on Bridge at
+              dusk. Z-Image-Turbo is in place: an image's takes can use it meanwhile.</span
+            ><code class="fix">mflux-generate-flux2: error: …</code
+            ><span class="small"><a class="l" href="#">Open Bridge at dusk</a></span
+            ><span class="faint small">This clears when a take with FLUX.2 klein 4B works.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>7 — The failed take was removed.</b> The warning stays, without the image’s name or link.
+      It is still there after the studio is closed and opened again.
+    </p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel check">
+          <span class="st off">Not set up</span>
+          <div class="col" style="gap: 4px">
+            <strong>Image models</strong
+            ><span class="muted"
+              >Optional: the last take with Z-Image-Turbo failed. FLUX.2 klein 4B is in place.</span
+            ><code class="fix"
+              >FileNotFoundError: No safetensors files found in
+              …/Z-Image-Turbo/snapshots/f332072…/text_encoder_2</code
+            ><span class="faint small">This clears when a take with Z-Image-Turbo works.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>8 — Both model menus mark it; it can still be picked.</b></p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel" style="max-width: 560px">
+          <div class="lbl" style="margin-bottom: 6px">Setup — Images, open</div>
+          <div class="opt on">
+            <span>FLUX.2 klein 4B</span><span class="faint small">about 8 s a take</span>
+          </div>
+          <div class="opt">
+            <span>Z-Image-Turbo</span
+            ><span class="small warnline">about 1 min a take — last take failed</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel" style="max-width: 560px">
+          <div class="lbl" style="margin-bottom: 6px">An image — Model for new takes, open</div>
+          <div class="opt on">
+            <span>FLUX.2 klein 4B</span><span class="faint small">about 8 s a take</span>
+          </div>
+          <div class="opt">
+            <span>Z-Image-Turbo</span
+            ><span class="small warnline">about 1 min a take — last take failed</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>9 — An image’s page, when the main model’s last take failed and the other is in place.</b>
+    </p>
+    <div class="frame ex" style="min-height: 0">
+      <main class="main">
+        <section class="panel">
+          <h2>Takes</h2>
+          <div class="row wrap">
+            <select aria-label="Model for new takes">
+              <option>Z-Image-Turbo — about 1 min a take</option></select
+            ><select>
+              <option>2 takes</option></select
+            ><button class="btn p">Make takes</button>
+          </div>
+          <span class="faint small" style="display: block; margin-top: 8px"
+            >FLUX.2 klein, the project's image model, failed on its last take, so these takes use
+            Z-Image-Turbo. Setup says what went wrong.</span
+          >
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
