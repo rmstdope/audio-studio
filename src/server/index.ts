@@ -168,7 +168,7 @@ export interface ServerOptions {
   music?: MusicGenerator
   /** The ElevenLabs client to use (tests); by default one is made from the project's API key. */
   elevenlabs?: ElevenLabsClient | null
-  /** The image generator to use (tests); by default mflux, or a stand-in when `AUDIO_STUDIO_FAKE_IMAGES=1`. */
+  /** The image generator to use (tests); by default mflux, or a stand-in when `CONTENT_STUDIO_FAKE_IMAGES=1`. */
   images?: ImageGenerator
 }
 
@@ -189,14 +189,14 @@ function sharedWhisper(): Transcriber {
 /**
  * The process's music generators as one, kept across `--dev` reloads like Whisper's: the ACE-Step
  * and Stable Audio workers, each started with its first take and ended with the studio, and Eleven
- * Music, with the project's ElevenLabs key read on every use. `AUDIO_STUDIO_FAKE_MUSIC=1` swaps
+ * Music, with the project's ElevenLabs key read on every use. `CONTENT_STUDIO_FAKE_MUSIC=1` swaps
  * them for a stand-in that makes tones, for working on the pages.
  */
 function sharedMusic(projectFile: string): MusicGenerator {
   const state = globalThis as { contentStudioMusic?: MusicGenerator }
   if (!state.contentStudioMusic) {
     state.contentStudioMusic =
-      process.env.AUDIO_STUDIO_FAKE_MUSIC === '1'
+      process.env.CONTENT_STUDIO_FAKE_MUSIC === '1'
         ? createFakeMusic()
         : createMusicRouter({
             acestep: createAceStepWorker(),
@@ -465,7 +465,7 @@ export function startServer({
 }: ServerOptions) {
   const imageGenerator =
     images ??
-    (process.env.AUDIO_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator())
+    (process.env.CONTENT_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator())
   const imageTakes = createImageTakes({ generator: imageGenerator })
   const musicGenerator = music ?? sharedMusic(projectFile)
   const musicTakes = createMusicTakes({

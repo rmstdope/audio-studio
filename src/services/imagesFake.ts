@@ -54,7 +54,7 @@ export function fakePng(width: number, height: number, seed: number): Uint8Array
 }
 
 /**
- * A stand-in generator for working on the studio's own pages (`AUDIO_STUDIO_FAKE_IMAGES=1`): a
+ * A stand-in generator for working on the studio's own pages (`CONTENT_STUDIO_FAKE_IMAGES=1`): a
  * patterned picture after a few seconds, a failure for a prompt that says "fail". It makes no art.
  */
 export function createFakeImages(delayMs = 3000): ImageGenerator {
