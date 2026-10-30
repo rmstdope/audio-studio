@@ -241,6 +241,7 @@ describe('comparing takes', () => {
     }) as typeof s.client.cancelQueries
     await s.click(s.button('Choose'))
     expect(cancelled).toEqual([{ queryKey: ['image-takes', 'inn'] }])
+    await act(async () => await new Promise((r) => setTimeout(r, 20)))
     await s.click(s.button('Drop'))
     expect(cancelled).toHaveLength(2)
   })

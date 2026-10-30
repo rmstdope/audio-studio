@@ -29,6 +29,7 @@ export function TakePair({
   lookError,
   current = false,
   saving = false,
+  saved = 0,
 }: {
   id: string
   take: ImageTakeView
@@ -36,6 +37,7 @@ export function TakePair({
   lookError: string | null
   current?: boolean
   saving?: boolean
+  saved?: number
 }) {
   const box = useRef<HTMLDivElement>(null)
   const [available, setAvailable] = useState(0)
@@ -51,7 +53,9 @@ export function TakePair({
   const { zoom, stacked } = lookZoom(available, GAP, row.width)
   const shown = { width: row.width * zoom, height: row.height * zoom }
   const base = `/api/images/${encodeURIComponent(id)}`
-  const version = tag(`${row.look.key ?? ''}${take.look}${row.looksOld}`)
+  // The chosen take and the count of saved choices are in the address: the picture at it changes
+  // with each choice, and a browser keeps what it loaded at an address.
+  const version = tag(`${row.look.key ?? ''}${take.look}${row.looksOld}${take.n}/${saved}`)
   const gameSrc = current
     ? `${base}/current?v=${version}`
     : `${base}/takes/${take.n}/game?v=${version}`
@@ -94,7 +98,7 @@ export function TakePair({
             {state === 'error'
               ? lookError
               : state === 'saving'
-                ? 'Saving the choice…'
+                ? ''
                 : state === 'missing'
                   ? "Not brought to the game's look yet."
                   : "Bringing to the game's look…"}

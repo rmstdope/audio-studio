@@ -108,6 +108,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
   const [picked, setPicked] = useState<ImageModelId | null>(null)
   const [modelOpen, setModelOpen] = useState(false)
   const [asking, setAsking] = useState(false)
+  const [saved, setSaved] = useState(0)
   const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
   const asked = useRef(new Set<number>())
   const chooseButton = useRef<HTMLButtonElement>(null)
@@ -195,7 +196,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
     setWasChosen(before)
     setRight(before ?? rightAfterDrop(strip, n))
     setPendingFocus(before !== null || strip.length > 1 ? 'choose' : 'right')
-    choose.mutate(n)
+    choose.mutate(n, { onSuccess: () => setSaved((count) => count + 1) })
   }
   const onDrop = (n: number) => {
     const next = rightAfterDrop(strip, n)
@@ -383,6 +384,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
                 opener={unchooseButton}
                 unchoosing={unchoose.isPending}
                 saving={choose.isPending}
+                saved={saved}
                 onUnchoose={() => {
                   unchoose.reset()
                   setAsking(true)
@@ -521,6 +523,7 @@ function LeftSide({
   opener,
   unchoosing,
   saving,
+  saved,
   onUnchoose,
   size,
   id,
@@ -533,6 +536,7 @@ function LeftSide({
   opener: React.RefObject<HTMLButtonElement | null>
   unchoosing: boolean
   saving: boolean
+  saved: number
   onUnchoose: () => void
   size: { width: number; height: number }
   id: string
@@ -563,7 +567,15 @@ function LeftSide({
             Un-choose
           </button>
         </div>
-        <TakePair id={id} take={chosen} row={row} lookError={lookError} current saving={saving} />
+        <TakePair
+          id={id}
+          take={chosen}
+          row={row}
+          lookError={lookError}
+          current
+          saving={saving}
+          saved={saved}
+        />
       </>
     )
   }
