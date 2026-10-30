@@ -213,10 +213,15 @@ describe('the Music row of the Models panel', () => {
 })
 
 describe('the Images row of the Models panel', () => {
-  const both = { klein: true, 'z-image-turbo': true }
-  const images = (model: 'klein' | 'z-image-turbo', installed = both): Images => ({
+  const whole = { download: 'whole', failed: false } as const
+  const both = { klein: whole, 'z-image-turbo': whole }
+  const absent = { download: 'absent', failed: false } as const
+  const images = (
+    model: 'klein' | 'z-image-turbo',
+    states: NonNullable<Images>['states'] = both,
+  ): Images => ({
     model,
-    installed,
+    states,
   })
   const imagePuts: unknown[] = []
   beforeEach(() => {
@@ -263,14 +268,31 @@ describe('the Images row of the Models panel', () => {
   })
 
   it('lists a missing model as such, which cannot be picked, and warns when it is the chosen one', () => {
-    const page = render(answer(null, images('klein', { klein: false, 'z-image-turbo': true })))
+    const page = render(answer(null, images('klein', { klein: absent, 'z-image-turbo': whole })))
     const [klein, z] = [...menuOf(page.container).options]
     expect(klein!.textContent).toBe('FLUX.2 klein 4B — about 8 s a take — not on this computer')
     expect(klein!.disabled).toBe(true)
     expect(z!.disabled).toBe(false)
     expect(page.container.querySelector('.warnline')!.textContent).toBe('not on this computer')
-    const fine = render(answer(null, images('klein', { klein: true, 'z-image-turbo': false })))
+    const fine = render(answer(null, images('klein', { klein: whole, 'z-image-turbo': absent })))
     expect(fine.container.querySelector('.warnline')).toBeNull()
+  })
+
+  it('marks a model whose last take failed, which can be picked, and warns when it is the chosen one', () => {
+    const failed = { download: 'whole', failed: true } as const
+    const page = render(answer(null, images('klein', { klein: failed, 'z-image-turbo': whole })))
+    const [klein] = [...menuOf(page.container).options]
+    expect(klein!.textContent).toBe('FLUX.2 klein 4B — about 8 s a take — last take failed')
+    expect(klein!.disabled).toBe(false)
+    expect(page.container.querySelector('.warnline')!.textContent).toBe('last take failed')
+  })
+
+  it('marks a partly downloaded model, which cannot be picked', () => {
+    const partial = { download: 'partial', failed: false } as const
+    const page = render(answer(null, images('klein', { klein: whole, 'z-image-turbo': partial })))
+    const z = [...menuOf(page.container).options][1]!
+    expect(z.textContent).toBe('Z-Image-Turbo — about 1 min a take — download incomplete')
+    expect(z.disabled).toBe(true)
   })
 
   it('saves a pick at once, with no question, and says Saving… while it does', async () => {

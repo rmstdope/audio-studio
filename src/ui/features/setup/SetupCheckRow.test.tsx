@@ -104,3 +104,44 @@ describe('a setup row with notes', () => {
     )
   })
 })
+
+describe('a setup row with failed takes', () => {
+  const failing: SetupCheck = {
+    id: 'imageModels',
+    title: 'Image models',
+    state: 'problem',
+    detail: '',
+    failures: [
+      {
+        sentence: 'The last take with FLUX.2 klein 4B failed on Bridge at dusk.',
+        error: 'FileNotFoundError: No safetensors',
+        link: { text: 'Open Bridge at dusk', href: '#/images/items/bridge' },
+        clears: 'This clears when a take with FLUX.2 klein 4B works.',
+      },
+      {
+        sentence: 'The last take with Z-Image-Turbo failed.',
+        error: 'RuntimeError: out of memory',
+        clears: 'This clears when a take with Z-Image-Turbo works.',
+      },
+    ],
+  }
+
+  it('shows each failure: sentence, the error in a code box, the link, and what clears it', () => {
+    const row = render(failing)
+    const items = [...row.querySelectorAll('.setup-failure')]
+    expect(items).toHaveLength(2)
+    expect(items[0]!.textContent).toContain(
+      'The last take with FLUX.2 klein 4B failed on Bridge at dusk.',
+    )
+    expect(items[0]!.querySelector('code')!.textContent).toBe('FileNotFoundError: No safetensors')
+    const link = items[0]!.querySelector('a')!
+    expect(link.textContent).toBe('Open Bridge at dusk')
+    expect(link.getAttribute('href')).toBe('#/images/items/bridge')
+    expect(items[0]!.textContent).toContain('This clears when a take with FLUX.2 klein 4B works.')
+    expect(items[1]!.querySelector('a')).toBeNull()
+  })
+
+  it('has no empty detail line when the row has only failures', () => {
+    expect(render(failing).querySelector('.setup-text > .muted')).toBeNull()
+  })
+})

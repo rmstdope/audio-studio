@@ -5263,7 +5263,10 @@ describe('the image model routes', () => {
     const view = await (await fetch(at('/api/models'))).json()
     expect(view.images).toEqual({
       model: 'klein',
-      installed: { klein: false, 'z-image-turbo': true },
+      states: {
+        klein: { download: 'absent', failed: false },
+        'z-image-turbo': { download: 'whole', failed: false },
+      },
     })
     const setup = await (await fetch(at('/api/setup'))).json()
     expect(setup.checks.find((c: { id: string }) => c.id === 'imageModels')).toMatchObject({

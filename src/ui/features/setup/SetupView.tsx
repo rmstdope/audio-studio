@@ -75,10 +75,24 @@ export function SetupCheckRow({ check }: { check: SetupCheck }) {
       </span>
       <div className="setup-text">
         <strong>{check.title}</strong>
-        <span className="muted">
-          {check.detail}
-          {check.credit !== undefined && ` ${dollars(check.credit)}`}
-        </span>
+        {(check.detail || check.credit !== undefined) && (
+          <span className="muted">
+            {check.detail}
+            {check.credit !== undefined && ` ${dollars(check.credit)}`}
+          </span>
+        )}
+        {check.failures?.map((failure) => (
+          <div key={failure.sentence} className="setup-failure">
+            <span className="muted">{failure.sentence}</span>
+            <code className="setup-fix mono">{failure.error}</code>
+            {failure.link && (
+              <span className="small">
+                <a href={failure.link.href}>{failure.link.text}</a>
+              </span>
+            )}
+            <span className="faint small">{failure.clears}</span>
+          </div>
+        ))}
         {check.notes && (
           <ul className="setup-notes small muted">
             {check.notes.map((note) => (

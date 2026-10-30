@@ -98,9 +98,15 @@ export interface ImageModelState {
  */
 export function imageMenuEntry(id: ImageModelId, state: ImageModelState): string {
   const entry = `${IMAGE_MODELS[id].name} — ${perTake(id)}`
-  if (state.download === 'absent') return `${entry} — not on this computer`
-  if (state.download === 'partial') return `${entry} — download incomplete`
-  return state.failed ? `${entry} — last take failed` : entry
+  const warning = imageWarning(state)
+  return warning ? `${entry} — ${warning}` : entry
+}
+
+/** The warning beside a menu that has this model shown, or null when it is whole and well. */
+export function imageWarning(state: ImageModelState): string | null {
+  if (state.download === 'absent') return 'not on this computer'
+  if (state.download === 'partial') return 'download incomplete'
+  return state.failed ? 'last take failed' : null
 }
 
 /** A model's entry in an image's closed menu: its short name and time. */

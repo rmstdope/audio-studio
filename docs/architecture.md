@@ -1612,10 +1612,17 @@ Planned (step 6): the server watches the resource files, so an edit made in the 
   optional Stable Audio Open models in `~/.cache/stable-audio` ("Not set up" until they are there,
   "Needs attention" only when the project's music model is one that is missing, with three numbered
   steps: accept the licence, make a read token, download), with an `images` section the image models
-  (**Image models**: mflux and the weights (a `.safetensors` file in a snapshot) of FLUX.2 klein 4B and Z-Image-Turbo in the Hugging Face cache,
-  `HF_HUB_CACHE`, else `$HF_HOME/hub`, else `~/.cache/huggingface/hub`: "Ready" with both, "Not set up" when only the
-  project's model is there, "Needs attention" when the project's model is missing, or mflux, or both models,
-  each with numbered steps and the commands to get what is missing; "Not used" without an `images` section), and two optional ElevenLabs rows (§8.6):
+  (**Image models**: mflux, and for FLUX.2 klein 4B and Z-Image-Turbo whether the whole download is in the Hugging Face cache,
+  `HF_HUB_CACHE`, else `$HF_HOME/hub`, else `~/.cache/huggingface/hub` (`imageModelDownload`: `absent` with no folder; `whole` when a snapshot holds a
+  `.safetensors` file, no blob is still `.incomplete`, no snapshot link points at a missing blob and every shard a `*.safetensors.index.json` names is there;
+  else `partial`), and whether the model's last take failed (the studio's own memory, `.content-studio/image-model-health.json`, one entry per model with the
+  image, take and the last line of the image tool's error, written when a take fails and removed when a take with that model works; a stopped take is no failure;
+  it survives a restart). "Ready" with both whole and no failed take; for a model that is partly downloaded, not on the computer or failed: "Not set up" (Optional)
+  when it is the other model, "Needs attention" when it is the project's model or neither model can run (and mflux itself), the incomplete download beating
+  a failed take; each with numbered steps ("Finish the download", "Download it") and the commands, and a failed take with the tool's error line, a link to the image
+  while it is in the game's lists, and what clears it; the two model menus (Setup's Images row, an image's "Model for new takes") mark "— download incomplete"
+  (not pickable) and "— last take failed" (pickable), and an image's new takes start on the other model when the project's failed its last take and the other
+  is whole; "Not used" without an `images` section), and two optional ElevenLabs rows (§8.6):
   its key ("Not set up" until there is one, saying where it goes) and its account (asked only with a
   key: the plan, the credits left of its allowance and when they renew, what may be billed
   beyond them, the voice slots used, and what the plan allows), each with what to do about it.
