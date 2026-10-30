@@ -43,6 +43,7 @@ const take = (n: number, over: Partial<ImageTakeView> = {}): ImageTakeView => ({
   n,
   width: 1024,
   height: 640,
+  model: 'klein',
   earlier: false,
   chosen: false,
   isNew: false,
@@ -52,6 +53,11 @@ const take = (n: number, over: Partial<ImageTakeView> = {}): ImageTakeView => ({
 const view = (over: Partial<ImageTakesView> = {}): ImageTakesView => ({
   ok: true,
   generator: { ok: true },
+  projectModel: 'klein',
+  models: [
+    { id: 'klein', installed: true },
+    { id: 'z-image-turbo', installed: true },
+  ],
   takes: [],
   making: [],
   failed: [],
@@ -305,9 +311,9 @@ describe('making takes', () => {
 
   it('the count menu offers 1 to 4 takes, starts at 2 and names the button', async () => {
     const s = await show(view({ takes: [take(1)] }))
-    const options = [...s.container.querySelectorAll('select option')]
+    const options = [...s.container.querySelectorAll('select.takes-count option')]
     expect(options.map((o) => o.textContent)).toEqual(['1 take', '2 takes', '3 takes', '4 takes'])
-    expect(s.container.querySelector<HTMLSelectElement>('select')!.value).toBe('2')
+    expect(s.container.querySelector<HTMLSelectElement>('select.takes-count')!.value).toBe('2')
   })
 })
 
@@ -335,7 +341,9 @@ describe('what can go wrong', () => {
       }),
     )
     expect(s.text()).toContain('Images can’t be made yet.'.replace('’', "'"))
-    expect(s.text()).toContain('The image model is not installed. Setup says what is missing.')
+    expect(s.text()).toContain(
+      'Neither image model can run on this computer. Setup says what is missing.',
+    )
     expect(s.container.querySelector('a')?.getAttribute('href')).toBe('#/setup')
     expect(s.button('Make 2 more takes').disabled).toBe(true)
     expect(s.container.querySelector<HTMLSelectElement>('select')!.disabled).toBe(true)
@@ -385,5 +393,121 @@ describe('what can go wrong', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
     })
     expect(s.text()).toContain('That take is gone.')
+  })
+})
+
+describe('the Takes section’s model menu', () => {
+  const only = (id: 'klein' | 'z-image-turbo') => [
+    { id: 'klein' as const, installed: id === 'klein' },
+    { id: 'z-image-turbo' as const, installed: id === 'z-image-turbo' },
+  ]
+  const modelMenu = (s: { container: HTMLElement }) =>
+    s.container.querySelector<HTMLSelectElement>('select[aria-label="Model for new takes"]')!
+  const pick = (s: { container: HTMLElement }, value: string) =>
+    act(async () => {
+      modelMenu(s).value = value
+      modelMenu(s).dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+  it('comes before the count menu, starts on the project’s model, and lists both with their times', async () => {
+    const s = await show(view({ takes: three }))
+    const menus = [...s.container.querySelectorAll('select')].map((m) =>
+      m.getAttribute('aria-label'),
+    )
+    expect(menus).toEqual(['Model for new takes', 'Number of new takes'])
+    expect(modelMenu(s).value).toBe('klein')
+    expect([...modelMenu(s).options].map((o) => o.textContent)).toEqual([
+      'FLUX.2 klein 4B — about 8 s a take',
+      'Z-Image-Turbo — about 1 min a take',
+    ])
+    // Closed, it shows the short name and the time.
+    expect(modelMenu(s).options[0]!.getAttribute('label')).toBe('FLUX.2 klein — about 8 s a take')
+  })
+
+  it('starts on Setup’s model when that is the other one', async () => {
+    const s = await show(view({ takes: three, projectModel: 'z-image-turbo' }))
+    expect(modelMenu(s).value).toBe('z-image-turbo')
+  })
+
+  it('makes takes with the model picked', async () => {
+    const s = await show(view({ takes: three }))
+    await pick(s, 'z-image-turbo')
+    await s.click(s.button('Make 2 more takes'))
+    expect(s.calls.at(-1)).toMatchObject({
+      url: '/api/images/inn/takes',
+      body: { count: 2, model: 'z-image-turbo' },
+    })
+  })
+
+  it('lists a model that is not here as such, and cannot be picked', async () => {
+    const s = await show(view({ takes: three, models: only('klein') }))
+    const z = modelMenu(s).options[1]!
+    expect(z.textContent).toBe('Z-Image-Turbo — about 1 min a take — not on this computer')
+    expect(z.disabled).toBe(true)
+    expect(s.text()).not.toContain("isn't on this computer")
+  })
+
+  it('starts on the model that is here when the project’s is missing, and says so', async () => {
+    const s = await show(view({ takes: three, models: only('z-image-turbo') }))
+    expect(modelMenu(s).value).toBe('z-image-turbo')
+    expect(s.text()).toContain(
+      "FLUX.2 klein, the project's image model, isn't on this computer, so these takes use Z-Image-Turbo. Setup says how to download it.",
+    )
+    await s.click(s.button('Make 2 more takes'))
+    expect(s.calls.at(-1)).toMatchObject({ body: { count: 2, model: 'z-image-turbo' } })
+  })
+
+  it('waits while takes are being made', async () => {
+    const s = await show(
+      view({ takes: three, making: [{ n: 4, state: 'making', elapsed: 1, expected: 8 }] }),
+    )
+    expect(modelMenu(s).disabled).toBe(true)
+  })
+
+  it('names the model after each take on the two sides, and not in the strip', async () => {
+    const s = await show(
+      view({
+        takes: [
+          take(2, { chosen: true, model: 'z-image-turbo' }),
+          take(3),
+          take(4, { model: 'klein' }),
+        ],
+      }),
+      { chosenTake: 2, status: 'chosen' },
+    )
+    const side = (name: string) => s.container.querySelector(`[data-side="${name}"] .take-row`)!
+    expect(side('left').textContent).toContain('Take 2')
+    expect(side('left').textContent).toContain('chosen')
+    expect(side('left').textContent).toContain('Z-Image-Turbo')
+    expect(side('right').textContent).toContain('Take 4')
+    expect(side('right').textContent).toContain('FLUX.2 klein')
+    const strip = s.container.querySelector('.image-strip, .image-thumbs') ?? s.container
+    const thumbs = [...strip.querySelectorAll('.image-thumb-label')].map((t) => t.textContent)
+    expect(thumbs.join(' ')).not.toContain('FLUX')
+  })
+
+  it('says images can’t be made yet when neither model can run, and waits', async () => {
+    const s = await show(
+      view({
+        takes: three,
+        generator: { ok: false, message: 'Neither image model is on this computer.', fix: 'x' },
+        models: [
+          { id: 'klein', installed: false },
+          { id: 'z-image-turbo', installed: false },
+        ],
+      }),
+    )
+    expect(s.text()).toContain("Images can't be made yet.")
+    expect(s.text()).toContain(
+      'Neither image model can run on this computer. Setup says what is missing.',
+    )
+    expect(s.text()).toContain('Open Setup')
+    expect(modelMenu(s).disabled).toBe(true)
+    expect(
+      s.container.querySelector<HTMLSelectElement>('select[aria-label="Number of new takes"]')!
+        .disabled,
+    ).toBe(true)
+    expect(s.button('Make 2 more takes').disabled).toBe(true)
+    expect(s.text()).not.toContain("isn't on this computer")
   })
 })

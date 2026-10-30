@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { DEFAULT_ELEVEN_MODEL, ELEVEN_TTS, isElevenModel } from './elevenSpeech'
 import { knownLanguage } from './languages'
+import { IMAGE_MODEL_IDS } from './imageModels'
 import { MUSIC_MODEL_IDS } from './musicModels'
 import { isPriced } from './prices'
 import { SOUND_ALIKE_WORD } from './soundAlikeEdit'
@@ -290,6 +291,8 @@ const imagesPath = z
 
 /** The optional `images` section: where the game lists its images and style, and the studio's own files. */
 const ImagesSchema = z.object({
+  /** The image model new takes are made with unless an image asks for the other; absent is FLUX.2 klein. */
+  model: z.enum(IMAGE_MODEL_IDS).optional(),
   paths: z.object({
     /** An act's images, written by the game. */
     list: imagesPath.refine((path) => path.includes('{part}'), {

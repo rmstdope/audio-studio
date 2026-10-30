@@ -3,6 +3,8 @@ import { setupChecks, type ElevenAnswer, type SetupCheck, type SetupFacts } from
 import { elevenLabsApiKey, fishApiKey } from './env'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS } from '../core/musicModels'
 import { missingStableAudio, STABLE_AUDIO_DIR } from './stableAudio'
+import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_IDS } from '../core/imageModels'
+import { HUB_DIR, imageModelInstalled, mfluxReady, type ImageGenerator } from './images'
 import { aceStepCheckpoints, aceStepReady } from './music'
 import { accountOf, createElevenLabsClient } from './elevenlabs'
 import type { CreditResult } from './fish'
@@ -43,6 +45,11 @@ export async function checkSetup(
   stableAudioDir: string = STABLE_AUDIO_DIR,
   account: (apiKey: string) => Promise<ElevenAnswer> = (apiKey) =>
     accountOf(createElevenLabsClient(apiKey)),
+  /** What says whether mflux can run and an image model's weights are on this computer. */
+  images: Pick<ImageGenerator, 'installed' | 'ready'> = {
+    installed: (model) => imageModelInstalled(HUB_DIR, model),
+    ready: () => mfluxReady(machine),
+  },
 ): Promise<SetupResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -77,6 +84,17 @@ export async function checkSetup(
             ({ id, family }) =>
               family === 'stable-audio' && missingStableAudio(stableAudioDir, id).length > 0,
           ).map(({ id }) => id),
+        }
+      : null,
+    images: project.images
+      ? {
+          mflux: await images.ready(),
+          model: project.images.model ?? DEFAULT_IMAGE_MODEL,
+          missing: (
+            await Promise.all(
+              IMAGE_MODEL_IDS.map(async (id) => ((await images.installed(id)) ? null : id)),
+            )
+          ).filter((id) => id !== null),
         }
       : null,
     elevenlabs: elevenAnswer,

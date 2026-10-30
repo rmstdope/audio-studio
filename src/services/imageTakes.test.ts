@@ -5,6 +5,7 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import { setImageWords } from './imageEdits'
 import { readImages } from './imageLists'
 import { createImageTakes } from './imageTakes'
+import type { ImageModelId } from '../core/imageModels'
 import type { ImageGenerator, ImageReady, ImageRequest } from './images'
 import { createSerial } from './serial'
 import { openProject } from './workspace'
@@ -22,10 +23,15 @@ const images = {
 const inn = { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 }
 
 /** A generator that makes `png-<seed>` and fails for a prompt saying "fail"; `gate` holds it back. */
-function fakeGenerator(ready: ImageReady = { ok: true }, gate?: Promise<void>) {
+function fakeGenerator(
+  ready: ImageReady = { ok: true },
+  gate?: Promise<void>,
+  here: Partial<Record<ImageModelId, boolean>> = {},
+) {
   const requests: ImageRequest[] = []
   const generator: ImageGenerator = {
     ready: () => ready,
+    installed: (model) => here[model] ?? true,
     async generate(request, signal) {
       requests.push(request)
       await gate
@@ -37,15 +43,22 @@ function fakeGenerator(ready: ImageReady = { ok: true }, gate?: Promise<void>) {
   return { generator, requests }
 }
 
-function setup(ready?: ImageReady, extra: Record<string, unknown> = {}, gate?: Promise<void>) {
+function setup(
+  ready?: ImageReady,
+  extra: Record<string, unknown> = {},
+  gate?: Promise<void>,
+  options: { here?: Partial<Record<ImageModelId, boolean>>; model?: ImageModelId } = {},
+) {
   const root = tempRepo({
-    'audio-studio.json': projectJson({ images }),
+    'audio-studio.json': projectJson({
+      images: options.model ? { ...images, model: options.model } : images,
+    }),
     'tts/act1/images.json': [inn, { ...inn, id: 'hall', title: 'Hall' }],
     'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
     ...extra,
   })
   const file = join(root, 'audio-studio.json')
-  const { generator, requests } = fakeGenerator(ready, gate)
+  const { generator, requests } = fakeGenerator(ready, gate, options.here)
   let seed = 100
   const takes = createImageTakes({
     generator,
@@ -107,8 +120,8 @@ describe('making takes', () => {
       [1, 'making'],
       [2, 'waiting'],
     ])
-    expect(view.making[0]!.expected).toBe(30)
-    expect(await takes.making(file)).toEqual({ inn: { takes: 2, left: 60 } })
+    expect(view.making[0]!.expected).toBe(8)
+    expect(await takes.making(file)).toEqual({ inn: { takes: 2, left: 16 } })
     release()
     await settled('inn')
     await takes.make(file, 'inn', { count: 1 })
@@ -159,6 +172,7 @@ describe('making takes', () => {
   it('refuses when images cannot be made here, and says what the view shows', async () => {
     const ready = {
       ok: false as const,
+      reason: 'mflux' as const,
       message: 'mflux is not on the PATH',
       fix: 'uv tool install mflux',
     }
@@ -333,5 +347,97 @@ describe('choosing', () => {
     mkdirSync(join(own.root, 'web'), { recursive: true })
     writeFileSync(join(own.root, 'web/own.png'), 'own')
     expect(await own.takes.currentFile(own.file, 'inn')).toBe(join(own.root, 'web/own.png'))
+  })
+})
+
+describe('image models', () => {
+  const viewOf = async (s: ReturnType<typeof setup>) => {
+    const view = await s.takes.view(s.file, 'inn')
+    if (!view || !('takes' in view)) throw new Error('no view')
+    return view
+  }
+
+  it('reports the project’s model and which models are here', async () => {
+    const s = setup(undefined, {}, undefined, { model: 'z-image-turbo', here: { klein: false } })
+    expect(await viewOf(s)).toMatchObject({
+      projectModel: 'z-image-turbo',
+      models: [
+        { id: 'klein', installed: false },
+        { id: 'z-image-turbo', installed: true },
+      ],
+      generator: { ok: true },
+    })
+  })
+
+  it('cannot make images only when neither model can run', async () => {
+    const none = setup(undefined, {}, undefined, {
+      here: { klein: false, 'z-image-turbo': false },
+    })
+    expect(await viewOf(none)).toMatchObject({ generator: { ok: false } })
+    const noMflux = setup({
+      ok: false,
+      reason: 'mflux',
+      message: 'mflux is not on the PATH',
+      fix: 'x',
+    })
+    expect(await viewOf(noMflux)).toMatchObject({ generator: { ok: false } })
+  })
+
+  it('makes a take with the model asked for, and records it', async () => {
+    const s = setup()
+    expect(await s.takes.make(s.file, 'inn', { count: 1, model: 'z-image-turbo' })).toEqual({
+      ok: true,
+    })
+    const view = (await s.settled('inn')) as Awaited<ReturnType<typeof viewOf>>
+    expect(s.requests[0]!.model).toBe('z-image-turbo')
+    expect(view.takes[0]!.model).toBe('z-image-turbo')
+    expect(JSON.parse(s.read('.audio-studio/images/inn.json')).takes[0].model).toBe('z-image-turbo')
+  })
+
+  it('without a model asked for, uses the project’s, else the other one that is here', async () => {
+    const main = setup(undefined, {}, undefined, { model: 'z-image-turbo' })
+    await main.takes.make(main.file, 'inn', { count: 1 })
+    await main.settled('inn')
+    expect(main.requests[0]!.model).toBe('z-image-turbo')
+    const missing = setup(undefined, {}, undefined, { here: { klein: false } })
+    await missing.takes.make(missing.file, 'inn', { count: 1 })
+    await missing.settled('inn')
+    expect(missing.requests[0]!.model).toBe('z-image-turbo')
+  })
+
+  it('refuses a model that is not on this computer, making nothing', async () => {
+    const s = setup(undefined, {}, undefined, { here: { 'z-image-turbo': false } })
+    expect(await s.takes.make(s.file, 'inn', { count: 1, model: 'z-image-turbo' })).toEqual({
+      ok: false,
+      message: 'Z-Image-Turbo is not on this computer. Setup says how to download it.',
+    })
+    expect(s.requests).toEqual([])
+  })
+
+  it('remakes a failed take with the model it was asked with', async () => {
+    const s = setup(undefined, {
+      'images/prompts.json': {
+        images: { inn: { words: 'fail now', gameWas: 'a low inn' } },
+        style: {},
+      },
+    })
+    await s.takes.make(s.file, 'inn', { count: 1, model: 'z-image-turbo' })
+    await s.settled('inn')
+    await setImageWords(s.file, 'inn', 'a low inn')
+    await s.takes.make(s.file, 'inn', { retry: 1 })
+    await s.settled('inn')
+    expect(s.requests.map((r) => r.model)).toEqual(['z-image-turbo', 'z-image-turbo'])
+  })
+
+  it('expects a take as long as its model takes', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const s = setup(undefined, {}, gate)
+    await s.takes.make(s.file, 'inn', { count: 1, model: 'z-image-turbo' })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect((await viewOf(s)).making[0]!.expected).toBe(60)
+    expect(await s.takes.making(s.file)).toEqual({ inn: { takes: 1, left: 60 } })
+    release()
+    await s.settled('inn')
   })
 })

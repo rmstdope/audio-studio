@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { ElevenAnswer } from '../core/setup'
 import type { CreditResult } from './fish'
+import { mfluxReady } from './images'
 import { checkSetup, type Machine } from './setup'
 
 const musicSection = {
@@ -107,6 +108,7 @@ describe('checkSetup', () => {
       refresh: 'off',
       music: 'off',
       stableAudio: 'off',
+      imageModels: 'off',
       elevenlabsKey: 'off',
       elevenlabs: 'off',
     })
@@ -135,6 +137,7 @@ describe('checkSetup', () => {
       refresh: 'off',
       music: 'off',
       stableAudio: 'off',
+      imageModels: 'off',
       elevenlabsKey: 'off',
       elevenlabs: 'off',
     })
@@ -257,5 +260,62 @@ describe('checkSetup, requests at once', () => {
     expect(await run()).toMatchObject({ state: 'ok' })
     await rm(join(root, 'stable/stable-audio-open-1.0'), { recursive: true })
     expect(await run('short')).toMatchObject({ state: 'problem' })
+  })
+})
+
+describe('checkSetup of the image models', () => {
+  const imagesSection = {
+    paths: {
+      list: 'tts/{part}/images.json',
+      style: 'images/style.json',
+      prompts: 'images/prompts.json',
+      lock: 'images/images.lock.json',
+      clips: 'web/images',
+      manifest: 'web/images/manifest.json',
+    },
+  }
+  const noAccount = async (): Promise<ElevenAnswer> => ({
+    ok: false,
+    reason: 'no-key',
+    message: 'no key',
+  })
+  const check = async (
+    images: Record<string, unknown> | undefined,
+    machine: Machine,
+    here: (model: string) => boolean,
+  ) => {
+    const root = tempRepo({ 'audio-studio.json': projectJson(images ? { images } : {}) })
+    const result = await checkSetup(
+      join(root, 'audio-studio.json'),
+      credit,
+      machine,
+      {},
+      undefined,
+      noAccount,
+      { installed: here, ready: () => mfluxReady(machine) },
+    )
+    if (!result.ok) throw new Error('expected checks')
+    return result.checks.find((c) => c.id === 'imageModels')!
+  }
+
+  it('finds which models are missing and whether mflux can run', async () => {
+    expect(await check(imagesSection, mac, () => true)).toMatchObject({ state: 'ok' })
+    expect(await check(imagesSection, mac, (m) => m === 'klein')).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+    })
+    expect(
+      await check({ ...imagesSection, model: 'z-image-turbo' }, mac, (m) => m === 'klein'),
+    ).toMatchObject({
+      state: 'problem',
+    })
+    expect(await check(imagesSection, { ...mac, which: () => false }, () => true)).toMatchObject({
+      state: 'problem',
+      detail: "Images can't be made: mflux, which runs the image models, is not installed.",
+    })
+  })
+
+  it('is not used without an images section', async () => {
+    expect(await check(undefined, mac, () => true)).toMatchObject({ label: 'Not used' })
   })
 })

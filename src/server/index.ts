@@ -68,6 +68,7 @@ import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/
 import {
   setElevenModel,
   setElevenSettings,
+  setImageModel,
   setMusicModel,
   setStageModel,
   switchRetiredModels,
@@ -462,11 +463,10 @@ export function startServer({
   elevenlabs,
   images,
 }: ServerOptions) {
-  const imageTakes = createImageTakes({
-    generator:
-      images ??
-      (process.env.AUDIO_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator()),
-  })
+  const imageGenerator =
+    images ??
+    (process.env.AUDIO_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator())
+  const imageTakes = createImageTakes({ generator: imageGenerator })
   const musicGenerator = music ?? sharedMusic(projectFile)
   const musicTakes = createMusicTakes({
     generator: musicGenerator,
@@ -1723,6 +1723,7 @@ export function startServer({
               undefined,
               undefined,
               elevenAccountOf,
+              imageGenerator,
             ),
           ),
         ),
@@ -1783,7 +1784,7 @@ export function startServer({
       },
       '/api/models': {
         GET: guard(async () => {
-          const view = await modelsView(projectFile, musicGenerator.installed)
+          const view = await modelsView(projectFile, musicGenerator.installed, imageGenerator)
           return Response.json(view.ok ? { ...view, busy: await busyNow() } : view)
         }),
         PATCH: fromOwnPage(async (request) => {
@@ -1802,6 +1803,16 @@ export function startServer({
             return Response.json({ error: 'expected { model, was }' }, { status: 400 })
           }
           const result = await setMusicModel(projectFile, body.data.model, body.data.was)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/image-model': {
+        PUT: fromOwnPage(async (request) => {
+          const body = StageModelBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { model, was }' }, { status: 400 })
+          }
+          const result = await setImageModel(projectFile, body.data.model, body.data.was)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

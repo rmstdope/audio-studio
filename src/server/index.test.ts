@@ -269,6 +269,7 @@ describe('server', () => {
       'refresh',
       'music',
       'stableAudio',
+      'imageModels',
       'elevenlabsKey',
       'elevenlabs',
     ])
@@ -5126,6 +5127,7 @@ describe('the image takes routes', () => {
     transcriber: null,
     images: {
       ready: () => ({ ok: true }),
+      installed: () => true,
       generate: async (request) => ({
         png: new TextEncoder().encode(`png-${request.seed}`),
         seed: request.seed,
@@ -5200,5 +5202,85 @@ describe('the image takes routes', () => {
     expect((await send('POST', '/api/images/inn/choose', { n: 'x' })).status).toBe(400)
     expect((await send('POST', '/api/images/ghost/takes', { count: 1 })).status).toBe(404)
     expect((await fetch(new URL('/api/images/ghost/takes', studio.url))).status).toBe(404)
+  })
+})
+
+describe('the image model routes', () => {
+  const root = tempRepo({
+    'audio-studio.json': projectJson({
+      images: {
+        paths: {
+          list: 'tts/{part}/images.json',
+          style: 'images/style.json',
+          prompts: 'images/prompts.json',
+          lock: 'images/images.lock.json',
+          clips: 'web/images',
+          manifest: 'web/images/manifest.json',
+        },
+      },
+    }),
+    'tts/act1/images.json': [
+      { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 },
+    ],
+    'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+  })
+  const asked: string[] = []
+  const studio = startServer({
+    projectFile: join(root, 'audio-studio.json'),
+    port: 0,
+    transcriber: null,
+    images: {
+      ready: () => ({ ok: true }),
+      installed: (model) => model !== 'klein',
+      generate: async (request) => {
+        asked.push(request.model)
+        return { png: new TextEncoder().encode('png'), seed: request.seed }
+      },
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const at = (path: string) => new URL(path, studio.url)
+  const send = (method: string, path: string, body: unknown, origin = studio.url.origin) =>
+    fetch(at(path), {
+      method,
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('shows the main image model, which models are here, and what Setup says', async () => {
+    const view = await (await fetch(at('/api/models'))).json()
+    expect(view.images).toEqual({
+      model: 'klein',
+      installed: { klein: false, 'z-image-turbo': true },
+    })
+    const setup = await (await fetch(at('/api/setup'))).json()
+    expect(setup.checks.find((c: { id: string }) => c.id === 'imageModels')).toMatchObject({
+      state: 'problem',
+    })
+  })
+
+  it('makes takes with the model asked for, and starts an image on the one that is here', async () => {
+    expect((await send('POST', '/api/images/inn/takes', { count: 1, model: 'klein' })).status).toBe(
+      409,
+    )
+    expect((await send('POST', '/api/images/inn/takes', { count: 1, model: 'huge' })).status).toBe(
+      400,
+    )
+    expect((await send('POST', '/api/images/inn/takes', { count: 1 })).status).toBe(200)
+    for (let i = 0; i < 200 && !asked.length; i++) await new Promise((r) => setTimeout(r, 5))
+    expect(asked).toEqual(['z-image-turbo'])
+    const takes = await (await fetch(at('/api/images/inn/takes'))).json()
+    expect(takes).toMatchObject({ projectModel: 'klein' })
+  })
+
+  it('saves the main model from its own page only, and the page then shows it', async () => {
+    const body = { model: 'z-image-turbo', was: 'klein' }
+    expect((await send('PUT', '/api/image-model', body, 'http://evil.test')).status).toBe(403)
+    expect((await send('PUT', '/api/image-model', { model: 'klein' })).status).toBe(400)
+    const saved = await send('PUT', '/api/image-model', body)
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await send('PUT', '/api/image-model', body)).status).toBe(409)
+    const view = await (await fetch(at('/api/models'))).json()
+    expect(view.images.model).toBe('z-image-turbo')
   })
 })

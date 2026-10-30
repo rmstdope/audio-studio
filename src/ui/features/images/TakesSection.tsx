@@ -9,6 +9,14 @@ import {
 } from '../../../core/imageTakes'
 import type { ImageRow } from '../../../core/images'
 import {
+  IMAGE_MODEL_IDS,
+  defaultTakeModel,
+  imageMenuEntry,
+  imageModel,
+  imageShortEntry,
+  type ImageModelId,
+} from '../../../core/imageModels'
+import {
   useChooseImageTake,
   useDropImageTake,
   useImageTakes,
@@ -18,6 +26,7 @@ import {
   useUnchooseImageTake,
 } from '../../api'
 import { Confirm } from '../../components/Confirm'
+import { openTracking } from '../../components/openTracking'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { makeTakesText, takeCountText, unchooseNote } from '../../imagesText'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
@@ -95,6 +104,8 @@ export function TakesSection({ row }: { row: ImageRow }) {
   const [right, setRight] = useState<number | null>(null)
   const [wasChosen, setWasChosen] = useState<number | null>(null)
   const [count, setCount] = useState(2)
+  const [picked, setPicked] = useState<ImageModelId | null>(null)
+  const [modelOpen, setModelOpen] = useState(false)
   const [asking, setAsking] = useState(false)
   const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
   const asked = useRef(new Set<number>())
@@ -146,6 +157,14 @@ export function TakesSection({ row }: { row: ImageRow }) {
   if (!ready) return <section className="panel">The takes could not be listed.</section>
 
   const { generator, takes, making, failed, lockUnread } = ready
+  const installed = Object.fromEntries(ready.models.map((m) => [m.id, m.installed])) as Record<
+    ImageModelId,
+    boolean
+  >
+  const fallback = defaultTakeModel(ready.projectModel, installed)
+  // A pick that has since gone missing falls back; the pick is this page's and is never saved.
+  const model = picked && installed[picked] ? picked : fallback
+  const otherInUse = fallback !== ready.projectModel
   const chosen = takes.find((t) => t.chosen)
   const rightTake = takes.find((t) => t.n === onRight)
   const none = takes.length === 0 && making.length === 0
@@ -201,6 +220,29 @@ export function TakesSection({ row }: { row: ImageRow }) {
   const controls = (
     <>
       <select
+        className="takes-model"
+        aria-label="Model for new takes"
+        value={model}
+        disabled={busy || make.isPending || !generator.ok}
+        onChange={(event) => {
+          setPicked(event.target.value as ImageModelId)
+          setModelOpen(false)
+        }}
+        {...openTracking(setModelOpen)}
+      >
+        {IMAGE_MODEL_IDS.map((id) => (
+          // The closed menu shows the label; the open list shows each entry in full.
+          <option
+            key={id}
+            value={id}
+            label={id === model && !modelOpen ? imageShortEntry(id) : undefined}
+            disabled={!installed[id]}
+          >
+            {imageMenuEntry(id, installed[id])}
+          </option>
+        ))}
+      </select>
+      <select
         className="takes-count"
         aria-label="Number of new takes"
         value={count}
@@ -218,7 +260,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
         className="btn btn-primary"
         disabled={!canMake}
         onClick={() => {
-          make.mutate({ count })
+          make.mutate({ count, model })
           setCount(2)
         }}
       >
@@ -237,7 +279,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
           <div className="errbox-text">
             <strong>Images can&apos;t be made yet.</strong>
             <span className="muted small">
-              The image model is not installed. Setup says what is missing.
+              Neither image model can run on this computer. Setup says what is missing.
             </span>
           </div>
           <a className="btn" href={routeHref({ view: 'setup' })}>
@@ -280,6 +322,13 @@ export function TakesSection({ row }: { row: ImageRow }) {
             </div>
           )}
         </div>
+        {otherInUse && generator.ok && (
+          <span className="takes-missing small" role="status">
+            {imageModel(ready.projectModel).short}, the project&apos;s image model, isn&apos;t on
+            this computer, so these takes use {imageModel(fallback).short}. Setup says how to
+            download it.
+          </span>
+        )}
         {lockUnread && !none && (
           <span className="takes-missing small">
             Choosing, dropping and un-choosing wait until the images lock can be read. You can still
@@ -347,6 +396,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
               {rightTake ? (
                 <>
                   <b>Take {rightTake.n}</b>
+                  <ModelName id={rightTake.model} />
                   {rightTake.earlier && <span className="faint small">earlier words</span>}
                   <span className="grow" />
                   <button
@@ -446,6 +496,11 @@ export function TakesSection({ row }: { row: ImageRow }) {
   )
 }
 
+/** The model that made a take, in faint text after its name; nothing for a model the studio does not know. */
+function ModelName({ id }: { id: ImageModelId | null }) {
+  return id ? <span className="faint small">{imageModel(id).short}</span> : null
+}
+
 /** The left side: the chosen take, the game's own image, or nothing. */
 function LeftSide({
   row,
@@ -480,6 +535,7 @@ function LeftSide({
           {label}
           <b>Take {chosen.n}</b>
           <span className="chip chip-ok">chosen</span>
+          <ModelName id={chosen.model} />
           <span className="grow" />
           <button
             type="button"

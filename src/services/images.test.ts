@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createGpuWorkers, GPU } from './gpu'
 import {
   createMfluxGenerator,
+  hubDirOf,
+  imageModelInstalled,
   makeImageTake,
   mfluxArguments,
   mfluxReady,
@@ -49,6 +53,67 @@ describe('mfluxReady', () => {
       ok: false,
       message: expect.stringContaining('mflux'),
     })
+  })
+})
+
+describe('imageModelInstalled', () => {
+  const hub = () => mkdtempSync(join(tmpdir(), 'hub-'))
+  const download = (dir: string, folder: string, files = ['model.safetensors']) => {
+    const snapshot = join(dir, folder, 'snapshots', 'abc')
+    mkdirSync(snapshot, { recursive: true })
+    for (const file of files) writeFileSync(join(snapshot, file), '{}')
+  }
+
+  it('finds a model by its Hugging Face folder, with a snapshot in it', () => {
+    const dir = hub()
+    expect(imageModelInstalled(dir, 'klein')).toBe(false)
+    download(dir, 'models--black-forest-labs--FLUX.2-klein-4B')
+    expect(imageModelInstalled(dir, 'klein')).toBe(true)
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
+  })
+
+  it('does not count a folder with no snapshot (a download that never finished)', () => {
+    const dir = hub()
+    mkdirSync(join(dir, 'models--Tongyi-MAI--Z-Image-Turbo', 'blobs'), { recursive: true })
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
+    download(dir, 'models--Tongyi-MAI--Z-Image-Turbo', [])
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
+  })
+
+  it('does not count a download stopped after its configs, and finds weights in a subfolder', () => {
+    const dir = hub()
+    download(dir, 'models--Tongyi-MAI--Z-Image-Turbo', ['model_index.json'])
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
+    const sub = join(dir, 'models--Tongyi-MAI--Z-Image-Turbo', 'snapshots', 'abc', 'transformer')
+    mkdirSync(sub)
+    writeFileSync(join(sub, 'part-1.safetensors'), 'x')
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(true)
+  })
+
+  it('is not thrown by a file among the snapshots, such as .DS_Store', () => {
+    const dir = hub()
+    download(dir, 'models--black-forest-labs--FLUX.2-klein-4B')
+    writeFileSync(
+      join(dir, 'models--black-forest-labs--FLUX.2-klein-4B', 'snapshots', '.DS_Store'),
+      'x',
+    )
+    expect(imageModelInstalled(dir, 'klein')).toBe(true)
+    writeFileSync(join(dir, 'models--Tongyi-MAI--Z-Image-Turbo'), 'not a folder')
+    expect(imageModelInstalled(dir, 'z-image-turbo')).toBe(false)
+  })
+
+  it('looks where Hugging Face keeps its downloads', () => {
+    expect(hubDirOf({ HF_HUB_CACHE: '/a' }, '/home/me')).toBe('/a')
+    expect(hubDirOf({ HF_HOME: '/b' }, '/home/me')).toBe('/b/hub')
+    expect(hubDirOf({}, '/home/me')).toBe('/home/me/.cache/huggingface/hub')
+  })
+
+  it('is what the generator answers for installed', () => {
+    const dir = hub()
+    download(dir, 'models--black-forest-labs--FLUX.2-klein-4B')
+    const generator = createMfluxGenerator({ hubDir: dir })
+    expect(generator.installed('klein')).toBe(true)
+    expect(generator.installed('z-image-turbo')).toBe(false)
   })
 })
 
@@ -118,6 +183,7 @@ describe('makeImageTake turn', () => {
     const queue = createSerial()
     const generator: ImageGenerator = {
       ready: () => ({ ok: true }),
+      installed: () => true,
       generate: async (r) => ({ png: new Uint8Array(), seed: r.seed }),
     }
     const turns: string[] = []
@@ -155,6 +221,7 @@ describe('makeImageTake', () => {
     workers.add(() => void log.push('free'))
     const generator: ImageGenerator = {
       ready: () => ({ ok: true }),
+      installed: () => true,
       generate: async (r) => {
         await job('image')()
         return { png: new Uint8Array(), seed: r.seed }
@@ -181,6 +248,7 @@ describe('makeImageTake', () => {
     const log: string[] = []
     const generator: ImageGenerator = {
       ready: () => ({ ok: true }),
+      installed: () => true,
       generate: async (r) => {
         log.push('generate')
         return { png: new Uint8Array(), seed: r.seed }
@@ -205,6 +273,7 @@ describe('makeImageTake', () => {
     const log: string[] = []
     const generator: ImageGenerator = {
       ready: () => ({ ok: true }),
+      installed: () => true,
       generate: async (r) => {
         log.push('generate')
         return { png: new Uint8Array(), seed: r.seed }
@@ -227,6 +296,7 @@ describe('makeImageTake', () => {
     const log: string[] = []
     const generator: ImageGenerator = {
       ready: () => ({ ok: true }),
+      installed: () => true,
       generate: async () => ({ png: new Uint8Array(), seed: 1 }),
     }
     await expect(

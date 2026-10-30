@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ChosenEntrySchema, type MadeFrom } from './images'
-import { MAX_IMAGE_SIDE } from './imageModels'
+import { IMAGE_MODEL_IDS, MAX_IMAGE_SIDE, type ImageModelId } from './imageModels'
 
 /** The longer side of a take as the model makes it, in pixels. */
 const TAKE_LONG_SIDE = 1024
@@ -57,9 +57,15 @@ export function takeIsEarlier(made: MadeFrom, wordsNow: string): boolean {
   return made.words !== wordsNow
 }
 
-/** The body of asking for takes: this many new ones (1 to 4), or the failed take with this number again. */
+/**
+ * The body of asking for takes: this many new ones (1 to 4), with the model to make them with
+ * (the project's, else the one that is here, when it is left out), or the failed take with this
+ * number again.
+ */
 export const MakeImageTakesBody = z.union([
-  z.object({ count: z.number().int().min(1).max(4) }).strict(),
+  z
+    .object({ count: z.number().int().min(1).max(4), model: z.enum(IMAGE_MODEL_IDS).optional() })
+    .strict(),
   z.object({ retry: z.number().int().positive() }).strict(),
 ])
 
@@ -71,6 +77,8 @@ export interface ImageTakeView {
   n: number
   width: number
   height: number
+  /** The model that made it; null for a name the studio does not know. */
+  model: ImageModelId | null
   /** Made from words that have since changed. */
   earlier: boolean
   /** The game uses it. */
@@ -102,6 +110,10 @@ export type ImageGeneratorView = { ok: true } | { ok: false; message: string; fi
 export interface ImageTakesView {
   ok: true
   generator: ImageGeneratorView
+  /** The project's main image model (Setup's). */
+  projectModel: ImageModelId
+  /** Every image model, and whether this computer has its weights. */
+  models: { id: ImageModelId; installed: boolean }[]
   takes: ImageTakeView[]
   making: ImageMakingView[]
   failed: ImageFailedView[]
