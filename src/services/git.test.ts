@@ -16,7 +16,7 @@ function git(cwd: string, ...args: string[]) {
 }
 
 const files = {
-  'audio-studio.json': projectJson(),
+  'content-studio.json': projectJson(),
   'tts/cast.json': { speakers: {}, pronounce: {} },
   'tts/act1/script.json': [{ key: 'a', speaker: 'mira', text: 'Hi.' }],
   'audio/act1/a.mp3': 'clip',
@@ -35,7 +35,7 @@ describe('gitChanges', () => {
     rmSync(join(root, 'audio/act1/a.mp3'))
     writeFileSync(join(root, 'notes.txt'), 'changed, but not the studio’s')
 
-    const result = await gitChanges(join(root, 'audio-studio.json'))
+    const result = await gitChanges(join(root, 'content-studio.json'))
     if (!result?.ok) throw new Error(JSON.stringify(result))
     expect(result.groups.total).toBe(4)
     expect(result.groups.project).toEqual([{ path: 'tts/cast.json', change: 'modified' }])
@@ -52,7 +52,7 @@ describe('gitChanges', () => {
   it('lists the music files and clips that changed', async () => {
     const root = tempRepo({
       ...files,
-      'audio-studio.json': projectJson({
+      'content-studio.json': projectJson({
         music: {
           paths: {
             loops: 'tts/{part}/music.json',
@@ -71,7 +71,7 @@ describe('gitChanges', () => {
     mkdirSync(join(root, 'web/music'), { recursive: true })
     writeFileSync(join(root, 'web/music/a.mp3'), 'music')
     writeFileSync(join(root, 'web/music/manifest.json'), '{}')
-    const result = await gitChanges(join(root, 'audio-studio.json'))
+    const result = await gitChanges(join(root, 'content-studio.json'))
     if (!result?.ok) throw new Error(JSON.stringify(result))
     expect(result.groups.total).toBe(2)
     expect(result.groups.music?.files).toEqual([
@@ -83,7 +83,7 @@ describe('gitChanges', () => {
   it('lists the images files that changed', async () => {
     const root = tempRepo({
       ...files,
-      'audio-studio.json': projectJson({
+      'content-studio.json': projectJson({
         images: {
           paths: {
             list: 'tts/{part}/images.json',
@@ -102,7 +102,7 @@ describe('gitChanges', () => {
     mkdirSync(join(root, 'images'), { recursive: true })
     writeFileSync(join(root, 'images/prompts.json'), '{}')
     writeFileSync(join(root, 'tts/act1/images.json'), '[]')
-    const result = await gitChanges(join(root, 'audio-studio.json'))
+    const result = await gitChanges(join(root, 'content-studio.json'))
     if (!result?.ok) throw new Error(JSON.stringify(result))
     expect(result.groups.images?.files.map((f) => [f.path, f.role]).sort()).toEqual([
       ['images/prompts.json', 'words'],
@@ -122,21 +122,24 @@ describe('gitChanges', () => {
       )
     }
     git(top, 'init', '-q')
-    const result = await gitChanges(join(root, 'audio-studio.json'))
+    const result = await gitChanges(join(root, 'content-studio.json'))
     if (!result?.ok) throw new Error(JSON.stringify(result))
-    expect(result.groups.project.map((c) => c.path)).toEqual(['audio-studio.json', 'tts/cast.json'])
+    expect(result.groups.project.map((c) => c.path)).toEqual([
+      'content-studio.json',
+      'tts/cast.json',
+    ])
   })
 
   it('says when git cannot be run, rather than that there is no repository', async () => {
     const root = tempRepo(files)
     expect(
-      await gitChanges(join(root, 'audio-studio.json'), { git: 'no-such-git-xyz' }),
+      await gitChanges(join(root, 'content-studio.json'), { git: 'no-such-git-xyz' }),
     ).toMatchObject({ ok: false, reason: 'git', message: expect.stringContaining('git') })
   })
 
   it('says when the project is not in a git repository', async () => {
     const root = tempRepo(files)
-    expect(await gitChanges(join(root, 'audio-studio.json'))).toMatchObject({
+    expect(await gitChanges(join(root, 'content-studio.json'))).toMatchObject({
       ok: false,
       reason: 'no-git',
     })

@@ -17,7 +17,7 @@ const cast = JSON.parse(readFileSync(castFile, 'utf8')) as {
 cast.speakers.narrator!.voice = 42
 writeFileSync(castFile, JSON.stringify(cast, null, 2))
 const server = startServer({
-  projectFile: join(root, 'audio-studio.json'),
+  projectFile: join(root, 'content-studio.json'),
   port: 0,
   fish: null,
   transcriber: null,

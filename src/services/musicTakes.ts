@@ -46,10 +46,10 @@ import { openProject, type ProjectFailure } from './workspace'
 const CLOUD = 'music-cloud'
 
 /** Where a project's music takes are cached, one folder per track. */
-export const MUSIC_TAKES_DIR = '.audio-studio/music-takes'
+export const MUSIC_TAKES_DIR = '.content-studio/music-takes'
 
 /** Where a track's board is saved: one file per track (a track id is a safe file name). */
-export const MUSIC_BOARD_DIR = '.audio-studio/music'
+export const MUSIC_BOARD_DIR = '.content-studio/music'
 
 /** A track id that is safe as a file and folder name (the game's list is validated too; this guards the board's path on its own). */
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
@@ -84,8 +84,8 @@ export type TakesResult = MusicTakesView | ProjectFailure | null
 
 /** Changes to one track's board, one after another, keyed `<project file>\0<track id>`. */
 export function boardQueue(): Serial {
-  const shared = globalThis as { audioStudioBoardQueue?: Serial }
-  return (shared.audioStudioBoardQueue ??= createSerial())
+  const shared = globalThis as { contentStudioBoardQueue?: Serial }
+  return (shared.contentStudioBoardQueue ??= createSerial())
 }
 
 /** Whether a track id is safe as the name of its board and takes folder. */
@@ -184,8 +184,8 @@ const fileOf = (take: Pick<BoardTake, 'hash' | 'n'>) => `${take.hash}.${take.n}.
 /**
  * The takes of the game's music: made by `generator` on the GPU `queue` (shared with Whisper),
  * shaped to what the game would play, and kept on a board per track in
- * `.audio-studio/music/<track>.json` (each take with its seed, waveform and the inputs it was made
- * from), its WAV in `.audio-studio/music-takes/<track>/<hash>.<n>.wav`. Takes waiting, being made
+ * `.content-studio/music/<track>.json` (each take with its seed, waveform and the inputs it was made
+ * from), its WAV in `.content-studio/music-takes/<track>/<hash>.<n>.wav`. Takes waiting, being made
  * and failed are kept in memory, per track, for the page to poll (they survive a `--dev` reload,
  * not a restart); a take made is a file and a board entry.
  */
@@ -210,8 +210,8 @@ export function createMusicTakes({
   spent?: (projectFile: string, take: MusicSpend) => void | Promise<void>
 }): MusicTakes {
   // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
-  const shared = globalThis as { audioStudioMakingTakes?: Map<string, Map<number, Entry>> }
-  const active = (shared.audioStudioMakingTakes ??= new Map())
+  const shared = globalThis as { contentStudioMakingTakes?: Map<string, Map<number, Entry>> }
+  const active = (shared.contentStudioMakingTakes ??= new Map())
   // Changes to one track's board, one after another: a take finishing and a drop lose neither.
   const boards = boardQueue()
 
@@ -354,7 +354,7 @@ export function createMusicTakes({
             outcome,
           })
         } catch (error) {
-          console.error('Audio Studio: could not save what a music take cost:', error)
+          console.error('Content Studio: could not save what a music take cost:', error)
         }
       }
     }

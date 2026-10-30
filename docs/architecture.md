@@ -1,6 +1,6 @@
-# Audio Studio — Architecture
+# Content Studio — Architecture
 
-Audio Studio is a local, graphical tool for producing a game's audio. It is started from inside a
+Content Studio is a local, graphical tool for producing a game's audio. It is started from inside a
 checked-out game repository (the _consumer_), reads that repository's project file, and writes
 voice files and their metadata **in place**. Committing and pushing is left to the user.
 
@@ -19,7 +19,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 
 **Goals**
 
-- One command, run from the consumer repo root, opens the studio: `audio-studio`.
+- One command, run from the consumer repo root, opens the studio: `content-studio`.
 - Everything the tool needs to know about the game is in one project file in the consumer repo.
 - Work on one _part_ (RetroQuest: an act) at a time.
 - A character is identified by its name across the whole project: the same name in different
@@ -46,10 +46,10 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 ## 2. How it runs
 
 ```
-retroquest/                      ← user runs `audio-studio` here
-├── audio-studio.json            ← project file (committed)
+retroquest/                      ← user runs `content-studio` here
+├── content-studio.json          ← project file (committed)
 ├── .env                         ← FISH_AUDIO_API_KEY (gitignored, already exists)
-├── .audio-studio/               ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard
+├── .content-studio/             ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard
 ├── tts/cast.json                ← character resource, shared by all parts (read + written)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
@@ -69,8 +69,12 @@ retroquest/                      ← user runs `audio-studio` here
         └── manifest.json        ← track → file, duration (written; planned)
 ```
 
-1. `audio-studio` walks up from the current directory to find `audio-studio.json`. That directory
+1. `content-studio` walks up from the current directory to find `content-studio.json`. That directory
    becomes the **project root**; every path in the project file is relative to it.
+   A game still on the studio's old names (Audio Studio, renamed Content Studio in as-yag.6) is not
+   opened: the walk also looks for `audio-studio.json`, and the project folder for `.audio-studio/`,
+   and `content-studio` prints the renames left (`core/renames.ts`, `locateProject` in
+   `services/workspace.ts`) and exits before any server starts. The old names are never read.
 2. It validates the project file and every resource it points to, then starts a Bun HTTP server on
    `127.0.0.1` (random free port, or `--port`) and opens the browser on it.
 3. The UI talks to the server over a small JSON API, and gets live job progress over a WebSocket.
@@ -116,7 +120,7 @@ A native window (Electrobun) can wrap the same web UI later; nothing in the desi
 
 ```
 audio-studio/
-├── bin/audio-studio.ts          CLI entry: find project, start server, open browser
+├── bin/content-studio.ts     CLI entry: find project, start server, open browser
 ├── src/
 │   ├── core/                    pure logic, no I/O; most of the tests
 │   │   ├── project.ts           project file schema, path templates ({part})
@@ -155,7 +159,7 @@ audio-studio/
 │   │   ├── auditions.ts         candidates and the cast voice of a character; cast changes, in turn
 │   │   ├── sessions.ts          audition sessions in progress, saved in the tool's cache
 │   │   ├── ruledOut.ts          ruled-out voices per character, saved in the tool's cache
-│   │   ├── spending.ts          the record of paid recordings (.audio-studio/spending.json) and the running ones
+│   │   ├── spending.ts          the record of paid recordings (.content-studio/spending.json) and the running ones
 │   │   ├── soundAlike.ts        the project's sound-alike groups, saved in the project file
 │   │   ├── models.ts            s1 → s2.1-pro, and a stage's model, in the project file's `narration.models`
 │   │   ├── modelsView.ts        the whole dialog's size and what recorded clips were made with, for the Models panel
@@ -196,7 +200,7 @@ audio, network or disk.
 
 ## 5. The project file
 
-`audio-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
+`content-studio.json` in the consumer repo root. Path templates use `{part}`, so a part only needs
 an id and a title.
 
 ```json
@@ -415,13 +419,13 @@ the line again writes a new entry without it.
 
 The lock is a separate file so the manifest format the game depends on stays exactly as it is.
 
-**Cache** (`.audio-studio/`, gitignored): the tool's own state, none of it the game's: audition
+**Cache** (`.content-studio/`, gitignored): the tool's own state, none of it the game's: audition
 takes, audition sessions in progress, the voices ruled out per character, a line's extra takes
-(`.audio-studio/line-takes/<part>-<hash>/<key>/<id>.wav` and `.json`: the audio as Fish sent it,
+(`.content-studio/line-takes/<part>-<hash>/<key>/<id>.wav` and `.json`: the audio as Fish sent it,
 joined, and what Whisper made of it), the user's notes on
-lines (`.audio-studio/notes/<part>-<hash>.json`: "too fast", "retake after the rewrite"; on this
+lines (`.content-studio/notes/<part>-<hash>.json`: "too fast", "retake after the rewrite"; on this
 machine only, so a teammate does not see them), and what Whisper heard
-of each kept take heard below full (`.audio-studio/heard/<part>-<hash>.json`: per line, the lock
+of each kept take heard below full (`.content-studio/heard/<part>-<hash>.json`: per line, the lock
 entry's time, the text it was checked against, Whisper's words and the shown words it missed). Deleting it loses nothing the game
 needs; it forgets paused auditions, ruled-out voices, notes and what was heard. Notes, what was
 heard and a line's extra takes are kept per language: the source language's under the part's own
@@ -543,9 +547,9 @@ credit while Fish works), asks Fish, and charges nothing when it refuses. With n
 the page starts one afterwards (a paid audition model's own box follows).
 Fish makes no voice on the account from a design, only audio, so a design has no Fish id until it
 is cast. The studio gives each a local id `design-<12 hex>` and keeps them per character in
-`.audio-studio/designs/<character>-<hash>.json` (one per language in a project with several, named as the audition's and ruled-out files are; `core/designs.ts`: the voices with their number
+`.content-studio/designs/<character>-<hash>.json` (one per language in a project with several, named as the audition's and ruled-out files are; `core/designs.ts`: the voices with their number
 "Design n", the description, when they were asked for, how many were ever made, and the last
-description sent); the preview is encoded to MP3 into `.audio-studio/takes/` under a key made from
+description sent); the preview is encoded to MP3 into `.content-studio/takes/` under a key made from
 the id, so it plays as the voice's take (a design is never recorded on a paid model). The session
 only references them (`designed`, a place like `yours`; `setDesigned` refreshes it from the store
 when an audition starts or a design is made), so a design never cast is back on the next audition
@@ -629,8 +633,8 @@ An audition is for a character, not for a part: the result applies to every part
 - **Phrase**: the project's standard phrase, the character's own phrase, or any of their lines
   picked from the script of any part ("hear it say something it will actually say").
 - Both belong to the tool, not the game, so they live in the gitignored cache: audition sessions
-  in `.audio-studio/auditions/<character>-<hash>.json` and ruled-out voices in
-  `.audio-studio/ruled-out/<character>-<hash>.json` (each voice's id, title and when it was
+  in `.content-studio/auditions/<character>-<hash>.json` and ruled-out voices in
+  `.content-studio/ruled-out/<character>-<hash>.json` (each voice's id, title and when it was
   dropped, so the page names them without asking Fish). A readable name plus a short hash of the
   id makes any character name a safe file name. The cast is only changed on **Cast**.
 
@@ -714,7 +718,7 @@ An audition is for a character, not for a part: the result applies to every part
 - Hear a cue before saving it (built: **Hear it** while editing a line's cue): the speaker's cast
   voice says the line after the cue as typed (empty: the character's style), as the cast says it.
   It is a take, not a clip: recorded with the free model (whatever the audition model is), the whole line in one
-  request (Fish splits long text itself), kept in `.audio-studio/takes/` under the take key, so
+  request (Fish splits long text itself), kept in `.content-studio/takes/` under the take key, so
   the same cue on the same line is recorded once; nothing of the game's is written. The clip
   recorded afterwards uses the draft model, chunked and checked, so it can sound a little
   different.
@@ -787,7 +791,7 @@ An audition is for a character, not for a part: the result applies to every part
 - **Spending** page (built): what paid recordings (and, with ElevenLabs, music takes) cost,
   project-wide and read only. Every
   recording made with a paid model (a whole part's, draft or final, or one line's record or extra
-  take) is added to `.audio-studio/spending.json` when it ends: when it started, part, language
+  take) is added to `.content-studio/spending.json` when it ends: when it started, part, language
   (the source language, as recording is), model, lines recorded out of lines planned, how it ended
   (done, stopped, or a failed line), and the dollars charged to its budget (`Budget.spent`: the
   studio's own price estimate as each line was sent, not Fish's bill). A recording that cost
@@ -937,7 +941,7 @@ the board is what the game will play:
   fanfare asked for at 10 seconds ends after about 6).
 
 The numbers are fixed in `core/musicTake.ts` and its tests (built, 12.4). A take is cached in
-`.audio-studio/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (brief, kind,
+`.content-studio/music-takes/<track>/<hash>.<n>.wav` by a hash of its inputs (brief, kind,
 seconds, bpm, key; the hash still begins with Balanced's recipe, so choosing a model never changes it) and a take number counted from 1 per hash, with `<hash>.<n>.json` beside it
 (seed, length, waveform bars). The same seed does not make the same take again on the Mac, so the cache keeps the take
 itself; the seed is kept with it, in the board and the lock, to say where it came from (absent from
@@ -956,7 +960,7 @@ takes as cards: The count menu ("Number of new takes", between the model menu an
 the page can be left meanwhile; **Drop** removes one (not the chosen one); **Choose** writes one at
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
-`.audio-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed?,
+`.content-studio/music/<track>.json` (a track id is a safe file name): `{ next, takes: [{ n, hash, seed?,
 seconds, peaks, inputs, model }] }` (`model` is the recipe of the music model that made the take, which Choose records in the lock; a board without it is read as Balanced, the only model there was), the take's WAV beside the others in `music-takes/<track>/`. Take
 numbers are per track and never reused (`next` is reserved when takes are asked for), and a take
 is on the board only once its WAV is written. The cache no longer keeps a sidecar file per take. A dropped take is just gone:
@@ -1216,7 +1220,7 @@ only, the fingerprint needs no provider of its own.
   meters stay at the top of the board as it scrolls; the bar, much taller, scrolls away with the
   voices, so it never hides a card's title. A resume asks for them again the same way.
 
-**Spending** (built in 14.7d). The log (`.audio-studio/spending.json`) moves to version 2 when it
+**Spending** (built in 14.7d). The log (`.content-studio/spending.json`) moves to version 2 when it
 first needs to, with its first ElevenLabs credits or music take (`needsVersion2`), so a Fish-only
 project's log stays version 1 and readable by an older studio (which cannot read a version 2 log,
 and then logs nothing of its own). In version 2 a recording's row keeps its Fish dollars (`cost`)
@@ -1259,7 +1263,7 @@ and the cast names the id ElevenLabs gave it. A voice the user had added already
 added it, when it is the id it became; once added, the board marks it so and no longer says a take
 or cast will add it. When ElevenLabs
 will not add one, its take fails with ElevenLabs' answer and its credits are given back, or it is
-not cast. The studio remembers which voices it added (`.audio-studio/eleven-voices.json`: the
+not cast. The studio remembers which voices it added (`.content-studio/eleven-voices.json`: the
 library id, the id on the account, its name, the character and when), so each is added once. **Voice slots** (built in 14.11b): below Bring in more, once a library
 voice is on the board or ElevenLabs' library is chosen, the board says how many of the plan's
 slots are used (from the subscription's `voice_limit` and `voice_slots_used`). A voice the studio
@@ -1399,7 +1403,7 @@ are ignored). An image is out of date when what a new take would be made from di
 words changes nothing the prompt uses, so it does not make an image out of date.
 
 **The style notice.** The studio keeps the game's style as the user last saw it in
-`.audio-studio/images-style-seen.json`, written the first time a style is read and moved by **Seen**, or at once when
+`.content-studio/images-style-seen.json`, written the first time a style is read and moved by **Seen**, or at once when
 a change leaves no chosen image out of date (there is then no notice to put away). When the game's style differs from it and at least one chosen image was made with the old
 style, every Images page shows one notice naming what changed. The user's own change to the style
 shows no notice; the images made with the old style are marked out of date.
@@ -1410,8 +1414,8 @@ that names none starts on `defaultTakeModel`: the project's `images.model`, else
 one is not on this computer) at the take size (`takeSize`: the listed shape with the longer side 1024,
 each side a multiple of 16; the listed sizes are not, so a take is then brought to them, below)
 and a new seed, on the GPU queue (`makeImageTake`). The board is
-`.audio-studio/images/<id>.json`, `{ next, takes: [{ n, seed, model, width, height, madeFrom, seen }] }`
-(`madeFrom` is what it was made from, as in the lock), the pictures `.audio-studio/image-takes/<id>/<n>.png`;
+`.content-studio/images/<id>.json`, `{ next, takes: [{ n, seed, model, width, height, madeFrom, seen }] }`
+(`madeFrom` is what it was made from, as in the lock), the pictures `.content-studio/image-takes/<id>/<n>.png`;
 a take is on the board only once its picture is written, numbers are per image and never reused
 (reserved at once), and what waits, is made or failed is in memory (`globalThis`), polled by the
 page. **Stop** ends the one being made and drops those waiting; a failed take stays with its reason
@@ -1494,10 +1498,10 @@ and `POST /api/parts/:part/lines/:key/record` (record one line into the clips, m
 asked), `POST /api/parts/:part/jobs` (`{ kind: record | measure | check, speaker, keys, orphans,
 retakeWeak }`: start a generation, a measuring or a checking again, the server planning it afresh), `GET /api/parts/:part/jobs/latest`, and
 `GET`/`DELETE /api/jobs/:id` (progress, cancel).
-Takes are cached in `.audio-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries, ElevenLabs' audition model for an ElevenLabs voice's, with its voice settings), voice,
+Takes are cached in `.content-studio/takes/<key>.mp3`, the key a hash of the take's model (the audition model on the board, the free one for the cast voice's page take and tries, ElevenLabs' audition model for an ElevenLabs voice's, with its voice settings), voice,
 spoken phrase and settings, so a take is recorded once. Auditions: `GET` and `DELETE
 /api/auditions/:id`, and `POST /api/auditions/:id/` `start`, `move` (`{ voice, move: shortlist | unlist | drop }`),
-`undo` (the last drop), `more` (`{ provider }`, `fish` unless `elevenlabs`; no body is Fish's), `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`, the first credits giving a sitting its ElevenLabs half) are the audition's money, and `GET /api/elevenlabs/account` the plan's account and what is held of it, `GET /api/elevenlabs/voices/freeable` the voices the studio added that nothing uses and `POST /api/elevenlabs/voices/free` (`{ voices }`) removes them; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.audio-studio/auditions/`. Ruled-out voices:
+`undo` (the last drop), `more` (`{ provider }`, `fish` unless `elevenlabs`; no body is Fish's), `add` and `cast` (`{ voice }`, a shortlisted one); `start` takes `{ spendUpTo }` on a paid audition model and `{ creditsUpTo }` for ElevenLabs voices' takes; `GET`, `POST` (`{ amount?, credits? }`, a fresh sitting) and `DELETE /api/auditions/:id/sitting` and `POST …/sitting/add` (`{ amount }` or `{ credits }`, the first credits giving a sitting its ElevenLabs half) are the audition's money, and `GET /api/elevenlabs/account` the plan's account and what is held of it, `GET /api/elevenlabs/voices/freeable` the voices the studio added that nothing uses and `POST /api/elevenlabs/voices/free` (`{ voices }`) removes them; a board take is `POST /api/characters/:id/takes` with `{ voice, board: true }`; sessions are kept in `.content-studio/auditions/`. Ruled-out voices:
 `GET`/`DELETE /api/characters/:id/ruled-out` (list, forget all) and
 `DELETE /api/characters/:id/ruled-out/:voice` (allow one again). Every route of a character, its
 voice, takes, audition and ruled-out voices takes `?language=` (the source language when absent or
@@ -1726,8 +1730,8 @@ Small, independently useful increments:
       the fingerprint: changing the target does not make clips stale.
    3. **The switch** (built, RetroQuest #508): in RetroQuest, one shared `tts/cast.json` from the four act casts (the
       grandmother's recast everywhere; the mother's Act III style as cues on her Act III lines),
-      `audio-studio.json` for all four acts with the new extractor, every act's clips adopted,
-      `.audio-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
+      `content-studio.json` for all four acts with the new extractor, every act's clips adopted,
+      `.content-studio/` ignored, `narrate.py`, `test_narrate.py` and `fish_tts.py` retired
       (`level.py` stays for the music).
 8. **Paid models**, in pull requests:
    1. **Prices and credit** (built): a dated price list (`core/prices.ts`, from Fish's pricing
@@ -1751,7 +1755,7 @@ Small, independently useful increments:
 
 9. **Audition rework** (§8.1), in small pull requests:
    1. **Ruled-out voices** (built): a dropped voice is ruled out for the character in
-      `.audio-studio/ruled-out/`, left out of every later search for it; listed on the character
+      `.content-studio/ruled-out/`, left out of every later search for it; listed on the character
       page, each allowed again or all forgotten.
    2. **Shortlist board** (built): voices to hear, Drop (gone at once, the last undone from a
       notice) and Shortlist, bring in more or a specific voice (also one dropped before), cast any
@@ -1809,7 +1813,7 @@ Small, independently useful increments:
        seam too.
     5. **Board** (built): a track's takes as cards, Make N more takes (N chosen, 1 to 6, in the background), Drop;
        takes from an earlier brief marked; Stop and Try again; the board saved in
-       `.audio-studio/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
+       `.content-studio/music/<track>.json`; "making 2 takes · about 4 min" on the lists.
     6. **Choose** (built): the chosen take levelled, encoded and written with the manifest and lock; each
        track's status on the Music pages; the music files in the Changes panel.
     7. **Orphans** (built): the music of a track the game no longer lists, shown on its list's page and

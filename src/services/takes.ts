@@ -37,7 +37,7 @@ import { randomUUID } from 'node:crypto'
 import { NO_KEY } from './fish'
 
 /** Where audition takes are kept, in the project's tool cache (gitignored by the consumer). */
-export const TAKES_DIR = '.audio-studio/takes'
+export const TAKES_DIR = '.content-studio/takes'
 
 /** A recorded take (its key, and the text it is of), or why there is none. Null for an unknown character. */
 export type TakeResult =

@@ -65,7 +65,7 @@ const TrySpendSchema = z.object({
 })
 
 /**
- * What the studio remembers of what it spent, kept in `.audio-studio/spending.json`: one entry per
+ * What the studio remembers of what it spent, kept in `.content-studio/spending.json`: one entry per
  * recording that cost money, added when the recording ends, and in version 2 the ElevenLabs
  * credits of a recording, a row per paid music take, and a row per take or try with an ElevenLabs
  * voice (`tries`, none in a version 2 record written before them). A record holding nothing of version 2's

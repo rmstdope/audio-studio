@@ -13,13 +13,13 @@ const ruleOutVoices = (
 ) => updateRuledOut(projectFile, characterId, { out: voices }, at)
 
 const files = {
-  'audio-studio.json': projectJson(),
+  'content-studio.json': projectJson(),
   'tts/cast.json': { speakers: { mira: { voice: 'cur' } } },
   'tts/act1/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
 }
 
 function project() {
-  return join(tempRepo(files), 'audio-studio.json')
+  return join(tempRepo(files), 'content-studio.json')
 }
 
 describe('ruled-out voices, saved', () => {
@@ -102,7 +102,10 @@ describe('ruled-out voices, saved', () => {
   })
 
   it('names what is wrong with a broken project file', async () => {
-    const projectFile = join(tempRepo({ ...files, 'audio-studio.json': '{' }), 'audio-studio.json')
+    const projectFile = join(
+      tempRepo({ ...files, 'content-studio.json': '{' }),
+      'content-studio.json',
+    )
     expect(await ruledOutVoices(projectFile, 'mira')).toMatchObject({ ok: false })
     expect(await allowVoices(projectFile, 'mira', 'all')).toMatchObject({ ok: false })
   })
@@ -132,7 +135,7 @@ describe('ruled-out voices per language', () => {
   const base = projectJson()
   const several = {
     ...files,
-    'audio-studio.json': {
+    'content-studio.json': {
       ...base,
       narration: {
         ...(base.narration as object),
@@ -147,7 +150,7 @@ describe('ruled-out voices per language', () => {
       },
     },
   }
-  const open = () => join(tempRepo(several), 'audio-studio.json')
+  const open = () => join(tempRepo(several), 'content-studio.json')
 
   it('keeps a list for each language: ruling out in Svenska leaves English alone', async () => {
     const projectFile = open()

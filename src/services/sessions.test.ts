@@ -86,7 +86,7 @@ const project = projectJson()
 ;(project.narration as { audition?: unknown }).audition = { candidatesPerRound: 3 }
 
 const files = {
-  'audio-studio.json': project,
+  'content-studio.json': project,
   'tts/cast.json':
     '{\n  "speakers": {\n' +
     '    "mira": { "voice": "cur", "style": "[low]", "audition": { "keywords": ["warm"] } },\n' +
@@ -112,7 +112,7 @@ async function started() {
 /** An audition just started: nothing to hear. */
 async function startedEmpty() {
   const root = tempRepo(files)
-  const projectFile = join(root, 'audio-studio.json')
+  const projectFile = join(root, 'content-studio.json')
   const result = await startAudition(projectFile, 'mira', fishFor)
   if (!result?.ok) throw new Error(JSON.stringify(result))
   return { root, projectFile, session: result.session }
@@ -136,7 +136,7 @@ describe('startAudition', () => {
       listVoices: (query) => (searched.push(query), fish.listVoices(query)),
     }
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await startAudition(projectFile, 'mira', async () => watching)
     expect(searched).toEqual([])
     const more = await moreVoices(projectFile, 'mira', async () => watching)
@@ -146,7 +146,7 @@ describe('startAudition', () => {
 
   it('has no session before one is started', async () => {
     const root = tempRepo(files)
-    expect(await sessionFor(join(root, 'audio-studio.json'), 'mira')).toEqual({
+    expect(await sessionFor(join(root, 'content-studio.json'), 'mira')).toEqual({
       ok: true,
       session: null,
     })
@@ -154,8 +154,8 @@ describe('startAudition', () => {
 
   it('takes an audition saved in rounds, before the shortlist, for none', async () => {
     const { root, projectFile } = await started()
-    const [file] = readdirSync(join(root, '.audio-studio/auditions'))
-    const path = join(root, '.audio-studio/auditions', file!)
+    const [file] = readdirSync(join(root, '.content-studio/auditions'))
+    const path = join(root, '.content-studio/auditions', file!)
     writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), version: 1 }))
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
   })
@@ -164,7 +164,7 @@ describe('startAudition', () => {
 describe('startAudition, with only an ElevenLabs key', () => {
   it('starts without Fish, and brings voices in from ElevenLabs', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const noFish = async () => null
     const { client } = fakeEleven()
     client.sharedVoices = async () => ({
@@ -201,7 +201,7 @@ describe('startAudition, for a character cast with an ElevenLabs voice', () => {
     }
     const { client, asked } = fakeEleven({ g1: elevenVoiceOf('g1') })
     const result = await startAudition(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'mira',
       async () => watching,
       undefined,
@@ -228,7 +228,7 @@ describe('startAudition, for a character cast with an ElevenLabs voice', () => {
       getVoice: (id) => (askedFish.push(id), fish.getVoice(id)),
     }
     const result = await startAudition(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'mira',
       async () => watching,
     )
@@ -258,7 +258,7 @@ describe('changeSession', () => {
 
   it('says so when there is no session', async () => {
     const root = tempRepo(files)
-    expect(await changeSession(join(root, 'audio-studio.json'), 'mira', (s) => s)).toEqual({
+    expect(await changeSession(join(root, 'content-studio.json'), 'mira', (s) => s)).toEqual({
       ok: false,
       reason: 'no-session',
       message: 'There is no audition for mira; start one.',
@@ -342,7 +342,7 @@ describe('moreVoices from ElevenLabs’ library', () => {
   it('leaves out a library voice the studio added that is cast or on the board as its own id', async () => {
     const { root, projectFile } = await started()
     writeFileSync(
-      join(root, '.audio-studio/eleven-voices.json'),
+      join(root, '.content-studio/eleven-voices.json'),
       JSON.stringify({
         version: 1,
         added: [
@@ -395,7 +395,7 @@ describe('moreVoices, with a large library', () => {
       },
     }
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await startAudition(projectFile, 'mira', async () => big)
     let shown = 0
     for (let i = 0; i < 20; i++) {
@@ -512,7 +512,7 @@ describe('castOwnVoice', () => {
 
   it('casts a voice no audition holds, and says which recorded lines go stale', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const result = await castOwnVoice(projectFile, 'mira', own)
     expect(result).toEqual({
       ok: true,
@@ -536,7 +536,7 @@ describe('castOwnVoice', () => {
   })
 
   it('changes nothing for the voice already cast', async () => {
-    const projectFile = join(tempRepo(files), 'audio-studio.json')
+    const projectFile = join(tempRepo(files), 'content-studio.json')
     expect(await castOwnVoice(projectFile, 'mira', { id: 'cur', name: 'Old' })).toMatchObject({
       ok: true,
       changed: false,
@@ -545,12 +545,12 @@ describe('castOwnVoice', () => {
   })
 
   it('says when the project will not load', async () => {
-    const projectFile = join(tempRepo({ 'audio-studio.json': '{' }), 'audio-studio.json')
+    const projectFile = join(tempRepo({ 'content-studio.json': '{' }), 'content-studio.json')
     expect(await castOwnVoice(projectFile, 'mira', own)).toMatchObject({ ok: false })
   })
 
   it('knows no character it was not asked about', async () => {
-    const projectFile = join(tempRepo(files), 'audio-studio.json')
+    const projectFile = join(tempRepo(files), 'content-studio.json')
     expect(await castOwnVoice(projectFile, 'nobody', own)).toBeNull()
   })
 })
@@ -651,11 +651,11 @@ describe('sessionFor, recorded lines', () => {
 describe('discardSession', () => {
   it('answers an unknown character with null, and a broken project with its problems', async () => {
     const root = tempRepo(files)
-    expect(await discardSession(join(root, 'audio-studio.json'), 'nobody')).toBeNull()
-    const broken = tempRepo({ ...files, 'audio-studio.json': '{' })
-    expect(await discardSession(join(broken, 'audio-studio.json'), 'mira')).toMatchObject({
+    expect(await discardSession(join(root, 'content-studio.json'), 'nobody')).toBeNull()
+    const broken = tempRepo({ ...files, 'content-studio.json': '{' })
+    expect(await discardSession(join(broken, 'content-studio.json'), 'mira')).toMatchObject({
       ok: false,
-      file: 'audio-studio.json',
+      file: 'content-studio.json',
     })
   })
 
@@ -664,7 +664,7 @@ describe('discardSession', () => {
     await moveVoice(projectFile, 'mira', 'a', 'drop')
     await discardSession(projectFile, 'mira')
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
-    expect(readdirSync(join(root, '.audio-studio/auditions'))).toEqual([])
+    expect(readdirSync(join(root, '.content-studio/auditions'))).toEqual([])
     expect(existsSync(join(root, 'tts/cast.json'))).toBe(true)
     expect(await ruledOutIds(projectFile, 'mira')).toEqual(['a'])
   })
@@ -694,7 +694,7 @@ describe('ruled-out voices in an audition', () => {
 
   it('changes nothing when the ruled-out voices cannot be saved', async () => {
     const { root, projectFile } = await started()
-    writeFileSync(join(root, '.audio-studio/ruled-out'), 'in the way')
+    writeFileSync(join(root, '.content-studio/ruled-out'), 'in the way')
     await expect(moveVoice(projectFile, 'mira', 'a', 'drop')).rejects.toThrow()
     const saved = await sessionFor(projectFile, 'mira')
     expect(saved?.ok && saved.session?.toHear).toEqual(['a', 'b', 'c'])
@@ -709,7 +709,7 @@ describe('ruled-out voices in an audition', () => {
 
   it('knows the cast voice when Fish cannot look it up, and never rules it out', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const forgetful: FishClient = {
       ...fish,
       getVoice: (id) => (id === 'cur' ? Promise.reject(new Error('busy')) : fish.getVoice(id)),
@@ -739,7 +739,7 @@ describe('ruled-out voices in an audition', () => {
 
   it('leaves voices ruled out earlier out of a new audition and of later searches', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await ruleOutVoices(projectFile, 'mira', [
       { id: 'a', title: 'Warm a' },
       { id: 'e', title: 'Warm e' },
@@ -755,7 +755,7 @@ describe('ruled-out voices in an audition', () => {
 
   it('allows a ruled-out voice again when it is brought in by its id, also one dropped in this audition', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await ruleOutVoices(projectFile, 'mira', [{ id: 'a', title: 'Warm a' }])
     await startAudition(projectFile, 'mira', fishFor)
     const added = await addVoiceById(projectFile, 'mira', 'a', fishFor)
@@ -771,25 +771,25 @@ describe('ruled-out voices in an audition', () => {
 describe('the money of an audition', () => {
   const paidFiles = {
     ...files,
-    'audio-studio.json': {
+    'content-studio.json': {
       ...project,
       narration: { ...(project.narration as object), models: { audition: 's2.1-pro' } },
     },
   }
 
   it('prices a take of the phrase on the audition model; a free model costs nothing', async () => {
-    const paid = join(tempRepo(paidFiles), 'audio-studio.json')
+    const paid = join(tempRepo(paidFiles), 'content-studio.json')
     const money = await auditionMoney(paid, 'mira')
     if (!money?.ok) throw new Error(JSON.stringify(money))
     expect(money.model).toBe('s2.1-pro')
     expect(money.perTake).toBeGreaterThan(0)
     expect(money.spentBefore).toBe(0)
-    const free = await auditionMoney(join(tempRepo(files), 'audio-studio.json'), 'mira')
+    const free = await auditionMoney(join(tempRepo(files), 'content-studio.json'), 'mira')
     expect(free).toMatchObject({ ok: true, model: 's2.1-pro-free', perTake: 0 })
   })
 
   it('prices an ElevenLabs take of the phrase in credits on ElevenLabs’ audition model', async () => {
-    const money = await auditionMoney(join(tempRepo(files), 'audio-studio.json'), 'mira')
+    const money = await auditionMoney(join(tempRepo(files), 'content-studio.json'), 'mira')
     if (!money?.ok) throw new Error(JSON.stringify(money))
     expect(money.eleven.model).toBe('eleven_v3')
     // A credit a character of the phrase as sent, with mira's style.
@@ -797,7 +797,7 @@ describe('the money of an audition', () => {
   })
 
   it('keeps what takes were charged in the saved audition, across sittings', async () => {
-    const projectFile = join(tempRepo(paidFiles), 'audio-studio.json')
+    const projectFile = join(tempRepo(paidFiles), 'content-studio.json')
     await startAudition(projectFile, 'mira', fishFor)
     await recordSpent(projectFile, 'mira', 0.01)
     await recordSpent(projectFile, 'mira', 0.02)
@@ -806,14 +806,14 @@ describe('the money of an audition', () => {
   })
 
   it('says whether the character has an audition going on', async () => {
-    const projectFile = join(tempRepo(files), 'audio-studio.json')
+    const projectFile = join(tempRepo(files), 'content-studio.json')
     expect(await auditionMoney(projectFile, 'mira')).toMatchObject({ going: false })
     await startAudition(projectFile, 'mira', fishFor)
     expect(await auditionMoney(projectFile, 'mira')).toMatchObject({ going: true })
   })
 
   it('is null for an unknown character, and records nothing without an audition', async () => {
-    const projectFile = join(tempRepo(paidFiles), 'audio-studio.json')
+    const projectFile = join(tempRepo(paidFiles), 'content-studio.json')
     expect(await auditionMoney(projectFile, 'nobody')).toBeNull()
     await recordSpent(projectFile, 'mira', 0.01)
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
@@ -883,7 +883,7 @@ describe('refreshOwnVoices', () => {
 
   it('has no session to fill before an audition is started', async () => {
     const root = tempRepo(files)
-    const result = await refreshOwnVoices(join(root, 'audio-studio.json'), 'mira', fishFor)
+    const result = await refreshOwnVoices(join(root, 'content-studio.json'), 'mira', fishFor)
     expect(result).toMatchObject({ ok: false, reason: 'no-session' })
   })
 })
@@ -892,7 +892,7 @@ describe('an audition per language', () => {
   const base = projectJson()
   const several = {
     ...files,
-    'audio-studio.json': {
+    'content-studio.json': {
       ...base,
       narration: {
         ...(base.narration as object),
@@ -922,7 +922,7 @@ describe('an audition per language', () => {
   }
   const begin = async (language = 'sv') => {
     const root = tempRepo(several)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const first = await startAudition(projectFile, 'mira', fishFor, language)
     if (!first?.ok) throw new Error(JSON.stringify(first))
     const result = await moreVoices(projectFile, 'mira', fishFor, language)
@@ -949,7 +949,7 @@ describe('an audition per language', () => {
   it('keeps her Fish voice in another language on the shortlist, by its id, without a Fish key', async () => {
     const root = tempRepo(several)
     const result = await startAudition(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'mira',
       async () => null,
       'sv',
@@ -1020,7 +1020,7 @@ describe('an audition per language', () => {
       'tts/act1/sv/script.json': [],
       'audio/act1/sv/manifest.json': {},
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await startAudition(projectFile, 'mira', fishFor, 'sv')).toMatchObject({
       ok: false,
       reason: 'no-phrase',
@@ -1055,19 +1055,22 @@ describe('voicesInUse', () => {
 
   it('knows nothing in use when the cast or a session cannot be read, so nothing is freed', async () => {
     const { root, projectFile } = await started()
-    const [file] = readdirSync(join(root, '.audio-studio/auditions'))
-    writeFileSync(join(root, '.audio-studio/auditions', file!), '{"version": 2}')
+    const [file] = readdirSync(join(root, '.content-studio/auditions'))
+    writeFileSync(join(root, '.content-studio/auditions', file!), '{"version": 2}')
     expect(await voicesInUse(projectFile)).toBeNull()
     // One of an earlier version is no audition in progress.
-    writeFileSync(join(root, '.audio-studio/auditions', file!), '{"version": 1}')
+    writeFileSync(join(root, '.content-studio/auditions', file!), '{"version": 1}')
     expect([...(await voicesInUse(projectFile))!].sort()).toEqual(['cur', 't1'])
     const broken = tempRepo({ ...files, 'tts/cast.json': '{ not json' })
-    expect(await voicesInUse(join(broken, 'audio-studio.json'))).toBeNull()
+    expect(await voicesInUse(join(broken, 'content-studio.json'))).toBeNull()
   })
 
   it('names only the cast when no audition is in progress', async () => {
     const root = tempRepo(files)
-    expect([...(await voicesInUse(join(root, 'audio-studio.json')))!].sort()).toEqual(['cur', 't1'])
+    expect([...(await voicesInUse(join(root, 'content-studio.json')))!].sort()).toEqual([
+      'cur',
+      't1',
+    ])
   })
 })
 

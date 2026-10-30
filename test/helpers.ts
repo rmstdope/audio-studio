@@ -30,7 +30,7 @@ export function projectJson(overrides: Record<string, unknown> = {}): Record<str
 
 /** A temporary consumer repository holding `files` (path → JSON value, or raw text; undefined leaves it out). */
 export function tempRepo(files: Record<string, unknown>): string {
-  const root = mkdtempSync(join(tmpdir(), 'audio-studio-test-'))
+  const root = mkdtempSync(join(tmpdir(), 'content-studio-test-'))
   for (const [path, content] of Object.entries(files)) {
     if (content === undefined) continue
     const full = join(root, path)

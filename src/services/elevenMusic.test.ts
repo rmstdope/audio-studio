@@ -108,7 +108,8 @@ describe.skipIf(Bun.which('ffmpeg') === null)('createElevenMusic, decoding with 
     const mp3File = join(tempRepo({}), 'piece.mp3')
     await ffmpegEncoder(second, mp3File, { bitrate: '128k', channels: 2 })
     const mp3 = new Uint8Array(readFileSync(mp3File))
-    const leftover = () => readdirSync(tmpdir()).filter((f) => f.startsWith('audio-studio-eleven-'))
+    const leftover = () =>
+      readdirSync(tmpdir()).filter((f) => f.startsWith('content-studio-eleven-'))
     const before = leftover()
     const take = await createElevenMusic({
       apiKey: async () => 'k',

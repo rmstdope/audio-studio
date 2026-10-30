@@ -68,8 +68,8 @@ export async function readChosen(
 
 /** One choice at a time per project: each reads the manifest and lock the one before wrote. */
 export function choices(): Serial {
-  const shared = globalThis as { audioStudioMusicChoices?: Serial }
-  return (shared.audioStudioMusicChoices ??= createSerial())
+  const shared = globalThis as { contentStudioMusicChoices?: Serial }
+  return (shared.contentStudioMusicChoices ??= createSerial())
 }
 
 /**

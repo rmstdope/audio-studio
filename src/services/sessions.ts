@@ -55,7 +55,7 @@ import {
 } from './workspace'
 
 /** Where audition sessions are kept, in the project's tool cache. */
-export const SESSIONS_DIR = '.audio-studio/auditions'
+export const SESSIONS_DIR = '.content-studio/auditions'
 
 /** Why a session action did nothing. */
 export type SessionFailure =

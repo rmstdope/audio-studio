@@ -7,7 +7,7 @@ import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
 
 /** Where what Whisper heard of each part's lines is kept, in the project's tool cache. */
-export const HEARD_DIR = '.audio-studio/heard'
+export const HEARD_DIR = '.content-studio/heard'
 
 /** What Whisper heard of a line's take now, or nothing kept for it; null for an unknown line. */
 export type HeardResult = { ok: true; heard: HeardLine | null } | ProjectFailure | null

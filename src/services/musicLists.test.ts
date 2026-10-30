@@ -7,7 +7,7 @@ import { loadProject, musicCurrentFile } from './workspace'
 
 describe('gameFilePath', () => {
   const outside = tempRepo({ 'secret.mp3': 'secret' })
-  const root = tempRepo({ 'game/walk.mp3': 'walk', 'audio-studio.json': projectJson() })
+  const root = tempRepo({ 'game/walk.mp3': 'walk', 'content-studio.json': projectJson() })
   mkdirSync(join(root, 'game/dir.mp3'))
   symlinkSync(join(root, 'game/walk.mp3'), join(root, 'game/link.mp3'))
   symlinkSync(outside, join(root, 'linked'))
@@ -33,7 +33,7 @@ describe('gameFilePath', () => {
 
 describe('a music lock that cannot be read', () => {
   const root = tempRepo({
-    'audio-studio.json': projectJson({
+    'content-studio.json': projectJson({
       music: {
         paths: {
           loops: 'tts/{part}/music.json',
@@ -56,13 +56,13 @@ describe('a music lock that cannot be read', () => {
   })
 
   it('makes what a track plays not known in the summary, not the game’s own file', async () => {
-    const loaded = await loadProject(join(root, 'audio-studio.json'))
+    const loaded = await loadProject(join(root, 'content-studio.json'))
     if (!loaded.ok) throw new Error('project')
     const stingers = loaded.summary.music!.lists.find((l) => l.kind === 'stingers')!
     expect(stingers.tracks[0]!.current).toEqual({ kind: 'unknown' })
   })
 
   it('serves no music for the track, not the game’s own file', async () => {
-    expect(await musicCurrentFile(join(root, 'audio-studio.json'), 'victory')).toBeNull()
+    expect(await musicCurrentFile(join(root, 'content-studio.json'), 'victory')).toBeNull()
   })
 })

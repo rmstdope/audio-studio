@@ -24,7 +24,7 @@ async function setUp(saved: number, options: { failWith?: string; unreadable?: b
         return Response.json(
           {
             ok: false,
-            problems: [{ file: 'audio-studio.json', path: 'takeFade', message: server.fail }],
+            problems: [{ file: 'content-studio.json', path: 'takeFade', message: server.fail }],
           },
           { status: 409 },
         )
@@ -33,10 +33,10 @@ async function setUp(saved: number, options: { failWith?: string; unreadable?: b
       return Response.json({ ok: true })
     }
     if (options.unreadable)
-      return Response.json({ ok: false, file: 'audio-studio.json', problems: [] })
+      return Response.json({ ok: false, file: 'content-studio.json', problems: [] })
     return Response.json({
       ok: true,
-      summary: { takeFade: server.saved, projectFile: 'audio-studio.json' },
+      summary: { takeFade: server.saved, projectFile: 'content-studio.json' },
     })
   }) as unknown as typeof fetch
   const container = document.createElement('div')
@@ -79,7 +79,7 @@ describe('the Playing takes panel', () => {
     try {
       expect(container.querySelector('h2')?.textContent).toBe('Playing takes')
       expect(container.textContent).toContain(
-        'How music takes sound when you play them in the studio. Saved in audio-studio.json for everyone on the project.',
+        'How music takes sound when you play them in the studio. Saved in content-studio.json for everyone on the project.',
       )
       expect(container.querySelector('.mname')?.textContent).toBe('Fade in and out')
       expect(container.textContent).toContain(

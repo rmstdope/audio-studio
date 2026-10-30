@@ -22,12 +22,12 @@ const stingers = [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 
 
 function repo(extra: Record<string, unknown> = {}) {
   const root = tempRepo({
-    'audio-studio.json': projectJson({ music }),
+    'content-studio.json': projectJson({ music }),
     'tts/act1/music.json': loops,
     'tts/stingers.json': stingers,
     ...extra,
   })
-  const file = join(root, 'audio-studio.json')
+  const file = join(root, 'content-studio.json')
   const briefs = () => readFileSync(join(root, 'music/briefs.json'), 'utf8')
   return { root, file, briefs }
 }
@@ -108,8 +108,10 @@ describe('setTrackBrief', () => {
   })
 
   it('knows no track in a project without music', async () => {
-    const root = tempRepo({ 'audio-studio.json': projectJson() })
-    expect(await setTrackBrief(join(root, 'audio-studio.json'), 'hall', { brief: 'x' })).toBeNull()
+    const root = tempRepo({ 'content-studio.json': projectJson() })
+    expect(
+      await setTrackBrief(join(root, 'content-studio.json'), 'hall', { brief: 'x' }),
+    ).toBeNull()
   })
 })
 
@@ -117,9 +119,9 @@ describe('setTrackBrief and tracks the game dropped', () => {
   const stale = {
     'tts/act2/music.json': [],
     'music/briefs.json': { gone: { bpm: 70 }, kept: { bpm: 80 } },
-    '.audio-studio/music/gone.json': { next: 2, takes: [] },
-    '.audio-studio/music-takes/gone/0123456789abcdef.1.wav': 'wav',
-    '.audio-studio/music/lonely.json': { next: 2, takes: [] },
+    '.content-studio/music/gone.json': { next: 2, takes: [] },
+    '.content-studio/music-takes/gone/0123456789abcdef.1.wav': 'wav',
+    '.content-studio/music/lonely.json': { next: 2, takes: [] },
     'music/music.lock.json': {
       kept: {
         fp: 'f',
@@ -132,30 +134,30 @@ describe('setTrackBrief and tracks the game dropped', () => {
       },
     },
     'audio/music/kept.mp3': 'mp3',
-    '.audio-studio/music/kept.json': { next: 2, takes: [] },
+    '.content-studio/music/kept.json': { next: 2, takes: [] },
   }
 
   it('drops the briefs and boards of unlisted tracks never chosen, at the next save', async () => {
     const { root, file, briefs } = repo(stale)
     expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
     expect(JSON.parse(briefs())).toEqual({ hall: { bpm: 70 }, kept: { bpm: 80 } })
-    expect(existsSync(join(root, '.audio-studio/music/gone.json'))).toBe(false)
-    expect(existsSync(join(root, '.audio-studio/music-takes/gone'))).toBe(false)
-    expect(existsSync(join(root, '.audio-studio/music/lonely.json'))).toBe(false)
-    expect(existsSync(join(root, '.audio-studio/music/kept.json'))).toBe(true)
+    expect(existsSync(join(root, '.content-studio/music/gone.json'))).toBe(false)
+    expect(existsSync(join(root, '.content-studio/music-takes/gone'))).toBe(false)
+    expect(existsSync(join(root, '.content-studio/music/lonely.json'))).toBe(false)
+    expect(existsSync(join(root, '.content-studio/music/kept.json'))).toBe(true)
   })
 
   it('drops nothing while a list is missing', async () => {
     const { root, file, briefs } = repo({ ...stale, 'tts/stingers.json': undefined })
     expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
     expect(JSON.parse(briefs())).toHaveProperty('gone')
-    expect(existsSync(join(root, '.audio-studio/music/gone.json'))).toBe(true)
+    expect(existsSync(join(root, '.content-studio/music/gone.json'))).toBe(true)
   })
 
   it('drops nothing when the lock cannot be read', async () => {
     const { root, file, briefs } = repo({ ...stale, 'music/music.lock.json': '{ nope' })
     expect(await setTrackBrief(file, 'hall', { bpm: 70 })).toEqual({ ok: true })
     expect(JSON.parse(briefs())).toHaveProperty('gone')
-    expect(existsSync(join(root, '.audio-studio/music/gone.json'))).toBe(true)
+    expect(existsSync(join(root, '.content-studio/music/gone.json'))).toBe(true)
   })
 })

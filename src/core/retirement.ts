@@ -49,7 +49,7 @@ export function bannerWords(takes: Take[], now: Date): { heading: string; body: 
 }
 
 /** The lines of the question before the switch: each take that changes, then what stays. */
-export function questionItems(takes: Take[], projectFile = 'audio-studio.json'): string[] {
+export function questionItems(takes: Take[], projectFile = 'content-studio.json'): string[] {
   return [
     ...takes.map((take) => `${capital(take)}: s1 → s2.1-pro`),
     `Saved in ${projectFile}; nothing else in it changes.`,

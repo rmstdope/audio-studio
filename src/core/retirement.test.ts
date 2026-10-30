@@ -54,7 +54,7 @@ describe('the question, the confirmation and the failure', () => {
     expect(questionItems(['draft', 'final'])).toEqual([
       'Draft: s1 → s2.1-pro',
       'Final: s1 → s2.1-pro',
-      'Saved in audio-studio.json; nothing else in it changes.',
+      'Saved in content-studio.json; nothing else in it changes.',
       'Lines already recorded with s1 stay as they are.',
     ])
     expect(questionItems(['final'], 'game.json')[0]).toBe('Final: s1 → s2.1-pro')
@@ -64,17 +64,17 @@ describe('the question, the confirmation and the failure', () => {
   })
 
   it('says what is now on s2.1-pro', () => {
-    const tail = 'saved in audio-studio.json. Lines already recorded with s1 stay as they are.'
-    expect(doneWords(['draft', 'final'], 'audio-studio.json')).toBe(
+    const tail = 'saved in content-studio.json. Lines already recorded with s1 stay as they are.'
+    expect(doneWords(['draft', 'final'], 'content-studio.json')).toBe(
       `Draft and final now use s2.1-pro, ${tail}`,
     )
-    expect(doneWords(['draft'], 'audio-studio.json')).toBe(`Draft now uses s2.1-pro, ${tail}`)
-    expect(doneWords(['final'], 'audio-studio.json')).toBe(`Final now uses s2.1-pro, ${tail}`)
+    expect(doneWords(['draft'], 'content-studio.json')).toBe(`Draft now uses s2.1-pro, ${tail}`)
+    expect(doneWords(['final'], 'content-studio.json')).toBe(`Final now uses s2.1-pro, ${tail}`)
   })
 
   it('names the file and the reason', () => {
-    expect(failureBody('audio-studio.json', 'disk full')).toBe(
-      'audio-studio.json could not be saved: disk full. Nothing was changed.',
+    expect(failureBody('content-studio.json', 'disk full')).toBe(
+      'content-studio.json could not be saved: disk full. Nothing was changed.',
     )
   })
 })

@@ -16,7 +16,7 @@ import type { Transcriber } from './transcriber'
 import { loadPart } from './workspace'
 
 const files = {
-  'audio-studio.json': projectJson(),
+  'content-studio.json': projectJson(),
   'tts/cast.json': {
     speakers: { narrator: { voice: 'v-n', style: '[warm]' } },
     pronounce: { Elior: 'El-ee-or' },
@@ -78,7 +78,7 @@ const keepWav: Encoder = async (wav, file) => {
   writeFileSync(file, wav)
 }
 
-const projectFileOf = (root: string) => join(root, 'audio-studio.json')
+const projectFileOf = (root: string) => join(root, 'content-studio.json')
 const free = createBudget({ model: 's2.1-pro-free', dollars: 0 })
 const take = (
   root: string,
@@ -163,7 +163,7 @@ describe('takeLine, a paid draft model', () => {
   const paid = () =>
     tempRepo({
       ...files,
-      'audio-studio.json': {
+      'content-studio.json': {
         ...projectJson(),
         narration: {
           ...(projectJson().narration as Record<string, unknown>),
@@ -265,7 +265,7 @@ describe('useLineTake', () => {
     const { fp, parts } = fingerprint(finalInputs)
     const root = tempRepo({
       ...files,
-      'audio-studio.json': project,
+      'content-studio.json': project,
       'audio/act1/manifest.json': { k1: { file: 'k1.mp3', speaker: 'narrator', duration: 1 } },
       'audio/act1/k1.mp3': 'paid',
       'tts/act1/narration.lock.json': { k1: { fp, voice: 'v-n', model: 's1', parts, at: 'then' } },
@@ -337,7 +337,7 @@ describe('takes of a line in a language besides the source', () => {
     manifest: 'audio/{part}/{language}/manifest.json',
   }
   const swedish = {
-    'audio-studio.json': several,
+    'content-studio.json': several,
     'tts/cast.json': {
       speakers: {
         narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-sv' } } },

@@ -6,7 +6,7 @@ import { setTakeFade } from './takeFade'
 
 function repo(project: Record<string, unknown> = projectJson(), indent = 2, eol = '\n') {
   const root = tempRepo({})
-  const projectFile = join(root, 'audio-studio.json')
+  const projectFile = join(root, 'content-studio.json')
   writeFileSync(projectFile, `${JSON.stringify(project, null, indent)}\n`.replace(/\n/g, eol))
   return { projectFile, read: () => readFileSync(projectFile, 'utf8') }
 }

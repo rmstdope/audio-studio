@@ -15,7 +15,7 @@ const NO_KEY = {
 
 /** ElevenLabs' MP3 as 16-bit WAV, through a temporary file ffmpeg reads. */
 async function decodeMp3(mp3: Uint8Array): Promise<Uint8Array> {
-  const file = join(tmpdir(), `audio-studio-eleven-${randomUUID()}.mp3`)
+  const file = join(tmpdir(), `content-studio-eleven-${randomUUID()}.mp3`)
   try {
     await writeFile(file, mp3)
     return (await decodeClip(file)).wav

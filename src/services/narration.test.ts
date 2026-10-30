@@ -57,7 +57,7 @@ const manifestText =
   '{\n "old": {\n  "file": "old.mp3",\n  "speaker": "mira",\n  "duration": 1.0,\n  "words": [\n   {\n    "word": "Gone\\u2026",\n    "start": 0.0,\n    "end": 1.0\n   }\n  ]\n }\n}\n'
 
 const files = {
-  'audio-studio.json': project,
+  'content-studio.json': project,
   'tts/cast.json': {
     speakers: { narrator: { voice: 'v-n', style: '[warm]' }, mira: { voice: 'v-m', speed: 1.15 } },
     pronounce: { Elior: 'El-ee-or' },
@@ -76,7 +76,7 @@ const files = {
 }
 
 function record(root: string, key: string, fish: FishClient, encode: Encoder = keepWav) {
-  return recordLine(join(root, 'audio-studio.json'), 'act1', key, async () => fish, {
+  return recordLine(join(root, 'content-studio.json'), 'act1', key, async () => fish, {
     encode,
     limiter: createLimiter(),
   })
@@ -118,7 +118,7 @@ describe('recordLine', () => {
         { word: 'up.', start: 0.667, end: 1 },
       ],
     })
-    const part = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const part = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.status).toBe('ok')
   })
 
@@ -173,7 +173,7 @@ describe('recordLine', () => {
     const root = tempRepo(files)
     const { fish, requests } = fakeFish()
     const limiter = createLimiter()
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const once = () =>
       recordLine(projectFile, 'act1', 'k1', async () => fish, { encode: keepWav, limiter })
     await Promise.all([once(), once()])
@@ -186,7 +186,7 @@ describe('recordLine', () => {
       'audio/act1/manifest.json': { k4: { file: 'k4.mp3', speaker: 'mira' } },
       'audio/act1/k4.mp3': 'old clip',
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     let release = () => {}
     const held = inPartTurn(projectFile, 'act1', () => new Promise<void>((r) => (release = r)))
     const adopting = adoptPart(projectFile, 'act1')
@@ -216,7 +216,7 @@ describe('recordLine', () => {
     }
     expect(readdirSync(join(root, 'audio/act1')).filter((f) => f.startsWith('.'))).toEqual([])
     expect(readdirSync(lockFolder).filter((f) => f.includes('.tmp'))).toEqual([])
-    const part = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const part = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.status).toBe('untracked')
   })
 
@@ -270,11 +270,11 @@ describe('recordLine', () => {
 describe('removeOrphans, a dialog that is gone', () => {
   it('removes nothing, whatever it is asked for', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson(),
+      'content-studio.json': projectJson(),
       'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'mira', duration: 1, words: [] } },
       'audio/act1/a.mp3': 'clip',
     })
-    expect(await removeOrphans(join(root, 'audio-studio.json'), 'act1', ['a'])).toBe(0)
+    expect(await removeOrphans(join(root, 'content-studio.json'), 'act1', ['a'])).toBe(0)
     expect(existsSync(join(root, 'audio/act1/a.mp3'))).toBe(true)
   })
 })
@@ -302,7 +302,7 @@ describe('removeOrphans', () => {
 
   it('removes the clips, manifest and lock entries of lines no longer in the dialog', async () => {
     const root = tempRepo(orphanFiles)
-    const removed = await removeOrphans(join(root, 'audio-studio.json'), 'act1', [
+    const removed = await removeOrphans(join(root, 'content-studio.json'), 'act1', [
       'gone',
       'k4',
       'sneaky',
@@ -325,7 +325,7 @@ describe('recordLine, only if needed', () => {
     const { fish, requests } = fakeFish()
     await record(root, 'k1', fish)
     const again = await recordLine(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'act1',
       'k1',
       async () => fish,
@@ -352,7 +352,7 @@ describe('removeOrphans, shared and odd files', () => {
       'audio/act1/shared.mp3': 'in use',
       'audio/act1/notes.txt': 'keep',
     })
-    const removed = await removeOrphans(join(root, 'audio-studio.json'), 'act1', ['old', 'odd'])
+    const removed = await removeOrphans(join(root, 'content-studio.json'), 'act1', ['old', 'odd'])
     expect(removed).toBe(1)
     expect(existsSync(join(root, 'audio/act1/shared.mp3'))).toBe(true)
     expect(existsSync(join(root, 'audio/act1/notes.txt'))).toBe(true)
@@ -362,7 +362,7 @@ describe('removeOrphans, shared and odd files', () => {
 describe('recordLine, only if needed, racing a hand recording', () => {
   it('skips the line when a hand recording finishes while the job is getting ready', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const { fish, requests } = fakeFish()
     const limiter = createLimiter()
     let release = () => {}
@@ -381,7 +381,7 @@ describe('recordLine, only if needed, racing a hand recording', () => {
   it('reports a line whose speaker lost its voice as uncast, not as up to date', async () => {
     const root = tempRepo({ ...files, 'tts/cast.json': { speakers: {}, pronounce: {} } })
     const result = await recordLine(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'act1',
       'k1',
       async () => fakeFish().fish,
@@ -416,7 +416,7 @@ describe('recordLine, checked with Whisper', () => {
   }
 
   const recordChecked = (root: string, transcriber: Transcriber, fish: FishClient) =>
-    recordLine(join(root, 'audio-studio.json'), 'act1', 'k1', async () => fish, {
+    recordLine(join(root, 'content-studio.json'), 'act1', 'k1', async () => fish, {
       encode: keepWav,
       limiter: createLimiter(),
       transcriber,
@@ -448,7 +448,7 @@ describe('recordLine, checked with Whisper', () => {
 
   it('keeps what Whisper heard of a kept take heard poorly, and forgets it once heard in full', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await recordChecked(root, hearing(['wakes'], ['wakes', 'up.'], ['up.']), fakeFish().fish)
     const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
     expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({
@@ -482,7 +482,7 @@ describe('recordLine, checked with Whisper', () => {
     const result = await recordChecked(root, hearing(['wakes'], ['wakes', 'up.'], ['up.']), fish)
     expect(result).toMatchObject({ ok: true, heard: 0.667, takes: 3 })
     expect(requests).toHaveLength(3)
-    const part = await loadPart(join(root, 'audio-studio.json'), 'act1')
+    const part = await loadPart(join(root, 'content-studio.json'), 'act1')
     expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.status).toBe('weak')
   })
 
@@ -504,7 +504,7 @@ describe('recordLine, checked with Whisper', () => {
       chunkLimit: 100,
       transcriber: 'none',
     }
-    const root = tempRepo({ ...files, 'audio-studio.json': unchecked })
+    const root = tempRepo({ ...files, 'content-studio.json': unchecked })
     const transcriber = hearing(['nothing'])
     const result = await recordChecked(root, transcriber, fakeFish().fish)
     expect(result).toEqual({ ok: true, key: 'k1', duration: 1 })
@@ -530,7 +530,7 @@ describe('recordLine, a later take failing', () => {
       close() {},
     }
     const result = await recordLine(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'act1',
       'k1',
       async () => flaky,
@@ -568,7 +568,7 @@ describe('measureLine', () => {
 
   async function recorded(transcriber: Transcriber | null = null) {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
       encode: keepWav,
       limiter: createLimiter(),
@@ -596,14 +596,14 @@ describe('measureLine', () => {
       chunkLimit: 100,
       soundAlike: [['Welcome', 'Wellcum']],
     }
-    const root = tempRepo({ ...files, 'audio-studio.json': own })
+    const root = tempRepo({ ...files, 'content-studio.json': own })
     const wellcum: Transcriber = {
       transcribe: async () => [
         { start: 0, end: 1, words: [{ word: 'Wellcum.', start: 0, end: 0.6 }] },
       ],
       close() {},
     }
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const result = await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
       encode: keepWav,
       limiter: createLimiter(),
@@ -618,8 +618,8 @@ describe('measureLine', () => {
       chunkLimit: 100,
       soundAlike: [['Welcome', 'Wellcum']],
     }
-    const root = tempRepo({ ...files, 'audio-studio.json': own })
-    const projectFile = join(root, 'audio-studio.json')
+    const root = tempRepo({ ...files, 'content-studio.json': own })
+    const projectFile = join(root, 'content-studio.json')
     await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
       encode: keepWav,
       limiter: createLimiter(),
@@ -746,7 +746,12 @@ describe('measureLine', () => {
 
   it('refuses a line without a clip the studio knows', async () => {
     const root = tempRepo(files)
-    const result = await measureLine(join(root, 'audio-studio.json'), 'act1', 'k4', measureOptions)
+    const result = await measureLine(
+      join(root, 'content-studio.json'),
+      'act1',
+      'k4',
+      measureOptions,
+    )
     expect(result).toMatchObject({ ok: false, reason: 'not-recorded' })
   })
 })
@@ -754,7 +759,7 @@ describe('measureLine', () => {
 describe('recordLine, retaking a weak line', () => {
   it('skips a weak line in a job that was not asked to retake weak lines', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const poor: Transcriber = { transcribe: async () => [], close() {} }
     const options = { encode: keepWav, limiter: createLimiter() }
     await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
@@ -773,7 +778,7 @@ describe('recordLine, retaking a weak line', () => {
 
   it('records a weak line when a job asks for it', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const poor: Transcriber = { transcribe: async () => [], close() {} }
     const options = { encode: keepWav, limiter: createLimiter() }
     await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
@@ -802,7 +807,7 @@ describe('measureLine, edge cases', () => {
 
   async function unchecked() {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
       encode: keepWav,
       limiter: createLimiter(),
@@ -866,16 +871,16 @@ describe('measureLine, edge cases', () => {
 describe('recordLine, a paid model', () => {
   /** The test project with a paid draft model. */
   function paidRepo() {
-    const paid = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    const paid = JSON.parse(JSON.stringify(files['content-studio.json']))
     paid.narration.models = { draft: 's2-pro' }
-    return tempRepo({ ...files, 'audio-studio.json': paid })
+    return tempRepo({ ...files, 'content-studio.json': paid })
   }
 
   it('sends nothing to Fish without a budget for it', async () => {
     const root = paidRepo()
     const { fish, requests } = fakeFish()
     const result = await recordLine(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'act1',
       'k1',
       async () => fish,
@@ -890,7 +895,7 @@ describe('recordLine, a paid model', () => {
 
   it('spends from the budget it is given, and stops where the budget ends', async () => {
     const root = paidRepo()
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const options = { encode: keepWav, limiter: createLimiter() }
     const short = await recordLine(projectFile, 'act1', 'k1', async () => fakeFish().fish, {
       ...options,
@@ -910,7 +915,7 @@ describe('recordLine, a paid model', () => {
     const root = paidRepo()
     const { fish, requests } = fakeFish()
     const result = await recordLine(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'act1',
       'k1',
       async () => fish,
@@ -932,15 +937,15 @@ describe('recordLine, a paid model', () => {
 describe('recordLine, the final recording', () => {
   /** The test project with a paid final model, the draft one free. */
   function finalRepo() {
-    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    const withFinal = JSON.parse(JSON.stringify(files['content-studio.json']))
     withFinal.narration.models = { final: 's2-pro' }
-    return tempRepo({ ...files, 'audio-studio.json': withFinal })
+    return tempRepo({ ...files, 'content-studio.json': withFinal })
   }
   const budget = () => createBudget({ model: 's2-pro', dollars: 1 })
 
   it('records with the final model, and the clip is final', async () => {
     const root = finalRepo()
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const { fish, requests } = fakeFish()
     const result = await recordLine(projectFile, 'act1', 'k1', async () => fish, {
       encode: keepWav,
@@ -959,7 +964,7 @@ describe('recordLine, the final recording', () => {
 
   it('records an up-to-date draft clip again in a final job, but not a final one', async () => {
     const root = finalRepo()
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const options = { encode: keepWav, limiter: createLimiter() }
     await recordLine(projectFile, 'act1', 'k1', async () => fakeFish().fish, options)
     const { fish, requests } = fakeFish()
@@ -982,7 +987,7 @@ describe('recordLine, stages kept apart', () => {
 
   it('records as a draft when the final model is the draft one', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await recordLine(projectFile, 'act1', 'k1', async () => fakeFish().fish, options)
     const { fish, requests } = fakeFish()
     const again = await recordLine(projectFile, 'act1', 'k1', async () => fish, {
@@ -995,10 +1000,10 @@ describe('recordLine, stages kept apart', () => {
   })
 
   it('does not take a weak final clip back to the draft model in a draft job', async () => {
-    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    const withFinal = JSON.parse(JSON.stringify(files['content-studio.json']))
     withFinal.narration.models = { final: 's2-pro' }
-    const root = tempRepo({ ...files, 'audio-studio.json': withFinal })
-    const projectFile = join(root, 'audio-studio.json')
+    const root = tempRepo({ ...files, 'content-studio.json': withFinal })
+    const projectFile = join(root, 'content-studio.json')
     const poor: Transcriber = { transcribe: async () => [], close() {} }
     await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
       ...options,
@@ -1018,10 +1023,10 @@ describe('recordLine, stages kept apart', () => {
   })
 
   it('does not share a draft recording with a final one of the same line', async () => {
-    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    const withFinal = JSON.parse(JSON.stringify(files['content-studio.json']))
     withFinal.narration.models = { final: 's2-pro' }
-    const root = tempRepo({ ...files, 'audio-studio.json': withFinal })
-    const projectFile = join(root, 'audio-studio.json')
+    const root = tempRepo({ ...files, 'content-studio.json': withFinal })
+    const projectFile = join(root, 'content-studio.json')
     const { fish, requests } = fakeFish()
     await Promise.all([
       recordLine(projectFile, 'act1', 'k1', async () => fish, options),
@@ -1041,14 +1046,14 @@ describe('recordLine, stages kept apart', () => {
 describe('recordLine, a draft finishing after a final recording', () => {
   const options = { encode: keepWav, limiter: createLimiter() }
   function finalRepo() {
-    const withFinal = JSON.parse(JSON.stringify(files['audio-studio.json']))
+    const withFinal = JSON.parse(JSON.stringify(files['content-studio.json']))
     withFinal.narration.models = { final: 's2-pro' }
-    return tempRepo({ ...files, 'audio-studio.json': withFinal })
+    return tempRepo({ ...files, 'content-studio.json': withFinal })
   }
 
   it('does not overwrite a final clip that landed meanwhile', async () => {
     const root = finalRepo()
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const { fish } = fakeFish()
     let release!: () => void
     const draftMayAnswer = new Promise<void>((resolve) => (release = resolve))
@@ -1074,7 +1079,7 @@ describe('recordLine, a draft finishing after a final recording', () => {
 
   it('retakes a weak final clip in a final job asked to retake weak lines', async () => {
     const root = finalRepo()
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const poor: Transcriber = { transcribe: async () => [], close() {} }
     const final = {
       ...options,
@@ -1105,7 +1110,7 @@ describe('acceptLine', () => {
 
   async function recordedWith(transcriber: Transcriber) {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const again = () =>
       recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, {
         encode: keepWav,
@@ -1152,7 +1157,7 @@ describe('recording in a language besides the source', () => {
     manifest: 'audio/{part}/{language}/manifest.json',
   }
   const swedish = {
-    'audio-studio.json': several,
+    'content-studio.json': several,
     'tts/cast.json': {
       speakers: {
         narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-n-sv' } } },
@@ -1171,7 +1176,7 @@ describe('recording in a language besides the source', () => {
     ],
     'tts/act1/en/cues.json': { k1: '[worried]' },
   }
-  const projectFile = (root: string) => join(root, 'audio-studio.json')
+  const projectFile = (root: string) => join(root, 'content-studio.json')
   const recordSv = (root: string, key: string, fish: FishClient) =>
     recordLine(projectFile(root), 'act1', key, async () => fish, {
       encode: keepWav,
@@ -1274,7 +1279,7 @@ describe('recording in a language besides the source', () => {
       },
       close() {},
     }
-    await recordLine(join(root, 'audio-studio.json'), 'act1', 'k1', async () => fish, {
+    await recordLine(join(root, 'content-studio.json'), 'act1', 'k1', async () => fish, {
       encode: keepWav,
       limiter: createLimiter(),
       transcriber,
@@ -1322,7 +1327,7 @@ describe('recordLine with an ElevenLabs voice', () => {
     credits = 100,
     fish = fakeFish().fish,
   ) =>
-    recordLine(join(root, 'audio-studio.json'), 'act1', 'k4', async () => fish, {
+    recordLine(join(root, 'content-studio.json'), 'act1', 'k4', async () => fish, {
       encode: keepWav,
       limiter: createLimiter(),
       elevenlabs: async () => eleven,
@@ -1359,7 +1364,7 @@ describe('recordLine with an ElevenLabs voice', () => {
     ;(tuned.narration as { elevenlabs?: unknown }).elevenlabs = {
       tts: { stability: 1, similarityBoost: 0.4, style: 0.3 },
     }
-    writeFileSync(join(root, 'audio-studio.json'), JSON.stringify(tuned))
+    writeFileSync(join(root, 'content-studio.json'), JSON.stringify(tuned))
     const { client, requests } = fakeEleven()
     expect(await recordEleven(root, client)).toMatchObject({ ok: true })
     expect(requests[0]!.settings).toEqual({
@@ -1381,7 +1386,7 @@ describe('recordLine with an ElevenLabs voice', () => {
 
   it('is never charged to the Fish budget, whatever it holds', async () => {
     const result = await recordLine(
-      join(elevenRoot(), 'audio-studio.json'),
+      join(elevenRoot(), 'content-studio.json'),
       'act1',
       'k4',
       async () => fakeFish().fish,
@@ -1405,7 +1410,7 @@ describe('recordLine with an ElevenLabs voice', () => {
       elevenlabs: async () => fakeEleven().client,
       credits: createBudget({ model: 'eleven_v3', dollars: 100 }),
     }
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(
       await recordLine(projectFile, 'act1', 'k4', async () => fakeFish().fish, options),
     ).toMatchObject({ ok: true })

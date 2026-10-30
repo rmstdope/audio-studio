@@ -16,7 +16,7 @@ describe('the problems on a part’s page', () => {
     }
     cast.speakers.narrator!.voice = 42
     writeFileSync(castFile, JSON.stringify(cast, null, 2))
-    const file = join(root, 'audio-studio.json')
+    const file = join(root, 'content-studio.json')
     const project = await loadProject(file)
     const part = await loadPart(file, 'act1')
     if (!project.ok || !part?.ok) throw new Error('the sample did not load')

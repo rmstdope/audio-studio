@@ -83,7 +83,7 @@ export function createStableAudioWorker({
     ready,
     installed: (model) => missingStableAudio(dir, model).length === 0,
     async generate({ model, ...request }, signal) {
-      const out = join(tmpdir(), `audio-studio-music-${randomUUID()}.wav`)
+      const out = join(tmpdir(), `content-studio-music-${randomUUID()}.wav`)
       const stop = () => worker.close()
       signal?.addEventListener('abort', stop, { once: true })
       try {

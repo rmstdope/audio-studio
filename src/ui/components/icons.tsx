@@ -18,11 +18,12 @@ function Stroke({ size = 16, children }: { size?: number; children: ReactNode })
   )
 }
 
-/** The studio's mark: a waveform. */
-export function WaveIcon({ size }: { size?: number }) {
+/** The studio's mark: two stacked layers, for many kinds of content. */
+export function LayersIcon({ size }: { size?: number }) {
   return (
     <Stroke size={size}>
-      <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4" />
+      <path d="M12 3 3 8l9 5 9-5-9-5Z" />
+      <path d="m3 13 9 5 9-5" />
     </Stroke>
   )
 }

@@ -62,7 +62,7 @@ const fish: FishClient = {
 }
 
 const files = {
-  'audio-studio.json': projectJson(),
+  'content-studio.json': projectJson(),
   'tts/cast.json': {
     speakers: { grandmother: { voice: 'cur', style: '[warm]', audition: { keywords: ['warm'] } } },
     pronounce: {},
@@ -77,7 +77,7 @@ describe('findCandidates', () => {
   it('searches with the character’s keywords, leaving out its current voice', async () => {
     const root = tempRepo(files)
     const result = await findCandidates(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'grandmother',
       async () => fish,
     )
@@ -89,7 +89,7 @@ describe('findCandidates', () => {
 
   it('gives the audition phrase and the takes already recorded', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const limiter = createLimiter()
     const recorded = await recordTake(projectFile, 'grandmother', 'w1', async () => fish, limiter)
     const result = await findCandidates(projectFile, 'grandmother', async () => fish)
@@ -101,7 +101,11 @@ describe('findCandidates', () => {
 
   it('reports a broken cast instead of guessing the phrase', async () => {
     const root = tempRepo({ ...files, 'tts/cast.json': '{ broken' })
-    const result = await findCandidates(join(root, 'audio-studio.json'), 'tilda', async () => fish)
+    const result = await findCandidates(
+      join(root, 'content-studio.json'),
+      'tilda',
+      async () => fish,
+    )
     expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
       'tts/cast.json',
     )
@@ -109,7 +113,11 @@ describe('findCandidates', () => {
 
   it('finds nothing for a character without keywords', async () => {
     const root = tempRepo(files)
-    const result = await findCandidates(join(root, 'audio-studio.json'), 'tilda', async () => fish)
+    const result = await findCandidates(
+      join(root, 'content-studio.json'),
+      'tilda',
+      async () => fish,
+    )
     expect(result?.ok && [result.keywords, result.candidates, result.current]).toEqual([
       [],
       [],
@@ -120,7 +128,7 @@ describe('findCandidates', () => {
   it('says so when there is no API key', async () => {
     const root = tempRepo(files)
     const result = await findCandidates(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'grandmother',
       async () => null,
     )
@@ -131,7 +139,7 @@ describe('findCandidates', () => {
     const root = tempRepo(files)
     const failing: FishClient = { ...fish, listVoices: () => Promise.reject('down') }
     const result = await findCandidates(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'grandmother',
       async () => failing,
     )
@@ -142,7 +150,7 @@ describe('findCandidates', () => {
     const root = tempRepo(files)
     const failing: FishClient = { ...fish, listVoices: () => Promise.reject(new Error('boom')) }
     const result = await findCandidates(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'grandmother',
       async () => failing,
     )
@@ -152,7 +160,7 @@ describe('findCandidates', () => {
   it('returns null for a character the project does not have', async () => {
     const root = tempRepo(files)
     expect(
-      await findCandidates(join(root, 'audio-studio.json'), 'nobody', async () => fish),
+      await findCandidates(join(root, 'content-studio.json'), 'nobody', async () => fish),
     ).toBeNull()
   })
 })
@@ -160,7 +168,7 @@ describe('findCandidates', () => {
 describe('characterVoice', () => {
   it('gives the cast voice as Fish knows it, its take and the audition phrase', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const recorded = await recordTake(
       projectFile,
       'grandmother',
@@ -182,7 +190,7 @@ describe('characterVoice', () => {
     let asked = 0
     const counting: FishClient = { ...fish, getVoice: (id) => (asked++, fish.getVoice(id)) }
     const result = await characterVoice(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'tilda',
       async () => counting,
     )
@@ -192,7 +200,7 @@ describe('characterVoice', () => {
 
   it('says why Fish could not give the details, without a key or when it fails', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const keyless = await characterVoice(projectFile, 'grandmother', async () => null)
     expect(keyless).toMatchObject({ ok: true, voice: null })
     expect(keyless?.ok && keyless.lookup?.reason).toBe('no-key')
@@ -212,7 +220,7 @@ describe('characterVoice', () => {
       ...files,
       'tts/cast.json': { speakers: { grandmother: { voice: 'eleven:g1' } }, pronounce: {} },
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const { client: eleven, asked } = fakeEleven({ g1: elevenVoiceOf('g1') })
     const noFish = async () => {
       throw new Error('Fish is not asked about an ElevenLabs voice')
@@ -248,7 +256,7 @@ describe('characterVoice', () => {
   it('reports a broken cast, and answers an unknown character with null', async () => {
     const broken = tempRepo({ ...files, 'tts/cast.json': '{ broken' })
     const result = await characterVoice(
-      join(broken, 'audio-studio.json'),
+      join(broken, 'content-studio.json'),
       'tilda',
       async () => fish,
     )
@@ -257,7 +265,7 @@ describe('characterVoice', () => {
     )
     const root = tempRepo(files)
     expect(
-      await characterVoice(join(root, 'audio-studio.json'), 'nobody', async () => fish),
+      await characterVoice(join(root, 'content-studio.json'), 'nobody', async () => fish),
     ).toBeNull()
   })
 })
@@ -265,7 +273,7 @@ describe('characterVoice', () => {
 describe('setPhrase', () => {
   it('saves a character’s own phrase, and clears it again', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setPhrase(projectFile, 'grandmother', '  Come in, dear.  ')).toEqual({ ok: true })
     let cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.grandmother.audition).toEqual({
@@ -284,7 +292,7 @@ describe('clearing audition fields', () => {
       ...files,
       'tts/cast.json': { speakers: { grandmother: { voice: 'cur' } }, pronounce: {} },
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await setPhrase(projectFile, 'grandmother', null)
     await setKeywords(projectFile, 'grandmother', ['warm'])
     await setKeywords(projectFile, 'grandmother', [])
@@ -298,7 +306,7 @@ describe('clearing audition fields', () => {
       'tts/cast.json':
         '{\n  "speakers": {\n    "grandmother": { "voice": "cur", "audition": { "phrase": "Hi." }, "style": "[warm]" }\n  }\n}\n',
     })
-    await setPhrase(join(root, 'audio-studio.json'), 'grandmother', null)
+    await setPhrase(join(root, 'content-studio.json'), 'grandmother', null)
     expect(readFileSync(join(root, 'tts/cast.json'), 'utf8')).toBe(
       '{\n  "speakers": {\n    "grandmother": { "voice": "cur", "style": "[warm]" }\n  }\n}\n',
     )
@@ -311,19 +319,23 @@ describe('clearing audition fields', () => {
         speakers: { grandmother: { audition: { phrase: null, keywords: ['a'] } } },
       },
     })
-    await setKeywords(join(root, 'audio-studio.json'), 'grandmother', [])
+    await setKeywords(join(root, 'content-studio.json'), 'grandmother', [])
     const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.grandmother).toEqual({})
   })
 
   it('answers an unknown character with null, whatever its phrase', async () => {
     const root = tempRepo(files)
-    expect(await setPhrase(join(root, 'audio-studio.json'), 'nobody', 'x'.repeat(401))).toBeNull()
+    expect(await setPhrase(join(root, 'content-studio.json'), 'nobody', 'x'.repeat(401))).toBeNull()
   })
 
   it('refuses a phrase too long for one take', async () => {
     const root = tempRepo(files)
-    const result = await setPhrase(join(root, 'audio-studio.json'), 'grandmother', 'x'.repeat(401))
+    const result = await setPhrase(
+      join(root, 'content-studio.json'),
+      'grandmother',
+      'x'.repeat(401),
+    )
     expect(result && !result.ok && 'problems' in result && result.problems[0]!.message).toContain(
       '400',
     )
@@ -333,7 +345,7 @@ describe('clearing audition fields', () => {
 describe('setKeywords', () => {
   it('saves the keywords in the cast, keeping the rest of the entry', async () => {
     const root = tempRepo(files)
-    const result = await setKeywords(join(root, 'audio-studio.json'), 'grandmother', [
+    const result = await setKeywords(join(root, 'content-studio.json'), 'grandmother', [
       ' old ',
       'warm',
       'old',
@@ -349,7 +361,7 @@ describe('setKeywords', () => {
 
   it('keeps both of two changes made at once', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await Promise.all([
       setKeywords(projectFile, 'grandmother', ['old']),
       setKeywords(projectFile, 'tilda', ['chatty']),
@@ -361,7 +373,12 @@ describe('setKeywords', () => {
 
   it('treats keywords differing only in case as one, and drops ones without words', async () => {
     const root = tempRepo(files)
-    await setKeywords(join(root, 'audio-studio.json'), 'grandmother', ['Warm', 'warm', '-', 'old'])
+    await setKeywords(join(root, 'content-studio.json'), 'grandmother', [
+      'Warm',
+      'warm',
+      '-',
+      'old',
+    ])
     const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.grandmother.audition.keywords).toEqual(['Warm', 'old'])
   })
@@ -371,7 +388,7 @@ describe('setKeywords', () => {
       '{\n  "pronounce": { "Act I:": "Act One:" },\n  "speakers": {\n' +
       '    "grandmother": { "voice": "cur" }\n  },\n  "notes": "keep me"\n}\n'
     const root = tempRepo({ ...files, 'tts/cast.json': original })
-    await setKeywords(join(root, 'audio-studio.json'), 'grandmother', ['old'])
+    await setKeywords(join(root, 'content-studio.json'), 'grandmother', ['old'])
     expect(readFileSync(join(root, 'tts/cast.json'), 'utf8')).toBe(
       '{\n  "pronounce": { "Act I:": "Act One:" },\n  "speakers": {\n' +
         '    "grandmother": { "voice": "cur", "audition": { "keywords": ["old"] } }\n' +
@@ -384,7 +401,7 @@ describe('setKeywords', () => {
       ...files,
       'tts/cast.json': { speakers: {}, pronounce: { '1': 'one' } },
     })
-    const result = await setKeywords(join(root, 'audio-studio.json'), 'tilda', ['chatty'])
+    const result = await setKeywords(join(root, 'content-studio.json'), 'tilda', ['chatty'])
     expect(result).toEqual({ ok: true })
   })
 
@@ -393,7 +410,7 @@ describe('setKeywords', () => {
       ...files,
       'tts/cast.json': { speakers: {}, pronounce: { 'Act I:': 'Act One:', '10': 'ten' } },
     })
-    const result = await setKeywords(join(root, 'audio-studio.json'), 'tilda', ['chatty'])
+    const result = await setKeywords(join(root, 'content-studio.json'), 'tilda', ['chatty'])
     expect(result && !result.ok && 'problems' in result && result.problems[0]!.message).toContain(
       '"10"',
     )
@@ -401,14 +418,14 @@ describe('setKeywords', () => {
 
   it('adds an entry for a speaker not in the cast yet', async () => {
     const root = tempRepo(files)
-    await setKeywords(join(root, 'audio-studio.json'), 'tilda', ['chatty'])
+    await setKeywords(join(root, 'content-studio.json'), 'tilda', ['chatty'])
     const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.tilda).toEqual({ audition: { keywords: ['chatty'] } })
   })
 
   it('creates the cast file if there is none', async () => {
     const root = tempRepo({ ...files, 'tts/cast.json': undefined })
-    await setKeywords(join(root, 'audio-studio.json'), 'tilda', ['chatty'])
+    await setKeywords(join(root, 'content-studio.json'), 'tilda', ['chatty'])
     const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast).toEqual({
       speakers: { tilda: { audition: { keywords: ['chatty'] } } },
@@ -418,7 +435,7 @@ describe('setKeywords', () => {
 
   it('refuses to write over a broken cast', async () => {
     const root = tempRepo({ ...files, 'tts/cast.json': '{ broken' })
-    const result = await setKeywords(join(root, 'audio-studio.json'), 'tilda', ['chatty'])
+    const result = await setKeywords(join(root, 'content-studio.json'), 'tilda', ['chatty'])
     expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
       'tts/cast.json',
     )
@@ -427,7 +444,7 @@ describe('setKeywords', () => {
 
   it('returns null for a character the project does not have', async () => {
     const root = tempRepo(files)
-    expect(await setKeywords(join(root, 'audio-studio.json'), 'nobody', ['x'])).toBeNull()
+    expect(await setKeywords(join(root, 'content-studio.json'), 'nobody', ['x'])).toBeNull()
   })
 })
 
@@ -439,7 +456,7 @@ describe('setVoice', () => {
         speakers: { grandmother: { voiceName: 'Old', style: '[w]', voice: 'cur' } },
       },
     })
-    await setVoice(join(root, 'audio-studio.json'), 'grandmother', { id: 'v', name: 'New' })
+    await setVoice(join(root, 'content-studio.json'), 'grandmother', { id: 'v', name: 'New' })
     const cast = readFileSync(join(root, 'tts/cast.json'), 'utf8')
     expect(cast).toContain('"grandmother": { "style": "[w]", "voice": "v", "voiceName": "New" }')
   })
@@ -449,7 +466,7 @@ describe('setVoice', () => {
       ...files,
       'tts/cast.json': { speakers: { grandmother: { voiceName: 'Old', style: '[w]' } } },
     })
-    await setVoice(join(root, 'audio-studio.json'), 'grandmother', { id: 'v', name: 'New' })
+    await setVoice(join(root, 'content-studio.json'), 'grandmother', { id: 'v', name: 'New' })
     const cast = readFileSync(join(root, 'tts/cast.json'), 'utf8')
     expect(cast).toContain('"grandmother": { "style": "[w]", "voice": "v", "voiceName": "New" }')
   })
@@ -458,7 +475,7 @@ describe('setVoice', () => {
 describe('setSpeed', () => {
   it('saves a character’s own speed, and removes it when cleared', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setSpeed(projectFile, 'grandmother', 0.85)).toEqual({ ok: true })
     let cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.grandmother).toEqual({
@@ -480,7 +497,7 @@ describe('setSpeed', () => {
 describe('setStyle', () => {
   it('saves a character’s style cue, trimmed, keeping the rest of the entry', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setStyle(projectFile, 'grandmother', '  [tired, kind]  ')).toEqual({ ok: true })
     const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.grandmother).toEqual({
@@ -492,7 +509,7 @@ describe('setStyle', () => {
 
   it('removes the style when it is cleared', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await setStyle(projectFile, 'grandmother', ' ')
     const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.grandmother).toEqual({ voice: 'cur', audition: { keywords: ['warm'] } })
@@ -500,7 +517,7 @@ describe('setStyle', () => {
 
   it('gives a character not yet in the cast an entry', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setStyle(projectFile, 'tilda', '[bright]')).toEqual({ ok: true })
     const cast = JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8'))
     expect(cast.speakers.tilda).toEqual({ style: '[bright]' })
@@ -508,7 +525,7 @@ describe('setStyle', () => {
 
   it('knows no unknown character', async () => {
     const root = tempRepo(files)
-    expect(await setStyle(join(root, 'audio-studio.json'), 'nobody', '[x]')).toBeNull()
+    expect(await setStyle(join(root, 'content-studio.json'), 'nobody', '[x]')).toBeNull()
   })
 })
 
@@ -551,7 +568,7 @@ describe('setPronunciations', () => {
       ['Act I:', 'Act One:'],
       ['Willowbrook', 'Willow brook'],
     ]
-    expect(await setPronunciations(join(root, 'audio-studio.json'), table, was)).toEqual({
+    expect(await setPronunciations(join(root, 'content-studio.json'), table, was)).toEqual({
       ok: true,
     })
     const text = readFileSync(join(root, 'tts/cast.json'), 'utf8')
@@ -566,9 +583,9 @@ describe('setPronunciations', () => {
   it('saves a language’s table apart from the source language’s', async () => {
     const root = tempRepo({
       ...withTable,
-      'audio-studio.json': languageProject(),
+      'content-studio.json': languageProject(),
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setPronunciations(projectFile, [['Eldoria', 'Eld-or-ia']], [], 'sv')).toEqual({
       ok: true,
     })
@@ -586,7 +603,7 @@ describe('setPronunciations', () => {
   it('refuses when the table changed since the page showed it', async () => {
     const root = tempRepo(withTable)
     const result = await setPronunciations(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       [],
       [['Act I:', 'Act One:']],
     )
@@ -602,7 +619,7 @@ describe('setPronunciations', () => {
 
   it('starts a cast when there is none', async () => {
     const root = tempRepo({ ...files, 'tts/cast.json': undefined })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setPronunciations(projectFile, [['Eldoria', 'El-door-ia']], [])).toEqual({
       ok: true,
     })
@@ -617,7 +634,7 @@ describe('setPronunciations', () => {
       ...withTable,
       'tts/cast.json': { speakers: {}, pronounce: { Eldoria: 'x', '10': 'ten' } },
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const shown: [string, string][] = [
       ['10', 'ten'],
       ['Eldoria', 'x'],
@@ -635,13 +652,13 @@ describe('setPronunciations', () => {
   it('refuses a character change that would reorder a language’s number key, too', async () => {
     const root = tempRepo({
       ...withTable,
-      'audio-studio.json': languageProject(),
+      'content-studio.json': languageProject(),
       'tts/cast.json': {
         speakers: { grandmother: { voice: 'cur' } },
         languages: { sv: { pronounce: { Eldoria: 'x', '10': 'tio' } } },
       },
     })
-    const result = await setStyle(join(root, 'audio-studio.json'), 'grandmother', '[x]')
+    const result = await setStyle(join(root, 'content-studio.json'), 'grandmother', '[x]')
     expect(result).toMatchObject({
       ok: false,
       problems: [{ file: 'tts/cast.json', path: 'languages.sv.pronounce' }],
@@ -651,13 +668,13 @@ describe('setPronunciations', () => {
   it('does not reorder another language’s number key by saving a table', async () => {
     const root = tempRepo({
       ...withTable,
-      'audio-studio.json': languageProject(),
+      'content-studio.json': languageProject(),
       'tts/cast.json': {
         speakers: { grandmother: { voice: 'cur' } },
         pronounce: { Eldoria: 'x', '10': 'ten' },
       },
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const before = readFileSync(join(root, 'tts/cast.json'), 'utf8')
     expect(await setPronunciations(projectFile, [['Kom', 'Komm']], [], 'sv')).toMatchObject({
       ok: false,
@@ -668,7 +685,7 @@ describe('setPronunciations', () => {
 
   it('keeps a character change made at the same time', async () => {
     const root = tempRepo(withTable)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await Promise.all([
       setStyle(projectFile, 'grandmother', '[tired]'),
       setPronunciations(projectFile, [['Eldoria', 'El-dor-ia']], was),
@@ -681,7 +698,7 @@ describe('setPronunciations', () => {
   it('refuses a table with a problem', async () => {
     const root = tempRepo(withTable)
     const result = await setPronunciations(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       [['', 'El-door-ia']],
       was,
     )
@@ -694,7 +711,7 @@ describe('casting per language', () => {
     const base = projectJson()
     return {
       ...files,
-      'audio-studio.json': {
+      'content-studio.json': {
         ...base,
         narration: {
           ...(base.narration as object),
@@ -715,7 +732,7 @@ describe('casting per language', () => {
 
   it('casts a voice for one language only, leaving the source language alone', async () => {
     const root = tempRepo(several())
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(
       await setVoice(projectFile, 'grandmother', { id: 'v', name: 'Varm Mormor' }, 'sv'),
     ).toEqual({ ok: true })
@@ -729,7 +746,7 @@ describe('casting per language', () => {
 
   it('saves a speed and a phrase for one language, and removes what is cleared', async () => {
     const root = tempRepo(several())
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await setSpeed(projectFile, 'grandmother', 0.95, 'sv')
     await setPhrase(projectFile, 'grandmother', ' Kom in. ', 'sv')
     expect(cast(root).speakers.grandmother.languages).toEqual({
@@ -743,14 +760,14 @@ describe('casting per language', () => {
 
   it('treats a language the project does not declare as the source language', async () => {
     const root = tempRepo(several())
-    await setSpeed(join(root, 'audio-studio.json'), 'grandmother', 0.8, 'fr')
+    await setSpeed(join(root, 'content-studio.json'), 'grandmother', 0.8, 'fr')
     expect(cast(root).speakers.grandmother.speed).toBe(0.8)
   })
 
   it('names a too-long phrase at its place in the language', async () => {
     const root = tempRepo(several())
     const result = await setPhrase(
-      join(root, 'audio-studio.json'),
+      join(root, 'content-studio.json'),
       'grandmother',
       'x'.repeat(401),
       'sv',
@@ -764,7 +781,7 @@ describe('casting per language', () => {
   describe('searching, listening', () => {
     const withCast = (cast: unknown, phrases: Record<string, string> = {}) => {
       const f = several()
-      const narration = f['audio-studio.json'].narration as { audition?: unknown }
+      const narration = f['content-studio.json'].narration as { audition?: unknown }
       narration.audition = { phrases }
       return { ...f, 'tts/cast.json': cast }
     }
@@ -790,7 +807,7 @@ describe('casting per language', () => {
       const root = tempRepo(withCast({ speakers: { grandmother } }, { sv: 'Kom in, barn.' }))
       const { languages, client } = spy()
       const result = await findCandidates(
-        join(root, 'audio-studio.json'),
+        join(root, 'content-studio.json'),
         'grandmother',
         async () => client,
         {},
@@ -814,7 +831,7 @@ describe('casting per language', () => {
         ],
       })
       const result = await findCandidates(
-        join(root, 'audio-studio.json'),
+        join(root, 'content-studio.json'),
         'grandmother',
         async () => fish,
         {},
@@ -832,7 +849,7 @@ describe('casting per language', () => {
           speakers: { grandmother: { ...grandmother, languages: { sv: { voice: 'w1' } } } },
         }),
       )
-      const projectFile = join(root, 'audio-studio.json')
+      const projectFile = join(root, 'content-studio.json')
       const sv = await characterVoice(projectFile, 'grandmother', async () => fish, 'sv')
       expect(sv).toMatchObject({ ok: true, id: 'w1', language: 'sv' })
       const de = await characterVoice(projectFile, 'grandmother', async () => fish, 'de')
@@ -842,7 +859,7 @@ describe('casting per language', () => {
     it('records a take of the language’s phrase, and none without a phrase', async () => {
       const f = withCast({ speakers: { grandmother } }, { sv: 'Kom in.' })
       const root = tempRepo(f)
-      const projectFile = join(root, 'audio-studio.json')
+      const projectFile = join(root, 'content-studio.json')
       const limiter = createLimiter()
       const en = await recordTake(projectFile, 'grandmother', 'w1', async () => fish, limiter)
       const sv = await recordTake(
@@ -858,7 +875,7 @@ describe('casting per language', () => {
       expect(sv?.ok && sv.spoken).toBe('[warm] Kom in.')
       const none = tempRepo(withCast({ speakers: { grandmother } }))
       const refused = await recordTake(
-        join(none, 'audio-studio.json'),
+        join(none, 'content-studio.json'),
         'grandmother',
         'w1',
         async () => fish,

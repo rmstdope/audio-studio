@@ -13,7 +13,7 @@ import { readJson, writeAtomic } from './files'
 import { createSerial } from './serial'
 
 /** The voices the studio added from ElevenLabs' library, in the project's tool cache. */
-export const ELEVEN_VOICES_FILE = '.audio-studio/eleven-voices.json'
+export const ELEVEN_VOICES_FILE = '.content-studio/eleven-voices.json'
 
 /** Additions to a project's voices, one at a time, so a library voice is added once. */
 const writes = createSerial()

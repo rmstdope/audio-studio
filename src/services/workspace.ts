@@ -6,6 +6,7 @@ import { basename, dirname, join } from 'node:path'
 import { soundAlikes, type SoundAlike } from '../core/align'
 import { capitalisesNouns, languageName } from '../core/languages'
 import { resolveInRoot } from '../core/paths'
+import { noProjectMessage, renameNotice, type FoundNames } from '../core/renames'
 import { NotesSchema, emptyNotes, type Notes } from '../core/notes'
 import {
   adoptUntracked,
@@ -15,6 +16,8 @@ import {
   type PlanInput,
 } from '../core/planner'
 import {
+  OLD_PROJECT_FILE,
+  OLD_STATE_DIR,
   PROJECT_FILE,
   ProjectSchema,
   declaredLanguage,
@@ -55,16 +58,32 @@ import { readImages } from './imageLists'
 import { gameFilePath, readMusic } from './musicLists'
 import { inPartTurn } from './partFiles'
 
-/** The project file in `start` or the nearest directory above it that has one; null if none. */
-export function findProjectFile(start: string): string | null {
+/** Where the project file is, or the message to print instead of starting the studio. */
+export type Located = { ok: true; file: string } | { ok: false; message: string }
+
+/**
+ * Finds the project file to open: `explicit` when given, else `content-studio.json` in `start` or
+ * the nearest folder above it that has it or the old `audio-studio.json`. A game still on the
+ * old names is not opened: the message lists the renames left, and nothing is read from them.
+ */
+export function locateProject(start: string, explicit?: string): Located {
+  if (explicit) return opening(dirname(explicit), explicit, { oldFile: false, newFile: true })
   let dir = start
   for (;;) {
-    const candidate = join(dir, PROJECT_FILE)
-    if (isFile(candidate)) return candidate
+    const oldFile = isFile(join(dir, OLD_PROJECT_FILE))
+    const newFile = isFile(join(dir, PROJECT_FILE))
+    if (oldFile || newFile) return opening(dir, join(dir, PROJECT_FILE), { oldFile, newFile })
     const parent = dirname(dir)
-    if (parent === dir) return null
+    if (parent === dir) return { ok: false, message: noProjectMessage(start) }
     dir = parent
   }
+}
+
+/** `file` to open, unless the old names found in `dir` (a leftover old folder too) say to stop. */
+function opening(dir: string, file: string, found: Omit<FoundNames, 'oldFolder'>): Located {
+  const oldFolder = isDirectory(join(dir, OLD_STATE_DIR))
+  const message = renameNotice({ ...found, oldFolder })
+  return message ? { ok: false, message } : { ok: true, file }
 }
 
 /** Why `path` cannot be used as a project file, or null if it can. */
@@ -177,7 +196,7 @@ export async function loadWorkspace(projectFile: string): Promise<
 }
 
 /** Where the user's notes on each part's lines are kept, in the project's tool cache. */
-export const NOTES_DIR = '.audio-studio/notes'
+export const NOTES_DIR = '.content-studio/notes'
 
 /**
  * The notes on a part's lines: none if there is no file. A file that cannot be read or does not
@@ -613,6 +632,14 @@ function projectPaths(project: Project): [string, string][] {
     }
   }
   return paths
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
 }
 
 function isFile(path: string): boolean {

@@ -28,8 +28,8 @@ export function NoMusic() {
         <strong>This project has no music yet</strong>
         <span>
           Add a <span className="mono">music</span> section to{' '}
-          <span className="mono">audio-studio.json</span> to say where the game lists its tracks and
-          where their files go, then reload.
+          <span className="mono">content-studio.json</span> to say where the game lists its tracks
+          and where their files go, then reload.
         </span>
         <button className="btn" type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
           How to set it up

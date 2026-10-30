@@ -9,7 +9,7 @@ import {
   MusicIcon,
   PeopleIcon,
   SpeakerIcon,
-  WaveIcon,
+  LayersIcon,
   ChangesIcon,
   SpendingIcon,
   CheckIcon,
@@ -40,9 +40,9 @@ export function Sidebar({
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark">
-          <WaveIcon size={18} />
+          <LayersIcon size={18} />
         </div>
-        <span className="brand-name">Audio Studio</span>
+        <span className="brand-name">Content Studio</span>
       </div>
 
       <div className="project-box">

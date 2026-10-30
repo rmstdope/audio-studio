@@ -22,8 +22,8 @@ const gravel: Voice = {
 
 /** A project, and a client that adds library voices as `own-<id>`, counting what it added. */
 function setUp() {
-  const root = tempRepo({ 'audio-studio.json': projectJson() })
-  const projectFile = join(root, 'audio-studio.json')
+  const root = tempRepo({ 'content-studio.json': projectJson() })
+  const projectFile = join(root, 'content-studio.json')
   const { client } = fakeEleven()
   const added: string[] = []
   client.addSharedVoice = async (owner, id, name) => {

@@ -21,7 +21,7 @@ describe('the tier menu', () => {
           ok: false,
           problems: [
             {
-              file: 'audio-studio.json',
+              file: 'content-studio.json',
               path: 'narration.quality.fishTier',
               message: 'permission denied',
             },

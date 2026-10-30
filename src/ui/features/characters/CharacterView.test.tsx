@@ -52,7 +52,7 @@ const summary: ProjectSummary = {
   models: { draft: 's2.1-pro', final: 's2.1-pro' },
   speed: 1,
   takeFade: 0.2,
-  projectFile: 'audio-studio.json',
+  projectFile: 'content-studio.json',
   music: null,
   images: null,
   problems: [],

@@ -7,7 +7,7 @@ import { loadPart, readPart } from './workspace'
 import { moveCue, moveSceneCue, setCue, setInsideCue, setSceneCue } from './cues'
 
 const files = {
-  'audio-studio.json': projectJson(),
+  'content-studio.json': projectJson(),
   'tts/cast.json': { speakers: { mira: { voice: 'v1', style: '[warm]' } }, pronounce: {} },
   'tts/act1/script.json': [
     { key: 'a', speaker: 'mira', text: 'Hello.' },
@@ -18,7 +18,7 @@ const files = {
 describe('setCue', () => {
   it('creates the cues file with the first cue', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setCue(projectFile, 'act1', 'a', '  [whispering]  ')).toEqual({ ok: true })
     expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe(
       '{\n  "a": "[whispering]"\n}\n',
@@ -27,7 +27,7 @@ describe('setCue', () => {
 
   it('keeps the file’s own order and its other cues, adding a new cue at the end', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const cuesFile = join(root, 'tts/act1/cues.json')
     writeFileSync(cuesFile, '{\n  "zz": "[old]",\n  "b": "[sad]"\n}\n')
     await setCue(projectFile, 'act1', 'a', '[happy]')
@@ -39,7 +39,7 @@ describe('setCue', () => {
 
   it('removes a cleared cue, so the line goes back to the character’s style', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await setCue(projectFile, 'act1', 'a', '[happy]')
     await setCue(projectFile, 'act1', 'a', '')
     expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe('{}\n')
@@ -53,7 +53,7 @@ describe('setCue', () => {
 
   it('delivers the line with its own cue from then on', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await setCue(projectFile, 'act1', 'b', '[sad]')
     const part = await loadPart(projectFile, 'act1')
     expect(part?.ok && part.part.lines.find((l) => l.key === 'b')).toMatchObject({
@@ -65,7 +65,7 @@ describe('setCue', () => {
 
   it('refuses a broken cues file instead of overwriting it', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     writeFileSync(join(root, 'tts/act1/cues.json'), '{ broken')
     const result = await setCue(projectFile, 'act1', 'a', '[x]')
     expect(result).toMatchObject({ ok: false, problems: [{ file: 'tts/act1/cues.json' }] })
@@ -74,7 +74,7 @@ describe('setCue', () => {
 
   it('writes nothing when the cue does not change', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const cuesFile = join(root, 'tts/act1/cues.json')
     expect(await setCue(projectFile, 'act1', 'a', '')).toEqual({ ok: true })
     expect(existsSync(cuesFile)).toBe(false)
@@ -93,7 +93,7 @@ describe('setCue', () => {
       ],
       'tts/act1/cues.json': { b: '[sad]' },
     })
-    const result = await setCue(join(root, 'audio-studio.json'), 'act1', '10', '[x]')
+    const result = await setCue(join(root, 'content-studio.json'), 'act1', '10', '[x]')
     expect(result).toMatchObject({ ok: false, problems: [{ file: 'tts/act1/cues.json' }] })
     expect(JSON.parse(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8'))).toEqual({
       b: '[sad]',
@@ -105,7 +105,7 @@ describe('setCue', () => {
       ...files,
       'tts/act1/script.json': [{ key: '__proto__', speaker: 'mira', text: 'Odd.' }],
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setCue(projectFile, 'act1', '__proto__', '[odd]')).toEqual({ ok: true })
     expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe(
       '{\n  "__proto__": "[odd]"\n}\n',
@@ -114,7 +114,7 @@ describe('setCue', () => {
 
   it('knows no unknown part or line', async () => {
     const root = tempRepo(files)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setCue(projectFile, 'act9', 'a', '[x]')).toBeNull()
     expect(await setCue(projectFile, 'act1', 'nope', '[x]')).toBeNull()
   })
@@ -128,7 +128,7 @@ describe('moveCue', () => {
 
   it('gives an orphaned cue to a line, in its place in the file', async () => {
     const root = tempRepo(withOrphan)
-    expect(await moveCue(join(root, 'audio-studio.json'), 'act1', 'gone', 'a')).toEqual({
+    expect(await moveCue(join(root, 'content-studio.json'), 'act1', 'gone', 'a')).toEqual({
       ok: true,
     })
     expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe(
@@ -138,17 +138,17 @@ describe('moveCue', () => {
 
   it('keeps every cue while the dialog is gone', async () => {
     const root = tempRepo({
-      'audio-studio.json': projectJson(),
+      'content-studio.json': projectJson(),
       'tts/act1/cues.json': { gone: '[sad]' },
     })
-    const result = await moveCue(join(root, 'audio-studio.json'), 'act1', 'gone', null)
+    const result = await moveCue(join(root, 'content-studio.json'), 'act1', 'gone', null)
     expect(result).toMatchObject({ ok: false, problems: [{ file: 'tts/act1/cues.json' }] })
     expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toContain('gone')
   })
 
   it('removes an orphaned cue', async () => {
     const root = tempRepo(withOrphan)
-    expect(await moveCue(join(root, 'audio-studio.json'), 'act1', 'gone', null)).toEqual({
+    expect(await moveCue(join(root, 'content-studio.json'), 'act1', 'gone', null)).toEqual({
       ok: true,
     })
     expect(readFileSync(join(root, 'tts/act1/cues.json'), 'utf8')).toBe(
@@ -158,7 +158,7 @@ describe('moveCue', () => {
 
   it('refuses a line that already has its own cue, and a cue that is not orphaned', async () => {
     const root = tempRepo(withOrphan)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await moveCue(projectFile, 'act1', 'gone', 'b')).toMatchObject({
       ok: false,
       problems: [{ path: 'b' }],
@@ -171,7 +171,7 @@ describe('moveCue', () => {
 
   it('knows no unknown cue or line', async () => {
     const root = tempRepo(withOrphan)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await moveCue(projectFile, 'act1', 'nope', 'a')).toBeNull()
     expect(await moveCue(projectFile, 'act1', 'gone', 'nope')).toBeNull()
   })
@@ -189,7 +189,7 @@ describe('cues in a language besides the source', () => {
     manifest: 'audio/{part}/{language}/manifest.json',
   }
   const swedish = {
-    'audio-studio.json': several,
+    'content-studio.json': several,
     'tts/cast.json': {
       speakers: { mira: { voice: 'v1', style: '[warm]', languages: { sv: { voice: 'v2' } } } },
     },
@@ -204,7 +204,7 @@ describe('cues in a language besides the source', () => {
 
   it('gives the line its own cue in that language only, never changing the source’s', async () => {
     const root = tempRepo(swedish)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setCue(projectFile, 'act1', 'a', '[mjukt]', 'sv')).toEqual({ ok: true })
     expect(readFileSync(join(root, 'tts/act1/sv/cues.json'), 'utf8')).toBe(
       '{\n  "a": "[mjukt]"\n}\n',
@@ -218,7 +218,7 @@ describe('cues in a language besides the source', () => {
 
   it('goes back to following the source cue when its own is cleared', async () => {
     const root = tempRepo(swedish)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await setCue(projectFile, 'act1', 'a', '[mjukt]', 'sv')
     await setCue(projectFile, 'act1', 'a', '', 'sv')
     expect(await cueOf(projectFile, 'sv')).toMatchObject({ cue: '[worried]', cueFrom: 'source' })
@@ -226,7 +226,7 @@ describe('cues in a language besides the source', () => {
 
   it('moves an orphaned cue of the language to a line of it', async () => {
     const root = tempRepo({ ...swedish, 'tts/act1/sv/cues.json': '{\n  "old": "[x]"\n}\n' })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await moveCue(projectFile, 'act1', 'old', 'a', 'sv')).toEqual({ ok: true })
     expect(await cueOf(projectFile, 'sv')).toMatchObject({ cue: '[x]', cueFrom: 'own' })
   })
@@ -245,7 +245,7 @@ describe('scene cues', () => {
 
   it('saves a scene’s cue under scene:<name>, after the others, and the narrator follows it', async () => {
     const root = tempRepo({ ...scened, 'tts/act1/cues.json': '{\n  "b": "[sad]"\n}\n' })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setSceneCue(projectFile, 'act1', 'Cave', ' [dark] ')).toEqual({ ok: true })
     expect(cuesOf(root)).toBe('{\n  "b": "[sad]",\n  "scene:Cave": "[dark]"\n}\n')
     const part = await loadPart(projectFile, 'act1')
@@ -257,7 +257,7 @@ describe('scene cues', () => {
 
   it('removes the cue when it is cleared, and writes nothing when it does not change', async () => {
     const root = tempRepo(scened)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     await setSceneCue(projectFile, 'act1', 'Cave', '[dark]')
     const before = cuesOf(root)
     await setSceneCue(projectFile, 'act1', 'Cave', '[dark]')
@@ -268,7 +268,7 @@ describe('scene cues', () => {
 
   it('knows no unknown scene or part', async () => {
     const root = tempRepo(scened)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await setSceneCue(projectFile, 'act1', 'Nowhere', '[x]')).toBeNull()
     expect(await setSceneCue(projectFile, 'nope', 'Cave', '[x]')).toBeNull()
   })
@@ -278,17 +278,17 @@ describe('scene cues', () => {
       ...scened,
       'tts/act1/cues.json': '{\n  "scene:Gone": "[old]",\n  "scene:Cave": "[dark]"\n}\n',
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     expect(await moveSceneCue(projectFile, 'act1', 'Cave', 'Meadow')).toMatchObject({ ok: false })
     expect(await moveSceneCue(projectFile, 'act1', 'Gone', 'Cave')).toMatchObject({ ok: false })
     expect(await moveSceneCue(projectFile, 'act1', 'Gone', 'Meadow')).toEqual({ ok: true })
     expect(cuesOf(root)).toBe('{\n  "scene:Meadow": "[old]",\n  "scene:Cave": "[dark]"\n}\n')
     const other = tempRepo({ ...scened, 'tts/act1/cues.json': { 'scene:Gone': '[old]' } })
-    expect(await moveSceneCue(join(other, 'audio-studio.json'), 'act1', 'Gone', null)).toEqual({
+    expect(await moveSceneCue(join(other, 'content-studio.json'), 'act1', 'Gone', null)).toEqual({
       ok: true,
     })
     expect(cuesOf(other)).toBe('{}\n')
-    expect(await moveSceneCue(join(other, 'audio-studio.json'), 'act1', 'Gone', null)).toBeNull()
+    expect(await moveSceneCue(join(other, 'content-studio.json'), 'act1', 'Gone', null)).toBeNull()
   })
 
   it('follows the source language’s scene name, and writes the language’s own cue only', async () => {
@@ -303,7 +303,7 @@ describe('scene cues', () => {
       manifest: 'audio/{part}/{language}/manifest.json',
     }
     const root = tempRepo({
-      'audio-studio.json': several,
+      'content-studio.json': several,
       'tts/cast.json': {
         speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v2' } } } },
       },
@@ -311,7 +311,7 @@ describe('scene cues', () => {
       'tts/act1/sv/script.json': [{ key: 'a', speaker: 'narrator', text: 'Hej.' }],
       'tts/act1/en/cues.json': { 'scene:Cave': '[dark]' },
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const line = async () => {
       const part = await loadPart(projectFile, 'act1', 'sv')
       return part?.ok ? part.part.lines[0] : undefined
@@ -350,7 +350,7 @@ describe('cues inside a line', () => {
 
   it('saves a cue at a gap with its brackets, and the line is stale for it', async () => {
     const root = tempRepo(inside)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const result = await setInsideCue(projectFile, 'act1', 'a', {
       at: 3,
       cue: ' resolute ',
@@ -368,7 +368,7 @@ describe('cues inside a line', () => {
 
   it('replaces the cue at a gap, removes it when empty, and drops the entry when nothing is left', async () => {
     const root = tempRepo(inside)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const text = 'I did it. I will fix it.'
     await setInsideCue(projectFile, 'act1', 'a', { at: 3, cue: '[a]', text })
     await setInsideCue(projectFile, 'act1', 'a', { at: 3, cue: '[b]', text })
@@ -381,7 +381,7 @@ describe('cues inside a line', () => {
 
   it('keeps the opening cue, and the opening cue edit keeps the cues inside', async () => {
     const root = tempRepo(inside)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const text = 'I did it. I will fix it.'
     await setCue(projectFile, 'act1', 'a', '[ashamed]')
     await setInsideCue(projectFile, 'act1', 'a', { at: 3, cue: '[resolute]', text })
@@ -393,7 +393,7 @@ describe('cues inside a line', () => {
 
   it('refuses a cue when the words changed since the page showed them', async () => {
     const root = tempRepo(inside)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const result = await setInsideCue(projectFile, 'act1', 'a', {
       at: 3,
       cue: '[a]',
@@ -408,7 +408,7 @@ describe('cues inside a line', () => {
 
   it('refuses a place that is not between two words', async () => {
     const root = tempRepo(inside)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const text = 'I did it. I will fix it.'
     for (const at of [0, 7, 2.5]) {
       expect(await setInsideCue(projectFile, 'act1', 'a', { at, cue: '[a]', text })).toMatchObject({
@@ -419,7 +419,7 @@ describe('cues inside a line', () => {
 
   it('replaces an entry whose words no longer fit when the opening cue is set again', async () => {
     const root = tempRepo(inside)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     writeFileSync(
       join(root, 'tts/act1/cues.json'),
       '{\n  "a": "[old] I did it. [x] I will mend it."\n}\n',
@@ -430,7 +430,7 @@ describe('cues inside a line', () => {
 
   it('places a cue on a stale entry afresh, dropping the old one', async () => {
     const root = tempRepo(inside)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     writeFileSync(
       join(root, 'tts/act1/cues.json'),
       '{\n  "a": "[old] I did it. [x] I will mend it."\n}\n',
@@ -451,7 +451,7 @@ describe('cues inside a line', () => {
         { key: 'b', speaker: 'mira', text: '[E] to open the door' },
       ],
     })
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const text = 'I did it. I will fix it.'
     await setInsideCue(projectFile, 'act1', 'a', { at: 2, cue: '[keep]', text })
     for (const cue of ['very [sad] slowly', 'sad]']) {
@@ -471,7 +471,7 @@ describe('cues inside a line', () => {
 
   it('keeps the free text of an opening cue when the words changed and a cue is placed again', async () => {
     const root = tempRepo(inside)
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     writeFileSync(
       join(root, 'tts/act1/cues.json'),
       '{\n  "a": "[sad] very slowly I did it. [x] I will mend it."\n}\n',

@@ -1,11 +1,11 @@
-# Audio Studio
+# Content Studio
 
 ## The project
 
 A local, graphical tool for producing a game's audio, starting with narration: casting a voice per
 character by audition on Fish Audio, and recording every line of dialog with it. It runs from
 inside a checked-out game repository (the _consumer_, first of all RetroQuest), reads that
-repository's `audio-studio.json`, and writes voice files and their metadata in place.
+repository's `content-studio.json`, and writes voice files and their metadata in place.
 
 `docs/architecture.md` is the design: read it before changing how the tool works, and keep it up to
 date in the same change when the design moves. Its delivery plan (§12) says what comes next.
@@ -51,7 +51,7 @@ text when needed) instead of guessing.
 ## Layout
 
 ```
-bin/audio-studio.ts   CLI: find the project file, start the server, open the browser
+bin/content-studio.ts CLI: find the project file, start the server, open the browser
 src/core/             pure logic: schemas, fingerprint, planner, text rules (no I/O)
 src/services/         I/O: reading and writing the consumer's files, later Fish, Whisper, ffmpeg
 src/server/           Bun.serve: JSON API and the UI
@@ -94,7 +94,7 @@ bundle breaks.
 - Never run git commands that change the consumer (`add`, `commit`, `push`, `checkout`). The user
   commits; the studio at most reads `git status`.
 - The game reads `manifest.json`: keep its format exactly. The studio's own state goes in the lock
-  file and in `.audio-studio/`.
+  file and in `.content-studio/`.
 - Write JSON with stable key order and small diffs (`formatEntriesPerLine` for the lock).
 - Never delete clips without the user confirming it in the UI.
 - Only changes from the studio's own page are accepted (the Origin check on POST routes).
@@ -108,7 +108,7 @@ bun run typecheck      # tsc --noEmit
 bun run format         # prettier --write; format:check is what CI runs
 bun run check          # format:check, typecheck and tests: run before every commit
 bun run dev            # the studio on test/fixtures/sample, reloading on changes
-audio-studio --dev     # in a consumer repository, reloading on changes (after `bun link`)
+content-studio --dev   # in a consumer repository, reloading on changes (after `bun link`)
 ```
 
 ## Code conventions

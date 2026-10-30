@@ -220,14 +220,15 @@ function StatusPanel({ part, language }: { part: PartDetail; language?: string }
   )
 }
 
-function AdoptBanner({ part, language }: { part: PartDetail; language?: string }) {
+/** The banner offering to adopt the clips of a part that the studio did not make. */
+export function AdoptBanner({ part, language }: { part: PartDetail; language?: string }) {
   const adopt = useAdopt(part.id, language)
   const result = adopt.data
   const count = part.counts.untracked
   return (
     <div className="adopt">
       <div className="adopt-text">
-        <strong>{plural(count, 'clip')} recorded before Audio Studio</strong>
+        <strong>{plural(count, 'clip')} recorded outside the studio</strong>
         <span>
           Nothing says which voice, cue and settings {count === 1 ? 'it was' : 'they were'} made
           with. Adopt {count === 1 ? 'it' : 'them'} as made with today’s settings, so only lines

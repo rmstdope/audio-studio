@@ -34,7 +34,7 @@ const answer = (
   images: Images = null,
 ): ModelsAnswer => ({
   ok: true,
-  file: 'audio-studio.json',
+  file: 'content-studio.json',
   models: { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 's2.1-pro-free' },
   elevenlabs: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_v3' },
   elevenTts: { stability: 0.5, similarityBoost: 0.75, style: 0 },
@@ -157,7 +157,7 @@ describe('the Music row of the Models panel', () => {
     const box = page.container.querySelector('[role="alert"]')!
     expect(box.textContent).toContain('Quick could not be saved as the music model.')
     expect(box.textContent).toContain(
-      'audio-studio.json could not be saved: disk full. Nothing was changed.',
+      'content-studio.json could not be saved: disk full. Nothing was changed.',
     )
     expect(page.menu()!.value).toBe('balanced')
     const buttons = [...box.querySelectorAll('button')].map((b) => b.textContent)
@@ -300,7 +300,7 @@ describe('the Images row of the Models panel', () => {
     const box = page.container.querySelector('[role="alert"]')!
     expect(box.textContent).toContain('Z-Image-Turbo could not be saved as the image model.')
     expect(box.textContent).toContain(
-      'audio-studio.json could not be written: disk full. Nothing was changed.',
+      'content-studio.json could not be written: disk full. Nothing was changed.',
     )
     expect(menuOf(page.container).value).toBe('klein')
     const buttons = [...box.querySelectorAll('button')].map((b) => b.textContent)

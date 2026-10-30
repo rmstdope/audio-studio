@@ -18,13 +18,13 @@ import { readJson, readResource, writeAtomic } from './files'
 import { gameFilePath } from './musicLists'
 
 /** Where the game's style as the user last saw it is kept, in the studio's own folder. */
-export const STYLE_SEEN_FILE = '.audio-studio/images-style-seen.json'
+export const STYLE_SEEN_FILE = '.content-studio/images-style-seen.json'
 
 /** Where an image's takes are cached, one folder per image, `<n>.png` the model's picture and `<n>.game.png` the game's version. */
-export const IMAGE_TAKES_DIR = '.audio-studio/image-takes'
+export const IMAGE_TAKES_DIR = '.content-studio/image-takes'
 
 /** Where an image's board is saved: one file per image (an id is a slug, so a safe file name). */
-export const IMAGE_BOARD_DIR = '.audio-studio/images'
+export const IMAGE_BOARD_DIR = '.content-studio/images'
 
 /** The look the game's style file asks for; none when it cannot be used, with the sentence saying why. */
 export async function readStyleLook(

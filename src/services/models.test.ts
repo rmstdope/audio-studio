@@ -20,7 +20,7 @@ function projectWith(models: Record<string, string>) {
 
 function repo(project: Record<string, unknown>, indent: number | string = 2) {
   const root = tempRepo({})
-  const projectFile = join(root, 'audio-studio.json')
+  const projectFile = join(root, 'content-studio.json')
   writeFileSync(projectFile, `${JSON.stringify(project, null, indent)}\n`)
   return { projectFile, read: () => readFileSync(projectFile, 'utf8') }
 }
@@ -55,7 +55,7 @@ describe('switchRetiredModels', () => {
 
   it('keeps the line endings and a missing last newline', async () => {
     const root = tempRepo({})
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const project = projectWith({ final: 's1' })
     writeFileSync(projectFile, JSON.stringify(project, null, 2).replace(/\n/g, '\r\n'))
     expect(await switchRetiredModels(projectFile, ['final'])).toEqual({ ok: true })
@@ -73,7 +73,7 @@ describe('switchRetiredModels', () => {
     for (const takes of [['draft'], ['final'], []] as const) {
       expect(await switchRetiredModels(projectFile, [...takes])).toMatchObject({
         ok: false,
-        problems: [{ file: 'audio-studio.json', path: 'narration.models' }],
+        problems: [{ file: 'content-studio.json', path: 'narration.models' }],
       })
     }
     expect(read()).toBe(before)
@@ -113,7 +113,7 @@ describe('switchRetiredModels', () => {
       expect(await switchRetiredModels(projectFile, ['draft', 'final'])).toEqual({
         ok: false,
         problems: [
-          { file: 'audio-studio.json', path: 'narration.models', message: 'permission denied' },
+          { file: 'content-studio.json', path: 'narration.models', message: 'permission denied' },
         ],
       })
     } finally {
@@ -137,7 +137,7 @@ describe('setStageModel', () => {
 
   it('keeps the line endings and a missing last newline', async () => {
     const root = tempRepo({})
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     writeFileSync(projectFile, JSON.stringify(projectWith(models), null, 2).replace(/\n/g, '\r\n'))
     await setStageModel(projectFile, 'final', 'drama-3', 's2.1-pro-free')
     const text = readFileSync(projectFile, 'utf8')
@@ -189,7 +189,7 @@ describe('setStageModel', () => {
         ok: false,
         problems: [
           {
-            file: 'audio-studio.json',
+            file: 'content-studio.json',
             path: 'narration.models.draft',
             message: 'permission denied',
           },
@@ -232,7 +232,7 @@ describe('setMusicModel', () => {
     const before = read()
     expect(await setMusicModel(projectFile, 'careful', 'balanced')).toMatchObject({
       ok: false,
-      problems: [{ file: 'audio-studio.json', path: 'music.model' }],
+      problems: [{ file: 'content-studio.json', path: 'music.model' }],
     })
     expect(read()).toBe(before)
   })
@@ -272,7 +272,7 @@ describe('setImageModel', () => {
     const before = read()
     expect(await setImageModel(projectFile, 'klein', 'klein')).toMatchObject({
       ok: false,
-      problems: [{ file: 'audio-studio.json', path: 'images.model' }],
+      problems: [{ file: 'content-studio.json', path: 'images.model' }],
     })
     expect(read()).toBe(before)
   })
@@ -330,7 +330,7 @@ describe('setElevenModel', () => {
 describe('setElevenModel, a file written by hand', () => {
   it('keeps a hand-written section’s other keys, and the file’s line endings', async () => {
     const root = tempRepo({})
-    const projectFile = join(root, 'audio-studio.json')
+    const projectFile = join(root, 'content-studio.json')
     const project = projectJson({
       narration: {
         ...(projectJson().narration as object),

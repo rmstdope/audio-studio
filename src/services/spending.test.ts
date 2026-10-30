@@ -27,7 +27,8 @@ const rec = (id: string, over: Partial<Recording> = {}): Recording => ({
   outcome: 'done',
   ...over,
 })
-const project = () => join(tempRepo({ 'audio-studio.json': projectJson() }), 'audio-studio.json')
+const project = () =>
+  join(tempRepo({ 'content-studio.json': projectJson() }), 'content-studio.json')
 
 describe('the spending record', () => {
   it('is empty before anything was recorded', async () => {

@@ -50,7 +50,7 @@ export function statusDetail(line: LineState, minHeard: number, language?: strin
     case 'missing':
       return 'not recorded yet'
     case 'untracked':
-      return 'recorded before Audio Studio; adopt to track it'
+      return 'recorded outside the studio; adopt to track it'
     case 'uncast':
       return language
         ? `${displayName(line.speaker)} has no ${language} voice yet`

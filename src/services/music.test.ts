@@ -14,7 +14,7 @@ import {
   type MusicReady,
 } from './music'
 
-const dir0 = mkdtempSync(join(tmpdir(), 'audio-studio-ace-log-'))
+const dir0 = mkdtempSync(join(tmpdir(), 'content-studio-ace-log-'))
 afterAll(() => rmSync(dir0, { recursive: true, force: true }))
 const fake = join(import.meta.dir, '../../test/fixtures/fake-acestep.ts')
 const worker = createAceStepWorker({ command: [process.execPath, fake] })
@@ -88,7 +88,7 @@ describe('aceStepCheckpoints', () => {
 
 describe('aceStepReady', () => {
   const mac = { which: () => true, platform: 'darwin', arch: 'arm64' }
-  const dir = mkdtempSync(join(tmpdir(), 'audio-studio-ace-'))
+  const dir = mkdtempSync(join(tmpdir(), 'content-studio-ace-'))
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
   it('says what is missing, in the order it can be fixed', () => {
@@ -129,9 +129,9 @@ describe('aceStepReady', () => {
   })
 
   it('writes the home folder as ~ in what is missing', () => {
-    const checkpoints = join(homedir(), '.audio-studio-no-such-checkpoints')
+    const checkpoints = join(homedir(), '.content-studio-no-such-checkpoints')
     expect(aceStepReady(mac, checkpoints)).toMatchObject({
-      message: expect.stringContaining('missing from ~/.audio-studio-no-such-checkpoints.'),
+      message: expect.stringContaining('missing from ~/.content-studio-no-such-checkpoints.'),
     })
   })
 
