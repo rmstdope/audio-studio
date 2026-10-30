@@ -113,6 +113,30 @@ describe('createMfluxGenerator', () => {
   })
 })
 
+describe('makeImageTake turn', () => {
+  it('says when the take’s turn comes, not for a take stopped while it waited', async () => {
+    const queue = createSerial()
+    const generator: ImageGenerator = {
+      ready: () => ({ ok: true }),
+      generate: async (r) => ({ png: new Uint8Array(), seed: r.seed }),
+    }
+    const turns: string[] = []
+    const gate = queue.run(GPU, () => wait(20))
+    const stop = new AbortController()
+    const stopped = makeImageTake({ generator, queue, free: () => {} }, request, stop.signal, () =>
+      turns.push('stopped'),
+    )
+    stop.abort()
+    const made = makeImageTake({ generator, queue, free: () => {} }, request, undefined, () =>
+      turns.push('made'),
+    )
+    await gate
+    await expect(stopped).rejects.toThrow()
+    await made
+    expect(turns).toEqual(['made'])
+  })
+})
+
 describe('makeImageTake', () => {
   it('runs an image take, a music take and a Whisper check one at a time, freeing the GPU first', async () => {
     const queue = createSerial()

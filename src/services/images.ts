@@ -155,12 +155,15 @@ export async function makeImageTake(
   }: { generator: ImageGenerator; queue?: Serial; free?: () => void | Promise<void> },
   request: ImageRequest,
   signal?: AbortSignal,
+  /** Called when the take's turn comes, before the other workers are freed (the page shows "making" from then). */
+  onTurn?: () => void,
 ): Promise<GeneratedImage> {
   const problem = checkImageRequest(request)
   if (problem) throw new Error(problem)
   return queue.run(GPU, async () => {
     // A take stopped while it waited must not cost the other workers their models.
     if (signal?.aborted) throw new Error('The image generator was stopped.')
+    onTurn?.()
     await free()
     return generator.generate(request, signal)
   })

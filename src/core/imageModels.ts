@@ -20,7 +20,12 @@ export interface ImageModel {
 /** The image models, by id. */
 export const IMAGE_MODELS: Record<ImageModelId, ImageModel> = {
   klein: { id: 'klein', name: 'FLUX.2 klein 4B', mflux: 'flux2-klein-4b', seconds: 30 },
-  'z-image-turbo': { id: 'z-image-turbo', name: 'Z-Image-Turbo', mflux: 'z-image-turbo', seconds: 60 },
+  'z-image-turbo': {
+    id: 'z-image-turbo',
+    name: 'Z-Image-Turbo',
+    mflux: 'z-image-turbo',
+    seconds: 60,
+  },
 }
 
 /** The image model with this id. */

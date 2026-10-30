@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { MadeFrom } from './images'
+import { ChosenEntrySchema, type MadeFrom } from './images'
 import { MAX_IMAGE_SIDE } from './imageModels'
 
 /** The longer side of a take as the model makes it, in pixels. */
@@ -134,3 +134,20 @@ export function rightAfterDrop(strip: number[], n: number): number | null {
   if (!rest.length) return null
   return rest[Math.min(Math.max(at, 0), rest.length - 1)]!
 }
+
+/** `manifest.json` of the images clips folder, which the game reads: `{ image: { file, width, height } }`. */
+export const ImageManifestSchema = z.record(
+  z.string(),
+  z.looseObject({ file: z.string(), width: z.number(), height: z.number() }),
+)
+
+/** The images manifest. */
+export type ImageManifest = z.infer<typeof ImageManifestSchema>
+
+/** The lock file as the studio writes it: the chosen take of each image, and any other key kept as it was. */
+export const ImageLockFileSchema = z.looseObject({
+  images: z.record(z.string(), z.looseObject({ chosen: ChosenEntrySchema.optional() })).default({}),
+})
+
+/** The images lock file. */
+export type ImageLockFile = z.infer<typeof ImageLockFileSchema>
