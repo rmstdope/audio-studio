@@ -180,11 +180,10 @@ export function createImageTakes({
   /** Every image model, and whether this computer has its weights. */
   async function installedModels() {
     return Promise.all(
-      IMAGE_MODEL_IDS.map(async (id) => ({
-        id,
-        installed: await generator.installed(id),
-        download: await downloadOf(generator, id),
-      })),
+      IMAGE_MODEL_IDS.map(async (id) => {
+        const download = await downloadOf(generator, id)
+        return { id, installed: download === 'whole', download }
+      }),
     )
   }
 
@@ -360,7 +359,21 @@ export function createImageTakes({
           entry.state = 'making'
           entry.startedAt = now()
         },
-      )
+      ).catch(async (error: unknown) => {
+        // Only a take the model failed to make is the model's failure; saving it is not.
+        if (!stop.signal.aborted) {
+          const message = describeFailure(error)
+          const line = error instanceof ImageToolError ? error.lastLine.trim() : ''
+          await health
+            .record(found.projectFile, entry.model, {
+              image: found.id,
+              take: entry.n,
+              error: line || message,
+            })
+            .catch(() => {})
+        }
+        throw error
+      })
       if (stop.signal.aborted) return
       const take: ImageBoardTake = {
         n: entry.n,
@@ -389,20 +402,12 @@ export function createImageTakes({
         throw new Error(`${saved.file} cannot be used`)
       }
       entries.delete(entry.n)
-      await health.clear(found.projectFile, entry.model)
+      await health.clear(found.projectFile, entry.model).catch(() => {})
       await bringTake(found, take.n)
     } catch (error) {
       if (stop.signal.aborted) return
       entry.state = 'failed'
       entry.message = describeFailure(error)
-      // The tool's own last line when it ended the take; else the sentence the page shows.
-      await health
-        .record(found.projectFile, entry.model, {
-          image: found.id,
-          take: entry.n,
-          error: error instanceof ImageToolError ? error.lastLine : entry.message,
-        })
-        .catch(() => {})
     }
   }
 

@@ -178,6 +178,13 @@ describe('createMfluxGenerator', () => {
     expect((failure as ImageToolError).lastLine).toBe('FileNotFoundError: No safetensors found')
   })
 
+  it('has an empty last line when the tool said nothing', async () => {
+    const generator = createMfluxGenerator({ build: fake(`process.exit(3)`), log: () => {} })
+    const failure = await generator.generate(request).catch((e: unknown) => e as ImageToolError)
+    expect(failure).toBeInstanceOf(ImageToolError)
+    expect((failure as ImageToolError).lastLine).toBe('')
+  })
+
   it('says the computer ran out of memory when the system killed it', async () => {
     const generator = createMfluxGenerator({
       build: fake(`process.kill(process.pid,'SIGKILL')`),

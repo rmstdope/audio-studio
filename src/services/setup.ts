@@ -112,7 +112,10 @@ async function imageFacts(
   health: Pick<ImageHealthStore, 'read'>,
 ): Promise<NonNullable<SetupFacts['images']>> {
   const failures = await health.read(projectFile)
-  const lists = await readImages(dirname(projectFile), project, [])
+  // The lists are read only to name the image of a failure.
+  const lists = Object.keys(failures).length
+    ? await readImages(dirname(projectFile), project, [])
+    : null
   const titles = new Map(lists?.acts.flatMap((a) => a.rows).map((r) => [r.id, r.title]))
   const models = Object.fromEntries(
     await Promise.all(

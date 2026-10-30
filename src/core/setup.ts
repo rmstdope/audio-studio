@@ -527,7 +527,10 @@ function imageModels(facts: SetupFacts): SetupCheck {
   const mainAffected = affected.includes(model)
   const link = (failure: NonNullable<typeof models.klein.failure>) =>
     failure.image
-      ? { text: `Open ${failure.image.title}`, href: `#/images/items/${failure.image.id}` }
+      ? {
+          text: `Open ${failure.image.title}`,
+          href: `#/images/items/${encodeURIComponent(failure.image.id)}`,
+        }
       : undefined
   /** The model that is in place, to close a sentence about the only affected one. */
   const tail = (id: ImageModelId) => {

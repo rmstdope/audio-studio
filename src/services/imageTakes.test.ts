@@ -42,7 +42,10 @@ function fakeGenerator(
       await gate
       if (signal?.aborted) throw new Error('The image generator was stopped.')
       if (request.prompt.includes('tool'))
-        throw new ImageToolError('Klein could not load.', 'FileNotFoundError: model.safetensors')
+        throw new ImageToolError(
+          'Klein could not load.',
+          request.prompt.includes('silent') ? '' : 'FileNotFoundError: model.safetensors',
+        )
       if (request.prompt.includes('fail')) throw new Error('The image generator: out of memory')
       return { png: fakePng(request.width, request.height, request.seed), seed: request.seed }
     },
@@ -752,6 +755,13 @@ describe('the failure of a model’s last take', () => {
     await takes.make(file, 'inn', { count: 1 })
     await settled('inn')
     expect((await health(file)).klein?.error).toBe('The image generator: out of memory.')
+  })
+
+  it('keeps the sentence when the tool’s error had no last line', async () => {
+    const { takes, file, settled } = setup(undefined, words('tool silent'))
+    await takes.make(file, 'inn', { count: 1 })
+    await settled('inn')
+    expect((await health(file)).klein?.error).toBe('Klein could not load.')
   })
 
   it('records nothing for a take that was stopped', async () => {

@@ -133,6 +133,7 @@ import { createStableAudioWorker } from '../services/stableAudio'
 import { createFakeMusic } from '../services/musicFake'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
+import { createImageHealth } from '../services/imageHealth'
 import { createImageTakes, type ImageTakesAnswer } from '../services/imageTakes'
 import { createMfluxGenerator, type ImageGenerator } from '../services/images'
 import { createFakeImages } from '../services/imagesFake'
@@ -466,7 +467,8 @@ export function startServer({
   const imageGenerator =
     images ??
     (process.env.CONTENT_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator())
-  const imageTakes = createImageTakes({ generator: imageGenerator })
+  const imageHealth = createImageHealth()
+  const imageTakes = createImageTakes({ generator: imageGenerator, health: imageHealth })
   const musicGenerator = music ?? sharedMusic(projectFile)
   const musicTakes = createMusicTakes({
     generator: musicGenerator,
@@ -1734,6 +1736,7 @@ export function startServer({
               undefined,
               elevenAccountOf,
               imageGenerator,
+              imageHealth,
             ),
           ),
         ),
@@ -1794,7 +1797,12 @@ export function startServer({
       },
       '/api/models': {
         GET: guard(async () => {
-          const view = await modelsView(projectFile, musicGenerator.installed, imageGenerator)
+          const view = await modelsView(
+            projectFile,
+            musicGenerator.installed,
+            imageGenerator,
+            imageHealth,
+          )
           return Response.json(view.ok ? { ...view, busy: await busyNow() } : view)
         }),
         PATCH: fromOwnPage(async (request) => {
