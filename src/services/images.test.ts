@@ -88,6 +88,15 @@ describe('createMfluxGenerator', () => {
     await expect(generator.generate(request)).rejects.toThrow(/no image/)
   })
 
+  it('keeps the error, not the progress bars, in the message', async () => {
+    const generator = createMfluxGenerator({
+      build: fake(
+        `console.error('error line');for(let i=0;i<3;i++)console.error('50%|#####| 2/4\\r50%|#####| 3/4');process.exit(2)`,
+      ),
+    })
+    await expect(generator.generate(request)).rejects.toThrow(/error line/)
+  })
+
   it('stops the process when aborted', async () => {
     const generator = createMfluxGenerator({ build: fake(`await Bun.sleep(30000)`) })
     const controller = new AbortController()
@@ -119,7 +128,7 @@ describe('makeImageTake', () => {
       log.push(`${name}:end`)
       running--
     }
-    workers.add(() => log.push('free'))
+    workers.add(() => void log.push('free'))
     const generator: ImageGenerator = {
       ready: () => ({ ok: true }),
       generate: async (r) => {
@@ -142,6 +151,52 @@ describe('makeImageTake', () => {
       'whisper:start',
       'whisper:end',
     ])
+  })
+
+  it('waits for the closed workers to be gone before the model loads', async () => {
+    const log: string[] = []
+    const generator: ImageGenerator = {
+      ready: () => ({ ok: true }),
+      generate: async (r) => {
+        log.push('generate')
+        return { png: new Uint8Array(), seed: r.seed }
+      },
+    }
+    await makeImageTake(
+      {
+        generator,
+        queue: createSerial(),
+        free: async () => {
+          await wait(20)
+          log.push('gone')
+        },
+      },
+      request,
+    )
+    expect(log).toEqual(['gone', 'generate'])
+  })
+
+  it('does not close the workers for a take stopped while it waited', async () => {
+    const queue = createSerial()
+    const log: string[] = []
+    const generator: ImageGenerator = {
+      ready: () => ({ ok: true }),
+      generate: async (r) => {
+        log.push('generate')
+        return { png: new Uint8Array(), seed: r.seed }
+      },
+    }
+    const controller = new AbortController()
+    const first = queue.run(GPU, () => wait(20))
+    const take = makeImageTake(
+      { generator, queue, free: () => void log.push('free') },
+      request,
+      controller.signal,
+    )
+    controller.abort()
+    await expect(take).rejects.toThrow(/stopped/)
+    await first
+    expect(log).toEqual([])
   })
 
   it('refuses a request that cannot be made without taking its turn', async () => {

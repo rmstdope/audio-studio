@@ -47,24 +47,36 @@ describe('onGpu', () => {
 })
 
 describe('createGpuWorkers', () => {
-  it('closes every registered worker when the GPU is freed, and only then', () => {
+  it('closes every registered worker when the GPU is freed, and only then', async () => {
     const log: string[] = []
     const workers = createGpuWorkers()
-    workers.add(() => log.push('music'))
-    workers.add(() => log.push('whisper'))
+    workers.add(() => void log.push('music'))
+    workers.add(() => void log.push('whisper'))
     expect(log).toEqual([])
-    workers.free()
+    await workers.free()
     expect(log).toEqual(['music', 'whisper'])
   })
 
-  it('frees with nothing registered, and registers a worker once', () => {
+  it('waits for workers that close late', async () => {
     const log: string[] = []
     const workers = createGpuWorkers()
-    workers.free()
-    const close = () => log.push('x')
+    workers.add(async () => {
+      await wait(20)
+      log.push('late')
+    })
+    workers.add(() => void log.push('now'))
+    await await workers.free()
+    expect(log).toEqual(['now', 'late'])
+  })
+
+  it('frees with nothing registered, and registers a worker once', async () => {
+    const log: string[] = []
+    const workers = createGpuWorkers()
+    await workers.free()
+    const close = () => void log.push('x')
     workers.add(close)
     workers.add(close)
-    workers.free()
+    await workers.free()
     expect(log).toEqual(['x'])
   })
 })

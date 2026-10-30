@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checkImageRequest, imageModel, type ImageModelId } from '../core/imageModels'
 import { freeGpu, gpuQueue, GPU } from './gpu'
+import { quietLines } from './lineWorker'
 import type { Serial } from './serial'
 import type { Machine } from './setup'
 
@@ -95,11 +96,11 @@ export function createMfluxGenerator({
     async generate(request, signal) {
       const problem = checkImageRequest(request)
       if (problem) throw new Error(problem)
+      if (signal?.aborted) throw new Error('The image generator was stopped.')
       const { command, out } = build(
         mfluxArguments(request, join(tmpdir(), `audio-studio-image-${randomUUID()}.png`)),
       )
       try {
-        if (signal?.aborted) throw new Error('The image generator was stopped.')
         const proc = Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe' })
         let stopped = ''
         const stop = (why: string) => {
@@ -124,7 +125,7 @@ export function createMfluxGenerator({
             )
           }
           if (code !== 0) {
-            const why = stderr.trim().split('\n').slice(-3).join(' ')
+            const why = quietLines(stderr).trim().split('\n').slice(-3).join(' ')
             throw new Error(`The image generator failed (exit code ${code}): ${why}`)
           }
         } finally {
@@ -143,7 +144,7 @@ export function createMfluxGenerator({
 
 /**
  * One image take, in its turn on the GPU queue with music and Whisper: when it is its turn the idle
- * workers are closed (`free`, by default `freeGpu`), so the model has the memory, and they start
+ * workers are closed and gone (`free`, by default `freeGpu`), so the model has the memory, and they start
  * again on their next request. A request that cannot be made is refused before it takes a turn.
  */
 export async function makeImageTake(
@@ -151,14 +152,16 @@ export async function makeImageTake(
     generator,
     queue = gpuQueue(),
     free = freeGpu,
-  }: { generator: ImageGenerator; queue?: Serial; free?: () => void },
+  }: { generator: ImageGenerator; queue?: Serial; free?: () => void | Promise<void> },
   request: ImageRequest,
   signal?: AbortSignal,
 ): Promise<GeneratedImage> {
   const problem = checkImageRequest(request)
   if (problem) throw new Error(problem)
   return queue.run(GPU, async () => {
-    free()
+    // A take stopped while it waited must not cost the other workers their models.
+    if (signal?.aborted) throw new Error('The image generator was stopped.')
+    await free()
     return generator.generate(request, signal)
   })
 }

@@ -48,8 +48,8 @@ export interface MusicGenerator {
    * ends it at once (Stop), and it rejects.
    */
   generate(request: MusicRequest, signal?: AbortSignal): Promise<GeneratedTake>
-  /** Stops the worker, if one is running. */
-  close(): void
+  /** Stops the worker, if one is running; a promise settles when its memory is free. */
+  close(): void | Promise<void>
 }
 
 /** The worker script, run with uv (which installs ACE-Step the first time). */
@@ -119,16 +119,16 @@ export function createMusicRouter(generators: Record<MusicFamily, MusicGenerator
   return {
     ready: (model) => of(model).ready(model),
     installed: (model) => of(model).installed(model),
-    generate(request, signal) {
+    async generate(request, signal) {
       const generator = of(request.model)
       if (onThisComputer(request.model)) {
-        if (last && last !== generator) last.close()
+        if (last && last !== generator) await last.close()
         last = generator
       }
       return generator.generate(request, signal)
     },
-    close() {
-      for (const generator of Object.values(generators)) generator.close()
+    async close() {
+      await Promise.all(Object.values(generators).map((generator) => generator.close()))
     },
   }
 }
