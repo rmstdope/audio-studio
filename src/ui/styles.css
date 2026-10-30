@@ -3508,8 +3508,48 @@ button.cue-chip[aria-expanded='true'] {
 /* Images: the Takes section, the image the game uses beside one other take */
 .image-stage {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 14px;
+}
+/* A take's two pictures: what the model made, then what the game gets */
+.look-pair {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.look-pair[data-stacked='true'] {
+  flex-direction: column;
+}
+.look-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+.look-side .image-take-picture {
+  max-width: 100%;
+  flex: none;
+}
+.look-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  border-radius: 8px;
+  background: var(--inset);
+  color: var(--muted);
+  max-width: 100%;
+}
+.look-empty-err {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+.images-look-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .image-side {
   display: flex;
@@ -3589,9 +3629,4 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--accent-soft-ink);
   background: var(--accent-soft-bg);
   border-color: var(--accent-soft-line);
-}
-@media (max-width: 700px) {
-  .image-stage {
-    grid-template-columns: 1fr;
-  }
 }

@@ -3,6 +3,7 @@ import { currentAct } from '../../imagesText'
 import type { ImagesRoute } from '../../route'
 import { ActPage } from './ActPage'
 import { ImagePage } from './ImagePage'
+import { LookNotice } from './LookNotice'
 import { NoImages } from './NoImages'
 import { StyleNotice } from './StyleNotice'
 import { StylePage } from './StylePage'
@@ -26,6 +27,7 @@ export function ImagesView({ summary, route }: { summary: ProjectSummary; route:
   return (
     <>
       {notice}
+      <LookNotice notice={images.lookNotice} />
       {row ? (
         <ImagePage key={row.id} act={act} row={row} />
       ) : (

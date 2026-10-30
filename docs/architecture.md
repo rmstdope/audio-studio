@@ -1341,8 +1341,9 @@ adds its new modules to the layout in §4.
 The images workspace shows the game's **images**: what each is called, its size and the words it is
 made from, beside the game's **style**. As with music, the game says which it needs; the studio
 never writes the game's lists. This section is the reading, the studio's own words and staleness
-(as-yag.3), and the takes: making, comparing and choosing them (as-yag.2 and as-yag.4). The
-screens are drawn in `docs/ui/as-yag.3-images.html` and `docs/ui/as-yag.4-image-takes.html`.
+(as-yag.3), the takes: making, comparing and choosing them (as-yag.2 and as-yag.4), and the game's
+look every take is brought to (as-yag.5). The screens are drawn in `docs/ui/as-yag.3-images.html`,
+`docs/ui/as-yag.4-image-takes.html` and `docs/ui/as-yag.5-take-look.html`.
 
 **Project file.** An optional `images` section beside `narration` and `music`, its acts the
 narration's parts. No `{language}` in any path: images are the same in every language. Refresh from
@@ -1374,8 +1375,9 @@ start on. It is saved from the Images row of Setup's Models panel (`PUT /api/ima
 the studio did not make it (a path inside the project root to a `.png`, `.jpg`, `.gif` or `.webp`;
 read only, never moved or written, shown as "The game's own image" until a take is chosen); the id a slug and unique across the game (a repeated
 id is a problem with both files, and neither image is shown). `style` holds `{ look, keepOut,
-palette, acts }`: `palette` is `#rrggbb` colours and `acts` an optional addition per part id (an
-id the project does not have is a problem). A list that is not there yet is not a problem (the game
+palette, colourDepth, dithering, acts }`: `palette` is `#rrggbb` colours, `colourDepth` (`full`,
+`16-bit` or `8-bit`) and `dithering` (`flat`, `patterned` or `scattered`) are optional, and `acts` an
+optional addition per part id (an id the project does not have is a problem). A list that is not there yet is not a problem (the game
 has not written it); a missing style file means each prompt is only its words.
 
 **The prompt.** The image's words (the user's own, else the game's description), then the act's
@@ -1388,7 +1390,9 @@ text when the words were written; a game description that differs from it raises
 own typed back, remove the entry. The palette and the acts' additions are never changed here.
 
 **Staleness.** A chosen take records what it was made from, `{ words, style, width, height }`
-(`style` is the look, what is kept out, the palette and the act's addition as one string), in
+(`style` is the look, what is kept out and the act's addition as one string; the palette, colour
+depth and dithering are not in it, since they decide how a take is brought to the game's look and
+not what the model is asked for), in
 `paths.lock` (`{ images: { <id>: { chosen } } }`; written by take-making, only read here; other keys
 are ignored). An image is out of date when what a new take would be made from differs: the words
 (the user's included), the size or the style. The game changing a description under the user's own
@@ -1404,8 +1408,8 @@ shows no notice; the images made with the old style are marked out of date.
 with the model asked for (`ImageModelId`, `core/imageModels.ts`: `klein` or `z-image-turbo`; a request
 that names none starts on `defaultTakeModel`: the project's `images.model`, else the other model when that
 one is not on this computer) at the take size (`takeSize`: the listed shape with the longer side 1024,
-each side a multiple of 16; the listed sizes are not multiples of 16, and bringing a take to them
-and to the palette is as-yag.5) and a new seed, on the GPU queue (`makeImageTake`). The board is
+each side a multiple of 16; the listed sizes are not, so a take is then brought to them, below)
+and a new seed, on the GPU queue (`makeImageTake`). The board is
 `.audio-studio/images/<id>.json`, `{ next, takes: [{ n, seed, model, width, height, madeFrom, seen }] }`
 (`madeFrom` is what it was made from, as in the lock), the pictures `.audio-studio/image-takes/<id>/<n>.png`;
 a take is on the board only once its picture is written, numbers are per image and never reused
@@ -1419,19 +1423,45 @@ computer (`ImageGenerator.installed`: its weights are in the Hugging Face cache)
 and **Try again** remakes with the model the take was asked with. Takes cannot be made only when mflux is
 missing or neither model is installed.
 
+**The game's look** (as-yag.5; `core/imageLook.ts`, `core/imagePixels.ts`, `services/png.ts`). The
+game's version of a take is the model's stored picture (`<n>.png`, never changed) brought to the
+image's exact listed size and to the style file's colours, written beside it as `<n>.game.png`; the
+same picture and look always give the same bytes, so it is redone from the stored picture and never
+made again. The look is read from the style file only: a listed `palette` wins; else `colourDepth`
+(`8-bit` is the one fixed set of 8 reds × 8 greens × 4 blues, `16-bit` 32 × 64 × 32, `full` no
+reduction, the default); `dithering` applies when colours are reduced (`patterned`, an 8 × 8 Bayer
+matrix, by default; `flat` is the nearest colour; `scattered` is Floyd–Steinberg). The size is a crop
+to fill (the middle kept) and a box average, in plain TypeScript over a small PNG codec on
+`node:zlib` (`Bun.Image` gives no pixel access), so nothing depends on the machine. `lookKey` (size,
+colours, dithering) is what a picture was brought to: it is noted on the board take (`look`) and in
+the lock's chosen entry (`look`), and an image is "old" when its chosen picture, or any take whose
+model picture is there, was brought to another key (one with no key was never brought). A take is
+brought as soon as it is on the board (the view says `bringing` meanwhile, and Choose is off); a
+style file that cannot be read leaves the take as the model made it, with the sentence saying what to
+fix (`explainStyleProblem`) and Choose refused. **Bring all** (`POST /api/images/bring-all`, one run
+per project in memory, polled by `GET`) brings every old image's takes and its chosen picture
+(clip, manifest at the listed size, lock `look`) from the stored pictures, counting `done` of
+`total`; an image whose chosen take's model picture is gone fails with that reason and keeps its
+old look, and the run stays in view with **Try again** until it is started again.
+
 **Choosing.** **Choose** (in the image's board turn and the project's choice turn, with both the
-manifest and the lock readable, or nothing is changed) writes the picture to `<clips>/<id>.png`, the
-manifest entry `{ file, width, height }` (the picture's own size) and last the lock entry
-`{ chosen: { words, style, width, height, take, seed, model, at } }`; other keys of the lock are kept
+manifest and the lock readable, or nothing is changed) writes the take's game's version (brought to
+the look first if its look is old) to `<clips>/<id>.png`, the manifest entry `{ file, width, height }`
+(the listed size) and last the lock entry
+`{ chosen: { words, style, width, height, take, seed, model, look, at } }`; other keys of the lock are kept
 and images are written one per line. **Un-choose** (asked first in the page) removes the manifest entry,
 then the picture, then the lock entry, so a failure can be pressed again; the take stays on the board.
 **Drop** removes a take that is not chosen, with no question, and refuses while the lock cannot be
 read. The game's own `file` is never written or deleted. Where the pictures of the chosen image and of
 the game's own are served from: `GET /api/images/:id/current` (the chosen clip, else the game's file).
 
-**The Takes section** (an image's page, under the Prompt panel): the image the game uses on the left,
-one other take on the right, a strip of the others; Choose moves the right-hand take left and the
-take chosen before comes to the right, marked "was chosen" for that visit. The right-hand take is the
+**The Takes section** (an image's page, under the Prompt panel): each take shows its two pictures,
+"What the model made" and "What the game gets", the game's version enlarged by the largest whole
+number at which both fit side by side (stacked, in the same order, when not even ×1 fits). The
+image the game uses on top (its right picture is the one the game has now), one other take
+beneath, a strip of the others (each side holds two pictures now, so they stack instead of sitting
+side by side); Choose moves the compared take up and the take chosen before comes to be compared,
+marked "was chosen" for that visit. The compared take is the
 page's own state (after a reload the newest) and does not move when a take finishes; ← / → step
 through the strip while focus is in the section but not in a menu or field. The status of an image
 on its act's list says "making 2 takes · about 1 min" while takes are made. Its heading row has a menu
@@ -1443,8 +1473,9 @@ saying so); a pick holds only while the page is open. The screens are drawn in `
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
 `PATCH /api/image-style` (`{ look }` or `{ keepOut }`) and `POST /api/image-style/seen`; for takes
 `GET` and `POST /api/images/:id/takes` (`{ count, model? }` 1 to 4, or `{ retry }`), `PUT /api/image-model`, `GET /api/images/:id/takes/:n`
-(the picture), `DELETE` it (drop), `POST …/takes/:n/seen`, `POST /api/images/:id/choose` (`{ n }`),
-`/unchoose`, `/stop`, `GET /api/images/:id/current` and `GET /api/images/making`; every change from
+(the model's picture), `…/:n/game` (the game's version), `DELETE` it (drop), `POST …/takes/:n/seen`, `POST /api/images/:id/choose` (`{ n }`),
+`/unchoose`, `/stop`, `GET /api/images/:id/current`, `GET /api/images/making` and
+`GET`/`POST /api/images/bring-all`; every change from
 the studio's own page only.
 
 ---
@@ -1912,7 +1943,7 @@ Small, independently useful increments:
        prompt overrides.
     3. **An image take** (as-yag.2, done) with either model, on the GPU queue with music and Whisper.
     4. **Takes and choosing** (as-yag.4, done: §8.7): an image's takes compared with the chosen one.
-    5. **The game's look** (as-yag.5): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.
+    5. **The game's look** (as-yag.5, done: §8.7): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.
     6. **Two models** (as-yag.7, done: §8.7): Setup says which are installed and chooses the main one;
        takes can be made with the other.
     7. **The rename** to Content Studio (as-yag.6), with §1 and the opening of this document, which still speak of a game's audio.

@@ -121,6 +121,7 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
                     ) : (
                       <span className={STATUS_CHIP[row.status]}>{row.status}</span>
                     )}
+                    {row.looksOld && <span className="chip chip-warn">Old look</span>}
                   </td>
                 </tr>
               ))}

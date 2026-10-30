@@ -1483,6 +1483,10 @@ export function startServer({
       '/api/images/making': {
         GET: guard(async () => Response.json(await imageTakes.making(projectFile))),
       },
+      '/api/images/bring-all': {
+        GET: guard(async () => Response.json(imageTakes.lookRun(projectFile))),
+        POST: fromOwnPage(async () => imageAnswer(await imageTakes.bringAll(projectFile))),
+      },
       '/api/images/:id/takes': {
         GET: guard(async (request) => {
           const view = await imageTakes.view(projectFile, request.params.id)
@@ -1506,6 +1510,12 @@ export function startServer({
             await imageTakes.drop(projectFile, request.params.id, Number(request.params.n)),
           ),
         ),
+      },
+      '/api/images/:id/takes/:n/game': {
+        GET: guard(async (request) => {
+          const file = await imageTakes.gameFile(projectFile, request.params.id, request.params.n)
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
       },
       '/api/images/:id/takes/:n/seen': {
         POST: fromOwnPage(async (request) =>

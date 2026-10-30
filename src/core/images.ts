@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { describeLook, lookChanges, lookKey, type Look } from './imageLook'
 import type { Problem } from './project'
 
 /** The path of the picture the game shows for an image now: inside the project root, and a picture. */
@@ -31,6 +32,10 @@ export const StyleSchema = z.object({
   look: z.string().min(1),
   keepOut: z.string().default(''),
   palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/, 'use a colour like #1a2b3c')).default([]),
+  /** How many colours the game's pictures have when no palette is listed; absent means full colour. */
+  colourDepth: z.enum(['full', '16-bit', '8-bit']).optional(),
+  /** How in-between shades are made when colours are reduced; absent means patterned. */
+  dithering: z.enum(['flat', 'patterned', 'scattered']).optional(),
   acts: z.record(z.string(), z.string().min(1)).default({}),
 })
 
@@ -57,6 +62,8 @@ export const ChosenEntrySchema = MadeFromSchema.extend({
   take: z.number().int().positive().optional(),
   seed: z.number().optional(),
   model: z.string().optional(),
+  /** What the game's picture was brought to (`lookKey`); absent for one chosen before looks. */
+  look: z.string().optional(),
   /** When it was chosen (ISO time). */
   at: z.string().optional(),
 })
@@ -110,9 +117,13 @@ export function assemblePrompt(words: string, style: EffectiveStyle | null): str
     .join('\n')
 }
 
-/** The style as one stable string, to compare what an image was made with. */
+/**
+ * The style as one stable string, to compare what an image was made with. The palette, colour depth
+ * and dithering are not in it: they decide how a take is brought to the game's look, not what the
+ * model is asked for, so a change of them never needs a take made again.
+ */
 function styleKey(style: EffectiveStyle | null): string {
-  return style ? JSON.stringify([style.look, style.keepOut, style.palette, style.addition]) : ''
+  return style ? JSON.stringify([style.look, style.keepOut, style.addition]) : ''
 }
 
 /** What a new take of an image would be made from. */
@@ -124,6 +135,22 @@ export function madeFromNow(
   return { words, style: styleKey(style), width: image.width, height: image.height }
 }
 
+/**
+ * A style key without the palette: keys written before the palette left the prompt's style held
+ * it as a third entry, which must not make a picture chosen then look out of date.
+ */
+function withoutPalette(key: string): string {
+  try {
+    const parts: unknown = JSON.parse(key)
+    if (Array.isArray(parts) && parts.length === 4) {
+      return JSON.stringify([parts[0], parts[1], parts[3]])
+    }
+  } catch {
+    // not a key of ours: compared as it is
+  }
+  return key
+}
+
 /** What differs between what an image would be made from and what its chosen take was. */
 export function outOfDateReasons(
   now: MadeFrom,
@@ -132,7 +159,7 @@ export function outOfDateReasons(
   const reasons: ('the words' | 'the size' | 'the style')[] = []
   if (now.words !== chosen.words) reasons.push('the words')
   if (now.width !== chosen.width || now.height !== chosen.height) reasons.push('the size')
-  if (now.style !== chosen.style) reasons.push('the style')
+  if (withoutPalette(now.style) !== withoutPalette(chosen.style)) reasons.push('the style')
   return reasons
 }
 
@@ -193,13 +220,19 @@ export function styleChanges(
   const changes: string[] = []
   if (seen.look !== now.look) changes.push('the look')
   if (seen.keepOut !== now.keepOut) changes.push('what is kept out')
-  if (JSON.stringify(seen.palette) !== JSON.stringify(now.palette)) changes.push('the palette')
   for (const part of parts) {
     if ((seen.acts[part.id] ?? null) !== (now.acts[part.id] ?? null)) {
       changes.push(`the addition for ${part.title}`)
     }
   }
   return changes
+}
+
+/** What differs in the looks the pictures were brought to and the look now, each named once, in a fixed order. */
+function lookChangeNames(pairs: [string | null, string][]): string[] {
+  const names = new Set(pairs.flatMap(([then, now]) => lookChanges(then, now)))
+  const order = ['its palette', 'its colour depth', 'its dithering', "an image's size", 'its look']
+  return order.filter((name) => names.has(name))
 }
 
 /** The status chip of an image. */
@@ -231,6 +264,10 @@ export interface ImageRow {
   madeFrom: MadeFrom
   status: ImageStatus
   reasons: ('the words' | 'the size' | 'the style')[]
+  /** The game's look for this image: the line under its title, what it is brought to, or why it cannot be. */
+  look: { line: string; key: string | null; error: string | null }
+  /** The game's picture, or one of the takes, was brought to another look than the style asks for now. */
+  looksOld: boolean
 }
 
 /** What reading one act's list gave. */
@@ -273,6 +310,8 @@ export interface ImagesSummary {
   style: StyleView
   /** One notice for a change of the game's style; null when none is due. */
   styleNotice: { count: number; changed: string[] } | null
+  /** One notice for a change of the game's look; null when every picture is up to date. */
+  lookNotice: { count: number; changed: string[] } | null
 }
 
 /** What `summarizeImages` is given. */
@@ -290,6 +329,11 @@ export interface ImagesInput {
   gameFiles?: Record<string, boolean>
   /** The game's style when the user last saw it; null before the first sight. */
   seen: GameStyle | null
+  /** The look the style asks for; null when it cannot be used (`lookError` says why). */
+  look?: Look | null
+  lookError?: string
+  /** What each image's takes (whose model picture is there) were brought to, by image id; null for never. */
+  takeLooks?: Record<string, (string | null)[]>
 }
 
 /** The Images pages from what was read, and the problems found in it. */
@@ -329,6 +373,8 @@ export function summarizeImages(input: ImagesInput): {
   }
 
   let changedCount = 0
+  let oldImages = 0
+  const lookPairs: [string | null, string][] = []
   const changes = style && input.seen ? styleChanges(input.seen, style, parts) : []
   const acts: ImagesAct[] = lists.map((list) => {
     const eff = effectiveStyle(style, prompts, list.id)
@@ -340,6 +386,18 @@ export function summarizeImages(input: ImagesInput): {
       const madeFrom = madeFromNow(words, image, eff)
       const made = chosen[image.id]
       const reasons = made ? outOfDateReasons(madeFrom, made) : []
+      const look =
+        input.look === undefined
+          ? ({ colours: { kind: 'full' }, dithering: 'patterned' } as Look)
+          : input.look
+      const key = look ? lookKey(look, image) : null
+      const thens: (string | null)[] = [
+        ...(made ? [made.look ?? null] : []),
+        ...(input.takeLooks?.[image.id] ?? []),
+      ].filter((then, at, all) => all.indexOf(then) === at)
+      const stale = key === null ? [] : thens.filter((then) => then !== key)
+      for (const then of stale) lookPairs.push([then, key!])
+      if (stale.length) oldImages++
       if (made && made.style !== madeFrom.style && changes.length) changedCount++
       return {
         id: image.id,
@@ -360,6 +418,12 @@ export function summarizeImages(input: ImagesInput): {
         madeFrom,
         status: !made ? 'none yet' : reasons.length ? 'out of date' : 'chosen',
         reasons,
+        look: {
+          line: describeLook(look, image),
+          key,
+          error: look ? null : (input.lookError ?? "Can't bring this take to the game's look."),
+        },
+        looksOld: stale.length > 0,
       }
     })
     return {
@@ -394,6 +458,7 @@ export function summarizeImages(input: ImagesInput): {
         })),
       },
       styleNotice: changedCount > 0 ? { count: changedCount, changed: changes } : null,
+      lookNotice: oldImages > 0 ? { count: oldImages, changed: lookChangeNames(lookPairs) } : null,
     },
     problems,
   }

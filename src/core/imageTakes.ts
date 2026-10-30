@@ -37,6 +37,8 @@ export const BoardTakeSchema = z.object({
     width: z.number(),
     height: z.number(),
   }),
+  /** What the game's version was brought to (`lookKey`); absent until it is. */
+  look: z.string().optional(),
   /** It has been shown on the right once; a take that has not shows "new". */
   seen: z.boolean().default(false),
 })
@@ -85,6 +87,13 @@ export interface ImageTakeView {
   chosen: boolean
   /** Not yet shown on the right. */
   isNew: boolean
+  /**
+   * The game's version: brought to the look now, being brought, brought to another look, or not
+   * there (never brought, or its file is gone).
+   */
+  look: 'ready' | 'bringing' | 'old' | 'missing'
+  /** The model's picture has another shape than the image, so the game's version cuts its edges. */
+  cropped: boolean
 }
 
 /** A take waiting or being made. */
@@ -119,6 +128,8 @@ export interface ImageTakesView {
   failed: ImageFailedView[]
   /** The lock cannot be read, so which take is chosen is not known. */
   lockUnread: boolean
+  /** Why the takes cannot be brought to the game's look (the style file); null when they can. */
+  lookError: string | null
 }
 
 /** What is being made for an image, for the act's list. */
@@ -163,3 +174,14 @@ export const ImageLockFileSchema = z.looseObject({
 
 /** The images lock file. */
 export type ImageLockFile = z.infer<typeof ImageLockFileSchema>
+
+/** Bringing the images and their takes to the game's new look, as the page polls it. */
+export interface LookRunView {
+  /** Still going. */
+  running: boolean
+  /** Images to bring, and how many are done (brought or failed). */
+  total: number
+  done: number
+  /** Images that could not be brought, with why. */
+  failed: { id: string; reason: 'missing' | string }[]
+}

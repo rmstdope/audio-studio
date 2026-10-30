@@ -8,6 +8,7 @@ import {
   imageModel,
   type ImageModelId,
 } from '../core/imageModels'
+import { bringToLook, isCropped } from '../core/imagePixels'
 import {
   ImageBoardSchema,
   ImageLockFileSchema,
@@ -22,26 +23,24 @@ import {
   type ImageMakingView,
   type ImageManifest,
   type ImageTakesView,
+  type LookRunView,
   type ImageTakeView,
 } from '../core/imageTakes'
-import type { ImageRow } from '../core/images'
+import type { ChosenEntry, ImageRow } from '../core/images'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import { readResource, writeAtomic } from './files'
 import { freeGpu, gpuQueue } from './gpu'
-import { readImages } from './imageLists'
+import { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
 import { makeImageTake, type ImageGenerator } from './images'
+import { decodePng, encodePng } from './png'
 import { choices, sorted } from './musicClips'
 import { gameFilePath } from './musicLists'
 import { boardQueue, isSafeId } from './musicTakes'
 import type { Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
-/** Where an image's takes are cached, one folder per image, `<n>.png` each. */
-export const IMAGE_TAKES_DIR = '.audio-studio/image-takes'
-
-/** Where an image's board is saved: one file per image (an id is a slug, so a safe file name). */
-export const IMAGE_BOARD_DIR = '.audio-studio/images'
+export { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR }
 
 /** What a change to takes answered: done, refused with a reason, or a file that cannot be used. */
 export type ImageTakesAnswer = { ok: true } | { ok: false; message: string } | ProjectFailure | null
@@ -81,10 +80,16 @@ export interface ImageTakes {
   unchoose(projectFile: string, id: string): Promise<ImageTakesAnswer>
   /** Takes a take off the board and deletes its picture; the chosen take stays. */
   drop(projectFile: string, id: string, n: number): Promise<ImageTakesAnswer>
+  /** Brings every image and take with an old look to the game's look now, from the model's stored pictures. */
+  bringAll(projectFile: string): Promise<ImageTakesAnswer>
+  /** The run that brings pictures to a new look, as the page polls it; null when none is to be shown. */
+  lookRun(projectFile: string): LookRunView | null
   /** Records that a take has been shown on the right once. */
   markSeen(projectFile: string, id: string, n: number): Promise<ImageTakesAnswer>
   /** What is being made in the project, by image, for the lists' status. */
   making(projectFile: string): Promise<Record<string, ImageMakingSummary>>
+  /** The path of a take's game version, or null for an image not listed, a bad number or a take not brought. */
+  gameFile(projectFile: string, id: string, name: string): Promise<string | null>
   /** The path of a take's picture, or null for an image not listed or a name that is not a take's number. */
   takeFile(projectFile: string, id: string, name: string): Promise<string | null>
   /** The picture the game shows now: the chosen one, else the game's own file, else null. */
@@ -99,6 +104,9 @@ const notHere = (model: ImageModelId): { ok: false; message: string } => ({
   ok: false,
   message: `${imageModel(model).name} is not on this computer. Setup says how to download it.`,
 })
+
+/** A take's game version, relative to the project root: the model's picture brought to the look. */
+const gameOf = (id: string, n: number) => `${IMAGE_TAKES_DIR}/${id}/${n}.game.png`
 
 /** The reason a generator gave, as a sentence. */
 function describeFailure(error: unknown): string {
@@ -127,8 +135,15 @@ export function createImageTakes({
   now?: () => number
   newSeed?: () => number
 }): ImageTakes {
-  const shared = globalThis as { audioStudioImageTakes?: Map<string, Map<number, Entry>> }
+  const shared = globalThis as {
+    audioStudioImageTakes?: Map<string, Map<number, Entry>>
+    audioStudioImageBringing?: Set<string>
+    audioStudioLookRuns?: Map<string, LookRunView>
+  }
   const active = (shared.audioStudioImageTakes ??= new Map())
+  /** Takes being brought to the look right now (`<image key>\0<n>`). */
+  const bringing = (shared.audioStudioImageBringing ??= new Set())
+  const lookRuns = (shared.audioStudioLookRuns ??= new Map())
   const boards = boardQueue()
 
   async function resolve(projectFile: string, id: string) {
@@ -141,7 +156,10 @@ export function createImageTakes({
     const summary = await readImages(root, project, [])
     const row = summary?.acts.flatMap((act) => act.rows).find((r) => r.id === id)
     if (!row) return null
+    const style = await readStyleLook(root, project.images.paths.style)
     return {
+      projectFile,
+      look: style.look,
       root,
       id,
       config: project.images,
@@ -224,6 +242,86 @@ export function createImageTakes({
   const entriesOf = (key: string) =>
     [...(active.get(key)?.values() ?? [])].sort((a, b) => a.n - b.n)
 
+  /**
+   * Makes the game show `png` for the image: the picture in the clips folder, the manifest entry
+   * (the listed size) and last the lock entry. `entry` makes the lock's chosen entry from the
+   * previous one, or returns null when there is nothing to change. Nothing is written when the
+   * manifest or the lock cannot be read.
+   */
+  async function publish(
+    found: Found,
+    png: Uint8Array,
+    entry: (previous: ChosenEntry | undefined) => ChosenEntry | null,
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    const { id } = found
+    return choices().run(`image-choice\0${found.projectFile}`, async () => {
+      const problems: Problem[] = []
+      const manifest = await manifestNow(found, problems)
+      const lock = await lockNow(found, problems)
+      if (!manifest || !lock) {
+        const unread = !manifest ? 'manifest' : 'lock'
+        return {
+          ok: false as const,
+          message: `The game's picture for ${id} could not be changed: the images ${unread} could not be read. Nothing was changed.`,
+        }
+      }
+      const next = entry(lock.images[id]?.chosen)
+      if (!next) return { ok: true as const }
+      const file = `${id}.png`
+      manifest[id] = { file, width: found.row.width, height: found.row.height }
+      lock.images[id] = { ...lock.images[id], chosen: next }
+      await writeAtomic(found.root, join(found.config.paths.clips, file), png)
+      await writeAtomic(
+        found.root,
+        found.config.paths.manifest,
+        `${JSON.stringify(sorted(manifest), null, 2)}\n`,
+      )
+      await writeAtomic(found.root, found.config.paths.lock, formatLock(lock))
+      return { ok: true as const }
+    })
+  }
+
+  /**
+   * The game's version of take `n`: the model's stored picture brought to the look, written beside
+   * it. Returns the PNG, or the sentence saying why it could not be made ('missing' when the model's
+   * picture is gone). It changes no board.
+   */
+  async function renderGame(found: Found, n: number): Promise<Uint8Array | { error: string }> {
+    if (!found.look) return { error: found.row.look.error ?? "The game's look cannot be used." }
+    let source: Uint8Array
+    try {
+      source = new Uint8Array(
+        await Bun.file(resolveInRoot(found.root, pictureOf(found.id, n))).arrayBuffer(),
+      )
+    } catch {
+      return { error: 'missing' }
+    }
+    try {
+      const png = encodePng(bringToLook(decodePng(source), found.look, found.row))
+      await writeAtomic(found.root, gameOf(found.id, n), png)
+      return png
+    } catch (error) {
+      return { error: describeFailure(error) }
+    }
+  }
+
+  /** Brings a take just made to the look and notes it on the board; a take that cannot be stays as the model made it. */
+  async function bringTake(found: Found, n: number): Promise<void> {
+    const key = found.row.look.key
+    const mark = `${found.key}\0${n}`
+    try {
+      if (!key) return
+      const made = await renderGame(found, n)
+      if ('error' in made) return
+      await changeBoard(found, (board) => {
+        const take = board.takes.find((t) => t.n === n)
+        if (take) take.look = key
+      })
+    } finally {
+      bringing.delete(mark)
+    }
+  }
+
   async function run(
     found: Found,
     entry: Entry,
@@ -256,24 +354,72 @@ export function createImageTakes({
       }
       // The picture first: a take is on the board only once its file is there.
       await writeAtomic(found.root, pictureOf(found.id, take.n), made.png)
+      // Marked before it is on the board, so the page never sees it between made and brought.
+      bringing.add(`${found.key}\0${take.n}`)
       const saved = await changeBoard(found, (board) => {
         if (stop.signal.aborted) return
         board.takes = [...board.takes.filter((t) => t.n !== take.n), take].sort((a, b) => a.n - b.n)
       })
       if (stop.signal.aborted) {
+        bringing.delete(`${found.key}\0${take.n}`)
         await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
         return
       }
       if (saved && 'ok' in saved) {
+        bringing.delete(`${found.key}\0${take.n}`)
         await rm(resolveInRoot(found.root, pictureOf(found.id, take.n)), { force: true })
         throw new Error(`${saved.file} cannot be used`)
       }
       entries.delete(entry.n)
+      await bringTake(found, take.n)
     } catch (error) {
       if (stop.signal.aborted) return
       entry.state = 'failed'
       entry.message = describeFailure(error)
     }
+  }
+
+  /** Brings one image's takes and its chosen picture to the look now; null when done, else why not. */
+  async function bringImage(projectFile: string, id: string): Promise<string | null> {
+    const found = await resolve(projectFile, id)
+    if (!found || !('row' in found)) return 'the image is not in the game any more'
+    const key = found.row.look.key
+    if (!key) return found.row.look.error ?? "the game's look cannot be used"
+    const outcome = await boards.run(turn(found), async (): Promise<string | null> => {
+      const board = await readBoard(found)
+      if ('ok' in board) return `${board.file} cannot be used`
+      const problems: Problem[] = []
+      const lock = await lockNow(found, problems)
+      const chosen = lock?.images[id]?.chosen
+      // A take that cannot be brought keeps the board's note of those before it, and the image
+      // stays old (so is tried again) through its chosen picture or its unbrought take.
+      let failure: string | null = null
+      let chosenPng: Uint8Array | null = null
+      for (const take of board.takes) {
+        const exists = await Bun.file(resolveInRoot(found.root, pictureOf(id, take.n))).exists()
+        if (!exists && take.n !== chosen?.take) continue
+        const there = await Bun.file(resolveInRoot(found.root, gameOf(id, take.n))).exists()
+        if (take.look === key && there && take.n !== chosen?.take) continue
+        const made = await renderGame(found, take.n)
+        if ('error' in made) {
+          failure ??= made.error
+          continue
+        }
+        take.look = key
+        if (take.n === chosen?.take) chosenPng = made
+      }
+      await writeAtomic(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
+      if (failure) return failure
+      if (chosen && chosen.look !== key) {
+        if (!chosenPng) return 'missing'
+        const answer = await publish(found, chosenPng, (previous) =>
+          previous && previous.look !== key ? { ...previous, look: key } : null,
+        )
+        if (!answer.ok) return answer.message
+      }
+      return null
+    })
+    return outcome
   }
 
   return {
@@ -288,7 +434,7 @@ export function createImageTakes({
       const chosen = lock?.images[id]?.chosen?.take
       const takes: ImageTakeView[] = []
       for (const take of board.takes) {
-        if (!(await Bun.file(join(found.root, pictureOf(id, take.n))).exists())) continue
+        if (!(await Bun.file(resolveInRoot(found.root, pictureOf(id, take.n))).exists())) continue
         takes.push({
           n: take.n,
           width: take.width,
@@ -297,6 +443,14 @@ export function createImageTakes({
           earlier: takeIsEarlier(take.madeFrom, found.row.words),
           chosen: chosen === take.n,
           isNew: !take.seen,
+          look: bringing.has(`${found.key}\0${take.n}`)
+            ? 'bringing'
+            : !(await Bun.file(resolveInRoot(found.root, gameOf(id, take.n))).exists())
+              ? 'missing'
+              : take.look === found.row.look.key
+                ? 'ready'
+                : 'old',
+          cropped: isCropped(take, found.row),
         })
       }
       const making: ImageMakingView[] = entries
@@ -329,6 +483,7 @@ export function createImageTakes({
         making,
         failed,
         lockUnread: lock === null,
+        lookError: found.row.look.error,
       }
     },
 
@@ -404,53 +559,45 @@ export function createImageTakes({
         if ('ok' in board) return board
         const take = board.takes.find((t) => t.n === n)
         if (!take) return { ok: false, message: 'That take is not on the board.' }
-        let png: Uint8Array
-        try {
-          png = new Uint8Array(await Bun.file(join(found.root, pictureOf(id, n))).arrayBuffer())
-        } catch {
-          return { ok: false, message: 'That take’s picture is gone, so it cannot be chosen.' }
+        const key = found.row.look.key
+        if (!key)
+          return { ok: false, message: found.row.look.error ?? "The game's look cannot be used." }
+        // The game gets the take brought to the look: the stored version, or made now when its look is old.
+        const stored =
+          take.look === key
+            ? await Bun.file(resolveInRoot(found.root, gameOf(id, n)))
+                .bytes()
+                .catch(() => null)
+            : null
+        const png = stored ?? (await renderGame(found, n))
+        if ('error' in png) {
+          return {
+            ok: false,
+            message:
+              png.error === 'missing'
+                ? 'That take’s picture is gone, so it cannot be chosen.'
+                : `Take ${n} could not be brought to the game's look: ${png.error}`,
+          }
         }
-        const file = `${id}.png`
-        return choices().run(
-          `image-choice\0${projectFile}`,
-          async (): Promise<ImageTakesAnswer> => {
-            const problems: Problem[] = []
-            const manifest = await manifestNow(found, problems)
-            const lock = await lockNow(found, problems)
-            if (!manifest || !lock) {
-              const unread = !manifest ? 'manifest' : 'lock'
-              return {
-                ok: false,
-                message: `Take ${n} could not be chosen: the images ${unread} could not be read. Nothing was changed.`,
-              }
-            }
-            // Nothing to do: the game already shows this take.
-            if (lock.images[id]?.chosen?.take === n) return { ok: true }
-            manifest[id] = { file, width: take.width, height: take.height }
-            lock.images[id] = {
-              ...lock.images[id],
-              chosen: {
+        const answer = await publish(found, png, (previous) =>
+          previous?.take === n && previous.look === key
+            ? null
+            : {
                 ...take.madeFrom,
                 take: take.n,
                 seed: take.seed,
                 model: take.model,
+                look: key,
                 at: new Date(now()).toISOString(),
               },
-            }
-            await writeAtomic(found.root, join(found.config.paths.clips, file), png)
-            await writeAtomic(
-              found.root,
-              found.config.paths.manifest,
-              `${JSON.stringify(sorted(manifest), null, 2)}\n`,
-            )
-            await writeAtomic(found.root, found.config.paths.lock, formatLock(lock))
-            if (!take.seen) {
-              take.seen = true
-              await writeAtomic(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
-            }
-            return { ok: true }
-          },
         )
+        if (!answer.ok) return answer
+        if (!take.seen || take.look !== key) {
+          take.seen = true
+          take.look = key
+          await writeAtomic(found.root, found.board, `${JSON.stringify(board, null, 2)}\n`)
+        }
+        return { ok: true }
       })
     },
 
@@ -506,6 +653,7 @@ export function createImageTakes({
       )
       if (!outcome || !('dropped' in outcome)) return outcome
       await rm(resolveInRoot(found.root, pictureOf(id, n)), { force: true })
+      await rm(resolveInRoot(found.root, gameOf(id, n)), { force: true })
       return { ok: true }
     },
 
@@ -542,11 +690,67 @@ export function createImageTakes({
       return summary
     },
 
+    async gameFile(projectFile, id, name) {
+      if (!/^[1-9]\d*$/.test(name)) return null
+      const found = await resolve(projectFile, id)
+      if (!found || !('row' in found)) return null
+      const file = resolveInRoot(found.root, gameOf(id, Number(name)))
+      return (await Bun.file(file).exists()) ? file : null
+    },
+
+    lookRun(projectFile) {
+      return lookRuns.get(projectFile) ?? null
+    },
+
+    async bringAll(projectFile) {
+      if (lookRuns.get(projectFile)?.running) {
+        return { ok: false, message: 'Images are already being brought to the new look.' }
+      }
+      // The slot is taken before anything is awaited, so a second press cannot start a second run.
+      const run: LookRunView = { running: true, total: 0, done: 0, failed: [] }
+      lookRuns.set(projectFile, run)
+      const release = () => {
+        if (lookRuns.get(projectFile) === run) lookRuns.delete(projectFile)
+      }
+      const opened = await openProject(projectFile).catch((error) => {
+        release()
+        throw error
+      })
+      if (!opened.ok || !opened.project.images) {
+        release()
+        return opened.ok ? null : opened
+      }
+      const summary = await readImages(dirname(projectFile), opened.project, [])
+      const ids = (summary?.acts ?? [])
+        .flatMap((act) => act.rows)
+        .filter((r) => r.looksOld)
+        .map((r) => r.id)
+      if (!ids.length) {
+        release()
+        return { ok: true }
+      }
+      run.total = ids.length
+      void (async () => {
+        for (const id of ids) {
+          try {
+            const failure = await bringImage(projectFile, id)
+            if (failure) run.failed.push({ id, reason: failure })
+          } catch (error) {
+            run.failed.push({ id, reason: describeFailure(error) })
+          }
+          run.done++
+        }
+        run.running = false
+        if (!run.failed.length) release()
+      })()
+      return { ok: true }
+    },
+
     async takeFile(projectFile, id, name) {
       if (!/^[1-9]\d*$/.test(name)) return null
       const found = await resolve(projectFile, id)
       if (!found || !('row' in found)) return null
-      const file = join(found.root, pictureOf(id, Number(name)))
+      const file = resolveInRoot(found.root, pictureOf(id, Number(name)))
       return (await Bun.file(file).exists()) ? file : null
     },
 

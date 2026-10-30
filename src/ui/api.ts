@@ -18,7 +18,7 @@ import type { CueChange } from '../services/cues'
 import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
-import type { ImageMakingSummary, ImageTakesView } from '../core/imageTakes'
+import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
 import type { MakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
 import type {
@@ -988,8 +988,37 @@ export function useImageTakes(imageId: string) {
       getJson<ImageTakesView | ProjectFailure>(`/api/images/${encodeURIComponent(imageId)}/takes`),
     refetchInterval: (query) => {
       const view = query.state.data
+      if (view && 'takes' in view && view.takes.some((t) => t.look === 'bringing')) return 1000
       return view && 'making' in view && takesAreBeingMade(view.making) ? 3000 : false
     },
+  })
+}
+
+/** The run that brings the images to the game's new look; polled while it goes, so a reload picks it up. */
+export function useLookRun() {
+  return useQuery({
+    queryKey: ['look-run'],
+    queryFn: () => getJson<LookRunView | null>('/api/images/bring-all'),
+    refetchInterval: (query) => (query.state.data?.running ? 1000 : false),
+  })
+}
+
+/** Starts bringing every image and take with an old look to the new one (from the model's stored pictures). */
+export function useBringAll() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/images/bring-all', { method: 'POST' })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`bringing the images to the new look answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<ImageTakesAnswer>
+    },
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['look-run'] }),
+        client.invalidateQueries({ queryKey: ['project'] }),
+      ]),
   })
 }
 
