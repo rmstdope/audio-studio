@@ -245,7 +245,7 @@ export interface ImagesSummary {
 }
 
 /** What `summarizeImages` is given. */
-export interface SummaryInput {
+export interface ImagesInput {
   parts: { id: string; title: string }[]
   lists: { id: string; title: string; file: string; state: ImageListState; canRefresh: boolean }[]
   styleFile: string
@@ -258,7 +258,7 @@ export interface SummaryInput {
 }
 
 /** The Images pages from what was read, and the problems found in it. */
-export function summarizeImages(input: SummaryInput): {
+export function summarizeImages(input: ImagesInput): {
   images: ImagesSummary
   problems: Problem[]
 } {

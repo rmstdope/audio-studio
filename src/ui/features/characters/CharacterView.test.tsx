@@ -54,6 +54,7 @@ const summary: ProjectSummary = {
   takeFade: 0.2,
   projectFile: 'audio-studio.json',
   music: null,
+  images: null,
   problems: [],
 }
 

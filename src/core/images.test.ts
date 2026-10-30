@@ -15,7 +15,7 @@ import {
   type GameStyle,
   type MadeFrom,
   type Prompts,
-  type SummaryInput,
+  type ImagesInput,
 } from './images'
 
 const style: GameStyle = {
@@ -136,7 +136,7 @@ describe('what changed in the game’s style', () => {
   })
 })
 
-function input(over: Partial<SummaryInput> = {}): SummaryInput {
+function input(over: Partial<ImagesInput> = {}): ImagesInput {
   return {
     parts: [{ id: 'act1', title: 'Act I' }],
     lists: [
