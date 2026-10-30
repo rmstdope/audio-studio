@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import type { ImageRow, ImagesAct } from '../../../core/images'
+import { Problems } from '../../components/Problems'
 import { useImageCompare, useSetImageWords } from '../../api'
 import { shortTitle } from '../../format'
 import { outOfDateText } from '../../imagesText'
@@ -80,6 +81,10 @@ export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
             >
               Keep mine
             </button>
+            {compare.isError && <span className="adopt-error">{compare.error.message}</span>}
+            {compare.data && !compare.data.ok && 'problems' in compare.data && (
+              <Problems title="Could not be settled" problems={compare.data.problems} />
+            )}
           </div>
         </section>
       )}

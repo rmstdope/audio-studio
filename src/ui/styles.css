@@ -3453,8 +3453,8 @@ button.cue-chip[aria-expanded='true'] {
 }
 .images-swatch {
   display: inline-block;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 3px;
   border: 1px solid var(--line-strong);
 }

@@ -157,6 +157,11 @@ describe('an act’s page', () => {
     expect(none.querySelector('.images-style-line')).toBeNull()
   })
 
+  it('says so when the game asks for no images in an act', () => {
+    const page = render({ view: 'images', page: 'act', part: 'act2' }, summary({ actTwo: 'empty' }))
+    expect(text(page)).toContain('The game asks for no images in Act II.')
+  })
+
   it('says when the game has not listed the act yet', () => {
     const page = render({ view: 'images', page: 'act', part: 'act2' })
     expect(text(page)).toContain(
@@ -178,7 +183,7 @@ describe('an act’s page', () => {
         summary({ prompts }),
       ).querySelectorAll('tbody tr'),
     ]
-    expect(text(rows[0])).toContain('changed here · the game’s words changed too')
+    expect(text(rows[0])).toContain("changed here · the game's words changed too")
     expect(text(rows[1])).toContain('changed here')
     expect(text(rows[1])).not.toContain('too')
   })
@@ -272,6 +277,28 @@ describe('an image’s page', () => {
       body: { choice: 'keep' },
     })
     expect(document.activeElement?.tagName).toBe('TEXTAREA')
+  })
+
+  it('also moves focus to the field after Use the game’s', async () => {
+    const prompts: Prompts = { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} }
+    const page = render(route, summary({ prompts }))
+    await act(async () => button(page, "Use the game's").click())
+    await flush()
+    expect(sent[0]).toEqual({
+      method: 'POST',
+      path: '/api/images/inn/compare',
+      body: { choice: 'game' },
+    })
+    expect(document.activeElement?.tagName).toBe('TEXTAREA')
+  })
+
+  it('says why when settling fails', async () => {
+    globalThis.fetch = (async () => new Response('{}', { status: 500 })) as unknown as typeof fetch
+    const prompts: Prompts = { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} }
+    const page = render(route, summary({ prompts }))
+    await act(async () => button(page, 'Keep mine').click())
+    await flush()
+    expect(text(page.querySelector('.images-compare .adopt-error'))).toBe('saving answered 500')
   })
 })
 

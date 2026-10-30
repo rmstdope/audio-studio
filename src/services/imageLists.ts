@@ -80,6 +80,7 @@ export async function readImages(
     await writeStyleSeen(root, style).catch(() => {})
   }
   const summary = summarizeImages({
+    styleInvalid: styleRead === 'invalid',
     parts: narration.parts,
     lists,
     styleFile: images.paths.style,
@@ -89,5 +90,14 @@ export async function readImages(
     seen,
   })
   problems.push(...summary.problems)
+  // A change that leaves nothing out of date has no notice to put away, so it is seen at once.
+  if (
+    style &&
+    seen &&
+    !summary.images.styleNotice &&
+    JSON.stringify(seen) !== JSON.stringify(style)
+  ) {
+    await writeStyleSeen(root, style).catch(() => {})
+  }
   return summary.images
 }

@@ -1,6 +1,7 @@
 import type { ImagesSummary } from '../../../core/images'
+import { Problems } from '../../components/Problems'
 import { useStyleSeen } from '../../api'
-import { styleNoticeText } from '../../imagesText'
+import { joined, styleNoticeText } from '../../imagesText'
 
 /**
  * The one notice at the top of every Images page when the game's style changed: how many chosen
@@ -14,7 +15,7 @@ export function StyleNotice({ notice }: { notice: NonNullable<ImagesSummary['sty
         <span>
           <strong>The game&apos;s style changed.</strong> {styleNoticeText(notice.count)}
         </span>
-        <span className="muted">Changed: {notice.changed.join(' and ')}.</span>
+        <span className="muted">Changed: {joined(notice.changed)}.</span>
       </div>
       <div className="notice-actions">
         <button
@@ -30,6 +31,10 @@ export function StyleNotice({ notice }: { notice: NonNullable<ImagesSummary['sty
         >
           Seen
         </button>
+        {seen.isError && <span className="adopt-error">{seen.error.message}</span>}
+        {seen.data && !seen.data.ok && 'problems' in seen.data && (
+          <Problems title="Could not be put away" problems={seen.data.problems} />
+        )}
       </div>
     </section>
   )

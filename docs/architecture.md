@@ -1383,8 +1383,8 @@ are ignored). An image is out of date when what a new take would be made from di
 words changes nothing the prompt uses, so it does not make an image out of date.
 
 **The style notice.** The studio keeps the game's style as the user last saw it in
-`.audio-studio/images-style-seen.json`, written the first time a style is read and moved only by
-**Seen**. When the game's style differs from it and at least one chosen image was made with the old
+`.audio-studio/images-style-seen.json`, written the first time a style is read and moved by **Seen**, or at once when
+a change leaves no chosen image out of date (there is then no notice to put away). When the game's style differs from it and at least one chosen image was made with the old
 style, every Images page shows one notice naming what changed. The user's own change to the style
 shows no notice; the images made with the old style are marked out of date.
 

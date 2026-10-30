@@ -82,13 +82,28 @@ describe('readImages', () => {
     expect((await summary()).images!.acts[0]!.rows[0]!.status).toBe('chosen')
   })
 
-  it('remembers the style it first saw, once, in the studio’s own folder', async () => {
-    const { root, summary, read } = repo()
+  it('remembers the style it first saw in the studio’s own folder', async () => {
+    const { summary, read } = repo()
     await summary()
     expect(JSON.parse(read('.audio-studio/images-style-seen.json'))).toEqual(style)
+  })
+
+  it('moves the remembered style along when a change leaves nothing out of date', async () => {
+    const { root, summary, read } = repo()
+    await summary()
     writeFileSync(join(root, 'images/style.json'), JSON.stringify({ ...style, look: 'oil' }))
     await summary()
-    expect(JSON.parse(read('.audio-studio/images-style-seen.json')).look).toBe('pixel art')
+    expect(JSON.parse(read('.audio-studio/images-style-seen.json')).look).toBe('oil')
+  })
+
+  it('tells a style the game could not be read from one it has not written yet', async () => {
+    const { summary } = repo({ 'images/style.json': '{nope' })
+    const { images: read, problems } = await summary()
+    expect(read!.style).toMatchObject({ present: false, invalid: true })
+    expect(problems[0]).toMatchObject({ file: 'images/style.json' })
+    expect((await repo({ 'images/style.json': undefined }).summary()).images!.style.invalid).toBe(
+      false,
+    )
   })
 })
 
@@ -103,6 +118,13 @@ describe('saving the studio’s own words', () => {
     })
     expect([read('tts/act1/images.json'), read('images/style.json')]).toEqual(before)
     expect(existsSync(join(root, 'tts/act1/images.json.tmp'))).toBe(false)
+  })
+
+  it('writes the style keys in a fixed order', async () => {
+    const { file, read } = repo()
+    await setStyleField(file, 'keepOut', 'nothing')
+    await setStyleField(file, 'look', 'oil paint')
+    expect(Object.keys(JSON.parse(read('images/prompts.json')).style)).toEqual(['look', 'keepOut'])
   })
 
   it('takes them back with null', async () => {

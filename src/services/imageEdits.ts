@@ -25,7 +25,9 @@ function formatPrompts(prompts: Prompts): string {
   const images = Object.fromEntries(
     Object.entries(prompts.images).sort(([a], [b]) => (a < b ? -1 : 1)),
   )
-  return `${JSON.stringify({ images, style: prompts.style }, null, 2)}\n`
+  const { look, keepOut } = prompts.style
+  const style = { ...(look && { look }), ...(keepOut && { keepOut }) }
+  return `${JSON.stringify({ images, style }, null, 2)}\n`
 }
 
 /**

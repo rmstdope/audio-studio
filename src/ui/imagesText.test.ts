@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { chosenLine, outOfDateText, paletteText, styleNoticeText } from './imagesText'
+import { chosenLine, joined, outOfDateText, paletteText, styleNoticeText } from './imagesText'
 import { parseRoute, routeHref } from './route'
 import { openWorkspace } from './sidebarActs'
 
@@ -14,6 +14,11 @@ describe('the images words', () => {
     )
     expect(outOfDateText(['the words', 'the size', 'the style'])).toBe(
       'Out of date since it was chosen: the words, the size and the style.',
+    )
+  })
+  it('joins what changed with and', () => {
+    expect(joined(['the look', 'the palette', 'the addition for Act II'])).toBe(
+      'the look, the palette and the addition for Act II',
     )
   })
   it('counts the palette', () => {

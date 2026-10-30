@@ -80,6 +80,34 @@ describe('gitChanges', () => {
     expect(result.groups.music?.clips.new).toBe(1)
   })
 
+  it('lists the images files that changed', async () => {
+    const root = tempRepo({
+      ...files,
+      'audio-studio.json': projectJson({
+        images: {
+          paths: {
+            list: 'tts/{part}/images.json',
+            style: 'images/style.json',
+            prompts: 'images/prompts.json',
+            lock: 'images/images.lock.json',
+          },
+        },
+      }),
+    })
+    git(root, 'init', '-q')
+    git(root, 'add', '.')
+    git(root, 'commit', '-q', '-m', 'start')
+    mkdirSync(join(root, 'images'), { recursive: true })
+    writeFileSync(join(root, 'images/prompts.json'), '{}')
+    writeFileSync(join(root, 'tts/act1/images.json'), '[]')
+    const result = await gitChanges(join(root, 'audio-studio.json'))
+    if (!result?.ok) throw new Error(JSON.stringify(result))
+    expect(result.groups.images?.files.map((f) => [f.path, f.role]).sort()).toEqual([
+      ['images/prompts.json', 'words'],
+      ['tts/act1/images.json', 'images'],
+    ])
+  })
+
   it('gives paths from the project root when it is inside the repository', async () => {
     const top = tempRepo({})
     const root = join(top, 'game')

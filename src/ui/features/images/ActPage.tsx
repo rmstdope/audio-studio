@@ -105,7 +105,7 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
                     {row.changed && (
                       <div className="chg">
                         {row.gameChanged
-                          ? 'changed here · the game’s words changed too'
+                          ? "changed here · the game's words changed too"
                           : 'changed here'}
                       </div>
                     )}

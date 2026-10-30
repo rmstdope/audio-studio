@@ -22,7 +22,14 @@ export function StylePage({ images }: { images: ImagesSummary }) {
           </span>
         </div>
       </header>
-      {!style.present ? (
+      {style.invalid ? (
+        <section className="panel no-music">
+          <strong>The game&apos;s style file cannot be read</strong>
+          <span>
+            See the problems above. Until it can be, each image&apos;s prompt is only its own words.
+          </span>
+        </section>
+      ) : !style.present ? (
         <section className="panel no-music">
           <strong>The game has no style file yet</strong>
           <span>

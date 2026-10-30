@@ -7,7 +7,7 @@ export function chosenLine(name: string, total: number, chosen: number): string 
 }
 
 /** Words joined as "a, b and c". */
-function joined(words: string[]): string {
+export function joined(words: string[]): string {
   return words.length < 2
     ? (words[0] ?? '')
     : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`

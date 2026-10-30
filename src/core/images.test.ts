@@ -85,6 +85,13 @@ describe('the studio’s own words', () => {
     expect(applyWordsChange(mine, 'inn', ' a low inn ', 'a low inn').images).toEqual({})
     expect(applyWordsChange(mine, 'inn', null, 'a low inn').images).toEqual({})
   })
+  it('keeps the game’s words an existing override was written over, so editing does not settle a compare', () => {
+    const mine: Prompts = { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} }
+    expect(applyWordsChange(mine, 'inn', 'cosier', 'a low inn').images.inn).toEqual({
+      words: 'cosier',
+      gameWas: 'older',
+    })
+  })
   it('does the same for the style fields', () => {
     const mine = applyStyleChange(none, 'look', 'oil paint', style.look)
     expect(mine.style.look).toEqual({ words: 'oil paint', gameWas: style.look })

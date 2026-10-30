@@ -125,7 +125,7 @@ export function applyWordsChange(
     images:
       words === '' || words === gameWords.trim()
         ? rest
-        : { ...rest, [id]: { words, gameWas: gameWords } },
+        : { ...rest, [id]: { words, gameWas: prompts.images[id]?.gameWas ?? gameWords } },
   }
 }
 
@@ -230,6 +230,8 @@ export interface StyleFieldView {
 /** The Style page. */
 export interface StyleView {
   present: boolean
+  /** The game's style file is there but cannot be read. */
+  invalid: boolean
   look: StyleFieldView
   keepOut: StyleFieldView
   palette: string[]
@@ -249,6 +251,8 @@ export interface ImagesInput {
   parts: { id: string; title: string }[]
   lists: { id: string; title: string; file: string; state: ImageListState; canRefresh: boolean }[]
   styleFile: string
+  /** The style file is there but cannot be read. */
+  styleInvalid?: boolean
   style: GameStyle | null
   prompts: Prompts
   /** What each image's chosen take was made from. */
@@ -344,6 +348,7 @@ export function summarizeImages(input: ImagesInput): {
       acts,
       style: {
         present: style !== null,
+        invalid: input.styleInvalid ?? false,
         look: field('look'),
         keepOut: field('keepOut'),
         palette: style?.palette ?? [],
