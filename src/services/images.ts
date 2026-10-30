@@ -196,7 +196,7 @@ export function createMfluxGenerator({
           }
           if (code !== 0) {
             const output = quietLines(stderr).trim()
-            log(`Content Studio: mflux-generate failed (exit code ${code}):\n${output}`)
+            log(`Content Studio: ${command[0]} failed (exit code ${code}):\n${output}`)
             throw new Error(imageFailureReason(request.model, code, output))
           }
         } finally {

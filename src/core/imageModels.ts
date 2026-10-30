@@ -71,7 +71,7 @@ export function imageFailureReason(id: ImageModelId, code: number, stderr: strin
     return `${name} could not load its weights: they are missing or incomplete on this computer; download them again with uvx --from huggingface_hub hf download ${repo}, then Try again.`
   }
   if (/invalid choice|unrecognized arguments|error: argument/i.test(stderr)) {
-    return `The installed mflux cannot make ${name} images; update it with uv tool upgrade mflux, then Try again.`
+    return `The installed mflux cannot make ${name} images; update it with uv tool install --upgrade mflux, then Try again.`
   }
   return `${name} could not make the image (mflux stopped with exit code ${code}); the details are in the studio's log.`
 }

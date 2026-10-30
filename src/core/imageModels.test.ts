@@ -86,12 +86,12 @@ describe('imageFailureReason', () => {
     const stderr =
       "usage: mflux-generate [-h] ...\nmflux-generate: error: argument --model: invalid choice: 'z-image-turbo'"
     expect(imageFailureReason('z-image-turbo', 2, stderr)).toBe(
-      'The installed mflux cannot make Z-Image-Turbo images; update it with uv tool upgrade mflux, then Try again.',
+      'The installed mflux cannot make Z-Image-Turbo images; update it with uv tool install --upgrade mflux, then Try again.',
     )
     expect(
       imageFailureReason('klein', 2, 'mflux-generate: error: unrecognized arguments: --seed 4'),
     ).toBe(
-      'The installed mflux cannot make FLUX.2 klein 4B images; update it with uv tool upgrade mflux, then Try again.',
+      'The installed mflux cannot make FLUX.2 klein 4B images; update it with uv tool install --upgrade mflux, then Try again.',
     )
   })
 
