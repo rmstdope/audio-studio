@@ -129,6 +129,27 @@ async function show(data: ImageTakesView, over: Partial<ImageRow> = {}) {
 
 const three = [take(1), take(2), take(3)]
 
+/** Drops focus from a focused button the moment it is switched off, as Chrome does; happy-dom does not. */
+function dropFocusWhenDisabled(container: Element) {
+  const observer = new MutationObserver((records) => {
+    for (const r of records)
+      if (
+        r.attributeName === 'disabled' &&
+        r.target === document.activeElement &&
+        (r.target as HTMLButtonElement).disabled
+      ) {
+        // happy-dom's blur() does nothing on a disabled button, so focus is moved away instead.
+        const away = document.createElement('div')
+        away.tabIndex = -1
+        document.body.append(away)
+        away.focus()
+        away.remove()
+      }
+  })
+  observer.observe(container, { attributes: true, subtree: true })
+  cleanups.push(() => observer.disconnect())
+}
+
 describe('the Takes section’s empty states', () => {
   it('nothing chosen and no takes: two empty frames and the first make button beneath', async () => {
     const s = await show(view())
@@ -260,24 +281,7 @@ describe('comparing takes', () => {
     const s = await show(view({ takes: [take(1), take(2, { chosen: true }), take(3)] }), {
       chosenTake: 2,
     })
-    // Chrome drops focus from a focused button the moment it becomes disabled; happy-dom does not.
-    const observer = new MutationObserver((records) => {
-      for (const r of records)
-        if (
-          r.attributeName === 'disabled' &&
-          r.target === document.activeElement &&
-          (r.target as HTMLButtonElement).disabled
-        ) {
-          // happy-dom's blur() does nothing on a disabled button, so focus is moved away instead.
-          const away = document.createElement('div')
-          away.tabIndex = -1
-          document.body.append(away)
-          away.focus()
-          away.remove()
-        }
-    })
-    observer.observe(s.container, { attributes: true, subtree: true })
-    cleanups.push(() => observer.disconnect())
+    dropFocusWhenDisabled(s.container)
     let release: () => void = () => {}
     globalThis.fetch = (async () => {
       await new Promise<void>((resolve) => (release = resolve))
@@ -379,6 +383,43 @@ describe('making takes', () => {
     expect(s.button('Make 2 more takes').disabled).toBe(true)
     await s.click(s.button('Stop'))
     expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/stop', method: 'POST' })
+  })
+
+  it('after Make takes, focus stays in the Takes section, so ← and → still step the right side (as in Chrome)', async () => {
+    const s = await show(view({ takes: [take(1), take(2), take(3)] }))
+    dropFocusWhenDisabled(s.container)
+    let release: () => void = () => {}
+    globalThis.fetch = (async () => {
+      await new Promise<void>((resolve) => (release = resolve))
+      return Response.json({ ok: true })
+    }) as unknown as typeof fetch
+    const makeButton = s.button('Make 2 more takes')
+    makeButton.focus()
+    const scrolls: unknown[] = []
+    const focus = HTMLElement.prototype.focus
+    HTMLElement.prototype.focus = function (options?: FocusOptions) {
+      scrolls.push(options?.preventScroll)
+      focus.call(this, options)
+    }
+    cleanups.push(() => (HTMLElement.prototype.focus = focus))
+    await s.click(makeButton)
+    const onRight = s.container.querySelector('[data-strip] [aria-pressed="true"]')
+    expect(onRight?.textContent).toContain('Take 3')
+    expect(document.activeElement).toBe(onRight)
+    // A press with the mouse leaves the page where it is, with the strip below the fold.
+    expect(scrolls.at(-1)).toBe(true)
+    expect(s.right()).toBe('Take 3')
+    await s.key('ArrowLeft', document.activeElement!)
+    expect(s.right()).toBe('Take 2')
+    await act(async () => release())
+  })
+
+  it('after the first Make takes, focus stays in the Takes section (as in Chrome)', async () => {
+    const s = await show(view())
+    dropFocusWhenDisabled(s.container)
+    s.button('Make 2 takes').focus()
+    await s.click(s.button('Make 2 takes'))
+    expect(document.activeElement?.textContent).toBe('Comparing')
   })
 
   it('does not move the right side when a take finishes', async () => {

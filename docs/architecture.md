@@ -1469,7 +1469,9 @@ beneath, a strip of the others (each side holds two pictures now, so they stack 
 side by side); Choose moves the compared take up and the take chosen before comes to be compared,
 marked "was chosen" for that visit. The compared take is the
 page's own state (after a reload the newest) and does not move when a take finishes; ← / → step
-through the strip while focus is in the section but not in a menu or field. The status of an image
+through the strip while focus is in the section but not in a menu or field. Pressing Make N takes
+puts focus on the compared take in the strip (on the Comparing label when there is none yet), so
+the keys keep working while the switched-off button cannot hold it (as-99s). The status of an image
 on its act's list says "making 2 takes · about 1 min" while takes are made. Its heading row has a menu
 "Model for new takes" before the count menu (closed: "FLUX.2 klein — about 8 s a take"; open: the full names),
 which starts on the project's model, or on the model that is here when that one is missing (with a faint line

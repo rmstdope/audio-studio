@@ -112,6 +112,8 @@ export function TakesSection({ row }: { row: ImageRow }) {
   const [saved, setSaved] = useState(0)
   const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
   const asked = useRef(new Set<number>())
+  // Focus asked for by a press of Make does not scroll: a mouse press stays where it was.
+  const focusQuietly = useRef(false)
   const chooseButton = useRef<HTMLButtonElement>(null)
   const unchooseButton = useRef<HTMLButtonElement>(null)
   const leftHeading = useRef<HTMLSpanElement>(null)
@@ -146,7 +148,8 @@ export function TakesSection({ row }: { row: ImageRow }) {
           ? rightHeading.current
           : thumbs.current.get(pendingFocus)
     // Asked for once the change has settled: tried once, and given up on if the target cannot take it.
-    target?.focus()
+    target?.focus(focusQuietly.current ? { preventScroll: true } : undefined)
+    focusQuietly.current = false
     setPendingFocus(null)
   }, [pendingFocus])
 
@@ -271,6 +274,10 @@ export function TakesSection({ row }: { row: ImageRow }) {
         className="btn btn-primary"
         disabled={!canMake}
         onClick={() => {
+          // The button is off while takes are made, and the browser drops focus from it; focus
+          // goes to the take on the right in the strip, so ← and → keep stepping it.
+          focusQuietly.current = true
+          setPendingFocus(onRight ?? 'right')
           make.mutate({ count, model })
           setCount(2)
         }}
