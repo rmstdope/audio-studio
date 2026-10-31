@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { ImageRow } from '../../../core/images'
 import { Problems } from '../../components/Problems'
 import { useSetImageActStyle } from '../../api'
@@ -23,6 +24,8 @@ export function ActStyleBox({
   onEdit: () => void
 }) {
   const save = useSetImageActStyle(imageId)
+  /** A save is on its way: set at the click, since the render that shows it may come later. */
+  const saving = useRef(false)
   return (
     <div className="brief-field">
       <label className="act-style-box">
@@ -30,9 +33,13 @@ export function ActStyleBox({
           type="checkbox"
           checked={actStyle.on}
           onChange={(e) => {
+            // not disabled while saving: a disabled box would lose focus
+            if (saving.current) return
+            saving.current = true
             onEdit()
             if (save.data || save.error) save.reset()
             save.mutate(e.target.checked, {
+              onSettled: () => (saving.current = false),
               onSuccess: (result) => {
                 if (result.ok) onSaved()
               },

@@ -28,7 +28,7 @@ function formatPrompts(prompts: Prompts): string {
   )
   const { look, keepOut } = prompts.style
   const style = { ...(look && { look }), ...(keepOut && { keepOut }) }
-  const { actStyleOff } = prompts
+  const actStyleOff = [...new Set(prompts.actStyleOff)].sort()
   return `${JSON.stringify({ images, style, ...(actStyleOff?.length && { actStyleOff }) }, null, 2)}\n`
 }
 

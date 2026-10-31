@@ -324,6 +324,22 @@ describe('an image’s page', () => {
       const page = render(route, summary({ prompts, chosen: { inn: row.madeFrom } }))
       expect(text(page)).toContain("Out of date since it was chosen: Act I's style.")
     })
+    it('ignores a second click while the first save is on its way, and keeps focus', async () => {
+      let answer: (r: Response) => void = () => {}
+      globalThis.fetch = ((path: string, init?: RequestInit) => {
+        sent.push({ method: init?.method ?? 'GET', path, body: JSON.parse(String(init?.body)) })
+        return new Promise<Response>((resolve) => (answer = resolve))
+      }) as unknown as typeof fetch
+      const page = render(route)
+      box(page).focus()
+      await act(async () => box(page).click())
+      await act(async () => box(page).click())
+      expect(sent).toHaveLength(1)
+      await act(async () => answer(Response.json({ ok: true })))
+      await act(async () => new Promise((r) => setTimeout(r, 20)))
+      expect(sent.filter((r) => r.method === 'PATCH')).toHaveLength(1)
+      expect(document.activeElement).toBe(box(page))
+    })
     it('shows why a save failed under the box', async () => {
       globalThis.fetch = (async () =>
         Response.json(
@@ -332,7 +348,7 @@ describe('an image’s page', () => {
         )) as unknown as typeof fetch
       const page = render(route)
       await act(async () => box(page).click())
-      await flush()
+      await act(async () => new Promise((r) => setTimeout(r, 20)))
       expect(text(page.querySelector('.brief-panel'))).toContain('Could not be saved')
       expect(box(page).checked).toBe(true)
     })

@@ -166,6 +166,14 @@ describe('saving the studio’s own words', () => {
     expect(await setImageActStyle(file, 'ghost', false)).toBeNull()
   })
 
+  it('writes a hand-edited actStyleOff sorted and without repeats', async () => {
+    const { file, read } = repo({
+      'images/prompts.json': { images: {}, style: {}, actStyleOff: ['b', 'a', 'b'] },
+    })
+    await setImageWords(file, 'inn', 'cosy')
+    expect(JSON.parse(read('images/prompts.json')).actStyleOff).toEqual(['a', 'b'])
+  })
+
   it('saves a style field over the game’s', async () => {
     const { file, read } = repo()
     expect(await setStyleField(file, 'look', 'oil paint')).toEqual({ ok: true })
