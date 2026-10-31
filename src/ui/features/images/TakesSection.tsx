@@ -145,12 +145,10 @@ export function TakesSection({ row }: { row: ImageRow }) {
         : pendingFocus === 'right'
           ? rightHeading.current
           : thumbs.current.get(pendingFocus)
+    // Asked for once the change has settled: tried once, and given up on if the target cannot take it.
     target?.focus()
-    // A button that is off while its change is under way takes focus once it is on again.
-    // A target not drawn yet is waited for while the change is under way, and given up on after.
-    if (target ? document.activeElement === target : !choose.isPending && !drop.isPending)
-      setPendingFocus(null)
-  }, [pendingFocus, ready, choose.isPending, drop.isPending])
+    setPendingFocus(null)
+  }, [pendingFocus])
 
   if (!view) {
     return (

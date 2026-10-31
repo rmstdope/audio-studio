@@ -267,8 +267,14 @@ describe('comparing takes', () => {
           r.attributeName === 'disabled' &&
           r.target === document.activeElement &&
           (r.target as HTMLButtonElement).disabled
-        )
-          (r.target as HTMLElement).blur()
+        ) {
+          // happy-dom's blur() does nothing on a disabled button, so focus is moved away instead.
+          const away = document.createElement('div')
+          away.tabIndex = -1
+          document.body.append(away)
+          away.focus()
+          away.remove()
+        }
     })
     observer.observe(s.container, { attributes: true, subtree: true })
     cleanups.push(() => observer.disconnect())
