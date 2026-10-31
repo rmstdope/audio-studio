@@ -13,9 +13,10 @@ export function joined(words: string[]): string {
     : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
 }
 
-/** What an out-of-date image changed since it was chosen. */
-export function outOfDateText(reasons: ImageRow['reasons']): string {
-  return `Out of date since it was chosen: ${joined(reasons)}.`
+/** What an out-of-date image changed since it was chosen; the act's style is named with the act's short name. */
+export function outOfDateText(reasons: ImageRow['reasons'], actName: string): string {
+  const named = reasons.map((r) => (r === 'the act style' ? `${actName}'s style` : r))
+  return `Out of date since it was chosen: ${joined(named)}.`
 }
 
 /** The palette's size, as the Style page shows it. */

@@ -5,7 +5,13 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import type { Problem } from '../core/project'
 import { loadProject } from './workspace'
 import { readImages } from './imageLists'
-import { markStyleSeen, resolveImageCompare, setImageWords, setStyleField } from './imageEdits'
+import {
+  markStyleSeen,
+  resolveImageCompare,
+  setImageActStyle,
+  setImageWords,
+  setStyleField,
+} from './imageEdits'
 import { openProject } from './workspace'
 
 const images = {
@@ -141,6 +147,23 @@ describe('saving the studio’s own words', () => {
     expect(await setImageWords(file, 'ghost', 'x')).toBeNull()
     const refused = await setImageWords(file, 'inn', 'x')
     expect(refused).toMatchObject({ ok: false })
+  })
+
+  it('keeps an image’s leaving out of its act’s style, and takes it back, touching no game file', async () => {
+    const { file, read } = repo()
+    const before = [read('tts/act1/images.json'), read('images/style.json')]
+    expect(await setImageActStyle(file, 'inn', false)).toEqual({ ok: true })
+    expect(JSON.parse(read('images/prompts.json'))).toEqual({
+      images: {},
+      style: {},
+      actStyleOff: ['inn'],
+    })
+    expect([read('tts/act1/images.json'), read('images/style.json')]).toEqual(before)
+    await setImageWords(file, 'inn', 'cosy')
+    expect(JSON.parse(read('images/prompts.json')).actStyleOff).toEqual(['inn'])
+    expect(await setImageActStyle(file, 'inn', true)).toEqual({ ok: true })
+    expect('actStyleOff' in JSON.parse(read('images/prompts.json'))).toBe(false)
+    expect(await setImageActStyle(file, 'ghost', false)).toBeNull()
   })
 
   it('saves a style field over the game’s', async () => {

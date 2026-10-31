@@ -5,6 +5,7 @@ import {
   ImageListSchema,
   PromptsSchema,
   StyleSchema,
+  applyActStyleChange,
   applyStyleChange,
   applyWordsChange,
   assemblePrompt,
@@ -385,5 +386,65 @@ describe('the game’s look in the rows', () => {
     const row2 = summarizeImages(input({ style: changed, seen: changed, chosen })).images.acts[0]!
       .rows[0]!
     expect(row2.status).toBe('chosen')
+  })
+})
+
+describe('leaving the act’s style out of one image', () => {
+  const off: Prompts = { images: {}, style: {}, actStyleOff: [inn.id] }
+  const row = (prompts: Prompts, extra: Partial<ImagesInput> = {}) =>
+    summarizeImages(input({ prompts, ...extra })).images.acts[0]!.rows[0]!
+  it('keeps the act’s line out of that image’s prompt only', () => {
+    expect(assemblePrompt('w', effectiveStyle(style, off, 'act1', inn.id))).toBe(
+      'w\nflat 16-colour pixel art\nKept out: text, modern things',
+    )
+    expect(assemblePrompt('w', effectiveStyle(style, off, 'act1', 'other'))).toContain(
+      'warm lantern light',
+    )
+    const left = row(off)
+    expect(left.prompt).not.toContain('warm lantern light')
+    expect(left.actStyle).toEqual({ text: 'warm lantern light', on: false })
+    expect(row(none).actStyle).toEqual({ text: 'warm lantern light', on: true })
+    expect(summarizeImages(input({ prompts: off })).images.acts[0]!.addition).toBe(
+      'warm lantern light',
+    )
+  })
+  it('has no choice to show when the act adds no style, and keeps it for when one returns', () => {
+    const plain = { ...style, acts: {} }
+    expect(row(off, { style: plain }).actStyle).toBeNull()
+    expect(row(off, { style: { ...style, acts: { act1: 'new light' } } }).prompt).not.toContain(
+      'new light',
+    )
+  })
+  it('toggles in the prompts, sorted, and removes the id when ticked again', () => {
+    const one = applyActStyleChange(none, 'b', false)
+    expect(applyActStyleChange(one, 'a', false).actStyleOff).toEqual(['a', 'b'])
+    expect(applyActStyleChange(one, 'b', false).actStyleOff).toEqual(['b'])
+    expect(applyActStyleChange(one, 'b', true).actStyleOff).toBeUndefined()
+  })
+  it('makes a picture out of date for the act’s style when the choice changes, and current again when undone', () => {
+    const made = row(none).madeFrom
+    expect(row(off, { chosen: { [inn.id]: made } })).toMatchObject({
+      status: 'out of date',
+      reasons: ['the act style'],
+    })
+    const madeLeftOut = row(off).madeFrom
+    expect(row(none, { chosen: { [inn.id]: madeLeftOut } }).reasons).toEqual(['the act style'])
+    expect(row(off, { chosen: { [inn.id]: madeLeftOut } }).status).toBe('chosen')
+  })
+  it('does not make a left-out image out of date when the game changes the act’s style, but does the others', () => {
+    const changed = { ...style, acts: { act1: 'new light' } }
+    const left = row(off).madeFrom
+    expect(row(off, { style: changed, chosen: { [inn.id]: left } }).status).toBe('chosen')
+    const used = row(none).madeFrom
+    expect(row(none, { style: changed, chosen: { [inn.id]: used } }).reasons).toEqual([
+      'the act style',
+    ])
+  })
+  it('names the look and the act’s style apart, and still reads keys written with a palette', () => {
+    const made = JSON.stringify(['a', 'k', 'x'])
+    const now = { words: 'w', style: JSON.stringify(['b', 'k', null]), width: 1, height: 1 }
+    expect(outOfDateReasons(now, { ...now, style: made })).toEqual(['the style', 'the act style'])
+    const old = JSON.stringify(['a', 'k', ['#000'], 'x'])
+    expect(outOfDateReasons({ ...now, style: made }, { ...now, style: old })).toEqual([])
   })
 })

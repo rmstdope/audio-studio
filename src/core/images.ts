@@ -46,6 +46,8 @@ const OwnWords = z.object({ words: z.string().min(1), gameWas: z.string() })
 export const PromptsSchema = z.object({
   images: z.record(z.string(), OwnWords).default({}),
   style: z.object({ look: OwnWords.optional(), keepOut: OwnWords.optional() }).default({}),
+  /** Ids of the images that leave their act's style addition out of the prompt (kept while the act has none). */
+  actStyleOff: z.array(z.string()).optional(),
 })
 
 /** What a chosen take was made from; the lock records it, and staleness compares it. */
@@ -94,18 +96,20 @@ export interface EffectiveStyle {
   addition: string | null
 }
 
-/** The style an act's images are made with; null when the game has no style file. */
+/** The style an image of an act is made with (the act's own without an image); null when the game has no style file. */
 export function effectiveStyle(
   game: GameStyle | null,
   prompts: Prompts,
   partId: string,
+  imageId?: string,
 ): EffectiveStyle | null {
   if (!game) return null
+  const left = imageId !== undefined && Boolean(prompts.actStyleOff?.includes(imageId))
   return {
     look: prompts.style.look?.words ?? game.look,
     keepOut: prompts.style.keepOut?.words ?? game.keepOut,
     palette: game.palette,
-    addition: game.acts[partId] ?? null,
+    addition: left ? null : (game.acts[partId] ?? null),
   }
 }
 
@@ -152,15 +156,41 @@ function withoutPalette(key: string): string {
 }
 
 /** What differs between what an image would be made from and what its chosen take was. */
-export function outOfDateReasons(
-  now: MadeFrom,
-  chosen: MadeFrom,
-): ('the words' | 'the size' | 'the style')[] {
-  const reasons: ('the words' | 'the size' | 'the style')[] = []
+export function outOfDateReasons(now: MadeFrom, chosen: MadeFrom): ImageReason[] {
+  const reasons: ImageReason[] = []
   if (now.words !== chosen.words) reasons.push('the words')
   if (now.width !== chosen.width || now.height !== chosen.height) reasons.push('the size')
-  if (withoutPalette(now.style) !== withoutPalette(chosen.style)) reasons.push('the style')
+  const [a, b] = [withoutPalette(now.style), withoutPalette(chosen.style)]
+  if (a !== b) {
+    const [pa, pb] = [styleParts(a), styleParts(b)]
+    if (!pa || !pb) reasons.push('the style')
+    else {
+      if (pa[0] !== pb[0] || pa[1] !== pb[1]) reasons.push('the style')
+      if (pa[2] !== pb[2]) reasons.push('the act style')
+    }
+  }
   return reasons
+}
+
+/** What makes an image out of date; 'the act style' is the act's addition, which the page names with the act. */
+export type ImageReason = 'the words' | 'the size' | 'the style' | 'the act style'
+
+/** A style key as its look, kept-out and addition; null for a key that is not one of ours. */
+function styleParts(key: string): unknown[] | null {
+  try {
+    const parts: unknown = JSON.parse(key)
+    return Array.isArray(parts) && parts.length === 3 ? parts : null
+  } catch {
+    return null
+  }
+}
+
+/** Prompts with an image's use of its act's style addition changed; ticked again removes the id. */
+export function applyActStyleChange(prompts: Prompts, id: string, on: boolean): Prompts {
+  const others = (prompts.actStyleOff ?? []).filter((other) => other !== id)
+  const off = (on ? others : [...others, id]).sort()
+  const { actStyleOff: _removed, ...rest } = prompts
+  return off.length ? { ...rest, actStyleOff: off } : rest
 }
 
 /** Prompts with the user's words for an image changed; empty text, or the game's own, removes them. */
@@ -256,6 +286,8 @@ export interface ImageRow {
   gameWas: string | null
   /** The whole prompt. */
   prompt: string
+  /** The act's style addition and whether this image uses it; null when the act adds none. */
+  actStyle: { text: string; on: boolean } | null
   /** The number of the chosen take on the image's board; null when none is chosen. */
   chosenTake: number | null
   /** The picture the game itself shows for it, and whether it is on disk; null when it names none. */
@@ -263,7 +295,7 @@ export interface ImageRow {
   /** What a new take would be made from. */
   madeFrom: MadeFrom
   status: ImageStatus
-  reasons: ('the words' | 'the size' | 'the style')[]
+  reasons: ImageReason[]
   /** The game's look for this image: the line under its title, what it is brought to, or why it cannot be. */
   look: { line: string; key: string | null; error: string | null }
   /** The game's picture, or one of the takes, was brought to another look than the style asks for now. */
@@ -377,10 +409,11 @@ export function summarizeImages(input: ImagesInput): {
   const lookPairs: [string | null, string][] = []
   const changes = style && input.seen ? styleChanges(input.seen, style, parts) : []
   const acts: ImagesAct[] = lists.map((list) => {
-    const eff = effectiveStyle(style, prompts, list.id)
+    const actEff = effectiveStyle(style, prompts, list.id)
     const images =
       list.state.status === 'ok' ? list.state.images.filter((i) => !repeated.has(i.id)) : []
     const rows = images.map((image): ImageRow => {
+      const eff = effectiveStyle(style, prompts, list.id, image.id)
       const own = prompts.images[image.id]
       const words = own?.words ?? image.description
       const madeFrom = madeFromNow(words, image, eff)
@@ -411,6 +444,7 @@ export function summarizeImages(input: ImagesInput): {
         gameChanged: Boolean(own) && own!.gameWas !== image.description,
         gameWas: own?.gameWas ?? null,
         prompt: assemblePrompt(words, eff),
+        actStyle: actEff?.addition ? { text: actEff.addition, on: eff?.addition != null } : null,
         chosenTake: made?.take ?? null,
         gameFile: image.file
           ? { file: image.file, exists: input.gameFiles?.[image.id] ?? false }
@@ -431,7 +465,7 @@ export function summarizeImages(input: ImagesInput): {
       title: list.title,
       file: list.file,
       state: list.state.status,
-      addition: eff?.addition ?? null,
+      addition: actEff?.addition ?? null,
       rows,
       chosen: rows.filter((row) => row.status !== 'none yet').length,
       canRefresh: list.canRefresh,
@@ -475,3 +509,6 @@ export const StyleFieldBody = z.union([
 
 /** The body of settling an image whose game description changed. */
 export const CompareBody = z.object({ choice: z.enum(['keep', 'game']) }).strict()
+
+/** The body of a change to an image's use of its act's style. */
+export const ActStyleBody = z.object({ on: z.boolean() }).strict()

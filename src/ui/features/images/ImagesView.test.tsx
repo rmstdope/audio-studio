@@ -278,6 +278,66 @@ describe('an image’s page', () => {
     expect(sent[0]).toEqual({ method: 'PATCH', path: '/api/images/inn', body: { words: null } })
   })
 
+  describe('the act’s style on an image', () => {
+    const box = (page: HTMLElement) => page.querySelector<HTMLInputElement>('.act-style-box input')!
+    it('is a ticked box after the words, with the act’s style text, and the whole prompt has it', () => {
+      const page = render(route)
+      const spans = [...page.querySelectorAll('.act-style-box span span')]
+      expect(spans.map((n) => text(n))).toEqual([
+        "Add Act I's style to this image",
+        'lantern light',
+      ])
+      expect(box(page).type).toBe('checkbox')
+      expect(box(page).checked).toBe(true)
+      const order = [...page.querySelectorAll('textarea, .act-style-box input')]
+      expect(order.map((n) => n.tagName)).toEqual(['TEXTAREA', 'INPUT'])
+      expect(text(page.querySelector('.images-whole pre'))).toContain('lantern light')
+    })
+    it('saves at once when unticked, and says Saved', async () => {
+      const page = render(route)
+      await act(async () => box(page).click())
+      expect(sent[0]).toEqual({
+        method: 'PATCH',
+        path: '/api/images/inn/act-style',
+        body: { on: false },
+      })
+      expect(text(page.querySelector('.saved'))).toBe('Saved')
+    })
+    it('shows an image that leaves it out struck through, with no act line, and a note on the act page', () => {
+      const prompts: Prompts = { images: {}, style: {}, actStyleOff: ['inn'] }
+      const page = render(route, summary({ prompts }))
+      expect(box(page).checked).toBe(false)
+      expect(page.querySelector('.act-style-box .act-style-off')).not.toBeNull()
+      expect(text(page.querySelector('.images-whole pre'))).not.toContain('lantern light')
+      const act = render({ view: 'images', page: 'act', part: 'act1' }, summary({ prompts }))
+      const rows = [...act.querySelectorAll('tbody tr')]
+      expect(text(rows[0])).toContain("Act I's style left out")
+      expect(text(rows[1])).not.toContain('style left out')
+    })
+    it('is not there when the act adds no style', () => {
+      const page = render(route, summary({ style: { ...style, acts: {} } }))
+      expect(page.querySelector('.act-style-box')).toBeNull()
+    })
+    it('names the act’s style as the reason a picture is out of date', () => {
+      const row = summary().images!.acts[0]!.rows[0]!
+      const prompts: Prompts = { images: {}, style: {}, actStyleOff: ['inn'] }
+      const page = render(route, summary({ prompts, chosen: { inn: row.madeFrom } }))
+      expect(text(page)).toContain("Out of date since it was chosen: Act I's style.")
+    })
+    it('shows why a save failed under the box', async () => {
+      globalThis.fetch = (async () =>
+        Response.json(
+          { ok: false, problems: [{ file: 'p.json', path: '', message: 'bad' }] },
+          { status: 409 },
+        )) as unknown as typeof fetch
+      const page = render(route)
+      await act(async () => box(page).click())
+      await flush()
+      expect(text(page.querySelector('.brief-panel'))).toContain('Could not be saved')
+      expect(box(page).checked).toBe(true)
+    })
+  })
+
   it('says what is out of date', () => {
     const row = summary().images!.acts[0]!.rows[0]!
     const chosen = { inn: { ...row.madeFrom, words: 'x', width: 1 } }

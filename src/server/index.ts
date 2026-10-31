@@ -58,11 +58,12 @@ import { setTrackBrief } from '../services/briefs'
 import {
   markStyleSeen,
   resolveImageCompare,
+  setImageActStyle,
   setImageWords,
   setStyleField,
   type ImageEditResult,
 } from '../services/imageEdits'
-import { CompareBody, StyleFieldBody, WordsBody } from '../core/images'
+import { ActStyleBody, CompareBody, StyleFieldBody, WordsBody } from '../core/images'
 import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import {
@@ -1469,6 +1470,15 @@ export function startServer({
             return Response.json({ error: 'expected { words: string | null }' }, { status: 400 })
           }
           return imageAnswer(await setImageWords(projectFile, request.params.id, body.data.words))
+        }),
+      },
+      '/api/images/:id/act-style': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = ActStyleBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { on: boolean }' }, { status: 400 })
+          }
+          return imageAnswer(await setImageActStyle(projectFile, request.params.id, body.data.on))
         }),
       },
       '/api/images/:id/compare': {
