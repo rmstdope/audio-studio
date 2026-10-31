@@ -271,6 +271,9 @@ export function TakesSection({ row }: { row: ImageRow }) {
         className="btn btn-primary"
         disabled={!canMake}
         onClick={() => {
+          // The button is off while takes are made, and the browser drops focus from it; focus
+          // goes to the take on the right in the strip, so ← and → keep stepping it.
+          setPendingFocus(onRight ?? 'right')
           make.mutate({ count, model })
           setCount(2)
         }}
