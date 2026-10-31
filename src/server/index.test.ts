@@ -5075,6 +5075,7 @@ describe('the images routes', () => {
       ['PATCH', '/api/images/inn', { words: 'x' }],
       ['PATCH', '/api/image-style', { look: 'x' }],
       ['POST', '/api/images/inn/compare', { choice: 'keep' }],
+      ['PATCH', '/api/images/inn/act-style', { on: false }],
       ['POST', '/api/image-style/seen', {}],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
@@ -5092,6 +5093,14 @@ describe('the images routes', () => {
     expect((await send('PATCH', '/api/images/inn', { words: 3 })).status).toBe(400)
     expect((await send('PATCH', '/api/images/ghost', { words: 'x' })).status).toBe(404)
     expect((await send('POST', '/api/images/inn/compare', { choice: 'maybe' })).status).toBe(400)
+  })
+
+  it('saves an image leaving its act’s style out, refuses a bad body and an unknown image', async () => {
+    expect(await (await send('PATCH', '/api/images/inn/act-style', { on: false })).json()).toEqual({
+      ok: true,
+    })
+    expect((await send('PATCH', '/api/images/inn/act-style', { on: 'no' })).status).toBe(400)
+    expect((await send('PATCH', '/api/images/ghost/act-style', { on: false })).status).toBe(404)
   })
 
   it('saves a style field, settles a compare and puts the style notice away', async () => {

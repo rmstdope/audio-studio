@@ -5,6 +5,7 @@ import { useImageCompare, useSetImageWords } from '../../api'
 import { shortTitle } from '../../format'
 import { outOfDateText } from '../../imagesText'
 import { routeHref } from '../../route'
+import { ActStyleBox } from './ActStyleBox'
 import { TakesSection } from './TakesSection'
 import { WordsField } from './WordsField'
 
@@ -41,7 +42,7 @@ export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
       {row.status === 'out of date' && (
         <section className="notice notice-warn">
           <div className="notice-text">
-            <strong>{outOfDateText(row.reasons)}</strong>
+            <strong>{outOfDateText(row.reasons, shortTitle(act.title))}</strong>
             <span>The game shows the chosen image until you choose another.</span>
           </div>
         </section>
@@ -110,6 +111,15 @@ export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
           inputRef={field}
         />
         {row.changed && <span className="muted">The game&apos;s words: {row.description}</span>}
+        {row.actStyle && (
+          <ActStyleBox
+            imageId={row.id}
+            actName={shortTitle(act.title)}
+            actStyle={row.actStyle}
+            onSaved={() => setSaved(true)}
+            onEdit={() => setSaved(false)}
+          />
+        )}
         <details className="images-whole">
           <summary>The whole prompt the model gets</summary>
           <pre className="images-ro mono">{row.prompt}</pre>

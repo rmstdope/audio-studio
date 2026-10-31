@@ -1,6 +1,7 @@
 import { dirname } from 'node:path'
 import {
   StyleSchema,
+  applyActStyleChange,
   applyStyleChange,
   applyWordsChange,
   resolveCompare,
@@ -27,7 +28,8 @@ function formatPrompts(prompts: Prompts): string {
   )
   const { look, keepOut } = prompts.style
   const style = { ...(look && { look }), ...(keepOut && { keepOut }) }
-  return `${JSON.stringify({ images, style }, null, 2)}\n`
+  const actStyleOff = [...new Set(prompts.actStyleOff)].sort()
+  return `${JSON.stringify({ images, style, ...(actStyleOff?.length && { actStyleOff }) }, null, 2)}\n`
 }
 
 /**
@@ -72,6 +74,15 @@ export function setImageWords(
   return edit(projectFile, descriptionOf(id), (prompts, game) =>
     applyWordsChange(prompts, id, text, game),
   )
+}
+
+/** Saves whether an image uses its act's style addition; the choice is the studio's own, kept even when the act adds none. */
+export function setImageActStyle(
+  projectFile: string,
+  id: string,
+  on: boolean,
+): Promise<ImageEditResult> {
+  return edit(projectFile, descriptionOf(id), (prompts) => applyActStyleChange(prompts, id, on))
 }
 
 /** Settles an image whose game description changed under the user's words. */

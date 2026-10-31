@@ -111,6 +111,9 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
                           : 'changed here'}
                       </div>
                     )}
+                    {row.actStyle?.on === false && (
+                      <div className="chg">{name}&apos;s style left out</div>
+                    )}
                   </td>
                   <td className="images-size">
                     {row.width} × {row.height}

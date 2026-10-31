@@ -33,6 +33,7 @@ const row: ImageRow = {
   gameChanged: false,
   gameWas: null,
   prompt: 'a low inn',
+  actStyle: null,
   chosenTake: null,
   gameFile: null,
   madeFrom: { words: 'a low inn', style: '', width: 320, height: 200 },

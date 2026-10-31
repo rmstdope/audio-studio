@@ -775,6 +775,15 @@ export function useSetImageWords(imageId: string) {
   }))
 }
 
+/** Saves whether an image uses its act's style addition. */
+export function useSetImageActStyle(imageId: string) {
+  return useImageEdit<boolean>(`image-${imageId}`, (on) => ({
+    method: 'PATCH',
+    path: `/api/images/${encodeURIComponent(imageId)}/act-style`,
+    body: { on },
+  }))
+}
+
 /** Settles an image whose game description changed under the user's words. */
 export function useImageCompare(imageId: string) {
   return useImageEdit<'keep' | 'game'>(`image-${imageId}`, (choice) => ({

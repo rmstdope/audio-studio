@@ -1385,10 +1385,15 @@ optional addition per part id (an id the project does not have is a problem). A 
 has not written it); a missing style file means each prompt is only its words.
 
 **The prompt.** The image's words (the user's own, else the game's description), then the act's
-addition, the look, and `Kept out: …`, on separate lines; an empty part is left out.
+addition, the look, and `Kept out: …`, on separate lines; an empty part is left out. An image can
+leave its act's addition out (as-1au): a tick box on its page, "Add Act IV's style to this image",
+ticked by default and shown only while the act has an addition. The choice is saved at once
+(`PATCH /api/images/:id/act-style`, `{ on }`) as the image's id in `actStyleOff` in the prompts
+file, kept when the act later has no addition, and the prompt and staleness key then carry no
+addition. The screens are drawn in `docs/ui/as-1au-act-style.html`.
 
 **The studio's own words** are `paths.prompts`, committed like `briefs.json` and joining the Changes
-panel: `{ images: { <id>: { words, gameWas } }, style: { look?, keepOut? } }`. `gameWas` is the game's
+panel: `{ images: { <id>: { words, gameWas } }, style: { look?, keepOut? }, actStyleOff?: [<id>] }`. `gameWas` is the game's
 text when the words were written; a game description that differs from it raises the compare notice
 (**Keep mine** moves `gameWas`, **Use the game's** removes the words). Emptied words, or the game's
 own typed back, remove the entry. The palette and the acts' additions are never changed here.

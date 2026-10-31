@@ -22,12 +22,19 @@ describe('the images words', () => {
     expect(chosenLine('Act I', 4, 1)).toBe('The images the game asks for in Act I. 1 of 4 chosen.')
   })
   it('names what an out-of-date image changed, joined with "and"', () => {
-    expect(outOfDateText(['the words'])).toBe('Out of date since it was chosen: the words.')
-    expect(outOfDateText(['the words', 'the size'])).toBe(
+    expect(outOfDateText(['the words'], 'Act I')).toBe(
+      'Out of date since it was chosen: the words.',
+    )
+    expect(outOfDateText(['the words', 'the size'], 'Act I')).toBe(
       'Out of date since it was chosen: the words and the size.',
     )
-    expect(outOfDateText(['the words', 'the size', 'the style'])).toBe(
+    expect(outOfDateText(['the words', 'the size', 'the style'], 'Act I')).toBe(
       'Out of date since it was chosen: the words, the size and the style.',
+    )
+  })
+  it('names the act’s style with the act’s name', () => {
+    expect(outOfDateText(['the words', 'the act style'], 'Act IV')).toBe(
+      "Out of date since it was chosen: the words and Act IV's style.",
     )
   })
   it('joins what changed with and', () => {
