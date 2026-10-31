@@ -395,9 +395,19 @@ describe('making takes', () => {
     }) as unknown as typeof fetch
     const makeButton = s.button('Make 2 more takes')
     makeButton.focus()
+    const scrolls: unknown[] = []
+    const focus = HTMLElement.prototype.focus
+    HTMLElement.prototype.focus = function (options?: FocusOptions) {
+      scrolls.push(options?.preventScroll)
+      focus.call(this, options)
+    }
+    cleanups.push(() => (HTMLElement.prototype.focus = focus))
     await s.click(makeButton)
-    const section = s.container.querySelector('section')!
-    expect(section.contains(document.activeElement)).toBe(true)
+    const onRight = s.container.querySelector('[data-strip] [aria-pressed="true"]')
+    expect(onRight?.textContent).toContain('Take 3')
+    expect(document.activeElement).toBe(onRight)
+    // A press with the mouse leaves the page where it is, with the strip below the fold.
+    expect(scrolls.at(-1)).toBe(true)
     expect(s.right()).toBe('Take 3')
     await s.key('ArrowLeft', document.activeElement!)
     expect(s.right()).toBe('Take 2')
