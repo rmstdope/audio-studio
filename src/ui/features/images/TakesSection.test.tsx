@@ -256,6 +256,34 @@ describe('comparing takes', () => {
     expect(document.activeElement).toBe(s.button('Choose'))
   })
 
+  it('after Choose, focus survives the button being off while the choice is saved (as in Chrome)', async () => {
+    const s = await show(view({ takes: [take(1), take(2, { chosen: true }), take(3)] }), {
+      chosenTake: 2,
+    })
+    // Chrome drops focus from a focused button the moment it becomes disabled; happy-dom does not.
+    const observer = new MutationObserver((records) => {
+      for (const r of records)
+        if (
+          r.attributeName === 'disabled' &&
+          r.target === document.activeElement &&
+          (r.target as HTMLButtonElement).disabled
+        )
+          (r.target as HTMLElement).blur()
+    })
+    observer.observe(s.container, { attributes: true, subtree: true })
+    cleanups.push(() => observer.disconnect())
+    let release: () => void = () => {}
+    globalThis.fetch = (async () => {
+      await new Promise<void>((resolve) => (release = resolve))
+      return Response.json({ ok: true })
+    }) as unknown as typeof fetch
+    s.button('Choose').focus()
+    await s.click(s.button('Choose'))
+    await act(async () => release())
+    for (let i = 0; i < 5; i++) await act(async () => await new Promise((r) => setTimeout(r, 5)))
+    expect(document.activeElement).toBe(s.button('Choose'))
+  })
+
   it('after the first Choose from nothing, focus is on the right side’s Choose button', async () => {
     const s = await show(view({ takes: three }))
     s.button('Choose').focus()

@@ -200,16 +200,20 @@ export function TakesSection({ row }: { row: ImageRow }) {
     }))
     setWasChosen(before)
     setRight(before ?? rightAfterDrop(strip, n))
-    setPendingFocus(before !== null || strip.length > 1 ? 'choose' : 'right')
-    choose.mutate(n, { onSuccess: () => setSaved((count) => count + 1) })
+    // Focus is asked for once the save has settled: asked earlier, it would be given to the button
+    // just before the button is switched off, and the browser drops it from a disabled button.
+    const focus = before !== null || strip.length > 1 ? 'choose' : 'right'
+    choose.mutate(n, {
+      onSuccess: () => setSaved((count) => count + 1),
+      onSettled: () => setPendingFocus(focus),
+    })
   }
   const onDrop = (n: number) => {
     const next = rightAfterDrop(strip, n)
     beforeChange()
     set((v) => ({ ...v, takes: v.takes.filter((t) => t.n !== n) }))
     setRight(next)
-    setPendingFocus(next ?? 'right')
-    drop.mutate(n)
+    drop.mutate(n, { onSettled: () => setPendingFocus(next ?? 'right') })
   }
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     const target = event.target
