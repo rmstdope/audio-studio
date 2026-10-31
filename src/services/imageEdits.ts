@@ -9,7 +9,7 @@ import {
   type StyleField,
 } from '../core/images'
 import type { Problem } from '../core/project'
-import { readResource, writeAtomic } from './files'
+import { readResource, writeAtomic, writeFailure } from './files'
 import { readImages, readPrompts, writeStyleSeen } from './imageLists'
 import { createSerial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
@@ -54,7 +54,11 @@ function edit(
     const problems: Problem[] = []
     const prompts = await readPrompts(root, file, problems)
     if (prompts === 'invalid') return { ok: false, problems }
-    await writeAtomic(root, file, formatPrompts(change(prompts, gameWords)))
+    try {
+      await writeAtomic(root, file, formatPrompts(change(prompts, gameWords)))
+    } catch (error) {
+      return { ok: false, problems: [{ file, path: '', message: writeFailure(error) }] }
+    }
     return { ok: true }
   })
 }
