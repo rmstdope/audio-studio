@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Problem } from '../core/project'
@@ -11,6 +11,7 @@ import {
   setImageActStyle,
   setImageWords,
   setStyleField,
+  type ImageEditResult,
 } from './imageEdits'
 import { openProject } from './workspace'
 
@@ -228,5 +229,21 @@ describe('through the project load', () => {
     const { file } = repo()
     const loaded = await loadProject(file)
     expect(loaded.ok && loaded.summary.images?.acts[0]?.rows).toHaveLength(1)
+  })
+
+  it('says why when the prompts file cannot be written, for the words and the act-style box', async () => {
+    const { root, file } = repo()
+    chmodSync(join(root, 'images'), 0o555)
+    try {
+      const failed: ImageEditResult = {
+        ok: false,
+        problems: [{ file: 'images/prompts.json', path: '', message: 'permission denied' }],
+      }
+      expect(await setImageWords(file, 'inn', 'a cosy inn')).toEqual(failed)
+      expect(await setImageActStyle(file, 'inn', false)).toEqual(failed)
+    } finally {
+      chmodSync(join(root, 'images'), 0o755)
+    }
+    expect(existsSync(join(root, 'images/prompts.json'))).toBe(false)
   })
 })
