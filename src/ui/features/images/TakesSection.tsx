@@ -145,12 +145,10 @@ export function TakesSection({ row }: { row: ImageRow }) {
         : pendingFocus === 'right'
           ? rightHeading.current
           : thumbs.current.get(pendingFocus)
+    // Asked for once the change has settled: tried once, and given up on if the target cannot take it.
     target?.focus()
-    // A button that is off while its change is under way takes focus once it is on again.
-    // A target not drawn yet is waited for while the change is under way, and given up on after.
-    if (target ? document.activeElement === target : !choose.isPending && !drop.isPending)
-      setPendingFocus(null)
-  }, [pendingFocus, ready, choose.isPending, drop.isPending])
+    setPendingFocus(null)
+  }, [pendingFocus])
 
   if (!view) {
     return (
@@ -200,16 +198,20 @@ export function TakesSection({ row }: { row: ImageRow }) {
     }))
     setWasChosen(before)
     setRight(before ?? rightAfterDrop(strip, n))
-    setPendingFocus(before !== null || strip.length > 1 ? 'choose' : 'right')
-    choose.mutate(n, { onSuccess: () => setSaved((count) => count + 1) })
+    // Focus is asked for once the save has settled: asked earlier, it would be given to the button
+    // just before the button is switched off, and the browser drops it from a disabled button.
+    const focus = before !== null || strip.length > 1 ? 'choose' : 'right'
+    choose.mutate(n, {
+      onSuccess: () => setSaved((count) => count + 1),
+      onSettled: () => setPendingFocus(focus),
+    })
   }
   const onDrop = (n: number) => {
     const next = rightAfterDrop(strip, n)
     beforeChange()
     set((v) => ({ ...v, takes: v.takes.filter((t) => t.n !== n) }))
     setRight(next)
-    setPendingFocus(next ?? 'right')
-    drop.mutate(n)
+    drop.mutate(n, { onSettled: () => setPendingFocus(next ?? 'right') })
   }
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     const target = event.target
