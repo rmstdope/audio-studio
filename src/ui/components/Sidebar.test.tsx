@@ -69,9 +69,17 @@ const summary = {
           { status: 'none yet' },
           { status: 'chosen' },
         ],
+        conflicts: [{ id: 'gate' }],
         order: [],
       },
-      { id: 'act2', title: 'Act II: The Road', state: 'missing', rows: [], order: [] },
+      {
+        id: 'act2',
+        title: 'Act II: The Road',
+        state: 'missing',
+        rows: [],
+        conflicts: [],
+        order: [],
+      },
     ],
   },
 } as unknown as ProjectSummary
@@ -181,7 +189,7 @@ describe('the sidebar elsewhere', () => {
     expect(open).toContain('Images')
     expect(open.slice(open.indexOf('Images'), open.indexOf('Images') + 4)).toEqual([
       'Images',
-      'Act I 2/4',
+      'Act I 2/5',
       'Act II',
       'Style',
     ])

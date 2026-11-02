@@ -108,6 +108,9 @@ describe('the game’s look words', () => {
     expect(lookZoom(300, 10, 320)).toEqual({ zoom: 0.93, stacked: true })
     expect(lookZoom(600, 10, 640)).toEqual({ zoom: 0.93, stacked: true })
   })
+  it('never shrinks a picture away to nothing while the stage is still being laid out', () => {
+    expect(lookZoom(5, 14, 640)).toEqual({ zoom: 0.1, stacked: true })
+  })
   it('draws a shrunk picture smooth, and one at a whole size with hard pixels', () => {
     expect(pictureRendering(0.68)).toBe('auto')
     expect(pictureRendering(1)).toBe('pixelated')

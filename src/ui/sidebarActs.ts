@@ -43,12 +43,12 @@ export function actCount(
   return { text: part.dialog === 'missing' ? 'no script' : 'invalid', warn: false, tone: null }
 }
 
-/** How many of `items` are done out of all of them, as the sidebar shows it ("2/3"), and its colour. */
-export function doneOf<T>(
-  items: readonly T[],
-  done: (item: T) => boolean,
-): { text: string; tone: DoneTone } {
-  return doneText(items.filter(done).length, items.length)
+/** How many are done out of all, as the sidebar shows it ("2/3"), and its colour. */
+export function doneCount({ done, total }: { done: number; total: number }): {
+  text: string
+  tone: DoneTone
+} {
+  return doneText(done, total)
 }
 
 function doneText(done: number, total: number): { text: string; tone: DoneTone } {

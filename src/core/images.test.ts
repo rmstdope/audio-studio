@@ -11,6 +11,7 @@ import {
   assemblePrompt,
   effectiveStyle,
   acceptableReasons,
+  imagesDone,
   outOfDateReasons,
   resolveCompare,
   styleChanges,
@@ -644,5 +645,16 @@ describe('acceptableReasons', () => {
     expect(acceptableReasons(['the words', 'the style', 'the act style'])).toBe(true)
     expect(acceptableReasons(['the words', 'the size'])).toBe(false)
     expect(acceptableReasons([])).toBe(false)
+  })
+})
+
+describe('imagesDone', () => {
+  const row = (id: string, status: string) => ({ id, status })
+  it('counts the images chosen and up to date out of all, the ones the lists disagree on among them', () => {
+    const act = {
+      rows: [row('a', 'chosen'), row('b', 'out of date'), row('c', 'none yet')],
+      conflicts: [{ id: 'd' }],
+    } as never
+    expect(imagesDone(act)).toEqual({ done: 1, total: 4, needs: ['b', 'c', 'd'] })
   })
 })

@@ -150,5 +150,6 @@ describe('the words for what needs attention', () => {
     expect(attentionText(3)).toBe('3 need attention')
     expect(showingAttentionText(1, 'image')).toBe('Showing the 1 image that needs attention.')
     expect(showingAttentionText(3, 'track')).toBe('Showing the 3 tracks that need attention.')
+    expect(showingAttentionText(0, 'track')).toBe('Nothing needs attention now.')
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { actCount, doneOf, doneTone, openWorkspace } from './sidebarActs'
+import { actCount, doneCount, doneTone, openWorkspace } from './sidebarActs'
 
 describe('the workspace open in the sidebar', () => {
   it('is Narration on an act or its lines', () => {
@@ -59,12 +59,9 @@ describe('what an act shows at the right of its sidebar entry', () => {
 })
 
 describe('what is done of a list', () => {
-  it('is how many are done out of all, the done ones told by a test', () => {
-    expect(doneOf(['chosen', 'changed', 'chosen'], (s) => s === 'chosen')).toEqual({
-      text: '2/3',
-      tone: 'few',
-    })
-    expect(doneOf([], () => true)).toEqual({ text: '0/0', tone: null })
+  it('is how many are done out of all, with its colour', () => {
+    expect(doneCount({ done: 2, total: 3 })).toEqual({ text: '2/3', tone: 'few' })
+    expect(doneCount({ done: 0, total: 0 })).toEqual({ text: '0/0', tone: null })
   })
 })
 

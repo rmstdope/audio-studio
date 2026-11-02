@@ -859,7 +859,9 @@ describe('accepting what changed since an image’s take was chosen', () => {
     cleanups.push(() => (globalThis.fetch = realFetch))
     const page = render(route, summary({ chosen: { inn: { ...made(), words: 'an old inn' } } }))
     const notice = page.querySelector('.notice-warn')!
-    expect(text(notice)).toContain('Accept to keep the chosen take as it is.')
+    expect(text(notice)).toContain(
+      'The game shows the chosen image until you choose another. Accept counts it as up to date as it is.',
+    )
     await act(async () => button(page, 'Accept').click())
     expect(calls).toContain('POST /api/images/inn/accept')
   })

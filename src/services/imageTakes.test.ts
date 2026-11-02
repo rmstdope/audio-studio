@@ -353,6 +353,18 @@ describe('choosing', () => {
     expect(read('web/images/inn.png')).toBe(picture)
   })
 
+  it('writes nothing while the lock cannot be read', async () => {
+    const { takes, file, root, read } = await made()
+    await takes.choose(file, 'inn', 1)
+    await setImageWords(file, 'inn', 'a high inn')
+    writeFileSync(join(root, 'images/images.lock.json'), '{ broken')
+    expect(await takes.accept(file, 'inn')).toEqual({
+      ok: false,
+      message: 'The images lock could not be read.',
+    })
+    expect(read('images/images.lock.json')).toBe('{ broken')
+  })
+
   it('refuses to accept a changed size, which needs a new take, or an image with nothing to accept', async () => {
     const { takes, file, root, read, row } = await made()
     expect(await takes.accept(file, 'inn')).toEqual({

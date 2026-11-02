@@ -375,6 +375,17 @@ describe('acceptChange', () => {
     expect(lockOf(root).hall!.inputs).toEqual(inputs)
   })
 
+  it('writes nothing while the lock cannot be read', async () => {
+    const root = await chosen()
+    writeFileSync(join(root, 'music/music.lock.json'), '{ broken')
+    const now = { ...inputs, brief: 'other' }
+    expect(await acceptChange({ root, music: config, id: 'hall', now })).toEqual({
+      ok: false,
+      message: 'The music lock could not be read.',
+    })
+    expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ broken')
+  })
+
   it('refuses a track with nothing changed, or none chosen', async () => {
     const root = await chosen()
     expect(await acceptChange({ root, music: config, id: 'hall', now: inputs })).toEqual({

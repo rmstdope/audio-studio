@@ -247,7 +247,8 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   const busy = making.length > 0
   const canMake = generator.ok && !busy && !make.isPending
   const size = { width: row.width, height: row.height }
-  // The two sides sit side by side at the largest whole size at which both fit, else one above the other.
+  // The two sides sit side by side at the largest whole size at which both fit, else shrunk side by
+  // side down to half the game's size, else one above the other (lookZoom).
   const { zoom, stacked } = lookZoom(available, STAGE_GAP, row.width)
   const set = (update: (v: ImageTakesView) => ImageTakesView) =>
     client.setQueryData<ImageTakesView>(['image-takes', id], (v) =>

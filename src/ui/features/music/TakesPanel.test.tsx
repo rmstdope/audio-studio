@@ -236,7 +236,7 @@ describe('playing a take', () => {
 })
 
 describe('accepting what changed since the take was chosen', () => {
-  function panel(changed: TrackRow['changed']) {
+  function panel(changed: TrackRow['changed'], answer: unknown = { ok: true }) {
     const view: MusicTakesView = {
       ok: true,
       kind: 'loop',
@@ -252,7 +252,7 @@ describe('accepting what changed since the take was chosen', () => {
     const realFetch = globalThis.fetch
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
       calls.push(`${init?.method ?? 'GET'} ${url}`)
-      return Response.json({ ok: true })
+      return Response.json(answer, { status: (answer as { ok: boolean }).ok ? 200 : 409 })
     }) as typeof fetch
     cleanups.push(() => (globalThis.fetch = realFetch))
     const client = new QueryClient({
@@ -280,9 +280,22 @@ describe('accepting what changed since the take was chosen', () => {
 
   it('offers Accept for a changed brief, tempo or key, which keeps the chosen take', async () => {
     const { box, accept, calls } = panel(['brief', 'tempo'])
-    expect(box.textContent).toContain('Accept to keep the chosen take as it is.')
+    expect(box.textContent).toContain('or Accept to count the chosen take as up to date.')
     await act(async () => accept!.click())
     expect(calls).toContain('POST /api/music/tracks/hall/accept')
+  })
+
+  it('says why when Accept could not read the project', async () => {
+    const { box, accept } = panel(['brief'], {
+      ok: false,
+      file: 'content-studio.json',
+      problems: [{ file: 'content-studio.json', path: '', message: 'not JSON' }],
+    })
+    await act(async () => accept!.click())
+    // The answer arrives on a later turn; waited for, up to a moment.
+    for (let i = 0; i < 50 && !box.textContent!.includes('could not be read'); i++)
+      await act(async () => new Promise((done) => setTimeout(done, 5)))
+    expect(box.textContent).toContain('The project file could not be read, so nothing was changed.')
   })
 
   it('offers no Accept when the length changed, and says it needs a new take', () => {

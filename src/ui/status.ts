@@ -116,9 +116,10 @@ export function attentionText(count: number): string {
 
 /**
  * The line over a list showing only what needs attention: `Showing the 3 tracks that need
- * attention.`, with the noun (`track`) made plural when there are several.
+ * attention.`, with the noun (`track`) made plural when there are several, or that nothing does.
  */
 export function showingAttentionText(count: number, noun: string): string {
+  if (count === 0) return 'Nothing needs attention now.'
   return count === 1
     ? `Showing the 1 ${noun} that needs attention.`
     : `Showing the ${count} ${noun}s that need attention.`

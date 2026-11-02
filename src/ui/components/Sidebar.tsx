@@ -16,7 +16,9 @@ import {
 } from './icons'
 import { dollars, plural, shortTitle } from '../format'
 import { amountText } from '../spending'
-import { actCount, doneOf, openWorkspace, type DoneTone } from '../sidebarActs'
+import { actCount, doneCount, openWorkspace, type DoneTone } from '../sidebarActs'
+import { imagesDone } from '../../core/images'
+import { tracksDone } from '../../core/musicChoose'
 
 /** The class of a count at the right of a sidebar entry, coloured by how much is done. */
 function metaClass(tone: DoneTone, warn = false): string {
@@ -128,7 +130,7 @@ export function Sidebar({
                 </span>
                 {list.state === 'ok' && (
                   <DoneCount
-                    count={doneOf(list.tracks, (t) => t.status === 'chosen')}
+                    count={doneCount(tracksDone(list.tracks))}
                     title="Tracks with a take chosen and up to date, out of all"
                   />
                 )}
@@ -158,7 +160,7 @@ export function Sidebar({
                 <span className="grow">{shortTitle(act.title)}</span>
                 {act.state === 'ok' && (
                   <DoneCount
-                    count={doneOf(act.rows, (r) => r.status === 'chosen')}
+                    count={doneCount(imagesDone(act))}
                     title="Images chosen and up to date, out of all"
                   />
                 )}

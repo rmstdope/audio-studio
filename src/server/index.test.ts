@@ -3574,6 +3574,22 @@ describe('server, choosing a take', () => {
     expect((await post('/api/music/tracks/nobody/accept', {})).status).toBe(404)
     // Nothing has changed since the take was chosen.
     expect((await post(path, {})).status).toBe(409)
+    const patch = (body: unknown) =>
+      fetch(at('/api/music/tracks/hall'), {
+        method: 'PATCH',
+        headers: { origin: studio.url.origin, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    const before = (await (await fetch(at('/api/project'))).json()).summary.music.lists[0].tracks[0]
+    expect((await patch({ brief: 'a new brief' })).status).toBe(200)
+    const changed = await (await fetch(at('/api/project'))).json()
+    expect(changed.summary.music.lists[0].tracks[0].status).toBe('changed')
+    expect(await post(path, {}).then((r) => r.json())).toEqual({ ok: true })
+    const after = await (await fetch(at('/api/project'))).json()
+    expect(after.summary.music.lists[0].tracks[0].status).toBe('chosen')
+    // Put the brief back for the tests that follow, and accept it again.
+    expect((await patch({ brief: before.brief })).status).toBe(200)
+    expect(await post(path, {}).then((r) => r.json())).toEqual({ ok: true })
   })
 
   it('serves the music clip as a plain file and nothing else of the folder', async () => {

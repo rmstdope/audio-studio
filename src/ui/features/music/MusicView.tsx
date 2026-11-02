@@ -2,7 +2,7 @@ import { trackFor, type MusicListSummary } from '../../../core/music'
 import type { ProjectSummary } from '../../../core/summary'
 import type { RefreshResult, RefreshSharedResult } from '../../../services/refresh'
 import { useMusicMaking, useRefreshDialog, useRefreshShared } from '../../api'
-import { STATUS_LABEL, type TrackStatus } from '../../../core/musicChoose'
+import { STATUS_LABEL, tracksDone, type TrackStatus } from '../../../core/musicChoose'
 import { useState } from 'react'
 import { Problems } from '../../components/Problems'
 import { PlayIcon, StopIcon } from '../../components/icons'
@@ -137,8 +137,8 @@ function ListPage({
         ? { view: 'music', page: 'stingers', show }
         : { view: 'music', page: 'act', part: list.id, show },
     )
-  const upToDate = list.tracks.filter((t) => t.status === 'chosen').length
-  const shown = attention ? list.tracks.filter((t) => t.status !== 'chosen') : list.tracks
+  const done = tracksDone(list.tracks)
+  const shown = attention ? list.tracks.filter((t) => done.needs.includes(t.id)) : list.tracks
   const notice = listNotice(list, name)
   const making = useMusicMaking().data ?? {}
   // Why the last press of play failed, by track; cleared when the row is pressed again.
@@ -175,13 +175,13 @@ function ListPage({
         )}
       </header>
       {refresh.panel}
-      {!notice && (
+      {!notice && list.tracks.length > 0 && (
         <section className="panel status-panel" aria-label="Tracks up to date">
           <div className="stats">
             <DoneStat
               label="Tracks up to date"
-              done={upToDate}
-              total={list.tracks.length}
+              done={done.done}
+              total={done.total}
               href={page('attention')}
             />
           </div>

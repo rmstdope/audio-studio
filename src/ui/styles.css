@@ -1,6 +1,6 @@
 :root {
   --bg: #06070c;
-  --sidebar: #0a0b12;
+  --sidebar: rgb(10 11 18 / 55%);
   --panel: #10121a;
   /* Aurora: glass surfaces over the page's glows, with soft edges */
   --glass: rgb(255 255 255 / 3.5%);
@@ -8,6 +8,16 @@
   --edge: rgb(255 255 255 / 8%);
   --accent-grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
   --accent-glow: 0 8px 24px rgb(255 90 100 / 30%);
+  --logo-glow: 0 6px 20px rgb(255 90 100 / 35%);
+  --glow-warm: rgb(255 90 120 / 14%);
+  --glow-cool: rgb(90 120 255 / 12%);
+  /* A dark well, for a delivery cue */
+  --well: rgb(0 0 0 / 25%);
+  /* What needs attention: a warm pill */
+  --attention-ink: #ffb38f;
+  --attention-bg: rgb(255 122 61 / 10%);
+  --attention-line: rgb(255 122 61 / 25%);
+  --ring-track: rgb(255 255 255 / 7%);
   --raised: #191c24;
   --raised-hover: #20242e;
   --inset: #0d0f14;
@@ -86,8 +96,8 @@ body {
   margin: 0;
   /* Aurora: two faint glows, a warm one top right and a cool one bottom left, fixed to the window */
   background:
-    radial-gradient(900px 500px at 85% -10%, rgb(255 90 120 / 14%), transparent 60%),
-    radial-gradient(700px 500px at 10% 110%, rgb(90 120 255 / 12%), transparent 60%), var(--bg);
+    radial-gradient(900px 500px at 85% -10%, var(--glow-warm), transparent 60%),
+    radial-gradient(700px 500px at 10% 110%, var(--glow-cool), transparent 60%), var(--bg);
   background-attachment: fixed;
   min-height: 100vh;
   color: var(--text);
@@ -133,7 +143,7 @@ a {
   flex: 1 1 240px;
   max-width: 100%;
   padding: 16px 10px;
-  background: rgb(10 11 18 / 55%);
+  background: var(--sidebar);
   border-right: 1px solid var(--edge);
   display: flex;
   flex-direction: column;
@@ -178,7 +188,7 @@ a {
   height: 30px;
   border-radius: 9px;
   background: var(--accent-grad);
-  box-shadow: 0 6px 20px rgb(255 90 100 / 35%);
+  box-shadow: var(--logo-glow);
   color: var(--accent-ink);
   display: flex;
   align-items: center;
@@ -360,8 +370,8 @@ a {
     background 0.2s;
 }
 
-/* A card lifts a little under the pointer (Aurora) */
-.card:hover {
+/* A character's card lifts a little under the pointer (Aurora); a card holding a form does not */
+article.card:hover {
   transform: translateY(-2px);
   background: var(--glass-strong);
 }
@@ -427,7 +437,7 @@ a {
   color: var(--text-soft);
   padding: 7px 10px;
   border-radius: 10px;
-  background: rgb(0 0 0 / 25%);
+  background: var(--well);
   border: 1px solid transparent;
   white-space: nowrap;
   overflow: hidden;
@@ -567,6 +577,16 @@ a {
   background: var(--glass-strong);
 }
 
+/* In a dialog, whose background is not glass, a plain button needs its own */
+.modal .btn:not(.btn-primary, .btn-ghost),
+.confirm .btn:not(.btn-primary, .btn-ghost) {
+  background: var(--raised-hover);
+}
+.modal .btn:not(.btn-primary, .btn-ghost):hover,
+.confirm .btn:not(.btn-primary, .btn-ghost):hover {
+  background: var(--chip-hover);
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -660,20 +680,15 @@ a {
   font-style: normal;
   letter-spacing: -0.02em;
   color: var(--text);
-  background: conic-gradient(var(--ok) 0 var(--done), rgb(255 255 255 / 7%) var(--done) 100%);
 }
+/* The ring itself, its hole cut out so the glass behind shows through */
 .done-ring::before {
   content: '';
   position: absolute;
-  inset: 8px;
+  inset: 0;
   border-radius: 50%;
-  background: var(--panel);
-}
-.done-ring {
-  isolation: isolate;
-}
-.done-ring::before {
-  z-index: -1;
+  background: conic-gradient(var(--ok) 0 var(--done), var(--ring-track) var(--done) 100%);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px));
 }
 
 /* Its label, which follows the ring */
@@ -713,9 +728,9 @@ a.stat-link {
 }
 .stat-more {
   font-size: 12.5px;
-  color: #ffb38f;
-  background: rgb(255 122 61 / 10%);
-  border: 1px solid rgb(255 122 61 / 25%);
+  color: var(--attention-ink);
+  background: var(--attention-bg);
+  border: 1px solid var(--attention-line);
   padding: 3px 10px;
   border-radius: 999px;
   margin-top: 4px;

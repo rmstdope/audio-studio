@@ -89,6 +89,19 @@ export function acceptable(changed: ChangedField[]): boolean {
   return changed.length > 0 && !changed.includes('length')
 }
 
+/**
+ * How far a list's tracks are: those chosen and up to date (`done`) out of all, and the ids of the
+ * rest, which need attention.
+ */
+export function tracksDone(tracks: readonly { id: string; status: TrackStatus }[]): {
+  done: number
+  total: number
+  needs: string[]
+} {
+  const needs = tracks.filter((t) => t.status !== 'chosen').map((t) => t.id)
+  return { done: tracks.length - needs.length, total: tracks.length, needs }
+}
+
 /** The first line of the box saying what changed since the take was chosen. */
 export function changedLine(fields: ChangedField[]): string {
   const names = fields.map((field) => NAMES[field])

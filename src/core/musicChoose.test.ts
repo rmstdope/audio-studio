@@ -4,6 +4,7 @@ import {
   MusicManifestSchema,
   changedFields,
   acceptable,
+  tracksDone,
   changedLine,
   chosenLine,
   inTheGame,
@@ -191,5 +192,16 @@ describe('acceptable', () => {
     expect(acceptable(['tempo', 'key'])).toBe(true)
     expect(acceptable(['brief', 'length'])).toBe(false)
     expect(acceptable([])).toBe(false)
+  })
+})
+
+describe('tracksDone', () => {
+  it('counts the tracks chosen and up to date out of all, and names the rest', () => {
+    const tracks = [
+      { id: 'a', status: 'chosen' },
+      { id: 'b', status: 'changed' },
+      { id: 'c', status: 'not-chosen' },
+    ] as never
+    expect(tracksDone(tracks)).toEqual({ done: 1, total: 3, needs: ['b', 'c'] })
   })
 })

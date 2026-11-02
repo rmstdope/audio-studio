@@ -654,7 +654,12 @@ export function createImageTakes({
           if (!lock) return { ok: false, message: 'The images lock could not be read.' }
           const chosen = lock.images[id]?.chosen
           if (!chosen) return { ok: false, message: 'No take is chosen for this image.' }
-          const now = found.row.madeFrom
+          // The image's words and style read again in the turn: one saved since `found` was read
+          // is what is accepted, never the one before it.
+          const fresh = await resolve(projectFile, id)
+          if (!fresh || !('row' in fresh))
+            return { ok: false, message: 'The image could not be read again.' }
+          const now = fresh.row.madeFrom
           const reasons = outOfDateReasons(now, chosen)
           if (!reasons.length)
             return { ok: false, message: 'Nothing has changed since the take was chosen.' }

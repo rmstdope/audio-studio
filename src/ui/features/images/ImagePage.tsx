@@ -82,10 +82,10 @@ export function ImagePage({
               )}
             </strong>
             <span>
-              The game shows the chosen image until you choose another
+              The game shows the chosen image until you choose another.{' '}
               {canAccept
-                ? ', or Accept to keep the chosen take as it is.'
-                : '. A changed size needs a new take.'}
+                ? 'Accept counts it as up to date as it is.'
+                : 'A changed size needs a new take.'}
             </span>
             {accept.data && !accept.data.ok && 'message' in accept.data && (
               <span className="adopt-error">{accept.data.message}</span>

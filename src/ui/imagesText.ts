@@ -88,6 +88,9 @@ export function unchooseNote(take: number): string {
 /** The smallest share of the game's size the two pictures are shrunk to side by side, before they stack. */
 const SMALLEST_BESIDE = 0.5
 
+/** The smallest share of the game's size a stacked picture is shown at. */
+const SMALLEST_STACKED = 0.1
+
 /** A zoom below 1, rounded down to hundredths so the pictures never overflow. */
 const shrunk = (zoom: number) => Math.floor(zoom * 100) / 100
 
@@ -95,7 +98,8 @@ const shrunk = (zoom: number) => Math.floor(zoom * 100) / 100
  * How big the takes' pictures are shown, as a multiple of the game's `width`, and whether the
  * workbench's two sides stack. Side by side in `available` pixels: the largest whole number at
  * which both fit; when not even ×1 fits, shrunk to fit, down to half the game's size. Below that
- * they stack, each fitted to the width (at most ×1). An unknown width (0) shows ×1 side by side.
+ * they stack, each fitted to the width (at most ×1, at least a tenth). An unknown width (0) shows ×1
+ * side by side.
  */
 export function lookZoom(
   available: number,
@@ -106,7 +110,8 @@ export function lookZoom(
   const beside = (available - gap) / (2 * width)
   if (beside >= 1) return { zoom: Math.floor(beside), stacked: false }
   if (beside >= SMALLEST_BESIDE) return { zoom: shrunk(beside), stacked: false }
-  return { zoom: shrunk(Math.min(1, available / width)), stacked: true }
+  // Never below a tenth: while the stage is being laid out it can measure a few pixels.
+  return { zoom: Math.max(SMALLEST_STACKED, shrunk(Math.min(1, available / width))), stacked: true }
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { ImagesAct, ImageRow, ImagesSummary } from '../../../core/images'
+import { imagesDone, type ImagesAct, type ImageRow, type ImagesSummary } from '../../../core/images'
 import { useImageMaking, useRefreshDialog } from '../../api'
 import { shortTitle } from '../../format'
 import { chosenLine, disagreeText } from '../../imagesText'
@@ -33,11 +33,8 @@ export function ActPage({
   const name = shortTitle(act.title)
   const page = (show?: 'attention') =>
     routeHref({ view: 'images', page: 'act', part: act.id, show })
-  const upToDate = act.rows.filter((r) => r.status === 'chosen').length
-  const needs = (id: string) =>
-    act.conflicts.some((c) => c.id === id) ||
-    act.rows.some((r) => r.id === id && r.status !== 'chosen')
-  const order = attention ? act.order.filter(needs) : act.order
+  const done = imagesDone(act)
+  const order = attention ? act.order.filter((id) => done.needs.includes(id)) : act.order
   const run = useRefreshDialog(act.id)
   const making = useImageMaking().data ?? {}
   const result = run.outcome?.result
@@ -90,8 +87,8 @@ export function ActPage({
           <div className="stats">
             <DoneStat
               label="Images up to date"
-              done={upToDate}
-              total={act.rows.length}
+              done={done.done}
+              total={done.total}
               href={page('attention')}
             />
           </div>

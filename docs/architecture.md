@@ -915,7 +915,7 @@ acts the same way); on Setup and the project pages both are folded. Each act sho
 done out of all: a narration act its lines that are ok in the language shown ("620/624", read with
 `GET /api/narration/progress?language=` every few seconds while the acts are listed, its line count
 until then), a music act or Stingers its tracks with a take chosen and up to date, an images act its
-images chosen and up to date. A count is green when all are done, red when fewer than three
+images chosen and up to date out of all (those the game's lists disagree on counted, never done). A count is green when all are done, red when fewer than three
 quarters are, yellow between (an empty list has no colour). At the top of each list's page the
 same count stands large beside a ring filled to the share done, the other statuses' counts in chips beside it ("Lines up to date 620 / 624" on an act's narration overview, "Tracks up to
 date" on a music act or Stingers, "Images up to date" on an images act) and, while some need

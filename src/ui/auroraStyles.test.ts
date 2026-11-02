@@ -38,13 +38,33 @@ describe('the Aurora look', () => {
     expect(rule(".tab[aria-selected='true']")).toContain('background: var(--glass-strong)')
   })
 
-  it('lifts a card a little under the pointer, and sets a delivery cue in a dark well', () => {
-    expect(rule('.card:hover')).toContain('transform: translateY(-2px)')
-    expect(rule('.style-cue')).toContain('background: rgb(0 0 0 / 25%)')
-  })
-
   it('gives pages a larger, tighter title', () => {
     expect(rule('.page-header h1')).toContain('letter-spacing: -0.03em')
+  })
+
+  it('takes its colours from tokens', () => {
+    expect(rule('.sidebar')).toContain('background: var(--sidebar)')
+    expect(rule('.brand-mark')).toContain('box-shadow: var(--logo-glow)')
+    expect(rule('.style-cue')).toContain('background: var(--well)')
+    expect(rule('.stat-more')).toContain('color: var(--attention-ink)')
+    expect(rule('body')).toContain('var(--glow-warm)')
+    expect(rule('body')).toContain('var(--glow-cool)')
+  })
+
+  it('cuts the ring’s hole out, so the glass behind shows through it', () => {
+    expect(rule('.done-ring::before')).toContain('mask:')
+    expect(rule('.done-ring::before')).not.toContain('var(--panel)')
+  })
+
+  it('sets a plain button apart in a dialog, whose background is not glass, and leaves the main one its gradient', () => {
+    const plain =
+      '.modal .btn:not(.btn-primary, .btn-ghost),\n.confirm .btn:not(.btn-primary, .btn-ghost)'
+    expect(rule(plain)).toContain('background: var(--raised-hover)')
+  })
+
+  it('lifts only a character’s card, never one holding a form', () => {
+    expect(rule('article.card:hover')).toContain('transform: translateY(-2px)')
+    expect(rule('.card:hover')).toBe('')
   })
 
   it('blurs nothing behind the panels, which would hold the dialogs inside them', () => {

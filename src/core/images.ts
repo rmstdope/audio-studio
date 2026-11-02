@@ -301,6 +301,22 @@ export function acceptableReasons(reasons: ImageReason[]): boolean {
   return reasons.length > 0 && !reasons.includes('the size')
 }
 
+/**
+ * How far an act's images are: those chosen and up to date (`done`) out of all, the ones the
+ * game's lists disagree on among them, and the ids of the rest, which need attention.
+ */
+export function imagesDone(act: {
+  rows: readonly { id: string; status: ImageStatus }[]
+  conflicts: readonly { id: string }[]
+}): { done: number; total: number; needs: string[] } {
+  const needs = [
+    ...act.rows.filter((r) => r.status !== 'chosen').map((r) => r.id),
+    ...act.conflicts.map((c) => c.id),
+  ]
+  const total = act.rows.length + act.conflicts.length
+  return { done: total - needs.length, total, needs }
+}
+
 /** The status chip of an image. */
 export type ImageStatus = 'none yet' | 'chosen' | 'out of date'
 

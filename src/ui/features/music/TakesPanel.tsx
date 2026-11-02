@@ -222,7 +222,7 @@ export function TakesPanel({
             The game plays the chosen take until you choose another. Make more takes to hear the new
             brief
             {acceptable(track.changed)
-              ? ', or Accept to keep the chosen take as it is.'
+              ? ', or Accept to count the chosen take as up to date.'
               : '. A changed length needs a new take.'}
           </span>
           {acceptable(track.changed) && (
@@ -235,8 +235,12 @@ export function TakesPanel({
               >
                 Accept
               </button>
-              {accept.data && !accept.data.ok && 'message' in accept.data && (
-                <span className="adopt-error">{accept.data.message}</span>
+              {accept.data && !accept.data.ok && (
+                <span className="adopt-error">
+                  {'message' in accept.data
+                    ? accept.data.message
+                    : 'The project file could not be read, so nothing was changed.'}
+                </span>
               )}
               {accept.error && <span className="adopt-error">{accept.error.message}</span>}
             </div>
