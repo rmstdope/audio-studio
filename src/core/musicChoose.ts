@@ -13,7 +13,10 @@ export const LockEntrySchema = z.object({
   list: z.string(),
   /** The number of the take on the track's board. */
   take: z.number().int().positive(),
-  /** The chosen take's own inputs, which the track's are compared with. */
+  /**
+   * What the chosen take counts as made from, which the track's inputs are compared with: its own
+   * inputs, with a brief, tempo or key accepted since (Accept) in place of what it was made from.
+   */
   inputs: TakeInputsSchema,
   /** When it was chosen (ISO time). */
   at: z.string(),
@@ -76,6 +79,14 @@ const NAMES: Record<ChangedField, string> = {
   length: 'the length',
   tempo: 'the tempo',
   key: 'the key',
+}
+
+/**
+ * Whether what changed since a take was chosen can be accepted (the take kept as it is): a change
+ * of the brief, tempo or key; a changed length needs a new take.
+ */
+export function acceptable(changed: ChangedField[]): boolean {
+  return changed.length > 0 && !changed.includes('length')
 }
 
 /** The first line of the box saying what changed since the take was chosen. */

@@ -36,7 +36,12 @@ export function ImagesView({ summary, route }: { summary: ProjectSummary; route:
       ) : row ? (
         <ImagePage key={row.id} act={act} row={row} images={images} />
       ) : (
-        <ActPage key={act.id} act={act} images={images} />
+        <ActPage
+          key={act.id}
+          act={act}
+          images={images}
+          attention={route.page === 'act' && route.show === 'attention'}
+        />
       )}
     </>
   )

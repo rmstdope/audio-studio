@@ -1,5 +1,5 @@
 import type { ProjectSummary } from '../../core/summary'
-import { useChanges, useCredit, useSetup, useSpending } from '../api'
+import { useChanges, useCredit, useNarrationProgress, useSetup, useSpending } from '../api'
 import { currentAct } from '../imagesText'
 import { listFor } from '../musicText'
 import { routeHref, type Route } from '../route'
@@ -16,7 +16,13 @@ import {
 } from './icons'
 import { dollars, plural, shortTitle } from '../format'
 import { amountText } from '../spending'
-import { actCount, openWorkspace } from '../sidebarActs'
+import { actCount, doneOf, openWorkspace, type DoneTone } from '../sidebarActs'
+
+/** The class of a count at the right of a sidebar entry, coloured by how much is done. */
+function metaClass(tone: DoneTone, warn = false): string {
+  if (warn) return 'meta meta-warn'
+  return tone ? `meta meta-done-${tone}` : 'meta'
+}
 
 /** The studio's navigation: project, the workspaces with the open one's acts, and the project-wide pages. */
 export function Sidebar({
@@ -36,6 +42,9 @@ export function Sidebar({
     ? setup.data.checks.filter((c) => c.state === 'problem').length
     : 0
   const open = openWorkspace(route)
+  const language = route.view === 'part' || route.view === 'lines' ? route.language : undefined
+  const progress = useNarrationProgress(language, open === 'narration')
+  const done = progress.data?.ok ? progress.data.parts : {}
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -69,7 +78,7 @@ export function Sidebar({
         </a>
         {open === 'narration' &&
           summary.parts.map((part) => {
-            const count = actCount(part)
+            const count = actCount(part, done[part.id])
             return (
               <a
                 key={part.id}
@@ -84,7 +93,12 @@ export function Sidebar({
                 aria-current={activePart === part.id ? 'page' : undefined}
               >
                 <span className="grow">{shortTitle(part.title)}</span>
-                <span className={count.warn ? 'meta meta-warn' : 'meta'}>{count.text}</span>
+                <span
+                  className={metaClass(count.tone, count.warn)}
+                  title={done[part.id] ? 'Lines that are ok, out of all' : undefined}
+                >
+                  {count.text}
+                </span>
               </a>
             )
           })}
@@ -112,7 +126,12 @@ export function Sidebar({
                 <span className="grow">
                   {list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)}
                 </span>
-                {list.state === 'ok' && <span className="meta">{list.tracks.length}</span>}
+                {list.state === 'ok' && (
+                  <DoneCount
+                    count={doneOf(list.tracks, (t) => t.status === 'chosen')}
+                    title="Tracks with a take chosen and up to date, out of all"
+                  />
+                )}
               </a>
             )
           })}
@@ -137,7 +156,12 @@ export function Sidebar({
                 }
               >
                 <span className="grow">{shortTitle(act.title)}</span>
-                {act.state === 'ok' && <span className="meta">{act.rows.length}</span>}
+                {act.state === 'ok' && (
+                  <DoneCount
+                    count={doneOf(act.rows, (r) => r.status === 'chosen')}
+                    title="Images chosen and up to date, out of all"
+                  />
+                )}
               </a>
             ))}
             <a
@@ -210,5 +234,14 @@ export function Sidebar({
         </a>
       </nav>
     </aside>
+  )
+}
+
+/** A done count at the right of a sidebar entry, in its colour. */
+function DoneCount({ count, title }: { count: { text: string; tone: DoneTone }; title: string }) {
+  return (
+    <span className={metaClass(count.tone)} title={title}>
+      {count.text}
+    </span>
   )
 }

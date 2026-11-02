@@ -1,6 +1,6 @@
 import type { ImageRow } from '../../../core/images'
 import type { ImageTakeView } from '../../../core/imageTakes'
-import { modelCaption } from '../../imagesText'
+import { modelCaption, pictureRendering } from '../../imagesText'
 
 /** Which of a take's pictures the Takes section shows: what the model made, or what the game gets. */
 export type Showing = 'model' | 'game'
@@ -90,7 +90,11 @@ export function TakePicture({
           className="image-take-picture"
           src={src}
           alt={`Take ${take.n}, what the game gets`}
-          style={{ width, aspectRatio: `${row.width} / ${row.height}` }}
+          style={{
+            width,
+            aspectRatio: `${row.width} / ${row.height}`,
+            imageRendering: pictureRendering(zoom),
+          }}
         />
       ) : (
         <div

@@ -3,6 +3,7 @@ import {
   MusicLockSchema,
   MusicManifestSchema,
   changedFields,
+  acceptable,
   changedLine,
   chosenLine,
   inTheGame,
@@ -181,5 +182,14 @@ describe('the Un-choose question', () => {
     expect(unchooseFailure(3, 'the music lock could not be read')).toBe(
       'Take 3 could not be un-chosen: the music lock could not be read. Nothing was changed.',
     )
+  })
+})
+
+describe('acceptable', () => {
+  it('is a change of the brief, tempo or key, never one with the length', () => {
+    expect(acceptable(['brief'])).toBe(true)
+    expect(acceptable(['tempo', 'key'])).toBe(true)
+    expect(acceptable(['brief', 'length'])).toBe(false)
+    expect(acceptable([])).toBe(false)
   })
 })

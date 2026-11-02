@@ -72,7 +72,13 @@ import {
   withTake,
   withVoiceTake,
 } from './takes'
-import type { AdoptResult, LoadResult, PartResult, ProjectFailure } from '../services/workspace'
+import type {
+  AdoptResult,
+  LoadResult,
+  PartProgress,
+  PartResult,
+  ProjectFailure,
+} from '../services/workspace'
 
 /** A successful answer about a character's cast voice. */
 export type Voiced = Extract<NonNullable<CharacterVoiceResult>, { ok: true }>
@@ -97,6 +103,23 @@ async function postJson<T>(path: string): Promise<T> {
 /** The project summary, or the problems with the project file. Refetched when the window regains focus. */
 export function useProject() {
   return useQuery({ queryKey: ['project'], queryFn: () => getJson<LoadResult>('/api/project') })
+}
+
+/** How far each act's narration is in a language, as the server answers it. */
+export type NarrationProgress = { ok: true; parts: Record<string, PartProgress> } | ProjectFailure
+
+/**
+ * How far each act's narration is in `language` (the source language when left out), for the
+ * sidebar while it lists the acts: read again every few seconds, since recording and checking
+ * change it from the act's page.
+ */
+export function useNarrationProgress(language: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['narration-progress', language],
+    queryFn: () => getJson<NarrationProgress>(inLanguage('/api/narration/progress', language)),
+    refetchInterval: 5000,
+    enabled,
+  })
 }
 
 /**
@@ -873,6 +896,31 @@ export function useUnchooseTake(trackId: string) {
   })
 }
 
+/**
+ * Accepts what changed of a track since its take was chosen (its brief, tempo or key): the take is
+ * kept and counts as made from them. Reloads the project, whose Music pages show the status, and
+ * the track's takes.
+ */
+export function useAcceptTrackChange(trackId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/music/tracks/${encodeURIComponent(trackId)}/accept`, {
+        method: 'POST',
+      })
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`accepting the change answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<ChooseResult>
+    },
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['music-takes', trackId] }),
+      ]),
+  })
+}
+
 /** Takes a take off a track's board, then reloads its takes. */
 export function useDropTake(trackId: string) {
   const client = useQueryClient()
@@ -1102,6 +1150,13 @@ export function useChooseImageTake(imageId: string) {
 /** Takes the image's chosen take back (its picture is deleted from the game). */
 export function useUnchooseImageTake(imageId: string) {
   return useImageTakesChange<void>(imageId, () => ({ path: '/unchoose', method: 'POST' }), true)
+}
+
+/**
+ * Accepts an image's changed words or style: its chosen take is kept and counts as made from them.
+ */
+export function useAcceptImageChange(imageId: string) {
+  return useImageTakesChange<void>(imageId, () => ({ path: '/accept', method: 'POST' }), true)
 }
 
 /** Takes a take off the image's board. */

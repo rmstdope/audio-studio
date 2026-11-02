@@ -27,7 +27,12 @@ import {
   type LookRunView,
   type ImageTakeView,
 } from '../core/imageTakes'
-import type { ChosenEntry, ImageRow } from '../core/images'
+import {
+  acceptableReasons,
+  outOfDateReasons,
+  type ChosenEntry,
+  type ImageRow,
+} from '../core/images'
 import { resolveInRoot } from '../core/paths'
 import type { Problem } from '../core/project'
 import { readResource, writeAtomic } from './files'
@@ -80,6 +85,11 @@ export interface ImageTakes {
   choose(projectFile: string, id: string, n: number): Promise<ImageTakesAnswer>
   /** Takes the chosen take back: the manifest entry, the picture, then the lock entry; the take stays. */
   unchoose(projectFile: string, id: string): Promise<ImageTakesAnswer>
+  /**
+   * Accepts changed words or style: the chosen take counts as made from the image's words and
+   * style now, and the image is up to date with the same picture. A changed size is refused.
+   */
+  accept(projectFile: string, id: string): Promise<ImageTakesAnswer>
   /** Takes a take off the board and deletes its picture; the chosen take stays. */
   drop(projectFile: string, id: string, n: number): Promise<ImageTakesAnswer>
   /** Brings every image and take with an old look to the game's look now, from the model's stored pictures. */
@@ -633,6 +643,35 @@ export function createImageTakes({
         }
         return { ok: true }
       })
+    },
+
+    async accept(projectFile, id) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('row' in found)) return found
+      return boards.run(turn(found), () =>
+        choices().run(`image-choice\0${projectFile}`, async (): Promise<ImageTakesAnswer> => {
+          const lock = await lockNow(found, [])
+          if (!lock) return { ok: false, message: 'The images lock could not be read.' }
+          const chosen = lock.images[id]?.chosen
+          if (!chosen) return { ok: false, message: 'No take is chosen for this image.' }
+          const now = found.row.madeFrom
+          const reasons = outOfDateReasons(now, chosen)
+          if (!reasons.length)
+            return { ok: false, message: 'Nothing has changed since the take was chosen.' }
+          if (!acceptableReasons(reasons)) {
+            return {
+              ok: false,
+              message: 'A changed size cannot be accepted: the image needs a new take.',
+            }
+          }
+          lock.images[id] = {
+            ...lock.images[id],
+            chosen: { ...chosen, words: now.words, style: now.style },
+          }
+          await writeAtomic(found.root, found.config.paths.lock, formatLock(lock))
+          return { ok: true }
+        }),
+      )
     },
 
     async unchoose(projectFile, id) {

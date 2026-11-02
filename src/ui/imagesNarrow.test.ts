@@ -33,7 +33,7 @@ describe('an image’s workbench', () => {
 
   it('puts the tools beside the pictures, both held in view, the takes scrolling on their own', () => {
     expect(rule('.image-workbench')).toMatch(
-      /grid-template-columns:\s*minmax\(280px, 340px\) minmax\(0, 1fr\)/,
+      /grid-template-columns:\s*minmax\(260px, 300px\) minmax\(0, 1fr\)/,
     )
     expect(rule('.image-workbench-tools')).toMatch(/position:\s*sticky/)
     expect(rule('.image-workbench-tools')).toMatch(/max-height:\s*calc\(100vh - 32px\)/)

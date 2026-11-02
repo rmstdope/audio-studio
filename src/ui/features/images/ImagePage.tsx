@@ -1,7 +1,12 @@
 import { useRef, useState } from 'react'
-import type { ImageRow, ImagesAct, ImagesSummary } from '../../../core/images'
+import {
+  acceptableReasons,
+  type ImageRow,
+  type ImagesAct,
+  type ImagesSummary,
+} from '../../../core/images'
 import { Problems } from '../../components/Problems'
-import { useImageCompare, useSetImageWords } from '../../api'
+import { useAcceptImageChange, useImageCompare, useSetImageWords } from '../../api'
 import { shortTitle } from '../../format'
 import { outOfDateText } from '../../imagesText'
 import { routeHref } from '../../route'
@@ -31,6 +36,8 @@ export function ImagePage({
   const [saved, setSaved] = useState(false)
   const save = useSetImageWords(row.id)
   const compare = useImageCompare(row.id)
+  const accept = useAcceptImageChange(row.id)
+  const canAccept = acceptableReasons(row.reasons)
   const field = useRef<HTMLTextAreaElement>(null)
   const settle = (choice: 'keep' | 'game') =>
     compare.mutate(choice, {
@@ -74,8 +81,29 @@ export function ImagePage({
                 },
               )}
             </strong>
-            <span>The game shows the chosen image until you choose another.</span>
+            <span>
+              The game shows the chosen image until you choose another
+              {canAccept
+                ? ', or Accept to keep the chosen take as it is.'
+                : '. A changed size needs a new take.'}
+            </span>
+            {accept.data && !accept.data.ok && 'message' in accept.data && (
+              <span className="adopt-error">{accept.data.message}</span>
+            )}
+            {accept.error && <span className="adopt-error">{accept.error.message}</span>}
           </div>
+          {canAccept && (
+            <div className="notice-actions">
+              <button
+                className="btn"
+                type="button"
+                disabled={accept.isPending}
+                onClick={() => accept.mutate()}
+              >
+                Accept
+              </button>
+            </div>
+          )}
         </section>
       )}
       {row.gameChanged && (

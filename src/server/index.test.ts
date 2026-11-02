@@ -3568,6 +3568,14 @@ describe('server, choosing a take', () => {
     })
   })
 
+  it('accepts a track’s changed brief from the studio’s own page only', async () => {
+    const path = '/api/music/tracks/hall/accept'
+    expect((await post(path, {}, 'https://evil.example')).status).toBe(403)
+    expect((await post('/api/music/tracks/nobody/accept', {})).status).toBe(404)
+    // Nothing has changed since the take was chosen.
+    expect((await post(path, {})).status).toBe(409)
+  })
+
   it('serves the music clip as a plain file and nothing else of the folder', async () => {
     expect((await fetch(at('/api/music/clips/hall.mp3'))).status).toBe(200)
     expect((await fetch(at('/api/music/clips/manifest.json'))).status).toBe(404)
@@ -5176,6 +5184,7 @@ describe('the image takes routes', () => {
       ['DELETE', '/api/images/inn/takes/1', undefined],
       ['POST', '/api/images/inn/choose', { n: 1 }],
       ['POST', '/api/images/inn/unchoose', undefined],
+      ['POST', '/api/images/inn/accept', undefined],
       ['POST', '/api/images/inn/stop', undefined],
       ['POST', '/api/images/inn/takes/1/seen', undefined],
       ['POST', '/api/images/bring-all', undefined],
@@ -5215,6 +5224,8 @@ describe('the image takes routes', () => {
     expect((await view()).takes[0].isNew).toBe(false)
     expect((await send('DELETE', '/api/images/inn/takes/2')).status).toBe(409)
     expect((await send('DELETE', '/api/images/inn/takes/1')).status).toBe(200)
+    // Nothing has changed since the take was chosen, so there is nothing to accept.
+    expect((await send('POST', '/api/images/inn/accept')).status).toBe(409)
     expect((await send('POST', '/api/images/inn/unchoose')).status).toBe(200)
     expect((await send('POST', '/api/images/inn/unchoose')).status).toBe(409)
     expect((await send('POST', '/api/images/inn/stop')).status).toBe(200)

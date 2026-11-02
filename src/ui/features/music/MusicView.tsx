@@ -12,6 +12,8 @@ import { clock, shortTitle } from '../../format'
 import { makingStatusText } from '../../musicTakesText'
 import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
 import { routeHref, type MusicRoute } from '../../route'
+import { showingAttentionText } from '../../status'
+import { DoneStat } from '../../components/DoneStat'
 import { NoMusic } from './NoMusic'
 import { OrphansPanel } from './OrphansPanel'
 import { TrackView } from './TrackView'
@@ -32,10 +34,11 @@ export function MusicView({ summary, route }: { summary: ProjectSummary; route: 
   if (!list) return <NoMusic />
   const found = route.page === 'track' ? trackFor(summary.music.lists, route.track) : undefined
   if (found) return <TrackView list={found.list} lists={summary.music.lists} track={found.track} />
+  const attention = 'show' in route && route.show === 'attention'
   return list.kind === 'stingers' ? (
-    <StingersPage key="stingers" list={list} />
+    <StingersPage key="stingers" list={list} attention={attention} />
   ) : (
-    <ActPage key={list.id} list={list} />
+    <ActPage key={list.id} list={list} attention={attention} />
   )
 }
 
@@ -46,7 +49,7 @@ interface Refresh {
   panel: React.ReactNode
 }
 
-function ActPage({ list }: { list: MusicListSummary }) {
+function ActPage({ list, attention }: { list: MusicListSummary; attention: boolean }) {
   const run = useRefreshDialog(list.id)
   const result = run.outcome?.result
   let panel: React.ReactNode = null
@@ -70,10 +73,16 @@ function ActPage({ list }: { list: MusicListSummary }) {
       )
     }
   }
-  return <ListPage list={list} refresh={{ start: run.start, pending: run.pending, panel }} />
+  return (
+    <ListPage
+      list={list}
+      refresh={{ start: run.start, pending: run.pending, panel }}
+      attention={attention}
+    />
+  )
 }
 
-function StingersPage({ list }: { list: MusicListSummary }) {
+function StingersPage({ list, attention }: { list: MusicListSummary; attention: boolean }) {
   const run = useRefreshShared()
   const result = run.outcome?.result
   let panel: React.ReactNode = null
@@ -99,11 +108,37 @@ function StingersPage({ list }: { list: MusicListSummary }) {
       )
     }
   }
-  return <ListPage list={list} refresh={{ start: run.start, pending: run.pending, panel }} />
+  return (
+    <ListPage
+      list={list}
+      refresh={{ start: run.start, pending: run.pending, panel }}
+      attention={attention}
+    />
+  )
 }
 
-function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh }) {
+/**
+ * A list of tracks (an act's loops or the stingers): how many are up to date, linking to those that
+ * need attention, and the tracks, all of them or (`attention`) only those.
+ */
+function ListPage({
+  list,
+  refresh,
+  attention,
+}: {
+  list: MusicListSummary
+  refresh: Refresh
+  attention: boolean
+}) {
   const name = list.kind === 'stingers' ? 'Stingers' : shortTitle(list.title)
+  const page = (show?: 'attention') =>
+    routeHref(
+      list.kind === 'stingers'
+        ? { view: 'music', page: 'stingers', show }
+        : { view: 'music', page: 'act', part: list.id, show },
+    )
+  const upToDate = list.tracks.filter((t) => t.status === 'chosen').length
+  const shown = attention ? list.tracks.filter((t) => t.status !== 'chosen') : list.tracks
   const notice = listNotice(list, name)
   const making = useMusicMaking().data ?? {}
   // Why the last press of play failed, by track; cleared when the row is pressed again.
@@ -140,6 +175,23 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
         )}
       </header>
       {refresh.panel}
+      {!notice && (
+        <section className="panel status-panel" aria-label="Tracks up to date">
+          <div className="stats">
+            <DoneStat
+              label="Tracks up to date"
+              done={upToDate}
+              total={list.tracks.length}
+              href={page('attention')}
+            />
+          </div>
+          {attention && (
+            <p className="status-note muted">
+              {showingAttentionText(shown.length, 'track')} <a href={page()}>Show all</a>
+            </p>
+          )}
+        </section>
+      )}
       {notice ? (
         <section className="panel">
           <p className="muted music-notice">{notice}</p>
@@ -158,7 +210,7 @@ function ListPage({ list, refresh }: { list: MusicListSummary; refresh: Refresh 
               </tr>
             </thead>
             <tbody>
-              {list.tracks.map((track) => {
+              {shown.map((track) => {
                 return (
                   <tr key={track.id}>
                     <td className="music-play">

@@ -146,3 +146,22 @@ describe('the Music pages in the address', () => {
     })
   })
 })
+
+describe('a list of what needs attention in the address', () => {
+  it('is read and written for a music act, the stingers and an images act', () => {
+    const routes = [
+      { view: 'music', page: 'act', part: 'act1', show: 'attention' },
+      { view: 'music', page: 'stingers', show: 'attention' },
+      { view: 'images', page: 'act', part: 'act1', show: 'attention' },
+    ] as const
+    for (const route of routes) expect(parseRoute(routeHref(route))).toEqual(route)
+    expect(routeHref(routes[0])).toBe('#/music/parts/act1?show=attention')
+    expect(routeHref(routes[1])).toBe('#/music/stingers?show=attention')
+    expect(routeHref(routes[2])).toBe('#/images/parts/act1?show=attention')
+  })
+
+  it('is left out when the whole list is shown, as before', () => {
+    expect(parseRoute('#/music/parts/act1')).toEqual({ view: 'music', page: 'act', part: 'act1' })
+    expect(routeHref({ view: 'images', page: 'act', part: 'act1' })).toBe('#/images/parts/act1')
+  })
+})

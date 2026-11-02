@@ -149,6 +149,7 @@ import {
   musicCurrentFile,
   loadPart,
   loadProject,
+  narrationProgress,
   openProject,
   readPart,
 } from '../services/workspace'
@@ -1157,6 +1158,11 @@ export function startServer({
       '/api/project': {
         GET: guard(async () => Response.json(await loadProject(projectFile))),
       },
+      '/api/narration/progress': {
+        GET: guard(async (request) =>
+          Response.json(await narrationProgress(projectFile, languageOf(request))),
+        ),
+      },
       '/api/parts/:part': {
         GET: guard(async (request) => {
           const result = await loadPart(projectFile, request.params.part, languageOf(request))
@@ -1551,6 +1557,11 @@ export function startServer({
           return imageAnswer(await imageTakes.choose(projectFile, request.params.id, body.data.n))
         }),
       },
+      '/api/images/:id/accept': {
+        POST: fromOwnPage(async (request) =>
+          imageAnswer(await imageTakes.accept(projectFile, request.params.id)),
+        ),
+      },
       '/api/images/:id/unchoose': {
         POST: fromOwnPage(async (request) =>
           imageAnswer(await imageTakes.unchoose(projectFile, request.params.id)),
@@ -1663,6 +1674,13 @@ export function startServer({
             body.data.file,
             body.data.to,
           )
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/accept': {
+        POST: fromOwnPage(async (request) => {
+          const result = await musicTakes.accept(projectFile, request.params.id)
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

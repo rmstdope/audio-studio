@@ -5,6 +5,8 @@ import { chosenLine, disagreeText } from '../../imagesText'
 import { ActLinks } from './ActLinks'
 import { makingStatusText } from '../../musicTakesText'
 import { routeHref } from '../../route'
+import { showingAttentionText } from '../../status'
+import { DoneStat } from '../../components/DoneStat'
 import { FailedPanel, RefreshPanel } from '../music/MusicView'
 
 /** The chip class of each status: muted until chosen, green when chosen, amber when out of date. */
@@ -14,9 +16,28 @@ const STATUS_CHIP: Record<ImageRow['status'], string> = {
   'out of date': 'chip chip-warn',
 }
 
-/** An act's page: its images with the words they are made from, their size and status. */
-export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary }) {
+/**
+ * An act's page: how many of its images are up to date, linking to those that need attention, and
+ * its images with the words they are made from, their size and status: all of them, or
+ * (`attention`) only those not chosen or out of date, and those the game's lists disagree on.
+ */
+export function ActPage({
+  act,
+  images,
+  attention = false,
+}: {
+  act: ImagesAct
+  images: ImagesSummary
+  attention?: boolean
+}) {
   const name = shortTitle(act.title)
+  const page = (show?: 'attention') =>
+    routeHref({ view: 'images', page: 'act', part: act.id, show })
+  const upToDate = act.rows.filter((r) => r.status === 'chosen').length
+  const needs = (id: string) =>
+    act.conflicts.some((c) => c.id === id) ||
+    act.rows.some((r) => r.id === id && r.status !== 'chosen')
+  const order = attention ? act.order.filter(needs) : act.order
   const run = useRefreshDialog(act.id)
   const making = useImageMaking().data ?? {}
   const result = run.outcome?.result
@@ -64,6 +85,23 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
         </p>
       )}
       {panel}
+      {act.state === 'ok' && act.order.length > 0 && (
+        <section className="panel status-panel" aria-label="Images up to date">
+          <div className="stats">
+            <DoneStat
+              label="Images up to date"
+              done={upToDate}
+              total={act.rows.length}
+              href={page('attention')}
+            />
+          </div>
+          {attention && (
+            <p className="status-note muted">
+              {showingAttentionText(order.length, 'image')} <a href={page()}>Show all</a>
+            </p>
+          )}
+        </section>
+      )}
       {act.state === 'missing' ? (
         <section className="panel">
           <p className="muted music-notice">
@@ -92,7 +130,7 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
               </tr>
             </thead>
             <tbody>
-              {act.order.map((id) => {
+              {order.map((id) => {
                 const conflict = act.conflicts.find((c) => c.id === id)
                 if (conflict) {
                   return (

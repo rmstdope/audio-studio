@@ -6,11 +6,13 @@ import type { ChosenState } from '../core/music'
 import {
   MusicLockSchema,
   MusicManifestSchema,
+  acceptable,
+  changedFields,
   type LockEntry,
   type MusicLock,
   type MusicManifest,
 } from '../core/musicChoose'
-import { MUSIC_MODEL, type BoardTake } from '../core/musicTake'
+import { MUSIC_MODEL, type BoardTake, type TakeInputs } from '../core/musicTake'
 import { resolveInRoot } from '../core/paths'
 import type { MusicConfig, Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
@@ -177,6 +179,54 @@ export async function uncommitChoice({
       }
       await rm(resolveInRoot(root, join(music.paths.clips, `${id}.mp3`)), { force: true })
       delete lock[id]
+      await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
+      return { ok: true }
+    })
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+/**
+ * Accepts a track's changed brief, tempo or key: in the project's choice turn, its lock entry comes
+ * to count the chosen take as made from what `now` has, so the track is up to date again with the
+ * same music. A changed length needs a new take and is refused, as is a track with nothing changed
+ * or none chosen.
+ */
+export async function acceptChange({
+  root,
+  projectFile = root,
+  music,
+  id,
+  now,
+}: {
+  root: string
+  /** What names the project in the queue; the root by default. */
+  projectFile?: string
+  music: MusicConfig
+  id: string
+  /** The track's inputs now. */
+  now: TakeInputs
+}): Promise<CommitResult> {
+  try {
+    return await choices().run(`music-choice\0${projectFile}`, async (): Promise<CommitResult> => {
+      const lock = await lockNow(root, music, [])
+      if (!lock) return { ok: false, message: 'The music lock could not be read.' }
+      const entry = lock[id]
+      if (!entry) return { ok: false, message: 'No take is chosen for this track.' }
+      const changed = changedFields(entry, now)
+      if (!changed.length)
+        return { ok: false, message: 'Nothing has changed since the take was chosen.' }
+      if (!acceptable(changed)) {
+        return {
+          ok: false,
+          message: 'A changed length cannot be accepted: the track needs a new take.',
+        }
+      }
+      lock[id] = {
+        ...entry,
+        inputs: { ...entry.inputs, brief: now.brief, bpm: now.bpm, key: now.key },
+      }
       await writeAtomic(root, music.paths.lock, formatEntriesPerLine(lock))
       return { ok: true }
     })

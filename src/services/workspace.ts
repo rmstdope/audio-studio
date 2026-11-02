@@ -145,6 +145,32 @@ export async function cacheNameFor(
     : `${characterId}\0${resolved}`
 }
 
+/** How far an act's narration is in one language: its lines that are ok, out of all of them. */
+export interface PartProgress {
+  ok: number
+  lines: number
+}
+
+/**
+ * How far each act's narration is in `language` (the source language when left out or not
+ * declared), for the sidebar: an act whose dialog cannot be read is left out.
+ */
+export async function narrationProgress(
+  projectFile: string,
+  language?: string,
+): Promise<{ ok: true; parts: Record<string, PartProgress> } | ProjectFailure> {
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return opened
+  const parts: Record<string, PartProgress> = {}
+  for (const part of opened.project.narration.parts) {
+    const read = await readPart(projectFile, part.id, language)
+    if (!read?.ok || read.dialog.status !== 'ok') continue
+    const state = planPart(read.input)
+    parts[part.id] = { ok: state.counts.ok, lines: state.lines.length }
+  }
+  return { ok: true, parts }
+}
+
 /** The parsed project file, the cast and the summary of the project, for the server's own use. */
 export async function loadWorkspace(projectFile: string): Promise<
   | {

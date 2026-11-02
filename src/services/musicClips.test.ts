@@ -2,10 +2,10 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { MUSIC_MODEL, type BoardTake } from '../core/musicTake'
+import { MUSIC_MODEL, type BoardTake, type TakeInputs } from '../core/musicTake'
 import { ProjectSchema } from '../core/project'
 import type { Encoder, EncodeOptions } from './audio'
-import { commitChoice, readChosen, uncommitChoice } from './musicClips'
+import { acceptChange, commitChoice, readChosen, uncommitChoice } from './musicClips'
 
 const music = {
   paths: {
@@ -327,5 +327,63 @@ describe('uncommitChoice', () => {
     expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
     expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
     expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
+  })
+})
+
+describe('acceptChange', () => {
+  async function chosen() {
+    const root = tempRepo({})
+    await commitChoice({
+      root,
+      music: config,
+      id: 'hall',
+      listId: 'act1',
+      take: take(1),
+      wav: new Uint8Array(4),
+      encode: fakeEncoder().encode,
+      now: () => at,
+    })
+    return root
+  }
+  const lockOf = (root: string) =>
+    JSON.parse(readFileSync(join(root, 'music/music.lock.json'), 'utf8')) as Record<
+      string,
+      { inputs: TakeInputs; fp: string; take: number }
+    >
+
+  it('counts the chosen take as made from the brief, tempo and key now, and changes nothing else', async () => {
+    const root = await chosen()
+    const now = { ...inputs, brief: 'warm lute, a little slower', bpm: 90, key: 'D minor' }
+    expect(await acceptChange({ root, music: config, id: 'hall', now })).toEqual({ ok: true })
+    const entry = lockOf(root).hall!
+    expect(entry.inputs).toEqual(now)
+    expect([entry.fp, entry.take]).toEqual(['0123456789abcdef', 1])
+  })
+
+  it('refuses a changed length, which needs a new take, with whatever else changed', async () => {
+    const root = await chosen()
+    for (const now of [
+      { ...inputs, seconds: 40 },
+      { ...inputs, brief: 'other', bpm: 90, seconds: 40 },
+    ]) {
+      const result = await acceptChange({ root, music: config, id: 'hall', now })
+      expect(result).toEqual({
+        ok: false,
+        message: 'A changed length cannot be accepted: the track needs a new take.',
+      })
+    }
+    expect(lockOf(root).hall!.inputs).toEqual(inputs)
+  })
+
+  it('refuses a track with nothing changed, or none chosen', async () => {
+    const root = await chosen()
+    expect(await acceptChange({ root, music: config, id: 'hall', now: inputs })).toEqual({
+      ok: false,
+      message: 'Nothing has changed since the take was chosen.',
+    })
+    expect(await acceptChange({ root, music: config, id: 'cave', now: inputs })).toEqual({
+      ok: false,
+      message: 'No take is chosen for this track.',
+    })
   })
 })

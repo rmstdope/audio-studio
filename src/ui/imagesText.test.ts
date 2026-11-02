@@ -9,6 +9,7 @@ import {
   lookNoticeText,
   lookZoom,
   makeTakesText,
+  pictureRendering,
   modelCaption,
   outOfDateText,
   paletteText,
@@ -97,10 +98,20 @@ describe('the game’s look words', () => {
     expect(lookZoom(2000, 10, 320)).toEqual({ zoom: 3, stacked: false })
     expect(lookZoom(650, 10, 320)).toEqual({ zoom: 1, stacked: false })
   })
-  it('stacks them in a window too narrow for side by side, each at the largest whole number', () => {
-    expect(lookZoom(640, 10, 320)).toEqual({ zoom: 2, stacked: true })
-    expect(lookZoom(300, 10, 320)).toEqual({ zoom: 1, stacked: true })
+  it('shrinks them side by side to fit when not even the game’s size fits, down to half', () => {
+    expect(lookZoom(890, 14, 640)).toEqual({ zoom: 0.68, stacked: false })
+    expect(lookZoom(890, 14, 480)).toEqual({ zoom: 0.91, stacked: false })
+    expect(lookZoom(640, 10, 320)).toEqual({ zoom: 0.98, stacked: false })
     expect(lookZoom(0, 10, 320)).toEqual({ zoom: 1, stacked: false })
+  })
+  it('stacks them, each fitted to the width, when side by side they would be under half size', () => {
+    expect(lookZoom(300, 10, 320)).toEqual({ zoom: 0.93, stacked: true })
+    expect(lookZoom(600, 10, 640)).toEqual({ zoom: 0.93, stacked: true })
+  })
+  it('draws a shrunk picture smooth, and one at a whole size with hard pixels', () => {
+    expect(pictureRendering(0.68)).toBe('auto')
+    expect(pictureRendering(1)).toBe('pixelated')
+    expect(pictureRendering(2)).toBe('pixelated')
   })
   it('captions the model’s picture, adding that it is cropped', () => {
     expect(modelCaption(1280, 720, false)).toBe('1280 × 720')

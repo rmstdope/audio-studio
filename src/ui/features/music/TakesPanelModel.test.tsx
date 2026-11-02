@@ -590,7 +590,7 @@ describe('the count menu on a track’s Takes panel', () => {
   it('says to make more takes to hear a changed brief', () => {
     const page = render(view(), { ...track, status: 'changed', changed: ['brief'] } as TrackRow)
     expect(page.container.textContent).toContain(
-      'The game plays the chosen take until you choose another. Make more takes to hear the new brief.',
+      'The game plays the chosen take until you choose another. Make more takes to hear the new brief, or Accept to keep the chosen take as it is.',
     )
   })
 })

@@ -1,4 +1,5 @@
 import type { PartSummary } from '../core/summary'
+import type { PartProgress } from '../services/workspace'
 import type { Route } from './route'
 
 /** The workspace whose acts the sidebar lists: the one the page shown belongs to, else none. */
@@ -8,12 +9,48 @@ export function openWorkspace(route: Route): 'narration' | 'music' | 'images' | 
   return route.view === 'images' ? 'images' : null
 }
 
-/** What an act's sidebar entry shows at the right: its line count, or why it has none. */
-export function actCount(part: Pick<PartSummary, 'dialog' | 'lineCount'>): {
+/**
+ * The colour of a done count: all done (green), at least three quarters (yellow), fewer (red);
+ * none for an empty list.
+ */
+export type DoneTone = 'all' | 'most' | 'few' | null
+
+/** The colour of `done` out of `total`. */
+export function doneTone(done: number, total: number): DoneTone {
+  if (total === 0) return null
+  if (done === total) return 'all'
+  return done / total < 0.75 ? 'few' : 'most'
+}
+
+/**
+ * What an act's sidebar entry shows at the right: its lines that are ok out of all of them
+ * (`progress`), with their colour, its line count until that is known, or why it has none.
+ */
+export function actCount(
+  part: Pick<PartSummary, 'dialog' | 'lineCount'>,
+  progress?: PartProgress,
+): {
   text: string
   warn: boolean
+  tone: DoneTone
 } {
-  if (part.dialog === 'ok') return { text: String(part.lineCount), warn: false }
-  if (part.dialog === 'gone') return { text: 'dialog gone', warn: true }
-  return { text: part.dialog === 'missing' ? 'no script' : 'invalid', warn: false }
+  if (part.dialog === 'ok') {
+    return progress
+      ? { ...doneText(progress.ok, progress.lines), warn: false }
+      : { text: String(part.lineCount), warn: false, tone: null }
+  }
+  if (part.dialog === 'gone') return { text: 'dialog gone', warn: true, tone: null }
+  return { text: part.dialog === 'missing' ? 'no script' : 'invalid', warn: false, tone: null }
+}
+
+/** How many of `items` are done out of all of them, as the sidebar shows it ("2/3"), and its colour. */
+export function doneOf<T>(
+  items: readonly T[],
+  done: (item: T) => boolean,
+): { text: string; tone: DoneTone } {
+  return doneText(items.filter(done).length, items.length)
+}
+
+function doneText(done: number, total: number): { text: string; tone: DoneTone } {
+  return { text: `${done}/${total}`, tone: doneTone(done, total) }
 }

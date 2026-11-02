@@ -9,7 +9,7 @@ import { loadPart, loadProject } from '../../../services/workspace'
 GlobalRegistrator.register()
 const { act, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { CastSection } = await import('./PartOverview')
+const { CastSection, StatusPanel } = await import('./PartOverview')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -62,4 +62,45 @@ describe('the cast on a part’s overview', () => {
       act(() => view.unmount())
     },
   )
+})
+
+describe('the lines up to date on a part’s overview', () => {
+  const panel = (statuses: string[], language?: string) => {
+    const counts = {
+      ok: 0,
+      weak: 0,
+      stale: 0,
+      missing: 0,
+      untracked: 0,
+      uncast: 0,
+      untranslated: 0,
+    }
+    for (const s of statuses) counts[s as keyof typeof counts]++
+    const part = {
+      id: 'act1',
+      counts,
+      lines: statuses.map((status, i) => ({ key: `l${i}`, status, reasons: [] })),
+      orphans: [],
+    }
+    const container = document.createElement('div')
+    document.body.append(container)
+    const view = createRoot(container)
+    act(() => view.render(createElement(StatusPanel, { part: part as never, language })))
+    return { container, done: () => act(() => view.unmount()) }
+  }
+
+  it('links to the act’s lines, which open on those that need attention', () => {
+    const { container, done } = panel(['ok', 'missing', 'stale'], 'sv')
+    const stat = container.querySelector<HTMLAnchorElement>('a.stat-lead')!
+    expect(stat.getAttribute('href')).toBe('#/parts/act1/lines?language=sv')
+    expect(stat.textContent).toBe('Lines up to date1 / 32 need attention ›')
+    done()
+  })
+
+  it('is no link when every line is up to date', () => {
+    const { container, done } = panel(['ok', 'ok'])
+    expect(container.querySelector('a.stat-lead')).toBeNull()
+    expect(container.querySelector('.stat-lead')?.textContent).toBe('Lines up to date2 / 2')
+    done()
+  })
 })

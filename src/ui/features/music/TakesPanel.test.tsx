@@ -234,3 +234,60 @@ describe('playing a take', () => {
     expect(container.querySelector<HTMLElement>('.wave .playhead')?.style.left).toBe('50%')
   })
 })
+
+describe('accepting what changed since the take was chosen', () => {
+  function panel(changed: TrackRow['changed']) {
+    const view: MusicTakesView = {
+      ok: true,
+      kind: 'loop',
+      generator: { ok: true },
+      defaultModel: 'balanced',
+      models: [{ id: 'balanced', installed: true }],
+      takes: [],
+      making: [],
+      failed: [],
+      lockUnread: false,
+    }
+    const calls: string[] = []
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? 'GET'} ${url}`)
+      return Response.json({ ok: true })
+    }) as typeof fetch
+    cleanups.push(() => (globalThis.fetch = realFetch))
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, enabled: false } },
+    })
+    client.setQueryData(['music-takes', 'hall'], view)
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => act(() => root.unmount()))
+    const changedTrack: TrackRow = { ...track, status: 'changed', changed }
+    act(() =>
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(TakesPanel, { track: changedTrack, lists: [] }),
+        ),
+      ),
+    )
+    const box = container.querySelector('.warnbox')!
+    const accept = [...box.querySelectorAll('button')].find((b) => b.textContent === 'Accept')
+    return { box, accept, calls }
+  }
+
+  it('offers Accept for a changed brief, tempo or key, which keeps the chosen take', async () => {
+    const { box, accept, calls } = panel(['brief', 'tempo'])
+    expect(box.textContent).toContain('Accept to keep the chosen take as it is.')
+    await act(async () => accept!.click())
+    expect(calls).toContain('POST /api/music/tracks/hall/accept')
+  })
+
+  it('offers no Accept when the length changed, and says it needs a new take', () => {
+    const { box, accept } = panel(['brief', 'length'])
+    expect(accept).toBeUndefined()
+    expect(box.textContent).toContain('A changed length needs a new take.')
+  })
+})

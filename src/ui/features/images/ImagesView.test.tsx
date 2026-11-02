@@ -808,3 +808,66 @@ describe('lists that disagree about an image', () => {
     expect(page.querySelector('textarea')).toBeNull()
   })
 })
+
+describe('what needs attention on an act’s images page', () => {
+  const made = (id: string) => summary().images!.acts[0]!.rows.find((r) => r.id === id)!.madeFrom
+  const names = (page: HTMLElement) =>
+    [...page.querySelectorAll('tbody tr .images-name strong')].map((s) => s.textContent)
+
+  it('counts the images up to date at the top, a link to the ones that need attention', () => {
+    const page = render(
+      { view: 'images', page: 'act', part: 'act1' },
+      summary({ chosen: { inn: made('inn') } }),
+    )
+    const stat = page.querySelector<HTMLAnchorElement>('a.stat-lead')!
+    expect(stat.getAttribute('href')).toBe('#/images/parts/act1?show=attention')
+    expect(text(stat)).toBe('Images up to date1 / 21 needs attention ›')
+  })
+
+  it('lists only the images that need attention there, with the way back to all', () => {
+    const page = render(
+      { view: 'images', page: 'act', part: 'act1', show: 'attention' },
+      summary({ chosen: { inn: made('inn') } }),
+    )
+    expect(names(page)).toEqual(['The Barn'])
+    const all = [...page.querySelectorAll('a')].find((a) => a.textContent === 'Show all')!
+    expect(all.getAttribute('href')).toBe('#/images/parts/act1')
+    expect(text(page)).toContain('Showing the 1 image that needs attention.')
+  })
+
+  it('has no link when every image is up to date', () => {
+    const page = render(
+      { view: 'images', page: 'act', part: 'act1' },
+      summary({ chosen: { inn: made('inn'), barn: made('barn') } }),
+    )
+    expect(page.querySelector('a.stat-lead')).toBeNull()
+    expect(text(page.querySelector('.stat-lead'))).toBe('Images up to date2 / 2')
+  })
+})
+
+describe('accepting what changed since an image’s take was chosen', () => {
+  const route = { view: 'images', page: 'image', image: 'inn' } as const
+  const made = () => summary().images!.acts[0]!.rows[0]!.madeFrom
+
+  it('offers Accept for changed words or style, keeping the chosen picture', async () => {
+    const calls: string[] = []
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? 'GET'} ${url}`)
+      return Response.json({ ok: true })
+    }) as typeof fetch
+    cleanups.push(() => (globalThis.fetch = realFetch))
+    const page = render(route, summary({ chosen: { inn: { ...made(), words: 'an old inn' } } }))
+    const notice = page.querySelector('.notice-warn')!
+    expect(text(notice)).toContain('Accept to keep the chosen take as it is.')
+    await act(async () => button(page, 'Accept').click())
+    expect(calls).toContain('POST /api/images/inn/accept')
+  })
+
+  it('offers no Accept when the size changed, and says it needs a new take', () => {
+    const page = render(route, summary({ chosen: { inn: { ...made(), width: 16 } } }))
+    const notice = page.querySelector('.notice-warn')!
+    expect([...notice.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Accept')
+    expect(text(notice)).toContain('A changed size needs a new take.')
+  })
+})

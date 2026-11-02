@@ -8,6 +8,7 @@ import { DialogGonePanel } from '../lines/DialogGonePanel'
 import { PartLanguageSwitch } from '../lines/PartLanguageSwitch'
 import { noDialogPanel } from '../../languages'
 import { CharacterCard } from '../../components/CharacterCard'
+import { DoneStat } from '../../components/DoneStat'
 import { AlertIcon, ListIcon } from '../../components/icons'
 import { Problems } from '../../components/Problems'
 import { StatusBar, StatusDot } from '../../components/StatusBar'
@@ -168,7 +169,11 @@ function NoLanguageDialog({
   )
 }
 
-function StatusPanel({ part, language }: { part: PartDetail; language?: string }) {
+/**
+ * How a part's clips stand: its lines up to date, a link to the lines page (which opens on those
+ * that need attention) while some do, the count of each other status and why lines are stale.
+ */
+export function StatusPanel({ part, language }: { part: PartDetail; language?: string }) {
   const { counts } = part
   const total = part.lines.length
   const reasons = reasonCounts(part.lines)
@@ -177,13 +182,12 @@ function StatusPanel({ part, language }: { part: PartDetail; language?: string }
   return (
     <section className="panel status-panel" aria-label="Clip status">
       <div className="stats">
-        <div className="stat stat-lead">
-          <span>Lines up to date</span>
-          <strong>
-            {counts.ok}
-            <span className="stat-of"> / {total}</span>
-          </strong>
-        </div>
+        <DoneStat
+          label="Lines up to date"
+          done={counts.ok}
+          total={total}
+          href={routeHref({ view: 'lines', part: part.id, language })}
+        />
         {shown.map((status) => (
           <div key={status} className="stat">
             <span>

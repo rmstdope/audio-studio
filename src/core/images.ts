@@ -293,6 +293,14 @@ function differences(images: GameImage[]): ConflictKind[] {
   return kinds
 }
 
+/**
+ * Whether what changed since an image's take was chosen can be accepted (the picture kept as it
+ * is): changed words or styles; a changed size needs a new take.
+ */
+export function acceptableReasons(reasons: ImageReason[]): boolean {
+  return reasons.length > 0 && !reasons.includes('the size')
+}
+
 /** The status chip of an image. */
 export type ImageStatus = 'none yet' | 'chosen' | 'out of date'
 

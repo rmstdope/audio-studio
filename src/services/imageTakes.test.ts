@@ -332,6 +332,54 @@ describe('choosing', () => {
     expect(await takes.currentFile(file, 'inn')).toBeNull()
   })
 
+  it('accepts changed words and style: the chosen take counts as made from them, up to date again', async () => {
+    const { takes, file, root, read, row } = await made()
+    await takes.choose(file, 'inn', 1)
+    const picture = read('web/images/inn.png')
+    await setImageWords(file, 'inn', 'a high inn')
+    writeFileSync(
+      join(root, 'images/style.json'),
+      JSON.stringify({ look: 'oil paint', keepOut: 'text', palette: ['#000000'], acts: {} }),
+    )
+    expect((await row()).reasons).toEqual(['the words', 'the style'])
+    expect(await takes.accept(file, 'inn')).toEqual({ ok: true })
+    expect((await row()).status).toBe('chosen')
+    const chosen = JSON.parse(read('images/images.lock.json')).images.inn.chosen
+    expect([chosen.words, chosen.style, chosen.take]).toEqual([
+      (await row()).madeFrom.words,
+      (await row()).madeFrom.style,
+      1,
+    ])
+    expect(read('web/images/inn.png')).toBe(picture)
+  })
+
+  it('refuses to accept a changed size, which needs a new take, or an image with nothing to accept', async () => {
+    const { takes, file, root, read, row } = await made()
+    expect(await takes.accept(file, 'inn')).toEqual({
+      ok: false,
+      message: 'No take is chosen for this image.',
+    })
+    await takes.choose(file, 'inn', 1)
+    expect(await takes.accept(file, 'inn')).toEqual({
+      ok: false,
+      message: 'Nothing has changed since the take was chosen.',
+    })
+    writeFileSync(
+      join(root, 'tts/act1/images.json'),
+      JSON.stringify([
+        { ...inn, description: 'a high inn', width: 160 },
+        { ...inn, id: 'hall', title: 'Hall' },
+      ]),
+    )
+    const before = read('images/images.lock.json')
+    expect(await takes.accept(file, 'inn')).toEqual({
+      ok: false,
+      message: 'A changed size cannot be accepted: the image needs a new take.',
+    })
+    expect(read('images/images.lock.json')).toBe(before)
+    expect((await row()).status).toBe('out of date')
+  })
+
   it('drops a take that is not chosen, and refuses the chosen one', async () => {
     const { takes, file, root } = await made()
     await takes.choose(file, 'inn', 2)

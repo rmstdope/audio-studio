@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react'
 
-/** The Music pages: none chosen (the first list), an act's loops, the stingers, or one track. */
+/**
+ * The Music pages: none chosen (the first list), an act's loops, the stingers (either only those
+ * that need attention, with `show`), or one track.
+ */
 export type MusicRoute =
   | { view: 'music'; page: null }
-  | { view: 'music'; page: 'act'; part: string }
-  | { view: 'music'; page: 'stingers' }
+  | { view: 'music'; page: 'act'; part: string; show?: 'attention' }
+  | { view: 'music'; page: 'stingers'; show?: 'attention' }
   | { view: 'music'; page: 'track'; track: string }
 
-/** The Images pages: none chosen (the first act), an act's images, the Style page, or one image. */
+/**
+ * The Images pages: none chosen (the first act), an act's images (only those that need attention,
+ * with `show`), the Style page, or one image.
+ */
 export type ImagesRoute =
   | { view: 'images'; page: null }
-  | { view: 'images'; page: 'act'; part: string }
+  | { view: 'images'; page: 'act'; part: string; show?: 'attention' }
   | { view: 'images'; page: 'style' }
   | { view: 'images'; page: 'image'; image: string; from?: string }
 
@@ -32,31 +38,34 @@ export type Route =
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers`, `#/music/tracks/victory`, `#/images`, `#/images/parts/act1`, `#/images/style`, `#/images/items/silver-stag-inn` (with `?from=act1`, the act it was opened from); anything else is the
+ * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers` (these two with `?show=attention`), `#/music/tracks/victory`, `#/images`, `#/images/parts/act1` (with `?show=attention`), `#/images/style`, `#/images/items/silver-stag-inn` (with `?from=act1`, the act it was opened from); anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
   const [path = '', query] = hash.replace(/^#/, '').split('?')
   const language = new URLSearchParams(query).get('language') ?? undefined
   const from = new URLSearchParams(query).get('from') ?? undefined
+  // Only what needs attention, on a list page; left out of the route when the whole list is shown.
+  const show =
+    new URLSearchParams(query).get('show') === 'attention' ? { show: 'attention' as const } : {}
   const [, first, second, third] = path.split('/')
   if (first === 'changes') return { view: 'changes' }
   if (first === 'spending') return { view: 'spending' }
   if (first === 'setup') return { view: 'setup' }
   if (first === 'music') {
     if (second === 'parts' && third) {
-      return { view: 'music', page: 'act', part: decodeURIComponent(third) }
+      return { view: 'music', page: 'act', part: decodeURIComponent(third), ...show }
     }
     if (second === 'tracks' && third) {
       return { view: 'music', page: 'track', track: decodeURIComponent(third) }
     }
     return second === 'stingers'
-      ? { view: 'music', page: 'stingers' }
+      ? { view: 'music', page: 'stingers', ...show }
       : { view: 'music', page: null }
   }
   if (first === 'images') {
     if (second === 'parts' && third) {
-      return { view: 'images', page: 'act', part: decodeURIComponent(third) }
+      return { view: 'images', page: 'act', part: decodeURIComponent(third), ...show }
     }
     if (second === 'items' && third) {
       const image = decodeURIComponent(third)
@@ -82,15 +91,16 @@ export function parseRoute(hash: string): Route {
 
 /** The hash for a route. */
 export function routeHref(route: Route): string {
+  const show = 'show' in route && route.show === 'attention' ? '?show=attention' : ''
   if (route.view === 'changes') return '#/changes'
   if (route.view === 'spending') return '#/spending'
   if (route.view === 'setup') return '#/setup'
   if (route.view === 'music') {
     if (route.page === 'track') return `#/music/tracks/${encodeURIComponent(route.track)}`
     return route.page === 'act'
-      ? `#/music/parts/${encodeURIComponent(route.part)}`
+      ? `#/music/parts/${encodeURIComponent(route.part)}${show}`
       : route.page === 'stingers'
-        ? '#/music/stingers'
+        ? `#/music/stingers${show}`
         : '#/music'
   }
   if (route.view === 'images') {
@@ -99,7 +109,7 @@ export function routeHref(route: Route): string {
       return `#/images/items/${encodeURIComponent(route.image)}${from}`
     }
     return route.page === 'act'
-      ? `#/images/parts/${encodeURIComponent(route.part)}`
+      ? `#/images/parts/${encodeURIComponent(route.part)}${show}`
       : route.page === 'style'
         ? '#/images/style'
         : '#/images'

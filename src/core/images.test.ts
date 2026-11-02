@@ -10,6 +10,7 @@ import {
   applyWordsChange,
   assemblePrompt,
   effectiveStyle,
+  acceptableReasons,
   outOfDateReasons,
   resolveCompare,
   styleChanges,
@@ -635,5 +636,13 @@ describe('lists that disagree about an image', () => {
       `the image id "${inn.id}" is used more than once in the game's lists`,
       `the image id "${inn.id}" is used more than once in the game's lists`,
     ])
+  })
+})
+
+describe('acceptableReasons', () => {
+  it('are changed words or styles, never a changed size', () => {
+    expect(acceptableReasons(['the words', 'the style', 'the act style'])).toBe(true)
+    expect(acceptableReasons(['the words', 'the size'])).toBe(false)
+    expect(acceptableReasons([])).toBe(false)
   })
 })

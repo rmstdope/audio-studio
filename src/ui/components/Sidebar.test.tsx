@@ -41,20 +41,45 @@ const summary = {
   ],
   music: {
     lists: [
-      { id: 'act1', kind: 'act', title: 'Act I: The Lantern', state: 'ok', tracks: [1, 2, 3] },
-      { id: 'stingers', kind: 'stingers', title: 'Stingers', state: 'ok', tracks: [1] },
+      {
+        id: 'act1',
+        kind: 'act',
+        title: 'Act I: The Lantern',
+        state: 'ok',
+        tracks: [{ status: 'chosen' }, { status: 'changed' }, { status: 'not-chosen' }],
+      },
+      {
+        id: 'stingers',
+        kind: 'stingers',
+        title: 'Stingers',
+        state: 'ok',
+        tracks: [{ status: 'chosen' }],
+      },
     ],
   },
   images: {
     acts: [
-      { id: 'act1', title: 'Act I: The Lantern', state: 'ok', rows: [1, 2, 3, 4], order: [] },
+      {
+        id: 'act1',
+        title: 'Act I: The Lantern',
+        state: 'ok',
+        rows: [
+          { status: 'chosen' },
+          { status: 'out of date' },
+          { status: 'none yet' },
+          { status: 'chosen' },
+        ],
+        order: [],
+      },
       { id: 'act2', title: 'Act II: The Road', state: 'missing', rows: [], order: [] },
     ],
   },
 } as unknown as ProjectSummary
 
 /** The sidebar's links as `[text, href, current]`, in reading order. */
-function render(route: Route) {
+function render(route: Route, data: [unknown[], unknown][] = []) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  for (const [key, value] of data) client.setQueryData(key, value)
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
@@ -63,11 +88,7 @@ function render(route: Route) {
     root.render(
       createElement(
         QueryClientProvider,
-        {
-          client: new QueryClient({
-            defaultOptions: { queries: { retry: false, enabled: false } },
-          }),
-        },
+        { client },
         createElement(Sidebar, { summary, route, activePart: 'act1' }),
       ),
     ),
@@ -127,13 +148,40 @@ describe('the sidebar on a Narration page', () => {
   })
 })
 
+describe('how far each narration act is', () => {
+  it('shows the ok lines out of all once they are counted, in the language shown', () => {
+    const progress = { ok: true, parts: { act1: { ok: 10, lines: 12 } } }
+    const sv = render({ view: 'part', part: 'act1', language: 'sv' }, [
+      [['narration-progress', 'sv'], progress],
+    ])
+    expect(sv.links.map((l) => l.text)).toContain('Act I 10/12')
+    const counting = render({ view: 'part', part: 'act1' })
+    expect(counting.links.map((l) => l.text)).toContain('Act I 12')
+  })
+})
+
+describe('the colour of each count', () => {
+  const tone = (container: HTMLElement, text: string) =>
+    [...container.querySelectorAll('.meta')].find((m) => m.textContent === text)?.className
+
+  it('is green for all done, yellow for most, red for fewer than three quarters', () => {
+    const music = render({ view: 'music', page: 'stingers' }).container
+    expect(tone(music, '1/1')).toBe('meta meta-done-all')
+    expect(tone(music, '1/3')).toBe('meta meta-done-few')
+    const narration = render({ view: 'part', part: 'act1' }, [
+      [['narration-progress', undefined], { ok: true, parts: { act1: { ok: 11, lines: 12 } } }],
+    ]).container
+    expect(tone(narration, '11/12')).toBe('meta meta-done-most')
+  })
+})
+
 describe('the sidebar elsewhere', () => {
   it('lists Images, its acts and Style only while an Images page is open', () => {
     const open = render({ view: 'images', page: 'style' }).links.map((l) => l.text)
     expect(open).toContain('Images')
     expect(open.slice(open.indexOf('Images'), open.indexOf('Images') + 4)).toEqual([
       'Images',
-      'Act I 4',
+      'Act I 2/4',
       'Act II',
       'Style',
     ])
@@ -146,9 +194,9 @@ describe('the sidebar elsewhere', () => {
   it('lists Music, its acts and Stingers on a Music page, and folds Narration', () => {
     const { links } = render({ view: 'music', page: 'stingers' })
     const texts = links.map((l) => l.text)
-    expect(texts.slice(0, 4)).toEqual(['Narration', 'Music', 'Act I 3', 'Stingers 1'])
+    expect(texts.slice(0, 4)).toEqual(['Narration', 'Music', 'Act I 1/3', 'Stingers 1/1'])
     expect(texts).not.toContain('Act II no script')
-    expect(links.filter((l) => l.current).map((l) => l.text)).toEqual(['Stingers 1'])
+    expect(links.filter((l) => l.current).map((l) => l.text)).toEqual(['Stingers 1/1'])
   })
   it('folds both on Setup', () => {
     const { links } = render({ view: 'setup' })

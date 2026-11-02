@@ -71,11 +71,13 @@ const list = (id: string, kind: MusicListSummary['kind']): MusicListSummary => (
 })
 
 /** A list page's play buttons, by track title. */
-function render(kind: MusicListSummary['kind']) {
+function render(kind: MusicListSummary['kind'], show?: 'attention') {
   const id = kind === 'act' ? 'act1' : 'stingers'
   const summary = { music: { lists: [list(id, kind)] } } as unknown as ProjectSummary
   const route = (
-    kind === 'act' ? { view: 'music', page: 'act', part: id } : { view: 'music', page: 'stingers' }
+    kind === 'act'
+      ? { view: 'music', page: 'act', part: id, show }
+      : { view: 'music', page: 'stingers', show }
   ) as MusicRoute
   const container = document.createElement('div')
   document.body.append(container)
@@ -151,5 +153,27 @@ describe.each(['act', 'stingers'] as const)('the play button on a %s page', (kin
     const { container } = render(kind)
     expect(playCell(container, 'Roof').querySelector('button')).toBeNull()
     expect(playCell(container, 'Roof').parentElement!.textContent).toContain('Nothing to play yet')
+  })
+})
+
+describe.each(['act', 'stingers'] as const)('what needs attention on a %s page', (kind) => {
+  const titles = (container: HTMLElement) =>
+    [...container.querySelectorAll('tbody tr strong')].map((s) => s.textContent)
+  const href = kind === 'act' ? '#/music/parts/act1' : '#/music/stingers'
+
+  it('counts the tracks up to date at the top, a link to the ones that need attention', () => {
+    const { container } = render(kind)
+    const stat = container.querySelector<HTMLAnchorElement>('a.stat-lead')!
+    expect(stat.getAttribute('href')).toBe(`${href}?show=attention`)
+    expect(stat.textContent).toBe('Tracks up to date2 / 53 need attention ›')
+    expect(titles(container)).toHaveLength(5)
+  })
+
+  it('lists only the tracks that need attention there, with the way back to all', () => {
+    const { container } = render(kind, 'attention')
+    expect(titles(container)).toEqual(['Cellar', 'Tower', 'Roof'])
+    const all = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Show all')!
+    expect(all.getAttribute('href')).toBe(href)
+    expect(container.textContent).toContain('Showing the 3 tracks that need attention.')
   })
 })

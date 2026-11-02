@@ -29,7 +29,13 @@ import {
 import { Confirm } from '../../components/Confirm'
 import { openTracking } from '../../components/openTracking'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
-import { lookZoom, makeTakesText, takeCountText, unchooseNote } from '../../imagesText'
+import {
+  lookZoom,
+  makeTakesText,
+  pictureRendering,
+  takeCountText,
+  unchooseNote,
+} from '../../imagesText'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
@@ -51,7 +57,10 @@ function refusal(answer: unknown): string | null {
     : 'That could not be done.'
 }
 
-/** A take's picture, scaled up without smoothing; `shown` is its width on the page, when set. */
+/**
+ * A take's picture; `shown` is its width on the page, when set, and a picture shown smaller than
+ * its own `width` is drawn smooth, else with hard pixels.
+ */
 function Picture({
   src,
   alt,
@@ -70,7 +79,11 @@ function Picture({
       className="image-take-picture"
       src={src}
       alt={alt}
-      style={{ width: shown, aspectRatio: `${width} / ${height}` }}
+      style={{
+        width: shown,
+        aspectRatio: `${width} / ${height}`,
+        imageRendering: shown === undefined ? undefined : pictureRendering(shown / width),
+      }}
     />
   )
 }

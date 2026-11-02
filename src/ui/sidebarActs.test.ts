@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { actCount, openWorkspace } from './sidebarActs'
+import { actCount, doneOf, doneTone, openWorkspace } from './sidebarActs'
 
 describe('the workspace open in the sidebar', () => {
   it('is Narration on an act or its lines', () => {
@@ -25,15 +25,56 @@ describe('the workspace open in the sidebar', () => {
 })
 
 describe('what an act shows at the right of its sidebar entry', () => {
-  it('is the bare number of lines', () => {
-    expect(actCount({ dialog: 'ok', lineCount: 12 })).toEqual({ text: '12', warn: false })
+  it('is the bare number of lines until it is known how many are ok', () => {
+    expect(actCount({ dialog: 'ok', lineCount: 12 })).toEqual({
+      text: '12',
+      warn: false,
+      tone: null,
+    })
+  })
+  it('is the lines that are ok out of all of them', () => {
+    expect(actCount({ dialog: 'ok', lineCount: 624 }, { ok: 620, lines: 624 })).toEqual({
+      text: '620/624',
+      warn: false,
+      tone: 'most',
+    })
   })
   it('says the problem in words, amber for a dialog gone', () => {
     expect(actCount({ dialog: 'missing', lineCount: 0 })).toEqual({
       text: 'no script',
       warn: false,
+      tone: null,
     })
-    expect(actCount({ dialog: 'gone', lineCount: 0 })).toEqual({ text: 'dialog gone', warn: true })
-    expect(actCount({ dialog: 'invalid', lineCount: 0 })).toEqual({ text: 'invalid', warn: false })
+    expect(actCount({ dialog: 'gone', lineCount: 0 })).toEqual({
+      text: 'dialog gone',
+      warn: true,
+      tone: null,
+    })
+    expect(actCount({ dialog: 'invalid', lineCount: 0 })).toEqual({
+      text: 'invalid',
+      warn: false,
+      tone: null,
+    })
+  })
+})
+
+describe('what is done of a list', () => {
+  it('is how many are done out of all, the done ones told by a test', () => {
+    expect(doneOf(['chosen', 'changed', 'chosen'], (s) => s === 'chosen')).toEqual({
+      text: '2/3',
+      tone: 'few',
+    })
+    expect(doneOf([], () => true)).toEqual({ text: '0/0', tone: null })
+  })
+})
+
+describe('the colour of a done count', () => {
+  it('is green when all are done, red under three quarters, yellow between, none for an empty list', () => {
+    expect(doneTone(624, 624)).toBe('all')
+    expect(doneTone(620, 624)).toBe('most')
+    expect(doneTone(3, 4)).toBe('most')
+    expect(doneTone(2, 4)).toBe('few')
+    expect(doneTone(0, 5)).toBe('few')
+    expect(doneTone(0, 0)).toBeNull()
   })
 })

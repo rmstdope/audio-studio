@@ -108,3 +108,18 @@ export function speakerCounts(
     if (line.speaker === speaker) counts[line.status] = (counts[line.status] ?? 0) + 1
   return counts
 }
+
+/** How many of a list need attention, in words: `1 needs attention`, `3 need attention`. */
+export function attentionText(count: number): string {
+  return `${count} ${count === 1 ? 'needs' : 'need'} attention`
+}
+
+/**
+ * The line over a list showing only what needs attention: `Showing the 3 tracks that need
+ * attention.`, with the noun (`track`) made plural when there are several.
+ */
+export function showingAttentionText(count: number, noun: string): string {
+  return count === 1
+    ? `Showing the 1 ${noun} that needs attention.`
+    : `Showing the ${count} ${noun}s that need attention.`
+}

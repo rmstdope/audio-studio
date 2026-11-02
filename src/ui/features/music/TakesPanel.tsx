@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { changedLine } from '../../../core/musicChoose'
+import { acceptable, changedLine } from '../../../core/musicChoose'
 import { trackFor, type MusicListSummary, type TrackRow } from '../../../core/music'
 import {
   actName,
@@ -30,6 +30,7 @@ import {
   type MusicModelId,
 } from '../../../core/musicModels'
 import {
+  useAcceptTrackChange,
   useChooseTake,
   useDropTake,
   useMakeTakes,
@@ -64,6 +65,7 @@ export function TakesPanel({
   const takes = useMusicTakes(trackId)
   const make = useMakeTakes(trackId)
   const stop = useStopTakes(trackId)
+  const accept = useAcceptTrackChange(trackId)
   const player = useClipPlayer()
   const view = takes.data
   const making = useMusicMaking().data ?? {}
@@ -218,8 +220,27 @@ export function TakesPanel({
           <strong>{changedLine(track.changed)}</strong>
           <span className="muted small">
             The game plays the chosen take until you choose another. Make more takes to hear the new
-            brief.
+            brief
+            {acceptable(track.changed)
+              ? ', or Accept to keep the chosen take as it is.'
+              : '. A changed length needs a new take.'}
           </span>
+          {acceptable(track.changed) && (
+            <div className="warnbox-actions">
+              <button
+                type="button"
+                className="btn btn-small"
+                disabled={accept.isPending}
+                onClick={() => accept.mutate()}
+              >
+                Accept
+              </button>
+              {accept.data && !accept.data.ok && 'message' in accept.data && (
+                <span className="adopt-error">{accept.data.message}</span>
+              )}
+              {accept.error && <span className="adopt-error">{accept.error.message}</span>}
+            </div>
+          )}
         </div>
       )}
       <InTheGame track={track} view={view} player={player} />

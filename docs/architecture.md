@@ -911,7 +911,18 @@ value typed back to the game's, removes it again. The game's lists are never wri
 Validated like every resource and written through `writeAtomic` in stable key order.
 
 **Pages.** The sidebar lists a workspace's acts only while one of its pages is open (Narration's
-acts the same way); on Setup and the project pages both are folded. Music opens into the acts and
+acts the same way); on Setup and the project pages both are folded. Each act shows how far it is,
+done out of all: a narration act its lines that are ok in the language shown ("620/624", read with
+`GET /api/narration/progress?language=` every few seconds while the acts are listed, its line count
+until then), a music act or Stingers its tracks with a take chosen and up to date, an images act its
+images chosen and up to date. A count is green when all are done, red when fewer than three
+quarters are, yellow between (an empty list has no colour). At the top of each list's page the
+same count stands large ("Lines up to date 620 / 624" on an act's narration overview, "Tracks up to
+date" on a music act or Stingers, "Images up to date" on an images act) and, while some need
+attention, says how many ("4 need attention ›") and links to them: the act's lines page, which
+opens on the lines needing attention, or the same music or images page with `?show=attention`,
+which lists only the tracks not chosen and up to date (or the images, with those the game's lists
+disagree on), with "Show all" back. Music opens into the acts and
 Stingers, a page each, listing its tracks
 with their status (see Status below). An act's page has **Refresh from the game** when the project
 has `refreshDialog`: the same command as Refresh dialog, which brings the act's lines and loops
@@ -925,7 +936,12 @@ not on disk when the page loads is marked "The file is not there." and has no bu
 empty cell keeps the column aligned.
 Play runs once from the start (a loop too), one row at a time, and stops on leaving the page; a
 play that fails says so in its row. The audio is `GET /api/music/tracks/:id/current`, which the
-studio resolves itself from the row (the page sends no path). A track opens its own page (built: its Brief panel and its Takes panel; its board: the In the game block with Un-choose, Make N more takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen).
+studio resolves itself from the row (the page sends no path). A track opens its own page (built: its Brief panel and its Takes panel; its board: the In the game block with Un-choose, Make N more takes, Stop, Drop, Choose, earlier-brief marks, and an amber box above the Takes panel when the track changed since its take was chosen, with
+**Accept** when what changed is the brief, tempo or key: `POST /api/music/tracks/:id/accept`, in the
+board's turn and the project's choice turn, writes those into the lock entry's `inputs`, so the
+chosen take counts as made from them and the track is up to date with the same music; a changed
+length needs a new take, so the box says so and offers no Accept, and the service refuses it (409),
+as it does a track with nothing changed or none chosen).
 
 **Takes.** A take is the brief generated with a new seed, and shaped at once, so what is heard on
 the board is what the game will play:
@@ -1479,7 +1495,13 @@ manifest and the lock readable, or nothing is changed) writes the take's game's 
 the look first if its look is old) to `<clips>/<id>.png`, the manifest entry `{ file, width, height }`
 (the listed size) and last the lock entry
 `{ chosen: { words, style, width, height, take, seed, model, look, at } }`; other keys of the lock are kept
-and images are written one per line. **Un-choose** (asked first in the page) removes the manifest entry,
+and images are written one per line. **Accept**, in the out-of-date notice on an image's page when
+what changed is its words, style or act style (`POST /api/images/:id/accept`, in the image's board
+turn and the project's choice turn), writes the image's words and style now into the lock's chosen
+entry, so the chosen picture counts as made from them and the image is up to date with the same
+picture; a changed size needs a new take, so the notice says so and offers no Accept, and the
+service refuses it (409), as it does an image with nothing changed or none chosen. **Un-choose**
+(asked first in the page) removes the manifest entry,
 then the picture, then the lock entry, so a failure can be pressed again; the take stays on the board.
 **Drop** removes a take that is not chosen, with no question, and refuses while the lock cannot be
 read. The game's own `file` is never written or deleted. Where the pictures of the chosen image and of
@@ -1500,8 +1522,10 @@ between what the model made (with its size, and "cropped to fit" when it had ano
 what the game gets (with the game's size; in its place, while a take has none, "Bringing to the
 game's look…", "Not brought to the game's look yet." or what to fix in the style file). The image
 the game uses (its game picture is the one the game has now) and the compared take are enlarged by
-the largest whole number of the game's size at which the two fit side by side in their column, and
-stand one above the other when not even ×1 fits, each with its buttons under its picture
+the largest whole number of the game's size at which the two fit side by side in their column,
+drawn with hard pixels; when not even ×1 fits (RetroQuest's 640- and 480-wide images on a laptop)
+they are shrunk side by side to fit, down to half the game's size, and drawn smooth; narrower still
+they stand one above the other, each fitted to the width. Each has its buttons under its picture
 (Un-choose; Drop and Choose). Choose moves the compared take to the left and the take chosen before
 comes to be compared, marked "was chosen" for that visit. The compared take is the page's own
 state (after a reload the newest) and does not move when a take finishes. Keys work anywhere on
@@ -1519,7 +1543,7 @@ are made. The model menu's screens are drawn in `docs/ui/as-yag.7-image-models.h
 `PATCH /api/image-style` (`{ look }` or `{ keepOut }`) and `POST /api/image-style/seen`; for takes
 `GET` and `POST /api/images/:id/takes` (`{ count, model? }` 1 to 4, or `{ retry }`), `PUT /api/image-model`, `GET /api/images/:id/takes/:n`
 (the model's picture), `…/:n/game` (the game's version), `DELETE` it (drop), `POST …/takes/:n/seen`, `POST /api/images/:id/choose` (`{ n }`),
-`/unchoose`, `/stop`, `GET /api/images/:id/current`, `GET /api/images/making` and
+`/unchoose`, `/accept`, `/stop`, `GET /api/images/:id/current`, `GET /api/images/making` and
 `GET`/`POST /api/images/bring-all`; every change from
 the studio's own page only.
 
@@ -1527,7 +1551,7 @@ the studio's own page only.
 
 ## 9. Server API
 
-Built so far: `GET /api/project`, `GET /api/parts/:part` (with every line's status),
+Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),
 `POST /api/parts/:part/adopt`, `GET /api/parts/:part/clips/:file`,
 `GET /api/characters/:id/voice` (its cast voice as Fish knows it, its take and the audition
 phrase; one lookup, no search), `PATCH /api/characters/:id`

@@ -85,11 +85,17 @@ export function unchooseNote(take: number): string {
   return `The game shows no image here until you choose another. Take ${take} stays among the takes.`
 }
 
+/** The smallest share of the game's size the two pictures are shrunk to side by side, before they stack. */
+const SMALLEST_BESIDE = 0.5
+
+/** A zoom below 1, rounded down to hundredths so the pictures never overflow. */
+const shrunk = (zoom: number) => Math.floor(zoom * 100) / 100
+
 /**
- * How big the takes' pictures are shown, as a whole multiple of the game's `width`, and whether the
- * Takes section's two sides stack: the largest whole number at which both fit side by side in
- * `available` pixels; when not even ×1 fits they stack, each the largest whole number that fits
- * alone. An unknown width (0) shows ×1 side by side.
+ * How big the takes' pictures are shown, as a multiple of the game's `width`, and whether the
+ * workbench's two sides stack. Side by side in `available` pixels: the largest whole number at
+ * which both fit; when not even ×1 fits, shrunk to fit, down to half the game's size. Below that
+ * they stack, each fitted to the width (at most ×1). An unknown width (0) shows ×1 side by side.
  */
 export function lookZoom(
   available: number,
@@ -97,9 +103,18 @@ export function lookZoom(
   width: number,
 ): { zoom: number; stacked: boolean } {
   if (available <= 0 || width <= 0) return { zoom: 1, stacked: false }
-  const beside = Math.floor((available - gap) / (2 * width))
-  if (beside >= 1) return { zoom: beside, stacked: false }
-  return { zoom: Math.max(1, Math.floor(available / width)), stacked: true }
+  const beside = (available - gap) / (2 * width)
+  if (beside >= 1) return { zoom: Math.floor(beside), stacked: false }
+  if (beside >= SMALLEST_BESIDE) return { zoom: shrunk(beside), stacked: false }
+  return { zoom: shrunk(Math.min(1, available / width)), stacked: true }
+}
+
+/**
+ * How a picture at `zoom` is drawn: with hard pixels at a whole size, as the game's pixel art is;
+ * smooth when shrunk, where hard pixels would drop some of them unevenly.
+ */
+export function pictureRendering(zoom: number): 'pixelated' | 'auto' {
+  return zoom < 1 ? 'auto' : 'pixelated'
 }
 
 /** The caption under the model's picture: its size, and that its edges are cut when it is another shape. */

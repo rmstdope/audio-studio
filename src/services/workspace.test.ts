@@ -11,6 +11,7 @@ import {
   locateProject,
   loadPart,
   loadProject,
+  narrationProgress,
   projectFileProblem,
   readPart,
 } from './workspace'
@@ -165,6 +166,35 @@ describe('loadProject', () => {
         message: '../elsewhere/cast.json is outside the project folder',
       },
     ])
+  })
+})
+
+describe('narrationProgress', () => {
+  const files = {
+    'content-studio.json': projectJson(),
+    'tts/cast.json': { speakers: { narrator: { voice: 'v1', style: '[warm]' } } },
+    'tts/act1/script.json': script,
+    'audio/act1/manifest.json': { a: { file: 'a.mp3', speaker: 'narrator', duration: 1.2 } },
+    'audio/act1/a.mp3': 'audio',
+  }
+
+  it('counts the ok lines of every act with dialog, out of all its lines', async () => {
+    const root = tempRepo(files)
+    const file = join(root, 'content-studio.json')
+    expect(await narrationProgress(file)).toEqual({
+      ok: true,
+      parts: { act1: { ok: 0, lines: 2 } },
+    })
+    await adoptPart(file, 'act1', new Date('2026-11-02T00:00:00Z'))
+    expect(await narrationProgress(file)).toEqual({
+      ok: true,
+      parts: { act1: { ok: 1, lines: 2 } },
+    })
+  })
+
+  it('says why when the project file cannot be read', async () => {
+    const root = tempRepo({ 'content-studio.json': '{' })
+    expect((await narrationProgress(join(root, 'content-studio.json'))).ok).toBe(false)
   })
 })
 
