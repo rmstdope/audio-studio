@@ -4,6 +4,8 @@ export interface Clip {
   url: string
   /** Fade it in and out (a take); the game's file and narration play as they are. */
   fade?: boolean
+  /** Play it round and round until stopped, as the game plays a loop. */
+  loop?: boolean
 }
 
 /** The part of an audio element the player uses, so tests can give a fake one. */
@@ -12,6 +14,7 @@ export interface AudioLike {
   currentTime: number
   volume?: number
   duration?: number
+  loop?: boolean
   play(): Promise<void>
   pause(): void
 }
@@ -50,7 +53,8 @@ export interface PlayerState {
  * plays, `playing()`, since a start can lag), fades out before its natural end, and a stop (or
  * another clip started) fades it out before the element pauses; the state still changes at once.
  * A clip without the flag plays as it is and is cut on stop; with no
- * `fadeSeconds` the element's volume is never touched.
+ * `fadeSeconds` the element's volume is never touched. A clip played with `loop: true` comes round
+ * until stopped, with no fade where it comes round.
  */
 export function createPlayer(
   element: AudioLike,
@@ -84,12 +88,12 @@ export function createPlayer(
 
   const emit = () => onChange({ playing: current, inTurn: queue.length > 0 })
 
-  /** The volume now: the lowest of the fade-in, the approach of the end, and the fade-out. */
+  /** The volume now: the lowest of the fade-in, the approach of the end (not for a loop), and the fade-out. */
   const level = () => {
     const t = clock.now()
     let gain = startedAt === null ? 0 : (t - startedAt) / fadeMs
     const length = element.duration
-    if (length !== undefined && Number.isFinite(length)) {
+    if (!element.loop && length !== undefined && Number.isFinite(length)) {
       gain = Math.min(gain, ((length - element.currentTime) * 1000) / fadeMs)
     }
     if (outSince !== null) gain = Math.min(gain, outFrom * (1 - (t - outSince) / fadeMs))
@@ -131,6 +135,7 @@ export function createPlayer(
   const begin = (clip: Clip) => {
     const mine = ++token
     element.src = clip.url
+    element.loop = clip.loop ?? false
     element.currentTime = 0
     current = clip.id
     fadeMs = lengthMs()
@@ -196,7 +201,7 @@ export function createPlayer(
 
   return {
     /** Plays a clip on its own, or stops it if it is the one playing. */
-    toggle(id: string, url: string, how: { fade?: boolean } = {}) {
+    toggle(id: string, url: string, how: { fade?: boolean; loop?: boolean } = {}) {
       if (current === id) return stop()
       queue = []
       start({ id, url, ...how })
@@ -231,4 +236,10 @@ export function createPlayer(
       disposed = true
     },
   }
+}
+
+/** How far into a clip the playhead is, 0 to 1, or null while its length is not known. */
+export function playedShare(currentTime: number, duration: number): number | null {
+  if (!Number.isFinite(duration) || duration <= 0) return null
+  return Math.max(0, Math.min(1, currentTime / duration))
 }

@@ -948,8 +948,9 @@ itself; the seed is kept with it, in the board and the lock, to say where it cam
 a take whose model takes none, as ElevenLabs' will not, §8.6). The brief a
 take is made from is the game's with the studio's changes over it. What is built is the Takes panel on a track's page: "Make N takes" (when there are none) queues N, 1 to 6 from the count menu (as-3ek),
 made one at a time on the GPU queue, each a dashed card with a progress bar (about 3 minutes
-expected, a guess) and its time left, then a card with play, its waveform (a loop's seam marked),
-its length and, for a loop, **Hear the seam** (`GET …/takes/<file>?seam=1` is the last 4 seconds
+expected, a guess) and its time left, then a card with play (a loop take comes round until stopped,
+with the take fade at its start and stop only, as the game plays it), its waveform (a loop's seam
+marked, and a line where it plays while it plays), its length and, for a loop, **Hear the seam** (`GET …/takes/<file>?seam=1` is the last 4 seconds
 followed by the first 4, one WAV). A take that fails is kept as "could not be made" with the
 generator's reason and **Try again** (remakes that number); the other takes stay. A worker the
 computer killed (exit code 137, most often memory running out) says so in plain words, never its

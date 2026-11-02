@@ -3169,6 +3169,14 @@ button.cue-chip[aria-expanded='true'] {
   width: 2px;
   background: var(--accent);
 }
+.wave .playhead {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
 .bar {
   height: 6px;
   border-radius: 99px;

@@ -371,7 +371,10 @@ export function TakesPanel({
   )
 }
 
-/** A take made: play, its waveform with the seam of a loop marked, its length, and Hear the seam. */
+/**
+ * A take made: play (a loop comes round until stopped), its waveform with the seam of a loop marked
+ * and where it plays, its length, and Hear the seam.
+ */
 function TakeCard({
   trackId,
   kind,
@@ -414,11 +417,15 @@ function TakeCard({
           type="button"
           className="play"
           aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-          onClick={() => player.toggle(id, url, { fade: true })}
+          onClick={() => player.toggle(id, url, { fade: true, loop: kind === 'loop' })}
         >
           {playing ? '■' : '▶'}
         </button>
-        <Wave peaks={take.peaks} loop={kind === 'loop'} />
+        <Wave
+          peaks={take.peaks}
+          loop={kind === 'loop'}
+          position={playing ? player.position : undefined}
+        />
         <span className="faint small">{clock(take.seconds)}</span>
       </div>
       <div className="take-row">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_TAKE_FADE } from '../../core/takeFade'
 import { useProject } from '../api'
-import { createPlayer, type Clip, type PlayerState } from '../player'
+import { createPlayer, playedShare, type Clip, type PlayerState } from '../player'
 
 /**
  * One clip playing at a time (see `createPlayer`): `toggle(id, url)` plays it, or stops it if it
@@ -9,11 +9,14 @@ import { createPlayer, type Clip, type PlayerState } from '../player'
  * (any toggle stops that). `onFailed` hears the id of a clip that failed. `playing` is the id of
  * the clip playing, or null; `inTurn` says whether a list is being played. `toggle(id, url, { fade: true })`
  * plays a take: it fades in and out, and a stop is a short fade, never a cut. The length is the
- * project's `takeFade` (Setup's Playing takes), asked as each clip begins.
+ * project's `takeFade` (Setup's Playing takes), asked as each clip begins. With `loop: true` it
+ * comes round until stopped. `position()` is how far into the clip playing it is, 0 to 1, or null
+ * while that is not known.
  */
 export function useClipPlayer(onFailed?: (id: string) => void) {
   const [state, setState] = useState<PlayerState>({ playing: null, inTurn: false })
   const player = useRef<ReturnType<typeof createPlayer> | null>(null)
+  const audio = useRef<HTMLAudioElement | null>(null)
   const failed = useRef(onFailed)
   failed.current = onFailed
   const project = useProject()
@@ -29,6 +32,7 @@ export function useClipPlayer(onFailed?: (id: string) => void) {
     element.addEventListener('ended', made.ended)
     element.addEventListener('error', made.failed)
     player.current = made
+    audio.current = element
     return () => {
       // Disposed, not just paused: a play still loading must not start the next clip.
       made.dispose()
@@ -36,14 +40,17 @@ export function useClipPlayer(onFailed?: (id: string) => void) {
       element.removeEventListener('ended', made.ended)
       element.removeEventListener('error', made.failed)
       player.current = null
+      audio.current = null
     }
   }, [])
 
   // The same functions on every render; they reach the player made on mount.
   const actions = useMemo(
     () => ({
-      toggle: (id: string, url: string, how?: { fade?: boolean }) =>
+      toggle: (id: string, url: string, how?: { fade?: boolean; loop?: boolean }) =>
         player.current?.toggle(id, url, how),
+      position: () =>
+        audio.current ? playedShare(audio.current.currentTime, audio.current.duration) : null,
       playInTurn: (clips: Clip[]) => player.current?.playInTurn(clips),
       stop: () => player.current?.stop(),
     }),

@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { TrackRow } from '../../../core/music'
 import { inTheGame, unchooseFailure, unchooseQuestion } from '../../../core/musicChoose'
 import type { MusicTakesView, TakeView } from '../../../core/musicTake'
@@ -12,14 +12,38 @@ import { movedFromLine } from '../../../core/musicMove'
 /** One clip at a time, shared with the takes below. */
 type Player = ReturnType<typeof useClipPlayer>
 
-/** A take's waveform, with the seam of a loop marked. */
-export function Wave({ peaks, loop }: { peaks: number[]; loop: boolean }) {
+/**
+ * A take's waveform, with the seam of a loop marked and, while it plays, a line where it is
+ * (`position`, 0 to 1, asked each frame; back at the start as a loop comes round).
+ */
+export function Wave({
+  peaks,
+  loop,
+  position,
+}: {
+  peaks: number[]
+  loop: boolean
+  position?: () => number | null
+}) {
+  const head = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!position) return
+    let frame = 0
+    const draw = () => {
+      const at = position()
+      if (head.current) head.current.style.left = `${(at ?? 0) * 100}%`
+      frame = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => cancelAnimationFrame(frame)
+  }, [position])
   return (
     <div className="wave" aria-hidden>
       {peaks.map((peak, i) => (
         <i key={i} style={{ height: `${Math.max(4, peak * 100)}%` }} />
       ))}
       {loop && <span className="seam" />}
+      {position && <span className="playhead" ref={head} />}
     </div>
   )
 }
@@ -254,11 +278,15 @@ function Playback({
         type="button"
         className="play"
         aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-        onClick={() => player.toggle(id, url, { fade: true })}
+        onClick={() => player.toggle(id, url, { fade: true, loop: kind === 'loop' })}
       >
         {playing ? '■' : '▶'}
       </button>
-      <Wave peaks={take.peaks} loop={kind === 'loop'} />
+      <Wave
+        peaks={take.peaks}
+        loop={kind === 'loop'}
+        position={playing ? player.position : undefined}
+      />
       <span className="faint small">{clock(take.seconds)}</span>
       {kind === 'loop' && (
         <button

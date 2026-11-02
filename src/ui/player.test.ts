@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { createPlayer, type AudioLike, type PlayerState } from './player'
+import { createPlayer, playedShare, type AudioLike, type PlayerState } from './player'
 
 /** A fake audio element whose `play()` the test settles. */
 function fakeAudio() {
@@ -387,5 +387,40 @@ describe('createPlayer, fading', () => {
     player.playing()
     player.stop()
     expect([touched.volume, touched.paused]).toEqual([1, true])
+  })
+})
+
+describe('createPlayer, a loop', () => {
+  it('plays round and round: the element loops, and a clip played after it does not', () => {
+    const { element, player } = setUp()
+    player.toggle('a', '/a.wav', { loop: true })
+    expect(element.loop).toBe(true)
+    player.toggle('b', '/b.wav')
+    expect(element.loop).toBe(false)
+  })
+
+  it('fades in at the start and out on stop, but not as it comes round', () => {
+    const { element, player, wait } = fadingSetUp(1)
+    player.toggle('a', '/a.wav', { fade: true, loop: true })
+    player.playing()
+    wait(200)
+    expect(element.volume).toBe(1)
+    // The playhead nears the end, where a clip played once fades out: a loop stays at full.
+    wait(750)
+    expect(element.volume).toBe(1)
+    player.stop()
+    wait(100)
+    expect(element.volume).toBeCloseTo(0.5, 1)
+    wait(100)
+    expect([element.volume, element.paused]).toEqual([0, true])
+  })
+})
+
+describe('playedShare', () => {
+  it('is how far in the playhead is, held between 0 and 1, and unknown without a length', () => {
+    expect(playedShare(5, 10)).toBe(0.5)
+    expect(playedShare(12, 10)).toBe(1)
+    expect(playedShare(0, Number.NaN)).toBeNull()
+    expect(playedShare(0, 0)).toBeNull()
   })
 })

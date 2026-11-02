@@ -103,3 +103,97 @@ describe('the Takes panel’s Stop', () => {
     expect(stopButton(making)?.disabled).toBe(false)
   })
 })
+
+/** An audio element that plays at once, five seconds into a ten-second take. */
+class FakeAudio {
+  static made: FakeAudio[] = []
+  src = ''
+  loop = false
+  currentTime = 0
+  duration = 10
+  volume = 1
+  paused = true
+  constructor() {
+    FakeAudio.made.push(this)
+  }
+  play() {
+    this.paused = false
+    this.currentTime = 5
+    return Promise.resolve()
+  }
+  pause() {
+    this.paused = true
+  }
+  addEventListener() {}
+  removeEventListener() {}
+}
+
+/** The panel with one take of a track of this kind, its audio element a fake. */
+async function withTake(kind: 'loop' | 'stinger') {
+  const realAudio = globalThis.Audio
+  globalThis.Audio = FakeAudio as unknown as typeof Audio
+  cleanups.push(() => (globalThis.Audio = realAudio))
+  const view: MusicTakesView = {
+    ok: true,
+    kind,
+    generator: { ok: true },
+    defaultModel: 'balanced',
+    models: [{ id: 'balanced', installed: true }],
+    takes: [
+      {
+        n: 1,
+        file: 'abc.1.wav',
+        seconds: 10,
+        peaks: [0.5, 0.5, 0.5, 0.5],
+        earlier: false,
+        chosen: false,
+        model: 'Balanced · XL turbo · 4B',
+      },
+    ],
+    making: [],
+    failed: [],
+    lockUnread: false,
+  }
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  client.setQueryData(['music-takes', 'hall'], view)
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  cleanups.push(() => act(() => root.unmount()))
+  act(() =>
+    root.render(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(TakesPanel, { track, lists: [] }),
+      ),
+    ),
+  )
+  await act(async () => {})
+  return container
+}
+
+describe('playing a take', () => {
+  it('plays a loop round and round, with a line on its waveform where it is', async () => {
+    const container = await withTake('loop')
+    expect(container.querySelector('.wave .playhead')).toBeNull()
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Play take 1"]')!.click()
+    })
+    expect(FakeAudio.made.at(-1)!.loop).toBe(true)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    const head = container.querySelector<HTMLElement>('.wave .playhead')
+    expect(head?.style.left).toBe('50%')
+  })
+
+  it('plays a stinger once', async () => {
+    const container = await withTake('stinger')
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Play take 1"]')!.click()
+    })
+    expect(FakeAudio.made.at(-1)!.loop).toBe(false)
+    expect(container.querySelector('.wave .playhead')).not.toBeNull()
+  })
+})
