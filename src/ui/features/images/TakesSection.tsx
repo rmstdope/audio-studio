@@ -451,7 +451,22 @@ export function TakesSection({ row }: { row: ImageRow }) {
                   <b>Take {rightTake.n}</b>
                   <ModelName id={rightTake.model} />
                   {rightTake.earlier && <span className="faint small">earlier words</span>}
-                  <span className="grow" />
+                </>
+              ) : (
+                <b>{chosen ? 'No other takes yet' : 'No takes yet'}</b>
+              )}
+            </div>
+            {rightTake ? (
+              <>
+                <TakePicture
+                  id={id}
+                  take={rightTake}
+                  row={row}
+                  lookError={lookError}
+                  showing={showing}
+                  zoom={zoom}
+                />
+                <div className="image-take-actions">
                   <button
                     type="button"
                     className="btn btn-ghost btn-small"
@@ -475,25 +490,13 @@ export function TakesSection({ row }: { row: ImageRow }) {
                   >
                     Choose
                   </button>
-                </>
-              ) : (
-                <b>{chosen ? 'No other takes yet' : 'No takes yet'}</b>
-              )}
-            </div>
-            {rightTake && lookError !== null && (
-              <span className="faint small">
-                Fix the game&apos;s style file to choose this take.
-              </span>
-            )}
-            {rightTake ? (
-              <TakePicture
-                id={id}
-                take={rightTake}
-                row={row}
-                lookError={lookError}
-                showing={showing}
-                zoom={zoom}
-              />
+                </div>
+                {lookError !== null && (
+                  <span className="faint small">
+                    Fix the game&apos;s style file to choose this take.
+                  </span>
+                )}
+              </>
             ) : (
               <EmptyFrame
                 title={
@@ -623,16 +626,6 @@ function LeftSide({
           <span className="chip chip-ok">Chosen</span>
           {row.looksOld && <span className="chip chip-warn">Old look</span>}
           <ModelName id={chosen.model} />
-          <span className="grow" />
-          <button
-            type="button"
-            ref={opener}
-            className="btn btn-small"
-            disabled={lockUnread || unchoosing}
-            onClick={onUnchoose}
-          >
-            Un-choose
-          </button>
         </div>
         <TakePicture
           id={id}
@@ -645,6 +638,17 @@ function LeftSide({
           saving={saving}
           saved={saved}
         />
+        <div className="image-take-actions">
+          <button
+            type="button"
+            ref={opener}
+            className="btn btn-small"
+            disabled={lockUnread || unchoosing}
+            onClick={onUnchoose}
+          >
+            Un-choose
+          </button>
+        </div>
       </>
     )
   }

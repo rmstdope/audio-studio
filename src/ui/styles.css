@@ -3586,6 +3586,13 @@ button.cue-chip[aria-expanded='true'] {
 .image-side .take-row {
   flex-wrap: wrap;
 }
+/* A take's buttons, under its picture */
+.image-take-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
 .image-take-picture {
   display: block;
   width: 100%;

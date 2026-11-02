@@ -1473,7 +1473,8 @@ when it had another shape) and what the game gets (with the game's size; in its 
 has none, "Bringing to the game's look…", "Not brought to the game's look yet." or what to fix in
 the style file). The image the game uses (its game picture is the one the game has now) sits beside
 one other take, both enlarged by the largest whole number of the game's size at which the two fit
-side by side, and one above the other when not even ×1 fits; under them a strip of the others.
+side by side, and one above the other when not even ×1 fits, each with its buttons under its
+picture (Un-choose; Drop and Choose); under them a strip of the others.
 Choose moves the compared take to the left and the take chosen before comes to be compared,
 marked "was chosen" for that visit. The compared take is the
 page's own state (after a reload the newest) and does not move when a take finishes; ← / → step

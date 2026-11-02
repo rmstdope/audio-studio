@@ -785,6 +785,18 @@ describe('a take’s picture', () => {
     expect(s.text()).not.toContain('Fix the game')
   })
 
+  it('puts Drop and Choose under the compared picture, and Un-choose under the chosen one', async () => {
+    const s = await show(view({ takes: [take(1, { chosen: true }), take(2)] }))
+    const after = (side: string, text: string) => {
+      const picture = s.container.querySelector(`[data-side="${side}"] img`)!
+      const button = s.button(text)
+      return !!(picture.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
+    }
+    expect(after('right', 'Drop')).toBe(true)
+    expect(after('right', 'Choose')).toBe(true)
+    expect(after('left', 'Un-choose')).toBe(true)
+  })
+
   it('has no box before there are takes', async () => {
     const s = await show(view())
     expect(s.container.querySelector('input[type="checkbox"]')).toBeNull()
