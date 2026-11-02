@@ -1505,9 +1505,11 @@ stand one above the other when not even ×1 fits, each with its buttons under it
 (Un-choose; Drop and Choose). Choose moves the compared take to the left and the take chosen before
 comes to be compared, marked "was chosen" for that visit. The compared take is the page's own
 state (after a reload the newest) and does not move when a take finishes. Keys work anywhere on
-the page except in a menu or field, with no Command, Control or Option held, and not while
-Un-choose is asked: ← / → step through the grid, **C** chooses the compared take and **D** drops
-it, each only when its button is on. Pressing Make N takes puts focus on the compared take in the
+the page except while typing in a field or menu (a box or button leaves them to the page; a radio
+keeps its arrows), with no Command, Control or Option held, and not while Un-choose is asked: ← / →
+step through the grid, which scrolls to keep the compared take in view, **C** chooses the compared
+take and **D** drops it, each only when its button is on, once per press (a held key does not
+repeat) and not while the last choice or drop is still being saved. Pressing Make N takes puts focus on the compared take in the
 grid (on the Comparing label when there is none yet), so the switched-off button does not lose it
 (as-99s). The status of an image on its act's list says "making 2 takes · about 1 min" while takes
 are made. The model menu's screens are drawn in `docs/ui/as-yag.7-image-models.html`.

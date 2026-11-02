@@ -5,7 +5,7 @@ import type { ImageTakeView, ImageTakesView } from '../../../core/imageTakes'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
-const { act, createElement } = await import('react')
+const { act, createElement, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { TakesSection } = await import('./TakesSection')
@@ -201,7 +201,9 @@ describe('comparing takes', () => {
   it('puts the newest take on the right, leaves the others in the strip, and Choose chooses it', async () => {
     const s = await show(view({ takes: three }))
     expect(s.right()).toBe('Take 3')
-    expect(s.text()).toContain('Press a take, or use ← →, to put it beside the chosen one.')
+    expect(s.text()).toContain(
+      'Press a take, or use ← →, to put it beside the image the game uses.',
+    )
     await s.click(s.button('Choose'))
     expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose', body: { n: 3 } })
   })
@@ -842,13 +844,95 @@ describe('the workbench', () => {
     expect(tools(s).querySelector('[aria-label="Takes"] h2')?.textContent).toBe('Takes · 2')
   })
 
-  it('C chooses the take on the right, and D drops it', async () => {
+  const changes = (s: { calls: { url: string; method: string }[] }) =>
+    s.calls
+      .filter((c) => c.method !== 'GET' && !c.url.endsWith('/seen'))
+      .map((c) => `${c.method} ${c.url}`)
+
+  it('C chooses the take on the right', async () => {
     const s = await show(view({ takes: three }))
     await s.key('c')
-    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose', body: { n: 3 } })
-    const t = await show(view({ takes: three }))
-    await t.key('d')
-    expect(t.calls.at(-1)).toMatchObject({ url: '/api/images/inn/takes/3', method: 'DELETE' })
+    expect(changes(s)).toEqual(['POST /api/images/inn/choose'])
+    expect(s.calls.at(-1)).toMatchObject({ body: { n: 3 } })
+  })
+
+  it('D drops the take on the right', async () => {
+    const s = await show(view({ takes: three }))
+    await s.key('d')
+    expect(changes(s)).toEqual(['DELETE /api/images/inn/takes/3'])
+  })
+
+  it('does nothing more while C or D is held down', async () => {
+    const s = await show(view({ takes: three }))
+    await act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'd', repeat: true, bubbles: true }),
+      )
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'c', repeat: true, bubbles: true }),
+      )
+    })
+    expect(changes(s)).toEqual([])
+  })
+
+  it('drops one take only for two presses of D before the first has settled', async () => {
+    const s = await show(view({ takes: three }))
+    let answer = () => {}
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      s.calls.push({ url: String(url), method: init?.method ?? 'GET', body: undefined })
+      if (init?.method === 'DELETE') await new Promise<void>((done) => (answer = done))
+      return Response.json({ ok: true })
+    }) as typeof fetch
+    await act(async () => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }))
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }))
+    })
+    expect(changes(s)).toEqual(['DELETE /api/images/inn/takes/3'])
+    await act(async () => answer())
+  })
+
+  it('hears the keys while the box is focused', async () => {
+    const s = await show(view({ takes: three }))
+    await s.key('c', s.container.querySelector('input[type="checkbox"]')!)
+    expect(changes(s)).toEqual(['POST /api/images/inn/choose'])
+  })
+
+  it('brings the thumb of the take stepped to into view', async () => {
+    const s = await show(view({ takes: three }))
+    const seen: string[] = []
+    const real = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      seen.push(this.textContent ?? '')
+    }
+    cleanups.push(() => (HTMLElement.prototype.scrollIntoView = real))
+    await s.key('ArrowLeft')
+    expect(seen.at(-1)).toBe('Take 2')
+  })
+
+  it('keeps the words being written in the prompt while the takes come and go', async () => {
+    function Draft() {
+      const [words, setWords] = useState('')
+      return createElement('textarea', {
+        'aria-label': 'Prompt',
+        value: words,
+        onChange: (e: { target: { value: string } }) => setWords(e.target.value),
+      })
+    }
+    const s = await show({ ok: false } as unknown as ImageTakesView, {}, createElement(Draft))
+    const field = s.container.querySelector('textarea')!
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(field, 'a new inn')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      s.client.setQueryData(['image-takes', 'inn'], view({ takes: three }))
+      // The query tells the page on its next turn.
+      await new Promise((done) => setTimeout(done, 0))
+    })
+    expect(s.text()).toContain('Takes · 3')
+    expect(s.container.querySelector('textarea')).toBe(field)
+    expect(field.value).toBe('a new inn')
   })
 
   it('hears C, D and the arrows anywhere on the page, not only inside the workbench', async () => {

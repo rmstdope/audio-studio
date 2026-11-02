@@ -34,6 +34,9 @@ import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 
+/** The inputs that are pressed rather than typed into, which leave the page's keys to it. */
+const PRESSED_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset'])
+
 /** How many takes one press can make. */
 const MAX_AT_ONCE = 4
 
@@ -130,23 +133,30 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   const leftHeading = useRef<HTMLSpanElement>(null)
   const rightHeading = useRef<HTMLSpanElement>(null)
   const thumbs = useRef(new Map<number, HTMLButtonElement>())
-  // The page's keys (← → C D) are heard anywhere on the page, by what this render last set here.
+  // The page's keys (← → C D) are heard anywhere on the page, by the handler of the last render.
   const keys = useRef<(event: KeyboardEvent) => void>(() => {})
-  keys.current = () => {}
+  let onKey: (event: KeyboardEvent) => void = () => {}
+  useEffect(() => {
+    keys.current = onKey
+  })
   useEffect(() => {
     const listen = (event: KeyboardEvent) => keys.current(event)
     document.addEventListener('keydown', listen)
     return () => document.removeEventListener('keydown', listen)
   }, [])
+  // A choice or drop asked for by a key and not yet settled: a second press waits for it, since the
+  // handler it would reach still sees the take as it was.
+  const changing = useRef(false)
   const refocusUnchoose = useFocusWhenClosed(asking, unchooseButton)
   const focusLeft = useFocusWhenClosed(asking, leftHeading)
 
   const ready = view && 'takes' in view ? view : null
-  const strip = ready ? ready.takes.filter((t) => !t.chosen).map((t) => t.n) : []
+  const others = ready ? ready.takes.filter((t) => !t.chosen) : []
+  const strip = others.map((t) => t.n)
   const onRight = right !== null && strip.includes(right) ? right : (strip.at(-1) ?? null)
 
   // The right side starts on the newest take and stays where it is put; it moves only when its
-  // take leaves the strip.
+  // take leaves the grid.
   useEffect(() => {
     if (strip.length && (right === null || !strip.includes(right))) setRight(strip.at(-1)!)
   })
@@ -158,6 +168,10 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
       seen.mutate(shown.n)
     }
   })
+  // The grid scrolls on its own: the take on the right is kept in view as ← and → step.
+  useEffect(() => {
+    if (onRight !== null) thumbs.current.get(onRight)?.scrollIntoView?.({ block: 'nearest' })
+  }, [onRight])
   useEffect(() => {
     if (!stage || typeof ResizeObserver === 'undefined') return
     const measure = () => setAvailable(stage.clientWidth)
@@ -181,17 +195,23 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
   }, [pendingFocus])
 
   if (!view || !ready) {
+    // The same shape as the workbench below, so the prompt is not made again (losing words being
+    // written) when the takes come and go.
     return (
-      <div className="image-workbench">
-        <div className="image-workbench-tools">{prompt}</div>
-        <section className="panel">
-          {!view
-            ? query.isError
-              ? 'The takes could not be loaded.'
-              : 'Loading takes…'
-            : 'The takes could not be listed.'}
-        </section>
-      </div>
+      <>
+        {null}
+        {[]}
+        <div className="image-workbench">
+          <div className="image-workbench-tools">{prompt}</div>
+          <section className="panel">
+            {!view
+              ? query.isError
+                ? 'The takes could not be loaded.'
+                : 'Loading takes…'
+              : 'The takes could not be listed.'}
+          </section>
+        </div>
+      </>
     )
   }
 
@@ -246,9 +266,13 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
     // Focus is asked for once the save has settled: asked earlier, it would be given to the button
     // just before the button is switched off, and the browser drops it from a disabled button.
     const focus = before !== null || strip.length > 1 ? 'choose' : 'right'
+    changing.current = true
     choose.mutate(n, {
       onSuccess: () => setSaved((count) => count + 1),
-      onSettled: () => setPendingFocus(focus),
+      onSettled: () => {
+        changing.current = false
+        setPendingFocus(focus)
+      },
     })
   }
   const onDrop = (n: number) => {
@@ -256,25 +280,37 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
     beforeChange()
     set((v) => ({ ...v, takes: v.takes.filter((t) => t.n !== n) }))
     setRight(next)
-    drop.mutate(n, { onSettled: () => setPendingFocus(next ?? 'right') })
+    changing.current = true
+    drop.mutate(n, {
+      onSettled: () => {
+        changing.current = false
+        setPendingFocus(next ?? 'right')
+      },
+    })
   }
-  keys.current = (event: KeyboardEvent) => {
+  onKey = (event: KeyboardEvent) => {
     const target = event.target
     if (event.defaultPrevented || asking) return
     if (event.metaKey || event.ctrlKey || event.altKey) return
     if (target instanceof HTMLElement && target.isContentEditable) return
+    // Keys typed into a field or menu are its own; a box or button leaves them to the page, but
+    // a radio keeps its arrows.
+    const box = target instanceof HTMLInputElement && PRESSED_INPUTS.has(target.type)
     if (
       target instanceof HTMLSelectElement ||
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement
+      target instanceof HTMLTextAreaElement ||
+      (target instanceof HTMLInputElement && !box)
     )
       return
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    const arrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+    if (arrow && target instanceof HTMLInputElement && target.type === 'radio') return
+    if (arrow) {
       const next = stepRight(strip, onRight, event.key === 'ArrowLeft' ? -1 : 1)
       event.preventDefault()
       if (next !== null) setRight(next)
     }
-    if (!rightTake) return
+    // Held down, C and D would choose back and forth, or drop take after take.
+    if (!rightTake || event.repeat || changing.current) return
     const key = event.key.toLowerCase()
     if (key === 'c' && canChoose(rightTake)) {
       event.preventDefault()
@@ -330,7 +366,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
         disabled={!canMake}
         onClick={() => {
           // The button is off while takes are made, and the browser drops focus from it; focus
-          // goes to the take on the right in the strip, so ← and → keep stepping it.
+          // goes to the take on the right in the grid, so ← and → keep stepping it.
           focusQuietly.current = true
           setPendingFocus(onRight ?? 'right')
           make.mutate({ count, model })
@@ -426,44 +462,42 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
             )}
             {strip.length > 0 || making.length > 0 ? (
               <div className="image-thumbs" data-strip>
-                {takes
-                  .filter((t) => !t.chosen)
-                  .map((t) => {
-                    const src =
-                      showing === 'game' ? gameSource(id, t, row, lookError) : modelSource(id, t)
-                    return (
-                      <button
-                        type="button"
-                        key={t.n}
-                        className="image-thumb"
-                        aria-pressed={t.n === onRight}
-                        ref={(el) => {
-                          if (el) thumbs.current.set(t.n, el)
-                          else thumbs.current.delete(t.n)
-                        }}
-                        onClick={() => setRight(t.n)}
-                      >
-                        {src ? (
-                          <Picture
-                            src={src}
-                            alt=""
-                            {...(showing === 'game' ? size : { width: t.width, height: t.height })}
-                          />
-                        ) : (
-                          <div
-                            className="image-take-empty"
-                            style={{ aspectRatio: `${row.width} / ${row.height}` }}
-                          />
-                        )}
-                        <span className="image-thumb-label">
-                          <span className="grow">Take {t.n}</span>
-                          {t.earlier && <span className="faint">earlier words</span>}
-                          {t.n === wasChosen && <span className="faint">was chosen</span>}
-                          {t.isNew && <span className="chip chip-new">new</span>}
-                        </span>
-                      </button>
-                    )
-                  })}
+                {others.map((t) => {
+                  const src =
+                    showing === 'game' ? gameSource(id, t, row, lookError) : modelSource(id, t)
+                  return (
+                    <button
+                      type="button"
+                      key={t.n}
+                      className="image-thumb"
+                      aria-pressed={t.n === onRight}
+                      ref={(el) => {
+                        if (el) thumbs.current.set(t.n, el)
+                        else thumbs.current.delete(t.n)
+                      }}
+                      onClick={() => setRight(t.n)}
+                    >
+                      {src ? (
+                        <Picture
+                          src={src}
+                          alt=""
+                          {...(showing === 'game' ? size : { width: t.width, height: t.height })}
+                        />
+                      ) : (
+                        <div
+                          className="image-take-empty"
+                          style={{ aspectRatio: `${row.width} / ${row.height}` }}
+                        />
+                      )}
+                      <span className="image-thumb-label">
+                        <span className="grow">Take {t.n}</span>
+                        {t.earlier && <span className="faint">earlier words</span>}
+                        {t.n === wasChosen && <span className="faint">was chosen</span>}
+                        {t.isNew && <span className="chip chip-new">new</span>}
+                      </span>
+                    </button>
+                  )
+                })}
                 {making.map((m) => (
                   <MakingThumb key={m.n} making={m} {...size} />
                 ))}
@@ -471,7 +505,8 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
             ) : null}
             {strip.length > 0 && (
               <span className="faint small">
-                Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.
+                Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the image the game
+                uses.
               </span>
             )}
             {none && (
@@ -590,7 +625,7 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
                       Choose
                     </button>
                     <span className="faint small">
-                      or press <kbd>C</kbd> or <kbd>D</kbd>
+                      or press <kbd>D</kbd> to drop, <kbd>C</kbd> to choose
                     </span>
                   </div>
                   {lookError !== null && (
@@ -730,7 +765,7 @@ function LeftSide({
   )
 }
 
-/** A take waiting or being made, in the strip: its place, its time and a progress bar. */
+/** A take waiting or being made, in the grid: its place, its time and a progress bar. */
 function MakingThumb({
   making,
   width,
