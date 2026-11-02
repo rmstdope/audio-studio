@@ -11,3 +11,16 @@ describe('the images list in a narrow window', () => {
     expect(block).toContain('minmax(0, 1fr) auto')
   })
 })
+
+describe('the two sides of an image’s takes', () => {
+  it('sit side by side when both fit, and one above the other when the stage says they stack', () => {
+    const rule = (selector: string) => {
+      const at = css.indexOf(`${selector} {`)
+      return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
+    }
+    expect(rule(".image-stage[data-stacked='false']")).toMatch(
+      /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
+    )
+    expect(rule('.image-stage')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
+  })
+})

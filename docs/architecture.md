@@ -1466,12 +1466,15 @@ then the picture, then the lock entry, so a failure can be pressed again; the ta
 read. The game's own `file` is never written or deleted. Where the pictures of the chosen image and of
 the game's own are served from: `GET /api/images/:id/current` (the chosen clip, else the game's file).
 
-**The Takes section** (an image's page, under the Prompt panel): each take shows its two pictures,
-"What the model made" and "What the game gets", the game's version enlarged by the largest whole
-number at which both fit side by side (stacked, in the same order, when not even ×1 fits). The
-image the game uses on top (its right picture is the one the game has now), one other take
-beneath, a strip of the others (each side holds two pictures now, so they stack instead of sitting
-side by side); Choose moves the compared take up and the take chosen before comes to be compared,
+**The Takes section** (an image's page, under the Prompt panel): a box in its heading row, "What
+the game gets" (ticked when the page opens; the page's own, never saved), switches every take shown,
+on both sides and in the strip, between what the model made (with its size, and "cropped to fit"
+when it had another shape) and what the game gets (with the game's size; in its place, while a take
+has none, "Bringing to the game's look…", "Not brought to the game's look yet." or what to fix in
+the style file). The image the game uses (its game picture is the one the game has now) sits beside
+one other take, both enlarged by the largest whole number of the game's size at which the two fit
+side by side, and one above the other when not even ×1 fits; under them a strip of the others.
+Choose moves the compared take to the left and the take chosen before comes to be compared,
 marked "was chosen" for that visit. The compared take is the
 page's own state (after a reload the newest) and does not move when a take finishes; ← / → step
 through the strip while focus is in the section but not in a menu or field. Pressing Make N takes

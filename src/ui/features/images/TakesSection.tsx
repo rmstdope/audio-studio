@@ -29,13 +29,16 @@ import {
 import { Confirm } from '../../components/Confirm'
 import { openTracking } from '../../components/openTracking'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
-import { makeTakesText, takeCountText, unchooseNote } from '../../imagesText'
+import { lookZoom, makeTakesText, takeCountText, unchooseNote } from '../../imagesText'
 import { failureLine, progressOf, timeLeftText } from '../../musicTakesText'
 import { routeHref } from '../../route'
-import { TakePair } from './TakePair'
+import { TakePicture, gameSource, modelSource, type Showing } from './TakePicture'
 
 /** How many takes one press can make. */
 const MAX_AT_ONCE = 4
+
+/** The space between the two sides, in pixels (the stylesheet's `.image-stage` gap). */
+const STAGE_GAP = 14
 
 /** What a change to takes answered, as a line to show when it was refused. */
 function refusal(answer: unknown): string | null {
@@ -45,24 +48,26 @@ function refusal(answer: unknown): string | null {
     : 'That could not be done.'
 }
 
-/** A take's picture, scaled up without smoothing. */
+/** A take's picture, scaled up without smoothing; `shown` is its width on the page, when set. */
 function Picture({
   src,
   alt,
   width,
   height,
+  shown,
 }: {
   src: string
   alt: string
   width: number
   height: number
+  shown?: number
 }) {
   return (
     <img
       className="image-take-picture"
       src={src}
       alt={alt}
-      style={{ aspectRatio: `${width} / ${height}` }}
+      style={{ width: shown, aspectRatio: `${width} / ${height}` }}
     />
   )
 }
@@ -88,9 +93,11 @@ function EmptyFrame({
 }
 
 /**
- * An image's Takes section: the image the game uses beside one other take, a strip of the rest to
- * put on the right, and making, choosing, un-choosing and dropping them. Which take is on the right
- * is this page's, never saved; after a reload it is the newest.
+ * An image's Takes section: the image the game uses beside one other take (one above the other when
+ * the window is too narrow for both at the game's size), a strip of the rest to put on the right,
+ * and making, choosing, un-choosing and dropping them. A box switches every take shown between what
+ * the model made and what the game gets. Which take is on the right, and what the box says, are
+ * this page's, never saved; after a reload it is the newest, and what the game gets.
  */
 export function TakesSection({ row }: { row: ImageRow }) {
   const id = row.id
@@ -111,6 +118,9 @@ export function TakesSection({ row }: { row: ImageRow }) {
   const [asking, setAsking] = useState(false)
   const [saved, setSaved] = useState(0)
   const [pendingFocus, setPendingFocus] = useState<'choose' | 'right' | number | null>(null)
+  const [showing, setShowing] = useState<Showing>('game')
+  const [stage, setStage] = useState<HTMLDivElement | null>(null)
+  const [available, setAvailable] = useState(0)
   const asked = useRef(new Set<number>())
   // Focus asked for by a press of Make does not scroll: a mouse press stays where it was.
   const focusQuietly = useRef(false)
@@ -139,6 +149,14 @@ export function TakesSection({ row }: { row: ImageRow }) {
       seen.mutate(shown.n)
     }
   })
+  useEffect(() => {
+    if (!stage || typeof ResizeObserver === 'undefined') return
+    const measure = () => setAvailable(stage.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(stage)
+    return () => observer.disconnect()
+  }, [stage])
   useEffect(() => {
     if (pendingFocus === null) return
     const target =
@@ -181,6 +199,8 @@ export function TakesSection({ row }: { row: ImageRow }) {
   const busy = making.length > 0
   const canMake = generator.ok && !busy && !make.isPending
   const size = { width: row.width, height: row.height }
+  // The two sides sit side by side at the largest whole size at which both fit, else one above the other.
+  const { zoom, stacked } = lookZoom(available, STAGE_GAP, row.width)
   const set = (update: (v: ImageTakesView) => ImageTakesView) =>
     client.setQueryData<ImageTakesView>(['image-takes', id], (v) =>
       v && 'takes' in v ? update(v) : v,
@@ -326,6 +346,14 @@ export function TakesSection({ row }: { row: ImageRow }) {
           <h2>Takes</h2>
           {!none && (
             <div className="takes-controls">
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={showing === 'game'}
+                  onChange={(event) => setShowing(event.target.checked ? 'game' : 'model')}
+                />
+                What the game gets
+              </label>
               {busy && (
                 <button
                   type="button"
@@ -355,7 +383,7 @@ export function TakesSection({ row }: { row: ImageRow }) {
             look and make more takes.
           </span>
         )}
-        <div className="image-stage">
+        <div className="image-stage" data-stacked={stacked} ref={setStage}>
           <div className="image-side" data-side="left">
             {asking && chosen ? (
               <Confirm
@@ -408,6 +436,8 @@ export function TakesSection({ row }: { row: ImageRow }) {
                 size={size}
                 id={id}
                 lookError={lookError}
+                showing={showing}
+                zoom={zoom}
               />
             )}
           </div>
@@ -456,7 +486,14 @@ export function TakesSection({ row }: { row: ImageRow }) {
               </span>
             )}
             {rightTake ? (
-              <TakePair id={id} take={rightTake} row={row} lookError={lookError} />
+              <TakePicture
+                id={id}
+                take={rightTake}
+                row={row}
+                lookError={lookError}
+                showing={showing}
+                zoom={zoom}
+              />
             ) : (
               <EmptyFrame
                 title={
@@ -473,32 +510,42 @@ export function TakesSection({ row }: { row: ImageRow }) {
           <div className="image-strip" data-strip>
             {takes
               .filter((t) => !t.chosen)
-              .map((t) => (
-                <button
-                  type="button"
-                  key={t.n}
-                  className="image-thumb"
-                  aria-pressed={t.n === onRight}
-                  ref={(el) => {
-                    if (el) thumbs.current.set(t.n, el)
-                    else thumbs.current.delete(t.n)
-                  }}
-                  onClick={() => setRight(t.n)}
-                >
-                  <Picture
-                    src={`/api/images/${encodeURIComponent(id)}/takes/${t.n}`}
-                    alt=""
-                    width={t.width}
-                    height={t.height}
-                  />
-                  <span className="image-thumb-label">
-                    <span className="grow">Take {t.n}</span>
-                    {t.earlier && <span className="faint">earlier words</span>}
-                    {t.n === wasChosen && <span className="faint">was chosen</span>}
-                    {t.isNew && <span className="chip chip-new">new</span>}
-                  </span>
-                </button>
-              ))}
+              .map((t) => {
+                const src =
+                  showing === 'game' ? gameSource(id, t, row, lookError) : modelSource(id, t)
+                return (
+                  <button
+                    type="button"
+                    key={t.n}
+                    className="image-thumb"
+                    aria-pressed={t.n === onRight}
+                    ref={(el) => {
+                      if (el) thumbs.current.set(t.n, el)
+                      else thumbs.current.delete(t.n)
+                    }}
+                    onClick={() => setRight(t.n)}
+                  >
+                    {src ? (
+                      <Picture
+                        src={src}
+                        alt=""
+                        {...(showing === 'game' ? size : { width: t.width, height: t.height })}
+                      />
+                    ) : (
+                      <div
+                        className="image-take-empty"
+                        style={{ aspectRatio: `${row.width} / ${row.height}` }}
+                      />
+                    )}
+                    <span className="image-thumb-label">
+                      <span className="grow">Take {t.n}</span>
+                      {t.earlier && <span className="faint">earlier words</span>}
+                      {t.n === wasChosen && <span className="faint">was chosen</span>}
+                      {t.isNew && <span className="chip chip-new">new</span>}
+                    </span>
+                  </button>
+                )
+              })}
             {making.map((m) => (
               <MakingThumb key={m.n} making={m} {...size} />
             ))}
@@ -544,6 +591,8 @@ function LeftSide({
   size,
   id,
   lookError,
+  showing,
+  zoom,
 }: {
   row: ImageRow
   chosen: ImageTakeView | undefined
@@ -557,6 +606,8 @@ function LeftSide({
   size: { width: number; height: number }
   id: string
   lookError: string | null
+  showing: Showing
+  zoom: number
 }) {
   const label = (
     <span className="lbl" ref={heading} tabIndex={-1}>
@@ -583,11 +634,13 @@ function LeftSide({
             Un-choose
           </button>
         </div>
-        <TakePair
+        <TakePicture
           id={id}
           take={chosen}
           row={row}
           lookError={lookError}
+          showing={showing}
+          zoom={zoom}
           current
           saving={saving}
           saved={saved}
@@ -607,6 +660,7 @@ function LeftSide({
             src={`/api/images/${encodeURIComponent(id)}/current`}
             alt="The game's own image"
             {...size}
+            shown={size.width * zoom}
           />
         ) : (
           <EmptyFrame title="The file is not there." {...size} />

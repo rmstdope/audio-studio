@@ -689,35 +689,64 @@ describe('the Takes section’s model menu', () => {
   })
 })
 
-describe('a take’s two pictures', () => {
+describe('a take’s picture', () => {
   const imgs = (s: { container: HTMLElement }, side: string) =>
     [...s.container.querySelectorAll(`[data-side="${side}"] img`)].map((i) => ({
       alt: i.getAttribute('alt'),
       src: i.getAttribute('src'),
     }))
+  const sources = (s: { container: HTMLElement }, where: string) =>
+    [...s.container.querySelectorAll(`${where} img`)].map(
+      (i) => i.getAttribute('src')!.split('?')[0],
+    )
+  const box = (s: { container: HTMLElement }) =>
+    s.container.querySelector<HTMLInputElement>('input[type="checkbox"]')!
+  const captions = (s: { container: HTMLElement }, side: string) =>
+    [...s.container.querySelectorAll(`[data-side="${side}"] .look-side > .small`)].map(
+      (l) => l.textContent,
+    )
 
-  it('shows what the model made, then what the game gets, each with its size', async () => {
-    const s = await show(view({ takes: [take(1, { width: 1280, height: 720 })] }))
-    const pair = s.container.querySelector('[data-side="right"] .look-pair')!
-    const labels = [...pair.querySelectorAll('.lbl')].map((l) => l.textContent)
-    expect(labels).toEqual(['What the model made', 'What the game gets'])
-    const captions = [...pair.querySelectorAll('.look-side > .small')].map((l) => l.textContent)
-    expect(captions).toEqual(['1280 × 720', '320 × 200'])
-    const sources = imgs(s, 'right').map((i) => i.src!.split('?')[0])
-    expect(sources).toEqual(['/api/images/inn/takes/1', '/api/images/inn/takes/1/game'])
+  it('shows what the game gets for every take at first, each with its size', async () => {
+    const s = await show(view({ takes: [take(1, { chosen: true }), take(2), take(3)] }))
+    expect(box(s).checked).toBe(true)
+    expect(box(s).closest('label')?.textContent).toBe('What the game gets')
+    expect(sources(s, '[data-side="left"]')).toEqual(['/api/images/inn/current'])
+    expect(sources(s, '[data-side="right"]')).toEqual(['/api/images/inn/takes/3/game'])
+    expect(sources(s, '.image-strip')).toEqual([
+      '/api/images/inn/takes/2/game',
+      '/api/images/inn/takes/3/game',
+    ])
+    expect(captions(s, 'right')).toEqual(['320 × 200'])
+  })
+
+  it('shows what the model made for every take when the box is cleared, and back when it is ticked', async () => {
+    const s = await show(
+      view({ takes: [take(1, { chosen: true }), take(2), take(3, { width: 1280, height: 720 })] }),
+    )
+    await s.click(box(s))
+    expect(box(s).checked).toBe(false)
+    expect(sources(s, '[data-side="left"]')).toEqual(['/api/images/inn/takes/1'])
+    expect(sources(s, '[data-side="right"]')).toEqual(['/api/images/inn/takes/3'])
+    expect(sources(s, '.image-strip')).toEqual([
+      '/api/images/inn/takes/2',
+      '/api/images/inn/takes/3',
+    ])
+    expect(captions(s, 'right')).toEqual(['1280 × 720'])
+    expect(imgs(s, 'right')[0]!.alt).toBe('Take 3, what the model made')
+    await s.click(box(s))
+    expect(sources(s, '[data-side="right"]')).toEqual(['/api/images/inn/takes/3/game'])
+    expect(imgs(s, 'right')[0]!.alt).toBe('Take 3, what the game gets')
   })
 
   it('says the model’s picture is cropped to fit when it has another shape', async () => {
     const s = await show(view({ takes: [take(4, { width: 1024, height: 1024, cropped: true })] }))
+    await s.click(box(s))
     expect(s.text()).toContain('1024 × 1024 · cropped to fit')
   })
 
   it('shows the picture the game has now for the chosen take, tagging an old look', async () => {
     const s = await show(view({ takes: [take(1, { chosen: true })] }), { looksOld: true })
-    expect(imgs(s, 'left').map((i) => i.src!.split('?')[0])).toEqual([
-      '/api/images/inn/takes/1',
-      '/api/images/inn/current',
-    ])
+    expect(sources(s, '[data-side="left"]')).toEqual(['/api/images/inn/current'])
     expect(s.container.querySelector('[data-side="left"]')?.textContent).toContain('Chosen')
     expect(s.container.querySelector('[data-side="left"]')?.textContent).toContain('Old look')
   })
@@ -725,8 +754,12 @@ describe('a take’s two pictures', () => {
   it('says it is bringing the take to the look, and cannot be chosen until it is done', async () => {
     const s = await show(view({ takes: [take(5, { look: 'bringing' })] }))
     expect(s.text()).toContain("Bringing to the game's look…")
-    expect(imgs(s, 'right')).toHaveLength(1)
+    expect(imgs(s, 'right')).toHaveLength(0)
+    expect(sources(s, '.image-strip')).toEqual([])
     expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(true)
+    await s.click(box(s))
+    expect(sources(s, '[data-side="right"]')).toEqual(['/api/images/inn/takes/5'])
+    expect(s.text()).not.toContain("Bringing to the game's look…")
   })
 
   it('shows what to fix in place of the game’s version, and turns Choose off', async () => {
@@ -734,14 +767,14 @@ describe('a take’s two pictures', () => {
       "Can't bring this take to the game's look: the style file's palette has a colour that isn't one: palette 3, “#7fb0e”."
     const s = await show(view({ takes: [take(3, { look: 'old' })], lookError: message }))
     expect(s.container.querySelector('[role="alert"]')?.textContent).toBe(message)
-    expect(imgs(s, 'right')).toHaveLength(1)
+    expect(imgs(s, 'right')).toHaveLength(0)
     expect(s.text()).toContain("Fix the game's style file to choose this take.")
     expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('shows a place for a take never brought to the look, instead of a missing picture', async () => {
     const s = await show(view({ takes: [take(2, { look: 'missing' })] }))
-    expect(imgs(s, 'right')).toHaveLength(1)
+    expect(imgs(s, 'right')).toHaveLength(0)
     expect(s.text()).toContain("Not brought to the game's look yet.")
     expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(false)
   })
@@ -750,6 +783,11 @@ describe('a take’s two pictures', () => {
     const s = await show(view({ takes: [take(3)] }))
     expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(false)
     expect(s.text()).not.toContain('Fix the game')
+  })
+
+  it('has no box before there are takes', async () => {
+    const s = await show(view())
+    expect(s.container.querySelector('input[type="checkbox"]')).toBeNull()
   })
 })
 

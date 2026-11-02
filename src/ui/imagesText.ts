@@ -60,9 +60,10 @@ export function unchooseNote(take: number): string {
 }
 
 /**
- * How big the game's version is shown, and whether the two pictures stack: the largest whole number
- * at which both fit side by side in `available` pixels; when not even ×1 fits they stack, each
- * the largest whole number that fits alone. An unknown width (0) shows ×1 side by side.
+ * How big the takes' pictures are shown, as a whole multiple of the game's `width`, and whether the
+ * Takes section's two sides stack: the largest whole number at which both fit side by side in
+ * `available` pixels; when not even ×1 fits they stack, each the largest whole number that fits
+ * alone. An unknown width (0) shows ×1 side by side.
  */
 export function lookZoom(
   available: number,
