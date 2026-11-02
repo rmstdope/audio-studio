@@ -689,6 +689,22 @@ describe('bringing everything to a new look', () => {
     expect((await s.row('hall')).looksOld).toBe(false)
   })
 
+  it('brings an image several acts list once', async () => {
+    const s = setup(undefined, {
+      'tts/act2/images.json': [inn],
+      'images/style.json': { look: 'pixel art', keepOut: 'text', palette: warm, acts: {} },
+    })
+    await s.takes.make(s.file, 'inn', { count: 1 })
+    await s.settled('inn')
+    await s.takes.choose(s.file, 'inn', 1)
+    writeFileSync(
+      join(s.root, 'images/style.json'),
+      JSON.stringify({ look: 'pixel art', keepOut: 'text', palette: ['#ff00ff'], acts: {} }),
+    )
+    expect(await s.takes.bringAll(s.file)).toEqual({ ok: true })
+    expect(s.takes.lookRun(s.file)).toMatchObject({ total: 1 })
+  })
+
   it('starts one run when it is pressed twice at once', async () => {
     const s = await chosenImages()
     writeFileSync(
