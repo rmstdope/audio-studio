@@ -47,8 +47,8 @@ const summary = {
   },
   images: {
     acts: [
-      { id: 'act1', title: 'Act I: The Lantern', state: 'ok', rows: [1, 2, 3, 4] },
-      { id: 'act2', title: 'Act II: The Road', state: 'missing', rows: [] },
+      { id: 'act1', title: 'Act I: The Lantern', state: 'ok', rows: [1, 2, 3, 4], order: [] },
+      { id: 'act2', title: 'Act II: The Road', state: 'missing', rows: [], order: [] },
     ],
   },
 } as unknown as ProjectSummary

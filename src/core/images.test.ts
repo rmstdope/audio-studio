@@ -255,24 +255,6 @@ describe('summarizeImages', () => {
     )
     expect(empty.images.acts[0]!.state).toBe('ok')
   })
-  it('drops images whose id is used twice, with a problem naming both files', () => {
-    const lists = [
-      { ...input().lists[0]! },
-      {
-        id: 'act2',
-        title: 'Act II',
-        file: 'tts/act2/images.json',
-        state: { status: 'ok' as const, images: [inn] },
-        canRefresh: true,
-      },
-    ]
-    const result = summarizeImages(
-      input({ lists, parts: [...input().parts, { id: 'act2', title: 'Act II' }] }),
-    )
-    expect(result.images.acts.every((act) => act.rows.length === 0)).toBe(true)
-    expect(result.problems).toHaveLength(2)
-    expect(result.problems[0]!.message).toContain('silver-stag-inn')
-  })
   it('reports an act addition for a part the project does not have', () => {
     const odd = { ...style, acts: { act9: 'x' } }
     const result = summarizeImages(input({ style: odd, seen: odd }))
@@ -446,5 +428,212 @@ describe('leaving the act’s style out of one image', () => {
     expect(outOfDateReasons(now, { ...now, style: made })).toEqual(['the style', 'the act style'])
     const old = JSON.stringify(['a', 'k', ['#000'], 'x'])
     expect(outOfDateReasons({ ...now, style: made }, { ...now, style: old })).toEqual([])
+  })
+})
+
+describe('an image the game lists in several acts', () => {
+  const lists = (...images: (typeof inn)[][]): ImagesInput['lists'] =>
+    images.map((list, i) => ({
+      id: `act${i + 1}`,
+      title: `Act ${['I', 'II', 'III'][i]}: Title`,
+      file: `tts/act${i + 1}/images.json`,
+      state: { status: 'ok' as const, images: list },
+      canRefresh: true,
+    }))
+  const shared = (over: Partial<ImagesInput> = {}) =>
+    summarizeImages(
+      input({
+        parts: [
+          { id: 'act1', title: 'Act I: Title' },
+          { id: 'act2', title: 'Act II: Title' },
+          { id: 'act3', title: 'Act III: Title' },
+        ],
+        lists: lists([inn], [inn], [inn]),
+        style: { ...style, acts: { act1: 'warm lantern light', act3: 'cold dawn' } },
+        seen: { ...style, acts: { act1: 'warm lantern light', act3: 'cold dawn' } },
+        ...over,
+      }),
+    )
+
+  it('is one image shown in each act, naming the other acts', () => {
+    const { images, problems } = shared()
+    expect(problems).toEqual([])
+    expect(images.acts.map((a) => a.rows.map((r) => r.id))).toEqual([[inn.id], [inn.id], [inn.id]])
+    expect(images.acts[0]!.rows[0]!.sharedWith.map((a) => a.id)).toEqual(['act2', 'act3'])
+    expect(images.acts[2]!.rows[0]!.sharedWith.map((a) => a.id)).toEqual(['act1', 'act2'])
+    expect(images.acts[1]!.rows[0]!.partId).toBe('act2')
+    expect(images.acts[0]!.order).toEqual([inn.id])
+  })
+  it('is not shared when only one act lists it', () => {
+    const row = summarizeImages(input()).images.acts[0]!.rows[0]!
+    expect(row.sharedWith).toEqual([])
+    expect(row.actStyle).toEqual({ text: 'warm lantern light', on: true })
+  })
+  it('has one status, from one chosen take, in every act', () => {
+    const first = shared().images.acts[0]!.rows[0]!
+    const { images } = shared({ chosen: { [inn.id]: { ...first.madeFrom, take: 2 } } })
+    expect(images.acts.map((a) => a.rows[0]!.status)).toEqual(['chosen', 'chosen', 'chosen'])
+    expect(images.acts.map((a) => a.rows[0]!.chosenTake)).toEqual([2, 2, 2])
+  })
+  it('counts once in the notices', () => {
+    const first = shared().images.acts[0]!.rows[0]!
+    const chosen = { [inn.id]: { ...first.madeFrom, take: 1, look: 'old' } }
+    const changed = {
+      ...style,
+      look: 'new look',
+      acts: { act1: 'warm lantern light', act3: 'cold dawn' },
+    }
+    const { images } = shared({ chosen, style: changed, look: lookOf(style) })
+    expect(images.styleNotice?.count).toBe(1)
+    expect(images.lookNotice?.count).toBe(1)
+  })
+
+  describe('act style', () => {
+    const row = (over: Partial<ImagesInput> = {}, at = 0) => shared(over).images.acts[at]!.rows[0]!
+    it('offers the acts that add a style, starting on the first act in the game’s order', () => {
+      const r = row()
+      expect(r.actStyle).toEqual({
+        text: 'warm lantern light',
+        on: true,
+        pick: 'act1',
+        choices: [
+          { id: 'act1', title: 'Act I: Title', text: 'warm lantern light' },
+          { id: 'act3', title: 'Act III: Title', text: 'cold dawn' },
+        ],
+      })
+      expect(r.prompt).toContain('warm lantern light')
+      // the same from every act
+      expect(row({}, 2).actStyle).toEqual(r.actStyle)
+      expect(row({}, 2).prompt).toBe(r.prompt)
+    })
+    it('uses the picked act’s addition', () => {
+      const prompts = { ...none, actStyleFrom: { [inn.id]: 'act3' } }
+      const r = row({ prompts })
+      expect(r.actStyle?.pick).toBe('act3')
+      expect(r.prompt).toContain('cold dawn')
+      expect(r.prompt).not.toContain('warm lantern')
+    })
+    it('starts on None when the first act adds none, and shows no menu when no act adds one', () => {
+      const parts = { act3: 'cold dawn' }
+      const r = row({ style: { ...style, acts: parts }, seen: { ...style, acts: parts } })
+      expect(r.actStyle?.pick).toBeNull()
+      expect(r.actStyle?.on).toBe(false)
+      expect(r.prompt).not.toContain('cold dawn')
+      const bare = { ...style, acts: {} }
+      expect(row({ style: bare, seen: bare }).actStyle).toBeNull()
+    })
+    it('is None when the image is on the list of those that leave it out', () => {
+      const r = row({
+        prompts: { ...none, actStyleOff: [inn.id], actStyleFrom: { [inn.id]: 'act3' } },
+      })
+      expect(r.actStyle?.pick).toBeNull()
+      expect(r.prompt).not.toContain('cold dawn')
+    })
+    it('goes back to the first act when the picked act no longer lists the image', () => {
+      const r = row({
+        lists: lists([inn], [inn], []),
+        prompts: { ...none, actStyleFrom: { [inn.id]: 'act3' } },
+      })
+      expect(r.actStyle?.pick).toBe('act1')
+    })
+    it('names the act style in the out-of-date reason', () => {
+      const made = row().madeFrom
+      const chosen = { [inn.id]: { ...made, take: 1 } }
+      const picked = row({ chosen, prompts: { ...none, actStyleFrom: { [inn.id]: 'act3' } } })
+      expect(picked.reasons).toEqual(['the act style'])
+      expect(picked.actStyleChange).toEqual({ now: 'act3', was: 'act1' })
+      const left = row({ chosen, prompts: { ...none, actStyleOff: [inn.id] } })
+      expect(left.actStyleChange).toEqual({ now: null, was: 'act1' })
+      expect(row({ chosen }).actStyleChange).toBeNull()
+    })
+  })
+})
+
+describe('lists that disagree about an image', () => {
+  const act = (n: number, image: typeof inn) => ({
+    id: `act${n}`,
+    title: `Act ${n}`,
+    file: `tts/act${n}/images.json`,
+    state: { status: 'ok' as const, images: [inn, image, { ...inn, id: `other-${n}` }].slice(1) },
+    canRefresh: true,
+  })
+  const summary = (...images: (typeof inn)[]) =>
+    summarizeImages(
+      input({
+        parts: images.map((_, i) => ({ id: `act${i + 1}`, title: `Act ${i + 1}` })),
+        lists: images.map((image, i) => act(i + 1, image)),
+      }),
+    )
+
+  it('shows neither copy, keeps the place in each act, and names the difference', () => {
+    const { images } = summary(inn, { ...inn, description: 'a different inn' })
+    for (const a of images.acts) {
+      expect(a.rows.map((r) => r.id)).toEqual([`other-${a.id.slice(3)}`])
+      expect(a.order).toEqual([inn.id, `other-${a.id.slice(3)}`])
+      expect(a.conflicts).toEqual([
+        {
+          id: inn.id,
+          title: inn.title,
+          acts: [
+            { id: 'act1', title: 'Act 1' },
+            { id: 'act2', title: 'Act 2' },
+          ],
+          differs: ['words'],
+        },
+      ])
+    }
+  })
+  it('reports words, sizes and names, in that order', () => {
+    const both = summary(inn, { ...inn, width: 640, title: 'Another', description: 'x' })
+    expect(both.images.acts[0]!.conflicts[0]!.differs).toEqual(['words', 'sizes', 'names'])
+  })
+  it('puts one problem on each list, naming the other list', () => {
+    const { problems } = summary(inn, { ...inn, height: 100 })
+    expect(problems).toEqual([
+      {
+        file: 'tts/act1/images.json',
+        path: '[0].id',
+        message: `the image "${inn.id}" has another size in tts/act2/images.json`,
+      },
+      {
+        file: 'tts/act2/images.json',
+        path: '[0].id',
+        message: `the image "${inn.id}" has another size in tts/act1/images.json`,
+      },
+    ])
+  })
+  it('says other words, and joins what differs', () => {
+    const { problems } = summary(inn, { ...inn, description: 'x', title: 'y' })
+    expect(problems[0]!.message).toBe(
+      `the image "${inn.id}" has other words and another name in tts/act2/images.json`,
+    )
+  })
+  it('names, for each list of three, a list it differs from', () => {
+    const { problems } = summary(inn, inn, { ...inn, description: 'x' })
+    expect(problems.map((p) => p.message.split(' in ')[1])).toEqual([
+      'tts/act3/images.json',
+      'tts/act3/images.json',
+      'tts/act1/images.json',
+    ])
+  })
+  it('keeps the old problem for an id used twice in one list', () => {
+    const result = summarizeImages(
+      input({
+        lists: [
+          {
+            id: 'act1',
+            title: 'Act I',
+            file: 'tts/act1/images.json',
+            state: { status: 'ok', images: [inn, inn] },
+            canRefresh: true,
+          },
+        ],
+      }),
+    )
+    expect(result.images.acts[0]!.rows).toEqual([])
+    expect(result.problems.map((p) => p.message)).toEqual([
+      `the image id "${inn.id}" is used more than once in the game's lists`,
+      `the image id "${inn.id}" is used more than once in the game's lists`,
+    ])
   })
 })

@@ -1,16 +1,30 @@
 import { useRef, useState } from 'react'
-import type { ImageRow, ImagesAct } from '../../../core/images'
+import type { ImageRow, ImagesAct, ImagesSummary } from '../../../core/images'
 import { Problems } from '../../components/Problems'
 import { useImageCompare, useSetImageWords } from '../../api'
 import { shortTitle } from '../../format'
 import { outOfDateText } from '../../imagesText'
 import { routeHref } from '../../route'
 import { ActStyleBox } from './ActStyleBox'
+import { ActStyleMenu } from './ActStyleMenu'
+import { ActLinks } from './ActLinks'
 import { TakesSection } from './TakesSection'
 import { WordsField } from './WordsField'
 
 /** An image's own page: its prompt (the words, editable), the whole prompt, and what is out of date. */
-export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
+export function ImagePage({
+  act,
+  row,
+  images,
+}: {
+  act: ImagesAct
+  row: ImageRow
+  images: ImagesSummary
+}) {
+  const actName = (id: string | null) => {
+    const found = images.acts.find((a) => a.id === id)
+    return found ? shortTitle(found.title) : null
+  }
   const [saved, setSaved] = useState(false)
   const save = useSetImageWords(row.id)
   const compare = useImageCompare(row.id)
@@ -33,6 +47,11 @@ export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
           </span>
           <h1 tabIndex={-1}>{row.title}</h1>
           <span className="mono muted">{row.id}</span>
+          {row.sharedWith.length > 0 && (
+            <span className="muted images-shared">
+              Shared with <ActLinks acts={row.sharedWith} />: a change here changes it there too.
+            </span>
+          )}
           <span className="muted images-look-line">
             {row.look.line}
             {row.looksOld && <span className="chip chip-warn">Old look</span>}
@@ -42,7 +61,16 @@ export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
       {row.status === 'out of date' && (
         <section className="notice notice-warn">
           <div className="notice-text">
-            <strong>{outOfDateText(row.reasons, shortTitle(act.title))}</strong>
+            <strong>
+              {outOfDateText(
+                row.reasons,
+                shortTitle(act.title),
+                row.actStyleChange && {
+                  now: actName(row.actStyleChange.now),
+                  was: actName(row.actStyleChange.was),
+                },
+              )}
+            </strong>
             <span>The game shows the chosen image until you choose another.</span>
           </div>
         </section>
@@ -111,14 +139,23 @@ export function ImagePage({ act, row }: { act: ImagesAct; row: ImageRow }) {
           inputRef={field}
         />
         {row.changed && <span className="muted">The game&apos;s words: {row.description}</span>}
-        {row.actStyle && (
-          <ActStyleBox
+        {row.actStyle?.choices ? (
+          <ActStyleMenu
             imageId={row.id}
-            actName={shortTitle(act.title)}
             actStyle={row.actStyle}
             onSaved={() => setSaved(true)}
             onEdit={() => setSaved(false)}
           />
+        ) : (
+          row.actStyle && (
+            <ActStyleBox
+              imageId={row.id}
+              actName={shortTitle(act.title)}
+              actStyle={row.actStyle}
+              onSaved={() => setSaved(true)}
+              onEdit={() => setSaved(false)}
+            />
+          )
         )}
         <details className="images-whole">
           <summary>The whole prompt the model gets</summary>

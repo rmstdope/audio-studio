@@ -59,6 +59,7 @@ import {
   markStyleSeen,
   resolveImageCompare,
   setImageActStyle,
+  setImageActStylePick,
   setImageWords,
   setStyleField,
   type ImageEditResult,
@@ -1476,9 +1477,16 @@ export function startServer({
         PATCH: fromOwnPage(async (request) => {
           const body = ActStyleBody.safeParse(await request.json().catch(() => null))
           if (!body.success) {
-            return Response.json({ error: 'expected { on: boolean }' }, { status: 400 })
+            return Response.json(
+              { error: 'expected { on: boolean } or { from: string | null }' },
+              { status: 400 },
+            )
           }
-          return imageAnswer(await setImageActStyle(projectFile, request.params.id, body.data.on))
+          return imageAnswer(
+            'on' in body.data
+              ? await setImageActStyle(projectFile, request.params.id, body.data.on)
+              : await setImageActStylePick(projectFile, request.params.id, body.data.from),
+          )
         }),
       },
       '/api/images/:id/compare': {

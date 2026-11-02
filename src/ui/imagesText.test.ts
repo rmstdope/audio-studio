@@ -3,6 +3,8 @@ import {
   bringFailureText,
   bringingText,
   chosenLine,
+  disagreeText,
+  listSeparator,
   joined,
   lookNoticeText,
   lookZoom,
@@ -117,6 +119,50 @@ describe('the game’s look words', () => {
     expect(bringFailureText(14, Array(5).fill({ reason: 'missing' }))).toEqual({
       head: 'Brought 9 of 14 images to the new look.',
       rest: "5 couldn't be: the model's picture for each is missing. Their old look stays until you make new takes.",
+    })
+  })
+})
+
+describe('the words of an image several acts list', () => {
+  it('joins the names the way the lists do', () => {
+    expect([0, 1, 2].map((i) => listSeparator(i, 3))).toEqual(['', ', ', ' and '])
+    expect([0, 1].map((i) => listSeparator(i, 2))).toEqual(['', ' and '])
+  })
+  it('names the act style change when a picture is out of date because of it', () => {
+    const change = (now: string | null, was: string | null) => ({ now, was })
+    expect(outOfDateText(['the act style'], 'Act I', change('Act III', 'Act I'))).toBe(
+      "Out of date since it was chosen: Act III's style instead of Act I's.",
+    )
+    expect(outOfDateText(['the act style'], 'Act I', change(null, 'Act I'))).toBe(
+      "Out of date since it was chosen: Act I's style left out.",
+    )
+    expect(outOfDateText(['the words', 'the act style'], 'Act I', change('Act III', null))).toBe(
+      "Out of date since it was chosen: the words and Act III's style.",
+    )
+  })
+  it('says what the lists disagree about', () => {
+    expect(disagreeText(['Act I', 'Act III'], ['words'])).toBe(
+      "The game's lists disagree about this image: Act I and Act III give it different words. Fix them in the game, then Refresh from the game.",
+    )
+    expect(disagreeText(['Act I', 'Act III', 'Act V'], ['words', 'sizes'])).toContain(
+      'Act I, Act III and Act V give it different words and sizes.',
+    )
+    expect(disagreeText(['Act I', 'Act III'], ['names'])).toContain('give it different names.')
+  })
+  it('keeps the act an image was opened from in its address', () => {
+    expect(routeHref({ view: 'images', page: 'image', image: 'inn', from: 'act3' })).toBe(
+      '#/images/items/inn?from=act3',
+    )
+    expect(parseRoute('#/images/items/inn?from=act3')).toEqual({
+      view: 'images',
+      page: 'image',
+      image: 'inn',
+      from: 'act3',
+    })
+    expect(parseRoute('#/images/items/inn')).toEqual({
+      view: 'images',
+      page: 'image',
+      image: 'inn',
     })
   })
 })

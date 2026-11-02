@@ -9,6 +9,7 @@ import {
   markStyleSeen,
   resolveImageCompare,
   setImageActStyle,
+  setImageActStylePick,
   setImageWords,
   setStyleField,
   type ImageEditResult,
@@ -165,6 +166,31 @@ describe('saving the studio’s own words', () => {
     expect(await setImageActStyle(file, 'inn', true)).toEqual({ ok: true })
     expect('actStyleOff' in JSON.parse(read('images/prompts.json'))).toBe(false)
     expect(await setImageActStyle(file, 'ghost', false)).toBeNull()
+  })
+
+  it('keeps which act’s style a shared image uses, and None, in the studio’s own file', async () => {
+    const two = {
+      'tts/act2/images.json': [inn],
+      'images/style.json': { ...style, acts: { act1: 'lantern', act2: 'dawn' } },
+    }
+    const { file, read, summary } = repo(two)
+    expect(await setImageActStylePick(file, 'inn', 'act2')).toEqual({ ok: true })
+    expect(JSON.parse(read('images/prompts.json')).actStyleFrom).toEqual({ inn: 'act2' })
+    expect(await setImageActStylePick(file, 'inn', null)).toEqual({ ok: true })
+    const saved = JSON.parse(read('images/prompts.json'))
+    expect(saved.actStyleOff).toEqual(['inn'])
+    expect('actStyleFrom' in saved).toBe(false)
+    expect(await setImageActStylePick(file, 'inn', 'act2')).toEqual({ ok: true })
+    expect('actStyleOff' in JSON.parse(read('images/prompts.json'))).toBe(false)
+    expect((await summary()).images!.acts[1]!.rows[0]!.actStyle?.pick).toBe('act2')
+  })
+
+  it('refuses a pick of an act that does not list the image or adds no style', async () => {
+    const { file, root } = repo({ 'tts/act2/images.json': [inn] })
+    expect(await setImageActStylePick(file, 'inn', 'act9')).toBeNull()
+    expect(await setImageActStylePick(file, 'inn', 'act2')).toBeNull() // act2 adds no style
+    expect(await setImageActStylePick(file, 'ghost', null)).toBeNull()
+    expect(existsSync(join(root, 'images/prompts.json'))).toBe(false)
   })
 
   it('writes a hand-edited actStyleOff sorted and without repeats', async () => {

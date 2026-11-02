@@ -777,10 +777,10 @@ export function useSetImageWords(imageId: string) {
 
 /** Saves whether an image uses its act's style addition. */
 export function useSetImageActStyle(imageId: string) {
-  return useImageEdit<boolean>(`image-${imageId}`, (on) => ({
+  return useImageEdit<{ on: boolean } | { from: string | null }>(`image-${imageId}`, (body) => ({
     method: 'PATCH',
     path: `/api/images/${encodeURIComponent(imageId)}/act-style`,
-    body: { on },
+    body,
   }))
 }
 

@@ -48,6 +48,8 @@ export const PromptsSchema = z.object({
   style: z.object({ look: OwnWords.optional(), keepOut: OwnWords.optional() }).default({}),
   /** Ids of the images that leave their act's style addition out of the prompt (kept while the act has none). */
   actStyleOff: z.array(z.string()).optional(),
+  /** For an image several acts list: the act whose style addition it uses (absent: the first act that lists it). */
+  actStyleFrom: z.record(z.string(), z.string()).optional(),
 })
 
 /** What a chosen take was made from; the lock records it, and staleness compares it. */
@@ -193,6 +195,15 @@ export function applyActStyleChange(prompts: Prompts, id: string, on: boolean): 
   return off.length ? { ...rest, actStyleOff: off } : rest
 }
 
+/** Prompts with the act whose style a shared image uses changed: null leaves the style out, an act takes it from that act. */
+export function applyActStylePick(prompts: Prompts, id: string, from: string | null): Prompts {
+  const base = applyActStyleChange(prompts, id, from !== null)
+  const { [id]: _removed, ...others } = base.actStyleFrom ?? {}
+  const { actStyleFrom: _old, ...rest } = base
+  const kept = from === null ? others : { ...others, [id]: from }
+  return Object.keys(kept).length ? { ...rest, actStyleFrom: kept } : rest
+}
+
 /** Prompts with the user's words for an image changed; empty text, or the game's own, removes them. */
 export function applyWordsChange(
   prompts: Prompts,
@@ -265,6 +276,23 @@ function lookChangeNames(pairs: [string | null, string][]): string[] {
   return order.filter((name) => names.has(name))
 }
 
+/** How a problem names each thing the lists can disagree about. */
+const KIND_PHRASE: Record<ConflictKind, string> = {
+  words: 'other words',
+  sizes: 'another size',
+  names: 'another name',
+}
+
+/** What differs between the listings of one image, in the order words, sizes, names. */
+function differences(images: GameImage[]): ConflictKind[] {
+  const [first, ...rest] = images
+  const kinds: ConflictKind[] = []
+  if (rest.some((i) => i.description !== first!.description)) kinds.push('words')
+  if (rest.some((i) => i.width !== first!.width || i.height !== first!.height)) kinds.push('sizes')
+  if (rest.some((i) => i.title !== first!.title)) kinds.push('names')
+  return kinds
+}
+
 /** The status chip of an image. */
 export type ImageStatus = 'none yet' | 'chosen' | 'out of date'
 
@@ -286,8 +314,16 @@ export interface ImageRow {
   gameWas: string | null
   /** The whole prompt. */
   prompt: string
-  /** The act's style addition and whether this image uses it; null when the act adds none. */
-  actStyle: { text: string; on: boolean } | null
+  /**
+   * The act's style addition and whether this image uses it; null when the act adds none. For an
+   * image several acts list: the addition it uses, `choices` the listing acts that add one and
+   * `pick` the act it is taken from (null: none); null when no listing act adds one.
+   */
+  actStyle: { text: string; on: boolean; pick?: string | null; choices?: ActStyleChoice[] } | null
+  /** The other acts that list this image, in the game's order; empty for an image of one act. */
+  sharedWith: { id: string; title: string }[]
+  /** For a shared image out of date because of its act style: the acts now and when it was chosen (null: none). */
+  actStyleChange: { now: string | null; was: string | null } | null
   /** The number of the chosen take on the image's board; null when none is chosen. */
   chosenTake: number | null
   /** The picture the game itself shows for it, and whether it is on disk; null when it names none. */
@@ -302,6 +338,25 @@ export interface ImageRow {
   looksOld: boolean
 }
 
+/** An act of a shared image that adds a style, and what it adds. */
+export interface ActStyleChoice {
+  id: string
+  title: string
+  text: string
+}
+
+/** What the acts' lists can disagree about for one image. */
+export type ConflictKind = 'words' | 'sizes' | 'names'
+
+/** An image that several acts list differently: shown in none of them, but in place in each. */
+export interface ImageConflict {
+  id: string
+  title: string
+  /** Every act that lists it, in the game's order. */
+  acts: { id: string; title: string }[]
+  differs: ConflictKind[]
+}
+
 /** What reading one act's list gave. */
 export type ImageListState =
   { status: 'ok'; images: GameImage[] } | { status: 'missing' } | { status: 'invalid' }
@@ -314,6 +369,10 @@ export interface ImagesAct {
   state: 'ok' | 'missing' | 'invalid'
   addition: string | null
   rows: ImageRow[]
+  /** Images the acts' lists disagree about (not among the rows). */
+  conflicts: ImageConflict[]
+  /** The ids of the list in the game's order, rows and conflicts alike. */
+  order: string[]
   chosen: number
   canRefresh: boolean
 }
@@ -375,23 +434,41 @@ export function summarizeImages(input: ImagesInput): {
 } {
   const { parts, lists, style, prompts, chosen } = input
   const problems: Problem[] = []
-  const owners = new Map<string, string[]>()
+  type Listing = { list: ImagesInput['lists'][number]; index: number; image: GameImage }
+  const listed = new Map<string, Listing[]>()
   for (const list of lists) {
     if (list.state.status !== 'ok') continue
     list.state.images.forEach((image, index) => {
-      owners.set(image.id, [...(owners.get(image.id) ?? []), `${list.file}\0[${index}].id`])
+      listed.set(image.id, [...(listed.get(image.id) ?? []), { list, index, image }])
     })
   }
+  /** Ids used twice in one list: a problem with every place, shown nowhere. */
   const repeated = new Set<string>()
-  for (const [id, places] of owners) {
+  /** Ids the lists give differently, with what differs. */
+  const conflicting = new Map<string, ConflictKind[]>()
+  for (const [id, places] of listed) {
     if (places.length < 2) continue
-    repeated.add(id)
+    if (new Set(places.map((place) => place.list.id)).size < places.length) {
+      repeated.add(id)
+      for (const { list, index } of places) {
+        problems.push({
+          file: list.file,
+          path: `[${index}].id`,
+          message: `the image id "${id}" is used more than once in the game's lists`,
+        })
+      }
+      continue
+    }
+    const differs = differences(places.map((place) => place.image))
+    if (!differs.length) continue
+    conflicting.set(id, differs)
     for (const place of places) {
-      const [file, path] = place.split('\0') as [string, string]
+      const other = places.find((o) => differences([place.image, o.image]).length)!
+      const kinds = differences([place.image, other.image]).map((kind) => KIND_PHRASE[kind])
       problems.push({
-        file,
-        path,
-        message: `the image id "${id}" is used more than once in the game's lists`,
+        file: place.list.file,
+        path: `[${place.index}].id`,
+        message: `the image "${id}" has ${kinds.join(' and ')} in ${other.list.file}`,
       })
     }
   }
@@ -404,62 +481,115 @@ export function summarizeImages(input: ImagesInput): {
     })
   }
 
-  let changedCount = 0
-  let oldImages = 0
+  const changedIds = new Set<string>()
+  const oldIds = new Set<string>()
   const lookPairs: [string | null, string][] = []
   const changes = style && input.seen ? styleChanges(input.seen, style, parts) : []
+  /** An image's row as first met; a shared image reuses it in every act. */
+  const bases = new Map<string, ImageRow>()
+  const baseRow = (list: ImagesInput['lists'][number], image: GameImage): ImageRow => {
+    const known = bases.get(image.id)
+    if (known) return known
+    const group = (listed.get(image.id) ?? []).map((place) => place.list)
+    const choices: ActStyleChoice[] = group.flatMap((g) => {
+      const text = style?.acts[g.id]
+      return text ? [{ id: g.id, title: g.title, text }] : []
+    })
+    const shared = group.length > 1
+    const off = Boolean(prompts.actStyleOff?.includes(image.id))
+    const wanted = prompts.actStyleFrom?.[image.id]
+    const first = group[0]!.id
+    const pick = off
+      ? null
+      : (choices.find((c) => c.id === wanted)?.id ??
+        (choices.some((c) => c.id === first) ? first : null))
+    const styleAct = shared ? (pick ?? first) : list.id
+    const actEff = effectiveStyle(style, prompts, styleAct)
+    const eff = effectiveStyle(style, prompts, styleAct, image.id)
+    const own = prompts.images[image.id]
+    const words = own?.words ?? image.description
+    const madeFrom = madeFromNow(words, image, eff)
+    const made = chosen[image.id]
+    const reasons = made ? outOfDateReasons(madeFrom, made) : []
+    const look =
+      input.look === undefined
+        ? ({ colours: { kind: 'full' }, dithering: 'patterned' } as Look)
+        : input.look
+    const key = look ? lookKey(look, image) : null
+    const thens: (string | null)[] = [
+      ...(made ? [made.look ?? null] : []),
+      ...(input.takeLooks?.[image.id] ?? []),
+    ].filter((then, at, all) => all.indexOf(then) === at)
+    const stale = key === null ? [] : thens.filter((then) => then !== key)
+    for (const then of stale) lookPairs.push([then, key!])
+    if (stale.length) oldIds.add(image.id)
+    if (made && made.style !== madeFrom.style && changes.length) changedIds.add(image.id)
+    const wasText = made ? styleParts(withoutPalette(made.style))?.[2] : null
+    const row: ImageRow = {
+      id: image.id,
+      title: image.title,
+      partId: list.id,
+      description: image.description,
+      width: image.width,
+      height: image.height,
+      words,
+      changed: Boolean(own),
+      gameChanged: Boolean(own) && own!.gameWas !== image.description,
+      gameWas: own?.gameWas ?? null,
+      prompt: assemblePrompt(words, eff),
+      actStyle: shared
+        ? choices.length
+          ? { text: eff?.addition ?? '', on: pick !== null, pick, choices }
+          : null
+        : actEff?.addition
+          ? { text: actEff.addition, on: eff?.addition != null }
+          : null,
+      sharedWith: [],
+      actStyleChange:
+        shared && reasons.includes('the act style')
+          ? { now: pick, was: choices.find((c) => c.text === wasText)?.id ?? null }
+          : null,
+      chosenTake: made?.take ?? null,
+      gameFile: image.file
+        ? { file: image.file, exists: input.gameFiles?.[image.id] ?? false }
+        : null,
+      madeFrom,
+      status: !made ? 'none yet' : reasons.length ? 'out of date' : 'chosen',
+      reasons,
+      look: {
+        line: describeLook(look, image),
+        key,
+        error: look ? null : (input.lookError ?? "Can't bring this take to the game's look."),
+      },
+      looksOld: stale.length > 0,
+    }
+    bases.set(image.id, row)
+    return row
+  }
   const acts: ImagesAct[] = lists.map((list) => {
     const actEff = effectiveStyle(style, prompts, list.id)
-    const images =
-      list.state.status === 'ok' ? list.state.images.filter((i) => !repeated.has(i.id)) : []
-    const rows = images.map((image): ImageRow => {
-      const eff = effectiveStyle(style, prompts, list.id, image.id)
-      const own = prompts.images[image.id]
-      const words = own?.words ?? image.description
-      const madeFrom = madeFromNow(words, image, eff)
-      const made = chosen[image.id]
-      const reasons = made ? outOfDateReasons(madeFrom, made) : []
-      const look =
-        input.look === undefined
-          ? ({ colours: { kind: 'full' }, dithering: 'patterned' } as Look)
-          : input.look
-      const key = look ? lookKey(look, image) : null
-      const thens: (string | null)[] = [
-        ...(made ? [made.look ?? null] : []),
-        ...(input.takeLooks?.[image.id] ?? []),
-      ].filter((then, at, all) => all.indexOf(then) === at)
-      const stale = key === null ? [] : thens.filter((then) => then !== key)
-      for (const then of stale) lookPairs.push([then, key!])
-      if (stale.length) oldImages++
-      if (made && made.style !== madeFrom.style && changes.length) changedCount++
-      return {
-        id: image.id,
-        title: image.title,
-        partId: list.id,
-        description: image.description,
-        width: image.width,
-        height: image.height,
-        words,
-        changed: Boolean(own),
-        gameChanged: Boolean(own) && own!.gameWas !== image.description,
-        gameWas: own?.gameWas ?? null,
-        prompt: assemblePrompt(words, eff),
-        actStyle: actEff?.addition ? { text: actEff.addition, on: eff?.addition != null } : null,
-        chosenTake: made?.take ?? null,
-        gameFile: image.file
-          ? { file: image.file, exists: input.gameFiles?.[image.id] ?? false }
-          : null,
-        madeFrom,
-        status: !made ? 'none yet' : reasons.length ? 'out of date' : 'chosen',
-        reasons,
-        look: {
-          line: describeLook(look, image),
-          key,
-          error: look ? null : (input.lookError ?? "Can't bring this take to the game's look."),
-        },
-        looksOld: stale.length > 0,
+    const images = list.state.status === 'ok' ? list.state.images : []
+    const rows: ImageRow[] = []
+    const conflicts: ImageConflict[] = []
+    const order: string[] = []
+    for (const image of images) {
+      if (repeated.has(image.id)) continue
+      order.push(image.id)
+      const group = (listed.get(image.id) ?? []).map((p) => ({
+        id: p.list.id,
+        title: p.list.title,
+      }))
+      const differs = conflicting.get(image.id)
+      if (differs) {
+        conflicts.push({ id: image.id, title: image.title, acts: group, differs })
+        continue
       }
-    })
+      rows.push({
+        ...baseRow(list, image),
+        partId: list.id,
+        sharedWith: group.filter((g) => g.id !== list.id),
+      })
+    }
     return {
       id: list.id,
       title: list.title,
@@ -467,6 +597,8 @@ export function summarizeImages(input: ImagesInput): {
       state: list.state.status,
       addition: actEff?.addition ?? null,
       rows,
+      conflicts,
+      order,
       chosen: rows.filter((row) => row.status !== 'none yet').length,
       canRefresh: list.canRefresh,
     }
@@ -491,8 +623,9 @@ export function summarizeImages(input: ImagesInput): {
           addition: style?.acts[part.id] ?? null,
         })),
       },
-      styleNotice: changedCount > 0 ? { count: changedCount, changed: changes } : null,
-      lookNotice: oldImages > 0 ? { count: oldImages, changed: lookChangeNames(lookPairs) } : null,
+      styleNotice: changedIds.size > 0 ? { count: changedIds.size, changed: changes } : null,
+      lookNotice:
+        oldIds.size > 0 ? { count: oldIds.size, changed: lookChangeNames(lookPairs) } : null,
     },
     problems,
   }
@@ -511,4 +644,7 @@ export const StyleFieldBody = z.union([
 export const CompareBody = z.object({ choice: z.enum(['keep', 'game']) }).strict()
 
 /** The body of a change to an image's use of its act's style. */
-export const ActStyleBody = z.object({ on: z.boolean() }).strict()
+export const ActStyleBody = z.union([
+  z.object({ on: z.boolean() }).strict(),
+  z.object({ from: z.string().nullable() }).strict(),
+])

@@ -1,7 +1,8 @@
 import type { ImagesAct, ImageRow, ImagesSummary } from '../../../core/images'
 import { useImageMaking, useRefreshDialog } from '../../api'
 import { shortTitle } from '../../format'
-import { chosenLine } from '../../imagesText'
+import { chosenLine, disagreeText } from '../../imagesText'
+import { ActLinks } from './ActLinks'
 import { makingStatusText } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { FailedPanel, RefreshPanel } from '../music/MusicView'
@@ -75,7 +76,7 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
             The list of images for {name} cannot be read; see the problems above.
           </p>
         </section>
-      ) : act.rows.length === 0 ? (
+      ) : act.order.length === 0 ? (
         <section className="panel">
           <p className="muted music-notice">The game asks for no images in {name}.</p>
         </section>
@@ -91,43 +92,83 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
               </tr>
             </thead>
             <tbody>
-              {act.rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="images-name">
-                    <a
-                      className="music-track-link"
-                      href={routeHref({ view: 'images', page: 'image', image: row.id })}
-                    >
-                      <strong>{row.title}</strong>
-                    </a>
-                    <div className="mono muted music-id">{row.id}</div>
-                  </td>
-                  <td className="images-prompt">
-                    <div>{row.words}</div>
-                    {row.changed && (
-                      <div className="chg">
-                        {row.gameChanged
-                          ? "changed here · the game's words changed too"
-                          : 'changed here'}
-                      </div>
-                    )}
-                    {row.actStyle?.on === false && (
-                      <div className="chg">{name}&apos;s style left out</div>
-                    )}
-                  </td>
-                  <td className="images-size">
-                    {row.width} × {row.height}
-                  </td>
-                  <td className="images-status">
-                    {making[row.id] ? (
-                      <span className="chip chip-warn">{makingStatusText(making[row.id]!)}</span>
-                    ) : (
-                      <span className={STATUS_CHIP[row.status]}>{row.status}</span>
-                    )}
-                    {row.looksOld && <span className="chip chip-warn">Old look</span>}
-                  </td>
-                </tr>
-              ))}
+              {act.order.map((id) => {
+                const conflict = act.conflicts.find((c) => c.id === id)
+                if (conflict) {
+                  return (
+                    <tr key={id} className="images-row-off">
+                      <td className="images-name">
+                        <strong>{conflict.title}</strong>
+                        <div className="mono muted music-id">{id}</div>
+                      </td>
+                      <td className="images-prompt">
+                        <div className="adopt-error">
+                          {disagreeText(
+                            conflict.acts.map((a) => shortTitle(a.title)),
+                            conflict.differs,
+                          )}
+                        </div>
+                      </td>
+                      <td className="images-size">—</td>
+                      <td className="images-status">
+                        <span className="chip chip-danger">lists disagree</span>
+                      </td>
+                    </tr>
+                  )
+                }
+                const row = act.rows.find((r) => r.id === id)
+                return (
+                  row && (
+                    <tr key={id}>
+                      <td className="images-name">
+                        <a
+                          className="music-track-link"
+                          href={routeHref({
+                            view: 'images',
+                            page: 'image',
+                            image: row.id,
+                            from: act.id,
+                          })}
+                        >
+                          <strong>{row.title}</strong>
+                        </a>
+                        <div className="mono muted music-id">{row.id}</div>
+                        {row.sharedWith.length > 0 && (
+                          <div className="muted images-also">
+                            also in <ActLinks acts={row.sharedWith} />
+                          </div>
+                        )}
+                      </td>
+                      <td className="images-prompt">
+                        <div>{row.words}</div>
+                        {row.changed && (
+                          <div className="chg">
+                            {row.gameChanged
+                              ? "changed here · the game's words changed too"
+                              : 'changed here'}
+                          </div>
+                        )}
+                        {row.actStyle?.on === false && act.addition !== null && (
+                          <div className="chg">{name}&apos;s style left out</div>
+                        )}
+                      </td>
+                      <td className="images-size">
+                        {row.width} × {row.height}
+                      </td>
+                      <td className="images-status">
+                        {making[row.id] ? (
+                          <span className="chip chip-warn">
+                            {makingStatusText(making[row.id]!)}
+                          </span>
+                        ) : (
+                          <span className={STATUS_CHIP[row.status]}>{row.status}</span>
+                        )}
+                        {row.looksOld && <span className="chip chip-warn">Old look</span>}
+                      </td>
+                    </tr>
+                  )
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -755,10 +755,15 @@ export function createImageTakes({
         return opened.ok ? null : opened
       }
       const summary = await readImages(dirname(projectFile), opened.project, [])
-      const ids = (summary?.acts ?? [])
-        .flatMap((act) => act.rows)
-        .filter((r) => r.looksOld)
-        .map((r) => r.id)
+      // an image several acts list has a row in each, and is brought once
+      const ids = [
+        ...new Set(
+          (summary?.acts ?? [])
+            .flatMap((act) => act.rows)
+            .filter((r) => r.looksOld)
+            .map((r) => r.id),
+        ),
+      ]
       if (!ids.length) {
         release()
         return { ok: true }

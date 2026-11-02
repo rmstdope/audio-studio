@@ -2,6 +2,7 @@ import type { ProjectSummary } from '../../../core/summary'
 import { currentAct } from '../../imagesText'
 import type { ImagesRoute } from '../../route'
 import { ActPage } from './ActPage'
+import { ConflictPage } from './ConflictPage'
 import { ImagePage } from './ImagePage'
 import { LookNotice } from './LookNotice'
 import { NoImages } from './NoImages'
@@ -24,12 +25,16 @@ export function ImagesView({ summary, route }: { summary: ProjectSummary; route:
   const act = images.acts.find((a) => a.id === currentAct(images, route)) ?? images.acts[0]
   if (!act) return <NoImages />
   const row = route.page === 'image' ? act.rows.find((r) => r.id === route.image) : undefined
+  const conflict =
+    route.page === 'image' ? act.conflicts.find((c) => c.id === route.image) : undefined
   return (
     <>
       {notice}
       <LookNotice notice={images.lookNotice} />
-      {row ? (
-        <ImagePage key={row.id} act={act} row={row} />
+      {conflict ? (
+        <ConflictPage act={act} conflict={conflict} />
+      ) : row ? (
+        <ImagePage key={row.id} act={act} row={row} images={images} />
       ) : (
         <ActPage key={act.id} act={act} images={images} />
       )}

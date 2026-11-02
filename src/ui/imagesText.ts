@@ -1,4 +1,4 @@
-import type { ImageRow, ImagesSummary } from '../core/images'
+import type { ConflictKind, ImageRow, ImagesSummary } from '../core/images'
 import type { ImagesRoute } from './route'
 
 /** The line under an act's heading: how many of its images have a chosen one. */
@@ -13,10 +13,35 @@ export function joined(words: string[]): string {
     : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
 }
 
-/** What an out-of-date image changed since it was chosen; the act's style is named with the act's short name. */
-export function outOfDateText(reasons: ImageRow['reasons'], actName: string): string {
-  const named = reasons.map((r) => (r === 'the act style' ? `${actName}'s style` : r))
+/** The separator before item `index` of `count` in "a, b and c". */
+export function listSeparator(index: number, count: number): string {
+  return index === 0 ? '' : index === count - 1 ? ' and ' : ', '
+}
+
+/**
+ * What an out-of-date image changed since it was chosen; the act's style is named with the act's
+ * short name, or for a shared image with the acts it was taken from now and when it was chosen.
+ */
+export function outOfDateText(
+  reasons: ImageRow['reasons'],
+  actName: string,
+  change?: { now: string | null; was: string | null } | null,
+): string {
+  const actStyle = !change
+    ? `${actName}'s style`
+    : change.now !== null
+      ? `${change.now}'s style${change.was !== null && change.was !== change.now ? ` instead of ${change.was}'s` : ''}`
+      : change.was !== null
+        ? `${change.was}'s style left out`
+        : 'the act style'
+  const named = reasons.map((r) => (r === 'the act style' ? actStyle : r))
   return `Out of date since it was chosen: ${joined(named)}.`
+}
+
+/** What an image whose lists disagree says: which acts, and about what. */
+export function disagreeText(acts: string[], differs: ConflictKind[]): string {
+  const about = joined(differs)
+  return `The game's lists disagree about this image: ${joined(acts)} give it different ${about}. Fix them in the game, then Refresh from the game.`
 }
 
 /** The palette's size, as the Style page shows it. */
@@ -32,14 +57,15 @@ export function styleNoticeText(count: number): string {
 }
 
 /**
- * The act whose page the route shows: the act asked for, the act of the image asked for, else the
- * first. Null on the Style page.
+ * The act whose page the route shows: the act asked for, for an image the act it was opened from
+ * (else the first act that lists it), else the first. Null on the Style page.
  */
 export function currentAct(images: ImagesSummary, route: ImagesRoute): string | null {
   if (route.page === 'style') return null
   if (route.page === 'act') return route.part
   if (route.page === 'image') {
-    return images.acts.find((act) => act.rows.some((row) => row.id === route.image))?.id ?? null
+    const lists = images.acts.filter((act) => act.order.includes(route.image))
+    return (lists.find((act) => act.id === route.from) ?? lists[0])?.id ?? null
   }
   return images.acts[0]?.id ?? null
 }

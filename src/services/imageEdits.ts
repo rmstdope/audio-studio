@@ -2,6 +2,7 @@ import { dirname } from 'node:path'
 import {
   StyleSchema,
   applyActStyleChange,
+  applyActStylePick,
   applyStyleChange,
   applyWordsChange,
   resolveCompare,
@@ -29,7 +30,16 @@ function formatPrompts(prompts: Prompts): string {
   const { look, keepOut } = prompts.style
   const style = { ...(look && { look }), ...(keepOut && { keepOut }) }
   const actStyleOff = [...new Set(prompts.actStyleOff)].sort()
-  return `${JSON.stringify({ images, style, ...(actStyleOff?.length && { actStyleOff }) }, null, 2)}\n`
+  const actStyleFrom = Object.fromEntries(
+    Object.entries(prompts.actStyleFrom ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)),
+  )
+  const out = {
+    images,
+    style,
+    ...(actStyleOff.length && { actStyleOff }),
+    ...(Object.keys(actStyleFrom).length && { actStyleFrom }),
+  }
+  return `${JSON.stringify(out, null, 2)}\n`
 }
 
 /**
@@ -87,6 +97,28 @@ export function setImageActStyle(
   on: boolean,
 ): Promise<ImageEditResult> {
   return edit(projectFile, descriptionOf(id), (prompts) => applyActStyleChange(prompts, id, on))
+}
+
+/**
+ * Saves which act's style a shared image uses (null: none). Null for an image the game does not
+ * list, and for an act that does not list it or adds no style.
+ */
+export function setImageActStylePick(
+  projectFile: string,
+  id: string,
+  from: string | null,
+): Promise<ImageEditResult> {
+  return edit(
+    projectFile,
+    (summary) => {
+      const row = summary.acts.flatMap((act) => act.rows).find((r) => r.id === id)
+      if (!row) return null
+      return from === null || row.actStyle?.choices?.some((c) => c.id === from)
+        ? row.description
+        : null
+    },
+    (prompts) => applyActStylePick(prompts, id, from),
+  )
 }
 
 /** Settles an image whose game description changed under the user's words. */
