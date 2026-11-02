@@ -128,11 +128,43 @@ class FakeAudio {
   removeEventListener() {}
 }
 
-/** The panel with one take of a track of this kind, its audio element a fake. */
+/** A Web Audio context that plays a ten-second loop, five seconds in, recording what it starts. */
+class FakeContext {
+  static started: { loop: boolean }[] = []
+  currentTime = 5
+  destination = {}
+  async decodeAudioData() {
+    return { duration: 10 }
+  }
+  createBufferSource() {
+    const source = {
+      buffer: null,
+      loop: false,
+      connect: (node: unknown) => node,
+      start: () => FakeContext.started.push({ loop: source.loop }),
+      stop() {},
+    }
+    return source
+  }
+  createGain() {
+    return { gain: { value: 1 }, connect: (node: unknown) => node }
+  }
+}
+
+/** The panel with one take of a track of this kind, its audio a fake. */
 async function withTake(kind: 'loop' | 'stinger') {
   const realAudio = globalThis.Audio
+  const realContext = globalThis.AudioContext
+  const realFetch = globalThis.fetch
   globalThis.Audio = FakeAudio as unknown as typeof Audio
-  cleanups.push(() => (globalThis.Audio = realAudio))
+  globalThis.AudioContext = FakeContext as unknown as typeof AudioContext
+  globalThis.fetch = (async () => new Response(new ArrayBuffer(8))) as unknown as typeof fetch
+  FakeContext.started = []
+  cleanups.push(() => {
+    globalThis.Audio = realAudio
+    globalThis.AudioContext = realContext
+    globalThis.fetch = realFetch
+  })
   const view: MusicTakesView = {
     ok: true,
     kind,
@@ -174,18 +206,19 @@ async function withTake(kind: 'loop' | 'stinger') {
 }
 
 describe('playing a take', () => {
-  it('plays a loop round and round, with a line on its waveform where it is', async () => {
+  it('plays a loop round and round without a gap, with a line on its waveform where it is', async () => {
     const container = await withTake('loop')
     expect(container.querySelector('.wave .playhead')).toBeNull()
     await act(async () => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Play take 1"]')!.click()
     })
-    expect(FakeAudio.made.at(-1)!.loop).toBe(true)
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
     })
+    expect(FakeContext.started).toEqual([{ loop: true }])
+    expect(FakeAudio.made.at(-1)!.paused).toBe(true)
     const head = container.querySelector<HTMLElement>('.wave .playhead')
-    expect(head?.style.left).toBe('50%')
+    expect(head?.style.left).toBe('0%')
   })
 
   it('plays a stinger once', async () => {
@@ -193,7 +226,11 @@ describe('playing a take', () => {
     await act(async () => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Play take 1"]')!.click()
     })
-    expect(FakeAudio.made.at(-1)!.loop).toBe(false)
-    expect(container.querySelector('.wave .playhead')).not.toBeNull()
+    expect(FakeContext.started).toEqual([])
+    expect(FakeAudio.made.at(-1)!.paused).toBe(false)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    expect(container.querySelector<HTMLElement>('.wave .playhead')?.style.left).toBe('50%')
   })
 })

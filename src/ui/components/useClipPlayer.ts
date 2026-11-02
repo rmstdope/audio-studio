@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_TAKE_FADE } from '../../core/takeFade'
 import { useProject } from '../api'
-import { createPlayer, playedShare, type Clip, type PlayerState } from '../player'
+import { createClipAudio } from '../loopAudio'
+import { createPlayer, playedShare, type AudioLike, type Clip, type PlayerState } from '../player'
 
 /**
  * One clip playing at a time (see `createPlayer`): `toggle(id, url)` plays it, or stops it if it
@@ -10,13 +11,13 @@ import { createPlayer, playedShare, type Clip, type PlayerState } from '../playe
  * the clip playing, or null; `inTurn` says whether a list is being played. `toggle(id, url, { fade: true })`
  * plays a take: it fades in and out, and a stop is a short fade, never a cut. The length is the
  * project's `takeFade` (Setup's Playing takes), asked as each clip begins. With `loop: true` it
- * comes round until stopped. `position()` is how far into the clip playing it is, 0 to 1, or null
+ * comes round until stopped, without a gap (`createClipAudio`). `position()` is how far into the clip playing it is, 0 to 1, or null
  * while that is not known.
  */
 export function useClipPlayer(onFailed?: (id: string) => void) {
   const [state, setState] = useState<PlayerState>({ playing: null, inTurn: false })
   const player = useRef<ReturnType<typeof createPlayer> | null>(null)
-  const audio = useRef<HTMLAudioElement | null>(null)
+  const audio = useRef<AudioLike | null>(null)
   const failed = useRef(onFailed)
   failed.current = onFailed
   const project = useProject()
@@ -25,14 +26,26 @@ export function useClipPlayer(onFailed?: (id: string) => void) {
 
   useEffect(() => {
     const element = new Audio()
-    const made = createPlayer(element, setState, (id) => failed.current?.(id), {
+    // Set once `made` is: a loop sounds only after a press, long after this.
+    let sounding = () => {}
+    const clip = createClipAudio(element, {
+      context: () => new AudioContext(),
+      load: async (url) => {
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(`${url} could not be loaded`)
+        return response.arrayBuffer()
+      },
+      playing: () => sounding(),
+    })
+    const made = createPlayer(clip, setState, (id) => failed.current?.(id), {
       fadeSeconds: () => fade.current,
     })
+    sounding = made.playing
     element.addEventListener('playing', made.playing)
     element.addEventListener('ended', made.ended)
     element.addEventListener('error', made.failed)
     player.current = made
-    audio.current = element
+    audio.current = clip
     return () => {
       // Disposed, not just paused: a play still loading must not start the next clip.
       made.dispose()
@@ -50,7 +63,9 @@ export function useClipPlayer(onFailed?: (id: string) => void) {
       toggle: (id: string, url: string, how?: { fade?: boolean; loop?: boolean }) =>
         player.current?.toggle(id, url, how),
       position: () =>
-        audio.current ? playedShare(audio.current.currentTime, audio.current.duration) : null,
+        audio.current
+          ? playedShare(audio.current.currentTime, audio.current.duration ?? Number.NaN)
+          : null,
       playInTurn: (clips: Clip[]) => player.current?.playInTurn(clips),
       stop: () => player.current?.stop(),
     }),

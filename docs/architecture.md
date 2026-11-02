@@ -187,6 +187,7 @@ audio-studio/
 │       │   ├── characters/      all characters, a character's page, the casting brief
 │       │   └── narration/       line table, plan, job progress, inspector
 │       ├── player.ts            plays clips one at a time, or a list in turn; takes fade in (from the element's playing event) and out for the project's `takeFade`, the game's file does not
+│       ├── loopAudio.ts         the player's audio: a loop decoded once and played round on Web Audio with no gap (an audio element's loop clicks where it comes round), every other clip on the element
 │       └── components/          buttons, chips, waveform, player, status pills
 ├── worker/transcribe.py         mlx-whisper worker (JSON lines on stdin/stdout)
 └── docs/
@@ -949,7 +950,7 @@ a take whose model takes none, as ElevenLabs' will not, §8.6). The brief a
 take is made from is the game's with the studio's changes over it. What is built is the Takes panel on a track's page: "Make N takes" (when there are none) queues N, 1 to 6 from the count menu (as-3ek),
 made one at a time on the GPU queue, each a dashed card with a progress bar (about 3 minutes
 expected, a guess) and its time left, then a card with play (a loop take comes round until stopped,
-with the take fade at its start and stop only, as the game plays it), its waveform (a loop's seam
+sample for sample on Web Audio, with the take fade at its start and stop only), its waveform (a loop's seam
 marked, and a line where it plays while it plays), its length and, for a loop, **Hear the seam** (`GET …/takes/<file>?seam=1` is the last 4 seconds
 followed by the first 4, one WAV). A take that fails is kept as "could not be made" with the
 generator's reason and **Try again** (remakes that number); the other takes stay. A worker the
