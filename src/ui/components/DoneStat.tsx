@@ -1,8 +1,10 @@
+import type { CSSProperties } from 'react'
 import { attentionText } from '../status'
 
 /**
- * The lead count at the top of a list's page, "Lines up to date 620 / 624": while some need
- * attention it says how many and is a link to them (`href`).
+ * The lead count at the top of a list's page, "Lines up to date 620 / 624", beside a ring filled to
+ * the share done (rounded down, so it is full only when all are): while some need attention it says
+ * how many and is a link to them (`href`).
  */
 export function DoneStat({
   label,
@@ -16,8 +18,16 @@ export function DoneStat({
   href: string
 }) {
   const left = total - done
+  const share = total ? Math.floor((done / total) * 100) : 0
   const body = (
     <>
+      <i
+        className="done-ring"
+        aria-hidden="true"
+        style={{ '--done': `${share}%` } as CSSProperties}
+      >
+        {total ? `${share}%` : '—'}
+      </i>
       <span>{label}</span>
       <strong>
         {done}

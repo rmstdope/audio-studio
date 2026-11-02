@@ -93,14 +93,21 @@ describe('the lines up to date on a part’s overview', () => {
     const { container, done } = panel(['ok', 'missing', 'stale'], 'sv')
     const stat = container.querySelector<HTMLAnchorElement>('a.stat-lead')!
     expect(stat.getAttribute('href')).toBe('#/parts/act1/lines?language=sv')
-    expect(stat.textContent).toBe('Lines up to date1 / 32 need attention ›')
+    expect(stat.textContent).toBe('33%Lines up to date1 / 32 need attention ›')
+    done()
+  })
+
+  it('counts every other status in a chip, with its dot', () => {
+    const { container, done } = panel(['ok', 'missing', 'stale', 'stale'])
+    const chips = [...container.querySelectorAll('.status-chip')].map((c) => c.textContent)
+    expect(chips).toEqual(['Stale 2', 'Missing 1'])
     done()
   })
 
   it('is no link when every line is up to date', () => {
     const { container, done } = panel(['ok', 'ok'])
     expect(container.querySelector('a.stat-lead')).toBeNull()
-    expect(container.querySelector('.stat-lead')?.textContent).toBe('Lines up to date2 / 2')
+    expect(container.querySelector('.stat-lead')?.textContent).toBe('100%Lines up to date2 / 2')
     done()
   })
 })

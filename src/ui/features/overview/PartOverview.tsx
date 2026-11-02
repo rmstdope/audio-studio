@@ -188,20 +188,20 @@ export function StatusPanel({ part, language }: { part: PartDetail; language?: s
           total={total}
           href={routeHref({ view: 'lines', part: part.id, language })}
         />
-        {shown.map((status) => (
-          <div key={status} className="stat">
-            <span>
-              <StatusDot status={status} /> {STATUS[status].label}
-            </span>
-            <strong>{counts[status]}</strong>
-          </div>
-        ))}
-        {part.orphans.length > 0 && (
-          <div className="stat">
-            <span>
-              <span className="dot" style={{ background: 'var(--status-orphan)' }} /> Orphaned clips
-            </span>
-            <strong>{part.orphans.length}</strong>
+        {(shown.length > 0 || part.orphans.length > 0) && (
+          <div className="status-chips">
+            {shown.map((status) => (
+              <span key={status} className="status-chip">
+                <StatusDot status={status} />
+                {STATUS[status].label} <b>{counts[status]}</b>
+              </span>
+            ))}
+            {part.orphans.length > 0 && (
+              <span className="status-chip">
+                <span className="dot" style={{ background: 'var(--status-orphan)' }} />
+                Orphaned clips <b>{part.orphans.length}</b>
+              </span>
+            )}
           </div>
         )}
       </div>

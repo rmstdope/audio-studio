@@ -1,12 +1,18 @@
 :root {
-  --bg: #0b0c10;
-  --sidebar: #0f1116;
-  --panel: #12141a;
+  --bg: #06070c;
+  --sidebar: #0a0b12;
+  --panel: #10121a;
+  /* Aurora: glass surfaces over the page's glows, with soft edges */
+  --glass: rgb(255 255 255 / 3.5%);
+  --glass-strong: rgb(255 255 255 / 6%);
+  --edge: rgb(255 255 255 / 8%);
+  --accent-grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+  --accent-glow: 0 8px 24px rgb(255 90 100 / 30%);
   --raised: #191c24;
   --raised-hover: #20242e;
   --inset: #0d0f14;
-  --line: #1f232d;
-  --line-strong: #2a2e39;
+  --line: rgb(255 255 255 / 7%);
+  --line-strong: rgb(255 255 255 / 11%);
   --text: #eceef3;
   --text-soft: #c7ccd6;
   --muted: #a9b0bd;
@@ -66,7 +72,7 @@
   --success-bg: #0f2219;
   --chip-hover: #262a35;
   --shadow: 0 12px 32px rgb(0 0 0 / 45%);
-  --radius: 14px;
+  --radius: 18px;
   --font: 'Geist', system-ui, -apple-system, sans-serif;
   --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   color-scheme: dark;
@@ -78,7 +84,12 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* Aurora: two faint glows, a warm one top right and a cool one bottom left, fixed to the window */
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgb(255 90 120 / 14%), transparent 60%),
+    radial-gradient(700px 500px at 10% 110%, rgb(90 120 255 / 12%), transparent 60%), var(--bg);
+  background-attachment: fixed;
+  min-height: 100vh;
   color: var(--text);
   font-family: var(--font);
   font-size: 14px;
@@ -122,8 +133,8 @@ a {
   flex: 1 1 240px;
   max-width: 100%;
   padding: 16px 10px;
-  background: var(--sidebar);
-  border-right: 1px solid #1e212a;
+  background: rgb(10 11 18 / 55%);
+  border-right: 1px solid var(--edge);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -165,8 +176,9 @@ a {
 .brand-mark {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-  background: var(--accent);
+  border-radius: 9px;
+  background: var(--accent-grad);
+  box-shadow: 0 6px 20px rgb(255 90 100 / 35%);
   color: var(--accent-ink);
   display: flex;
   align-items: center;
@@ -182,8 +194,8 @@ a {
 .project-box {
   padding: 10px;
   border-radius: 12px;
-  background: #151821;
-  border: 1px solid #222632;
+  background: var(--glass);
+  border: 1px solid var(--edge);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -223,12 +235,13 @@ a {
 }
 
 .nav-item:hover {
-  background: #171a21;
+  background: var(--glass);
   color: var(--text);
 }
 
 .nav-item[aria-current='page'] {
-  background: var(--chip);
+  background: var(--glass-strong);
+  box-shadow: inset 0 0 0 1px var(--edge);
   color: var(--text);
 }
 
@@ -273,15 +286,15 @@ a {
 .page-header h1 {
   font-size: 30px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   margin: 6px 0;
 }
 
 .panel {
   padding: 20px 22px;
-  border-radius: 16px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--glass);
+  border: 1px solid var(--edge);
 }
 
 .stats {
@@ -337,11 +350,20 @@ a {
 .card {
   padding: 16px;
   border-radius: var(--radius);
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--glass);
+  border: 1px solid var(--edge);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  transition:
+    transform 0.2s,
+    background 0.2s;
+}
+
+/* A card lifts a little under the pointer (Aurora) */
+.card:hover {
+  transform: translateY(-2px);
+  background: var(--glass-strong);
 }
 
 .card-head {
@@ -404,9 +426,9 @@ a {
   font-size: 12px;
   color: var(--text-soft);
   padding: 7px 10px;
-  border-radius: 8px;
-  background: var(--inset);
-  border: 1px solid #1b1e27;
+  border-radius: 10px;
+  background: rgb(0 0 0 / 25%);
+  border: 1px solid transparent;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -432,9 +454,9 @@ a {
 
 .chip {
   font-size: 11.5px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: #181b23;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--glass-strong);
   color: var(--muted);
 }
 
@@ -532,9 +554,9 @@ a {
   gap: 8px;
   min-height: 36px;
   padding: 0 14px;
-  border-radius: 9px;
-  border: 1px solid var(--line-strong);
-  background: var(--raised);
+  border-radius: 11px;
+  border: 1px solid var(--edge);
+  background: var(--glass);
   color: var(--text);
   cursor: pointer;
   white-space: nowrap;
@@ -542,7 +564,7 @@ a {
 }
 
 .btn:hover {
-  background: var(--raised-hover);
+  background: var(--glass-strong);
 }
 
 :focus-visible {
@@ -612,14 +634,91 @@ a {
   color: var(--faint);
 }
 
+/* The lead count beside its ring (Aurora): the ring, then the label, the count and the link */
+.stat-lead {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto auto;
+  column-gap: 20px;
+  row-gap: 4px;
+  align-items: center;
+  justify-content: start;
+}
+.stat-lead > :not(.done-ring) {
+  grid-column: 2;
+  justify-self: start;
+}
+.done-ring {
+  grid-row: 1 / 4;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+  font: 600 18px var(--font);
+  font-style: normal;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  background: conic-gradient(var(--ok) 0 var(--done), rgb(255 255 255 / 7%) var(--done) 100%);
+}
+.done-ring::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: var(--panel);
+}
+.done-ring {
+  isolation: isolate;
+}
+.done-ring::before {
+  z-index: -1;
+}
+
+/* Its label, which follows the ring */
+.stat-lead > span:first-of-type {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* The other statuses' counts, as chips beside the lead count */
+.status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--glass);
+  border: 1px solid var(--edge);
+}
+.status-chip b {
+  color: var(--text);
+  font-weight: 500;
+}
+
 /* The lead count as a link to what needs attention */
 a.stat-link {
   color: inherit;
   text-decoration: none;
 }
 .stat-more {
-  font-size: 12px;
-  color: var(--accent-soft-ink);
+  font-size: 12.5px;
+  color: #ffb38f;
+  background: rgb(255 122 61 / 10%);
+  border: 1px solid rgb(255 122 61 / 25%);
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-top: 4px;
 }
 a.stat-link:hover .stat-more,
 a.stat-link:focus-visible .stat-more {
@@ -670,15 +769,17 @@ a.stat-link:focus-visible .stat-more {
 }
 
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-grad);
+  border-color: transparent;
   color: var(--accent-ink);
   font-weight: 600;
   align-self: center;
+  box-shadow: var(--accent-glow);
 }
 
 .btn-primary:hover {
-  background: var(--accent-hover);
+  background: var(--accent-grad);
+  filter: brightness(1.08);
 }
 
 .btn:disabled {
@@ -722,10 +823,15 @@ a.btn {
   gap: 12px;
 }
 
+/* Tabs: one glass segmented control (Aurora) */
 .tabs {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--glass);
+  border: 1px solid var(--edge);
 }
 
 .tab {
@@ -734,9 +840,9 @@ a.btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 8px;
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 9px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
@@ -748,8 +854,9 @@ a.btn {
 }
 
 .tab[aria-selected='true'] {
-  background: var(--chip);
-  border-color: var(--line-strong);
+  background: var(--glass-strong);
+  border-color: var(--edge);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
   color: var(--text);
 }
 
@@ -792,8 +899,8 @@ a.btn {
   overflow-x: auto;
   container-type: inline-size;
   border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--sidebar);
+  border: 1px solid var(--edge);
+  background: var(--glass);
 }
 
 .table {

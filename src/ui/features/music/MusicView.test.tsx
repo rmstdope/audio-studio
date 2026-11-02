@@ -165,7 +165,7 @@ describe.each(['act', 'stingers'] as const)('what needs attention on a %s page',
     const { container } = render(kind)
     const stat = container.querySelector<HTMLAnchorElement>('a.stat-lead')!
     expect(stat.getAttribute('href')).toBe(`${href}?show=attention`)
-    expect(stat.textContent).toBe('Tracks up to date2 / 53 need attention ›')
+    expect(stat.textContent).toBe('40%Tracks up to date2 / 53 need attention ›')
     expect(titles(container)).toHaveLength(5)
   })
 

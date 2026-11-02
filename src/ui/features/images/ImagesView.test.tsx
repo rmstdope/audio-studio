@@ -821,7 +821,7 @@ describe('what needs attention on an act’s images page', () => {
     )
     const stat = page.querySelector<HTMLAnchorElement>('a.stat-lead')!
     expect(stat.getAttribute('href')).toBe('#/images/parts/act1?show=attention')
-    expect(text(stat)).toBe('Images up to date1 / 21 needs attention ›')
+    expect(text(stat)).toBe('50%Images up to date1 / 21 needs attention ›')
   })
 
   it('lists only the images that need attention there, with the way back to all', () => {
@@ -841,7 +841,7 @@ describe('what needs attention on an act’s images page', () => {
       summary({ chosen: { inn: made('inn'), barn: made('barn') } }),
     )
     expect(page.querySelector('a.stat-lead')).toBeNull()
-    expect(text(page.querySelector('.stat-lead'))).toBe('Images up to date2 / 2')
+    expect(text(page.querySelector('.stat-lead'))).toBe('100%Images up to date2 / 2')
   })
 })
 

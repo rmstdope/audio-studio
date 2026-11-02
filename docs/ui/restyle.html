@@ -1,0 +1,1640 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Studio restyle</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Silkscreen&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --page: #07080b;
+        --ink: #eceef3;
+        --soft: #a9b0bd;
+        --line: #232733;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font:
+          14px/1.45 Geist,
+          system-ui,
+          sans-serif;
+        padding: 24px 16px 48px;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+      .intro h1 {
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro p {
+        color: var(--soft);
+        margin: 0 0 14px;
+        max-width: 900px;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      .tab {
+        font: inherit;
+        color: var(--soft);
+        background: #12141a;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 14px;
+        cursor: pointer;
+      }
+      .tab[aria-pressed='true'] {
+        color: #ff9a6b;
+        border-color: #ff6b2c;
+        background: #2a1b12;
+      }
+      .frame {
+        height: 760px;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        display: none;
+      }
+      .frame.on {
+        display: flex;
+      }
+      .notes {
+        margin-top: 14px;
+        background: #101218;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 18px;
+        color: var(--soft);
+        display: none;
+      }
+      .notes.on {
+        display: block;
+      }
+      .notes b {
+        color: var(--ink);
+      }
+      .notes ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .scroll {
+        flex: 1;
+        min-width: 0;
+        overflow: auto;
+      }
+
+      /* ═════════ A · Aurora: glass on deep night ═════════ */
+      .a {
+        --bg: #06070c;
+        --glass: rgba(255, 255, 255, 0.035);
+        --glass-2: rgba(255, 255, 255, 0.06);
+        --edge: rgba(255, 255, 255, 0.08);
+        --text: #f3f4f8;
+        --mute: #9aa1b2;
+        --dim: #6b7285;
+        --hot: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+        --ok: #4be3a4;
+        --warn: #ffcb5c;
+        --bad: #ff7a9a;
+        --cool: #8db4ff;
+        background:
+          radial-gradient(900px 500px at 85% -10%, rgba(255, 90, 120, 0.16), transparent 60%),
+          radial-gradient(700px 500px at 10% 110%, rgba(90, 120, 255, 0.14), transparent 60%),
+          var(--bg);
+        color: var(--text);
+        font-family: Geist, sans-serif;
+      }
+      .a .side {
+        width: 228px;
+        padding: 18px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        border-right: 1px solid var(--edge);
+        background: rgba(10, 11, 18, 0.55);
+        backdrop-filter: blur(20px);
+      }
+      .a .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        padding: 0 6px;
+      }
+      .a .logo {
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: var(--hot);
+        box-shadow: 0 6px 20px rgba(255, 90, 100, 0.35);
+      }
+      .a .proj {
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        border-radius: 14px;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .a .proj .dot {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #2b3a6b, #5a3b6b);
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+        font-size: 12px;
+      }
+      .a .proj small {
+        display: block;
+        color: var(--dim);
+        font: 11px 'Geist Mono';
+      }
+      .a .cap {
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+        padding: 0 8px 4px;
+      }
+      .a .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .a .ni {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 8px;
+        border-radius: 10px;
+        color: var(--mute);
+        font-size: 13.5px;
+      }
+      .a .ni svg {
+        width: 16px;
+        height: 16px;
+        opacity: 0.9;
+      }
+      .a .ni.ws {
+        color: var(--text);
+      }
+      .a .ni.sub {
+        padding-left: 34px;
+        font-size: 13px;
+      }
+      .a .ni.on {
+        background: var(--glass-2);
+        color: var(--text);
+        box-shadow: inset 0 0 0 1px var(--edge);
+      }
+      .a .ni .n {
+        margin-left: auto;
+        font: 11px 'Geist Mono';
+      }
+      .a .n.g {
+        color: var(--ok);
+      }
+      .a .n.y {
+        color: var(--warn);
+      }
+      .a .n.r {
+        color: var(--bad);
+      }
+      .a .foot {
+        margin-top: auto;
+      }
+      .a .main {
+        padding: 22px 28px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .a .crumb {
+        color: var(--dim);
+        font-size: 12px;
+      }
+      .a .head {
+        display: flex;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .a h1 {
+        font-size: 30px;
+        letter-spacing: -0.03em;
+        margin: 2px 0 0;
+        font-weight: 600;
+      }
+      .a .path {
+        font: 12px 'Geist Mono';
+        color: var(--dim);
+      }
+      .a .seg {
+        display: inline-flex;
+        padding: 3px;
+        border-radius: 12px;
+        background: var(--glass);
+        border: 1px solid var(--edge);
+      }
+      .a .seg span {
+        padding: 5px 11px;
+        border-radius: 9px;
+        font-size: 12.5px;
+        color: var(--mute);
+      }
+      .a .seg span.on {
+        background: var(--glass-2);
+        color: var(--text);
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+      }
+      .a .seg i {
+        font: normal 11px 'Geist Mono';
+        color: var(--dim);
+        margin-left: 6px;
+      }
+      .a .btn {
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        color: var(--text);
+        border-radius: 11px;
+        padding: 8px 14px;
+        font: 500 13px Geist;
+      }
+      .a .btn.hot {
+        background: var(--hot);
+        border: 0;
+        color: #1b0a06;
+        font-weight: 600;
+        box-shadow: 0 8px 24px rgba(255, 90, 100, 0.3);
+      }
+      .a .card {
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        border-radius: 20px;
+        padding: 20px 22px;
+        backdrop-filter: blur(12px);
+      }
+      .a .hero {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 28px;
+        align-items: center;
+      }
+      .a .ring {
+        width: 132px;
+        height: 132px;
+        border-radius: 50%;
+        background: conic-gradient(#4be3a4 0 99.3%, #ffcb5c 99.3% 99.6%, #8db4ff 99.6% 100%);
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+      .a .ring::after {
+        content: '';
+        position: absolute;
+        inset: 10px;
+        border-radius: 50%;
+        background: #0c0e15;
+      }
+      .a .ring b {
+        position: relative;
+        z-index: 1;
+        font-size: 28px;
+        letter-spacing: -0.03em;
+        text-align: center;
+        line-height: 1;
+      }
+      .a .ring b small {
+        display: block;
+        font: 500 11px Geist;
+        color: var(--dim);
+        margin-top: 4px;
+        letter-spacing: 0;
+      }
+      .a .big {
+        font-size: 40px;
+        font-weight: 600;
+        letter-spacing: -0.04em;
+        line-height: 1;
+      }
+      .a .big span {
+        color: var(--dim);
+        font-size: 22px;
+      }
+      .a .attn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        font-size: 13px;
+        color: #ffb38f;
+        background: rgba(255, 122, 61, 0.1);
+        border: 1px solid rgba(255, 122, 61, 0.25);
+        padding: 5px 10px;
+        border-radius: 999px;
+      }
+      .a .chips {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+      .a .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12.5px;
+        color: var(--mute);
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--glass);
+        border: 1px solid var(--edge);
+      }
+      .a .chip i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .a .chip b {
+        color: var(--text);
+        font-weight: 500;
+      }
+      .a h2 {
+        font-size: 15px;
+        margin: 0;
+        font-weight: 600;
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+      }
+      .a h2 small {
+        color: var(--dim);
+        font-weight: 400;
+        font-size: 12.5px;
+      }
+      .a .cast {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .a .who {
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        border-radius: 18px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        transition: transform 0.2s;
+      }
+      .a .who:hover {
+        transform: translateY(-2px);
+        background: var(--glass-2);
+      }
+      .a .who .top {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .a .av {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+      }
+      .a .who .nm {
+        font-weight: 600;
+      }
+      .a .who .vc {
+        font-size: 12px;
+        color: var(--dim);
+      }
+      .a .cue {
+        font: 12px 'Geist Mono';
+        color: var(--mute);
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 10px;
+        padding: 7px 9px;
+      }
+      .a .bar {
+        height: 5px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.06);
+        overflow: hidden;
+      }
+      .a .bar i {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #4be3a4, #8de8c4);
+      }
+      .a .row2 {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--dim);
+      }
+
+      /* ═════════ B · Graphite: quiet, dense, precise ═════════ */
+      .b {
+        --bg: #0e0f11;
+        --raise: #151619;
+        --raise-2: #1b1c20;
+        --hair: #26272c;
+        --text: #e8e8ea;
+        --mute: #8e8f96;
+        --dim: #5f6068;
+        --accent: #ff6b2c;
+        --ok: #3fcf8e;
+        --warn: #e8b647;
+        --bad: #ef6b7b;
+        --cool: #6f9cff;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          13px/1.45 Geist,
+          sans-serif;
+      }
+      .b .rail {
+        width: 52px;
+        border-right: 1px solid var(--hair);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 12px 0;
+        gap: 6px;
+      }
+      .b .rail .logo {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        background: var(--accent);
+        margin-bottom: 10px;
+      }
+      .b .rail a {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: var(--mute);
+      }
+      .b .rail a.on {
+        background: var(--raise-2);
+        color: var(--text);
+      }
+      .b .rail svg {
+        width: 17px;
+        height: 17px;
+      }
+      .b .rail .grow {
+        flex: 1;
+      }
+      .b .acts {
+        width: 196px;
+        border-right: 1px solid var(--hair);
+        padding: 14px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        background: #0b0c0e;
+      }
+      .b .acts .ttl {
+        padding: 2px 8px 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .b .acts .ttl b {
+        font-size: 13px;
+      }
+      .b .acts .ttl span {
+        color: var(--dim);
+        font: 11px 'Geist Mono';
+      }
+      .b .act {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 8px;
+        border-radius: 7px;
+        color: var(--mute);
+      }
+      .b .act.on {
+        background: var(--raise-2);
+        color: var(--text);
+      }
+      .b .act .l {
+        display: flex;
+        justify-content: space-between;
+      }
+      .b .act .l i {
+        font: normal 11px 'Geist Mono';
+      }
+      .b .act .mini {
+        height: 2px;
+        background: var(--hair);
+        border-radius: 1px;
+        overflow: hidden;
+      }
+      .b .act .mini u {
+        display: block;
+        height: 100%;
+        text-decoration: none;
+      }
+      .b .g {
+        color: var(--ok);
+      }
+      .b .y {
+        color: var(--warn);
+      }
+      .b .r {
+        color: var(--bad);
+      }
+      .b .main {
+        display: flex;
+        flex-direction: column;
+      }
+      .b .bar-top {
+        height: 46px;
+        border-bottom: 1px solid var(--hair);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 20px;
+        color: var(--mute);
+        font-size: 12.5px;
+      }
+      .b .bar-top b {
+        color: var(--text);
+        font-weight: 500;
+      }
+      .b .bar-top .sp {
+        flex: 1;
+      }
+      .b .kbd {
+        font: 11px 'Geist Mono';
+        color: var(--dim);
+        border: 1px solid var(--hair);
+        border-radius: 5px;
+        padding: 1px 5px;
+      }
+      .b .search {
+        border: 1px solid var(--hair);
+        background: var(--raise);
+        border-radius: 7px;
+        padding: 5px 10px;
+        color: var(--dim);
+        width: 220px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .b .body {
+        padding: 22px 24px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .b .head {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+      }
+      .b h1 {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+      .b .sub {
+        color: var(--dim);
+        font: 12px 'Geist Mono';
+        margin-top: 4px;
+      }
+      .b .tabs2 {
+        display: flex;
+        gap: 18px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .b .tabs2 span {
+        padding: 8px 0;
+        color: var(--mute);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+      }
+      .b .tabs2 span.on {
+        color: var(--text);
+        border-color: var(--accent);
+      }
+      .b .tabs2 i {
+        font: normal 11px 'Geist Mono';
+        color: var(--dim);
+        margin-left: 6px;
+      }
+      .b .btn {
+        border: 1px solid var(--hair);
+        background: var(--raise);
+        color: var(--text);
+        border-radius: 7px;
+        padding: 6px 11px;
+        font: 500 12.5px Geist;
+      }
+      .b .btn.p {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #170800;
+      }
+      .b .grid4 {
+        display: grid;
+        grid-template-columns: 1.4fr repeat(4, 1fr);
+        border: 1px solid var(--hair);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .b .cell {
+        padding: 14px 16px;
+        border-right: 1px solid var(--hair);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .b .cell:last-child {
+        border-right: 0;
+      }
+      .b .cell span {
+        color: var(--mute);
+        font-size: 12px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .b .cell span i {
+        width: 6px;
+        height: 6px;
+        border-radius: 2px;
+      }
+      .b .cell b {
+        font: 600 22px Geist;
+        letter-spacing: -0.02em;
+      }
+      .b .cell b small {
+        color: var(--dim);
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .b .cell a {
+        color: var(--accent);
+        font-size: 12px;
+        text-decoration: none;
+      }
+      .b .seg-bar {
+        display: flex;
+        height: 6px;
+        gap: 2px;
+      }
+      .b .seg-bar u {
+        text-decoration: none;
+        border-radius: 1px;
+      }
+      .b table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .b th {
+        text-align: left;
+        font-weight: 500;
+        color: var(--dim);
+        font-size: 11.5px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .b td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--hair);
+        vertical-align: middle;
+      }
+      .b tr:hover td {
+        background: var(--raise);
+      }
+      .b .av {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        display: inline-grid;
+        place-items: center;
+        font: 600 11px Geist;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+      .b .mono {
+        font: 12px 'Geist Mono';
+        color: var(--mute);
+      }
+      .b .pill {
+        font-size: 11.5px;
+        padding: 2px 8px;
+        border-radius: 5px;
+        border: 1px solid var(--hair);
+        color: var(--mute);
+      }
+      .b .pill.g {
+        color: var(--ok);
+        border-color: rgba(63, 207, 142, 0.3);
+      }
+      .b .pill.y {
+        color: var(--warn);
+        border-color: rgba(232, 182, 71, 0.3);
+      }
+      .b .pill.r {
+        color: var(--bad);
+        border-color: rgba(239, 107, 123, 0.3);
+      }
+      .b .tiny {
+        width: 90px;
+        height: 4px;
+        background: var(--hair);
+        border-radius: 2px;
+        display: inline-block;
+        vertical-align: middle;
+        overflow: hidden;
+        margin-right: 8px;
+      }
+      .b .tiny u {
+        display: block;
+        height: 100%;
+        background: var(--ok);
+        text-decoration: none;
+      }
+
+      /* ═════════ C · Arcade: the game's own world ═════════ */
+      .c {
+        --bg: #120f1c;
+        --panel: #1b1729;
+        --panel-2: #241e37;
+        --line: #3a3156;
+        --text: #f7efc7;
+        --mute: #b9a9d6;
+        --dim: #7d6fa0;
+        --amber: #e8a33d;
+        --lamp: #f2d16b;
+        --rose: #d4684a;
+        --leaf: #9bc46a;
+        --sky: #8fc3d9;
+        --wine: #a1485c;
+        background:
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px),
+          radial-gradient(800px 400px at 70% 0%, rgba(232, 163, 61, 0.12), transparent 60%),
+          var(--bg);
+        color: var(--text);
+        font-family: Geist, sans-serif;
+      }
+      .c .pix {
+        font-family: Silkscreen, monospace;
+        letter-spacing: 0.02em;
+      }
+      .c .side {
+        width: 220px;
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        border-right: 2px solid var(--line);
+        background: rgba(18, 15, 28, 0.8);
+      }
+      .c .brand {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 0 4px;
+      }
+      .c .brand .logo {
+        width: 28px;
+        height: 28px;
+        background:
+          linear-gradient(var(--lamp) 0 0) 6px 6px / 8px 8px no-repeat,
+          linear-gradient(var(--amber) 0 0) 14px 14px / 8px 8px no-repeat,
+          var(--wine);
+        image-rendering: pixelated;
+        box-shadow: 3px 3px 0 #000;
+      }
+      .c .brand b {
+        font-size: 13px;
+      }
+      .c .proj {
+        border: 2px solid var(--line);
+        background: var(--panel);
+        padding: 10px;
+        box-shadow: 3px 3px 0 #000;
+      }
+      .c .proj small {
+        display: block;
+        color: var(--dim);
+        font-size: 11px;
+      }
+      .c .cap {
+        font-size: 10px;
+        color: var(--dim);
+        padding: 0 6px 4px;
+      }
+      .c .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .c .ni {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        padding: 7px 8px;
+        color: var(--mute);
+        font-size: 13.5px;
+        border: 2px solid transparent;
+      }
+      .c .ni.ws {
+        color: var(--text);
+      }
+      .c .ni.sub {
+        padding-left: 30px;
+      }
+      .c .ni.on {
+        background: var(--panel-2);
+        border-color: var(--line);
+        color: var(--lamp);
+      }
+      .c .ni.on::before {
+        content: '▶';
+        position: absolute;
+        margin-left: -18px;
+        font-size: 9px;
+        color: var(--lamp);
+      }
+      .c .ni .n {
+        margin-left: auto;
+        font-size: 10px;
+      }
+      .c .g {
+        color: var(--leaf);
+      }
+      .c .y {
+        color: var(--lamp);
+      }
+      .c .r {
+        color: var(--rose);
+      }
+      .c .foot {
+        margin-top: auto;
+      }
+      .c .main {
+        padding: 22px 26px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .c .crumb {
+        color: var(--dim);
+        font-size: 11px;
+      }
+      .c h1 {
+        font: 400 30px Silkscreen;
+        margin: 4px 0 0;
+        color: var(--lamp);
+        text-shadow: 3px 3px 0 #000;
+      }
+      .c .tag {
+        color: var(--mute);
+        font-family: 'Instrument Serif', serif;
+        font-style: italic;
+        font-size: 17px;
+      }
+      .c .head {
+        display: flex;
+        gap: 14px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+      .c .btn {
+        font: 12px Silkscreen;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 2px solid var(--line);
+        padding: 8px 12px;
+        box-shadow: 3px 3px 0 #000;
+      }
+      .c .btn.p {
+        background: var(--amber);
+        border-color: #f2c26b;
+        color: #1b1206;
+      }
+      .c .btn:active {
+        transform: translate(2px, 2px);
+        box-shadow: 1px 1px 0 #000;
+      }
+      .c .lang {
+        display: flex;
+        gap: 6px;
+      }
+      .c .lang span {
+        border: 2px solid var(--line);
+        padding: 4px 9px;
+        font-size: 12.5px;
+        color: var(--mute);
+      }
+      .c .lang span.on {
+        background: var(--panel-2);
+        color: var(--text);
+        border-color: var(--amber);
+      }
+      .c .box {
+        background: var(--panel);
+        border: 2px solid var(--line);
+        box-shadow: 4px 4px 0 #000;
+        padding: 18px 20px;
+      }
+      .c .hp {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 20px;
+        align-items: center;
+      }
+      .c .score {
+        font: 34px Silkscreen;
+        color: var(--leaf);
+        line-height: 1;
+        text-shadow: 3px 3px 0 #000;
+      }
+      .c .score small {
+        font-size: 16px;
+        color: var(--dim);
+        text-shadow: none;
+      }
+      .c .meter {
+        height: 18px;
+        border: 2px solid var(--line);
+        background: #0c0a14;
+        display: flex;
+        padding: 2px;
+        gap: 2px;
+      }
+      .c .meter u {
+        text-decoration: none;
+      }
+      .c .meter .bricks {
+        flex: 1;
+        background: repeating-linear-gradient(90deg, var(--leaf) 0 10px, transparent 10px 12px);
+      }
+      .c .quest {
+        font: 12px Silkscreen;
+        color: var(--lamp);
+        border: 2px dashed var(--amber);
+        padding: 8px 10px;
+        text-align: center;
+      }
+      .c .legend {
+        display: flex;
+        gap: 14px;
+        margin-top: 12px;
+        font-size: 12.5px;
+        color: var(--mute);
+      }
+      .c .legend i {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        margin-right: 6px;
+      }
+      .c h2 {
+        font: 16px Silkscreen;
+        margin: 0;
+        color: var(--text);
+      }
+      .c h2 small {
+        font: italic 15px 'Instrument Serif';
+        color: var(--dim);
+        margin-left: 8px;
+      }
+      .c .cast {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 14px;
+        margin-top: 12px;
+      }
+      .c .who {
+        background: var(--panel);
+        border: 2px solid var(--line);
+        box-shadow: 4px 4px 0 #000;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      .c .who .top {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .c .face {
+        width: 40px;
+        height: 40px;
+        image-rendering: pixelated;
+        border: 2px solid #000;
+      }
+      .c .who .nm {
+        font: 13px Silkscreen;
+      }
+      .c .who .vc {
+        font-size: 12px;
+        color: var(--dim);
+      }
+      .c .cue {
+        font-family: 'Instrument Serif', serif;
+        font-style: italic;
+        font-size: 15px;
+        color: var(--mute);
+      }
+      .c .hpbar {
+        height: 10px;
+        border: 2px solid #000;
+        background: #0c0a14;
+      }
+      .c .hpbar i {
+        display: block;
+        height: 100%;
+        background: var(--leaf);
+      }
+      .c .row2 {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--dim);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="intro">
+        <h1>Content Studio, restyled: three directions</h1>
+        <p>
+          The same screen in each: an act's Narration overview, with the sidebar, the header with
+          its languages and actions, how far the act is, and its cast. Only the look changes; the
+          parts and the words are today's. Numbers are made up, RetroQuest-sized.
+        </p>
+      </div>
+      <div class="tabs" role="group" aria-label="Direction">
+        <button class="tab" data-t="a" aria-pressed="true">A · Aurora</button>
+        <button class="tab" data-t="b" aria-pressed="false">B · Graphite</button>
+        <button class="tab" data-t="c" aria-pressed="false">C · Arcade</button>
+      </div>
+
+      <!-- ═════════ A ═════════ -->
+      <div class="frame a on" id="a">
+        <aside class="side">
+          <div class="brand"><span class="logo"></span>Content Studio</div>
+          <div class="proj">
+            <span class="dot">RQ</span>
+            <div>RetroQuest<small>$12.40 credit</small></div>
+          </div>
+          <nav class="nav">
+            <div class="cap">Workspace</div>
+            <div class="ni ws">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg
+              >Narration
+            </div>
+            <div class="ni sub on">Act I <span class="n y">620/624</span></div>
+            <div class="ni sub">Act II <span class="n r">96/140</span></div>
+            <div class="ni sub">Act III <span class="n g">88/88</span></div>
+            <div class="ni ws">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" /></svg
+              >Music
+            </div>
+            <div class="ni ws">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-5-5L5 21" /></svg
+              >Images
+            </div>
+          </nav>
+          <nav class="nav foot">
+            <div class="ni">All characters <span class="n">14</span></div>
+            <div class="ni">Changes <span class="n">13</span></div>
+            <div class="ni">Spending <span class="n">$4.20</span></div>
+            <div class="ni">Setup</div>
+          </nav>
+        </aside>
+        <div class="scroll">
+          <div class="main">
+            <div>
+              <div class="crumb">Narration / Act I</div>
+              <div class="head">
+                <div>
+                  <h1>The Lantern</h1>
+                  <div class="path">tts/act1/en/script.json</div>
+                </div>
+                <span style="flex: 1"></span>
+                <div class="seg">
+                  <span class="on">English<i>620/624</i></span
+                  ><span>Svenska<i>412/624</i></span
+                  ><span>Deutsch<i>—</i></span>
+                </div>
+                <button class="btn">Refresh dialog</button>
+                <button class="btn">All lines</button>
+                <button class="btn hot">Generate 4 lines</button>
+              </div>
+            </div>
+            <section class="card hero">
+              <div class="ring">
+                <b>99%<small>up to date</small></b>
+              </div>
+              <div>
+                <div class="big">620 <span>/ 624 lines</span></div>
+                <span class="attn">4 need attention →</span>
+                <div class="chips">
+                  <span class="chip"><i style="background: #ffcb5c"></i>Stale <b>2</b></span>
+                  <span class="chip"><i style="background: #8db4ff"></i>Missing <b>1</b></span>
+                  <span class="chip"><i style="background: #ff7a9a"></i>Weak <b>1</b></span>
+                  <span class="chip">Stale because: the cue (2)</span>
+                </div>
+              </div>
+            </section>
+            <section>
+              <h2>Cast <small>4 characters in Act I · voices shared across acts</small></h2>
+              <div class="cast">
+                <div class="who">
+                  <div class="top">
+                    <span class="av" style="background: #233b33; color: #4be3a4">N</span>
+                    <div>
+                      <div class="nm">Narrator</div>
+                      <div class="vc">Old man bible · Fish</div>
+                    </div>
+                  </div>
+                  <div class="cue">[warm, gentle storyteller]</div>
+                  <div class="bar"><i style="width: 100%"></i></div>
+                  <div class="row2">
+                    <span>312 lines</span><span style="color: #4be3a4">all up to date</span>
+                  </div>
+                </div>
+                <div class="who">
+                  <div class="top">
+                    <span class="av" style="background: #3b2f23; color: #ffcb5c">K</span>
+                    <div>
+                      <div class="nm">Keeper</div>
+                      <div class="vc">Gravel elder · Fish</div>
+                    </div>
+                  </div>
+                  <div class="cue">[low, kind, unhurried]</div>
+                  <div class="bar"><i style="width: 98%"></i></div>
+                  <div class="row2">
+                    <span>146 lines</span><span style="color: #ffcb5c">2 stale</span>
+                  </div>
+                </div>
+                <div class="who">
+                  <div class="top">
+                    <span class="av" style="background: #23304b; color: #8db4ff">W</span>
+                    <div>
+                      <div class="nm">Wren</div>
+                      <div class="vc">Bright apprentice · ElevenLabs</div>
+                    </div>
+                  </div>
+                  <div class="cue">[eager, quick, a little breathless]</div>
+                  <div class="bar"><i style="width: 99%"></i></div>
+                  <div class="row2">
+                    <span>118 lines</span><span style="color: #8db4ff">1 missing</span>
+                  </div>
+                </div>
+                <div class="who">
+                  <div class="top">
+                    <span class="av" style="background: #3b2333; color: #ff7a9a">M</span>
+                    <div>
+                      <div class="nm">Mira</div>
+                      <div class="vc">Innkeeper · Fish</div>
+                    </div>
+                  </div>
+                  <div class="cue">[busy, warm, teasing]</div>
+                  <div class="bar"><i style="width: 98%"></i></div>
+                  <div class="row2">
+                    <span>48 lines</span><span style="color: #ff7a9a">1 weak</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════════ B ═════════ -->
+      <div class="frame b" id="b">
+        <nav class="rail">
+          <span class="logo"></span>
+          <a class="on" title="Narration"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg
+          ></a>
+          <a title="Music"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" /></svg
+          ></a>
+          <a title="Images"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-5-5L5 21" /></svg
+          ></a>
+          <span class="grow"></span>
+          <a title="All characters"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="9" cy="8" r="4" />
+              <path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3" /></svg
+          ></a>
+          <a title="Changes"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="6" cy="6" r="3" />
+              <circle cx="18" cy="18" r="3" />
+              <path d="M6 9v3a6 6 0 0 0 6 6h3" /></svg
+          ></a>
+          <a title="Setup"
+            ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2" /></svg
+          ></a>
+        </nav>
+        <aside class="acts">
+          <div class="ttl"><b>Narration</b><span>RetroQuest</span></div>
+          <div class="act on">
+            <div class="l">Act I · The Lantern <i class="y">620/624</i></div>
+            <div class="mini"><u style="width: 99%; background: #e8b647"></u></div>
+          </div>
+          <div class="act">
+            <div class="l">Act II · The Road <i class="r">96/140</i></div>
+            <div class="mini"><u style="width: 69%; background: #ef6b7b"></u></div>
+          </div>
+          <div class="act">
+            <div class="l">Act III · The Crown <i class="g">88/88</i></div>
+            <div class="mini"><u style="width: 100%; background: #3fcf8e"></u></div>
+          </div>
+        </aside>
+        <div class="scroll main">
+          <div class="bar-top">
+            Narration <span>/</span> <b>Act I</b>
+            <span class="sp"></span>
+            <span class="search">Search lines, characters… <span class="kbd">⌘K</span></span>
+            <span>$4.20 spent</span>
+          </div>
+          <div class="body">
+            <div class="head">
+              <div>
+                <h1>The Lantern</h1>
+                <div class="sub">tts/act1/en/script.json · 624 lines · 4 characters</div>
+              </div>
+              <span style="flex: 1"></span>
+              <button class="btn">Refresh dialog</button>
+              <button class="btn">All lines</button>
+              <button class="btn p">Generate 4 lines</button>
+            </div>
+            <div class="tabs2">
+              <span class="on">English<i>620/624</i></span
+              ><span>Svenska<i>412/624</i></span
+              ><span>Deutsch<i>no dialog</i></span>
+            </div>
+            <div>
+              <div class="grid4">
+                <div class="cell">
+                  <span>Lines up to date</span>
+                  <b>620 <small>/ 624</small></b>
+                  <a href="#">4 need attention →</a>
+                </div>
+                <div class="cell">
+                  <span><i style="background: #e8b647"></i>Stale</span><b>2</b>
+                </div>
+                <div class="cell">
+                  <span><i style="background: #6f9cff"></i>Missing</span><b>1</b>
+                </div>
+                <div class="cell">
+                  <span><i style="background: #ef6b7b"></i>Weak</span><b>1</b>
+                </div>
+                <div class="cell"><span>Orphaned clips</span><b>0</b></div>
+              </div>
+              <div class="seg-bar" style="margin-top: 8px">
+                <u style="flex: 620; background: #3fcf8e"></u
+                ><u style="flex: 8; background: #e8b647"></u
+                ><u style="flex: 4; background: #6f9cff"></u
+                ><u style="flex: 4; background: #ef6b7b"></u>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Character</th>
+                  <th>Voice</th>
+                  <th>Delivery</th>
+                  <th>Lines</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <span class="av" style="background: #1c3329; color: #3fcf8e">N</span>Narrator
+                  </td>
+                  <td class="mono">Old man bible</td>
+                  <td class="mono">[warm, gentle storyteller]</td>
+                  <td>
+                    <span class="tiny"><u style="width: 100%"></u></span>312
+                  </td>
+                  <td><span class="pill g">up to date</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <span class="av" style="background: #33291a; color: #e8b647">K</span>Keeper
+                  </td>
+                  <td class="mono">Gravel elder</td>
+                  <td class="mono">[low, kind, unhurried]</td>
+                  <td>
+                    <span class="tiny"><u style="width: 98%"></u></span>146
+                  </td>
+                  <td><span class="pill y">2 stale</span></td>
+                </tr>
+                <tr>
+                  <td><span class="av" style="background: #1a2540; color: #6f9cff">W</span>Wren</td>
+                  <td class="mono">Bright apprentice</td>
+                  <td class="mono">[eager, quick, a little breathless]</td>
+                  <td>
+                    <span class="tiny"><u style="width: 99%"></u></span>118
+                  </td>
+                  <td><span class="pill">1 missing</span></td>
+                </tr>
+                <tr>
+                  <td><span class="av" style="background: #3a1c26; color: #ef6b7b">M</span>Mira</td>
+                  <td class="mono">Innkeeper</td>
+                  <td class="mono">[busy, warm, teasing]</td>
+                  <td>
+                    <span class="tiny"><u style="width: 98%"></u></span>48
+                  </td>
+                  <td><span class="pill r">1 weak</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════════ C ═════════ -->
+      <div class="frame c" id="c">
+        <aside class="side">
+          <div class="brand"><span class="logo"></span><b class="pix">Content Studio</b></div>
+          <div class="proj">
+            <b class="pix" style="font-size: 12px">RetroQuest</b><small>$12.40 credit</small>
+          </div>
+          <nav class="nav">
+            <div class="cap pix">Workspace</div>
+            <div class="ni ws">Narration</div>
+            <div class="ni sub on">Act I <span class="n pix y">620/624</span></div>
+            <div class="ni sub">Act II <span class="n pix r">96/140</span></div>
+            <div class="ni sub">Act III <span class="n pix g">88/88</span></div>
+            <div class="ni ws">Music</div>
+            <div class="ni ws">Images</div>
+          </nav>
+          <nav class="nav foot">
+            <div class="ni">All characters <span class="n pix">14</span></div>
+            <div class="ni">Changes <span class="n pix">13</span></div>
+            <div class="ni">Spending <span class="n pix">$4.20</span></div>
+            <div class="ni">Setup</div>
+          </nav>
+        </aside>
+        <div class="scroll">
+          <div class="main">
+            <div>
+              <div class="crumb pix">Narration › Act I</div>
+              <div class="head">
+                <div>
+                  <h1>The Lantern</h1>
+                  <div class="tag">tts/act1/en/script.json</div>
+                </div>
+                <span style="flex: 1"></span>
+                <div class="lang">
+                  <span class="on">English 620</span><span>Svenska 412</span><span>Deutsch —</span>
+                </div>
+                <button class="btn">Refresh</button>
+                <button class="btn p">Generate 4</button>
+              </div>
+            </div>
+            <section class="box">
+              <div class="hp">
+                <div class="score">620<small>/624</small></div>
+                <div>
+                  <div class="meter">
+                    <span class="bricks"></span><u style="width: 10px; background: var(--lamp)"></u
+                    ><u style="width: 6px; background: var(--sky)"></u
+                    ><u style="width: 6px; background: var(--rose)"></u>
+                  </div>
+                  <div class="legend">
+                    <span><i style="background: var(--leaf)"></i>Up to date</span>
+                    <span><i style="background: var(--lamp)"></i>Stale 2</span>
+                    <span><i style="background: var(--sky)"></i>Missing 1</span>
+                    <span><i style="background: var(--rose)"></i>Weak 1</span>
+                  </div>
+                </div>
+                <div class="quest">4 need attention ▶</div>
+              </div>
+            </section>
+            <section>
+              <h2>Cast<small>4 characters in Act I</small></h2>
+              <div class="cast">
+                <div class="who">
+                  <div class="top">
+                    <canvas class="face" data-seed="3" width="8" height="8"></canvas>
+                    <div>
+                      <div class="nm">Narrator</div>
+                      <div class="vc">Old man bible</div>
+                    </div>
+                  </div>
+                  <div class="cue">“warm, gentle storyteller”</div>
+                  <div class="hpbar"><i style="width: 100%"></i></div>
+                  <div class="row2 pix"><span>312 lines</span><span class="g">all clear</span></div>
+                </div>
+                <div class="who">
+                  <div class="top">
+                    <canvas class="face" data-seed="8" width="8" height="8"></canvas>
+                    <div>
+                      <div class="nm">Keeper</div>
+                      <div class="vc">Gravel elder</div>
+                    </div>
+                  </div>
+                  <div class="cue">“low, kind, unhurried”</div>
+                  <div class="hpbar"><i style="width: 98%"></i></div>
+                  <div class="row2 pix"><span>146 lines</span><span class="y">2 stale</span></div>
+                </div>
+                <div class="who">
+                  <div class="top">
+                    <canvas class="face" data-seed="13" width="8" height="8"></canvas>
+                    <div>
+                      <div class="nm">Wren</div>
+                      <div class="vc">Bright apprentice</div>
+                    </div>
+                  </div>
+                  <div class="cue">“eager, quick, a little breathless”</div>
+                  <div class="hpbar"><i style="width: 99%"></i></div>
+                  <div class="row2 pix">
+                    <span>118 lines</span><span style="color: var(--sky)">1 missing</span>
+                  </div>
+                </div>
+                <div class="who">
+                  <div class="top">
+                    <canvas class="face" data-seed="21" width="8" height="8"></canvas>
+                    <div>
+                      <div class="nm">Mira</div>
+                      <div class="vc">Innkeeper</div>
+                    </div>
+                  </div>
+                  <div class="cue">“busy, warm, teasing”</div>
+                  <div class="hpbar"><i style="width: 98%"></i></div>
+                  <div class="row2 pix"><span>48 lines</span><span class="r">1 weak</span></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes on" id="n-a">
+        <b>A · Aurora.</b> Today's dark studio, made softer and richer.
+        <ul>
+          <li>
+            Translucent "glass" panels on a deep background with two faint colour glows; rounder
+            corners (16–20 px).
+          </li>
+          <li>
+            The orange accent becomes an orange-to-pink gradient, used only for the main action and
+            the logo.
+          </li>
+          <li>
+            The act's progress is a ring with the big count beside it; the status counts are pills.
+          </li>
+          <li>Cast cards lift on hover; the delivery cue sits in a code-like well.</li>
+          <li>
+            Closest to today in layout: the sidebar, header and sections stay where they are, so
+            it's mostly a stylesheet change.
+          </li>
+        </ul>
+      </div>
+      <div class="notes" id="n-b">
+        <b>B · Graphite.</b> Quiet and dense, like a pro tool (think Linear or Raycast).
+        <ul>
+          <li>
+            A 52 px icon rail for the workspaces, with a narrow act list beside it showing each
+            act's count and a thin progress line. Together they take 248 px, about as much as
+            today's sidebar, but they hold more.
+          </li>
+          <li>
+            A top bar with the breadcrumb, a search (⌘K) and spending; smaller type and hairline
+            borders throughout.
+          </li>
+          <li>
+            Languages are underlined tabs; the counts are one strip of cells over a segmented bar.
+          </li>
+          <li>
+            The cast is a table instead of cards: more characters fit on screen, which suits
+            RetroQuest's larger cast.
+          </li>
+          <li>The biggest change to layout and navigation, and the most room for content.</li>
+        </ul>
+      </div>
+      <div class="notes" id="n-c">
+        <b>C · Arcade.</b> The studio dressed like the game it makes.
+        <ul>
+          <li>
+            A pixel font (Silkscreen) for titles, buttons and numbers, an italic serif for delivery
+            cues, and Geist for the reading text.
+          </li>
+          <li>
+            The game's own 16-colour palette (lamp yellow, amber, leaf green, wine) on deep purple,
+            with faint scanlines.
+          </li>
+          <li>Hard 2 px borders with offset black shadows; buttons press in when clicked.</li>
+          <li>
+            The progress is a brick "health bar"; each character gets a little pixel portrait and an
+            HP bar.
+          </li>
+          <li>
+            Most character; less neutral for long sessions, and the pixel font is for short labels
+            only.
+          </li>
+        </ul>
+      </div>
+    </div>
+    <script>
+      for (const tab of document.querySelectorAll('.tab'))
+        tab.addEventListener('click', () => {
+          for (const t of document.querySelectorAll('.tab'))
+            t.setAttribute('aria-pressed', String(t === tab))
+          for (const id of ['a', 'b', 'c']) {
+            document.getElementById(id).classList.toggle('on', id === tab.dataset.t)
+            document.getElementById('n-' + id).classList.toggle('on', id === tab.dataset.t)
+          }
+        })
+      // Little pixel portraits for Arcade, mirrored left to right, from the game's palette.
+      const P = [
+        '#f7efc7',
+        '#e8a33d',
+        '#d4684a',
+        '#a1485c',
+        '#9bc46a',
+        '#8fc3d9',
+        '#6b3f5e',
+        '#f2d16b',
+      ]
+      for (const c of document.querySelectorAll('canvas.face')) {
+        let s = Number(c.dataset.seed) * 9301 + 49297
+        const r = () => (s = (s * 9301 + 49297) % 233280) / 233280
+        const g = c.getContext('2d')
+        g.fillStyle = '#241e37'
+        g.fillRect(0, 0, 8, 8)
+        const skin = P[Math.floor(r() * 3)]
+        const hair = P[3 + Math.floor(r() * 5)]
+        for (let y = 0; y < 8; y++)
+          for (let x = 0; x < 4; x++) {
+            let col = null
+            if (y < 2 && x > 0) col = hair
+            else if (y >= 2 && y < 6 && x > 0) col = skin
+            if (y === 3 && x === 2) col = '#120f1c'
+            if (y >= 6 && x > 0) col = hair
+            if (y < 3 && x === 1 && r() > 0.4) col = hair
+            if (col) {
+              g.fillStyle = col
+              g.fillRect(x, y, 1, 1)
+              g.fillRect(7 - x, y, 1, 1)
+            }
+          }
+      }
+    </script>
+  </body>
+</html>
