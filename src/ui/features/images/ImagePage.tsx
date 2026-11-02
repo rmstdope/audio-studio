@@ -11,7 +11,10 @@ import { ActLinks } from './ActLinks'
 import { TakesSection } from './TakesSection'
 import { WordsField } from './WordsField'
 
-/** An image's own page: its prompt (the words, editable), the whole prompt, and what is out of date. */
+/**
+ * An image's own page: what is out of date above, then its workbench: the prompt (the words,
+ * editable, and the whole prompt) beside its takes.
+ */
 export function ImagePage({
   act,
   row,
@@ -120,49 +123,53 @@ export function ImagePage({
           </div>
         </section>
       )}
-      <section className="panel brief-panel">
-        <div className="brief-panel-head">
-          <h2>Prompt</h2>
-          {saved && (
-            <span className="saved" role="status">
-              Saved
-            </span>
-          )}
-        </div>
-        <WordsField
-          label="What the image shows"
-          words={row.words}
-          changed={row.changed}
-          save={save}
-          onSaved={() => setSaved(true)}
-          onEdit={() => setSaved(false)}
-          inputRef={field}
-        />
-        {row.changed && <span className="muted">The game&apos;s words: {row.description}</span>}
-        {row.actStyle?.choices ? (
-          <ActStyleMenu
-            imageId={row.id}
-            actStyle={row.actStyle}
-            onSaved={() => setSaved(true)}
-            onEdit={() => setSaved(false)}
-          />
-        ) : (
-          row.actStyle && (
-            <ActStyleBox
-              imageId={row.id}
-              actName={shortTitle(act.title)}
-              actStyle={row.actStyle}
+      <TakesSection
+        row={row}
+        prompt={
+          <section className="panel brief-panel" aria-label="Prompt">
+            <div className="brief-panel-head">
+              <h2>Prompt</h2>
+              {saved && (
+                <span className="saved" role="status">
+                  Saved
+                </span>
+              )}
+            </div>
+            <WordsField
+              label="What the image shows"
+              words={row.words}
+              changed={row.changed}
+              save={save}
               onSaved={() => setSaved(true)}
               onEdit={() => setSaved(false)}
+              inputRef={field}
             />
-          )
-        )}
-        <details className="images-whole">
-          <summary>The whole prompt the model gets</summary>
-          <pre className="images-ro mono">{row.prompt}</pre>
-        </details>
-      </section>
-      <TakesSection row={row} />
+            {row.changed && <span className="muted">The game&apos;s words: {row.description}</span>}
+            {row.actStyle?.choices ? (
+              <ActStyleMenu
+                imageId={row.id}
+                actStyle={row.actStyle}
+                onSaved={() => setSaved(true)}
+                onEdit={() => setSaved(false)}
+              />
+            ) : (
+              row.actStyle && (
+                <ActStyleBox
+                  imageId={row.id}
+                  actName={shortTitle(act.title)}
+                  actStyle={row.actStyle}
+                  onSaved={() => setSaved(true)}
+                  onEdit={() => setSaved(false)}
+                />
+              )
+            )}
+            <details className="images-whole">
+              <summary>The whole prompt the model gets</summary>
+              <pre className="images-ro mono">{row.prompt}</pre>
+            </details>
+          </section>
+        }
+      />
     </>
   )
 }

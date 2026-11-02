@@ -1485,25 +1485,32 @@ then the picture, then the lock entry, so a failure can be pressed again; the ta
 read. The game's own `file` is never written or deleted. Where the pictures of the chosen image and of
 the game's own are served from: `GET /api/images/:id/current` (the chosen clip, else the game's file).
 
-**The Takes section** (an image's page, under the Prompt panel): a box in its heading row, "What
-the game gets" (ticked when the page opens; the page's own, never saved), switches every take shown,
-on both sides and in the strip, between what the model made (with its size, and "cropped to fit"
-when it had another shape) and what the game gets (with the game's size; in its place, while a take
-has none, "Bringing to the game's look…", "Not brought to the game's look yet." or what to fix in
-the style file). The image the game uses (its game picture is the one the game has now) sits beside
-one other take, both enlarged by the largest whole number of the game's size at which the two fit
-side by side, and one above the other when not even ×1 fits, each with its buttons under its
-picture (Un-choose; Drop and Choose); under them a strip of the others.
-Choose moves the compared take to the left and the take chosen before comes to be compared,
-marked "was chosen" for that visit. The compared take is the
-page's own state (after a reload the newest) and does not move when a take finishes; ← / → step
-through the strip while focus is in the section but not in a menu or field. Pressing Make N takes
-puts focus on the compared take in the strip (on the Comparing label when there is none yet), so
-the keys keep working while the switched-off button cannot hold it (as-99s). The status of an image
-on its act's list says "making 2 takes · about 1 min" while takes are made. Its heading row has a menu
-"Model for new takes" before the count menu (closed: "FLUX.2 klein — about 8 s a take"; open: the full names),
-which starts on the project's model, or on the model that is here when that one is missing (with a faint line
-saying so); a pick holds only while the page is open. The screens are drawn in `docs/ui/as-yag.7-image-models.html`.
+**The workbench** (an image's page, under its notices) keeps the whole round, words, make, look,
+choose or drop, in view at once (`docs/ui/image-workspace.html`, layout A). Its first column holds
+the Prompt panel, then **Make takes** (the menu "Model for new takes" on a line of its own, which
+starts on the project's model, or on the model that is here when that one is missing, with a faint
+line saying so, a pick holding only while the page is open; closed it reads "FLUX.2 klein — about 8 s
+a take"; then the count menu and Make N takes, and Stop while takes are made), then **Takes · N**:
+the other takes as a grid of thumbs that scrolls on its own, takes being made among them with their
+progress. The second column holds the image the game uses beside one other take. Both columns stay
+in view while the page scrolls (sticky, the first at most the window's height); below 1000 px they
+stand one above the other. A box in the Takes heading, "What the game gets" (ticked when the page
+opens; the page's own, never saved), switches every take shown, on both sides and in the grid,
+between what the model made (with its size, and "cropped to fit" when it had another shape) and
+what the game gets (with the game's size; in its place, while a take has none, "Bringing to the
+game's look…", "Not brought to the game's look yet." or what to fix in the style file). The image
+the game uses (its game picture is the one the game has now) and the compared take are enlarged by
+the largest whole number of the game's size at which the two fit side by side in their column, and
+stand one above the other when not even ×1 fits, each with its buttons under its picture
+(Un-choose; Drop and Choose). Choose moves the compared take to the left and the take chosen before
+comes to be compared, marked "was chosen" for that visit. The compared take is the page's own
+state (after a reload the newest) and does not move when a take finishes. Keys work anywhere on
+the page except in a menu or field, with no Command, Control or Option held, and not while
+Un-choose is asked: ← / → step through the grid, **C** chooses the compared take and **D** drops
+it, each only when its button is on. Pressing Make N takes puts focus on the compared take in the
+grid (on the Comparing label when there is none yet), so the switched-off button does not lose it
+(as-99s). The status of an image on its act's list says "making 2 takes · about 1 min" while takes
+are made. The model menu's screens are drawn in `docs/ui/as-yag.7-image-models.html`.
 
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),

@@ -79,7 +79,11 @@ const view = (over: Partial<ImageTakesView> = {}): ImageTakesView => ({
 })
 
 /** Shows the section with this view, and records what the page asks the server. */
-async function show(data: ImageTakesView, over: Partial<ImageRow> = {}) {
+async function show(
+  data: ImageTakesView,
+  over: Partial<ImageRow> = {},
+  prompt?: ReturnType<typeof createElement>,
+) {
   const calls: { url: string; method: string; body: unknown }[] = []
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     calls.push({
@@ -103,7 +107,7 @@ async function show(data: ImageTakesView, over: Partial<ImageRow> = {}) {
       createElement(
         QueryClientProvider,
         { client },
-        createElement(TakesSection, { row: { ...row, ...over } }),
+        createElement(TakesSection, { row: { ...row, ...over }, prompt }),
       ),
     ),
   )
@@ -663,7 +667,7 @@ describe('the Takes section’s model menu', () => {
     expect(side('left').textContent).toContain('Z-Image-Turbo')
     expect(side('right').textContent).toContain('Take 4')
     expect(side('right').textContent).toContain('FLUX.2 klein')
-    const strip = s.container.querySelector('.image-strip, .image-thumbs') ?? s.container
+    const strip = s.container.querySelector('[data-strip]') ?? s.container
     const thumbs = [...strip.querySelectorAll('.image-thumb-label')].map((t) => t.textContent)
     expect(thumbs.join(' ')).not.toContain('FLUX')
   })
@@ -714,7 +718,7 @@ describe('a take’s picture', () => {
     expect(box(s).closest('label')?.textContent).toBe('What the game gets')
     expect(sources(s, '[data-side="left"]')).toEqual(['/api/images/inn/current'])
     expect(sources(s, '[data-side="right"]')).toEqual(['/api/images/inn/takes/3/game'])
-    expect(sources(s, '.image-strip')).toEqual([
+    expect(sources(s, '[data-strip]')).toEqual([
       '/api/images/inn/takes/2/game',
       '/api/images/inn/takes/3/game',
     ])
@@ -729,7 +733,7 @@ describe('a take’s picture', () => {
     expect(box(s).checked).toBe(false)
     expect(sources(s, '[data-side="left"]')).toEqual(['/api/images/inn/takes/1'])
     expect(sources(s, '[data-side="right"]')).toEqual(['/api/images/inn/takes/3'])
-    expect(sources(s, '.image-strip')).toEqual([
+    expect(sources(s, '[data-strip]')).toEqual([
       '/api/images/inn/takes/2',
       '/api/images/inn/takes/3',
     ])
@@ -757,7 +761,7 @@ describe('a take’s picture', () => {
     const s = await show(view({ takes: [take(5, { look: 'bringing' })] }))
     expect(s.text()).toContain("Bringing to the game's look…")
     expect(imgs(s, 'right')).toHaveLength(0)
-    expect(sources(s, '.image-strip')).toEqual([])
+    expect(sources(s, '[data-strip]')).toEqual([])
     expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(true)
     await s.click(box(s))
     expect(sources(s, '[data-side="right"]')).toEqual(['/api/images/inn/takes/5'])
@@ -802,6 +806,91 @@ describe('a take’s picture', () => {
   it('has no box before there are takes', async () => {
     const s = await show(view())
     expect(s.container.querySelector('input[type="checkbox"]')).toBeNull()
+  })
+})
+
+describe('the workbench', () => {
+  const tools = (s: { container: HTMLElement }) =>
+    s.container.querySelector('.image-workbench-tools')!
+
+  it('keeps the prompt, Make and the other takes in one column, and the two pictures in another', async () => {
+    const prompt = createElement('section', { className: 'panel', 'aria-label': 'Prompt' }, 'words')
+    const s = await show(view({ takes: [take(1, { chosen: true }), take(2), take(3)] }), {}, prompt)
+    const column = [...tools(s).children].map((c) => c.getAttribute('aria-label'))
+    expect(column).toEqual(['Prompt', 'Make takes', 'Takes'])
+    const make = tools(s).querySelector('[aria-label="Make takes"]')!
+    expect(make.querySelector('select[aria-label="Model for new takes"]')).not.toBeNull()
+    expect(make.querySelector('select[aria-label="Number of new takes"]')).not.toBeNull()
+    expect(make.textContent).toContain('Make 2 more takes')
+    expect(tools(s).querySelectorAll('[data-strip] button')).toHaveLength(2)
+    const stage = s.container.querySelector('.image-stage')!
+    expect(tools(s).contains(stage)).toBe(false)
+    expect(stage.querySelector('[data-side="left"]')).not.toBeNull()
+    expect(stage.querySelector('[data-side="right"]')).not.toBeNull()
+  })
+
+  it('has Make in its column before there are takes, and one make button only', async () => {
+    const s = await show(view())
+    expect(tools(s).querySelector('[aria-label="Make takes"]')?.textContent).toContain(
+      'Make 2 takes',
+    )
+    expect(s.buttons('Make 2 takes')).toHaveLength(1)
+  })
+
+  it('counts the other takes in the heading of their list', async () => {
+    const s = await show(view({ takes: [take(1, { chosen: true }), take(2), take(3)] }))
+    expect(tools(s).querySelector('[aria-label="Takes"] h2')?.textContent).toBe('Takes · 2')
+  })
+
+  it('C chooses the take on the right, and D drops it', async () => {
+    const s = await show(view({ takes: three }))
+    await s.key('c')
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose', body: { n: 3 } })
+    const t = await show(view({ takes: three }))
+    await t.key('d')
+    expect(t.calls.at(-1)).toMatchObject({ url: '/api/images/inn/takes/3', method: 'DELETE' })
+  })
+
+  it('hears C, D and the arrows anywhere on the page, not only inside the workbench', async () => {
+    const s = await show(view({ takes: three }))
+    await s.key('ArrowLeft', document.body)
+    expect(s.right()).toBe('Take 2')
+    await s.key('c', document.body)
+    expect(s.calls.at(-1)).toMatchObject({ url: '/api/images/inn/choose', body: { n: 2 } })
+  })
+
+  it('leaves the keys alone while a key is held with Command or Control', async () => {
+    const s = await show(view({ takes: three }))
+    const before = s.calls.length
+    await act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'c', metaKey: true, bubbles: true }),
+      )
+    })
+    expect(s.calls.slice(before).filter((c) => c.method !== 'GET')).toEqual([])
+  })
+
+  it('leaves C and D to the words being typed', async () => {
+    const prompt = createElement('textarea', { 'aria-label': 'Prompt' })
+    const s = await show(view({ takes: three }), {}, prompt)
+    const before = s.calls.length
+    await s.key('c', s.container.querySelector('textarea')!)
+    await s.key('d', s.container.querySelector('textarea')!)
+    expect(s.calls.slice(before).filter((c) => c.method !== 'GET')).toEqual([])
+  })
+
+  it('shows the prompt while the takes cannot be listed', async () => {
+    const prompt = createElement('section', { 'aria-label': 'Prompt' }, 'the words')
+    const s = await show({ ok: false } as unknown as ImageTakesView, {}, prompt)
+    expect(s.text()).toContain('the words')
+    expect(s.text()).toContain('The takes could not be listed.')
+  })
+
+  it('does not choose with C when Choose is off', async () => {
+    const s = await show(view({ takes: three, lockUnread: true }))
+    await s.key('c')
+    await s.key('d')
+    expect(s.calls.filter((c) => c.method !== 'GET' && !c.url.endsWith('/seen'))).toEqual([])
   })
 })
 

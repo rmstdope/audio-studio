@@ -24,3 +24,27 @@ describe('the two sides of an image’s takes', () => {
     expect(rule('.image-stage')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
   })
 })
+
+describe('an image’s workbench', () => {
+  const rule = (selector: string, from = css) => {
+    const at = from.indexOf(`${selector} {`)
+    return at < 0 ? '' : from.slice(at, from.indexOf('}', at))
+  }
+
+  it('puts the tools beside the pictures, both held in view, the takes scrolling on their own', () => {
+    expect(rule('.image-workbench')).toMatch(
+      /grid-template-columns:\s*minmax\(280px, 340px\) minmax\(0, 1fr\)/,
+    )
+    expect(rule('.image-workbench-tools')).toMatch(/position:\s*sticky/)
+    expect(rule('.image-workbench-tools')).toMatch(/max-height:\s*calc\(100vh - 32px\)/)
+    expect(rule('.image-stage-panel')).toMatch(/position:\s*sticky/)
+    expect(rule('.image-thumbs')).toMatch(/overflow-y:\s*auto/)
+  })
+
+  it('puts the columns one above the other in a narrow window', () => {
+    const narrow = css.slice(css.indexOf('@media (max-width: 1000px) {\n  .image-workbench'))
+    const block = narrow.slice(0, narrow.indexOf('\n}\n'))
+    expect(rule('.image-workbench', block)).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
+    expect(block).toMatch(/position:\s*static/)
+  })
+})

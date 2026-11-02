@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   rightAfterDrop,
   stepRight,
@@ -93,13 +93,14 @@ function EmptyFrame({
 }
 
 /**
- * An image's Takes section: the image the game uses beside one other take (one above the other when
- * the window is too narrow for both at the game's size), a strip of the rest to put on the right,
- * and making, choosing, un-choosing and dropping them. A box switches every take shown between what
- * the model made and what the game gets. Which take is on the right, and what the box says, are
- * this page's, never saved; after a reload it is the newest, and what the game gets.
+ * An image's workbench: in one column `prompt` (the image's words), making takes, and the other
+ * takes to put on the right; in the other the image the game uses beside one other take (one
+ * above the other when the column is too narrow for both at the game's size), with choosing,
+ * un-choosing and dropping under them, also by C and D. A box switches every take shown between
+ * what the model made and what the game gets. Which take is on the right, and what the box says,
+ * are this page's, never saved; after a reload it is the newest, and what the game gets.
  */
-export function TakesSection({ row }: { row: ImageRow }) {
+export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNode }) {
   const id = row.id
   const query = useImageTakes(id)
   const make = useMakeImageTakes(id)
@@ -129,6 +130,14 @@ export function TakesSection({ row }: { row: ImageRow }) {
   const leftHeading = useRef<HTMLSpanElement>(null)
   const rightHeading = useRef<HTMLSpanElement>(null)
   const thumbs = useRef(new Map<number, HTMLButtonElement>())
+  // The page's keys (← → C D) are heard anywhere on the page, by what this render last set here.
+  const keys = useRef<(event: KeyboardEvent) => void>(() => {})
+  keys.current = () => {}
+  useEffect(() => {
+    const listen = (event: KeyboardEvent) => keys.current(event)
+    document.addEventListener('keydown', listen)
+    return () => document.removeEventListener('keydown', listen)
+  }, [])
   const refocusUnchoose = useFocusWhenClosed(asking, unchooseButton)
   const focusLeft = useFocusWhenClosed(asking, leftHeading)
 
@@ -171,14 +180,20 @@ export function TakesSection({ row }: { row: ImageRow }) {
     setPendingFocus(null)
   }, [pendingFocus])
 
-  if (!view) {
+  if (!view || !ready) {
     return (
-      <section className="panel">
-        {query.isError ? 'The takes could not be loaded.' : 'Loading takes…'}
-      </section>
+      <div className="image-workbench">
+        <div className="image-workbench-tools">{prompt}</div>
+        <section className="panel">
+          {!view
+            ? query.isError
+              ? 'The takes could not be loaded.'
+              : 'Loading takes…'
+            : 'The takes could not be listed.'}
+        </section>
+      </div>
     )
   }
-  if (!ready) return <section className="panel">The takes could not be listed.</section>
 
   const { generator, takes, making, failed, lockUnread, lookError } = ready
   const states = Object.fromEntries(ready.models.map((m) => [m.id, m])) as Record<
@@ -211,6 +226,13 @@ export function TakesSection({ row }: { row: ImageRow }) {
     void client.cancelQueries({ queryKey: ['image-takes', id] })
     for (const mutation of [make, choose, drop, unchoose]) mutation.reset()
   }
+  const canChoose = (t: ImageTakeView) =>
+    !lockUnread &&
+    !choose.isPending &&
+    !drop.isPending &&
+    lookError === null &&
+    t.look !== 'bringing'
+  const canDrop = !lockUnread && !drop.isPending && !choose.isPending
   const onChoose = (n: number) => {
     const before = chosen?.n ?? null
     beforeChange()
@@ -236,8 +258,11 @@ export function TakesSection({ row }: { row: ImageRow }) {
     setRight(next)
     drop.mutate(n, { onSettled: () => setPendingFocus(next ?? 'right') })
   }
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+  keys.current = (event: KeyboardEvent) => {
     const target = event.target
+    if (event.defaultPrevented || asking) return
+    if (event.metaKey || event.ctrlKey || event.altKey) return
+    if (target instanceof HTMLElement && target.isContentEditable) return
     if (
       target instanceof HTMLSelectElement ||
       target instanceof HTMLInputElement ||
@@ -248,6 +273,16 @@ export function TakesSection({ row }: { row: ImageRow }) {
       const next = stepRight(strip, onRight, event.key === 'ArrowLeft' ? -1 : 1)
       event.preventDefault()
       if (next !== null) setRight(next)
+    }
+    if (!rightTake) return
+    const key = event.key.toLowerCase()
+    if (key === 'c' && canChoose(rightTake)) {
+      event.preventDefault()
+      onChoose(rightTake.n)
+    }
+    if (key === 'd' && canDrop) {
+      event.preventDefault()
+      onDrop(rightTake.n)
     }
   }
 
@@ -341,19 +376,12 @@ export function TakesSection({ row }: { row: ImageRow }) {
           </button>
         </div>
       ))}
-      <section className="panel takes-panel image-takes" aria-label="Takes" onKeyDown={onKeyDown}>
-        <div className="takes-head">
-          <h2>Takes</h2>
-          {!none && (
-            <div className="takes-controls">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={showing === 'game'}
-                  onChange={(event) => setShowing(event.target.checked ? 'game' : 'model')}
-                />
-                What the game gets
-              </label>
+      <div className="image-workbench">
+        <div className="image-workbench-tools">
+          {prompt}
+          <section className="panel takes-panel image-make" aria-label="Make takes">
+            <div className="takes-head">
+              <h2>Make takes</h2>
               {busy && (
                 <button
                   type="button"
@@ -364,213 +392,229 @@ export function TakesSection({ row }: { row: ImageRow }) {
                   Stop
                 </button>
               )}
-              {controls}
             </div>
-          )}
-        </div>
-        {otherInUse && generator.ok && (
-          <span className="takes-missing small" role="status">
-            {states[ready.projectModel].installed
-              ? imageSwitchedLine(ready.projectModel, fallback)
-              : states[ready.projectModel].download === 'partial'
-                ? `${imageModel(ready.projectModel).short}, the project's image model, is only partly downloaded, so these takes use ${imageModel(fallback).short}. Setup says how to finish it.`
-                : `${imageModel(ready.projectModel).short}, the project's image model, isn't on this computer, so these takes use ${imageModel(fallback).short}. Setup says how to download it.`}
-          </span>
-        )}
-        {lockUnread && !none && (
-          <span className="takes-missing small">
-            Choosing, dropping and un-choosing wait until the images lock can be read. You can still
-            look and make more takes.
-          </span>
-        )}
-        <div className="image-stage" data-stacked={stacked} ref={setStage}>
-          <div className="image-side" data-side="left">
-            {asking && chosen ? (
-              <Confirm
-                title={`Un-choose take ${chosen.n}?`}
-                effects={[]}
-                note={unchooseNote(chosen.n)}
-                back="Cancel"
-                backDisabled={unchoose.isPending}
-                onBack={() => {
-                  refocusUnchoose()
-                  setAsking(false)
-                }}
-              >
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  autoFocus
-                  disabled={unchoose.isPending}
-                  onClick={() =>
-                    unchoose.mutate(undefined, {
-                      onSuccess: (answer) => {
-                        setAsking(false)
-                        if (answer.ok) focusLeft()
-                        else refocusUnchoose()
-                      },
-                      onError: () => {
-                        setAsking(false)
-                        refocusUnchoose()
-                      },
-                    })
-                  }
-                >
-                  {unchoose.isPending ? 'Un-choosing…' : 'Un-choose'}
-                </button>
-              </Confirm>
-            ) : (
-              <LeftSide
-                row={row}
-                chosen={chosen}
-                lockUnread={lockUnread}
-                heading={leftHeading}
-                opener={unchooseButton}
-                unchoosing={unchoose.isPending}
-                saving={choose.isPending}
-                saved={saved}
-                onUnchoose={() => {
-                  unchoose.reset()
-                  setAsking(true)
-                }}
-                size={size}
-                id={id}
-                lookError={lookError}
-                showing={showing}
-                zoom={zoom}
-              />
-            )}
-          </div>
-          <div className="image-side" data-side="right">
-            <div className="take-row">
-              <span className="lbl" ref={rightHeading} tabIndex={-1}>
-                Comparing
+            {otherInUse && generator.ok && (
+              <span className="takes-missing small" role="status">
+                {states[ready.projectModel].installed
+                  ? imageSwitchedLine(ready.projectModel, fallback)
+                  : states[ready.projectModel].download === 'partial'
+                    ? `${imageModel(ready.projectModel).short}, the project's image model, is only partly downloaded, so these takes use ${imageModel(fallback).short}. Setup says how to finish it.`
+                    : `${imageModel(ready.projectModel).short}, the project's image model, isn't on this computer, so these takes use ${imageModel(fallback).short}. Setup says how to download it.`}
               </span>
-              {rightTake ? (
-                <>
-                  <b>Take {rightTake.n}</b>
-                  <ModelName id={rightTake.model} />
-                  {rightTake.earlier && <span className="faint small">earlier words</span>}
-                </>
-              ) : (
-                <b>{chosen ? 'No other takes yet' : 'No takes yet'}</b>
+            )}
+            <div className="takes-make">{controls}</div>
+          </section>
+          <section className="panel takes-panel image-takes" aria-label="Takes">
+            <div className="takes-head">
+              <h2>{none ? 'Takes' : `Takes · ${strip.length}`}</h2>
+              {!none && (
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={showing === 'game'}
+                    onChange={(event) => setShowing(event.target.checked ? 'game' : 'model')}
+                  />
+                  What the game gets
+                </label>
               )}
             </div>
-            {rightTake ? (
-              <>
-                <TakePicture
-                  id={id}
-                  take={rightTake}
+            {lockUnread && !none && (
+              <span className="takes-missing small">
+                Choosing, dropping and un-choosing wait until the images lock can be read. You can
+                still look and make more takes.
+              </span>
+            )}
+            {strip.length > 0 || making.length > 0 ? (
+              <div className="image-thumbs" data-strip>
+                {takes
+                  .filter((t) => !t.chosen)
+                  .map((t) => {
+                    const src =
+                      showing === 'game' ? gameSource(id, t, row, lookError) : modelSource(id, t)
+                    return (
+                      <button
+                        type="button"
+                        key={t.n}
+                        className="image-thumb"
+                        aria-pressed={t.n === onRight}
+                        ref={(el) => {
+                          if (el) thumbs.current.set(t.n, el)
+                          else thumbs.current.delete(t.n)
+                        }}
+                        onClick={() => setRight(t.n)}
+                      >
+                        {src ? (
+                          <Picture
+                            src={src}
+                            alt=""
+                            {...(showing === 'game' ? size : { width: t.width, height: t.height })}
+                          />
+                        ) : (
+                          <div
+                            className="image-take-empty"
+                            style={{ aspectRatio: `${row.width} / ${row.height}` }}
+                          />
+                        )}
+                        <span className="image-thumb-label">
+                          <span className="grow">Take {t.n}</span>
+                          {t.earlier && <span className="faint">earlier words</span>}
+                          {t.n === wasChosen && <span className="faint">was chosen</span>}
+                          {t.isNew && <span className="chip chip-new">new</span>}
+                        </span>
+                      </button>
+                    )
+                  })}
+                {making.map((m) => (
+                  <MakingThumb key={m.n} making={m} {...size} />
+                ))}
+              </div>
+            ) : null}
+            {strip.length > 0 && (
+              <span className="faint small">
+                Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.
+              </span>
+            )}
+            {none && (
+              <div className="takes-empty">
+                <strong>Each take is a new image made from the prompt.</strong>
+                <span className="muted">
+                  Make a few, compare them, and choose the one the game shows.
+                </span>
+              </div>
+            )}
+          </section>
+        </div>
+        <section
+          className="panel image-stage-panel"
+          aria-label="The chosen take and one to compare"
+        >
+          <div className="image-stage" data-stacked={stacked} ref={setStage}>
+            <div className="image-side" data-side="left">
+              {asking && chosen ? (
+                <Confirm
+                  title={`Un-choose take ${chosen.n}?`}
+                  effects={[]}
+                  note={unchooseNote(chosen.n)}
+                  back="Cancel"
+                  backDisabled={unchoose.isPending}
+                  onBack={() => {
+                    refocusUnchoose()
+                    setAsking(false)
+                  }}
+                >
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    autoFocus
+                    disabled={unchoose.isPending}
+                    onClick={() =>
+                      unchoose.mutate(undefined, {
+                        onSuccess: (answer) => {
+                          setAsking(false)
+                          if (answer.ok) focusLeft()
+                          else refocusUnchoose()
+                        },
+                        onError: () => {
+                          setAsking(false)
+                          refocusUnchoose()
+                        },
+                      })
+                    }
+                  >
+                    {unchoose.isPending ? 'Un-choosing…' : 'Un-choose'}
+                  </button>
+                </Confirm>
+              ) : (
+                <LeftSide
                   row={row}
+                  chosen={chosen}
+                  lockUnread={lockUnread}
+                  heading={leftHeading}
+                  opener={unchooseButton}
+                  unchoosing={unchoose.isPending}
+                  saving={choose.isPending}
+                  saved={saved}
+                  onUnchoose={() => {
+                    unchoose.reset()
+                    setAsking(true)
+                  }}
+                  size={size}
+                  id={id}
                   lookError={lookError}
                   showing={showing}
                   zoom={zoom}
                 />
-                <div className="image-take-actions">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-small"
-                    disabled={lockUnread || drop.isPending || choose.isPending}
-                    onClick={() => onDrop(rightTake.n)}
-                  >
-                    Drop
-                  </button>
-                  <button
-                    type="button"
-                    ref={chooseButton}
-                    className="btn btn-primary btn-small"
-                    disabled={
-                      lockUnread ||
-                      choose.isPending ||
-                      drop.isPending ||
-                      lookError !== null ||
-                      rightTake.look === 'bringing'
-                    }
-                    onClick={() => onChoose(rightTake.n)}
-                  >
-                    Choose
-                  </button>
-                </div>
-                {lookError !== null && (
-                  <span className="faint small">
-                    Fix the game&apos;s style file to choose this take.
-                  </span>
+              )}
+            </div>
+            <div className="image-side" data-side="right">
+              <div className="take-row">
+                <span className="lbl" ref={rightHeading} tabIndex={-1}>
+                  Comparing
+                </span>
+                {rightTake ? (
+                  <>
+                    <b>Take {rightTake.n}</b>
+                    <ModelName id={rightTake.model} />
+                    {rightTake.earlier && <span className="faint small">earlier words</span>}
+                  </>
+                ) : (
+                  <b>{chosen ? 'No other takes yet' : 'No takes yet'}</b>
                 )}
-              </>
-            ) : (
-              <EmptyFrame
-                title={
-                  chosen
-                    ? 'No other takes yet — make a few more to compare with the chosen one.'
-                    : 'No takes yet'
-                }
-                {...size}
-              />
-            )}
-          </div>
-        </div>
-        {strip.length > 0 || making.length > 0 ? (
-          <div className="image-strip" data-strip>
-            {takes
-              .filter((t) => !t.chosen)
-              .map((t) => {
-                const src =
-                  showing === 'game' ? gameSource(id, t, row, lookError) : modelSource(id, t)
-                return (
-                  <button
-                    type="button"
-                    key={t.n}
-                    className="image-thumb"
-                    aria-pressed={t.n === onRight}
-                    ref={(el) => {
-                      if (el) thumbs.current.set(t.n, el)
-                      else thumbs.current.delete(t.n)
-                    }}
-                    onClick={() => setRight(t.n)}
-                  >
-                    {src ? (
-                      <Picture
-                        src={src}
-                        alt=""
-                        {...(showing === 'game' ? size : { width: t.width, height: t.height })}
-                      />
-                    ) : (
-                      <div
-                        className="image-take-empty"
-                        style={{ aspectRatio: `${row.width} / ${row.height}` }}
-                      />
-                    )}
-                    <span className="image-thumb-label">
-                      <span className="grow">Take {t.n}</span>
-                      {t.earlier && <span className="faint">earlier words</span>}
-                      {t.n === wasChosen && <span className="faint">was chosen</span>}
-                      {t.isNew && <span className="chip chip-new">new</span>}
+              </div>
+              {rightTake ? (
+                <>
+                  <TakePicture
+                    id={id}
+                    take={rightTake}
+                    row={row}
+                    lookError={lookError}
+                    showing={showing}
+                    zoom={zoom}
+                  />
+                  <div className="image-take-actions">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-small"
+                      disabled={!canDrop}
+                      onClick={() => onDrop(rightTake.n)}
+                    >
+                      Drop
+                    </button>
+                    <button
+                      type="button"
+                      ref={chooseButton}
+                      className="btn btn-primary btn-small"
+                      disabled={!canChoose(rightTake)}
+                      onClick={() => onChoose(rightTake.n)}
+                    >
+                      Choose
+                    </button>
+                    <span className="faint small">
+                      or press <kbd>C</kbd> or <kbd>D</kbd>
                     </span>
-                  </button>
-                )
-              })}
-            {making.map((m) => (
-              <MakingThumb key={m.n} making={m} {...size} />
-            ))}
+                  </div>
+                  {lookError !== null && (
+                    <span className="faint small">
+                      Fix the game&apos;s style file to choose this take.
+                    </span>
+                  )}
+                </>
+              ) : (
+                <EmptyFrame
+                  title={
+                    chosen
+                      ? 'No other takes yet — make a few more to compare with the chosen one.'
+                      : 'No takes yet'
+                  }
+                  {...size}
+                />
+              )}
+            </div>
           </div>
-        ) : null}
-        {strip.length > 0 && (
-          <span className="faint small">
-            Press a take, or use <kbd>←</kbd> <kbd>→</kbd>, to put it beside the chosen one.
-          </span>
-        )}
-        {none && (
-          <div className="takes-empty">
-            <strong>Each take is a new image made from the prompt.</strong>
-            <span className="muted">
-              Make a few, compare them, and choose the one the game shows.
-            </span>
-            <div className="takes-make">{controls}</div>
-          </div>
-        )}
-        {problem && <span className="adopt-error">{problem}</span>}
-        {error && <span className="adopt-error">{error.message}</span>}
-      </section>
+          {problem && <span className="adopt-error">{problem}</span>}
+          {error && <span className="adopt-error">{error.message}</span>}
+        </section>
+      </div>
     </>
   )
 }
