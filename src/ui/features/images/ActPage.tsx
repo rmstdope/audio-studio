@@ -148,7 +148,7 @@ export function ActPage({ act, images }: { act: ImagesAct; images: ImagesSummary
                               : 'changed here'}
                           </div>
                         )}
-                        {row.actStyle?.on === false && (
+                        {row.actStyle?.on === false && act.addition !== null && (
                           <div className="chg">{name}&apos;s style left out</div>
                         )}
                       </td>

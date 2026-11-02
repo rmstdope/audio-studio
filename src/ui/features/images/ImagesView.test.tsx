@@ -702,6 +702,19 @@ describe('an image the game lists in two acts', () => {
       expect([...menu(page).options].map((o) => o.textContent)).toEqual(["Act II's — dawn", 'None'])
       expect(menu(page).value).toBe('')
     })
+    it('says an act’s style is left out only on the list of an act that adds one', () => {
+      const only = { ...style, acts: { act2: 'dawn' } }
+      const one = render(
+        { view: 'images', page: 'act', part: 'act1' },
+        shared({ style: only, seen: only }),
+      )
+      expect(text(one.querySelector('tbody tr'))).not.toContain('style left out')
+      const two = render(
+        { view: 'images', page: 'act', part: 'act2' },
+        shared({ style: only, seen: only }),
+      )
+      expect(text(two.querySelector('tbody tr'))).toContain("Act II's style left out")
+    })
     it('has no menu when no act adds a style', () => {
       const bare = { ...style, acts: {} }
       const page = render(route, shared({ style: bare, seen: bare }))
