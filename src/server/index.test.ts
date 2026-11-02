@@ -5103,6 +5103,14 @@ describe('the images routes', () => {
     expect((await send('PATCH', '/api/images/ghost/act-style', { on: false })).status).toBe(404)
   })
 
+  it('saves which act’s style a shared image uses, and refuses an act that cannot give one', async () => {
+    expect(await (await send('PATCH', '/api/images/inn/act-style', { from: null })).json()).toEqual(
+      { ok: true },
+    )
+    expect((await send('PATCH', '/api/images/inn/act-style', { from: 'act9' })).status).toBe(404)
+    expect((await send('PATCH', '/api/images/inn/act-style', { from: 3 })).status).toBe(400)
+  })
+
   it('saves a style field, settles a compare and puts the style notice away', async () => {
     expect((await send('PATCH', '/api/image-style', { look: 'oil' })).status).toBe(200)
     expect((await summary()).style.look).toMatchObject({ words: 'oil', changed: true })
