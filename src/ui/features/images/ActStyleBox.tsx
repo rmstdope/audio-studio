@@ -38,12 +38,15 @@ export function ActStyleBox({
             saving.current = true
             onEdit()
             if (save.data || save.error) save.reset()
-            save.mutate(e.target.checked, {
-              onSettled: () => (saving.current = false),
-              onSuccess: (result) => {
-                if (result.ok) onSaved()
+            save.mutate(
+              { on: e.target.checked },
+              {
+                onSettled: () => (saving.current = false),
+                onSuccess: (result) => {
+                  if (result.ok) onSaved()
+                },
               },
-            })
+            )
           }}
         />
         <span>

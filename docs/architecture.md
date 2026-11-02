@@ -1377,8 +1377,8 @@ start on. It is saved from the Images row of Setup's Models panel (`PUT /api/ima
 **The game's files** (read only, `core/images.ts`). `list` holds an act's images in the game's order:
 `{ id, title, description, width, height, file? }`, `file` the picture the game shows for it now when
 the studio did not make it (a path inside the project root to a `.png`, `.jpg`, `.gif` or `.webp`;
-read only, never moved or written, shown as "The game's own image" until a take is chosen); the id a slug and unique across the game (a repeated
-id is a problem with both files, and neither image is shown). `style` holds `{ look, keepOut,
+read only, never moved or written, shown as "The game's own image" until a take is chosen); the id a slug. An id used twice in one list is a problem with
+both places, and neither image is shown. An id several acts list (as-94e) is one image, below. `style` holds `{ look, keepOut,
 palette, colourDepth, dithering, acts }`: `palette` is `#rrggbb` colours, `colourDepth` (`full`,
 `16-bit` or `8-bit`) and `dithering` (`flat`, `patterned` or `scattered`) are optional, and `acts` an
 optional addition per part id (an id the project does not have is a problem). A list that is not there yet is not a problem (the game
@@ -1392,8 +1392,25 @@ ticked by default and shown only while the act has an addition. The choice is sa
 file, kept when the act later has no addition, and the prompt and staleness key then carry no
 addition. The screens are drawn in `docs/ui/as-1au-act-style.html`.
 
+**An image several acts list** (as-94e). A game may list one id in more than one act's list (a
+recurring character's portrait). When the copies agree on title, words (`description`) and size it is
+one image: one set of words, one board, one chosen picture and one clip, shown on every act's page
+(`ImageRow.sharedWith` names the other acts; the row of the first listing act is copied per act, and
+the notices count it once). The row says "also in Act I" under its id, the page "Shared with Act I:
+a change here changes it there too.", and the page's crumb returns to the act it was opened from
+(`#/images/items/<id>?from=<act>`; a fresh load uses the first act that lists it). When the copies
+disagree, the image is shown in none of them: each act keeps the row in place, dimmed, with the
+reason, "—" for size and a "lists disagree" chip (`ImagesAct.conflicts`, with `order` the list's ids
+in the game's order), the page of such an image shows only the reason, and the banner has one
+problem per list naming another list that differs. The act style of a shared image is one pick for
+all acts, not the tick box: the menu "Act style for this image" lists the listing acts that add a
+style and None. `actStyleOff` still means None; `actStyleFrom` (`{ <id>: <act id> }` in the prompts
+file) names the act, and a missing, unlisted or style-less pick is the first listing act (None when
+it adds none). `PATCH /api/images/:id/act-style` takes `{ on }` or `{ from: <act id> | null }`. The
+screens are drawn in `docs/ui/as-94e-shared-images.html`.
+
 **The studio's own words** are `paths.prompts`, committed like `briefs.json` and joining the Changes
-panel: `{ images: { <id>: { words, gameWas } }, style: { look?, keepOut? }, actStyleOff?: [<id>] }`. `gameWas` is the game's
+panel: `{ images: { <id>: { words, gameWas } }, style: { look?, keepOut? }, actStyleOff?: [<id>], actStyleFrom?: { <id>: <act id> } }`. `gameWas` is the game's
 text when the words were written; a game description that differs from it raises the compare notice
 (**Keep mine** moves `gameWas`, **Use the game's** removes the words). Emptied words, or the game's
 own typed back, remove the entry. The palette and the acts' additions are never changed here.
@@ -1970,7 +1987,8 @@ Small, independently useful increments:
     5. **The game's look** (as-yag.5, done: §8.7): each take brought to the image's size, and to a palette or colour depth when the style file asks, shown beside what the model made.
     6. **Two models** (as-yag.7, done: §8.7): Setup says which are installed and chooses the main one;
        takes can be made with the other.
-    7. **The rename** to Content Studio (as-yag.6), with §1 and the opening of this document, which still speak of a game's audio.
+    7. **Shared images** (as-94e, done: §8.7): an image the game lists in several acts is one image shown in each, with one act-style pick; lists that disagree are reported.
+    8. **The rename** to Content Studio (as-yag.6), with §1 and the opening of this document, which still speak of a game's audio.
 
 ---
 

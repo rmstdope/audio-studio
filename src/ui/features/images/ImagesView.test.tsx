@@ -51,6 +51,8 @@ interface Options {
   seen?: GameStyle | null
   style?: GameStyle | null
   actTwo?: 'missing' | 'empty'
+  /** The images Act II lists (overrides `actTwo`). */
+  actTwoImages?: (typeof inn)[]
   /** What the chosen pictures were brought to; the look now when absent. */
   lookWas?: string
 }
@@ -73,7 +75,11 @@ function summary(options: Options = {}): ProjectSummary {
         id: 'act2',
         title: 'Act II: The Road',
         file: 'a2.json',
-        state: options.actTwo === 'empty' ? { status: 'ok', images: [] } : { status: 'missing' },
+        state: options.actTwoImages
+          ? { status: 'ok', images: options.actTwoImages }
+          : options.actTwo === 'empty'
+            ? { status: 'ok', images: [] }
+            : { status: 'missing' },
         canRefresh: false,
       },
     ],
@@ -624,5 +630,168 @@ describe('the game’s look', () => {
     expect(text(page.querySelector('.images-look-line'))).toBe(
       "320 × 200 · the game's palette — can't be read",
     )
+  })
+})
+
+describe('an image the game lists in two acts', () => {
+  const both = { style: { ...style, acts: { act1: 'lantern light', act2: 'dawn' } } }
+  const shared = (over: Options = {}) => summary({ ...both, actTwoImages: [inn], ...over })
+  const links = (node: Element | null | undefined) =>
+    [...(node?.querySelectorAll('a') ?? [])].map((a) => [a.textContent, a.getAttribute('href')])
+
+  it('names the other acts under the id on each act’s list, as links', () => {
+    const one = render({ view: 'images', page: 'act', part: 'act1' }, shared())
+    const row = one.querySelector('tbody tr')!
+    expect(text(row.querySelector('td'))).toBe('The Inninnalso in Act II')
+    expect(links(row.querySelector('.images-also'))).toEqual([['Act II', '#/images/parts/act2']])
+    expect(row.querySelector('a.music-track-link')!.getAttribute('href')).toBe(
+      '#/images/items/inn?from=act1',
+    )
+    const two = render({ view: 'images', page: 'act', part: 'act2' }, shared())
+    expect(text(two.querySelector('.images-also'))).toBe('also in Act I')
+  })
+  it('shows the same making status on every act’s list', () => {
+    for (const part of ['act1', 'act2']) {
+      const page = render({ view: 'images', page: 'act', part }, shared(), {
+        inn: { takes: 2, left: 2 },
+      })
+      expect(text(page.querySelector('.images-status'))).toContain('making 2 takes')
+    }
+  })
+  it('goes back to the act it was opened from, and falls back to the first act', () => {
+    const from = render({ view: 'images', page: 'image', image: 'inn', from: 'act2' }, shared())
+    expect(text(from.querySelector('.crumbs'))).toBe('Images › Act II')
+    const bare = render({ view: 'images', page: 'image', image: 'inn' }, shared())
+    expect(text(bare.querySelector('.crumbs'))).toBe('Images › Act I')
+    const wrong = render({ view: 'images', page: 'image', image: 'inn', from: 'act9' }, shared())
+    expect(text(wrong.querySelector('.crumbs'))).toBe('Images › Act I')
+  })
+  it('says on its page that a change reaches the other acts', () => {
+    const page = render({ view: 'images', page: 'image', image: 'inn', from: 'act2' }, shared())
+    const line = page.querySelector('.images-shared')
+    expect(text(line)).toBe('Shared with Act I: a change here changes it there too.')
+    expect(links(line)).toEqual([['Act I', '#/images/parts/act1']])
+  })
+  describe('the act style menu', () => {
+    const route: ImagesRoute = { view: 'images', page: 'image', image: 'inn', from: 'act2' }
+    const menu = (page: HTMLElement) =>
+      page.querySelector('select.act-style-menu') as HTMLSelectElement
+    it('replaces the tick box with a menu of the acts that add a style, and None', () => {
+      const page = render(route, shared())
+      expect(page.querySelector('.act-style-box')).toBeNull()
+      const label = [...page.querySelectorAll('label')].find((l) => l.htmlFor === menu(page).id)
+      expect(text(label)).toBe('Act style for this image')
+      expect([...menu(page).options].map((o) => o.textContent)).toEqual([
+        "Act I's — lantern light",
+        "Act II's — dawn",
+        'None',
+      ])
+      expect(menu(page).value).toBe('act1')
+      expect(text(page.querySelector('.images-act-style-note'))).toBe(
+        "One act's style is used for this image in every act.",
+      )
+    })
+    it('starts on None when the first act adds none, and leaves only the acts that add one', () => {
+      const page = render(
+        route,
+        shared({
+          style: { ...style, acts: { act2: 'dawn' } },
+          seen: { ...style, acts: { act2: 'dawn' } },
+        }),
+      )
+      expect([...menu(page).options].map((o) => o.textContent)).toEqual(["Act II's — dawn", 'None'])
+      expect(menu(page).value).toBe('')
+    })
+    it('has no menu when no act adds a style', () => {
+      const bare = { ...style, acts: {} }
+      const page = render(route, shared({ style: bare, seen: bare }))
+      expect(page.querySelector('select.act-style-menu')).toBeNull()
+      expect(page.querySelector('.act-style-box')).toBeNull()
+    })
+    it('saves a pick at once and says Saved', async () => {
+      const page = render(route, shared())
+      await act(async () => {
+        menu(page).value = ''
+        menu(page).dispatchEvent(new Event('change', { bubbles: true }))
+      })
+      await flush()
+      expect(sent[0]).toEqual({
+        method: 'PATCH',
+        path: '/api/images/inn/act-style',
+        body: { from: null },
+      })
+      expect(text(page.querySelector('.saved'))).toBe('Saved')
+    })
+    it('says why a save failed, under the menu', async () => {
+      globalThis.fetch = (async () =>
+        Response.json(
+          { ok: false, problems: [{ file: 'p.json', path: '', message: 'bad' }] },
+          { status: 409 },
+        )) as unknown as typeof fetch
+      const page = render(route, shared())
+      await act(async () => {
+        menu(page).value = 'act2'
+        menu(page).dispatchEvent(new Event('change', { bubbles: true }))
+      })
+      await act(async () => new Promise((r) => setTimeout(r, 20)))
+      expect(text(page.querySelector('.brief-panel'))).toContain('Could not be saved')
+      expect(menu(page).value).toBe('act1')
+    })
+    it('names the acts in the out-of-date notice', () => {
+      const row = shared().images!.acts[0]!.rows[0]!
+      const chosen = { inn: row.madeFrom }
+      const picked = summary({
+        ...both,
+        actTwoImages: [inn],
+        chosen,
+        prompts: { images: {}, style: {}, actStyleFrom: { inn: 'act2' } },
+      })
+      expect(text(render(route, picked))).toContain(
+        "Out of date since it was chosen: Act II's style instead of Act I's.",
+      )
+      const none = summary({
+        ...both,
+        actTwoImages: [inn],
+        chosen,
+        prompts: { images: {}, style: {}, actStyleOff: ['inn'] },
+      })
+      expect(text(render(route, none))).toContain(
+        "Out of date since it was chosen: Act I's style left out.",
+      )
+    })
+  })
+})
+
+describe('lists that disagree about an image', () => {
+  const other = { ...inn, description: 'a tall inn' }
+  const summed = () => summary({ actTwoImages: [other] })
+  const sentence =
+    "The game's lists disagree about this image: Act I and Act II give it different words. Fix them in the game, then Refresh from the game."
+
+  it('keeps the row in place on every act, dimmed, with the reason and no link', () => {
+    for (const part of ['act1', 'act2']) {
+      const page = render({ view: 'images', page: 'act', part }, summed())
+      const rows = [...page.querySelectorAll('tbody tr')]
+      const row = rows.find((r) => r.textContent?.includes('The Inn'))!
+      expect(row.className).toContain('images-row-off')
+      expect(row.querySelector('a')).toBeNull()
+      expect(text(row.querySelector('.images-prompt'))).toBe(sentence)
+      expect(row.querySelector('.images-prompt .adopt-error')).not.toBeNull()
+      expect(text(row.querySelector('.images-size'))).toBe('—')
+      expect(text(row.querySelector('.images-status'))).toBe('lists disagree')
+    }
+    const first = render({ view: 'images', page: 'act', part: 'act1' }, summed())
+    expect([...first.querySelectorAll('tbody tr')].map((r) => text(r.querySelector('td')))).toEqual(
+      ['The Inninn', 'The Barnbarn'],
+    )
+  })
+  it('shows only the reason on the page of such an image', () => {
+    const page = render({ view: 'images', page: 'image', image: 'inn', from: 'act2' }, summed())
+    expect(text(page.querySelector('.crumbs'))).toBe('Images › Act II')
+    expect(text(page.querySelector('h1'))).toBe('The Inn')
+    expect(text(page.querySelector('.page-header .mono'))).toBe('inn')
+    expect(text(page.querySelector('.notice-err'))).toBe(sentence)
+    expect(page.querySelector('.brief-panel')).toBeNull()
+    expect(page.querySelector('textarea')).toBeNull()
   })
 })

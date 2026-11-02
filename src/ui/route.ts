@@ -12,7 +12,7 @@ export type ImagesRoute =
   | { view: 'images'; page: null }
   | { view: 'images'; page: 'act'; part: string }
   | { view: 'images'; page: 'style' }
-  | { view: 'images'; page: 'image'; image: string }
+  | { view: 'images'; page: 'image'; image: string; from?: string }
 
 /**
  * Where the UI is: a part's overview or its lines, every character, one character's page or its
@@ -32,12 +32,13 @@ export type Route =
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers`, `#/music/tracks/victory`, `#/images`, `#/images/parts/act1`, `#/images/style`, `#/images/items/silver-stag-inn`; anything else is the
+ * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers`, `#/music/tracks/victory`, `#/images`, `#/images/parts/act1`, `#/images/style`, `#/images/items/silver-stag-inn` (with `?from=act1`, the act it was opened from); anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
   const [path = '', query] = hash.replace(/^#/, '').split('?')
   const language = new URLSearchParams(query).get('language') ?? undefined
+  const from = new URLSearchParams(query).get('from') ?? undefined
   const [, first, second, third] = path.split('/')
   if (first === 'changes') return { view: 'changes' }
   if (first === 'spending') return { view: 'spending' }
@@ -58,7 +59,10 @@ export function parseRoute(hash: string): Route {
       return { view: 'images', page: 'act', part: decodeURIComponent(third) }
     }
     if (second === 'items' && third) {
-      return { view: 'images', page: 'image', image: decodeURIComponent(third) }
+      const image = decodeURIComponent(third)
+      return from
+        ? { view: 'images', page: 'image', image, from }
+        : { view: 'images', page: 'image', image }
     }
     return second === 'style' ? { view: 'images', page: 'style' } : { view: 'images', page: null }
   }
@@ -90,7 +94,10 @@ export function routeHref(route: Route): string {
         : '#/music'
   }
   if (route.view === 'images') {
-    if (route.page === 'image') return `#/images/items/${encodeURIComponent(route.image)}`
+    if (route.page === 'image') {
+      const from = route.from ? `?from=${encodeURIComponent(route.from)}` : ''
+      return `#/images/items/${encodeURIComponent(route.image)}${from}`
+    }
     return route.page === 'act'
       ? `#/images/parts/${encodeURIComponent(route.part)}`
       : route.page === 'style'

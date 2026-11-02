@@ -3451,6 +3451,22 @@ button.cue-chip[aria-expanded='true'] {
   margin-top: 3px;
   accent-color: var(--accent);
 }
+.images-also,
+.images-shared {
+  display: block;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.images-row-off {
+  opacity: 0.6;
+}
+.act-style-menu {
+  max-width: 100%;
+}
+.images-act-style-note {
+  display: block;
+  font-size: 12.5px;
+}
 .act-style-off {
   text-decoration: line-through;
   color: var(--faint);
