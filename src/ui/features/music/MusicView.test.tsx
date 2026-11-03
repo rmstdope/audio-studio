@@ -208,4 +208,22 @@ describe('the music the game no longer asks for', () => {
     )
     expect(stacking).not.toEqual([])
   })
+
+  it('holds no minimum width in any window, so it never scrolls the page and Remove stays in the panel', () => {
+    const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8')
+    // The rules that apply in every window: the stylesheet with its media blocks taken out.
+    const always = css.replace(/@media [^{]*\{[\s\S]*?\n\}\n/g, '')
+    const { container } = render('act', undefined, [orphan])
+    const panel = container.querySelector('[aria-label="Music the game no longer asks for"]')!
+    const table = panel.querySelector('table')!
+    // The plain table's 760 px minimum is for tables in a box that scrolls; this one is not in one,
+    // so a later rule for one of its own classes must take that minimum away.
+    expect(table.closest('.table-box')).toBeNull()
+    const tableRule = always.search(/(?:^|\n)\.table \{/)
+    const cleared = [...table.classList].filter((c) => {
+      const at = always.search(new RegExp(`(?:^|\\n)\\.${c} \\{[^}]*min-width: 0;`))
+      return at > tableRule
+    })
+    expect(cleared).not.toEqual([])
+  })
 })
