@@ -214,7 +214,7 @@ function DroppedPanel({ dropped }: { dropped: DroppedEffect[] }) {
           You changed the description of these, and the game no longer asks for them. Your words are
           kept in case the game lists them again.
         </span>
-        <table className="table">
+        <table className="table effects-table">
           <tbody>
             {dropped.map((row) => (
               <tr key={row.id}>
