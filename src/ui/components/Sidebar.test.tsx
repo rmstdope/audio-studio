@@ -82,6 +82,7 @@ const summary = {
       },
     ],
   },
+  effects: { status: 'ok', done: { done: 0, total: 8, needs: [] } },
 } as unknown as ProjectSummary
 
 /** The sidebar's links as `[text, href, current]`, in reading order. */
@@ -210,5 +211,25 @@ describe('the sidebar elsewhere', () => {
     const { links } = render({ view: 'setup' })
     expect(links.map((l) => l.text).slice(0, 2)).toEqual(['Narration', 'Music'])
     expect(links.some((l) => l.text.startsWith('Act'))).toBe(false)
+  })
+})
+
+describe('the sidebar’s Sound effects', () => {
+  it('links to the workspace with its done count, and has no sub-entries', () => {
+    const { links, container } = render({ view: 'effects', page: null })
+    const effects = links.find((l) => l.text.startsWith('Sound effects'))!
+    expect(effects).toMatchObject({ text: 'Sound effects 0/8', href: '#/effects', current: true })
+    expect(links.some((l) => l.text === 'Soon')).toBe(false)
+    expect(container.textContent).not.toContain('Soon')
+    expect(
+      [...container.querySelectorAll('.meta')].find((m) => m.textContent === '0/8')?.className,
+    ).toBe('meta meta-done-few')
+    const i = links.indexOf(effects)
+    expect(links[i + 1]!.text).not.toMatch(/^Act|Style/)
+  })
+
+  it('is not current on another page', () => {
+    const { links } = render({ view: 'setup' })
+    expect(links.find((l) => l.text.startsWith('Sound effects'))!.current).toBe(false)
   })
 })

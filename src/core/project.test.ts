@@ -481,3 +481,30 @@ describe('problemsFrom wording', () => {
     expect(problemsFrom('f.json', r.error).map((p) => p.message)).toEqual(['k is too loud'])
   })
 })
+
+describe('the effects section', () => {
+  const effects = (paths: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
+    projectJson({ effects: { paths: { list: 'tts/effects.json', ...paths }, ...extra } })
+
+  it('is optional', () => {
+    expect(parse(projectJson()).data!.effects).toBeUndefined()
+  })
+
+  it('accepts the list path and the refresh command', () => {
+    const result = parse(effects({}, { refresh: 'node tts/extract-effects.js' }))
+    expect(result.success).toBe(true)
+    expect(result.data!.effects).toEqual({
+      refresh: 'node tts/extract-effects.js',
+      paths: { list: 'tts/effects.json' },
+    })
+  })
+
+  it('refuses {language} and {part} in the list path: the list is for the whole game', () => {
+    expect(problems(effects({ list: 'tts/{part}/effects.json' }))[0]!.path).toBe(
+      'effects.paths.list',
+    )
+    expect(problems(effects({ list: '{language}/effects.json' }))[0]!.path).toBe(
+      'effects.paths.list',
+    )
+  })
+})

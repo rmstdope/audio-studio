@@ -3904,3 +3904,50 @@ button.cue-chip[aria-expanded='true'] {
   background: var(--accent-soft-bg);
   border-color: var(--accent-soft-line);
 }
+
+/* Sound effects: a row opens its page; a long description wraps in full. */
+.effects-row {
+  cursor: pointer;
+}
+.effects-row:hover td,
+.effects-row:focus-visible td {
+  background: var(--raised);
+}
+.effects-description {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.effects-description .chip {
+  margin-left: 8px;
+}
+.effects-length {
+  white-space: nowrap;
+}
+.effects-length-line {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin-top: 12px;
+}
+
+/* Narrow window: each row stacks its name, description, length and status. */
+@media (max-width: 700px) {
+  .effects-table thead {
+    display: none;
+  }
+  .effects-table,
+  .effects-table tbody,
+  .effects-table tr,
+  .effects-table td {
+    display: block;
+    min-width: 0;
+  }
+  .effects-table td {
+    border: 0;
+    padding: 2px 12px;
+  }
+  .effects-table tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+}

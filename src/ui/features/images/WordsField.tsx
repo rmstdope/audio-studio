@@ -3,7 +3,7 @@ import { useId, useState, type Ref } from 'react'
 import type { ImageEditResult } from '../../../services/imageEdits'
 import { Problems } from '../../components/Problems'
 
-/** The save of a field of the user's own words: `useSetImageWords` or `useSetStyleField`. */
+/** The save of a field of the user's own words: `useSetImageWords`, `useSetStyleField` or `useSetEffectDescription`. */
 export type WordsSave = UseMutationResult<NonNullable<ImageEditResult>, Error, string | null>
 
 /**
@@ -19,6 +19,7 @@ export function WordsField({
   onSaved,
   onEdit,
   inputRef,
+  failTitle = 'Could not be saved',
 }: {
   label: string
   words: string
@@ -29,6 +30,8 @@ export function WordsField({
   /** The person began changing the field. */
   onEdit: () => void
   inputRef?: Ref<HTMLTextAreaElement>
+  /** The heading over the problems a failed save reports. */
+  failTitle?: string
 }) {
   const id = useId()
   const [draft, setDraft] = useState<string | null>(null)
@@ -84,7 +87,7 @@ export function WordsField({
         onBlur={leave}
       />
       {save.data && !save.data.ok && 'problems' in save.data && (
-        <Problems title="Could not be saved" problems={save.data.problems} />
+        <Problems title={failTitle} problems={save.data.problems} />
       )}
       {save.isError && <span className="adopt-error">{save.error.message}</span>}
     </div>

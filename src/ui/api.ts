@@ -34,7 +34,8 @@ import type { StyleField } from '../core/images'
 import type { ImageEditResult } from '../services/imageEdits'
 import type { RemoveResult } from '../services/musicOrphans'
 import type { ImageMakeRequest, ImageTakesAnswer } from '../services/imageTakes'
-import type { RefreshResult, RefreshSharedResult } from '../services/refresh'
+import type { RefreshEffectsResult, RefreshResult, RefreshSharedResult } from '../services/refresh'
+import type { EffectEditResult } from '../services/effectWords'
 import { useCallback, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
@@ -719,6 +720,72 @@ export function useRefreshShared() {
     '/api/music/stingers/refresh',
     (client) => client.invalidateQueries({ queryKey: ['project'] }),
   )
+}
+
+/** Refreshing the sound effects with the project's `effects.refresh`: see `useRefreshRun`. */
+export function useRefreshEffects() {
+  return useRefreshRun<RefreshEffectsResult>(
+    ['refresh-effects'],
+    '/api/effects/refresh',
+    (client) => client.invalidateQueries({ queryKey: ['project'] }),
+  )
+}
+
+/**
+ * Sends one change to the studio's own sound effect descriptions, then reloads the project, whose
+ * Sound effects pages show the result. A 404 means the game does not list the effect (any more).
+ */
+function useEffectEdit<V>(
+  id: string,
+  request: (value: V) => { method: string; path: string; body?: unknown },
+) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `effect-${id}` },
+    mutationFn: async (value: V) => {
+      const { method, path, body } = request(value)
+      const response = await fetch(path, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      if (response.status === 404) {
+        throw new Error(
+          'The game no longer lists this sound effect; the page shows it as it is now.',
+        )
+      }
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the description answered ${response.status}`)
+      }
+      return (await response.json()) as NonNullable<EffectEditResult>
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
+  })
+}
+
+/** Saves the studio's description of a sound effect; null takes the game's back. */
+export function useSetEffectDescription(id: string) {
+  return useEffectEdit<string | null>(id, (description) => ({
+    method: 'PATCH',
+    path: `/api/effects/${encodeURIComponent(id)}`,
+    body: { description },
+  }))
+}
+
+/** Keep mine: the studio's description stays when the game rewords the effect. */
+export function useKeepMineEffect(id: string) {
+  return useEffectEdit<void>(id, () => ({
+    method: 'POST',
+    path: `/api/effects/${encodeURIComponent(id)}/keep-mine`,
+  }))
+}
+
+/** Forget: deletes the studio's description of an effect the game no longer lists. */
+export function useForgetEffect(id: string) {
+  return useEffectEdit<void>(id, () => ({
+    method: 'POST',
+    path: `/api/effects/${encodeURIComponent(id)}/forget`,
+  }))
 }
 
 /**

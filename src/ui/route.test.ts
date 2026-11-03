@@ -165,3 +165,17 @@ describe('a list of what needs attention in the address', () => {
     expect(routeHref({ view: 'images', page: 'act', part: 'act1' })).toBe('#/images/parts/act1')
   })
 })
+
+describe('the sound effects routes', () => {
+  it('is read and written for the list, the list of what needs attention, and an effect', () => {
+    const routes = [
+      { view: 'effects', page: null },
+      { view: 'effects', page: null, show: 'attention' },
+      { view: 'effects', page: 'effect', effect: 'door-creak' },
+    ] as const
+    for (const route of routes) expect(parseRoute(routeHref(route))).toEqual(route)
+    expect(routeHref(routes[0])).toBe('#/effects')
+    expect(routeHref(routes[1])).toBe('#/effects?show=attention')
+    expect(routeHref(routes[2])).toBe('#/effects/items/door-creak')
+  })
+})

@@ -52,5 +52,10 @@
       "clips": "web/public/images/generated",
       "manifest": "web/public/images/generated/manifest.json"
     }
+  },
+  "effects": {
+    "paths": {
+      "list": "tts/effects.json"
+    }
   }
 }
