@@ -2996,6 +2996,10 @@ button.cue-chip[aria-expanded='true'] {
   gap: 10px;
   margin-top: 16px;
 }
+/* Not in a box that scrolls, so it fits the panel at any width rather than scrolling the page. */
+.music-orphans-table {
+  min-width: 0;
+}
 .music-orphan-action {
   text-align: right;
 }
