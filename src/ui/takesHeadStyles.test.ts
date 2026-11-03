@@ -2,6 +2,10 @@ import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 
 const css = readFileSync(new URL('./styles.css', import.meta.url), 'utf8')
+const effectPanel = readFileSync(
+  new URL('./features/effects/EffectTakesPanel.tsx', import.meta.url),
+  'utf8',
+)
 
 /** The declarations of the first rule whose selector is exactly `selector`, outside any media query. */
 function rule(source: string, selector: string): string {
@@ -53,5 +57,22 @@ describe("the Takes panel's model menu fills a narrow panel", () => {
 
   it('no longer keys the menu on the window width, which left it capped beside a gap', () => {
     expect(css).not.toMatch(/@media \(max-width: 640px\) \{\s*\.takes-controls/)
+  })
+})
+
+// A sound-effects model's entry is long ('Stable Audio 3 Small SFX — about 2 s a take'). Beside the
+// count and the button it was cut at a 600 px window (as-b2t), so on an effect's page the menu
+// takes a line of its own, first, with Stop, the count and the button under it.
+describe("an effect's model menu shows its whole entry in a narrow panel", () => {
+  it('marks the Takes panel as an effect one', () => {
+    expect(effectPanel).toContain('className="panel takes-panel effect-takes"')
+  })
+
+  it('wraps the controls, the menu first on a line of its own', () => {
+    const body = narrow(css)
+    expect(inner(body, '.effect-takes .takes-controls')).toContain('flex-wrap: wrap')
+    expect(inner(body, '.effect-takes .takes-make')).toContain('flex-wrap: wrap')
+    expect(inner(body, '.effect-takes .takes-model')).toContain('flex: 1 1 100%')
+    expect(inner(body, '.effect-takes .takes-model')).toContain('order: -1')
   })
 })

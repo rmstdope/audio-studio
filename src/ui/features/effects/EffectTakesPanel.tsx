@@ -203,7 +203,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
         </div>
       )}
       <EffectInTheGame row={row} view={view} player={player} />
-      <section className="panel takes-panel" aria-label="Takes">
+      <section className="panel takes-panel effect-takes" aria-label="Takes">
         <div className="takes-head">
           <h2>Takes</h2>
           {!none && (
