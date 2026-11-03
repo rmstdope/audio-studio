@@ -597,7 +597,7 @@ function effectModels(facts: SetupFacts): SetupCheck {
   const title = 'Sound-effect models'
   const { uv, models } = facts.effects
   const id = EFFECT_MODEL_IDS[0]
-  const { name, repo, gigabytes } = effectModel(id)
+  const { name, short, repo, gigabytes } = effectModel(id)
   const { download, failure } = models[id]
   const optional = "Optional: for the game's sound effects."
   const off = { id: 'effectModels' as const, title, state: 'off' as const, label: 'Not set up' }
@@ -668,7 +668,7 @@ function effectModels(facts: SetupFacts): SetupCheck {
         {
           sentence: `${optional} The last effect made with ${name} failed.`,
           error: failure.error,
-          clears: `This clears once an effect made with ${effectModel(id).short} works.`,
+          clears: `This clears once an effect made with ${short} works.`,
         },
       ],
     }

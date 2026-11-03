@@ -7,7 +7,9 @@ import { createEffectsWorker } from './effects'
 // Sound-effect models row).
 const probe = createEffectsWorker()
 const live =
-  process.env.AUDIO_STUDIO_LIVE_EFFECTS === '1' && probe.ready().ok && probe.download() === 'whole'
+  process.env.AUDIO_STUDIO_LIVE_EFFECTS === '1' &&
+  Bun.which('uv') !== null &&
+  probe.download() === 'whole'
 
 describe.skipIf(!live)('createEffectsWorker, with real Small SFX', () => {
   it(

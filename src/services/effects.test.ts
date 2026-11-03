@@ -3,22 +3,10 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readWav } from '../core/wav'
-import { createEffectsWorker, effectsReady } from './effects'
+import { createEffectsWorker } from './effects'
 
 const fake = join(import.meta.dir, '../../test/fixtures/fake-effects.ts')
 const command = [process.execPath, fake]
-
-describe('effectsReady', () => {
-  it('needs only uv: the model runs on the processor, on any platform', () => {
-    const machine = { which: () => true, platform: 'linux', arch: 'x64' }
-    expect(effectsReady(machine)).toEqual({ ok: true })
-    expect(effectsReady({ ...machine, which: () => false })).toMatchObject({
-      ok: false,
-      message: 'uv is not on the PATH; it runs the effects worker.',
-      fix: expect.stringContaining('brew install uv'),
-    })
-  })
-})
 
 describe('createEffectsWorker', () => {
   it('makes a take from a description, a length and a seed, with its trailing silence trimmed', async () => {

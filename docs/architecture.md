@@ -1567,7 +1567,8 @@ model stops before the length asked. Nothing calls it yet: the effects page is a
 **Where the weights are read from:** the Hugging Face cache (`HF_HOME`, else `~/.cache/huggingface`),
 as the image models' are, not the studio's own folder: a half-finished download there would
 otherwise show as Ready. The user downloads them once with `hf download` and a read token passed
-on the command line (the repository is gated); the studio never asks for or keeps the token. Whole,
+on the command line (the repository is gated); the studio never asks for or keeps the token. The
+worker runs with `HF_HUB_OFFLINE=1`, so it never downloads: what Setup judged whole is what loads. Whole,
 interrupted and absent downloads are told apart by `hubDownload` (`src/services/images.ts`).
 
 **Setup's Sound-effect models row** (one row for every effects model, after Image models) is checked

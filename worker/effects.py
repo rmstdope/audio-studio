@@ -1,6 +1,8 @@
 # /// script
 # requires-python = ">=3.10,<3.14"
 # dependencies = ["stable-audio-3 @ git+https://github.com/Stability-AI/stable-audio-3@790793b", "soundfile"]
+# [tool.uv]
+# exclude-newer = "2026-10-27T00:00:00Z"
 # ///
 """Content Studio's sound-effects worker: makes one take of an effect, the model loaded once.
 
