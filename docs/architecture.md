@@ -37,7 +37,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Sound effects: the list and the studio's own descriptions are built (§8.9), and the model is in place (§8.8); making takes is planned (§12 step 16; §13 decision 9).
+- Sound effects: the list and the studio's own descriptions (§8.9), the model (§8.8) and the takes — made, compared, chosen — (§8.10) are built (§12 step 16; §13 decision 9).
 - Deciding where a track plays. The game decides which track a room or region plays, and when a
   stinger sounds; the studio makes the tracks it lists.
 
@@ -1562,7 +1562,7 @@ a JSON-lines worker like the music workers, started on the first effect (the mod
 4 s) and stopped with the studio. An effect is a description, a length and a seed; the worker
 writes a 44.1 kHz stereo 16-bit WAV, and the studio trims its trailing silence (`trimTrailingSilence`
 in `src/core/wav.ts`: everything after the last frame above −59 dB, less a 20 ms tail), since the
-model stops before the length asked. Nothing calls it yet: the effects page is as-5wc.4.
+model stops before the length asked. The effects page (§8.10) calls it.
 
 **Where the weights are read from:** the Hugging Face cache (`HF_HOME`, else `~/.cache/huggingface`),
 as the image models' are, not the studio's own folder: a half-finished download there would
@@ -1590,14 +1590,20 @@ choosing takes come with as-5wc.3 and as-5wc.4. The screens are drawn in
 ```json
 "effects": {
   "refresh": "node tts/extract-effects.js",
-  "paths": { "list": "tts/effects.json" }
+  "paths": {
+    "list": "tts/effects.json",
+    "lock": "audio/effects.lock.json",
+    "clips": "audio/effects",
+    "manifest": "audio/effects/manifest.json"
+  }
 }
 ```
 
 The `effects` section is optional; without it the page says how to add one. `refresh` is optional:
 the game's command that writes the list, run in the project root, only when the user clicks
 Refresh from the game (the consumer rules in CLAUDE.md name it). `paths.list` may contain neither
-`{part}` nor `{language}`.
+`{part}` nor `{language}`. `lock`, `clips` and `manifest` (as-5wc.4) are required: where the studio
+writes what the game plays (§8.10); a section without them is a problem naming the path.
 
 **The list** is `[{ "id", "description", "seconds" }]` in the game's order, read only. An id is a
 slug; `seconds` is positive and may be fractional. The list is read entry by entry
@@ -1618,8 +1624,49 @@ entry. The words of an effect the game dropped stay in the file, shown under the
 merely unreadable is not taken for dropped. A descriptions file that cannot be read is reported and
 never written over.
 
-**Status.** No takes exist yet, so every effect reads "none yet" and counts as needing attention;
-the ring and the sidebar count cover the readable effects only.
+**Status** is §8.10's: the ring and the sidebar count the effects up to date, over the readable ones only.
+
+### 8.10 Sound effects: takes (as-5wc.4)
+
+An effect's page is a stinger's page without the brief's tempo and key: the **Description** panel, a
+green **In the game** block (the chosen take on its own, or a dashed "Nothing plays here yet"), and
+the **Takes** panel (the others as cards, two to a row in take-number order). The screens are drawn in
+`docs/ui/as-5wc.4-effect-takes.html`.
+
+**Takes.** A take is the description in use (the studio's over the game's) generated for the
+`seconds` the game asks, with a new seed, by `EffectGenerator` (§8.8) one at a time on its own queue
+(the CPU, not the GPU queue). The model stops when its sound does, so a take ends where its sound
+ends (the trailing silence already trimmed) and its **real length** is what the card shows and the
+manifest keeps; the length the game asked for stays in the Description panel. The menu is 1 to 8
+takes (starts on 4, page state); a batch goes on when the page is left or reloaded and survives a
+`--dev` reload, not a restart. The board is `.content-studio/effect-boards/<effect>.json`
+(`{ next, takes: [{ n, hash, seed, model, seconds, peaks, inputs }] }`; numbers never reused, reserved
+when takes are asked for), the WAV `.content-studio/effect-takes/<effect>/<hash>.<n>.wav`, the hash of
+the model, description and length. A take made for an earlier description stays a take, with no mark.
+A take that fails is kept in memory as "could not be made" with **Try again**; success clears and
+failure records the model's health (Setup's row, §8.8), a stopped take neither. **Stop** discards the
+one being made and the ones waiting.
+
+**Compare.** "▶ The chosen, then this" plays the chosen take, one second of quiet, then the take
+(`Clip.after` in `ui/player.ts`); "■ Stop", a second press or any other sound ends it.
+
+**Choose** (no question) encodes the take to `<effect>.mp3` (stereo, 160 kbps, not levelled: effects are
+short and the game sets their volume) in the clips folder, written like a music clip: a hidden
+temporary file renamed in, then the manifest `{ effect: { file, duration } }` (the game's format, as
+music's), the lock last, in the project's one choice turn (`services/effectClips.ts`). The lock
+(`{ fp, model, seed, take, inputs: { description, seconds }, at }` per effect, one per line) records the
+take's own inputs. **Un-choose** asks first, then deletes the manifest entry, the clip and the lock
+entry last; the take stays on the board. **Drop** removes a take that is not chosen, at once; a
+chosen take is refused (409).
+
+**Status** (`effectStatus`): "none yet" (no take on the board), "not chosen", "chosen", "changed since
+chosen" (the description in use or the length differs from the chosen take's own inputs), "clip missing"
+(ahead of changed), "not known" (the lock cannot be read; Choose, Drop and Un-choose wait), and, in
+the list while a batch is made, "making 4 takes · about 10 s". An effect with a chosen take counts as
+chosen in the subtitle, an out-of-date one included; the ring and sidebar count those chosen and
+unchanged. **Accept** (`POST /api/effects/:id/accept`) counts the chosen take as made from the
+description now, when the description alone changed; a changed length needs a new take (409).
+`CONTENT_STUDIO_FAKE_EFFECTS=1` swaps the generator for a stand-in that makes short tones.
 
 ## 9. Server API
 
@@ -1682,6 +1729,14 @@ POST   /api/effects/refresh                      run effects.refresh; the effect
 PATCH  /api/effects/:id                          the studio's description of a sound effect ({ description }; null or empty: the game's)
 POST   /api/effects/:id/keep-mine                keep the studio's words after the game reworded the effect
 POST   /api/effects/:id/forget                   delete the words of an effect the game no longer lists
+GET    /api/effects/:id/takes                    the effect's takes, those being made and failed
+POST   /api/effects/:id/takes                    make takes ({ count } 1–8, or { retry })
+GET    /api/effects/:id/takes/:file              a take's WAV
+DELETE /api/effects/:id/takes/:file              drop a take that is not chosen
+POST   /api/effects/:id/choose|unchoose|accept|stop   choose a take ({ file }), take it back, accept a changed description, stop the batch
+GET    /api/effects/clips/:file                  a chosen clip (plain `.mp3` only)
+GET    /api/effects/:id/current                  the clip the game plays for the effect
+GET    /api/effects/making                       the batches being made, by effect
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
 PATCH  /api/parts/:part/cues/:key/inside         a cue at a gap inside the line ({ at, cue, text }; empty cue: remove;
@@ -2107,6 +2162,8 @@ Small, independently useful increments:
        trailing silence trimmed, and Setup's Sound-effect models row.
     3. **The game's effects list and the studio's descriptions** (as-5wc.2, done: §8.9), read-only,
        with the studio's own description overrides and the Sound effects workspace.
+    4. **Takes** (as-5wc.4, done: §8.10): make, hear, compare, choose, un-choose, drop and accept; the
+       lock, manifest and clips; statuses in the list. The second model is as-5wc.5.
 
 ---
 
