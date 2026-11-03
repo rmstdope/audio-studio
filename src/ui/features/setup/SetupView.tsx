@@ -123,10 +123,11 @@ export function SetupCheckRow({ check }: { check: SetupCheck }) {
                       {command}
                     </code>
                   ))}
+                  {step.after && <span>{step.after}</span>}
                 </li>
               ))}
             </ol>
-            <span className="faint small">{check.steps.note}</span>
+            {check.steps.note && <span className="faint small">{check.steps.note}</span>}
           </>
         )}
       </div>

@@ -79,6 +79,19 @@ describe('a setup row with steps', () => {
     expect(row.textContent).toContain('The studio never asks for or keeps your token.')
   })
 
+  it('shows text after a step’s command, and no note line when the note is empty', () => {
+    const row = render({
+      ...check,
+      steps: {
+        list: [{ parts: ['Install uv:'], commands: ['brew install uv'], after: '(then restart)' }],
+        note: '',
+      },
+    })
+    const item = row.querySelector('ol.setup-steps > li')!
+    expect(item.textContent).toBe('Install uv:brew install uv(then restart)')
+    expect(row.querySelector('.setup-text > span.faint')).toBeNull()
+  })
+
   it('has neither list nor note without steps', () => {
     const row = render({ ...check, steps: undefined })
     expect(row.querySelector('ol')).toBeNull()

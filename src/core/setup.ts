@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import { EFFECT_MODEL_IDS, effectModel, type EffectModelId } from './effectModels'
 import { IMAGE_MODEL_IDS, imageModel, type ImageDownload, type ImageModelId } from './imageModels'
 import { MUSIC_MODELS, musicModel, type MusicModelId } from './musicModels'
 import type { FishTierSchema } from './project'
@@ -99,6 +100,12 @@ export interface SetupFacts {
       }
     >
   } | null
+  /** The sound-effect models and uv, which runs them; always checked, since no project section is needed. */
+  effects: {
+    uv: boolean
+    /** Each effect model: how much of its download is here, and its last effect if that failed. */
+    models: Record<EffectModelId, { download: ImageDownload; failure: { error: string } | null }>
+  }
   /** What asking ElevenLabs for the account gave (not asked without its key). */
   elevenlabs: ElevenAnswer
 }
@@ -107,6 +114,8 @@ export interface SetupFacts {
 export interface SetupStep {
   parts: (string | { link: string; href: string })[]
   commands?: string[]
+  /** Text after the commands, on the same step. */
+  after?: string
 }
 
 /**
@@ -124,6 +133,7 @@ export interface SetupCheck {
     | 'music'
     | 'stableAudio'
     | 'imageModels'
+    | 'effectModels'
     | 'elevenlabsKey'
     | 'elevenlabs'
   title: string
@@ -166,6 +176,7 @@ export function setupChecks(facts: SetupFacts): SetupCheck[] {
     music(facts),
     stableAudio(facts),
     imageModels(facts),
+    effectModels(facts),
     elevenlabsKey(facts),
     elevenlabs(facts),
   ]
@@ -578,6 +589,95 @@ function imageModels(facts: SetupFacts): SetupCheck {
     detail,
     ...(failures.length ? { failures } : {}),
     ...(downloadSteps.length ? { steps: noteSteps(downloadSteps) } : {}),
+  }
+}
+
+/** The row for the sound-effect models: optional for now, so whatever is wrong shows as "Not set up". */
+function effectModels(facts: SetupFacts): SetupCheck {
+  const title = 'Sound-effect models'
+  const { uv, models } = facts.effects
+  const id = EFFECT_MODEL_IDS[0]
+  const { name, repo, gigabytes } = effectModel(id)
+  const { download, failure } = models[id]
+  const optional = "Optional: for the game's sound effects."
+  const off = { id: 'effectModels' as const, title, state: 'off' as const, label: 'Not set up' }
+  if (!uv) {
+    return {
+      ...off,
+      detail: `${optional} uv, which runs ${name}, is not on the PATH.`,
+      steps: {
+        list: [
+          {
+            parts: ['Install uv:'],
+            commands: ['brew install uv'],
+            after: '(then start the studio again if it is still not found)',
+          },
+        ],
+        note: '',
+      },
+    }
+  }
+  const command = `HF_TOKEN=… uvx --from huggingface_hub hf download ${repo}`
+  const note = 'Then press Check again.'
+  if (download === 'partial') {
+    return {
+      ...off,
+      detail: `${optional} ${name}'s download is incomplete, so it can't run.`,
+      steps: {
+        list: [
+          { parts: ['Finish the download (it picks up where it stopped):'], commands: [command] },
+        ],
+        note,
+      },
+    }
+  }
+  if (download === 'absent') {
+    return {
+      ...off,
+      detail: `${optional} ${name} is not on this computer.`,
+      steps: {
+        list: [
+          {
+            parts: [
+              "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+              { link: repo, href: `https://huggingface.co/${repo}` },
+              '.',
+            ],
+          },
+          {
+            parts: [
+              'Make a read token at ',
+              {
+                link: 'huggingface.co/settings/tokens',
+                href: 'https://huggingface.co/settings/tokens',
+              },
+              '.',
+            ],
+          },
+          { parts: [`Download it, once (about ${gigabytes} GB):`], commands: [command] },
+        ],
+        note: `The studio never asks for or keeps your token. ${note}`,
+      },
+    }
+  }
+  if (failure) {
+    return {
+      ...off,
+      detail: '',
+      failures: [
+        {
+          sentence: `${optional} The last effect made with ${name} failed.`,
+          error: failure.error,
+          clears: `This clears once an effect made with ${effectModel(id).short} works.`,
+        },
+      ],
+    }
+  }
+  return {
+    id: 'effectModels',
+    title,
+    state: 'ok',
+    detail: `${name} is downloaded on this computer; it loads on the first effect, in about 4 seconds.`,
   }
 }
 

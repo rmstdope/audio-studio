@@ -3,12 +3,16 @@ import { setupChecks, type ElevenAnswer, type SetupCheck, type SetupFacts } from
 import { elevenLabsApiKey, fishApiKey } from './env'
 import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS } from '../core/musicModels'
 import { missingStableAudio, STABLE_AUDIO_DIR } from './stableAudio'
+import type { ImageDownload } from '../core/imageModels'
 import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_IDS } from '../core/imageModels'
+import { EFFECT_MODEL_IDS, effectModel, type EffectModelId } from '../core/effectModels'
+import { createEffectHealth, type EffectHealthStore } from './effectHealth'
 import { createImageHealth, type ImageHealthStore } from './imageHealth'
 import { readImages } from './imageLists'
 import {
   downloadOf,
   HUB_DIR,
+  hubDownload,
   imageModelDownload,
   imageModelInstalled,
   mfluxReady,
@@ -62,6 +66,12 @@ export async function checkSetup(
   },
   /** What remembers the image models whose last take failed. */
   health: Pick<ImageHealthStore, 'read'> = createImageHealth(),
+  /** What remembers the effect models whose last effect failed. */
+  effectHealth: Pick<EffectHealthStore, 'read'> = createEffectHealth(),
+  /** What says how much of an effect model's weights are on this computer. */
+  effectModels: { download: (model: EffectModelId) => ImageDownload } = {
+    download: (model) => hubDownload(HUB_DIR, effectModel(model).repo),
+  },
 ): Promise<SetupResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -99,6 +109,7 @@ export async function checkSetup(
         }
       : null,
     images: project.images ? await imageFacts(projectFile, project, images, health) : null,
+    effects: await effectFacts(projectFile, machine, effectHealth, effectModels),
     elevenlabs: elevenAnswer,
   }
   return { ok: true, checks: setupChecks(facts) }
@@ -141,5 +152,27 @@ async function imageFacts(
     mflux: await images.ready(),
     model: project.images?.model ?? DEFAULT_IMAGE_MODEL,
     models,
+  }
+}
+
+/** The sound-effect models' facts: uv, and for each model its download and its failed last effect, if any. */
+async function effectFacts(
+  projectFile: string,
+  machine: Machine,
+  health: Pick<EffectHealthStore, 'read'>,
+  effects: { download: (model: EffectModelId) => ImageDownload },
+): Promise<SetupFacts['effects']> {
+  const failures = await health.read(projectFile)
+  return {
+    uv: machine.which('uv'),
+    models: Object.fromEntries(
+      EFFECT_MODEL_IDS.map((id) => [
+        id,
+        {
+          download: effects.download(id),
+          failure: failures[id] ? { error: failures[id].error } : null,
+        },
+      ]),
+    ) as SetupFacts['effects']['models'],
   }
 }

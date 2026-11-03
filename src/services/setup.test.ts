@@ -6,6 +6,7 @@ import type { ElevenAnswer } from '../core/setup'
 import type { CreditResult } from './fish'
 import type { ImageDownload, ImageModelId } from '../core/imageModels'
 import { createImageHealth } from './imageHealth'
+import { createEffectHealth } from './effectHealth'
 import { mfluxReady } from './images'
 import { checkSetup, type Machine } from './setup'
 
@@ -101,7 +102,18 @@ describe('checkSetup', () => {
       'content-studio.json': projectJson(),
       '.env': 'FISH_AUDIO_API_KEY=k\n',
     })
-    const result = await checkSetup(join(root, 'content-studio.json'), credit, mac, {})
+    const result = await checkSetup(
+      join(root, 'content-studio.json'),
+      credit,
+      mac,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { download: () => 'absent' },
+    )
     if (!result.ok) throw new Error('expected checks')
     expect(result.checks.find((c) => c.id === 'fish')).toMatchObject({ credit: 3 })
     expect(byId(result.checks)).toEqual({
@@ -114,6 +126,7 @@ describe('checkSetup', () => {
       music: 'off',
       stableAudio: 'off',
       imageModels: 'off',
+      effectModels: 'off',
       elevenlabsKey: 'off',
       elevenlabs: 'off',
     })
@@ -131,6 +144,12 @@ describe('checkSetup', () => {
       },
       machine,
       {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { download: () => 'absent' },
     )
     if (!result.ok) throw new Error('expected checks')
     expect(byId(result.checks)).toEqual({
@@ -143,6 +162,7 @@ describe('checkSetup', () => {
       music: 'off',
       stableAudio: 'off',
       imageModels: 'off',
+      effectModels: 'off',
       elevenlabsKey: 'off',
       elevenlabs: 'off',
     })
@@ -382,5 +402,48 @@ describe('checkSetup of the image models', () => {
 
   it('is not used without an images section', async () => {
     expect(await check(undefined, mac, () => true)).toMatchObject({ label: 'Not used' })
+  })
+})
+
+describe('checkSetup: the sound-effect models', () => {
+  const row = async (
+    machine: Machine,
+    download: ImageDownload,
+    root = tempRepo({ 'content-studio.json': projectJson() }),
+  ) => {
+    const result = await checkSetup(
+      join(root, 'content-studio.json'),
+      credit,
+      machine,
+      {},
+      undefined,
+      async () => ({ ok: false, reason: 'no-key', message: 'no key' }),
+      undefined,
+      undefined,
+      undefined,
+      { download: () => download },
+    )
+    if (!result.ok) throw new Error('expected checks')
+    return result.checks.find((c) => c.id === 'effectModels')!
+  }
+
+  it('is checked without any project section, and is never a problem', async () => {
+    expect(await row(mac, 'whole')).toMatchObject({ state: 'ok' })
+    expect(await row(mac, 'absent')).toMatchObject({ state: 'off', label: 'Not set up' })
+    expect(await row(mac, 'partial')).toMatchObject({ label: 'Not set up' })
+    expect(await row({ ...mac, which: () => false }, 'whole')).toMatchObject({
+      state: 'off',
+      detail: expect.stringContaining('uv, which runs'),
+    })
+  })
+
+  it('shows a failed effect remembered across a restart, and writes nothing to the project', async () => {
+    const root = tempRepo({ 'content-studio.json': projectJson() })
+    const file = join(root, 'content-studio.json')
+    await createEffectHealth().record(file, 'small-sfx', { error: 'RuntimeError: boom' })
+    const found = await row(mac, 'whole', root)
+    expect(found.failures![0]).toMatchObject({ error: 'RuntimeError: boom' })
+    await createEffectHealth().clear(file, 'small-sfx')
+    expect(await row(mac, 'whole', root)).toMatchObject({ state: 'ok' })
   })
 })

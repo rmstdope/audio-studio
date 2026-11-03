@@ -15,6 +15,7 @@ const ready: SetupFacts = {
   fishTier: null,
   music: { ready: { ok: true }, checkpoints: '/models', model: 'balanced', stableAudioMissing: [] },
   images: imageFacts({}),
+  effects: effectFacts({}),
   elevenlabs: { ok: false, reason: 'no-key', message: 'x' },
 }
 
@@ -29,6 +30,20 @@ const starter: ElevenAccount = {
 }
 
 const byId = (facts: SetupFacts) => Object.fromEntries(setupChecks(facts).map((c) => [c.id, c]))
+
+/** The sound-effect facts of a machine whose model is whole and well, with these changes. */
+function effectFacts(change: {
+  uv?: boolean
+  download?: 'whole' | 'partial' | 'absent'
+  failure?: { error: string } | null
+}): SetupFacts['effects'] {
+  return {
+    uv: change.uv ?? true,
+    models: {
+      'small-sfx': { download: change.download ?? 'whole', failure: change.failure ?? null },
+    },
+  }
+}
 
 /** The image facts of a project whose models are whole and well, with these changes. */
 function imageFacts(change: {
@@ -60,6 +75,7 @@ describe('setupChecks', () => {
       'music',
       'stableAudio',
       'imageModels',
+      'effectModels',
       'elevenlabsKey',
       'elevenlabs',
     ])
@@ -618,5 +634,122 @@ describe('the image models check', () => {
       detail: 'Image takes are made on macOS with Apple silicon only.',
     })
     void here
+  })
+})
+
+describe('the Sound-effect models row', () => {
+  const row = (effects: SetupFacts['effects']) => byId({ ...ready, effects }).effectModels!
+  const download =
+    'HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/stable-audio-3-small-sfx'
+
+  it('is ready with the download whole, uv there and no failed effect', () => {
+    expect(row(effectFacts({}))).toMatchObject({
+      title: 'Sound-effect models',
+      state: 'ok',
+      detail:
+        'Stable Audio 3 Small SFX is downloaded on this computer; it loads on the first effect, in about 4 seconds.',
+    })
+  })
+
+  it('says the model is not on this computer, with three steps, in grey', () => {
+    const check = row(effectFacts({ download: 'absent' }))
+    expect(check).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+      detail:
+        "Optional: for the game's sound effects. Stable Audio 3 Small SFX is not on this computer.",
+    })
+    expect(check.steps?.note).toBe(
+      'The studio never asks for or keeps your token. Then press Check again.',
+    )
+    expect(check.steps?.list).toEqual([
+      {
+        parts: [
+          "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+          {
+            link: 'stabilityai/stable-audio-3-small-sfx',
+            href: 'https://huggingface.co/stabilityai/stable-audio-3-small-sfx',
+          },
+          '.',
+        ],
+      },
+      {
+        parts: [
+          'Make a read token at ',
+          {
+            link: 'huggingface.co/settings/tokens',
+            href: 'https://huggingface.co/settings/tokens',
+          },
+          '.',
+        ],
+      },
+      { parts: ['Download it, once (about 6.5 GB):'], commands: [download] },
+    ])
+  })
+
+  it('tells an interrupted download from a missing one', () => {
+    expect(row(effectFacts({ download: 'partial' }))).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+      detail:
+        "Optional: for the game's sound effects. Stable Audio 3 Small SFX's download is incomplete, so it can't run.",
+      steps: {
+        list: [
+          { parts: ['Finish the download (it picks up where it stopped):'], commands: [download] },
+        ],
+        note: 'Then press Check again.',
+      },
+    })
+  })
+
+  it('asks for uv first, whether or not the model is there', () => {
+    for (const d of ['whole', 'absent', 'partial'] as const) {
+      expect(row(effectFacts({ uv: false, download: d }))).toMatchObject({
+        state: 'off',
+        label: 'Not set up',
+        detail:
+          "Optional: for the game's sound effects. uv, which runs Stable Audio 3 Small SFX, is not on the PATH.",
+        steps: {
+          list: [
+            {
+              parts: ['Install uv:'],
+              commands: ['brew install uv'],
+              after: '(then start the studio again if it is still not found)',
+            },
+          ],
+          note: '',
+        },
+      })
+    }
+  })
+
+  it('shows the last failed effect, with its error and what clears it, no link', () => {
+    const check = row(effectFacts({ failure: { error: 'RuntimeError: boom' } }))
+    expect(check).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+      detail: '',
+      failures: [
+        {
+          sentence:
+            "Optional: for the game's sound effects. The last effect made with Stable Audio 3 Small SFX failed.",
+          error: 'RuntimeError: boom',
+          clears: 'This clears once an effect made with Small SFX works.',
+        },
+      ],
+    })
+    expect(check.failures![0]).not.toHaveProperty('link')
+  })
+
+  it('shows the download before the failure, and never counts as a problem', () => {
+    const both = row(effectFacts({ download: 'absent', failure: { error: 'x' } }))
+    expect(both.failures).toBeUndefined()
+    expect(both.detail).toContain('is not on this computer')
+    for (const e of [
+      effectFacts({ uv: false }),
+      effectFacts({ download: 'partial' }),
+      effectFacts({ failure: { error: 'x' } }),
+    ])
+      expect(row(e).state).not.toBe('problem')
   })
 })
