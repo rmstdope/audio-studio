@@ -4,8 +4,17 @@ import type { EffectsSummary } from '../core/effects'
 export function effectsSubtitle(effects: EffectsSummary): string {
   const lead = 'The sound effects the game asks for.'
   if (effects.status !== 'ok' || effects.rows.length === 0) return lead
-  const unread = effects.unreadable ? `; ${effects.unreadable} could not be read` : ''
-  return `${lead} 0 of ${effects.rows.length} chosen${unread}.`
+  if (effects.rows.every((row) => row.status === 'unknown')) {
+    return `${lead} Which are chosen is not known.`
+  }
+  const chosen = effects.rows.filter((row) => row.chosen).length
+  const missing = effects.rows.filter((row) => row.status === 'missing').length
+  const parts = [
+    `${chosen} of ${effects.rows.length} chosen`,
+    ...(missing ? [missing === 1 ? '1 clip is missing' : `${missing} clips are missing`] : []),
+    ...(effects.unreadable ? [`${effects.unreadable} could not be read`] : []),
+  ]
+  return `${lead} ${parts.join('; ')}.`
 }
 
 /** The one line that stands in for the table, or null when there is a table (or problems to read). */

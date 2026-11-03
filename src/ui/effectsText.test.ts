@@ -14,6 +14,9 @@ const summary = (extra: Partial<EffectsSummary> = {}): EffectsSummary => ({
     changedHere: false,
     gameChanged: false,
     status: 'none-yet' as const,
+    current: { kind: 'nothing' as const },
+    changed: [],
+    chosen: false,
   })),
   dropped: [],
   unreadable: 0,
@@ -25,6 +28,28 @@ const summary = (extra: Partial<EffectsSummary> = {}): EffectsSummary => ({
 describe('effectsSubtitle', () => {
   it('counts the chosen out of all', () => {
     expect(effectsSubtitle(summary())).toBe('The sound effects the game asks for. 0 of 8 chosen.')
+  })
+
+  it('counts an out-of-date effect as chosen, and names missing clips', () => {
+    const rows = summary().rows.map((row, i) => ({
+      ...row,
+      chosen: i < 4,
+      status: i === 0 ? ('missing' as const) : i === 1 ? ('changed' as const) : row.status,
+    }))
+    expect(effectsSubtitle(summary({ rows }))).toBe(
+      'The sound effects the game asks for. 4 of 8 chosen; 1 clip is missing.',
+    )
+    const two = rows.map((row, i) => (i === 1 ? { ...row, status: 'missing' as const } : row))
+    expect(effectsSubtitle(summary({ rows: two }))).toBe(
+      'The sound effects the game asks for. 4 of 8 chosen; 2 clips are missing.',
+    )
+  })
+
+  it('says which are chosen is not known while the lock cannot be read', () => {
+    const rows = summary().rows.map((row) => ({ ...row, status: 'unknown' as const }))
+    expect(effectsSubtitle(summary({ rows }))).toBe(
+      'The sound effects the game asks for. Which are chosen is not known.',
+    )
   })
 
   it('says how many could not be read', () => {

@@ -6,6 +6,8 @@ export interface Clip {
   fade?: boolean
   /** Play it round and round until stopped, as the game plays a loop. */
   loop?: boolean
+  /** In a list: seconds of quiet after it ends on its own, before the next clip. */
+  after?: number
 }
 
 /** The part of an audio element the player uses, so tests can give a fake one. */
@@ -85,6 +87,12 @@ export function createPlayer(
   let token = 0
   // Once disposed (its page left), the player starts nothing again.
   let disposed = false
+  // The quiet between two clips of a list, until the next one starts.
+  let gap: ReturnType<typeof setTimeout> | null = null
+  const endGap = () => {
+    if (gap !== null) clearTimeout(gap)
+    gap = null
+  }
 
   const emit = () => onChange({ playing: current, inTurn: queue.length > 0 })
 
@@ -156,6 +164,7 @@ export function createPlayer(
   }
 
   const start = (clip: Clip) => {
+    endGap()
     if (disposed) return
     if (!audible) return begin(clip)
     // Something still sounds: let it fade out, then start this one.
@@ -167,6 +176,7 @@ export function createPlayer(
 
   const stop = () => {
     token++
+    endGap()
     queue = []
     current = null
     if (audible) fadeOut(null)
@@ -184,12 +194,23 @@ export function createPlayer(
     return false
   }
 
-  /** The next clip of the list, or the end. */
-  const advance = () => {
+  /**
+   * The next clip of the list, or the end. After a clip that ended on its own (`quiet`) the next
+   * waits for that clip's quiet, with nothing playing and the list still in turn.
+   */
+  const advance = (quiet = false) => {
     const at = queue.findIndex((c) => c.id === current)
     const clip = at >= 0 ? queue[at + 1] : undefined
-    if (clip) start(clip)
-    else stop()
+    if (!clip) return stop()
+    const wait = quiet ? queue[at]?.after : undefined
+    if (!wait) return start(clip)
+    const mine = ++token
+    current = null
+    emit()
+    gap = setTimeout(() => {
+      gap = null
+      if (mine === token) start(clip)
+    }, wait * 1000)
   }
 
   const fail = (of: number) => {
@@ -220,7 +241,7 @@ export function createPlayer(
     },
     /** The clip playing has ended. */
     ended() {
-      if (!over()) advance()
+      if (!over()) advance(true)
     },
     /** The clip playing could not be played. */
     failed() {

@@ -252,3 +252,8 @@ export function effectTimeLeft(
 export function effectMakingStatus({ takes, left }: EffectMakingSummary): string {
   return `making ${takes} ${takes === 1 ? 'take' : 'takes'} · about ${Math.max(1, Math.round(left))} s`
 }
+
+/** A take's real length as the card writes it: "1.4 s". */
+export function effectTakeLength(seconds: number): string {
+  return `${seconds.toFixed(1)} s`
+}

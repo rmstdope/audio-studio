@@ -7,6 +7,7 @@ import {
   effectChangedLine,
   effectInTheGame,
   effectMakingStatus,
+  effectTakeLength,
   effectStatus,
   effectTimeLeft,
   effectUnchooseQuestion,
@@ -144,5 +145,13 @@ describe('words for making takes', () => {
     expect(MakeEffectTakesBody.safeParse({ count: 0 }).success).toBe(false)
     expect(MakeEffectTakesBody.safeParse({ retry: 3 }).success).toBe(true)
     expect(MakeEffectTakesBody.safeParse({ count: 2, model: 'x' }).success).toBe(false)
+  })
+})
+
+describe('effectTakeLength', () => {
+  it('writes the real length to a tenth of a second', () => {
+    expect(effectTakeLength(1.4)).toBe('1.4 s')
+    expect(effectTakeLength(2)).toBe('2.0 s')
+    expect(effectTakeLength(0.5004)).toBe('0.5 s')
   })
 })

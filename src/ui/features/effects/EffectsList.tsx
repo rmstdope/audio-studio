@@ -1,16 +1,33 @@
 import { useRef, useState } from 'react'
 import type { DroppedEffect, EffectsSummary } from '../../../core/effects'
 import { effectSeconds } from '../../../core/effects'
-import { useForgetEffect, useRefreshEffects } from '../../api'
+import {
+  EFFECT_STATUS_LABEL,
+  effectMakingStatus,
+  type EffectStatus,
+} from '../../../core/effectTakes'
+import { useEffectsMaking, useForgetEffect, useRefreshEffects } from '../../api'
 import { Confirm } from '../../components/Confirm'
 import { DoneStat } from '../../components/DoneStat'
 import { Failure } from '../../components/Failure'
 import { Problems } from '../../components/Problems'
+import { PlayIcon, StopIcon } from '../../components/icons'
+import { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { effectsNotice, effectsRefreshSummary, effectsSubtitle } from '../../effectsText'
 import { routeHref } from '../../route'
 import { showingAttentionText } from '../../status'
 import { FailedPanel, RefreshPanel } from '../music/MusicView'
+
+/** The chip class of each status: green when chosen, amber when it needs a look. */
+const STATUS_CHIP: Record<EffectStatus, string> = {
+  'none-yet': 'chip',
+  'not-chosen': 'chip',
+  chosen: 'chip chip-ok',
+  changed: 'chip chip-warn',
+  missing: 'chip chip-warn',
+  unknown: 'chip chip-warn',
+}
 
 /** The list page of Sound effects: the game's effects, with Refresh from the game. */
 export function EffectsList({
@@ -21,6 +38,8 @@ export function EffectsList({
   attention: boolean
 }) {
   const run = useRefreshEffects()
+  const making = useEffectsMaking().data ?? {}
+  const player = useClipPlayer()
   const result = run.outcome?.result
   const notice = effectsNotice(effects)
   const shown = attention
@@ -92,6 +111,7 @@ export function EffectsList({
             <table className="table effects-table">
               <thead>
                 <tr>
+                  <th aria-label="Play" />
                   <th>Effect</th>
                   <th>Description</th>
                   <th>Length</th>
@@ -114,6 +134,35 @@ export function EffectsList({
                         if (event.key === 'Enter' && event.target === event.currentTarget) open()
                       }}
                     >
+                      <td className="music-play">
+                        {row.current.kind === 'take' && row.current.exists && (
+                          <button
+                            className={
+                              player.playing === row.id ? 'icon-btn music-stop' : 'icon-btn'
+                            }
+                            type="button"
+                            aria-label={
+                              player.playing === row.id
+                                ? `Stop ${row.name}`
+                                : `Play ${row.name}: take ${row.current.take}`
+                            }
+                            onClick={(event) => {
+                              // The row opens the effect's page; the button only plays.
+                              event.stopPropagation()
+                              player.toggle(
+                                row.id,
+                                `/api/effects/${encodeURIComponent(row.id)}/current`,
+                                {
+                                  fade: true,
+                                },
+                              )
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
+                          >
+                            {player.playing === row.id ? <StopIcon /> : <PlayIcon />}
+                          </button>
+                        )}
+                      </td>
                       <td>
                         <strong>{row.name}</strong>
                         <div className="mono muted music-id">{row.id}</div>
@@ -127,7 +176,13 @@ export function EffectsList({
                       </td>
                       <td className="effects-length">{effectSeconds(row.seconds)}</td>
                       <td>
-                        <span className="chip">none yet</span>
+                        {making[row.id] ? (
+                          <span className="chip">{effectMakingStatus(making[row.id]!)}</span>
+                        ) : (
+                          <span className={STATUS_CHIP[row.status]}>
+                            {EFFECT_STATUS_LABEL[row.status]}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   )
