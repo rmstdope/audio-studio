@@ -5,6 +5,7 @@ import type { ProjectSummary } from '../../../core/summary'
 import type { EffectsRoute } from '../../route'
 import { installFakeWebAudio, started } from '../../../../test/fakeWebAudio'
 import { readFileSync } from 'node:fs'
+import { minWidthsInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -410,6 +411,17 @@ describe('the dropped effects', () => {
       new RegExp(`\\.${c}\\b[^{}]*\\{[^}]*display:\\s*block[^}]*min-width:\\s*0`).test(narrow),
     )
     expect(stacking).not.toEqual([])
+  })
+
+  it('fit the panel in a window wider than the stacking width, so Forget is never off the edge', () => {
+    const { container } = render(list, effects({ dropped }))
+    const panel = container.querySelector('[aria-label="No longer in the game\'s list"]')!
+    const table = panel.querySelector('table')!
+    expect(table.closest('.table-box')).toBeNull()
+    expect(minWidthsInEveryWindow(table)).toEqual([])
+    // The effects table above, in its box that scrolls, keeps its columns wide.
+    const boxed = container.querySelector('.table-box table')!
+    expect(minWidthsInEveryWindow(boxed)).toEqual([':where(.table-box) .table: 760px'])
   })
 
   it('asks first; Cancel puts focus back on Forget', async () => {

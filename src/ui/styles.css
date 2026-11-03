@@ -920,9 +920,14 @@ a.btn {
 
 .table {
   width: 100%;
-  min-width: 760px;
   border-collapse: collapse;
   font-size: 13px;
+}
+/* Only a table in a box that scrolls keeps its columns wide: one in a panel fits the panel at any
+   width rather than scrolling the page. `:where` keeps this as weak as `.table`, so a table's own
+   minimum (`.music-table`, `.spending-table`) still wins. */
+:where(.table-box) .table {
+  min-width: 760px;
 }
 
 .table th {
@@ -2995,10 +3000,6 @@ button.cue-chip[aria-expanded='true'] {
   flex-direction: column;
   gap: 10px;
   margin-top: 16px;
-}
-/* Not in a box that scrolls, so it fits the panel at any width rather than scrolling the page. */
-.music-orphans-table {
-  min-width: 0;
 }
 .music-orphan-action {
   text-align: right;

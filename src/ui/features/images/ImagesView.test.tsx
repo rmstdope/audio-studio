@@ -3,6 +3,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagesRoute } from '../../route'
 import type { MadeFrom, Prompts, GameStyle } from '../../../core/images'
 import type { ProjectSummary } from '../../../core/summary'
+import { minWidthsInEveryWindow } from '../../../../test/stylesheet'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -451,6 +452,16 @@ describe('the Style page', () => {
       field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
     })
     expect(sent[0]).toEqual({ method: 'PATCH', path: '/api/image-style', body: { look: 'oil' } })
+  })
+
+  it('keeps the Added per act table to the panel, so it never scrolls the page sideways', () => {
+    const page = render(route)
+    const panel = [...page.querySelectorAll('section')].find((s) =>
+      s.querySelector('h2')?.textContent?.includes('Added per act'),
+    )!
+    const table = panel.querySelector('table')!
+    expect(table.closest('.table-box')).toBeNull()
+    expect(minWidthsInEveryWindow(table)).toEqual([])
   })
 
   it('says when the game has no style file yet', () => {
