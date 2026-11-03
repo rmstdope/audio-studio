@@ -5,6 +5,7 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import {
   setElevenModel,
   setElevenSettings,
+  setEffectModel,
   setImageModel,
   setMusicModel,
   setStageModel,
@@ -286,6 +287,45 @@ describe('setImageModel', () => {
     expect(await setImageModel(plain.projectFile, 'klein', 'klein')).toMatchObject({
       ok: false,
       problems: [{ path: 'images' }],
+    })
+  })
+})
+
+describe('setEffectModel', () => {
+  const effectPaths = {
+    list: 'tts/effects.json',
+    lock: 'audio/effects.lock.json',
+    clips: 'audio/effects',
+    manifest: 'audio/effects/manifest.json',
+  }
+  const withEffects = (extra: Record<string, unknown> = {}) =>
+    projectJson({ effects: { paths: effectPaths, ...extra } })
+
+  it('writes effects.model and nothing else, in the file’s own indentation', async () => {
+    const { projectFile, read } = repo(withEffects(), 4)
+    expect(await setEffectModel(projectFile, 'open-1', 'small-sfx')).toEqual({ ok: true })
+    expect(read()).toBe(`${JSON.stringify(withEffects({ model: 'open-1' }), null, 4)}\n`)
+  })
+
+  it('refuses, writing nothing, when the file changed since the page read it', async () => {
+    const { projectFile, read } = repo(withEffects({ model: 'open-1' }))
+    const before = read()
+    expect(await setEffectModel(projectFile, 'small-sfx', 'small-sfx')).toMatchObject({
+      ok: false,
+      problems: [{ file: 'content-studio.json', path: 'effects.model' }],
+    })
+    expect(read()).toBe(before)
+  })
+
+  it('refuses a model it does not know, and a project with no effects section', async () => {
+    const { projectFile, read } = repo(withEffects())
+    const before = read()
+    expect(await setEffectModel(projectFile, 'huge', 'small-sfx')).toMatchObject({ ok: false })
+    expect(read()).toBe(before)
+    const plain = repo(projectJson())
+    expect(await setEffectModel(plain.projectFile, 'open-1', 'small-sfx')).toMatchObject({
+      ok: false,
+      problems: [{ path: 'effects' }],
     })
   })
 })

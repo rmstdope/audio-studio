@@ -18,7 +18,7 @@ import type { MusicGenerator, MusicReady, MusicRequest } from './music'
 import type { Encoder } from './audio'
 import { loadProject } from './workspace'
 import { boardQueue, createMusicTakes, musicTakeHash } from './musicTakes'
-import { GPU } from './gpu'
+import { GPU, gpuInUse } from './gpu'
 import { refreshDialog, refreshShared, stopRefreshes } from './refresh'
 import type { MusicSpend } from '../core/spending'
 import { createHash } from 'node:crypto'
@@ -121,6 +121,18 @@ describe('createMusicTakes', () => {
     // Generated 20 s longer than it plays.
     expect(requests.map((r) => r.seconds)).toEqual([50, 50])
     expect(requests[0]).toMatchObject({ brief: 'warm lute', kind: 'loop', bpm: null, key: null })
+  })
+
+  it('shows as music on the GPU while a take is made', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes, settled } = setup(undefined, {}, [], gate)
+    await takes.make(file, 'hall', { count: 1 })
+    for (let i = 0; i < 200 && !gpuInUse(); i++) await new Promise((r) => setTimeout(r, 5))
+    expect(gpuInUse()).toBe('music')
+    release()
+    await settled('hall')
+    expect(gpuInUse()).toBeNull()
   })
 
   it('shows a take being made and the next waiting, in turn', async () => {

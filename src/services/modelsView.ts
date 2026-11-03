@@ -7,10 +7,18 @@ import {
   type ImageModelId,
   type ImageModelState,
 } from '../core/imageModels'
+import {
+  DEFAULT_EFFECT_MODEL,
+  EFFECT_MODEL_IDS,
+  type EffectModelId,
+  type EffectModelState,
+} from '../core/effectModels'
 import { planPart } from '../core/planner'
 import type { ElevenTts } from '../core/project'
 import { sentPieces, spokenPieces } from '../core/spoken'
 import { providerOf } from '../core/voices'
+import { createEffectHealth, type EffectHealthStore } from './effectHealth'
+import { effectDownload, type EffectGenerator } from './effects'
 import { createImageHealth, type ImageHealthStore } from './imageHealth'
 import { downloadOf, type ImageGenerator } from './images'
 import { readMusic } from './musicLists'
@@ -32,6 +40,7 @@ export type ModelsView =
       recorded: Recorded
       music: MusicModels | null
       images: ImageModels | null
+      effects: EffectModels | null
     }
   | ProjectFailure
 
@@ -50,6 +59,13 @@ export interface ImageModels {
   states: Record<ImageModelId, ImageModelState>
 }
 
+/** The project's main sound-effects model, which models this computer has; null for a project with no effects section. */
+export interface EffectModels {
+  model: EffectModelId
+  /** Each model's download, and whether its last effect failed. */
+  states: Record<EffectModelId, EffectModelState>
+}
+
 const encoder = new TextEncoder()
 
 /**
@@ -63,6 +79,8 @@ export async function modelsView(
   installed: (model: MusicModelId) => boolean | Promise<boolean> = () => true,
   images: Pick<ImageGenerator, 'installed' | 'download'> = { installed: () => true },
   health: Pick<ImageHealthStore, 'read'> = createImageHealth(),
+  effects: Pick<EffectGenerator, 'download'> = { download: (model) => effectDownload(model) },
+  effectHealth: Pick<EffectHealthStore, 'read'> = createEffectHealth(),
 ): Promise<ModelsView> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
@@ -140,6 +158,12 @@ export async function modelsView(
           states: await imageStates(projectFile, images, health),
         }
       : null,
+    effects: project.effects
+      ? {
+          model: project.effects.model ?? DEFAULT_EFFECT_MODEL,
+          states: await effectStates(projectFile, effects, effectHealth),
+        }
+      : null,
   }
 }
 
@@ -158,4 +182,21 @@ async function imageStates(
       ]),
     ),
   ) as Record<ImageModelId, ImageModelState>
+}
+
+/** Each effect model's download, and whether its last effect failed. */
+async function effectStates(
+  projectFile: string,
+  effects: Pick<EffectGenerator, 'download'>,
+  health: Pick<EffectHealthStore, 'read'>,
+): Promise<Record<EffectModelId, EffectModelState>> {
+  const failures = await health.read(projectFile)
+  return Object.fromEntries(
+    await Promise.all(
+      EFFECT_MODEL_IDS.map(async (id) => [
+        id,
+        { download: await effects.download(id), failed: Boolean(failures[id]) },
+      ]),
+    ),
+  ) as Record<EffectModelId, EffectModelState>
 }

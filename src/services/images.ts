@@ -11,7 +11,7 @@ import {
   type ImageDownload,
   type ImageModelId,
 } from '../core/imageModels'
-import { freeGpu, gpuQueue, GPU } from './gpu'
+import { freeGpu, gpuQueue, holdGpu, GPU } from './gpu'
 import { quietLines } from './lineWorker'
 import type { Serial } from './serial'
 import type { Machine } from './setup'
@@ -306,8 +306,10 @@ export async function makeImageTake(
   return queue.run(GPU, async () => {
     // A take stopped while it waited must not cost the other workers their models.
     if (signal?.aborted) throw new Error('The image generator was stopped.')
-    onTurn?.()
-    await free()
-    return generator.generate(request, signal)
+    return holdGpu('image', async () => {
+      onTurn?.()
+      await free()
+      return generator.generate(request, signal)
+    })
   })
 }

@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { EFFECT_MODEL_IDS, type EffectModelId } from './effectModels'
+import type { ImageDownload } from './imageModels'
 
 /** What a sound-effect take is made from: the description in use and the length the game asks. */
 export const EffectInputsSchema = z.object({
@@ -75,12 +77,15 @@ export type EffectBoardTake = z.infer<typeof EffectBoardTakeSchema>
 /** The most takes one click asks for. */
 export const MAX_EFFECT_TAKES = 8
 
-/** About how long one take takes, in seconds. */
-export const EFFECT_TAKE_SECONDS = 2.5
-
 /** The body of a request for takes: this many new ones, or a failed one again. */
 export const MakeEffectTakesBody = z.union([
-  z.object({ count: z.number().int().min(1).max(MAX_EFFECT_TAKES) }).strict(),
+  z
+    .object({
+      count: z.number().int().min(1).max(MAX_EFFECT_TAKES),
+      /** The model to make them with; absent is the default for the effect. */
+      model: z.enum(EFFECT_MODEL_IDS).optional(),
+    })
+    .strict(),
   z.object({ retry: z.number().int().positive() }).strict(),
 ])
 
@@ -247,6 +252,20 @@ export interface EffectTakeView {
   quietAt: number | null
 }
 
+/** What is using the GPU: a music take, an image take, a sound effect take, or a check of a recording. */
+export type GpuUse = 'music' | 'image' | 'effect' | 'recording'
+
+/** The faint line under a take waiting for the graphics chip: what is using it now; null when nothing is. */
+export function effectChipLine(using: GpuUse | null): string | null {
+  if (!using) return null
+  return {
+    music: 'Music is being made first.',
+    image: 'An image is being made first.',
+    effect: 'Another effect is being made first.',
+    recording: 'A recording is being checked first.',
+  }[using]
+}
+
 /** A take being made or waiting its turn. */
 export interface EffectMakingView {
   n: number
@@ -255,7 +274,13 @@ export interface EffectMakingView {
   elapsed: number
   /** About how long a take takes, in seconds. */
   expected: number
+  /** The model making it: its full name. */
   model: string
+  /**
+   * Set on the first waiting take of the effect that waits for the graphics chip, with what is
+   * using the chip now; absent on the takes behind it, which say "waiting".
+   */
+  chip?: { using: GpuUse | null }
 }
 
 /** A take that could not be made, and why. */
@@ -267,8 +292,14 @@ export interface EffectFailedView {
 /** An effect's takes as its page shows them. */
 export interface EffectTakesView {
   ok: true
-  /** Whether takes can be made on this computer, and what is missing if not. */
-  generator: { ok: true } | { ok: false; message: string }
+  /** Whether takes can be made at all: one of the models can run on this computer. */
+  canMake: boolean
+  /** The project's main model. */
+  projectModel: EffectModelId
+  /** Whether uv, which runs the models, is on the PATH. */
+  uv: boolean
+  /** Each model: how much of it is on this computer, and whether its last effect failed. */
+  models: { id: EffectModelId; download: ImageDownload; failed: boolean }[]
   takes: EffectTakeView[]
   making: EffectMakingView[]
   failed: EffectFailedView[]
@@ -282,18 +313,25 @@ export interface EffectMakingSummary {
   left: number
 }
 
+/** Seconds as a person reads a wait: "12 s", "1 min", "1 min 10 s". */
+function waitOf(seconds: number): string {
+  if (seconds < 60) return `${seconds} s`
+  const rest = seconds % 60
+  return `${Math.floor(seconds / 60)} min${rest ? ` ${rest} s` : ''}`
+}
+
 /** What a take being made says beside its name: its wait, or about how long is left. */
 export function effectTimeLeft(
-  making: Pick<EffectMakingView, 'state' | 'elapsed' | 'expected'>,
+  making: Pick<EffectMakingView, 'state' | 'elapsed' | 'expected' | 'chip'>,
 ): string {
-  if (making.state === 'waiting') return 'waiting'
+  if (making.state === 'waiting') return making.chip ? 'waiting for the graphics chip' : 'waiting'
   const left = Math.max(1, Math.floor(making.expected - making.elapsed))
-  return `making · about ${left} s left`
+  return `making · about ${waitOf(left)} left`
 }
 
 /** A list status while takes are made: how many, and about how long is left. */
 export function effectMakingStatus({ takes, left }: EffectMakingSummary): string {
-  return `making ${takes} ${takes === 1 ? 'take' : 'takes'} · about ${Math.max(1, Math.round(left))} s`
+  return `making ${takes} ${takes === 1 ? 'take' : 'takes'} · about ${waitOf(Math.max(1, Math.round(left)))}`
 }
 
 /** A take's real length as the card writes it: "1.4 s". */

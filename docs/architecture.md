@@ -1554,7 +1554,7 @@ the studio's own page only.
 
 ---
 
-### 8.8 Sound effects (as-5wc.3, the model only)
+### 8.8 Sound effects: the models (as-5wc.3, as-5wc.5)
 
 Sound effects are made with Stable Audio 3 Small SFX on the CPU (§13 decision 9), by a worker of its
 own, `worker/effects.py`, run with uv from `src/services/effects.ts` (`createEffectsWorker`). It is
@@ -1571,14 +1571,44 @@ on the command line (the repository is gated); the studio never asks for or keep
 worker runs with `HF_HUB_OFFLINE=1`, so it never downloads: what Setup judged whole is what loads. Whole,
 interrupted and absent downloads are told apart by `hubDownload` (`src/services/images.ts`).
 
+**Two models** (as-5wc.5; `src/core/effectModels.ts`): Small SFX (`small-sfx`, about 2 s a take, CPU)
+and **Stable Audio Open 1.0** (`open-1`, about 100 s a take, GPU). Open 1.0 runs on the music's
+Stable Audio worker (`worker/stable_audio.py`, model Short, the folder
+`~/.cache/stable-audio/stable-audio-open-1.0`) through `createOpenEffects(music)` in
+`src/services/effects.ts`: the request carries `plain: true`, so the worker sends the description as
+it is (no "instrumental", tempo or key), and the studio trims the take's trailing silence like Small
+SFX's. One worker serves music and effects, so a `--dev` reload and the image takes' freeing of the
+GPU treat it as the music's. `createEffectGenerator` sends each request, readiness check and
+download check to its model's generator. Open 1.0's download is whole or absent, since a folder
+can't be told whole from half (`effectDownload`).
+
+**One GPU, and what is using it** (`services/gpu.ts`): music takes on this computer, image takes,
+Whisper's checks and Open 1.0 effect takes all run on the one GPU queue, one at a time. `holdGpu`
+names the use while a job runs (`gpuInUse()`: music, image, effect, recording), so the first waiting
+Open 1.0 take of an effect can say "waiting for the graphics chip" with the line "Music is being made
+first." and the like; the takes behind it say "waiting". Small SFX's takes stay on their own CPU queue.
+
+**The project's model** is `effects.model` (§8.9), saved from the Sound effects row of the Models panel
+(always shown in a project with an effects section, so it can be picked before the game lists any
+effect; the menu lists both models by full name with their time, a model not on this computer or
+partly downloaded can't be picked, one whose last effect failed can). An effect's page starts each
+visit on Setup's model, or on the other when Setup's can't run and the other can (not on this
+computer, partly downloaded, or its last effect failed), with a faint line saying why
+(`defaultEffectModel`, as `defaultTakeModel` for images); a pick lasts while the page stays open.
+Each take keeps the model that made it; Try again remakes with it.
+
 **Setup's Sound-effect models row** (one row for every effects model, after Image models) is checked
 afresh each time and writes nothing to the project. It is always checked, since it needs no section
-of the project file. For now it is optional: whatever is missing shows as grey "Not set up" and is
-not counted in the sidebar; once the game lists effects, the same states become "Needs attention".
-Only the first thing that applies is shown: uv missing, then the download, then the last failed
-effect. The last failure is kept in `.content-studio/effect-model-health.json`
+of the project file, and judges each model's download and last failed effect separately, as the
+image models' row does. Only the project's own model makes "Needs attention", and only once the game
+lists effects; before that, and for the other model, whatever is missing shows as grey "Not set up",
+optional, and is not counted in the sidebar. One sentence per model that has something to say, with a
+step for each download; what to fix first still wins: uv missing, then a download, then a failed
+effect. When neither model can run the row says sound effects can't be made. The last failure of each
+model is kept in `.content-studio/effect-model-health.json` with the effect it was made on
 (`createEffectHealth`: `record` when an effect fails, `clear` when one made with the model works,
-nothing when one is stopped); the take flow that calls them comes with the effects page.
+nothing when one is stopped); the row links the effect's page, and names no effect once the game no
+longer lists it.
 
 ### 8.9 Sound effects: the list and the studio’s descriptions
 
@@ -1590,6 +1620,7 @@ choosing takes come with as-5wc.3 and as-5wc.4. The screens are drawn in
 ```json
 "effects": {
   "refresh": "node tts/extract-effects.js",
+  "model": "small-sfx",
   "paths": {
     "list": "tts/effects.json",
     "lock": "audio/effects.lock.json",
@@ -1599,7 +1630,10 @@ choosing takes come with as-5wc.3 and as-5wc.4. The screens are drawn in
 }
 ```
 
-The `effects` section is optional; without it the page says how to add one. `refresh` is optional:
+The `effects` section is optional; without it the page says how to add one. `model` is optional
+(`small-sfx`, the default, or `open-1`): the sound-effects model an effect's new takes start on,
+saved from the Sound effects row of Setup's Models panel (`PUT /api/effect-model`, `{ model, was }`,
+as `images.model` is), at once and with nothing asked, over a stale `was` refused (§8.8). `refresh` is optional:
 the game's command that writes the list, run in the project root, only when the user clicks
 Refresh from the game (the consumer rules in CLAUDE.md name it). `paths.list` may contain neither
 `{part}` nor `{language}`. `lock`, `clips` and `manifest` (as-5wc.4) are required: where the studio
@@ -1635,15 +1669,15 @@ the **Takes** panel (the others as cards, two to a row in take-number order). Th
 `docs/ui/as-5wc.4-effect-takes.html`.
 
 **Takes.** A take is the description in use (the studio's over the game's) generated for the
-`seconds` the game asks, with a new seed, by `EffectGenerator` (§8.8) one at a time on its own queue
-(the CPU, not the GPU queue). The model stops when its sound does, so a take ends where its sound
+`seconds` the game asks, with a new seed, by `EffectGenerator` (§8.8) one at a time: Small SFX's takes on their own queue
+(the CPU), Open 1.0's on the GPU queue (§8.8). The model stops when its sound does, so a take ends where its sound
 ends (the trailing silence already trimmed) and its **real length** is what the card shows and the
 manifest keeps; the length the game asked for stays in the Description panel. The menu is 1 to 8
 takes (starts on 4, page state); a batch goes on when the page is left or reloaded and survives a
 `--dev` reload, not a restart. The board is `.content-studio/effect-boards/<effect>.json`
 (`{ next, takes: [{ n, hash, seed, model, seconds, peaks, inputs }] }`; numbers never reused, reserved
 when takes are asked for), the WAV `.content-studio/effect-takes/<effect>/<hash>.<n>.wav`, the hash of
-the model, description and length. A take made for an earlier description stays a take, with no mark.
+the description and length (the model is the take's own field). A take made for an earlier description stays a take, with no mark.
 A take that fails is kept in memory as "could not be made" with **Try again**; success clears and
 failure records the model's health (Setup's row, §8.8), a stopped take neither. **Stop** discards the
 one being made and the ones waiting.
@@ -1752,13 +1786,14 @@ PATCH  /api/effects/:id                          the studio's description of a s
 POST   /api/effects/:id/keep-mine                keep the studio's words after the game reworded the effect
 POST   /api/effects/:id/forget                   delete the words of an effect the game no longer lists
 GET    /api/effects/:id/takes                    the effect's takes, those being made and failed
-POST   /api/effects/:id/takes                    make takes ({ count } 1–8, or { retry })
+POST   /api/effects/:id/takes                    make takes ({ count, model? } 1–8, or { retry })
 GET    /api/effects/:id/takes/:file              a take's WAV (?seam=1: its seam, the last 4 seconds then the first 4)
 DELETE /api/effects/:id/takes/:file              drop a take that is not chosen
 POST   /api/effects/:id/choose|unchoose|accept|stop   choose a take ({ file }), take it back, accept a changed description, stop the batch
 GET    /api/effects/clips/:file                  a chosen clip (plain `.mp3` only)
 GET    /api/effects/:id/current                  the clip the game plays for the effect
 GET    /api/effects/making                       the batches being made, by effect
+PUT    /api/effect-model                         the project's sound-effects model ({ model, was }; stale `was` 409)
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
 PATCH  /api/parts/:part/cues/:key/inside         a cue at a gap inside the line ({ at, cue, text }; empty cue: remove;
@@ -2185,10 +2220,12 @@ Small, independently useful increments:
     3. **The game's effects list and the studio's descriptions** (as-5wc.2, done: §8.9), read-only,
        with the studio's own description overrides and the Sound effects workspace.
     4. **Takes** (as-5wc.4, done: §8.10): make, hear, compare, choose, un-choose, drop and accept; the
-       lock, manifest and clips; statuses in the list. The second model is as-5wc.5.
+       lock, manifest and clips; statuses in the list.
     5. **Looping effects** (as-5wc.6, done: §8.10): the list marks which effects loop; their takes are
        made seamless at the game's length, play round, have Hear the seam, and a change of how an
        effect plays is a change since chosen.
+    6. **The second model** (as-5wc.5, done: §8.8): Stable Audio Open 1.0 on the GPU queue, Setup checking both
+       models and choosing the main one (`effects.model`), and a model menu on an effect's page.
 
 ---
 

@@ -1,3 +1,4 @@
+import { mkdirSync, readFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
 import { join } from 'node:path'
@@ -6,7 +7,9 @@ import type { ElevenAnswer } from '../core/setup'
 import type { CreditResult } from './fish'
 import type { ImageDownload, ImageModelId } from '../core/imageModels'
 import { createImageHealth } from './imageHealth'
+import type { EffectModelId } from '../core/effectModels'
 import { createEffectHealth } from './effectHealth'
+import { effectDownload } from './effects'
 import { mfluxReady } from './images'
 import { checkSetup, type Machine } from './setup'
 
@@ -406,9 +409,22 @@ describe('checkSetup of the image models', () => {
 })
 
 describe('checkSetup: the sound-effect models', () => {
+  const effectsProject = (extra: Record<string, unknown> = {}) =>
+    projectJson({
+      effects: {
+        paths: {
+          list: 'tts/effects.json',
+          lock: 'audio/effects.lock.json',
+          clips: 'audio/effects',
+          manifest: 'audio/effects/manifest.json',
+        },
+        ...extra,
+      },
+    })
+  const listed = [{ id: 'chest-open', description: 'A chest opens', seconds: 2 }]
   const row = async (
     machine: Machine,
-    download: ImageDownload,
+    downloads: Partial<Record<EffectModelId, ImageDownload>>,
     root = tempRepo({ 'content-studio.json': projectJson() }),
   ) => {
     const result = await checkSetup(
@@ -421,29 +437,68 @@ describe('checkSetup: the sound-effect models', () => {
       undefined,
       undefined,
       undefined,
-      { download: () => download },
+      { download: (model) => downloads[model] ?? 'whole' },
     )
     if (!result.ok) throw new Error('expected checks')
     return result.checks.find((c) => c.id === 'effectModels')!
   }
 
-  it('is checked without any project section, and is never a problem', async () => {
-    expect(await row(mac, 'whole')).toMatchObject({ state: 'ok' })
-    expect(await row(mac, 'absent')).toMatchObject({ state: 'off', label: 'Not set up' })
-    expect(await row(mac, 'partial')).toMatchObject({ label: 'Not set up' })
-    expect(await row({ ...mac, which: () => false }, 'whole')).toMatchObject({
+  it('is checked without any project section, and is never a problem then', async () => {
+    expect(await row(mac, {})).toMatchObject({ state: 'ok' })
+    expect(await row(mac, { 'small-sfx': 'absent' })).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+    })
+    expect(await row(mac, { 'small-sfx': 'partial' })).toMatchObject({ label: 'Not set up' })
+    expect(await row({ ...mac, which: () => false }, {})).toMatchObject({
       state: 'off',
       detail: expect.stringContaining('uv, which runs'),
     })
   })
 
-  it('shows a failed effect remembered across a restart, and writes nothing to the project', async () => {
+  it('makes the project’s own model a problem once the game lists effects, and the other optional', async () => {
+    const root = tempRepo({
+      'content-studio.json': effectsProject({ model: 'open-1' }),
+      'tts/effects.json': listed,
+    })
+    expect(await row(mac, { 'open-1': 'absent' }, root)).toMatchObject({ state: 'problem' })
+    expect(await row(mac, { 'small-sfx': 'absent' }, root)).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+    })
+  })
+
+  it('looks for Open 1.0 in the Stable Audio folder, and Small SFX in the Hugging Face cache', () => {
     const root = tempRepo({ 'content-studio.json': projectJson() })
+    const folder = join(root, 'stable')
+    const hub = join(root, 'hub')
+    expect(effectDownload('open-1', hub, folder)).toBe('absent')
+    mkdirSync(join(folder, 'stable-audio-open-1.0'), { recursive: true })
+    expect(effectDownload('open-1', hub, folder)).toBe('whole')
+    expect(effectDownload('small-sfx', hub, folder)).toBe('absent')
+  })
+
+  it('shows a failed effect remembered across a restart, naming its effect, and writes nothing to the project', async () => {
+    const root = tempRepo({
+      'content-studio.json': effectsProject(),
+      'tts/effects.json': listed,
+    })
     const file = join(root, 'content-studio.json')
-    await createEffectHealth().record(file, 'small-sfx', { error: 'RuntimeError: boom' })
-    const found = await row(mac, 'whole', root)
-    expect(found.failures![0]).toMatchObject({ error: 'RuntimeError: boom' })
+    const before = readFileSync(file, 'utf8')
+    await createEffectHealth().record(file, 'small-sfx', {
+      error: 'RuntimeError: boom',
+      effect: 'chest-open',
+    })
+    const found = await row(mac, {}, root)
+    expect(found.failures![0]).toMatchObject({
+      error: 'RuntimeError: boom',
+      link: { href: '#/effects/items/chest-open' },
+    })
+    expect(readFileSync(file, 'utf8')).toBe(before)
+    // An effect the game no longer lists: no name, no link.
+    await createEffectHealth().record(file, 'small-sfx', { error: 'boom', effect: 'gone' })
+    expect((await row(mac, {}, root)).failures![0]).not.toHaveProperty('link')
     await createEffectHealth().clear(file, 'small-sfx')
-    expect(await row(mac, 'whole', root)).toMatchObject({ state: 'ok' })
+    expect(await row(mac, {}, root)).toMatchObject({ state: 'ok' })
   })
 })

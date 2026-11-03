@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createGpuWorkers, GPU } from './gpu'
+import { createGpuWorkers, gpuInUse, GPU } from './gpu'
 import {
   createMfluxGenerator,
   hubDirOf,
@@ -254,6 +254,23 @@ describe('makeImageTake turn', () => {
     await expect(stopped).rejects.toThrow()
     await made
     expect(turns).toEqual(['made'])
+  })
+})
+
+describe('makeImageTake use of the GPU', () => {
+  it('shows as an image while the take is made', async () => {
+    const seen: (string | null)[] = []
+    const generator: ImageGenerator = {
+      ready: () => ({ ok: true }),
+      installed: () => true,
+      generate: async (r) => {
+        seen.push(gpuInUse())
+        return { png: new Uint8Array(), seed: r.seed }
+      },
+    }
+    await makeImageTake({ generator, queue: createSerial(), free: () => {} }, request)
+    expect(seen).toEqual(['image'])
+    expect(gpuInUse()).toBeNull()
   })
 })
 

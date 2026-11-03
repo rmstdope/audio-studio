@@ -8,13 +8,14 @@
 
 Reads one JSON request per line on stdin: {"id": "...", "brief": "...", "kind": "loop|stinger",
 "seconds": 20, "bpm": 84 | null, "key": "D major" | null, "seed": 123,
-"model_dir": "~/.cache/stable-audio/stable-audio-open-1.0", "small": false, "out": "take.wav"}.
+"model_dir": "~/.cache/stable-audio/stable-audio-open-1.0", "small": false, "plain": false,
+"out": "take.wav"}; "plain": true (a sound effect) sends the brief as it is.
 Writes one JSON answer per line on stdout: {"id": "...", "seed": 123} after writing the take to
 `out` as a 16-bit WAV, or {"id": "...", "error": "..."}. Anything the libraries print goes to
 stderr, so stdout carries only answers. The model a request names (`model_dir`, a folder holding
 model_config.json and model.safetensors, downloaded outside the studio) is loaded on the first
 request that needs it and swapped when a request names another. No token is read: the one thing
-fetched is the public t5-base text encoder both models load, on the first take. Always instrumental.
+fetched is the public t5-base text encoder both models load, on the first take. Music is always instrumental; a sound effect (`plain`) is sent as described.
 """
 
 import json
@@ -75,11 +76,13 @@ def make(request: dict) -> int:
     size = cfg["sample_size"]
     seconds = min(float(request["seconds"]), size / rate)
     prompt = request["brief"]
-    if request.get("bpm"):
-        prompt += f", {request['bpm']} BPM"
-    if request.get("key"):
-        prompt += f", {request['key']}"
-    conditioning = [{"prompt": prompt + ", instrumental", "seconds_start": 0, "seconds_total": seconds}]
+    if not request.get("plain"):  # a sound effect goes as described; music is always instrumental
+        if request.get("bpm"):
+            prompt += f", {request['bpm']} BPM"
+        if request.get("key"):
+            prompt += f", {request['key']}"
+        prompt += ", instrumental"
+    conditioning = [{"prompt": prompt, "seconds_start": 0, "seconds_total": seconds}]
     # Open 1.0 is a 100-step diffusion model; Small is distilled to a handful of steps.
     small = bool(request.get("small"))
     audio = generate_diffusion_cond(

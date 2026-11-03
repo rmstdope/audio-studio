@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { effectModel, type EffectModelId } from '../core/effectModels'
 import {
-  EFFECT_TAKE_SECONDS,
+  DEFAULT_EFFECT_MODEL,
+  EFFECT_MODEL_IDS,
+  defaultEffectModel,
+  effectModel,
+  type EffectModelId,
+  type EffectModelState,
+} from '../core/effectModels'
+import {
   effectTakeChoosable,
   type EffectBoard,
   type EffectBoardTake,
@@ -24,15 +30,13 @@ import { acceptEffect, commitEffect, readEffectChosen, uncommitEffect } from './
 import { readEffects } from './effectsLists'
 import type { EffectGenerator } from './effects'
 import type { EffectHealthStore } from './effectHealth'
+import { gpuInUse, gpuQueue, GPU, holdGpu } from './gpu'
 import { writeAtomic } from './files'
 import type { CommitResult } from './musicClips'
 import { createSerial, type Serial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
 export { EFFECT_BOARD_DIR, EFFECT_TAKES_DIR }
-
-/** The model every take is made with until there is a second one (as-5wc.5). */
-const MODEL: EffectModelId = 'small-sfx'
 
 /** How many bars a take's waveform has. */
 const WAVEFORM_BARS = 120
@@ -43,11 +47,11 @@ const SAFE_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 /** A take's file name: the hash of its inputs, its number, `.wav`. */
 const TAKE_FILE = /^([0-9a-f]{16})\.(\d+)\.wav$/
 
-/** The queue key effects are made on: one at a time, on the CPU. */
+/** The queue key Small SFX's effects are made on: one at a time, on the CPU. */
 const CPU = 'effects'
 
-/** What to make: this many new takes, or the failed take with this number again. */
-export type MakeEffectRequest = { count: number } | { retry: number }
+/** What to make: this many new takes (with `model`, else the default for the effect), or the failed take with this number again. */
+export type MakeEffectRequest = { count: number; model?: EffectModelId } | { retry: number }
 
 /** What asking for takes, dropping or stopping answered; null for an effect the project does not list. */
 export type EffectMakeResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
@@ -62,11 +66,11 @@ export type EffectChooseResult = CommitResult | null
 export type EffectTakesResult = EffectTakesView | ProjectFailure | null
 
 /**
- * A hash of what went into a take: the model, the description in use, the length, and for a loop
- * the word "loop" (a one-shot's hash is as it was before effects could loop).
+ * A hash of what went into a take: the description in use, the length, and for a loop the word
+ * "loop" (the model is the take's own field).
  */
 export function effectTakeHash(inputs: EffectInputs): string {
-  const parts = [MODEL, inputs.description, inputs.seconds, ...(inputs.loops ? ['loop'] : [])]
+  const parts = [inputs.description, inputs.seconds, ...(inputs.loops ? ['loop'] : [])]
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16)
 }
 
@@ -78,6 +82,8 @@ interface Entry {
   message: string
   /** The hash of the inputs it is made for; the page shows only the current inputs'. */
   hash: string
+  /** The model it is made with. */
+  model: EffectModelId
   /** Ends the take while it is being made (Stop). */
   stop?: AbortController
 }
@@ -107,6 +113,10 @@ export interface EffectTakes {
 /** A take's file name on the board. */
 const fileOf = (take: Pick<EffectBoardTake, 'hash' | 'n'>) => `${take.hash}.${take.n}.wav`
 
+/** A model's full name; an id the studio does not know is shown as it is. */
+const modelName = (id: string) =>
+  (EFFECT_MODEL_IDS as readonly string[]).includes(id) ? effectModel(id as EffectModelId).name : id
+
 /** A failure as a sentence for the page. */
 function describeFailure(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
@@ -125,14 +135,20 @@ export function createEffectTakes({
   generator,
   health,
   queue,
+  gpu = gpuQueue(),
+  hasUv = () => Bun.which('uv') !== null,
   now = Date.now,
   newSeed = () => Math.floor(Math.random() * 2 ** 31),
   encode = ffmpegEncoder,
 }: {
   generator: EffectGenerator
-  health?: Pick<EffectHealthStore, 'record' | 'clear'>
-  /** Where takes wait their turn; one shared queue by default. */
+  health?: Pick<EffectHealthStore, 'read' | 'record' | 'clear'>
+  /** Where Small SFX's takes wait their turn (the CPU); one shared queue by default. */
   queue?: Serial
+  /** Where Open 1.0's takes wait their turn, with music, images and recording checks; the process's GPU queue by default. */
+  gpu?: Serial
+  /** Whether uv, which runs the models, is on the PATH (tests). */
+  hasUv?: () => boolean
   now?: () => number
   newSeed?: () => number
   /** Encodes the chosen take (tests); ffmpeg by default. */
@@ -169,6 +185,7 @@ export function createEffectTakes({
       id,
       effects: project.effects,
       inputs,
+      projectModel: project.effects.model ?? DEFAULT_EFFECT_MODEL,
       hash: effectTakeHash(inputs),
       folder: `${EFFECT_TAKES_DIR}/${id}`,
     }
@@ -206,15 +223,18 @@ export function createEffectTakes({
     entry.stop = stop
     const { inputs } = found
     try {
-      const take = await generator.generate(
-        {
-          prompt: inputs.description,
-          seconds: inputs.loops ? loopRequestSeconds(inputs.seconds) : inputs.seconds,
-          seed: newSeed(),
-          ...(inputs.loops && { loops: true }),
-        },
-        stop.signal,
-      )
+      const generate = () =>
+        generator.generate(
+          {
+            prompt: inputs.description,
+            seconds: inputs.loops ? loopRequestSeconds(inputs.seconds) : inputs.seconds,
+            seed: newSeed(),
+            model: entry.model,
+            ...(inputs.loops && { loops: true }),
+          },
+          stop.signal,
+        )
+      const take = await (entry.model === 'open-1' ? holdGpu('effect', generate) : generate())
       // Stopped while it was made: it is discarded, and no longer in the map.
       if (stop.signal.aborted) return
       // A loop is made seamless at the length the game asks; a one-shot ends where its sound does.
@@ -225,7 +245,7 @@ export function createEffectTakes({
         n: entry.n,
         hash: entry.hash,
         seed: take.seed,
-        model: MODEL,
+        model: entry.model,
         seconds: wavSeconds(wav),
         peaks: peaks(wav, WAVEFORM_BARS),
         inputs,
@@ -243,14 +263,26 @@ export function createEffectTakes({
       }
       if (saved && 'ok' in saved) throw new Error(`${saved.file} cannot be used`)
       waiting.delete(entry.n)
-      await health?.clear(projectFile, MODEL).catch(() => {})
+      await health?.clear(projectFile, entry.model).catch(() => {})
     } catch (error) {
       if (stop.signal.aborted) return
       entry.state = 'failed'
       entry.message = describeFailure(error)
       const last = entry.message.split('\n').filter(Boolean).pop() ?? entry.message
-      await health?.record(projectFile, MODEL, { error: last }).catch(() => {})
+      await health
+        ?.record(projectFile, entry.model, { error: last, effect: found.id })
+        .catch(() => {})
     }
+  }
+
+  /** Each model: how much of it is on this computer, and whether its last effect failed. */
+  async function modelStates(projectFile: string) {
+    const failures = (await health?.read(projectFile)) ?? {}
+    const states = {} as Record<EffectModelId, EffectModelState>
+    for (const id of EFFECT_MODEL_IDS) {
+      states[id] = { download: await generator.download(id), failed: Boolean(failures[id]) }
+    }
+    return states
   }
 
   /** An effect's entries: waiting, being made, or failed. */
@@ -269,7 +301,6 @@ export function createEffectTakes({
       if ('ok' in board) return board
       const chosenEffects = await readEffectChosen(root, found.effects, [])
       const chosen = chosenEffects?.[id]?.lock
-      const name = effectModel(MODEL).name
       const takes: EffectTakeView[] = []
       for (const take of board.takes) {
         if (!(await Bun.file(join(root, folder, fileOf(take))).exists())) continue
@@ -279,26 +310,41 @@ export function createEffectTakes({
           seconds: take.seconds,
           peaks: take.peaks,
           chosen: chosen?.take === take.n && chosen.fp === take.hash,
-          model: name,
+          model: modelName(take.model),
           loops: Boolean(take.inputs.loops),
           quietAt: take.quietAt ?? null,
         })
       }
-      const making: EffectMakingView[] = entries
-        .filter((entry) => entry.state !== 'failed' && !takes.some((take) => take.n === entry.n))
-        .map((entry) => ({
-          n: entry.n,
-          state: entry.state as 'waiting' | 'making',
-          elapsed: entry.state === 'making' ? Math.max(0, (now() - entry.startedAt) / 1000) : 0,
-          expected: EFFECT_TAKE_SECONDS,
-          model: name,
-        }))
+      const pending = entries.filter(
+        (entry) => entry.state !== 'failed' && !takes.some((take) => take.n === entry.n),
+      )
+      // The first Open 1.0 take that waits for the chip says so and what is using it, unless one
+      // of this effect's own takes is making: then the takes behind it say "waiting".
+      const first = pending.some((entry) => entry.state === 'making')
+        ? undefined
+        : pending.find((entry) => entry.state === 'waiting' && entry.model === 'open-1')
+      const making: EffectMakingView[] = pending.map((entry) => ({
+        n: entry.n,
+        state: entry.state as 'waiting' | 'making',
+        elapsed: entry.state === 'making' ? Math.max(0, (now() - entry.startedAt) / 1000) : 0,
+        expected: effectModel(entry.model).seconds,
+        model: modelName(entry.model),
+        ...(entry === first ? { chip: { using: gpuInUse() } } : {}),
+      }))
       const failed: EffectFailedView[] = entries
         .filter((entry) => entry.state === 'failed' && entry.hash === hash)
         .map((entry) => ({ n: entry.n, message: entry.message }))
+      const states = await modelStates(projectFile)
+      const uv = hasUv()
+      const runnable = await Promise.all(
+        EFFECT_MODEL_IDS.map(async (model) => (await generator.ready(model)).ok),
+      )
       return {
         ok: true,
-        generator: generator.ready(),
+        canMake: runnable.some(Boolean),
+        projectModel: found.projectModel,
+        uv,
+        models: EFFECT_MODEL_IDS.map((model) => ({ id: model, ...states[model] })),
         takes,
         making,
         failed,
@@ -310,20 +356,31 @@ export function createEffectTakes({
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       const { hash } = found
-      const ready = generator.ready()
-      if (!ready.ok) return { ok: false, message: ready.message }
       const key = keyOf(projectFile, id)
-      const entries = active.get(key) ?? new Map<number, Entry>()
-      active.set(key, entries)
-      const queued: Entry[] = []
+      const entries0 = active.get(key)
+      let model: EffectModelId
       if ('retry' in request) {
-        const failed = entries.get(request.retry)
+        const failed = entries0?.get(request.retry)
         if (!failed || failed.state !== 'failed' || failed.hash !== hash) {
           return {
             ok: false,
             message: `Take ${request.retry} did not fail, so it is not made again.`,
           }
         }
+        model = failed.model
+      } else {
+        model =
+          request.model ??
+          defaultEffectModel(found.projectModel, await modelStates(projectFile), hasUv())
+      }
+      const ready = await generator.ready(model)
+      if (!ready.ok) return { ok: false, message: ready.message }
+
+      const entries = active.get(key) ?? new Map<number, Entry>()
+      active.set(key, entries)
+      const queued: Entry[] = []
+      if ('retry' in request) {
+        const failed = entries.get(request.retry)!
         failed.state = 'waiting'
         queued.push(failed)
       } else {
@@ -342,12 +399,16 @@ export function createEffectTakes({
             startedAt: 0,
             message: '',
             hash,
+            model,
           }
           entries.set(entry.n, entry)
           queued.push(entry)
         }
       }
-      for (const entry of queued) void cpu.run(CPU, () => run(projectFile, found, entry, entries))
+      for (const entry of queued) {
+        const make = () => run(projectFile, found, entry, entries)
+        void (entry.model === 'open-1' ? gpu.run(GPU, make) : cpu.run(CPU, make))
+      }
       return { ok: true }
     },
 
@@ -466,10 +527,11 @@ export function createEffectTakes({
         for (const entry of entries.values()) {
           if (entry.state === 'failed') continue
           takes++
+          const { seconds } = effectModel(entry.model)
           left +=
             entry.state === 'waiting'
-              ? EFFECT_TAKE_SECONDS
-              : Math.max(0, EFFECT_TAKE_SECONDS - (now() - entry.startedAt) / 1000)
+              ? seconds
+              : Math.max(0, seconds - (now() - entry.startedAt) / 1000)
         }
         if (takes) summary[key.slice(prefix.length)] = { takes, left }
       }

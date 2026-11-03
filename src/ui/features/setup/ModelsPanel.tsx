@@ -38,10 +38,21 @@ import {
   imageModel,
   imageSaveFailureBody,
   imageSaveFailureHeading,
+  type ImageDownload,
   type ImageModelId,
 } from '../../../core/imageModels'
+import type { ModelsChange } from '../../../services/models'
+import {
+  EFFECT_MODEL_IDS,
+  effectMenuEntry,
+  effectModel,
+  effectSaveFailureHeading,
+  effectWarning,
+  type EffectModelId,
+} from '../../../core/effectModels'
 import {
   useModelsView,
+  useSetEffectModel,
   useSetImageModel,
   useSetElevenModel,
   useSetElevenTts,
@@ -95,11 +106,13 @@ export function ModelsPanel() {
         Models
       </h2>
       <span className="muted">
-        {view.data.images
-          ? 'Which model records each stage of the voices, which makes the music, and which makes the images.'
-          : view.data.music
-            ? 'Which model records each stage of the voices, and which makes the music.'
-            : 'Which Fish model records each stage.'}{' '}
+        {view.data.effects
+          ? 'Which model records each stage of the voices, which makes the music, which makes the images, and which makes the sound effects.'
+          : view.data.images
+            ? 'Which model records each stage of the voices, which makes the music, and which makes the images.'
+            : view.data.music
+              ? 'Which model records each stage of the voices, and which makes the music.'
+              : 'Which Fish model records each stage.'}{' '}
         Saved in <span className="mono">{view.data.file}</span> for everyone on the project.
       </span>
       {busy && (
@@ -132,6 +145,7 @@ export function ModelsPanel() {
       {view.data.castsEleven && <ElevenVoiceRow view={view.data as View} locked={locked} />}
       {view.data.music && <MusicRow file={view.data.file} music={view.data.music} />}
       {view.data.images && <ImagesRow file={view.data.file} images={view.data.images} />}
+      {view.data.effects && <EffectsRow file={view.data.file} effects={view.data.effects} />}
     </section>
   )
 }
@@ -254,12 +268,86 @@ function MusicRow({ file, music }: { file: string; music: NonNullable<View['musi
  */
 function ImagesRow({ file, images }: { file: string; images: NonNullable<View['images']> }) {
   const save = useSetImageModel()
+  return (
+    <LocalModelRow
+      file={file}
+      label="Images"
+      blurb="The game's images, made on this computer. An image's takes can use the other model."
+      menuLabel="Image model"
+      ids={IMAGE_MODEL_IDS}
+      current={images.model}
+      states={images.states}
+      entry={imageMenuEntry}
+      warning={imageWarning}
+      nameOf={(id) => imageModel(id as ImageModelId).name}
+      failureHeading={(id) => imageSaveFailureHeading(id as ImageModelId)}
+      save={(model, was) => save.mutateAsync({ model, was })}
+    />
+  )
+}
+
+/**
+ * The Sound effects row: the model an effect's new takes start on, a menu of the two local models
+ * saved in the project file as soon as one is picked. Built like the Images row, and always shown
+ * in a project with an effects section, so the model can be picked before the game lists effects.
+ */
+function EffectsRow({ file, effects }: { file: string; effects: NonNullable<View['effects']> }) {
+  const save = useSetEffectModel()
+  return (
+    <LocalModelRow
+      file={file}
+      label="Sound effects"
+      blurb="The game's sound effects, made on this computer. An effect's takes can use the other model."
+      menuLabel="Sound-effects model"
+      ids={EFFECT_MODEL_IDS}
+      current={effects.model}
+      states={effects.states}
+      entry={effectMenuEntry}
+      warning={effectWarning}
+      nameOf={(id) => effectModel(id as EffectModelId).name}
+      failureHeading={(id) => effectSaveFailureHeading(id as EffectModelId)}
+      save={(model, was) => save.mutateAsync({ model, was })}
+    />
+  )
+}
+
+/**
+ * A row for a local model that is picked from a menu and saved at once: a model this computer
+ * lacks is listed but cannot be picked, one whose last job failed can. A failed save goes back to
+ * the model saved before and offers Keep and Try again.
+ */
+function LocalModelRow<Id extends string>({
+  file,
+  label,
+  blurb,
+  menuLabel,
+  ids,
+  current,
+  states,
+  entry,
+  warning,
+  nameOf,
+  failureHeading,
+  save,
+}: {
+  file: string
+  label: string
+  blurb: string
+  menuLabel: string
+  ids: readonly Id[]
+  current: Id
+  states: Record<Id, { download: ImageDownload; failed: boolean }>
+  entry: (id: Id, state: { download: ImageDownload; failed: boolean }) => string
+  warning: (state: { download: ImageDownload; failed: boolean }) => string | null
+  nameOf: (id: Id) => string
+  failureHeading: (id: string) => string
+  save: (model: string, was: string) => Promise<ModelsChange>
+}) {
   const [state, dispatch] = useReducer(rowReducer, startRow)
   const retry = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLSelectElement>(null)
   const previous = useRef(state)
   const lastRun = useRef('')
-  const current = images.model
   const pending = state.phase === 'saving'
 
   useEffect(() => {
@@ -273,7 +361,7 @@ function ImagesRow({ file, images }: { file: string; images: NonNullable<View['i
   useEffect(() => {
     const key = state.phase === 'saving' ? state.to : ''
     if (key && key !== lastRun.current) {
-      save.mutateAsync({ model: key, was: current }).then(
+      save(key, current).then(
         (result) =>
           result.ok
             ? dispatch({ type: 'saved' })
@@ -285,41 +373,36 @@ function ImagesRow({ file, images }: { file: string; images: NonNullable<View['i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
-  const shown = (state.phase === 'saving' ? state.to : current) as ImageModelId
+  const shown = (state.phase === 'saving' ? state.to : current) as Id
   return (
     <div className="mrow">
-      <div className="mname">Images</div>
+      <div className="mname">{label}</div>
       <div className="mtx">
-        <span className="muted">
-          The game&apos;s images, made on this computer. An image&apos;s takes can use the other
-          model.
-        </span>
+        <span className="muted">{blurb}</span>
         <div className="mmenu">
           <select
             ref={menu}
-            aria-label="Image model"
+            aria-label={menuLabel}
             value={shown}
             disabled={pending}
             onChange={(event) =>
               dispatch({ type: 'pick', to: event.target.value, change: { kind: 'save' } })
             }
           >
-            {IMAGE_MODEL_IDS.map((id) => (
-              <option key={id} value={id} disabled={images.states[id].download !== 'whole'}>
-                {imageMenuEntry(id, images.states[id])}
+            {ids.map((id) => (
+              <option key={id} value={id} disabled={states[id].download !== 'whole'}>
+                {entry(id, states[id])}
               </option>
             ))}
           </select>
           <span className="free">Free</span>
-          {imageWarning(images.states[shown]) && (
-            <span className="warnline">{imageWarning(images.states[shown])}</span>
-          )}
+          {warning(states[shown]) && <span className="warnline">{warning(states[shown])}</span>}
           {pending && <span className="muted">Saving…</span>}
         </div>
         {state.phase === 'failed' && (
           <section className="notice notice-err" role="alert">
             <div className="notice-text">
-              <strong>{imageSaveFailureHeading(state.to as ImageModelId)}</strong>
+              <strong>{failureHeading(state.to)}</strong>
               <span className="muted">
                 <Mono text={imageSaveFailureBody(file, state.reason)} words={[file]} />
               </span>
@@ -330,7 +413,7 @@ function ImagesRow({ file, images }: { file: string; images: NonNullable<View['i
                 type="button"
                 onClick={() => dispatch({ type: 'keep' })}
               >
-                Keep {imageModel(current).name}
+                Keep {nameOf(current)}
               </button>
               <button
                 ref={retry}

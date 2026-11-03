@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { DEFAULT_ELEVEN_MODEL, ELEVEN_TTS, isElevenModel } from './elevenSpeech'
 import { knownLanguage } from './languages'
+import { EFFECT_MODEL_IDS } from './effectModels'
 import { IMAGE_MODEL_IDS } from './imageModels'
 import { MUSIC_MODEL_IDS } from './musicModels'
 import { isPriced } from './prices'
@@ -319,6 +320,8 @@ const ImagesSchema = z.object({
 
 /** The optional `effects` section: where the game lists its sound effects, and the command that writes the list. */
 const EffectsSchema = z.object({
+  /** The effects model new takes are made with unless an effect asks for the other; absent is Small SFX. */
+  model: z.enum(EFFECT_MODEL_IDS).optional(),
   /** The game's command that writes the effects list; run in the project root, only from Refresh from the game. */
   refresh: z.string().min(1).optional(),
   paths: z.object({

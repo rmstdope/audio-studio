@@ -23,6 +23,8 @@ export interface MusicRequest {
   seed: number
   /** The music model to make it with. */
   model: MusicModelId
+  /** A sound effect, not music: the brief is sent as it is, with no "instrumental", tempo or key. */
+  plain?: boolean
 }
 
 /** One take as generated: a WAV, and the seed it was made from (absent from one that takes none). */
