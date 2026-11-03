@@ -48,6 +48,7 @@ const choose = (root: string, id: string, n: number, encode: Encoder, hash?: str
     effects: config,
     id,
     take: take(n, hash ? { hash } : {}),
+    inUse: inputs,
     wav: new Uint8Array(4),
     encode,
     now: () => at,
@@ -114,6 +115,69 @@ describe('commitEffect', () => {
       ok: false,
       message: expect.stringContaining('the sound effects manifest could not be read'),
     })
+  })
+})
+
+describe('choosing a take made for an earlier description', () => {
+  it('counts the effect as made from the description in use, and keeps the take’s own length', async () => {
+    const root = tempRepo({})
+    const inUse = { description: 'A heavy door groans', seconds: 3 }
+    await commitEffect({
+      root,
+      effects: config,
+      id: 'door-creak',
+      take: take(1),
+      inUse,
+      wav: new Uint8Array(4),
+      encode: fakeEncoder().encode,
+      now: () => at,
+    })
+    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    expect(lock['door-creak'].inputs).toEqual({ description: 'A heavy door groans', seconds: 3 })
+    // A take made for another length stays changed: a changed length needs a new take.
+    await commitEffect({
+      root,
+      effects: config,
+      id: 'door-creak',
+      take: take(2, { inputs: { ...inputs, seconds: 2 } }),
+      inUse,
+      wav: new Uint8Array(4),
+      encode: fakeEncoder().encode,
+      now: () => at,
+    })
+    const again = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    expect(again['door-creak'].inputs).toEqual({ description: 'A heavy door groans', seconds: 2 })
+  })
+})
+
+describe('the order of writes', () => {
+  it('leaves the lock as it was when the manifest write fails after the clip is in place', async () => {
+    const root = tempRepo({})
+    await choose(root, 'coins', 1, fakeEncoder().encode)
+    const before = readFileSync(join(root, 'audio/effects.lock.json'), 'utf8')
+    // A directory where the manifest must be written makes that write fail.
+    const { rmSync } = await import('node:fs')
+    rmSync(join(root, 'audio/effects/manifest.json'))
+    mkdirSync(join(root, 'audio/effects/manifest.json'))
+    const result = await choose(root, 'door-creak', 1, fakeEncoder().encode)
+    expect(result).toMatchObject({ ok: false })
+    expect(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8')).toBe(before)
+  })
+
+  it('un-choosing removes the lock entry last: a failure leaves the effect chosen', async () => {
+    const root = tempRepo({})
+    await choose(root, 'coins', 1, fakeEncoder().encode)
+    const { rmSync } = await import('node:fs')
+    rmSync(join(root, 'audio/effects/manifest.json'))
+    mkdirSync(join(root, 'audio/effects/manifest.json'))
+    // The manifest cannot be read as JSON, so nothing is changed.
+    expect(await uncommitEffect({ root, effects: config, id: 'coins' })).toMatchObject({
+      ok: false,
+    })
+    expect(
+      Object.keys(JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))),
+    ).toEqual(['coins'])
+    expect(existsSync(join(root, 'audio/effects/coins.mp3'))).toBe(true)
   })
 })
 

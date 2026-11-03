@@ -3942,6 +3942,9 @@ button.cue-chip[aria-expanded='true'] {
     display: block;
     min-width: 0;
   }
+  .effects-table td:empty {
+    display: none;
+  }
   .effects-table td {
     border: 0;
     padding: 2px 12px;

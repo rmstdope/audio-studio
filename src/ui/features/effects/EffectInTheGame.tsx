@@ -212,7 +212,7 @@ export function Playback({
         type="button"
         className="play"
         aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-        onClick={() => player.toggle(id, takeUrl(effect, take.file), { fade: true })}
+        onClick={() => player.toggle(id, takeUrl(effect, take.file), {})}
       >
         {playing ? '■' : '▶'}
       </button>

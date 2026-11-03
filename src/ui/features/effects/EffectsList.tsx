@@ -152,9 +152,7 @@ export function EffectsList({
                               player.toggle(
                                 row.id,
                                 `/api/effects/${encodeURIComponent(row.id)}/current`,
-                                {
-                                  fade: true,
-                                },
+                                {},
                               )
                             }}
                             onKeyDown={(event) => event.stopPropagation()}

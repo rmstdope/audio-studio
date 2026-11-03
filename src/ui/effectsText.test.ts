@@ -45,11 +45,9 @@ describe('effectsSubtitle', () => {
     )
   })
 
-  it('says which are chosen is not known while the lock cannot be read', () => {
+  it('gives no count while the lock cannot be read', () => {
     const rows = summary().rows.map((row) => ({ ...row, status: 'unknown' as const }))
-    expect(effectsSubtitle(summary({ rows }))).toBe(
-      'The sound effects the game asks for. Which are chosen is not known.',
-    )
+    expect(effectsSubtitle(summary({ rows }))).toBe('The sound effects the game asks for.')
   })
 
   it('says how many could not be read', () => {

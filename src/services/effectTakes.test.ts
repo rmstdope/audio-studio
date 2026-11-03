@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { wavSeconds } from '../core/musicTake'
@@ -349,5 +349,53 @@ describe('createEffectTakes', () => {
     )
     await takes.make(file, 'coins', { count: 1 })
     expect((await settled('coins')).takes.map((t) => t.n)).toEqual([1, 2])
+  })
+
+  it('goes on after a reload: a second service on the same process sees the batch being made', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const inner = fakeGenerator()
+    const slow: EffectGenerator = {
+      ...inner.generator,
+      generate: async (request, signal) => {
+        await gate
+        return inner.generator.generate(request, signal)
+      },
+    }
+    const root = tempRepo({
+      'content-studio.json': projectJson({ effects }),
+      'tts/effects.json': [{ id: 'coins', description: 'Coins', seconds: 0.5 }],
+    })
+    const file = join(root, 'content-studio.json')
+    const before = createEffectTakes({ generator: slow, queue: createSerial(), newSeed: () => 1 })
+    await before.make(file, 'coins', { count: 2 })
+    // A reload makes a new service; what is being made belongs to the process, not to it.
+    const after = createEffectTakes({ generator: slow, queue: createSerial(), newSeed: () => 1 })
+    expect(await after.making(file)).toMatchObject({ coins: { takes: 2 } })
+    const view = await after.view(file, 'coins')
+    expect(view).toMatchObject({ making: [{ n: 1 }, { n: 2 }] })
+    release()
+  })
+})
+
+describe('readEffects with a lock', () => {
+  it('reads each effect’s chosen take, whether its clip is there, and which have takes', async () => {
+    const { root, file, takes, settled } = setup()
+    await takes.make(file, 'coins', { count: 1 })
+    const view = await settled('coins')
+    await takes.choose(file, 'coins', view.takes[0]!.file)
+    await takes.make(file, 'door-creak', { count: 1 })
+    await settled('door-creak')
+    const { loadProject } = await import('./workspace')
+    const summary = (await loadProject(file)) as {
+      summary: { effects: { rows: { id: string; status: string }[] } }
+    }
+    expect(summary.summary.effects.rows.map((r) => [r.id, r.status])).toEqual([
+      ['door-creak', 'not-chosen'],
+      ['coins', 'chosen'],
+    ])
+    rmSync(join(root, 'audio/effects/coins.mp3'))
+    const again = (await loadProject(file)) as typeof summary
+    expect(again.summary.effects.rows[1]!.status).toBe('missing')
   })
 })

@@ -4,9 +4,8 @@ import type { EffectsSummary } from '../core/effects'
 export function effectsSubtitle(effects: EffectsSummary): string {
   const lead = 'The sound effects the game asks for.'
   if (effects.status !== 'ok' || effects.rows.length === 0) return lead
-  if (effects.rows.every((row) => row.status === 'unknown')) {
-    return `${lead} Which are chosen is not known.`
-  }
+  // Which are chosen is not known while the lock cannot be read: no count to give.
+  if (effects.rows.every((row) => row.status === 'unknown')) return lead
   const chosen = effects.rows.filter((row) => row.chosen).length
   const missing = effects.rows.filter((row) => row.status === 'missing').length
   const parts = [

@@ -6,7 +6,6 @@ import {
   effectChangedAdvice,
   effectChangedLine,
   effectCountEntry,
-  effectTakeLength,
   effectTimeLeft,
   makeEffectTakesLabel,
   type EffectMakingView,
@@ -24,8 +23,7 @@ import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { failureLine, progressOf } from '../../musicTakesText'
 import { routeHref } from '../../route'
-import { Wave } from '../music/InTheGame'
-import { EffectInTheGame, takePlayId, takeUrl, type Player } from './EffectInTheGame'
+import { EffectInTheGame, Playback, takePlayId, takeUrl, type Player } from './EffectInTheGame'
 
 /** The seconds of quiet between the chosen take and the one compared with it. */
 const QUIET_SECONDS = 1
@@ -106,10 +104,9 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
       {
         id: takePlayId(id, chosen.n),
         url: takeUrl(id, chosen.file),
-        fade: true,
         after: QUIET_SECONDS,
       },
-      { id: takePlayId(id, take.n), url: takeUrl(id, take.file), fade: true },
+      { id: takePlayId(id, take.n), url: takeUrl(id, take.file) },
     ])
   }
   const changed = row.changed
@@ -191,7 +188,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
             </div>
           )}
         </div>
-        {!none && view.lockUnread && (
+        {view.lockUnread && (
           <span className="takes-missing small">
             Choosing and dropping wait until the sound effects lock can be read. You can still
             listen and make more takes.
@@ -230,12 +227,6 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
               <MakingCard key={making.n} making={making} />
             ))}
           </div>
-        )}
-        {view.lockUnread && none && (
-          <span className="takes-missing small">
-            Choosing and dropping wait until the sound effects lock can be read. You can still
-            listen and make more takes.
-          </span>
         )}
         {make.data && !make.data.ok && 'message' in make.data && (
           <span className="adopt-error">{make.data.message}</span>
@@ -280,18 +271,7 @@ function TakeCard({
         <b className="grow">Take {take.n}</b>
       </div>
       <span className="faint small">{take.model}</span>
-      <div className="take-row">
-        <button
-          type="button"
-          className="play"
-          aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-          onClick={() => player.toggle(id, takeUrl(effect, take.file), { fade: true })}
-        >
-          {playing ? '■' : '▶'}
-        </button>
-        <Wave peaks={take.peaks} loop={false} position={playing ? player.position : undefined} />
-        <span className="faint small">{effectTakeLength(take.seconds)}</span>
-      </div>
+      <Playback effect={effect} take={take} player={player} />
       {canCompare && (
         <div className="take-row">
           <button type="button" className="btn btn-small" onClick={onCompare}>

@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import type { EffectModelId } from './effectModels'
 
 /** What a sound-effect take is made from: the description in use and the length the game asks. */
 export const EffectInputsSchema = z.object({ description: z.string(), seconds: z.number() })
@@ -235,9 +234,6 @@ export interface EffectMakingSummary {
   takes: number
   left: number
 }
-
-/** The model ids a take can carry. */
-export type EffectTakeModel = EffectModelId
 
 /** What a take being made says beside its name: its wait, or about how long is left. */
 export function effectTimeLeft(

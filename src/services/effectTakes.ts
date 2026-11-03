@@ -399,6 +399,7 @@ export function createEffectTakes({
           effects: found.effects,
           id,
           take,
+          inUse: found.inputs,
           wav,
           encode,
         })

@@ -78,6 +78,7 @@ export async function commitEffect({
   effects,
   id,
   take,
+  inUse,
   wav,
   encode,
   now = () => new Date(),
@@ -88,6 +89,12 @@ export async function commitEffect({
   effects: EffectsConfig
   id: string
   take: EffectBoardTake
+  /**
+   * The effect's inputs now. Choosing any take counts the effect as made from the description in
+   * use (so it clears an out-of-date box); the length stays the take's own, since a changed length
+   * needs a new take.
+   */
+  inUse: EffectInputs
   wav: Uint8Array
   encode: Encoder
   now?: () => Date
@@ -117,7 +124,7 @@ export async function commitEffect({
         model: take.model,
         ...(take.seed !== undefined && { seed: take.seed }),
         take: take.n,
-        inputs: take.inputs,
+        inputs: { description: inUse.description, seconds: take.inputs.seconds },
         at: now().toISOString(),
       }
       await rename(temporary, target)
