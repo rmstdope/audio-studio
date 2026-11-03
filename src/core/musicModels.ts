@@ -119,8 +119,9 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     generator: 'Stable Audio Open 1.0',
     recipe: 'stable-audio-open-1.0',
     folders: ['stable-audio-open-1.0'],
-    seconds: 40,
-    minutes: '40 s',
+    // Measured at 95–112 s a take on the M5 Pro: it always makes its full 47 s at 100 steps.
+    seconds: 100,
+    minutes: '100 s',
     download: null,
     perMinute: null,
   },
@@ -132,6 +133,7 @@ export const MUSIC_MODELS: readonly MusicModel[] = [
     generator: 'Stable Audio Open Small',
     recipe: 'stable-audio-open-small',
     folders: ['stable-audio-open-small'],
+    // Not measured yet: an estimate.
     seconds: 10,
     minutes: '10 s',
     download: null,

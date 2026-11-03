@@ -95,7 +95,7 @@ describe('the Music row of the Models panel', () => {
       'Quick · XL turbo · 1.7B — about 1¼ min a take',
       'Quickest · Turbo · 1.7B — about 1 min a take',
       'Careful · XL sft · 4B — about 7 min a take',
-      'Short · Stable Audio Open 1.0 — about 40 s a take',
+      'Short · Stable Audio Open 1.0 — about 100 s a take',
       'Shortest · Stable Audio Open Small — about 10 s a take',
       'Eleven Music · ElevenLabs, in the cloud — about 1 min a take, $0.15 a minute of music',
     ])
@@ -204,7 +204,7 @@ describe('the Music row of the Models panel', () => {
     )
     const short = [...page.menu()!.options].find((o) => o.value === 'short')!
     expect(short.textContent).toBe(
-      'Short · Stable Audio Open 1.0 — about 40 s a take — not on this computer',
+      'Short · Stable Audio Open 1.0 — about 100 s a take — not on this computer',
     )
     expect(short.disabled).toBe(false)
     await page.pick('short')
