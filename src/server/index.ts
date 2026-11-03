@@ -1678,7 +1678,15 @@ export function startServer({
             request.params.id,
             request.params.file,
           )
-          return file ? new Response(Bun.file(file)) : notFound()
+          if (!file) return notFound()
+          // `?seam=1`: the take's last seconds and then its first, to hear a loop come round.
+          if (new URL(request.url).searchParams.get('seam') !== '1') {
+            return new Response(Bun.file(file))
+          }
+          const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
+          return new Response(writeWav(seamWav(wav)) as Uint8Array<ArrayBuffer>, {
+            headers: { 'content-type': 'audio/wav' },
+          })
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await effectTakes.drop(projectFile, request.params.id, request.params.file)

@@ -4,7 +4,8 @@ import type { EffectGenerator } from './effects'
 /**
  * A stand-in generator for working on the studio's own pages (`CONTENT_STUDIO_FAKE_EFFECTS=1`): a
  * short tone, shorter than the length asked as the real model's effects are, after about two
- * seconds, and a failure for a description that says "fail". It makes no sound effects.
+ * seconds, and a failure for a description that says "fail". A loop's tone fills the length asked,
+ * unless the description says "quiet", which stops it at 60% of it. It makes no sound effects.
  */
 export function createFakeEffects(delayMs = 2000): EffectGenerator {
   return {
@@ -21,7 +22,9 @@ export function createFakeEffects(delayMs = 2000): EffectGenerator {
       if (request.prompt.includes('fail'))
         throw new Error('The effects generator ran out of memory')
       const rate = 8000
-      const seconds = Math.min(request.seconds, 0.4 + (request.seed % 7) * 0.2)
+      const seconds = request.loops
+        ? request.seconds * (request.prompt.includes('quiet') ? 0.6 : 1)
+        : Math.min(request.seconds, 0.4 + (request.seed % 7) * 0.2)
       const samples = new Int16Array(Math.round(seconds * rate))
       samples.forEach((_, i) => {
         const fade = 1 - i / samples.length

@@ -31,6 +31,25 @@ describe('createEffectsWorker', () => {
     })
   })
 
+  it('tells the worker nothing of looping: it is told the words, the length and the seed', async () => {
+    const log = join(mkdtempSync(join(tmpdir(), 'content-studio-effects-')), 'request.json')
+    process.env.FAKE_EFFECTS_LOG = log
+    const worker = createEffectsWorker({ command })
+    try {
+      await worker.generate({ prompt: 'rain', seconds: 12, seed: 3, loops: true })
+    } finally {
+      await worker.close()
+      delete process.env.FAKE_EFFECTS_LOG
+    }
+    expect(Object.keys(JSON.parse(readFileSync(log, 'utf8'))).sort()).toEqual([
+      'id',
+      'out',
+      'prompt',
+      'seconds',
+      'seed',
+    ])
+  })
+
   it('rejects with the worker’s error, and says what is missing when it cannot start', async () => {
     const worker = createEffectsWorker({ command })
     await expect(worker.generate({ prompt: 'fail', seconds: 1, seed: 1 })).rejects.toThrow(

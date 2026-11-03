@@ -5433,6 +5433,7 @@ describe('server, sound effect takes', () => {
     'tts/effects.json': [
       { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
       { id: 'door-creak', description: 'A door creaks', seconds: 3 },
+      { id: 'wind', description: 'Wind howls', seconds: 6, loops: true },
     ],
   })
   const studio = startServer({
@@ -5504,6 +5505,25 @@ describe('server, sound effect takes', () => {
     // Only plain clips are served: not the manifest, not hidden or nested names.
     expect((await fetch(new URL('/api/effects/clips/manifest.json', studio.url))).status).toBe(404)
     expect((await fetch(new URL('/api/effects/clips/.coins.mp3', studio.url))).status).toBe(404)
+  })
+
+  it('makes a looping take the length asked and serves its seam: the last 4 seconds, then the first 4', async () => {
+    expect((await send('POST', '/api/effects/wind/takes', { count: 1 })).status).toBe(200)
+    const made = await settled('wind')
+    expect(made.takes[0]).toMatchObject({ loops: true, seconds: 6, quietAt: null })
+    const seam = await fetch(
+      new URL(`/api/effects/wind/takes/${made.takes[0].file}?seam=1`, studio.url),
+    )
+    expect(seam.status).toBe(200)
+    expect(seam.headers.get('content-type')).toBe('audio/wav')
+    const heard = readWav(new Uint8Array(await seam.arrayBuffer()))
+    expect(heard.data.length / 2 / heard.format.sampleRate).toBe(8)
+    const plain = await fetch(new URL(`/api/effects/wind/takes/${made.takes[0].file}`, studio.url))
+    expect(readWav(new Uint8Array(await plain.arrayBuffer())).data.length / 2 / 8000).toBe(6)
+    const project = await (await fetch(new URL('/api/project', studio.url))).json()
+    expect(project.summary.effects.rows.find((r: { id: string }) => r.id === 'wind').loops).toBe(
+      true,
+    )
   })
 
   it('refuses to drop the chosen take (409), drops another, and un-chooses', async () => {

@@ -18,6 +18,11 @@ export interface EffectRequest {
   /** The length asked for; the take is often shorter, since the model stops early. */
   seconds: number
   seed: number
+  /**
+   * The effect loops, so its sound should fill the length. Only the stand-ins read it: the model
+   * is told nothing but the words, and ambience fills its length by itself.
+   */
+  loops?: boolean
 }
 
 /** One finished effect: a 16-bit WAV with its trailing silence trimmed, and the seed it was made from. */
@@ -87,7 +92,8 @@ export function createEffectsWorker({
       signal?.addEventListener('abort', stop, { once: true })
       try {
         if (signal?.aborted) throw new Error('The effects generator was stopped.')
-        const answer = await worker.request({ ...request, out })
+        const { loops: _loops, ...asked } = request
+        const answer = await worker.request({ ...asked, out })
         const wav = trimTrailingSilence(readWav(new Uint8Array(await readFile(out))))
         return { wav: writeWav(wav), seed: Number(answer.seed) }
       } finally {

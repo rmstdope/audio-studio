@@ -210,6 +210,7 @@ export function createEffectTakes({
           prompt: inputs.description,
           seconds: inputs.loops ? loopRequestSeconds(inputs.seconds) : inputs.seconds,
           seed: newSeed(),
+          ...(inputs.loops && { loops: true }),
         },
         stop.signal,
       )
