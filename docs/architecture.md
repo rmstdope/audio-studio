@@ -8,7 +8,7 @@ The first workspace is **Narration**: casting a voice for every character by aud
 recording every line of dialog with the cast voice, regenerating only what is missing or out of
 date. The second is **Music** (§8.5, planned): looping background tracks and short stingers, each
 chosen by audition from takes generated locally with ACE-Step. Sound effects are a later workspace
-on the same foundation.
+on the same foundation (§12 step 16).
 
 The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py`,
 `tts/narrate.py`) this tool replaces.
@@ -37,7 +37,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Sound effects, for now: planned (§12 step 16; §13 decision 9).
+- Sound effects: planned (§12 step 16; §13 decision 9).
 - Deciding where a track plays. The game decides which track a room or region plays, and when a
   stinger sounds; the studio makes the tracks it lists.
 
@@ -1086,8 +1086,9 @@ numpy 1), and uv's `exclude-newer` holds the rest to the date they were last tri
 fresh install gets the libraries that made takes; `musicLive.test.ts` makes one take per downloaded
 model, opt-in. It guides with plain classifier-free guidance (`apg_scale=0.0`), since 0.0.20's
 default APG needs float64, which the Mac's GPU lacks. Takes are shaped as ACE-Step's are and record
-the recipe `stable-audio-open-1.0` or `-small`. The times per take (40 s and 10 s) are estimates
-until measured on real takes. ACE-Step and Whisper share the one GPU
+the recipe `stable-audio-open-1.0` or `-small`. The times per take (40 s and 10 s) are estimates;
+the effects spike measured Open 1.0 at 95–112 s a take (§13 decision 9), and correcting
+Short's 40 s in the menus is as-66x. ACE-Step and Whisper share the one GPU
 and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`, a process-wide
 `createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a Whisper check at a
 time. In the spike, with both loaded and running together, 42 of the 48 GB were in use (20 GB of it
@@ -2029,7 +2030,7 @@ Small, independently useful increments:
     7. **Shared images** (as-94e, done: §8.7): an image the game lists in several acts is one image shown in each, with one act-style pick; lists that disagree are reported.
     8. **The rename** to Content Studio (as-yag.6), with §1 and the opening of this document, which still speak of a game's audio.
 16. **Sound effects** (epic as-5wc), in small pull requests:
-    1. **Spike** (done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
+    1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.
 
 ---
@@ -2129,37 +2130,51 @@ Small, independently useful increments:
    ambience, a sword draw, a chest opening, a fireplace, coins, distant thunder; 1 to 10 seconds),
    each from the same text with both models:
 
-   | Model                           | Runs on | Time per take | Memory            | On disk | Licence                                    |
-   | ------------------------------- | ------- | ------------- | ----------------- | ------- | ------------------------------------------ |
-   | Stable Audio 3 Small SFX        | CPU     | 1.7–2.5 s     | 5.3 GB (resident) | 6.5 GB  | Stability AI Community, plus Gemma's terms |
-   | the same, on the GPU (MPS)      | GPU     | 0.3–0.9 s     | not measured      |         |                                            |
-   | Stable Audio Open 1.0 (`Short`) | GPU     | 95–112 s      | 20 GB (MPS)       | 15 GB   | Stability AI Community                     |
+   | Model                           | Runs on | Time per take | Memory                 | On disk                               | Licence                                    |
+   | ------------------------------- | ------- | ------------- | ---------------------- | ------------------------------------- | ------------------------------------------ |
+   | Stable Audio 3 Small SFX        | CPU     | 1.7–2.5 s     | 5.3 GB (process, peak) | 6.5 GB                                | Stability AI Community, plus Gemma's terms |
+   | the same, on the GPU (MPS)      | GPU     | 0.3–0.9 s     | not measured           | the same                              | the same                                   |
+   | Stable Audio Open 1.0 (`Short`) | GPU     | 95–112 s      | 20 GB (MPS, allocated) | about 5 GB used (15 GB as downloaded) | Stability AI Community                     |
 
-   The navigator judged both usable by ear. Small SFX is the default for its speed: its time grows
-   only a little with the length (a 1 s click in 1.7 s, a 10 s ambience in 2.5 s), and on the CPU it
-   needs no turn on the GPU queue, so effects can be made while music, images or Whisper hold the
-   GPU. Open 1.0 always makes its full 47 seconds whatever is asked, hence its time. The model
-   loads in about 4 s. Run beside a GPU take, a CPU take took 7–12 s.
+   The two memory figures are measured differently (the process's peak resident memory; the GPU
+   memory torch allocated) and are only roughly comparable. The navigator judged both models usable
+   by ear, with no clear preference. Small SFX is the default for its speed: its time grows only a
+   little with the length (a 1 s click in 1.7 s, a 10 s ambience in 2.5 s), and on the CPU it
+   needs no turn on the GPU queue, so an effect can be made while the GPU is busy, though slower:
+   beside an Open 1.0 take on the GPU, a CPU take took 7–12 s. Small SFX loads in about 4 s with
+   its weights cached. Open 1.0 always makes its full 47 seconds at 100 steps whatever is asked,
+   hence its time; it is kept at the navigator's choice, as a second take when Small SFX misses,
+   and needs nothing new: it is already downloaded and runs in `worker/stable_audio.py` on the GPU
+   queue. The music worker makes its takes the same way, so Short's music takes are as slow, not
+   the 40 s §8.5 estimated (as-66x).
 
    **How it runs.** Small SFX loads through Stability's `stable-audio-3` library (git
    `790793b`, 0.1.0; not on PyPI), `StableAudioModel.from_pretrained("small-sfx", device="cpu")`,
    `generate(prompt, duration, seed)` at its defaults (8 steps, guidance 1), which returns
    44.1 kHz stereo. That library pins torch 2.7.1 and numpy 2, while the Stable Audio Open worker
    pins numpy below 2 (§8.5), so effects get a worker of their own, not a third model family in
-   `worker/stable_audio.py`. The weights come from the gated `stabilityai/stable-audio-3-small-sfx`,
-   accepted once by the user on Hugging Face and downloaded into the Hugging Face cache (outside
-   the studio, as the other models are); Stability also publishes them ungated for MLX
-   (`stable-audio-3-optimized`), not tried.
+   `worker/stable_audio.py`. Loading Small SFX with that worker's stable-audio-tools 0.0.20 (or
+   that library's unreleased main, which Stability says can load it) was not tried. The weights
+   come from the gated `stabilityai/stable-audio-3-small-sfx`, accepted once by the user on Hugging
+   Face, and `from_pretrained` downloads them into the Hugging Face cache with the user's token.
+   That departs from §8.5's rule for Stable Audio Open (its own folder in `~/.cache/stable-audio`,
+   no token read); the step that builds the effects worker chooses between the two. Stability also
+   publishes the weights ungated for MLX (`stable-audio-3-optimized`), not tried.
 
-   **The takes' edges.** Every Small SFX take ends in silence (the last 10 ms below −68 dB), but
-   the sound stops before the length asked: a 3 s door creak by about 2.2 s, a 2 s sword draw by
-   0.95 s, a 1 s click by 0.4 s. Long sounds (ambience, fire) fill the length and start at full
-   level. So the studio trims the trailing silence of a take, and a sound that should loop needs
-   its own treatment. Two of Open 1.0's ten takes were cut off at the end (footsteps, ambience at
-   −15 to −28 dB in the last 10 ms).
+   **The takes' edges.** Every Small SFX take ends in silence (the last 10 ms below −59 dB), and
+   the one-shots stop well before the length asked: a 3 s door creak by about 2.2 s, a 2 s sword
+   draw by 0.95 s, a 1 s click by 0.4 s. The long sounds (ambience, fire) fill nearly all their
+   length and then fade out themselves in their last tenth of a second to under a second, so no
+   take loops as it is. The one-shots start within 0.13 s, most of them quietly (−41 to −63 dB in
+   the first 10 ms); the chime and one of the sword draws start at once (−17 to −30 dB), and the
+   ambience starts at full level. So a later step trims a take's trailing silence, and an effect
+   that loops (ambience) would need a crossfaded seam as the music loops do (§8.5) or a step of
+   its own. Two of Open 1.0's ten takes were cut off at the end (footsteps and ambience, −15 to
+   −28 dB in the last 10 ms).
 
    Ruled out before the spike: ElevenLabs Sound Effects (the Free plan's output is non-commercial;
    a paid plan may come later, as for music, decision 7), MMAudio, Meta's AudioGen and Sony's
-   Woosh (non-commercial weights) and TangoFlux (research use only). Not measured: Small SFX's
-   memory on the GPU, its time beside a running Whisper check, offline loading
+   Woosh (non-commercial weights) and TangoFlux (research use only). Not measured: memory beside
+   ACE-Step and Whisper (42 of the 48 GB in use with both loaded, §8.5; Small SFX adds about 5),
+   Small SFX's memory on the GPU, its time beside a running Whisper check, offline loading
    (`HF_HUB_OFFLINE`) once downloaded, and effects RetroQuest actually lists.
