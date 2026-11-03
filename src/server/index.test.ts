@@ -271,6 +271,7 @@ describe('server', () => {
       'music',
       'stableAudio',
       'imageModels',
+      'effectModels',
       'elevenlabsKey',
       'elevenlabs',
     ])

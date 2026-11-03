@@ -37,7 +37,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Sound effects: planned (§12 step 16; §13 decision 9).
+- Sound effects: planned (§12 step 16; §13 decision 9); the model is in place (§8.8).
 - Deciding where a track plays. The game decides which track a room or region plays, and when a
   stinger sounds; the studio makes the tracks it lists.
 
@@ -1554,6 +1554,32 @@ the studio's own page only.
 
 ---
 
+### 8.8 Sound effects (as-5wc.3, the model only)
+
+Sound effects are made with Stable Audio 3 Small SFX on the CPU (§13 decision 9), by a worker of its
+own, `worker/effects.py`, run with uv from `src/services/effects.ts` (`createEffectsWorker`). It is
+a JSON-lines worker like the music workers, started on the first effect (the model loads in about
+4 s) and stopped with the studio. An effect is a description, a length and a seed; the worker
+writes a 44.1 kHz stereo 16-bit WAV, and the studio trims its trailing silence (`trimTrailingSilence`
+in `src/core/wav.ts`: everything after the last frame above −59 dB, less a 20 ms tail), since the
+model stops before the length asked. Nothing calls it yet: the effects page is as-5wc.4.
+
+**Where the weights are read from:** the Hugging Face cache (`HF_HOME`, else `~/.cache/huggingface`),
+as the image models' are, not the studio's own folder: a half-finished download there would
+otherwise show as Ready. The user downloads them once with `hf download` and a read token passed
+on the command line (the repository is gated); the studio never asks for or keeps the token. The
+worker runs with `HF_HUB_OFFLINE=1`, so it never downloads: what Setup judged whole is what loads. Whole,
+interrupted and absent downloads are told apart by `hubDownload` (`src/services/images.ts`).
+
+**Setup's Sound-effect models row** (one row for every effects model, after Image models) is checked
+afresh each time and writes nothing to the project. It is always checked, since it needs no section
+of the project file. For now it is optional: whatever is missing shows as grey "Not set up" and is
+not counted in the sidebar; once the game lists effects, the same states become "Needs attention".
+Only the first thing that applies is shown: uv missing, then the download, then the last failed
+effect. The last failure is kept in `.content-studio/effect-model-health.json`
+(`createEffectHealth`: `record` when an effect fails, `clear` when one made with the model works,
+nothing when one is stopped); the take flow that calls them comes with the effects page.
+
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),
@@ -2032,6 +2058,8 @@ Small, independently useful increments:
 16. **Sound effects** (epic as-5wc), in small pull requests:
     1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.
+    2. **The model** (as-5wc.3, done: §8.8): a worker making one effect with Small SFX on the CPU, its
+       trailing silence trimmed, and Setup's Sound-effect models row.
 
 ---
 
@@ -2158,7 +2186,7 @@ Small, independently useful increments:
    come from the gated `stabilityai/stable-audio-3-small-sfx`, accepted once by the user on Hugging
    Face, and `from_pretrained` downloads them into the Hugging Face cache with the user's token.
    That departs from §8.5's rule for Stable Audio Open (its own folder in `~/.cache/stable-audio`,
-   no token read); the step that builds the effects worker chooses between the two. Stability also
+   no token read); the step that builds the effects worker chooses between the two (as-5wc.3 chose the Hugging Face cache, §8.8). Stability also
    publishes the weights ungated for MLX (`stable-audio-3-optimized`), not tried.
 
    **The takes' edges.** Every Small SFX take ends in silence (the last 10 ms below −59 dB), and

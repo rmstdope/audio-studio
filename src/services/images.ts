@@ -132,15 +132,20 @@ function hasUnfinishedBlob(dir: string): boolean {
 }
 
 /**
- * How much of a model's download is in the Hugging Face cache `hubDir`: `absent` with no folder
+ * How much of a repository's download is in the Hugging Face cache `hubDir`: `absent` with no folder
  * for it, `whole` when a snapshot holds weights and nothing is unfinished (no `.incomplete` blob, no
  * link to a missing blob, every shard an index names), `partial` otherwise.
  */
-export function imageModelDownload(hubDir: string, model: ImageModelId): ImageDownload {
-  const folder = join(hubDir, `models--${imageModel(model).repo.replace('/', '--')}`)
+export function hubDownload(hubDir: string, repo: string): ImageDownload {
+  const folder = join(hubDir, `models--${repo.replace('/', '--')}`)
   if (!existsSync(folder)) return 'absent'
   const { weights, broken } = inspectSnapshots(join(folder, 'snapshots'))
   return weights && !broken && !hasUnfinishedBlob(join(folder, 'blobs')) ? 'whole' : 'partial'
+}
+
+/** How much of an image model's download is in the Hugging Face cache `hubDir` (see `hubDownload`). */
+export function imageModelDownload(hubDir: string, model: ImageModelId): ImageDownload {
+  return hubDownload(hubDir, imageModel(model).repo)
 }
 
 /** Whether a model's whole download is in the Hugging Face cache `hubDir`. */

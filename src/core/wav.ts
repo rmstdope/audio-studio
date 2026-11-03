@@ -117,3 +117,32 @@ export function joinWavs(
   }
   return { wav: writeWav({ format, data }), seconds: data.length / frame / format.sampleRate }
 }
+
+/**
+ * The audio without the silence at its end: everything up to the last frame louder than
+ * `thresholdDb` (default −59 dB, below which a Stable Audio 3 take is silent), plus a short tail
+ * (`tailSeconds`, default 20 ms) so the sound does not stop short. A take that is all silence, or
+ * is not 16-bit, is returned as it is.
+ */
+export function trimTrailingSilence(
+  wav: Wav,
+  { thresholdDb = -59, tailSeconds = 0.02 }: { thresholdDb?: number; tailSeconds?: number } = {},
+): Wav {
+  const { channels, sampleRate, bitsPerSample } = wav.format
+  if (bitsPerSample !== 16) return wav
+  const view = new DataView(wav.data.buffer, wav.data.byteOffset, wav.data.byteLength)
+  const limit = 32768 * 10 ** (thresholdDb / 20)
+  const frames = Math.floor(wav.data.length / (2 * channels))
+  let last = -1
+  for (let frame = frames - 1; frame >= 0 && last < 0; frame--) {
+    for (let c = 0; c < channels; c++) {
+      if (Math.abs(view.getInt16((frame * channels + c) * 2, true)) > limit) {
+        last = frame
+        break
+      }
+    }
+  }
+  if (last < 0) return wav
+  const keep = Math.min(frames, last + 1 + Math.round(tailSeconds * sampleRate))
+  return { format: wav.format, data: wav.data.subarray(0, keep * channels * 2) }
+}

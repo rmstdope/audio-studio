@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { joinWavs, readWav } from './wav'
+import { joinWavs, readWav, trimTrailingSilence, type Wav } from './wav'
 
 /** A 16-bit mono WAV of `frames` frames at `rate`, optionally with a streaming placeholder length. */
 function wav(frames: number, rate = 1000, placeholder = false, tag = 1): Uint8Array {
@@ -74,5 +74,45 @@ describe('readWav, other shapes', () => {
     const none = wav(10)
     new DataView(none.buffer).setUint16(22, 0, true)
     expect(() => readWav(none)).toThrow('unsupported WAV')
+  })
+})
+
+describe('trimTrailingSilence', () => {
+  const rate = 1000
+  /** A 16-bit stereo wav: `loud` frames of a tone, then `quiet` frames of near-silence. */
+  const wav = (loud: number, quiet: number) => {
+    const samples = new Int16Array((loud + quiet) * 2)
+    for (let i = 0; i < loud * 2; i++) samples[i] = 8000
+    for (let i = loud * 2; i < samples.length; i++) samples[i] = 1
+    return {
+      format: { channels: 2, sampleRate: rate, bitsPerSample: 16 },
+      data: new Uint8Array(samples.buffer),
+    }
+  }
+  const frames = (w: Wav) => w.data.length / 4
+
+  it('cuts the silence after the last sound, keeping a short tail', () => {
+    const trimmed = trimTrailingSilence(wav(500, 400), { tailSeconds: 0.02 })
+    expect(frames(trimmed)).toBe(520)
+    expect(trimmed.format).toEqual(wav(1, 1).format)
+  })
+
+  it('leaves a take that ends in sound, and one that is all silence, as it is', () => {
+    expect(frames(trimTrailingSilence(wav(500, 0)))).toBe(500)
+    expect(frames(trimTrailingSilence(wav(0, 300)))).toBe(300)
+  })
+
+  it('keeps a quiet sound above the threshold', () => {
+    const w = wav(100, 100)
+    new Int16Array(w.data.buffer)[2 * 150] = 400 // about -38 dB
+    expect(frames(trimTrailingSilence(w, { tailSeconds: 0 }))).toBe(151)
+  })
+
+  it('leaves audio that is not 16-bit untouched', () => {
+    const w = {
+      format: { channels: 1, sampleRate: rate, bitsPerSample: 8 },
+      data: new Uint8Array(10),
+    }
+    expect(trimTrailingSilence(w)).toBe(w)
   })
 })

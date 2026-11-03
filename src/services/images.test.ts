@@ -7,6 +7,7 @@ import {
   createMfluxGenerator,
   hubDirOf,
   ImageToolError,
+  hubDownload,
   imageModelDownload,
   imageModelInstalled,
   makeImageTake,
@@ -381,6 +382,13 @@ describe('imageModelDownload', () => {
     expect(imageModelDownload(dir, 'klein')).toBe('absent')
     whole(dir)
     expect(imageModelDownload(dir, 'klein')).toBe('whole')
+  })
+
+  it('checks any repository the same way (the sound-effect model)', () => {
+    const dir = hub()
+    expect(hubDownload(dir, 'stabilityai/stable-audio-3-small-sfx')).toBe('absent')
+    whole(dir, 'models--stabilityai--stable-audio-3-small-sfx')
+    expect(hubDownload(dir, 'stabilityai/stable-audio-3-small-sfx')).toBe('whole')
   })
 
   it('is partial for a folder with no weights, or with an unfinished blob', () => {
