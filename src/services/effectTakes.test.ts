@@ -491,6 +491,9 @@ describe('takes of an effect that loops', () => {
       JSON.stringify([{ id: 'rain', description: rain.description, seconds: 10 }]),
     )
     const accepted = await takes.accept(file, 'rain')
-    expect(accepted).toMatchObject({ ok: false })
+    expect(accepted).toEqual({
+      ok: false,
+      message: 'A change of how the effect plays cannot be accepted: the effect needs a new take.',
+    })
   })
 })

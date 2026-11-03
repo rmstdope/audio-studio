@@ -1753,7 +1753,7 @@ POST   /api/effects/:id/keep-mine                keep the studio's words after t
 POST   /api/effects/:id/forget                   delete the words of an effect the game no longer lists
 GET    /api/effects/:id/takes                    the effect's takes, those being made and failed
 POST   /api/effects/:id/takes                    make takes ({ count } 1–8, or { retry })
-GET    /api/effects/:id/takes/:file              a take's WAV
+GET    /api/effects/:id/takes/:file              a take's WAV (?seam=1: its seam, the last 4 seconds then the first 4)
 DELETE /api/effects/:id/takes/:file              drop a take that is not chosen
 POST   /api/effects/:id/choose|unchoose|accept|stop   choose a take ({ file }), take it back, accept a changed description, stop the batch
 GET    /api/effects/clips/:file                  a chosen clip (plain `.mp3` only)

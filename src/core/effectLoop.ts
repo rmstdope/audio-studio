@@ -14,6 +14,9 @@ export const EFFECT_LOOP_SPARE_SECONDS = 1
 /** A sound ending within this many seconds of the length counts as sounding all the way. */
 const FULL_TOLERANCE_SECONDS = 0.01
 
+/** A blend shorter than this is not worth making: the take is just cut. */
+const MIN_BLEND_SECONDS = 0.02
+
 /** The crossfade at the seam of a loop of `seconds`: a second, at most half of a short loop. */
 export function effectSeamSeconds(seconds: number): number {
   return Math.min(EFFECT_SEAM_SECONDS, seconds / 2)
@@ -38,13 +41,16 @@ function fitted(wav: Wav, seconds: number): Wav {
  * A loop from a take made at `loopRequestSeconds` (its trailing silence trimmed), exactly `seconds`
  * long. A sound that ends before `seconds` is kept as it is, padded with silence, and says where
  * it goes quiet (`quietAt`): crossfading silence over the start would dip it. Otherwise the take is
- * cut at the end of the seam and the seam crossfaded over the start, as a music loop's.
+ * cut where its sound ends, at most the seam after `seconds`, and that stretch crossfaded over the
+ * start, as a music loop's.
  */
 export function shapeEffectLoop(wav: Wav, seconds: number): { wav: Wav; quietAt: number | null } {
   const sounded = wavSeconds(wav)
   if (sounded < seconds - FULL_TOLERANCE_SECONDS) {
     return { wav: fitted(wav, seconds), quietAt: Math.round(sounded * 1000) / 1000 }
   }
-  const seam = effectSeamSeconds(seconds)
-  return { wav: shapeLoop(fitted(wav, seconds + seam), seconds, seam), quietAt: null }
+  // Only the sound there is is blended: silence over the start would dip it.
+  const blend = Math.min(effectSeamSeconds(seconds), sounded - seconds)
+  if (blend < MIN_BLEND_SECONDS) return { wav: fitted(wav, seconds), quietAt: null }
+  return { wav: shapeLoop(fitted(wav, seconds + blend), seconds, blend), quietAt: null }
 }

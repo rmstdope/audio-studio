@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { effectModel, type EffectModelId } from '../core/effectModels'
 import {
   EFFECT_TAKE_SECONDS,
+  effectTakeChoosable,
   type EffectBoard,
   type EffectBoardTake,
   type EffectFailedView,
@@ -404,7 +405,9 @@ export function createEffectTakes({
         if ('ok' in board) return board
         const take = board.takes.find((t) => fileOf(t) === name)
         if (!take) return { ok: false, message: 'That take is not on the board.' }
-        if (Boolean(take.inputs.loops) !== Boolean(found.inputs.loops)) {
+        if (
+          !effectTakeChoosable({ loops: Boolean(take.inputs.loops) }, Boolean(found.inputs.loops))
+        ) {
           const made = take.inputs.loops ? 'to loop' : 'to play once'
           const plays = found.inputs.loops ? 'loops' : 'plays once'
           return {

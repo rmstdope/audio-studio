@@ -5526,6 +5526,19 @@ describe('server, sound effect takes', () => {
     )
   })
 
+  it('serves a one-shot take’s seam as well: the take twice over when shorter than 4 seconds', async () => {
+    expect((await send('POST', '/api/effects/door-creak/takes', { count: 1 })).status).toBe(200)
+    const made = await settled('door-creak')
+    const url = `/api/effects/door-creak/takes/${made.takes[0].file}`
+    const plain = readWav(
+      new Uint8Array(await (await fetch(new URL(url, studio.url))).arrayBuffer()),
+    )
+    const seam = readWav(
+      new Uint8Array(await (await fetch(new URL(`${url}?seam=1`, studio.url))).arrayBuffer()),
+    )
+    expect(seam.data.length).toBe(plain.data.length * 2)
+  })
+
   it('refuses to drop the chosen take (409), drops another, and un-chooses', async () => {
     const v = await view('coins')
     const chosen = v.takes.find((t: { chosen: boolean }) => t.chosen)

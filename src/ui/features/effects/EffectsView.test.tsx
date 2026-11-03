@@ -3,6 +3,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { EffectRow, EffectsSummary } from '../../../core/effects'
 import type { ProjectSummary } from '../../../core/summary'
 import type { EffectsRoute } from '../../route'
+import { installFakeWebAudio, started } from '../../../../test/fakeWebAudio'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -137,17 +138,24 @@ describe('the Sound effects list, with takes', () => {
     expect(container.querySelectorAll('.loops-tag')).toHaveLength(1)
   })
 
-  it('plays a looping row round until ■ is pressed, and a one-shot row the same way it did', async () => {
+  it('plays a looping row round until ■ is pressed, and a one-shot row once', async () => {
+    cleanups.push(installFakeWebAudio())
     const { container, settle } = render(
       list,
-      effects({ rows: [chosen('wind', { loops: true, seconds: 10 })] }),
+      effects({
+        rows: [chosen('wind', { loops: true, seconds: 10 }), chosen('door-creak')],
+      }),
     )
-    const play = container.querySelector<HTMLButtonElement>('tbody .icon-btn')!
-    await act(async () => play.click())
+    const [wind, door] = [...container.querySelectorAll<HTMLButtonElement>('tbody .icon-btn')]
+    await act(async () => wind!.click())
     await settle()
-    expect(play.getAttribute('aria-label')).toBe('Stop Wind')
-    await act(async () => play.click())
-    expect(play.getAttribute('aria-label')).toBe('Play Wind: take 2')
+    expect(started).toEqual([{ loop: true }])
+    expect(wind!.getAttribute('aria-label')).toBe('Stop Wind')
+    await act(async () => wind!.click())
+    expect(wind!.getAttribute('aria-label')).toBe('Play Wind: take 2')
+    await act(async () => door!.click())
+    await settle()
+    expect(started).toEqual([{ loop: true }])
   })
 
   it('says on the effect’s page that it loops', () => {

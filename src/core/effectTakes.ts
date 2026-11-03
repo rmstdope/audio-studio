@@ -182,7 +182,7 @@ export function effectQuietLine(quietAt: number): string {
 
 /** Whether a take can be chosen: only one made the way the effect plays now. */
 export function effectTakeChoosable(take: { loops: boolean }, effectLoops: boolean): boolean {
-  return take.loops === effectLoops
+  return effectTakeKind(take, effectLoops) === null
 }
 
 /** What an effect's In the game block shows. */

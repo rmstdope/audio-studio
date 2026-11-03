@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
-import type { EffectRow } from '../../../core/effects'
+import { effectSeconds, type EffectRow } from '../../../core/effects'
 import {
   effectInTheGame,
   effectQuietLine,
@@ -257,7 +257,9 @@ export function Playback({
           quiet={quiet}
           position={playing ? player.position : undefined}
         />
-        <span className="faint small">{effectTakeLength(take.seconds)}</span>
+        <span className="faint small">
+          {take.loops ? effectSeconds(take.seconds) : effectTakeLength(take.seconds)}
+        </span>
       </div>
       {take.quietAt !== null && <span className="take-quiet">{effectQuietLine(take.quietAt)}</span>}
     </>

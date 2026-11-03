@@ -2,6 +2,7 @@ import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { EffectRow } from '../../../core/effects'
 import type { EffectTakesView, EffectTakeView } from '../../../core/effectTakes'
+import { installFakeWebAudio, started } from '../../../../test/fakeWebAudio'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -454,7 +455,8 @@ describe('an effect that loops', () => {
     expect(cards).toHaveLength(2)
     for (const card of cards) {
       expect(card.querySelector('.wave .seam')).not.toBeNull()
-      expect(card.textContent).toContain('10.0 s')
+      expect(card.textContent).toContain('10 s')
+      expect(card.textContent).not.toContain('10.0')
       expect(card.textContent).toContain('Hear the seam')
     }
     expect(buttons('Hear the seam')).toHaveLength(2)
@@ -511,12 +513,26 @@ describe('an effect that loops', () => {
     expect(calls[0]).toMatchObject({ url: '/api/effects/rain/choose', method: 'POST' })
   })
 
-  it('compares with the same button, reading ■ Stop while it plays', async () => {
+  it('plays a looping take round, and a take of a one-shot once', async () => {
+    cleanups.push(installFakeWebAudio())
+    const loops = render(looping({ status: 'not-chosen' }), view({ takes: [loopTake(1)] }))
+    await loops.click(loops.container.querySelector('.takes .play')!)
+    expect(started).toEqual([{ loop: true }])
+    cleanups.splice(0).forEach((c) => c())
+    cleanups.push(installFakeWebAudio())
+    const once = render(row({ status: 'not-chosen' }), view({ takes: [take(1)] }))
+    await once.click(once.container.querySelector('.takes .play')!)
+    expect(started).toEqual([])
+  })
+
+  it('compares with the same button, the chosen loop round first, reading ■ Stop while it plays', async () => {
+    cleanups.push(installFakeWebAudio())
     const { buttons, click } = render(
       looping({ status: 'chosen', chosen: true, current: { kind: 'take', take: 2, exists: true } }),
       view({ takes: [loopTake(1), loopTake(2, { chosen: true })] }),
     )
     await click(buttons('▶ The chosen, then this')[0]!)
+    expect(started).toEqual([{ loop: true }])
     expect(buttons('■ Stop')).toHaveLength(1)
   })
 })

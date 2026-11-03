@@ -483,6 +483,17 @@ export function allowedHosts(port: number): string[] {
 }
 
 /**
+ * A take's WAV; with `?seam=1`, its seam instead: the last seconds and then the first, to hear a
+ * loop come round.
+ */
+async function takeResponse(request: Request, file: string): Promise<Response> {
+  if (new URL(request.url).searchParams.get('seam') !== '1') return new Response(Bun.file(file))
+  const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
+  return new Response(writeWav(seamWav(wav)) as Uint8Array<ArrayBuffer>, {
+    headers: { 'content-type': 'audio/wav' },
+  })
+}
+/**
  * The studio's local server: the UI, and a JSON API over the project. It listens on 127.0.0.1
  * only, reads the project from disk on every request, so edits show up on reload, and takes
  * changes only from its own page.
@@ -1678,15 +1689,7 @@ export function startServer({
             request.params.id,
             request.params.file,
           )
-          if (!file) return notFound()
-          // `?seam=1`: the take's last seconds and then its first, to hear a loop come round.
-          if (new URL(request.url).searchParams.get('seam') !== '1') {
-            return new Response(Bun.file(file))
-          }
-          const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
-          return new Response(writeWav(seamWav(wav)) as Uint8Array<ArrayBuffer>, {
-            headers: { 'content-type': 'audio/wav' },
-          })
+          return file ? takeResponse(request, file) : notFound()
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await effectTakes.drop(projectFile, request.params.id, request.params.file)
@@ -1789,15 +1792,7 @@ export function startServer({
             request.params.id,
             request.params.file,
           )
-          if (!file) return notFound()
-          // `?seam=1`: the take's last seconds and then its first, to hear the loop come round.
-          if (new URL(request.url).searchParams.get('seam') !== '1') {
-            return new Response(Bun.file(file))
-          }
-          const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
-          return new Response(writeWav(seamWav(wav)) as Uint8Array<ArrayBuffer>, {
-            headers: { 'content-type': 'audio/wav' },
-          })
+          return file ? takeResponse(request, file) : notFound()
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await musicTakes.drop(projectFile, request.params.id, request.params.file)

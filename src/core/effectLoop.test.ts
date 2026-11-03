@@ -60,11 +60,25 @@ describe('shapeEffectLoop', () => {
     expect(out[619]).toBe(1000)
   })
 
-  it('crossfades a take that sounds past the length but not to the end of the seam', () => {
-    const source = make(10.5, () => 1000)
-    const { wav, quietAt } = shapeEffectLoop(source, 10)
+  it('crossfades only the sound there is when it ends between the length and the end of the seam', () => {
+    const { wav, quietAt } = shapeEffectLoop(
+      make(10.5, () => 1000),
+      10,
+    )
     expect(quietAt).toBeNull()
     expect(wavSeconds(wav)).toBe(10)
+    // Blending silence over the start would dip it: with sound on both sides the blend never drops below the level.
+    expect(Math.min(...samplesOf(wav))).toBeGreaterThanOrEqual(995)
+  })
+
+  it('only cuts a take whose sound ends a moment past the length', () => {
+    const { wav, quietAt } = shapeEffectLoop(
+      make(10.01, () => 1000),
+      10,
+    )
+    expect(quietAt).toBeNull()
+    expect(wavSeconds(wav)).toBe(10)
+    expect(Math.min(...samplesOf(wav))).toBe(1000)
   })
 
   it('shapes a short loop with a shortened seam', () => {
