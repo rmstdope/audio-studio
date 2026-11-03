@@ -175,6 +175,11 @@ export function effectTakeKind(
   return take.loops ? 'made to loop' : 'made to play once'
 }
 
+/** The amber line under a loop whose sound ends early: where it goes quiet. */
+export function effectQuietLine(quietAt: number): string {
+  return `Goes quiet at ${quietAt.toFixed(1)} s, so it loops with a gap.`
+}
+
 /** Whether a take can be chosen: only one made the way the effect plays now. */
 export function effectTakeChoosable(take: { loops: boolean }, effectLoops: boolean): boolean {
   return take.loops === effectLoops

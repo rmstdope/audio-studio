@@ -12,6 +12,7 @@ import {
   effectTimeLeft,
   effectUnchooseQuestion,
   effectTakeChoosable,
+  effectQuietLine,
   effectTakeKind,
   makeEffectTakesLabel,
   type EffectLockEntry,
@@ -116,6 +117,13 @@ describe('how an effect plays, once or looping', () => {
     expect(effectTakeKind({ loops: false }, false)).toBeNull()
     expect(effectTakeChoosable({ loops: true }, true)).toBe(true)
     expect(effectTakeChoosable({ loops: false }, true)).toBe(false)
+  })
+})
+
+describe('the line for a loop that goes quiet early', () => {
+  it('names where, to a tenth of a second', () => {
+    expect(effectQuietLine(6.2)).toBe('Goes quiet at 6.2 s, so it loops with a gap.')
+    expect(effectQuietLine(8.04)).toBe('Goes quiet at 8.0 s, so it loops with a gap.')
   })
 })
 

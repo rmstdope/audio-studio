@@ -126,6 +126,42 @@ describe('the Sound effects list, with takes', () => {
     expect(buttons(2)).toHaveLength(0)
   })
 
+  it('tags a looping effect "loops" beside its length, and no other', () => {
+    const { container } = render(
+      list,
+      effects({ rows: [row('door-creak'), row('wind', { loops: true, seconds: 10 })] }),
+    )
+    const lengths = [...container.querySelectorAll('tbody td.effects-length')]
+    expect(lengths.map((td) => td.textContent)).toEqual(['3 s', '10 sloops'])
+    expect(lengths[1]!.querySelector('.loops-tag')!.textContent).toBe('loops')
+    expect(container.querySelectorAll('.loops-tag')).toHaveLength(1)
+  })
+
+  it('plays a looping row round until ■ is pressed, and a one-shot row the same way it did', async () => {
+    const { container, settle } = render(
+      list,
+      effects({ rows: [chosen('wind', { loops: true, seconds: 10 })] }),
+    )
+    const play = container.querySelector<HTMLButtonElement>('tbody .icon-btn')!
+    await act(async () => play.click())
+    await settle()
+    expect(play.getAttribute('aria-label')).toBe('Stop Wind')
+    await act(async () => play.click())
+    expect(play.getAttribute('aria-label')).toBe('Play Wind: take 2')
+  })
+
+  it('says on the effect’s page that it loops', () => {
+    const { text } = render(
+      page('wind'),
+      effects({ rows: [row('wind', { loops: true, seconds: 10 }), row('coins')] }),
+    )
+    expect(text()).toContain('10 s · loops · set by the game')
+    cleanups.splice(0).forEach((c) => c())
+    const once = render(page('coins'), effects({ rows: [row('coins')] }))
+    expect(once.text()).toContain('3 s · set by the game')
+    expect(once.text()).not.toContain('loops')
+  })
+
   it('plays the chosen take without opening the page, and stops on a second press', async () => {
     window.location.hash = '#/sound-effects'
     const { container, settle } = render(list, effects({ rows: [chosen('door-creak')] }))

@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { effectSeconds, type EffectRow, type EffectsSummary } from '../../../core/effects'
+import type { EffectRow, EffectsSummary } from '../../../core/effects'
 import { useKeepMineEffect, useSetEffectDescription } from '../../api'
 import { Failure } from '../../components/Failure'
 import { WordsField } from '../images/WordsField'
+import { effectLengthLine } from '../../effectsText'
 import { routeHref } from '../../route'
 import { EffectTakesPanel } from './EffectTakesPanel'
 
@@ -99,7 +100,7 @@ function Found({ row }: { row: EffectRow }) {
         {row.changedHere && <span className="muted">The game&apos;s: {row.gameDescription}</span>}
         <div className="effects-length-line">
           <span className="label">Length</span>
-          <span>{effectSeconds(row.seconds)} · set by the game</span>
+          <span>{effectLengthLine(row.seconds, row.loops)}</span>
         </div>
       </section>
       <EffectTakesPanel key={`takes-${row.id}`} row={row} />

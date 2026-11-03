@@ -152,7 +152,8 @@ export function EffectsList({
                               player.toggle(
                                 row.id,
                                 `/api/effects/${encodeURIComponent(row.id)}/current`,
-                                {},
+                                // A looping effect comes round until stopped, as the game plays it.
+                                row.loops ? { loop: true } : {},
                               )
                             }}
                             onKeyDown={(event) => event.stopPropagation()}
@@ -172,7 +173,10 @@ export function EffectsList({
                           <span className="chip chip-warn">game&apos;s changed</span>
                         )}
                       </td>
-                      <td className="effects-length">{effectSeconds(row.seconds)}</td>
+                      <td className="effects-length">
+                        {effectSeconds(row.seconds)}
+                        {row.loops && <span className="loops-tag">loops</span>}
+                      </td>
                       <td>
                         {making[row.id] ? (
                           <span className="chip">{effectMakingStatus(making[row.id]!)}</span>

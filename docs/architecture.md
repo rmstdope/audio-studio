@@ -37,7 +37,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Sound effects: the list and the studio's own descriptions (§8.9), the model (§8.8) and the takes — made, compared, chosen — (§8.10) are built (§12 step 16; §13 decision 9).
+- Sound effects: the list and the studio's own descriptions (§8.9), the model (§8.8) and the takes — made, compared, chosen, looping ones seamless — (§8.10) are built (§12 step 16; §13 decision 9).
 - Deciding where a track plays. The game decides which track a room or region plays, and when a
   stinger sounds; the studio makes the tracks it lists.
 
@@ -1605,7 +1605,8 @@ Refresh from the game (the consumer rules in CLAUDE.md name it). `paths.list` ma
 `{part}` nor `{language}`. `lock`, `clips` and `manifest` (as-5wc.4) are required: where the studio
 writes what the game plays (§8.10); a section without them is a problem naming the path.
 
-**The list** is `[{ "id", "description", "seconds" }]` in the game's order, read only. An id is a
+**The list** is `[{ "id", "description", "seconds", "loops"? }]` in the game's order, read only. `loops` is an optional
+boolean (as-5wc.6): `true` marks an effect the game plays round and round (ambience); absent or `false`, it plays once. An id is a
 slug; `seconds` is positive and may be fractional. The list is read entry by entry
 (`readEffectEntries`): an entry with a problem, or an id used twice (both entries), is left out and
 reported with its file and place (`tts/effects.json at [2].seconds`), and the rest still show. A
@@ -1667,6 +1668,27 @@ chosen in the subtitle, an out-of-date one included; the ring and sidebar count 
 unchanged. **Accept** (`POST /api/effects/:id/accept`) counts the chosen take as made from the
 description now, when the description alone changed; a changed length needs a new take (409).
 `CONTENT_STUDIO_FAKE_EFFECTS=1` swaps the generator for a stand-in that makes short tones.
+
+**Effects that loop** (as-5wc.6; drawn in `docs/ui/as-5wc.6-looping-effects.html`). The list's `loops` flag is read
+on every read, never stored. A looping effect's take is asked of the model at `seconds` plus a seam
+plus a spare second (`loopRequestSeconds` in `core/effectLoop.ts`; the seam is 1 s, at most half of a
+short loop, and the spare is dropped because Small SFX fades out in its last tenth of a second to
+under a second), then shaped by `shapeEffectLoop`: a sound that lasts to the length is cut at the
+end of the seam and the seam crossfaded over the start (`shapeLoop` of music, with a shorter blend),
+so the take is exactly `seconds` long and its end runs into its beginning; a sound that stops
+before `seconds` is padded with silence to the length, with no crossfade (blending silence over
+the start would dip it), and the board take records `quietAt`, which the card shades and words
+("Goes quiet at 6.2 s, so it loops with a gap."). It can still be chosen. A take's kind is in its
+inputs (`loops`, absent = plays once, in the board and the lock) and in its hash only when it loops,
+so one-shot takes keep theirs. A loop plays round on Web Audio (`createClipAudio`), the board's
+and the list's ▶ alike (the list plays the chosen clip itself, the MP3 the game plays, which relies
+on the encoder's gapless header); a comparison plays a loop for 2 rounds (`Clip.rounds`), a take
+made to play once once. `GET …/takes/<file>?seam=1` is the last 4 seconds then the first 4, as
+music's. When the game switches an effect between once and looping, the lock's inputs differ in
+`loops`: the status is "changed since chosen", the box says "now loops" / "no longer loops"
+(alone or after the description or length), and nothing is accepted. Takes of the other kind stay,
+marked "made to play once" / "made to loop", and can be played, compared and dropped but not
+chosen (the service refuses with 409). Choosing a take of the new kind clears the box.
 
 ## 9. Server API
 
@@ -2164,6 +2186,9 @@ Small, independently useful increments:
        with the studio's own description overrides and the Sound effects workspace.
     4. **Takes** (as-5wc.4, done: §8.10): make, hear, compare, choose, un-choose, drop and accept; the
        lock, manifest and clips; statuses in the list. The second model is as-5wc.5.
+    5. **Looping effects** (as-5wc.6, done: §8.10): the list marks which effects loop; their takes are
+       made seamless at the game's length, play round, have Hear the seam, and a change of how an
+       effect plays is a change since chosen.
 
 ---
 

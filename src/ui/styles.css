@@ -3323,6 +3323,15 @@ button.cue-chip[aria-expanded='true'] {
   width: 2px;
   background: var(--accent);
 }
+.wave .quiet {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background: var(--warn-bg);
+  border-left: 1px dashed var(--warn);
+  pointer-events: none;
+}
 .wave .playhead {
   position: absolute;
   top: -4px;
@@ -3922,6 +3931,18 @@ button.cue-chip[aria-expanded='true'] {
 }
 .effects-length {
   white-space: nowrap;
+}
+.loops-tag {
+  margin-left: 6px;
+  padding: 0 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-soft);
+}
+.take-quiet {
+  color: var(--warn);
+  font-size: 12px;
 }
 .effects-length-line {
   display: flex;

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import type { EffectsSummary } from '../core/effects'
-import { effectsNotice, effectsRefreshSummary, effectsSubtitle } from './effectsText'
+import {
+  effectLengthLine,
+  effectsNotice,
+  effectsRefreshSummary,
+  effectsSubtitle,
+} from './effectsText'
 
 const summary = (extra: Partial<EffectsSummary> = {}): EffectsSummary => ({
   status: 'ok',
@@ -115,5 +120,12 @@ describe('effectsRefreshSummary', () => {
     expect(effectsRefreshSummary(3, null).headline).toBe(
       '3 sound effects · what changed is not known',
     )
+  })
+})
+
+describe('effectLengthLine', () => {
+  it('says a loop loops, and a one-shot nothing more than the game sets it', () => {
+    expect(effectLengthLine(10, true)).toBe('10 s · loops · set by the game')
+    expect(effectLengthLine(3, false)).toBe('3 s · set by the game')
   })
 })

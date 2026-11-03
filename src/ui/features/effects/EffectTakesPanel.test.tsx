@@ -438,3 +438,175 @@ describe('the lock cannot be read', () => {
     expect(buttons('Make 4 more takes')[0]!.hasAttribute('disabled')).toBe(false)
   })
 })
+
+describe('an effect that loops', () => {
+  const looping = (over: Partial<EffectRow> = {}) =>
+    row({ id: 'rain', name: 'Rain', seconds: 10, loops: true, ...over })
+  const loopTake = (n: number, over: Partial<EffectTakeView> = {}) =>
+    take(n, { seconds: 10, loops: true, ...over })
+
+  it('gives each looping take its seam mark, the game’s length and Hear the seam', () => {
+    const { container, buttons } = render(
+      looping({ status: 'not-chosen' }),
+      view({ takes: [loopTake(1), loopTake(2)] }),
+    )
+    const cards = [...container.querySelectorAll('.takes .take')]
+    expect(cards).toHaveLength(2)
+    for (const card of cards) {
+      expect(card.querySelector('.wave .seam')).not.toBeNull()
+      expect(card.textContent).toContain('10.0 s')
+      expect(card.textContent).toContain('Hear the seam')
+    }
+    expect(buttons('Hear the seam')).toHaveLength(2)
+  })
+
+  it('shows nothing extra on a take of an effect that plays once', () => {
+    const { container, text } = render(row({ status: 'not-chosen' }), view({ takes: [take(1)] }))
+    expect(container.querySelector('.seam')).toBeNull()
+    expect(text()).not.toContain('Hear the seam')
+    expect(text()).not.toContain('made to')
+  })
+
+  it('reads Stop while the seam plays, and Hear the seam again after', async () => {
+    const { buttons, click } = render(
+      looping({ status: 'not-chosen' }),
+      view({ takes: [loopTake(1), loopTake(2)] }),
+    )
+    await click(buttons('Hear the seam')[0]!)
+    expect(buttons('Stop')).toHaveLength(1)
+    expect(buttons('Hear the seam')).toHaveLength(1)
+    await click(buttons('Stop')[0]!)
+    expect(buttons('Hear the seam')).toHaveLength(2)
+  })
+
+  it('has Hear the seam in the In the game block too', () => {
+    const { container } = render(
+      looping({ status: 'chosen', chosen: true, current: { kind: 'take', take: 2, exists: true } }),
+      view({ takes: [loopTake(1), loopTake(2, { chosen: true })] }),
+    )
+    const block = container.querySelector('[aria-label="In the game"]')!
+    expect(block.textContent).toContain('Hear the seam')
+    expect(block.querySelector('.wave .seam')).not.toBeNull()
+  })
+
+  it('shades the quiet part and says where the loop goes quiet, on the card and in the block', () => {
+    const { container } = render(
+      looping({ status: 'chosen', chosen: true, current: { kind: 'take', take: 2, exists: true } }),
+      view({ takes: [loopTake(1, { quietAt: 6.2 }), loopTake(2, { chosen: true, quietAt: 8.1 })] }),
+    )
+    const card = container.querySelector('.takes .take')!
+    expect(card.textContent).toContain('Goes quiet at 6.2 s, so it loops with a gap.')
+    expect(card.querySelector<HTMLElement>('.wave .quiet')!.style.width).toBe('38%')
+    const block = container.querySelector('[aria-label="In the game"]')!
+    expect(block.textContent).toContain('Goes quiet at 8.1 s, so it loops with a gap.')
+    expect(block.querySelector<HTMLElement>('.wave .quiet')!.style.width).toBe('19%')
+  })
+
+  it('can still choose a take that goes quiet early', async () => {
+    const { calls, click, buttons } = render(
+      looping({ status: 'not-chosen' }),
+      view({ takes: [loopTake(1, { quietAt: 6.2 })] }),
+    )
+    await click(buttons('Choose')[0]!)
+    expect(calls[0]).toMatchObject({ url: '/api/effects/rain/choose', method: 'POST' })
+  })
+
+  it('compares with the same button, reading ■ Stop while it plays', async () => {
+    const { buttons, click } = render(
+      looping({ status: 'chosen', chosen: true, current: { kind: 'take', take: 2, exists: true } }),
+      view({ takes: [loopTake(1), loopTake(2, { chosen: true })] }),
+    )
+    await click(buttons('▶ The chosen, then this')[0]!)
+    expect(buttons('■ Stop')).toHaveLength(1)
+  })
+})
+
+describe('the game changed how an effect plays', () => {
+  const chosenTake = (over: Partial<EffectTakeView> = {}) =>
+    take(2, { chosen: true, seconds: 7.4, ...over })
+  const changedRow = (changed: EffectRow['changed'], loops: boolean) =>
+    chosenRow({ id: 'wind', name: 'Wind', loops, status: 'changed', changed })
+
+  it('once to looping: the amber box, no Accept; takes made to play once are marked, not choosable, with no seam', () => {
+    const { container, text, buttons } = render(
+      changedRow(['now loops'], true),
+      view({
+        takes: [
+          take(1, { seconds: 6.8 }),
+          chosenTake(),
+          take(3),
+          take(5, { loops: true, seconds: 10 }),
+        ],
+      }),
+    )
+    expect(text()).toContain('Changed since its take was chosen: now loops.')
+    expect(text()).toContain(
+      "The game plays the chosen take until you choose another. Make more takes that loop. A take made to play once can't loop without a jump.",
+    )
+    expect(buttons('Accept')).toHaveLength(0)
+    const block = container.querySelector('[aria-label="In the game"]')!
+    expect(block.textContent).toContain('made to play once')
+    expect(block.textContent).not.toContain('Hear the seam')
+    const cards = [...container.querySelectorAll('.takes .take')]
+    expect(cards.map((c) => c.querySelector('b')!.textContent)).toEqual([
+      'Take 1',
+      'Take 3',
+      'Take 5',
+    ])
+    expect(cards.map((c) => c.textContent!.includes('made to play once'))).toEqual([
+      true,
+      true,
+      false,
+    ])
+    // Only the new looping take can be chosen or heard at its seam; the others can be played, compared and dropped.
+    expect(cards.map((c) => c.textContent!.includes('Choose'))).toEqual([false, false, true])
+    expect(cards.map((c) => c.textContent!.includes('Hear the seam'))).toEqual([false, false, true])
+    expect(cards.every((c) => c.textContent!.includes('The chosen, then this'))).toBe(true)
+    expect(cards.every((c) => c.textContent!.includes('Drop'))).toBe(true)
+  })
+
+  it('looping to once: marks takes made to loop, which keep Hear the seam but cannot be chosen', () => {
+    const { container, text, buttons } = render(
+      changedRow(['no longer loops'], false),
+      view({
+        takes: [
+          chosenTake({ loops: true, seconds: 10 }),
+          take(3),
+          take(4, { loops: true, seconds: 10 }),
+        ],
+      }),
+    )
+    expect(text()).toContain('Changed since its take was chosen: no longer loops.')
+    expect(text()).toContain(
+      'A take made to loop runs to the full length instead of ending with its sound.',
+    )
+    expect(buttons('Accept')).toHaveLength(0)
+    const cards = [...container.querySelectorAll('.takes .take')]
+    expect(cards.map((c) => c.textContent!.includes('made to loop'))).toEqual([false, true])
+    expect(cards.map((c) => c.textContent!.includes('Choose'))).toEqual([true, false])
+    expect(cards[1]!.textContent).toContain('Hear the seam')
+    expect(container.querySelector('[aria-label="In the game"]')!.textContent).toContain(
+      'made to loop',
+    )
+  })
+
+  it('words the box when the description or length changed too, and never offers Accept', () => {
+    const { text, buttons } = render(
+      changedRow(['description', 'now loops'], true),
+      view({ takes: [chosenTake()] }),
+    )
+    expect(text()).toContain('Changed since its take was chosen: description, and now loops.')
+    expect(buttons('Accept')).toHaveLength(0)
+  })
+
+  it('clears the box once a take of the new kind is chosen', () => {
+    const { text, container } = render(
+      chosenRow({ id: 'wind', loops: true }),
+      view({ takes: [take(5, { loops: true, seconds: 10, chosen: true })] }),
+    )
+    expect(text()).not.toContain('Changed since')
+    expect(container.querySelector('[aria-label="In the game"]')!.textContent).not.toContain(
+      'made to',
+    )
+  })
+})

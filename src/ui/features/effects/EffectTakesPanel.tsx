@@ -6,6 +6,7 @@ import {
   effectChangedAdvice,
   effectChangedLine,
   effectCountEntry,
+  effectTakeChoosable,
   effectTimeLeft,
   makeEffectTakesLabel,
   type EffectMakingView,
@@ -23,10 +24,8 @@ import { Problems } from '../../components/Problems'
 import { useClipPlayer } from '../../components/useClipPlayer'
 import { failureLine, progressOf } from '../../musicTakesText'
 import { routeHref } from '../../route'
-import { EffectInTheGame, Playback, takePlayId, takeUrl, type Player } from './EffectInTheGame'
-
-/** The seconds of quiet between the chosen take and the one compared with it. */
-const QUIET_SECONDS = 1
+import { compareClips, takePlayId } from '../../effectsPlay'
+import { EffectInTheGame, HearTheSeam, KindChip, Playback, type Player } from './EffectInTheGame'
 
 /**
  * An effect's Takes panel with the boxes above it: the takes made, played alone or after the chosen
@@ -100,14 +99,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
       return
     }
     setComparing(take.n)
-    player.playInTurn([
-      {
-        id: takePlayId(id, chosen.n),
-        url: takeUrl(id, chosen.file),
-        after: QUIET_SECONDS,
-      },
-      { id: takePlayId(id, take.n), url: takeUrl(id, take.file) },
-    ])
+    player.playInTurn(compareClips(id, chosen, take))
   }
   const changed = row.changed
   return (
@@ -215,6 +207,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
               <TakeCard
                 key={take.n}
                 effect={id}
+                effectLoops={row.loops}
                 take={take}
                 player={player}
                 locked={view.lockUnread}
@@ -241,6 +234,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
 /** A take made: play, its waveform with a line where it plays, its length, and what can be done with it. */
 function TakeCard({
   effect,
+  effectLoops,
   take,
   player,
   locked,
@@ -249,6 +243,8 @@ function TakeCard({
   onCompare,
 }: {
   effect: string
+  /** How the effect plays now: a take made the other way cannot be chosen. */
+  effectLoops: boolean
   take: EffectTakeView
   player: Player
   /** The lock cannot be read: Choose and Drop wait. */
@@ -261,6 +257,7 @@ function TakeCard({
 }) {
   const id = takePlayId(effect, take.n)
   const playing = player.playing === id
+  const seamPlaying = player.playing === `${id}-seam`
   const drop = useDropEffectTake(effect)
   const choose = useChooseEffectTake(effect)
   const failedChoose = choose.isError || (choose.data && !choose.data.ok)
@@ -269,31 +266,37 @@ function TakeCard({
     <div className="take">
       <div className="take-row">
         <b className="grow">Take {take.n}</b>
+        <KindChip take={take} effectLoops={effectLoops} />
       </div>
       <span className="faint small">{take.model}</span>
       <Playback effect={effect} take={take} player={player} />
-      {canCompare && (
+      {(take.loops || canCompare) && (
         <div className="take-row">
-          <button type="button" className="btn btn-small" onClick={onCompare}>
-            {comparing ? '■ Stop' : '▶ The chosen, then this'}
-          </button>
+          {take.loops && <HearTheSeam effect={effect} take={take} player={player} />}
+          {canCompare && (
+            <button type="button" className="btn btn-small" onClick={onCompare}>
+              {comparing ? '■ Stop' : '▶ The chosen, then this'}
+            </button>
+          )}
         </div>
       )}
       <div className="take-row">
-        <button
-          type="button"
-          className="btn btn-small"
-          disabled={locked || choose.isPending || drop.isPending}
-          onClick={() => choose.mutate(take.file)}
-        >
-          {choose.isPending ? 'Choosing…' : 'Choose'}
-        </button>
+        {effectTakeChoosable(take, effectLoops) && (
+          <button
+            type="button"
+            className="btn btn-small"
+            disabled={locked || choose.isPending || drop.isPending}
+            onClick={() => choose.mutate(take.file)}
+          >
+            {choose.isPending ? 'Choosing…' : 'Choose'}
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-ghost btn-small"
           disabled={locked || drop.isPending || choose.isPending}
           onClick={() => {
-            if (playing || comparing) player.stop()
+            if (playing || comparing || seamPlaying) player.stop()
             drop.mutate(take.file)
           }}
         >
