@@ -37,7 +37,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Sound effects: the list and the studio's own descriptions are built (§8.9), and the model is in place (§8.9); making takes is planned (§12 step 16; §13 decision 9).
+- Sound effects: the list and the studio's own descriptions are built (§8.9), and the model is in place (§8.8); making takes is planned (§12 step 16; §13 decision 9).
 - Deciding where a track plays. The game decides which track a room or region plays, and when a
   stinger sounds; the studio makes the tracks it lists.
 
