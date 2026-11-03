@@ -1,10 +1,10 @@
 import { afterAll, describe, expect, it } from 'bun:test'
+import { readFileSync } from 'node:fs'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { MusicListSummary, OrphanRow, TrackRow } from '../../../core/music'
 import type { TrackStatus } from '../../../core/musicChoose'
 import type { ProjectSummary } from '../../../core/summary'
 import type { MusicRoute } from '../../route'
-import { readFileSync } from 'node:fs'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -192,7 +192,7 @@ describe('the music the game no longer asks for', () => {
 
   it('stacks in a narrow window, as the dropped effects do, so Remove is never off the edge', () => {
     const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8')
-    // Every rule inside a narrow-window media block (up to 700 px wide).
+    // Every rule that applies in a 600 px window: those in media blocks of 600 px wide or more.
     const narrow = [...css.matchAll(/@media \(max-width: (\d+)px\) \{([\s\S]*?)\n\}\n/g)]
       .filter((m) => Number(m[1]) >= 600)
       .map((m) => m[2])
@@ -200,8 +200,11 @@ describe('the music the game no longer asks for', () => {
     const { container } = render('act', undefined, [orphan])
     const panel = container.querySelector('[aria-label="Music the game no longer asks for"]')!
     const table = panel.querySelector('table')!
+    // The table element itself, by a bare class in a selector list, must lose its minimum width.
     const stacking = [...table.classList].filter((c) =>
-      new RegExp(`\\.${c}\\b[^{}]*\\{[^}]*display:\\s*block[^}]*min-width:\\s*0`).test(narrow),
+      new RegExp(
+        `(?:^|[\\s,])\\.${c}\\s*(?:,[^{}]*)?\\{[^}]*display:\\s*block[^}]*min-width:\\s*0`,
+      ).test(narrow),
     )
     expect(stacking).not.toEqual([])
   })
