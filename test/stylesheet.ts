@@ -13,13 +13,14 @@ function alwaysRules(): { selectors: string[]; body: string }[] {
 
 /**
  * The non-zero `min-width`s that the stylesheet's rules for every window width give an element,
- * each with the selector that gives it. Empty means nothing stops the element from shrinking.
+ * each with the selector that gives it. Empty means no rule outside a media or container block
+ * gives the element itself a minimum width; widths, cells and the cascade are not looked at.
  */
 export function minWidthsInEveryWindow(element: Element): string[] {
   const found: string[] = []
   for (const rule of alwaysRules()) {
     const width = /(?:^|[;\s])min-width:\s*([^;]+);/.exec(rule.body)?.[1]?.trim()
-    if (!width || width === '0') continue
+    if (!width || /^0(px)?$/.test(width)) continue
     for (const selector of rule.selectors) {
       let matches = false
       try {
