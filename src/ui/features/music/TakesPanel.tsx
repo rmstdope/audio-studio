@@ -87,7 +87,7 @@ export function TakesPanel({
   }, [moving])
   // The pick holds while the page stays open; until there is one, the project's model.
   const [picked, setPicked] = useState<MusicModelId | null>(null)
-  // How many takes the next press makes: back to 2 whenever one is started, never kept.
+  // How many takes the next press makes: 2 at first, then the pick, while the page stays open.
   const [count, setCount] = useState(2)
   // Whether the model menu's list is probably open: then every entry reads in full.
   const [listOpen, setListOpen] = useState(false)

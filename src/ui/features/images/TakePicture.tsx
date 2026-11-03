@@ -47,7 +47,8 @@ export function modelSource(id: string, take: ImageTakeView): string {
  * says what to fix when the style file cannot be used. While the choice of the take shown as
  * `current` is still being saved the game has no such picture yet, so none is asked for. The game's
  * version is captioned and shaped by its own size once it loads, which is the old one for a picture
- * brought to the look before the image's size changed.
+ * brought to the look before the image's size changed; it is drawn as wide as the image would be,
+ * with hard pixels when that enlarges it.
  */
 export function TakePicture({
   id,
@@ -71,6 +72,7 @@ export function TakePicture({
   saved?: number
 }) {
   const width = row.width * zoom
+  const [loaded, setLoaded] = useState<{ src: string; width: number; height: number } | null>(null)
   if (showing === 'model') {
     return (
       <div className="look-side">
@@ -85,8 +87,6 @@ export function TakePicture({
     )
   }
   const src = current && saving ? null : gameSource(id, take, row, lookError, current, saved)
-  // The picture's own size once loaded: one made before the image's size changed keeps the old one.
-  const [loaded, setLoaded] = useState<{ src: string; width: number; height: number } | null>(null)
   const size = loaded && loaded.src === src ? loaded : row
   const state = src ? 'ready' : current ? 'saving' : lookError ? 'error' : take.look
   return (
@@ -99,11 +99,12 @@ export function TakePicture({
           style={{
             width,
             aspectRatio: `${size.width} / ${size.height}`,
-            imageRendering: pictureRendering(zoom),
+            imageRendering: pictureRendering(width / size.width),
           }}
           onLoad={(e) => {
-            const { naturalWidth: width, naturalHeight: height } = e.currentTarget
-            if (width && height) setLoaded({ src, width, height })
+            const { naturalWidth, naturalHeight } = e.currentTarget
+            if (naturalWidth && naturalHeight)
+              setLoaded({ src, width: naturalWidth, height: naturalHeight })
           }}
         />
       ) : (

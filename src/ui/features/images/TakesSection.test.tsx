@@ -10,6 +10,7 @@ const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { TakesSection } = await import('./TakesSection')
 const { useSetImageWords } = await import('../../api')
+const { TakePicture } = await import('./TakePicture')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -440,6 +441,19 @@ describe('making takes', () => {
     expect(s.container.textContent).toContain('new')
   })
 
+  it('keeps the number of takes picked after Make', async () => {
+    const s = await show(view({ takes: three }))
+    const count = s.container.querySelector<HTMLSelectElement>('select.takes-count')!
+    await act(async () => {
+      count.value = '4'
+      count.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await s.click(s.button('Make 4 more takes'))
+    expect(s.calls.at(-1)).toMatchObject({ body: { count: 4 } })
+    expect(count.value).toBe('4')
+    expect(s.button('Make 4 more takes')).toBeTruthy()
+  })
+
   it('the count menu offers 1 to 4 takes, starts at 2 and names the button', async () => {
     const s = await show(view({ takes: [take(1)] }))
     const options = [...s.container.querySelectorAll('select.takes-count option')]
@@ -573,19 +587,6 @@ describe('the Takes section’s model menu', () => {
       url: '/api/images/inn/takes',
       body: { count: 2, model: 'z-image-turbo' },
     })
-  })
-
-  it('keeps the number of takes picked after Make', async () => {
-    const s = await show(view({ takes: three }))
-    const count = s.container.querySelector<HTMLSelectElement>('select.takes-count')!
-    await act(async () => {
-      count.value = '4'
-      count.dispatchEvent(new Event('change', { bubbles: true }))
-    })
-    await s.click(s.button('Make 4 more takes'))
-    expect(s.calls.at(-1)).toMatchObject({ body: { count: 4 } })
-    expect(count.value).toBe('4')
-    expect(s.button('Make 4 more takes')).toBeTruthy()
   })
 
   it('lists a model that is not here as such, and cannot be picked', async () => {
@@ -758,6 +759,54 @@ describe('a take’s picture', () => {
     })
     expect([...captions(s, 'left'), ...captions(s, 'right')]).toEqual(['480 × 360', '480 × 360'])
     expect(pictures.map((p) => p.style.aspectRatio)).toEqual(['480 / 360', '480 / 360'])
+  })
+
+  it('keeps the game’s picture’s own size when the box is cleared and ticked again', async () => {
+    const s = await show(view({ takes: [take(1, { chosen: true }), take(2, { look: 'old' })] }), {
+      width: 1920,
+      height: 1080,
+    })
+    const right = s.container.querySelector<HTMLImageElement>('[data-side="right"] img')!
+    await act(async () => {
+      Object.defineProperty(right, 'naturalWidth', { value: 480 })
+      Object.defineProperty(right, 'naturalHeight', { value: 360 })
+      right.dispatchEvent(new Event('load'))
+    })
+    await s.click(box(s))
+    await s.click(box(s))
+    expect(captions(s, 'right')).toEqual(['480 × 360'])
+  })
+
+  it('draws a game picture smaller than the image with hard pixels when it is enlarged', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => {
+      act(() => root.unmount())
+      container.remove()
+    })
+    const big = { ...row, width: 1920, height: 1080 }
+    act(() =>
+      root.render(
+        createElement(TakePicture, {
+          id: 'inn',
+          take: take(2, { look: 'old' }),
+          row: big,
+          lookError: null,
+          showing: 'game',
+          zoom: 0.5,
+        }),
+      ),
+    )
+    const picture = container.querySelector<HTMLImageElement>('img')!
+    expect(picture.style.imageRendering).toBe('auto')
+    await act(async () => {
+      Object.defineProperty(picture, 'naturalWidth', { value: 480 })
+      Object.defineProperty(picture, 'naturalHeight', { value: 360 })
+      picture.dispatchEvent(new Event('load'))
+    })
+    expect(picture.style.width).toBe('960px')
+    expect(picture.style.imageRendering).toBe('pixelated')
   })
 
   it('shows what the model made for every take when the box is cleared, and back when it is ticked', async () => {
