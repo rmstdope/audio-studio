@@ -15,7 +15,7 @@ Writes one JSON answer per line on stdout: {"id": "...", "seed": 123} after writ
 stderr, so stdout carries only answers. The model a request names (`model_dir`, a folder holding
 model_config.json and model.safetensors, downloaded outside the studio) is loaded on the first
 request that needs it and swapped when a request names another. No token is read: the one thing
-fetched is the public t5-base text encoder both models load, on the first take. Always instrumental.
+fetched is the public t5-base text encoder both models load, on the first take. Music is always instrumental; a sound effect (`plain`) is sent as described.
 """
 
 import json

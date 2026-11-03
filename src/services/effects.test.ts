@@ -174,7 +174,10 @@ describe('createOpenEffects', () => {
       }).music,
     )
     expect(await missing.download()).toBe('absent')
-    expect(await missing.ready()).toEqual({ ok: false, message: 'Short is not on this computer.' })
+    expect(await missing.ready()).toEqual({
+      ok: false,
+      message: 'Stable Audio Open 1.0 is not on this computer. Setup says how to download it.',
+    })
   })
 })
 

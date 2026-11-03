@@ -119,8 +119,3 @@ export function effectSwitchedLine(
 export function effectSaveFailureHeading(id: EffectModelId): string {
   return `${EFFECT_MODELS[id].name} could not be saved as the sound-effects model.`
 }
-
-/** The body of that box: the file, and why. */
-export function effectSaveFailureBody(file: string, reason: string): string {
-  return `${file} could not be written: ${reason}. Nothing was changed.`
-}

@@ -113,13 +113,6 @@ export interface EffectTakes {
 /** A take's file name on the board. */
 const fileOf = (take: Pick<EffectBoardTake, 'hash' | 'n'>) => `${take.hash}.${take.n}.wav`
 
-/** The answer to asking for a model that cannot run on this computer. */
-const cannot = (model: EffectModelId, message?: string): { ok: false; message: string } => ({
-  ok: false,
-  message:
-    message ?? `${effectModel(model).name} is not on this computer. Setup says how to download it.`,
-})
-
 /** A model's full name; an id the studio does not know is shown as it is. */
 const modelName = (id: string) =>
   (EFFECT_MODEL_IDS as readonly string[]).includes(id) ? effectModel(id as EffectModelId).name : id
@@ -381,7 +374,7 @@ export function createEffectTakes({
           defaultEffectModel(found.projectModel, await modelStates(projectFile), hasUv())
       }
       const ready = await generator.ready(model)
-      if (!ready.ok) return cannot(model, ready.message)
+      if (!ready.ok) return { ok: false, message: ready.message }
 
       const entries = active.get(key) ?? new Map<number, Entry>()
       active.set(key, entries)

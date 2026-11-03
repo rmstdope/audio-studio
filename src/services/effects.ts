@@ -93,6 +93,13 @@ export function createOpenEffects(music: MusicGenerator): ModelEffects {
     async ready() {
       const ready = await music.ready('short')
       if (ready.ok) return { ok: true }
+      // Short's own words name the music model; an effect says Open 1.0.
+      if (!(await music.installed('short'))) {
+        return {
+          ok: false,
+          message: `${effectModel('open-1').name} is not on this computer. Setup says how to download it.`,
+        }
+      }
       return { ok: false, message: ready.message }
     },
     async generate(request, signal) {

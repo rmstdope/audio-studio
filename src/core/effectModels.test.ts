@@ -5,7 +5,6 @@ import {
   defaultEffectModel,
   effectMenuEntry,
   effectModel,
-  effectSaveFailureBody,
   effectSaveFailureHeading,
   effectSwitchedLine,
   effectWarning,
@@ -85,9 +84,6 @@ describe('both models', () => {
   it('words a failed save', () => {
     expect(effectSaveFailureHeading('open-1')).toBe(
       'Stable Audio Open 1.0 could not be saved as the sound-effects model.',
-    )
-    expect(effectSaveFailureBody('content-studio.json', 'disk full')).toBe(
-      'content-studio.json could not be written: disk full. Nothing was changed.',
     )
   })
 })

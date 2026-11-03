@@ -75,6 +75,22 @@ describe('createStableAudioWorker', () => {
     })
   })
 
+  it('sends a plain request on to the worker as it is', async () => {
+    const seen = join(dir, 'plain.json')
+    process.env.FAKE_ACESTEP_LOG = seen
+    const worker = createStableAudioWorker({ command: [process.execPath, fake], dir })
+    try {
+      await worker.generate({ ...request, brief: 'a door creak', model: 'short', plain: true })
+    } finally {
+      worker.close()
+      delete process.env.FAKE_ACESTEP_LOG
+    }
+    expect(JSON.parse(readFileSync(seen, 'utf8'))).toMatchObject({
+      brief: 'a door creak',
+      plain: true,
+    })
+  })
+
   it('says what is missing when the worker cannot start', async () => {
     const missing = createStableAudioWorker({ command: ['no-such-command-xyz'], dir })
     await expect(missing.generate({ ...request, brief: 'a', model: 'short' })).rejects.toThrow(
