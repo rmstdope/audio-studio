@@ -5,14 +5,15 @@ import { DEFAULT_MUSIC_MODEL, MUSIC_MODELS } from '../core/musicModels'
 import { missingStableAudio, STABLE_AUDIO_DIR } from './stableAudio'
 import type { ImageDownload } from '../core/imageModels'
 import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_IDS } from '../core/imageModels'
-import { EFFECT_MODEL_IDS, effectModel, type EffectModelId } from '../core/effectModels'
+import { DEFAULT_EFFECT_MODEL, EFFECT_MODEL_IDS, type EffectModelId } from '../core/effectModels'
+import { effectDownload } from './effects'
+import { readEffects } from './effectsLists'
 import { createEffectHealth, type EffectHealthStore } from './effectHealth'
 import { createImageHealth, type ImageHealthStore } from './imageHealth'
 import { readImages } from './imageLists'
 import {
   downloadOf,
   HUB_DIR,
-  hubDownload,
   imageModelDownload,
   imageModelInstalled,
   mfluxReady,
@@ -69,8 +70,8 @@ export async function checkSetup(
   /** What remembers the effect models whose last effect failed. */
   effectHealth: Pick<EffectHealthStore, 'read'> = createEffectHealth(),
   /** What says how much of an effect model's weights are on this computer. */
-  effectModels: { download: (model: EffectModelId) => ImageDownload } = {
-    download: (model) => hubDownload(HUB_DIR, effectModel(model).repo),
+  effectModels: { download: (model: EffectModelId) => ImageDownload | Promise<ImageDownload> } = {
+    download: (model) => effectDownload(model, HUB_DIR, stableAudioDir),
   },
 ): Promise<SetupResult> {
   const opened = await openProject(projectFile)
@@ -109,7 +110,7 @@ export async function checkSetup(
         }
       : null,
     images: project.images ? await imageFacts(projectFile, project, images, health) : null,
-    effects: await effectFacts(projectFile, machine, effectHealth, effectModels),
+    effects: await effectFacts(projectFile, project, machine, effectHealth, effectModels),
     elevenlabs: elevenAnswer,
   }
   return { ok: true, checks: setupChecks(facts) }
@@ -155,24 +156,44 @@ async function imageFacts(
   }
 }
 
-/** The sound-effect models' facts: uv, and for each model its download and its failed last effect, if any. */
+/** The sound-effect models' facts: uv, whether the game lists effects, the main model, and for each model its download and its failed last effect, if any. */
 async function effectFacts(
   projectFile: string,
+  project: Parameters<typeof readEffects>[1],
   machine: Machine,
   health: Pick<EffectHealthStore, 'read'>,
-  effects: { download: (model: EffectModelId) => ImageDownload },
+  effects: { download: (model: EffectModelId) => ImageDownload | Promise<ImageDownload> },
 ): Promise<SetupFacts['effects']> {
   const failures = await health.read(projectFile)
+  // The list is read to know whether the game lists effects, and to name the effect of a failure.
+  const list = await readEffects(dirname(projectFile), project, [])
+  const titles = new Map(list?.rows.map((row) => [row.id, row.name]))
   return {
     uv: machine.which('uv'),
+    listed: Boolean(list?.rows.length),
+    model: project.effects?.model ?? DEFAULT_EFFECT_MODEL,
     models: Object.fromEntries(
-      EFFECT_MODEL_IDS.map((id) => [
-        id,
-        {
-          download: effects.download(id),
-          failure: failures[id] ? { error: failures[id].error } : null,
-        },
-      ]),
+      await Promise.all(
+        EFFECT_MODEL_IDS.map(async (id) => {
+          const failure = failures[id]
+          const title = failure?.effect === undefined ? undefined : titles.get(failure.effect)
+          return [
+            id,
+            {
+              download: await effects.download(id),
+              failure: failure
+                ? {
+                    error: failure.error,
+                    effect:
+                      failure.effect === undefined || title === undefined
+                        ? null
+                        : { id: failure.effect, title },
+                  }
+                : null,
+            },
+          ]
+        }),
+      ),
     ) as SetupFacts['effects']['models'],
   }
 }

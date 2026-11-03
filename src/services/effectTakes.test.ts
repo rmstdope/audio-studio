@@ -6,7 +6,10 @@ import { wavSeconds } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
 import { createEffectTakes, effectTakeHash } from './effectTakes'
-import type { EffectGenerator, EffectRequest } from './effects'
+import type { EffectGenerator, EffectReady, EffectRequest } from './effects'
+import type { EffectModelId } from '../core/effectModels'
+import type { ImageDownload } from '../core/imageModels'
+import { holdGpu } from './gpu'
 import type { EffectHealthStore } from './effectHealth'
 import { createSerial } from './serial'
 
@@ -20,11 +23,16 @@ const effects = {
 }
 
 /** A generator that makes a tone `length` seconds long (shorter than asked, as the model does), and fails for a description saying "fail". */
-function fakeGenerator(ready: ReturnType<EffectGenerator['ready']> = { ok: true }, length = 1.4) {
-  const requests: EffectRequest[] = []
+function fakeGenerator(
+  ready: EffectReady = { ok: true },
+  length = 1.4,
+  /** Per model, what differs from a model that is here and ready. */
+  models: Partial<Record<EffectModelId, { ready?: EffectReady; download?: ImageDownload }>> = {},
+) {
+  const requests: (EffectRequest & { model: EffectModelId })[] = []
   const generator: EffectGenerator = {
-    download: () => 'whole',
-    ready: () => ready,
+    download: (model) => models[model]?.download ?? 'whole',
+    ready: (model) => models[model]?.ready ?? ready,
     async generate(request) {
       requests.push(request)
       if (request.prompt.includes('fail')) throw new Error('The effects generator stopped.')
@@ -38,32 +46,45 @@ function fakeGenerator(ready: ReturnType<EffectGenerator['ready']> = { ok: true 
   return { generator, requests }
 }
 
-function fakeHealth() {
+function fakeHealth(failed: EffectModelId[] = []) {
   const calls: string[] = []
-  const health: Pick<EffectHealthStore, 'record' | 'clear'> = {
-    record: async (_file, _model, failure) => void calls.push(`record ${failure.error}`),
-    clear: async () => void calls.push('clear'),
+  const health: Pick<EffectHealthStore, 'read' | 'record' | 'clear'> = {
+    read: async () =>
+      Object.fromEntries(failed.map((id) => [id, { error: 'x', at: '' }])) as Awaited<
+        ReturnType<EffectHealthStore['read']>
+      >,
+    record: async (_file, model, failure) =>
+      void calls.push(`record ${model} ${failure.error} on ${failure.effect}`),
+    clear: async (_file, model) => void calls.push(`clear ${model}`),
   }
   return { health, calls }
 }
 
 function setup(
-  ready?: ReturnType<EffectGenerator['ready']>,
+  ready?: EffectReady,
   list: unknown = [
     { id: 'door-creak', description: 'A slow wooden door creaks open', seconds: 3 },
     { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
   ],
   extra: Record<string, unknown> = {},
   length = 1.4,
+  options: {
+    models?: Parameters<typeof fakeGenerator>[2]
+    failed?: EffectModelId[]
+    main?: EffectModelId
+    gpu?: ReturnType<typeof createSerial>
+  } = {},
 ) {
   const root = tempRepo({
-    'content-studio.json': projectJson({ effects }),
+    'content-studio.json': projectJson({
+      effects: options.main ? { ...effects, model: options.main } : effects,
+    }),
     'tts/effects.json': list,
     ...extra,
   })
   const file = join(root, 'content-studio.json')
-  const { generator, requests } = fakeGenerator(ready, length)
-  const { health, calls } = fakeHealth()
+  const { generator, requests } = fakeGenerator(ready, length, options.models)
+  const { health, calls } = fakeHealth(options.failed)
   let seed = 100
   const encode: Encoder = async (_wav, out) => {
     mkdirSync(dirname(out), { recursive: true })
@@ -74,6 +95,8 @@ function setup(
     health,
     encode,
     queue: createSerial(),
+    gpu: options.gpu ?? createSerial(),
+    hasUv: () => true,
     now: () => 0,
     newSeed: () => seed++,
   })
@@ -104,7 +127,7 @@ describe('createEffectTakes', () => {
       [2, 1.4, false, 'Stable Audio 3 Small SFX'],
     ])
     expect(view.takes[0]!.peaks.length).toBeGreaterThan(10)
-    expect(view.generator).toEqual({ ok: true })
+    expect(view.canMake).toBe(true)
   })
 
   it('makes takes from the studio’s own words when they are in use', async () => {
@@ -161,7 +184,7 @@ describe('createEffectTakes', () => {
     await takes.make(file, 'coins', { count: 1 })
     const failed = await settled('coins')
     expect(failed.failed).toEqual([{ n: 1, message: 'The effects generator stopped.' }])
-    expect(calls).toEqual(['record The effects generator stopped.'])
+    expect(calls).toEqual(['record small-sfx The effects generator stopped. on coins'])
     expect(await takes.make(file, 'coins', { retry: 2 })).toMatchObject({ ok: false })
     expect(await takes.make(file, 'coins', { retry: 1 })).toEqual({ ok: true })
     await settled('coins')
@@ -176,7 +199,7 @@ describe('createEffectTakes', () => {
     const { file, takes, calls, settled } = setup()
     await takes.make(file, 'coins', { count: 1 })
     await settled('coins')
-    expect(calls).toEqual(['clear'])
+    expect(calls).toEqual(['clear small-sfx'])
   })
 
   it('refuses to make takes when the model is not ready, and says why', async () => {
@@ -189,7 +212,7 @@ describe('createEffectTakes', () => {
       ok: false,
       message: ready.message,
     })
-    expect(await takes.view(file, 'coins')).toMatchObject({ generator: ready })
+    expect(await takes.view(file, 'coins')).toMatchObject({ canMake: false })
   })
 
   it('stops every take: the one being made ends and is discarded, the waiting ones never start', async () => {
@@ -376,6 +399,112 @@ describe('createEffectTakes', () => {
     const view = await after.view(file, 'coins')
     expect(view).toMatchObject({ making: [{ n: 1 }, { n: 2 }] })
     release()
+  })
+})
+
+describe('two models', () => {
+  it('shows the project’s model, each model’s state and uv on the page', async () => {
+    const { file, takes } = setup(undefined, undefined, {}, undefined, {
+      main: 'open-1',
+      models: { 'small-sfx': { download: 'partial' } },
+      failed: ['open-1'],
+    })
+    expect(await takes.view(file, 'coins')).toMatchObject({
+      canMake: true,
+      projectModel: 'open-1',
+      uv: true,
+      models: [
+        { id: 'small-sfx', download: 'partial', failed: false },
+        { id: 'open-1', download: 'whole', failed: true },
+      ],
+    })
+  })
+
+  it('makes a take with the model asked for, names it, and clears that model’s failure', async () => {
+    const { file, takes, requests, calls, settled } = setup()
+    expect(await takes.make(file, 'coins', { count: 1, model: 'open-1' })).toEqual({ ok: true })
+    const view = await settled('coins')
+    expect(requests.map((r) => r.model)).toEqual(['open-1'])
+    expect(view.takes.map((t) => t.model)).toEqual(['Stable Audio Open 1.0'])
+    expect(calls).toEqual(['clear open-1'])
+  })
+
+  it('starts on the project’s model, and on the other when the project’s cannot run', async () => {
+    const first = setup()
+    await first.takes.make(first.file, 'coins', { count: 1 })
+    await first.settled('coins')
+    expect(first.requests.map((r) => r.model)).toEqual(['small-sfx'])
+    const absent = setup(undefined, undefined, {}, undefined, {
+      models: { 'small-sfx': { download: 'absent' } },
+    })
+    await absent.takes.make(absent.file, 'coins', { count: 1 })
+    await absent.settled('coins')
+    expect(absent.requests.map((r) => r.model)).toEqual(['open-1'])
+    const failed = setup(undefined, undefined, {}, undefined, {
+      main: 'open-1',
+      failed: ['open-1'],
+    })
+    await failed.takes.make(failed.file, 'coins', { count: 1 })
+    await failed.settled('coins')
+    expect(failed.requests.map((r) => r.model)).toEqual(['small-sfx'])
+  })
+
+  it('refuses a model that cannot run, with the generator’s reason', async () => {
+    const reason = 'Stable Audio Open 1.0 is not on this computer.'
+    const { file, takes } = setup(undefined, undefined, {}, undefined, {
+      models: { 'open-1': { ready: { ok: false, message: reason } } },
+    })
+    expect(await takes.make(file, 'coins', { count: 1, model: 'open-1' })).toEqual({
+      ok: false,
+      message: reason,
+    })
+  })
+
+  it('cannot make anything when neither model can run', async () => {
+    const no = { ok: false as const, message: 'nope' }
+    const { file, takes } = setup(no)
+    expect(await takes.view(file, 'coins')).toMatchObject({ canMake: false })
+  })
+
+  it('remakes a failed take with the model it was asked with, and records the failure per model', async () => {
+    const { file, takes, requests, calls, settled } = setup(undefined, [
+      { id: 'coins', description: 'fail once', seconds: 0.5 },
+    ])
+    await takes.make(file, 'coins', { count: 1, model: 'open-1' })
+    await settled('coins')
+    expect(calls).toEqual(['record open-1 The effects generator stopped. on coins'])
+    await takes.make(file, 'coins', { retry: 1 })
+    await settled('coins')
+    expect(requests.map((r) => r.model)).toEqual(['open-1', 'open-1'])
+  })
+
+  it('makes Open 1.0 takes on the GPU queue, behind other jobs, saying what it waits for', async () => {
+    const gpu = createSerial()
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    // A music take holds the chip.
+    void gpu.run('gpu', () => holdGpu('music', () => gate))
+    const { file, takes, settled } = setup(undefined, undefined, {}, undefined, { gpu })
+    await takes.make(file, 'coins', { count: 3, model: 'open-1' })
+    const view = await takes.view(file, 'coins')
+    if (!view || !('making' in view)) throw new Error('expected a view')
+    expect(view.making.map((m) => [m.n, m.state, m.model, m.expected, m.chip])).toEqual([
+      [1, 'waiting', 'Stable Audio Open 1.0', 100, { using: 'music' }],
+      [2, 'waiting', 'Stable Audio Open 1.0', 100, undefined],
+      [3, 'waiting', 'Stable Audio Open 1.0', 100, undefined],
+    ])
+    expect(await takes.making(file)).toEqual({ coins: { takes: 3, left: 300 } })
+    release()
+    expect((await settled('coins')).takes).toHaveLength(3)
+  })
+
+  it('keeps Small SFX takes off the GPU queue', async () => {
+    const gpu = createSerial()
+    const gate = new Promise<void>(() => {})
+    void gpu.run('gpu', () => gate)
+    const { file, takes, settled } = setup(undefined, undefined, {}, undefined, { gpu })
+    await takes.make(file, 'coins', { count: 1, model: 'small-sfx' })
+    expect((await settled('coins')).takes).toHaveLength(1)
   })
 })
 

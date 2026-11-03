@@ -492,6 +492,12 @@ describe('the effects section', () => {
   const effects = (paths: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
     projectJson({ effects: { paths: { ...effectPaths, ...paths }, ...extra } })
 
+  it('names the main effects model, Small SFX when absent', () => {
+    expect(parse(effects()).data!.effects!.model).toBeUndefined()
+    expect(parse(effects({}, { model: 'open-1' })).data!.effects!.model).toBe('open-1')
+    expect(parse(effects({}, { model: 'other' })).success).toBe(false)
+  })
+
   it('is optional', () => {
     expect(parse(projectJson()).data!.effects).toBeUndefined()
   })

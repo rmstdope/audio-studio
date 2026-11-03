@@ -1,3 +1,4 @@
+import type { GpuUse } from '../core/effectTakes'
 import { createSerial, type Serial } from './serial'
 import type { Transcriber } from './transcriber'
 
@@ -15,11 +16,34 @@ export function gpuQueue(): Serial {
   return state.contentStudioGpu
 }
 
+export type { GpuUse }
+
+/**
+ * Runs `job`, which holds the GPU (call it from a job on the GPU queue), and says what it is while
+ * it runs: `gpuInUse()` answers `use` until it ends, whether it succeeds or fails.
+ */
+export async function holdGpu<T>(use: GpuUse, job: () => Promise<T>): Promise<T> {
+  const state = globalThis as { contentStudioGpuUse?: GpuUse | null }
+  state.contentStudioGpuUse = use
+  try {
+    return await job()
+  } finally {
+    state.contentStudioGpuUse = null
+  }
+}
+
+/** What is using the GPU now, or null when nothing is. */
+export function gpuInUse(): GpuUse | null {
+  return (globalThis as { contentStudioGpuUse?: GpuUse | null }).contentStudioGpuUse ?? null
+}
+
 /** A transcriber whose checks wait their turn on the GPU queue. */
 export function onGpu(transcriber: Transcriber, queue: Serial = gpuQueue()): Transcriber {
   return {
     transcribe: (model, path, language) =>
-      queue.run(GPU, () => transcriber.transcribe(model, path, language)),
+      queue.run(GPU, () =>
+        holdGpu('recording', () => transcriber.transcribe(model, path, language)),
+      ),
     close: () => transcriber.close(),
   }
 }

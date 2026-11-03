@@ -8,6 +8,8 @@ export const EFFECT_HEALTH_FILE = '.content-studio/effect-model-health.json'
 export const EffectFailureSchema = z.object({
   /** The last line of the effects tool's error, verbatim. */
   error: z.string(),
+  /** The id of the effect the failed take was made on. */
+  effect: z.string().optional(),
   at: z.string(),
 })
 

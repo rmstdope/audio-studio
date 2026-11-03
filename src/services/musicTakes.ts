@@ -34,7 +34,7 @@ import { movedBoardTake } from '../core/musicMove'
 import { readWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
-import { gpuQueue, GPU } from './gpu'
+import { gpuQueue, holdGpu, GPU } from './gpu'
 import type { MusicGenerator } from './music'
 import {
   acceptChange,
@@ -503,7 +503,8 @@ export function createMusicTakes({
         // Takes made on this computer wait for its GPU; takes made in the cloud wait only for
         // each other.
         const turn = onThisComputer(entry.model) ? GPU : CLOUD
-        void queue.run(turn, () => run(projectFile, found, entry, inputs, entries))
+        const make = () => run(projectFile, found, entry, inputs, entries)
+        void queue.run(turn, turn === GPU ? () => holdGpu('music', make) : make)
       }
       return { ok: true }
     },

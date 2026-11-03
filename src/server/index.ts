@@ -76,6 +76,7 @@ import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/
 import {
   setElevenModel,
   setElevenSettings,
+  setEffectModel,
   setImageModel,
   setMusicModel,
   setStageModel,
@@ -140,7 +141,12 @@ import { createAceStepWorker, createMusicRouter, type MusicGenerator } from '../
 import { createStableAudioWorker } from '../services/stableAudio'
 import { createFakeMusic } from '../services/musicFake'
 import { createEffectHealth } from '../services/effectHealth'
-import { createEffectsWorker, type EffectGenerator } from '../services/effects'
+import {
+  createEffectGenerator,
+  createEffectsWorker,
+  createOpenEffects,
+  type EffectGenerator,
+} from '../services/effects'
 import { createEffectTakes } from '../services/effectTakes'
 import { createFakeEffects } from '../services/effectsFake'
 import { ChooseEffectTakeBody, MakeEffectTakesBody } from '../core/effectTakes'
@@ -193,12 +199,18 @@ export interface ServerOptions {
 
 /**
  * The process's one sound effects generator, kept across `--dev` reloads like the music workers:
- * started with its first effect and ended with the studio.
+ * Small SFX's worker and Open 1.0 on the music's Stable Audio worker (`music`), each started with
+ * its first effect and ended with the studio.
  */
-function sharedEffects(): EffectGenerator {
+function sharedEffects(music: MusicGenerator): EffectGenerator {
   const state = globalThis as { contentStudioEffects?: EffectGenerator }
   return (state.contentStudioEffects ??=
-    process.env.CONTENT_STUDIO_FAKE_EFFECTS === '1' ? createFakeEffects() : createEffectsWorker())
+    process.env.CONTENT_STUDIO_FAKE_EFFECTS === '1'
+      ? createFakeEffects()
+      : createEffectGenerator({
+          'small-sfx': createEffectsWorker(),
+          'open-1': createOpenEffects(music),
+        }))
 }
 
 /**
@@ -518,12 +530,14 @@ export function startServer({
     (process.env.CONTENT_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator())
   const imageHealth = createImageHealth()
   const imageTakes = createImageTakes({ generator: imageGenerator, health: imageHealth })
+  const musicGenerator = music ?? sharedMusic(projectFile)
+  const effectGenerator = effects ?? sharedEffects(musicGenerator)
+  const effectHealth = createEffectHealth()
   const effectTakes = createEffectTakes({
-    generator: effects ?? sharedEffects(),
-    health: createEffectHealth(),
+    generator: effectGenerator,
+    health: effectHealth,
     ...(encode ? { encode } : {}),
   })
-  const musicGenerator = music ?? sharedMusic(projectFile)
   const musicTakes = createMusicTakes({
     generator: musicGenerator,
     ...(encode ? { encode } : {}),
@@ -1920,6 +1934,8 @@ export function startServer({
               elevenAccountOf,
               imageGenerator,
               imageHealth,
+              effectHealth,
+              effectGenerator,
             ),
           ),
         ),
@@ -1985,6 +2001,8 @@ export function startServer({
             musicGenerator.installed,
             imageGenerator,
             imageHealth,
+            effectGenerator,
+            effectHealth,
           )
           return Response.json(view.ok ? { ...view, busy: await busyNow() } : view)
         }),
@@ -2014,6 +2032,16 @@ export function startServer({
             return Response.json({ error: 'expected { model, was }' }, { status: 400 })
           }
           const result = await setImageModel(projectFile, body.data.model, body.data.was)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effect-model': {
+        PUT: fromOwnPage(async (request) => {
+          const body = StageModelBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { model, was }' }, { status: 400 })
+          }
+          const result = await setEffectModel(projectFile, body.data.model, body.data.was)
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },

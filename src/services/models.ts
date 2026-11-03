@@ -2,6 +2,7 @@ import { basename } from 'node:path'
 import { ProjectSchema, problemsFrom, type ElevenTts, type Problem } from '../core/project'
 import { sameSettings, type Stage } from '../core/models'
 import { DEFAULT_IMAGE_MODEL, IMAGE_MODEL_IDS } from '../core/imageModels'
+import { DEFAULT_EFFECT_MODEL, EFFECT_MODEL_IDS } from '../core/effectModels'
 import { MUSIC_MODEL_IDS, DEFAULT_MUSIC_MODEL } from '../core/musicModels'
 import { isElevenModel } from '../core/elevenSpeech'
 import { isPriced } from '../core/prices'
@@ -157,6 +158,45 @@ export function setImageModel(
     const parsed = ProjectSchema.safeParse(opened.raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
     return saveProject(projectFile, opened, 'images.model', (indent) =>
+      projectJson(opened.raw, indent),
+    )
+  })
+}
+
+/**
+ * Saves the sound-effects model new takes are made with (`effects.model` in the project file).
+ * `was` is the model the page showed (Small SFX when the file names none): if the file names
+ * another, someone changed it meanwhile and nothing is written. A project with no effects section
+ * has no model to save. The rest of the file stays as it was, in its own indentation and line endings.
+ */
+export function setEffectModel(
+  projectFile: string,
+  model: string,
+  was: string,
+): Promise<ModelsChange> {
+  return projectWrites.run(projectFile, async () => {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const file = basename(projectFile)
+    const refuse = (path: string, message: string): ModelsChange => ({
+      ok: false,
+      problems: [{ file, path, message }],
+    })
+    if (!opened.project.effects) return refuse('effects', 'the project has no effects section')
+    if (!(EFFECT_MODEL_IDS as readonly string[]).includes(model)) {
+      return refuse('effects.model', `${model} is not a sound-effects model the studio knows`)
+    }
+    if ((opened.project.effects.model ?? DEFAULT_EFFECT_MODEL) !== was) {
+      return refuse(
+        'effects.model',
+        'the model in the file changed since the page was read; reload the studio',
+      )
+    }
+    const effects = (opened.raw as { effects: Record<string, unknown> }).effects
+    effects.model = model
+    const parsed = ProjectSchema.safeParse(opened.raw)
+    if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
+    return saveProject(projectFile, opened, 'effects.model', (indent) =>
       projectJson(opened.raw, indent),
     )
   })

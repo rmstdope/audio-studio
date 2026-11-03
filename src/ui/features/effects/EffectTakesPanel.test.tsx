@@ -35,7 +35,13 @@ const take = (n: number, over: Partial<EffectTakeView> = {}): EffectTakeView => 
 })
 const view = (over: Partial<EffectTakesView> = {}): EffectTakesView => ({
   ok: true,
-  generator: { ok: true },
+  canMake: true,
+  projectModel: 'small-sfx',
+  uv: true,
+  models: [
+    { id: 'small-sfx', download: 'whole', failed: false },
+    { id: 'open-1', download: 'whole', failed: false },
+  ],
   takes: [],
   making: [],
   failed: [],
@@ -153,7 +159,7 @@ describe('a new effect', () => {
     expect(button('Make 2 takes')).toBeDefined()
     await click(button('Make 2 takes'))
     expect(calls[0]).toMatchObject({ url: '/api/effects/chest-open/takes', method: 'POST' })
-    expect(JSON.parse(calls[0]!.body!)).toEqual({ count: 2 })
+    expect(JSON.parse(calls[0]!.body!)).toEqual({ count: 2, model: 'small-sfx' })
   })
 })
 
@@ -385,7 +391,11 @@ describe('a take failed', () => {
 
 describe('the model is not ready', () => {
   const data = view({
-    generator: { ok: false, message: 'Stable Audio 3 Small SFX is not on this computer.' },
+    canMake: false,
+    models: [
+      { id: 'small-sfx', download: 'absent', failed: false },
+      { id: 'open-1', download: 'absent', failed: false },
+    ],
     takes: [take(1), take(2, { chosen: true })],
   })
 
@@ -393,10 +403,16 @@ describe('the model is not ready', () => {
     const { container, text, button, buttons, click, calls } = render(chosenRow(), data)
     expect(text()).toContain("Sound effects can't be made yet.")
     expect(text()).toContain(
-      'Stable Audio 3 Small SFX is not on this computer. Setup says what is missing.',
+      'Neither sound-effects model can run on this computer. Setup says what is missing.',
     )
     expect(container.querySelector('a.btn')!.getAttribute('href')).toBe('#/setup')
     expect(button('Make 4 more takes').disabled).toBe(true)
+    for (const label of ['Model for new takes', 'Number of new takes']) {
+      expect(
+        container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!.disabled,
+      ).toBe(true)
+    }
+    expect(text()).toContain('Open Setup')
     await click(buttons('Choose')[0]!)
     expect(calls[0]!.url).toBe('/api/effects/chest-open/choose')
   })
@@ -624,5 +640,136 @@ describe('the game changed how an effect plays', () => {
     expect(container.querySelector('[aria-label="In the game"]')!.textContent).not.toContain(
       'made to',
     )
+  })
+})
+
+describe('the model for new takes', () => {
+  const modelMenu = (container: HTMLElement) =>
+    container.querySelector<HTMLSelectElement>('select[aria-label="Model for new takes"]')!
+  const states = (
+    small: Partial<EffectTakesView['models'][number]>,
+    open: Partial<EffectTakesView['models'][number]> = {},
+  ): EffectTakesView['models'] => [
+    { id: 'small-sfx', download: 'whole', failed: false, ...small },
+    { id: 'open-1', download: 'whole', failed: false, ...open },
+  ]
+
+  it('is a menu before the count menu, with both full names and times, starting on Setup’s model', () => {
+    const { container } = render(row(), view({ takes: [take(1)] }))
+    const selects = [...container.querySelectorAll('.takes-controls select')].map((n) =>
+      n.getAttribute('aria-label'),
+    )
+    expect(selects).toEqual(['Model for new takes', 'Number of new takes'])
+    expect([...modelMenu(container).options].map((o) => o.textContent)).toEqual([
+      'Stable Audio 3 Small SFX — about 2 s a take',
+      'Stable Audio Open 1.0 — about 100 s a take',
+    ])
+    expect(modelMenu(container).value).toBe('small-sfx')
+    const open = render(row(), view({ projectModel: 'open-1', takes: [take(1)] }))
+    expect(modelMenu(open.container).value).toBe('open-1')
+  })
+
+  it('makes with the picked model, and the pick lasts only while the page is open', async () => {
+    const page = render(row(), view({ takes: [take(1)] }))
+    await act(async () => {
+      modelMenu(page.container).value = 'open-1'
+      modelMenu(page.container).dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await page.click(page.button('Make 4 more takes'))
+    expect(JSON.parse(page.calls[0]!.body!)).toEqual({ count: 4, model: 'open-1' })
+    const again = render(row(), view({ takes: [take(1)] }))
+    expect(modelMenu(again.container).value).toBe('small-sfx')
+  })
+
+  it('starts on the other model, with a faint line saying why, when Setup’s is not on this computer', async () => {
+    const page = render(row(), view({ takes: [take(1)], models: states({ download: 'absent' }) }))
+    expect(modelMenu(page.container).value).toBe('open-1')
+    expect(page.text()).toContain(
+      "Stable Audio 3 Small SFX, the project's sound-effects model, isn't on this computer, so these takes use Stable Audio Open 1.0. Setup says how to download it.",
+    )
+    const [small, open] = [...modelMenu(page.container).options]
+    expect(small!.textContent).toBe(
+      'Stable Audio 3 Small SFX — about 2 s a take — not on this computer',
+    )
+    expect(small!.disabled).toBe(true)
+    expect(open!.disabled).toBe(false)
+    await page.click(page.button('Make 4 more takes'))
+    expect(JSON.parse(page.calls[0]!.body!)).toEqual({ count: 4, model: 'open-1' })
+  })
+
+  it('says a partly downloaded or failed model is why, and keeps a failed one pickable', () => {
+    const partial = render(row(), view({ models: states({ download: 'partial' }) }))
+    expect(partial.text()).toContain(
+      "the project's sound-effects model, is only partly downloaded, so these takes use Stable Audio Open 1.0. Setup says how to finish it.",
+    )
+    const failed = render(row(), view({ models: states({ failed: true }) }))
+    expect(modelMenu(failed.container).value).toBe('open-1')
+    expect(failed.text()).toContain(
+      'failed on its last effect, so these takes use Stable Audio Open 1.0. Setup says what went wrong.',
+    )
+    const small = [...modelMenu(failed.container).options][0]!
+    expect(small.textContent).toBe(
+      'Stable Audio 3 Small SFX — about 2 s a take — last effect failed',
+    )
+    expect(small.disabled).toBe(false)
+  })
+
+  it('has no line when Setup’s model is the one used', () => {
+    const { text } = render(row(), view({ takes: [take(1)] }))
+    expect(text()).not.toContain('so these takes use')
+  })
+
+  it('waits while a batch is made', () => {
+    const making = {
+      n: 2,
+      state: 'making' as const,
+      elapsed: 0,
+      expected: 2,
+      model: MODEL,
+    }
+    const { container } = render(row(), view({ takes: [take(1)], making: [making] }))
+    expect(modelMenu(container).disabled).toBe(true)
+  })
+
+  it('shows an Open 1.0 take waiting for the graphics chip, what uses it, and the takes behind it waiting', () => {
+    const waiting = (n: number, chip?: { using: 'music' | null }) => ({
+      n,
+      state: 'waiting' as const,
+      elapsed: 0,
+      expected: 100,
+      model: 'Stable Audio Open 1.0',
+      ...(chip ? { chip } : {}),
+    })
+    const { container, text } = render(
+      row(),
+      view({ takes: [take(1)], making: [waiting(2, { using: 'music' }), waiting(3)] }),
+    )
+    const cards = [...container.querySelectorAll('.take-making')].map((c) =>
+      c.textContent!.replace(/\s+/g, ' '),
+    )
+    expect(cards[0]).toContain('waiting for the graphics chip')
+    expect(cards[0]).toContain('Music is being made first.')
+    expect(cards[1]).toContain('waiting')
+    expect(cards[1]).not.toContain('graphics chip')
+    expect(text()).toContain('Stable Audio Open 1.0')
+  })
+
+  it('counts an Open 1.0 take down in minutes', () => {
+    const making = {
+      n: 2,
+      state: 'making' as const,
+      elapsed: 30,
+      expected: 100,
+      model: 'Stable Audio Open 1.0',
+    }
+    expect(render(row(), view({ making: [making] })).text()).toContain(
+      'making · about 1 min 10 s left',
+    )
+  })
+
+  it('remakes a failed take with Try again, which names no model so the take keeps its own', async () => {
+    const page = render(row(), view({ takes: [take(1)], failed: [{ n: 5, message: 'It broke.' }] }))
+    await page.click(page.button('Try again'))
+    expect(JSON.parse(page.calls[0]!.body!)).toEqual({ retry: 5 })
   })
 })

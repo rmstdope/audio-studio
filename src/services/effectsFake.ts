@@ -8,12 +8,13 @@ import type { EffectGenerator } from './effects'
  * unless the description says "quiet", which stops it at 60% of it. It makes no sound effects.
  */
 export function createFakeEffects(delayMs = 2000): EffectGenerator {
+  // Open 1.0 is slower than Small SFX, so the waits on the page can be seen.
   return {
     download: () => 'whole',
     ready: () => ({ ok: true }),
     async generate(request, signal) {
       await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, delayMs)
+        const timer = setTimeout(resolve, request.model === 'open-1' ? delayMs * 3 : delayMs)
         signal?.addEventListener('abort', () => {
           clearTimeout(timer)
           reject(new Error('The effects generator was stopped.'))

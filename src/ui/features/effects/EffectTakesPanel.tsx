@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react'
 import type { EffectRow } from '../../../core/effects'
 import {
+  EFFECT_MODEL_IDS,
+  defaultEffectModel,
+  effectMenuEntry,
+  effectModel,
+  effectSwitchedLine,
+  type EffectModelId,
+  type EffectModelState,
+} from '../../../core/effectModels'
+import {
   MAX_EFFECT_TAKES,
+  effectChipLine,
   effectAcceptable,
   effectChangedAdvice,
   effectChangedLine,
@@ -48,6 +58,8 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
   }, [inTurn])
   // How many takes the next press makes: 4 at first, then the pick, while the page stays open.
   const [count, setCount] = useState(4)
+  // The model the next press uses: Setup's, until a pick, which lasts while the page stays open.
+  const [picked, setPicked] = useState<EffectModelId | null>(null)
   const view = takes.data
   if (!view) {
     return (
@@ -59,28 +71,57 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
   if (!('making' in view)) {
     return <Problems title="The takes could not be listed" problems={view.problems} />
   }
-  const { generator } = view
+  const states = Object.fromEntries(
+    view.models.map(({ id, download, failed }) => [id, { download, failed }]),
+  ) as Record<EffectModelId, EffectModelState>
+  const fallback = defaultEffectModel(view.projectModel, states, view.uv)
+  const model = picked && states[picked].download === 'whole' ? picked : fallback
+  // Why new takes start on the other model, when Setup's cannot run.
+  const mainState = states[view.projectModel]
+  const switchedReason =
+    fallback === view.projectModel
+      ? null
+      : mainState.download === 'absent'
+        ? 'absent'
+        : mainState.download === 'partial'
+          ? 'partial'
+          : 'failed'
   // The chosen take is shown above, in the game's block; the cards are the others.
   const chosen = view.takes.find((take) => take.chosen)
   const others = view.takes.filter((take) => !take.chosen)
   const none = !others.length && !view.making.length
   const busy = view.making.length > 0
-  const canMake = generator.ok
-  const makeBatch = () => make.mutate({ count })
+  const canMake = view.canMake
+  const makeBatch = () => make.mutate({ count, model })
   const menu = (
-    <select
-      className="takes-count"
-      aria-label="Number of new takes"
-      value={count}
-      disabled={busy}
-      onChange={(event) => setCount(Number(event.target.value))}
-    >
-      {Array.from({ length: MAX_EFFECT_TAKES }, (_, i) => i + 1).map((n) => (
-        <option key={n} value={n}>
-          {effectCountEntry(n)}
-        </option>
-      ))}
-    </select>
+    <>
+      <select
+        className="takes-model"
+        aria-label="Model for new takes"
+        value={model}
+        disabled={busy || make.isPending || !canMake}
+        onChange={(event) => setPicked(event.target.value as EffectModelId)}
+      >
+        {EFFECT_MODEL_IDS.map((id) => (
+          <option key={id} value={id} disabled={states[id].download !== 'whole'}>
+            {effectMenuEntry(id, states[id])}
+          </option>
+        ))}
+      </select>
+      <select
+        className="takes-count"
+        aria-label="Number of new takes"
+        value={count}
+        disabled={busy || !canMake}
+        onChange={(event) => setCount(Number(event.target.value))}
+      >
+        {Array.from({ length: MAX_EFFECT_TAKES }, (_, i) => i + 1).map((n) => (
+          <option key={n} value={n}>
+            {effectCountEntry(n)}
+          </option>
+        ))}
+      </select>
+    </>
   )
   const button = (hasTakes: boolean) => (
     <button
@@ -104,11 +145,13 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
   const changed = row.changed
   return (
     <>
-      {!generator.ok && (
+      {!canMake && (
         <div className="errbox" role="alert">
           <div className="errbox-text">
             <strong>Sound effects can&apos;t be made yet.</strong>
-            <span className="muted small">{`${generator.message} Setup says what is missing.`}</span>
+            <span className="muted small">
+              Neither sound-effects model can run on this computer. Setup says what is missing.
+            </span>
           </div>
           <a className="btn" href={routeHref({ view: 'setup' })}>
             Open Setup
@@ -126,7 +169,7 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
           <button
             type="button"
             className="btn"
-            disabled={make.isPending || !generator.ok}
+            disabled={make.isPending || !canMake}
             onClick={() => make.mutate({ retry: failed.n })}
           >
             Try again
@@ -180,6 +223,11 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
             </div>
           )}
         </div>
+        {switchedReason && canMake && (
+          <span className="faint small">
+            {effectSwitchedLine(view.projectModel, fallback, switchedReason)}
+          </span>
+        )}
         {view.lockUnread && (
           <span className="takes-missing small">
             Choosing and dropping wait until the sound effects lock can be read. You can still
@@ -190,7 +238,8 @@ export function EffectTakesPanel({ row }: { row: EffectRow }) {
           <div className="takes-empty">
             <strong>{chosen ? 'No other takes yet' : 'No takes yet'}</strong>
             <span className="muted">
-              Each take is a new sound made from the description, about 2 seconds each.
+              Each take is a new sound made from the description, about {effectModel(model).seconds}{' '}
+              seconds each.
               <br />
               {chosen
                 ? 'Make a few more to compare with the chosen one.'
@@ -311,12 +360,14 @@ function TakeCard({
 
 /** A take waiting or being made: a dashed card with a progress bar and the time left. */
 function MakingCard({ making }: { making: EffectMakingView }) {
+  const chipLine = making.chip ? effectChipLine(making.chip.using) : null
   return (
     <div className="take take-making">
       <div className="take-row">
         <b>Take {making.n}</b>
         <span className="small">{effectTimeLeft(making)}</span>
       </div>
+      {chipLine && <span className="faint small">{chipLine}</span>}
       <span className="faint small">{making.model}</span>
       <div className="bar" role="progressbar" aria-label={`Take ${making.n}`}>
         <i style={{ width: `${Math.round(progressOf(making) * 100)}%` }} />

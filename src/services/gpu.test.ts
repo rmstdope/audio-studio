@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { createSerial } from './serial'
-import { GPU, createGpuWorkers, onGpu } from './gpu'
+import { GPU, createGpuWorkers, gpuInUse, holdGpu, onGpu } from './gpu'
 import type { Transcriber } from './transcriber'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -78,5 +78,40 @@ describe('createGpuWorkers', () => {
     workers.add(close)
     await workers.free()
     expect(log).toEqual(['x'])
+  })
+})
+
+describe('holdGpu', () => {
+  it('names what runs on the GPU while it runs, and nothing after, also after a failure', async () => {
+    expect(gpuInUse()).toBeNull()
+    const during: { value: string | null } = { value: null }
+    await holdGpu('music', async () => {
+      during.value = gpuInUse()
+    })
+    expect(during.value).toBe('music')
+    expect(gpuInUse()).toBeNull()
+    await expect(
+      holdGpu('image', async () => {
+        throw new Error('no memory')
+      }),
+    ).rejects.toThrow('no memory')
+    expect(gpuInUse()).toBeNull()
+  })
+
+  it('names a Whisper check as a recording check', async () => {
+    const during: { value: string | null } = { value: null }
+    const whisper = onGpu(
+      {
+        async transcribe() {
+          during.value = gpuInUse()
+          return []
+        },
+        close() {},
+      },
+      createSerial(),
+    )
+    await whisper.transcribe('tiny', 'a.wav')
+    expect(during.value).toBe('recording')
+    expect(gpuInUse()).toBeNull()
   })
 })

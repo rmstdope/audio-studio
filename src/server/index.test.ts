@@ -5378,6 +5378,19 @@ describe('server, the sound effects', () => {
       body: body === undefined ? undefined : JSON.stringify(body),
     })
 
+  it('saves the main sound-effects model from its own page only, and the models page then shows it', async () => {
+    const body = { model: 'open-1', was: 'small-sfx' }
+    expect((await send('PUT', '/api/effect-model', body, 'https://evil.example')).status).toBe(403)
+    expect((await send('PUT', '/api/effect-model', { model: 'open-1' })).status).toBe(400)
+    const saved = await send('PUT', '/api/effect-model', body)
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect((await send('PUT', '/api/effect-model', body)).status).toBe(409)
+    const view = await (await fetch(new URL('/api/models', studio.url))).json()
+    expect(view.effects.model).toBe('open-1')
+    expect(Object.keys(view.effects.states)).toEqual(['small-sfx', 'open-1'])
+    await send('PUT', '/api/effect-model', { model: 'small-sfx', was: 'open-1' })
+  })
+
   it('shows the effects in the project summary', async () => {
     const body = await (await fetch(new URL('/api/project', studio.url))).json()
     expect(body.summary.effects.rows.map((r: { id: string }) => r.id)).toEqual(['coins'])

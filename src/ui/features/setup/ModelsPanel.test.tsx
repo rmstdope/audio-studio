@@ -28,10 +28,12 @@ const installed = {
 }
 
 type Images = Extract<ModelsAnswer, { ok: true }>['images']
+type Effects = Extract<ModelsAnswer, { ok: true }>['effects']
 
 const answer = (
   music: Extract<ModelsAnswer, { ok: true }>['music'],
   images: Images = null,
+  effects: Effects = null,
 ): ModelsAnswer => ({
   ok: true,
   file: 'content-studio.json',
@@ -43,6 +45,7 @@ const answer = (
   recorded: {},
   music,
   images,
+  effects,
   busy: null,
 })
 
@@ -330,6 +333,142 @@ describe('the Images row of the Models panel', () => {
     expect(document.activeElement).toBe(box.querySelectorAll('button')[1] ?? null)
     await act(async () => box.querySelectorAll('button')[1]!.click())
     expect(imagePuts).toHaveLength(2)
+  })
+})
+
+const imageStates = {
+  klein: { download: 'whole', failed: false },
+  'z-image-turbo': { download: 'whole', failed: false },
+} as const
+
+describe('the Sound effects row of the Models panel', () => {
+  const whole = { download: 'whole', failed: false } as const
+  const absent = { download: 'absent', failed: false } as const
+  const both = { 'small-sfx': whole, 'open-1': whole }
+  const effects = (
+    model: 'small-sfx' | 'open-1',
+    states: NonNullable<Effects>['states'] = both,
+  ): Effects => ({ model, states })
+  const puts: unknown[] = []
+  beforeEach(() => {
+    puts.length = 0
+    reply = async () => new Response(JSON.stringify({ ok: true }))
+    globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PUT' && String(url) === '/api/effect-model') {
+        puts.push(JSON.parse(String(init.body)))
+        return reply()
+      }
+      return new Response('{}')
+    }) as typeof fetch
+  })
+  const menuOf = (container: HTMLElement) =>
+    container.querySelector<HTMLSelectElement>('select[aria-label="Sound-effects model"]')!
+  const pickEffect = (container: HTMLElement, value: string) =>
+    act(async () => {
+      menuOf(container).value = value
+      menuOf(container).dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+  it('is a row after Images with its purpose, both models by full name with their times, and Free', () => {
+    const page = render(answer(null, { model: 'klein', states: imageStates }, effects('small-sfx')))
+    const rows = [...page.container.querySelectorAll('.mrow .mname')].map((n) => n.textContent)
+    expect(rows).toEqual(['Audition', 'Draft', 'Final', 'Images', 'Sound effects'])
+    const text = page.container.textContent!
+    expect(text).toContain(
+      "The game's sound effects, made on this computer. An effect's takes can use the other model.",
+    )
+    expect(text).toContain(
+      'Which model records each stage of the voices, which makes the music, which makes the images, and which makes the sound effects. Saved in content-studio.json for everyone on the project.',
+    )
+    expect(text).toContain('Free')
+    expect([...menuOf(page.container).options].map((o) => o.textContent)).toEqual([
+      'Stable Audio 3 Small SFX — about 2 s a take',
+      'Stable Audio Open 1.0 — about 100 s a take',
+    ])
+    expect(menuOf(page.container).value).toBe('small-sfx')
+    expect(page.container.querySelector('.warnline')).toBeNull()
+  })
+
+  it('is shown in a project with an effects section and no images or music', () => {
+    const page = render(answer(null, null, effects('open-1')))
+    expect(menuOf(page.container).value).toBe('open-1')
+    expect(
+      render(answer(null)).container.querySelector('select[aria-label="Sound-effects model"]'),
+    ).toBeNull()
+  })
+
+  it('lists a missing model as such, which cannot be picked, and warns when it is the chosen one', () => {
+    const page = render(
+      answer(null, null, effects('small-sfx', { 'small-sfx': absent, 'open-1': whole })),
+    )
+    const [small, open] = [...menuOf(page.container).options]
+    expect(small!.textContent).toBe(
+      'Stable Audio 3 Small SFX — about 2 s a take — not on this computer',
+    )
+    expect(small!.disabled).toBe(true)
+    expect(open!.disabled).toBe(false)
+    expect(page.container.querySelector('.warnline')!.textContent).toBe('not on this computer')
+  })
+
+  it('marks a model whose last effect failed, which can be picked', () => {
+    const failed = { download: 'whole', failed: true } as const
+    const page = render(
+      answer(null, null, effects('open-1', { 'small-sfx': whole, 'open-1': failed })),
+    )
+    const open = [...menuOf(page.container).options][1]!
+    expect(open.textContent).toBe('Stable Audio Open 1.0 — about 100 s a take — last effect failed')
+    expect(open.disabled).toBe(false)
+    expect(page.container.querySelector('.warnline')!.textContent).toBe('last effect failed')
+  })
+
+  it('marks a partly downloaded model, which cannot be picked', () => {
+    const partial = { download: 'partial', failed: false } as const
+    const page = render(
+      answer(null, null, effects('open-1', { 'small-sfx': partial, 'open-1': whole })),
+    )
+    const small = [...menuOf(page.container).options][0]!
+    expect(small.textContent).toBe(
+      'Stable Audio 3 Small SFX — about 2 s a take — download incomplete',
+    )
+    expect(small.disabled).toBe(true)
+  })
+
+  it('saves a pick at once, and says Saving… while it does', async () => {
+    let finish: (r: Response) => void = () => {}
+    reply = () => new Promise((resolve) => (finish = resolve))
+    const page = render(answer(null, null, effects('small-sfx')))
+    await pickEffect(page.container, 'open-1')
+    expect(puts).toEqual([{ model: 'open-1', was: 'small-sfx' }])
+    expect(menuOf(page.container).disabled).toBe(true)
+    expect(page.container.textContent).toContain('Saving…')
+    await act(async () => finish(new Response(JSON.stringify({ ok: true }))))
+    expect(page.container.textContent).not.toContain('Saving…')
+  })
+
+  it('says a save failed, goes back to the saved model, and offers Keep and Try again', async () => {
+    reply = async () =>
+      new Response(
+        JSON.stringify({
+          ok: false,
+          problems: [{ file: 'a', path: 'effects.model', message: 'disk full' }],
+        }),
+        { status: 409 },
+      )
+    const page = render(answer(null, null, effects('small-sfx')))
+    await pickEffect(page.container, 'open-1')
+    const box = page.container.querySelector('[role="alert"]')!
+    expect(box.textContent).toContain(
+      'Stable Audio Open 1.0 could not be saved as the sound-effects model.',
+    )
+    expect(box.textContent).toContain(
+      'content-studio.json could not be written: disk full. Nothing was changed.',
+    )
+    expect(menuOf(page.container).value).toBe('small-sfx')
+    const buttons = [...box.querySelectorAll('button')].map((b) => b.textContent)
+    expect(buttons).toEqual(['Keep Stable Audio 3 Small SFX', 'Try again'])
+    expect(document.activeElement).toBe(box.querySelectorAll('button')[1] ?? null)
+    await act(async () => box.querySelectorAll('button')[1]!.click())
+    expect(puts).toHaveLength(2)
   })
 })
 

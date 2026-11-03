@@ -31,16 +31,24 @@ const starter: ElevenAccount = {
 
 const byId = (facts: SetupFacts) => Object.fromEntries(setupChecks(facts).map((c) => [c.id, c]))
 
-/** The sound-effect facts of a machine whose model is whole and well, with these changes. */
+type EffectModelFact = SetupFacts['effects']['models']['small-sfx']
+
+/** The sound-effect facts of a machine whose models are whole and well and whose game lists effects, with these changes. */
 function effectFacts(change: {
   uv?: boolean
-  download?: 'whole' | 'partial' | 'absent'
-  failure?: { error: string } | null
+  listed?: boolean
+  model?: 'small-sfx' | 'open-1'
+  small?: Partial<EffectModelFact>
+  open?: Partial<EffectModelFact>
 }): SetupFacts['effects'] {
+  const whole: EffectModelFact = { download: 'whole', failure: null }
   return {
     uv: change.uv ?? true,
+    listed: change.listed ?? true,
+    model: change.model ?? 'small-sfx',
     models: {
-      'small-sfx': { download: change.download ?? 'whole', failure: change.failure ?? null },
+      'small-sfx': { ...whole, ...change.small },
+      'open-1': { ...whole, ...change.open },
     },
   }
 }
@@ -639,30 +647,183 @@ describe('the image models check', () => {
 
 describe('the Sound-effect models row', () => {
   const row = (effects: SetupFacts['effects']) => byId({ ...ready, effects }).effectModels!
-  const download =
+  const opening = "Optional: for the game's sound effects."
+  const smallCommand =
     'HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/stable-audio-3-small-sfx'
+  const openCommand =
+    'HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/stable-audio-open-1.0 --local-dir ~/.cache/stable-audio/stable-audio-open-1.0'
+  const tokenStep = {
+    parts: [
+      'Make a read token at ',
+      { link: 'huggingface.co/settings/tokens', href: 'https://huggingface.co/settings/tokens' },
+      '.',
+    ],
+  }
+  const licence = (repo: string) => ({
+    parts: [
+      "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
+      { link: repo, href: `https://huggingface.co/${repo}` },
+      '.',
+    ],
+  })
+  const chest = { id: 'chest-open', title: 'Chest open' }
 
-  it('is ready with the download whole, uv there and no failed effect', () => {
+  it('is ready with both models whole, uv there and no failed effect', () => {
     expect(row(effectFacts({}))).toMatchObject({
       title: 'Sound-effect models',
       state: 'ok',
       detail:
-        'Stable Audio 3 Small SFX is downloaded on this computer; it loads on the first effect, in about 4 seconds.',
+        'Stable Audio 3 Small SFX and Stable Audio Open 1.0 are fully downloaded on this computer; a model loads on its first effect.',
     })
   })
 
-  it('says the model is not on this computer, with three steps, in grey', () => {
-    const check = row(effectFacts({ download: 'absent' }))
+  it('calls the other model missing optional, with its own three steps', () => {
+    const check = row(effectFacts({ open: { download: 'absent' } }))
     expect(check).toMatchObject({
       state: 'off',
       label: 'Not set up',
       detail:
-        "Optional: for the game's sound effects. Stable Audio 3 Small SFX is not on this computer.",
+        'Optional: Stable Audio Open 1.0 is not on this computer. Stable Audio 3 Small SFX is in place.',
+      steps: {
+        note: 'The studio never asks for or keeps your token. Then press Check again.',
+        list: [
+          licence('stabilityai/stable-audio-open-1.0'),
+          tokenStep,
+          {
+            parts: ['Download it into ~/.cache/stable-audio, where the studio looks for it:'],
+            commands: [openCommand],
+          },
+        ],
+      },
     })
-    expect(check.steps?.note).toBe(
-      'The studio never asks for or keeps your token. Then press Check again.',
-    )
+  })
+
+  it('makes the project’s own model missing a problem, with Small SFX’s three steps', () => {
+    const check = row(effectFacts({ small: { download: 'absent' } }))
+    expect(check).toMatchObject({
+      state: 'problem',
+      detail:
+        "The project's sound-effects model, Stable Audio 3 Small SFX, is not on this computer. Stable Audio Open 1.0 is in place: an effect's takes can use it meanwhile.",
+    })
+    expect(check.label).toBeUndefined()
     expect(check.steps?.list).toEqual([
+      licence('stabilityai/stable-audio-3-small-sfx'),
+      tokenStep,
+      { parts: ['Download it, once (about 6.5 GB):'], commands: [smallCommand] },
+    ])
+  })
+
+  it('makes the project’s model Open 1.0 missing a problem too', () => {
+    expect(row(effectFacts({ model: 'open-1', open: { download: 'absent' } }))).toMatchObject({
+      state: 'problem',
+      detail:
+        "The project's sound-effects model, Stable Audio Open 1.0, is not on this computer. Stable Audio 3 Small SFX is in place: an effect's takes can use it meanwhile.",
+    })
+  })
+
+  it('tells an interrupted download of Small SFX from a missing one: one step', () => {
+    expect(row(effectFacts({ small: { download: 'partial' } }))).toMatchObject({
+      state: 'problem',
+      detail:
+        "The project's sound-effects model, Stable Audio 3 Small SFX, is only partly downloaded, so it can't run. Stable Audio Open 1.0 is in place: an effect's takes can use it meanwhile.",
+      steps: {
+        list: [
+          {
+            parts: ['Finish the download (it picks up where it stopped):'],
+            commands: [smallCommand],
+          },
+        ],
+        note: 'Then press Check again.',
+      },
+    })
+    expect(row(effectFacts({ model: 'open-1', small: { download: 'partial' } }))).toMatchObject({
+      state: 'off',
+      label: 'Not set up',
+      detail:
+        "Optional: Stable Audio 3 Small SFX's download is incomplete, so it can't run. Stable Audio Open 1.0 is in place.",
+    })
+  })
+
+  it('shows the project’s failed effect with its error, a link to the effect and what clears it', () => {
+    const check = row(
+      effectFacts({ small: { failure: { error: 'RuntimeError: boom', effect: chest } } }),
+    )
+    expect(check).toMatchObject({
+      state: 'problem',
+      detail: '',
+      failures: [
+        {
+          sentence:
+            "The last effect with Stable Audio 3 Small SFX, the project's sound-effects model, failed on Chest open. Stable Audio Open 1.0 is in place: an effect's takes can use it meanwhile.",
+          error: 'RuntimeError: boom',
+          link: { text: 'Open Chest open', href: '#/effects/items/chest-open' },
+          clears: 'This clears once an effect made with Small SFX works.',
+        },
+      ],
+    })
+  })
+
+  it('calls the other model’s failed effect optional', () => {
+    expect(row(effectFacts({ open: { failure: { error: 'boom', effect: chest } } }))).toMatchObject(
+      {
+        state: 'off',
+        label: 'Not set up',
+        failures: [
+          {
+            sentence:
+              'Optional: the last effect with Stable Audio Open 1.0 failed on Chest open. Stable Audio 3 Small SFX is in place.',
+            link: { text: 'Open Chest open', href: '#/effects/items/chest-open' },
+            clears: 'This clears once an effect made with Open 1.0 works.',
+          },
+        ],
+      },
+    )
+  })
+
+  it('drops the effect’s name and link when its takes were dropped', () => {
+    const check = row(effectFacts({ open: { failure: { error: 'boom', effect: null } } }))
+    expect(check.failures![0]!.sentence).toBe(
+      'Optional: the last effect with Stable Audio Open 1.0 failed. Stable Audio 3 Small SFX is in place.',
+    )
+    expect(check.failures![0]).not.toHaveProperty('link')
+  })
+
+  it('says one sentence per model when both have something to say, the failed one after the download', () => {
+    const check = row(
+      effectFacts({
+        small: { failure: { error: 'x', effect: chest } },
+        open: { download: 'absent' },
+      }),
+    )
+    expect(check).toMatchObject({
+      state: 'problem',
+      detail: 'Stable Audio Open 1.0 is not on this computer.',
+      failures: [
+        {
+          sentence:
+            "The last effect with Stable Audio 3 Small SFX, the project's sound-effects model, failed on Chest open.",
+        },
+      ],
+    })
+    const failed = row(
+      effectFacts({
+        small: { failure: { error: 'a', effect: chest } },
+        open: { failure: { error: 'b', effect: null } },
+      }),
+    )
+    expect(failed.failures!.map((f) => f.error)).toEqual(['a', 'b'])
+    expect(failed.failures![1]!.sentence).toBe('The last effect with Stable Audio Open 1.0 failed.')
+    expect(failed.state).toBe('problem')
+  })
+
+  it('says sound effects can’t be made when neither model can run, and gives a step for each', () => {
+    const both = row(effectFacts({ small: { download: 'absent' }, open: { download: 'absent' } }))
+    expect(both).toMatchObject({
+      state: 'problem',
+      detail:
+        "Sound effects can't be made: Stable Audio 3 Small SFX and Stable Audio Open 1.0 are not on this computer.",
+    })
+    expect(both.steps?.list).toEqual([
       {
         parts: [
           "Sign in to Hugging Face and accept Stability AI's Community Licence on ",
@@ -670,86 +831,72 @@ describe('the Sound-effect models row', () => {
             link: 'stabilityai/stable-audio-3-small-sfx',
             href: 'https://huggingface.co/stabilityai/stable-audio-3-small-sfx',
           },
-          '.',
-        ],
-      },
-      {
-        parts: [
-          'Make a read token at ',
+          ' and ',
           {
-            link: 'huggingface.co/settings/tokens',
-            href: 'https://huggingface.co/settings/tokens',
+            link: 'stabilityai/stable-audio-open-1.0',
+            href: 'https://huggingface.co/stabilityai/stable-audio-open-1.0',
           },
           '.',
         ],
       },
-      { parts: ['Download it, once (about 6.5 GB):'], commands: [download] },
+      tokenStep,
+      {
+        parts: ['Download Stable Audio 3 Small SFX, once (about 6.5 GB):'],
+        commands: [smallCommand],
+      },
+      {
+        parts: [
+          'Download Stable Audio Open 1.0 into ~/.cache/stable-audio, where the studio looks for it:',
+        ],
+        commands: [openCommand],
+      },
+    ])
+    const mixed = row(effectFacts({ small: { download: 'partial' }, open: { download: 'absent' } }))
+    expect(mixed.detail).toBe(
+      "Sound effects can't be made: Stable Audio 3 Small SFX's download is incomplete and Stable Audio Open 1.0 is not on this computer.",
+    )
+    expect(mixed.steps?.list.map((step) => step.commands)).toEqual([
+      undefined,
+      undefined,
+      [smallCommand],
+      [openCommand],
     ])
   })
 
-  it('tells an interrupted download from a missing one', () => {
-    expect(row(effectFacts({ download: 'partial' }))).toMatchObject({
-      state: 'off',
-      label: 'Not set up',
-      detail:
-        "Optional: for the game's sound effects. Stable Audio 3 Small SFX's download is incomplete, so it can't run.",
-      steps: {
-        list: [
-          { parts: ['Finish the download (it picks up where it stopped):'], commands: [download] },
-        ],
-        note: 'Then press Check again.',
-      },
-    })
-  })
-
-  it('asks for uv first, whether or not the model is there', () => {
-    for (const d of ['whole', 'absent', 'partial'] as const) {
-      expect(row(effectFacts({ uv: false, download: d }))).toMatchObject({
-        state: 'off',
-        label: 'Not set up',
+  it('asks for uv first, whatever the models are', () => {
+    const step = {
+      parts: ['Install uv:'],
+      commands: ['brew install uv'],
+      after: '(then start the studio again if it is still not found)',
+    }
+    for (const small of [{}, { download: 'absent' as const }]) {
+      expect(row(effectFacts({ uv: false, small }))).toMatchObject({
+        state: 'problem',
         detail:
-          "Optional: for the game's sound effects. uv, which runs Stable Audio 3 Small SFX, is not on the PATH.",
-        steps: {
-          list: [
-            {
-              parts: ['Install uv:'],
-              commands: ['brew install uv'],
-              after: '(then start the studio again if it is still not found)',
-            },
-          ],
-          note: '',
-        },
+          "Sound effects can't be made: uv, which runs the sound-effects models, is not on the PATH.",
+        steps: { list: [step], note: '' },
       })
     }
   })
 
-  it('shows the last failed effect, with its error and what clears it, no link', () => {
-    const check = row(effectFacts({ failure: { error: 'RuntimeError: boom' } }))
-    expect(check).toMatchObject({
-      state: 'off',
-      label: 'Not set up',
-      detail: '',
-      failures: [
-        {
-          sentence:
-            "Optional: for the game's sound effects. The last effect made with Stable Audio 3 Small SFX failed.",
-          error: 'RuntimeError: boom',
-          clears: 'This clears once an effect made with Small SFX works.',
-        },
-      ],
-    })
-    expect(check.failures![0]).not.toHaveProperty('link')
-  })
-
-  it('shows the download before the failure, and never counts as a problem', () => {
-    const both = row(effectFacts({ download: 'absent', failure: { error: 'x' } }))
-    expect(both.failures).toBeUndefined()
-    expect(both.detail).toContain('is not on this computer')
-    for (const e of [
-      effectFacts({ uv: false }),
-      effectFacts({ download: 'partial' }),
-      effectFacts({ failure: { error: 'x' } }),
-    ])
-      expect(row(e).state).not.toBe('problem')
+  it('stays grey and optional while the game lists no sound effects', () => {
+    const none = (change: Parameters<typeof effectFacts>[0]) =>
+      row(effectFacts({ listed: false, ...change }))
+    for (const check of [
+      none({ small: { download: 'absent' } }),
+      none({ small: { download: 'absent' }, open: { download: 'absent' } }),
+      none({ uv: false }),
+      none({ small: { failure: { error: 'x', effect: null } } }),
+    ]) {
+      expect(check).toMatchObject({ state: 'off', label: 'Not set up' })
+      expect(check.detail + (check.failures?.[0]?.sentence ?? '')).toStartWith(opening)
+    }
+    expect(none({ uv: false }).detail).toBe(
+      `${opening} uv, which runs the sound-effects models, is not on the PATH.`,
+    )
+    expect(none({ small: { download: 'absent' } }).detail).toBe(
+      `${opening} The project's sound-effects model, Stable Audio 3 Small SFX, is not on this computer. Stable Audio Open 1.0 is in place: an effect's takes can use it meanwhile.`,
+    )
+    expect(none({}).state).toBe('ok')
   })
 })

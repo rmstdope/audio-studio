@@ -9,6 +9,7 @@ import {
   effectMakingStatus,
   effectTakeLength,
   effectStatus,
+  effectChipLine,
   effectTimeLeft,
   effectUnchooseQuestion,
   effectTakeChoosable,
@@ -202,7 +203,32 @@ describe('words for making takes', () => {
       'making · about 1 s left',
     )
     expect(effectMakingStatus({ takes: 4, left: 10 })).toBe('making 4 takes · about 10 s')
+    expect(effectMakingStatus({ takes: 4, left: 400 })).toBe('making 4 takes · about 6 min 40 s')
     expect(effectMakingStatus({ takes: 1, left: 0.2 })).toBe('making 1 take · about 1 s')
+  })
+  it('words a slow take’s time in minutes and a wait for the graphics chip', () => {
+    expect(effectTimeLeft({ state: 'making', elapsed: 30, expected: 100 })).toBe(
+      'making · about 1 min 10 s left',
+    )
+    expect(effectTimeLeft({ state: 'making', elapsed: 40, expected: 100 })).toBe(
+      'making · about 1 min left',
+    )
+    expect(effectTimeLeft({ state: 'making', elapsed: 90, expected: 100 })).toBe(
+      'making · about 10 s left',
+    )
+    expect(
+      effectTimeLeft({ state: 'waiting', elapsed: 0, expected: 100, chip: { using: null } }),
+    ).toBe('waiting for the graphics chip')
+    expect(effectChipLine('music')).toBe('Music is being made first.')
+    expect(effectChipLine('image')).toBe('An image is being made first.')
+    expect(effectChipLine('effect')).toBe('Another effect is being made first.')
+    expect(effectChipLine('recording')).toBe('A recording is being checked first.')
+    expect(effectChipLine(null)).toBeNull()
+  })
+  it('accepts a model with a count, and only a known one', () => {
+    expect(MakeEffectTakesBody.safeParse({ count: 2, model: 'open-1' }).success).toBe(true)
+    expect(MakeEffectTakesBody.safeParse({ count: 2, model: 'huge' }).success).toBe(false)
+    expect(MakeEffectTakesBody.safeParse({ retry: 2, model: 'open-1' }).success).toBe(false)
   })
   it('accepts 1 to 8 takes at once, or a retry, and nothing else', () => {
     expect(MakeEffectTakesBody.safeParse({ count: 8 }).success).toBe(true)
