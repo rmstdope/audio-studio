@@ -1,4 +1,12 @@
 import { z } from 'zod'
+import {
+  effectChangedFields,
+  effectStatus,
+  type EffectChangedField,
+  type EffectCurrent,
+  type EffectLockEntry,
+  type EffectStatus,
+} from './effectTakes'
 import { problemsFrom, type Problem } from './project'
 
 /** A sound effect as the game lists it. The id names the effect everywhere, so it is a slug. */
@@ -156,9 +164,26 @@ export interface EffectRow {
   changedHere: boolean
   /** The game reworded the effect since the studio's words were written or last kept. */
   gameChanged: boolean
-  /** No takes can be made yet, so none exists. */
-  status: 'none-yet'
+  /** Where the effect stands: no take yet, not chosen, chosen, changed since, its clip missing, or not known. */
+  status: EffectStatus
+  /** What the game plays for it now. */
+  current: EffectCurrent
+  /** What differs from the chosen take's inputs (empty when none is chosen). */
+  changed: EffectChangedField[]
+  /** A take is chosen, an out-of-date one included (not while the lock cannot be read). */
+  chosen: boolean
 }
+
+/** What the studio knows of the effects' takes, read from the lock, the clips folder and the boards. */
+export interface EffectsState {
+  /** The lock's entries with whether each clip is a plain file there; null while the lock cannot be read. */
+  chosen: Record<string, { lock: EffectLockEntry; fileExists: boolean }> | null
+  /** The effects that have a take on their board. */
+  takesMade: ReadonlySet<string>
+}
+
+/** Nothing chosen, made or being made. */
+const NO_STATE: EffectsState = { chosen: {}, takesMade: new Set() }
 
 /** An effect the game no longer lists, whose description the studio still keeps. */
 export interface DroppedEffect {
@@ -186,14 +211,16 @@ export function summarizeEffects(input: {
   list: EffectsListState
   overrides: EffectOverrides
   canRefresh: boolean
+  state?: EffectsState
 }): EffectsSummary {
-  const { list, overrides, canRefresh } = input
+  const { list, overrides, canRefresh, state = NO_STATE } = input
   // Entries, and none of them readable: as unreadable as a list that is not one.
   if (list.status === 'ok' && list.effects.length === 0 && list.unreadable > 0) {
     return summarizeEffects({
       list: { status: 'invalid', problems: list.problems },
       overrides,
       canRefresh,
+      state,
     })
   }
   const none = { rows: [], dropped: [], unreadable: 0, problems: [] as Problem[] }
@@ -209,15 +236,32 @@ export function summarizeEffects(input: {
   }
   const rows: EffectRow[] = list.effects.map((effect) => {
     const own = overrides[effect.id]
+    const description = own?.words ?? effect.description
+    const now = { description, seconds: effect.seconds }
+    const entry = state.chosen?.[effect.id]
+    const status = effectStatus({
+      lockUnread: state.chosen === null,
+      chosen: entry,
+      now,
+      hasTakes: state.takesMade.has(effect.id),
+    })
     return {
       id: effect.id,
       name: effectName(effect.id),
-      description: own?.words ?? effect.description,
+      description,
       gameDescription: effect.description,
       seconds: effect.seconds,
       changedHere: Boolean(own),
       gameChanged: Boolean(own) && own!.gameWas !== effect.description,
-      status: 'none-yet',
+      status,
+      current:
+        state.chosen === null
+          ? ({ kind: 'unknown' } as const)
+          : entry
+            ? ({ kind: 'take', take: entry.lock.take, exists: entry.fileExists } as const)
+            : ({ kind: 'nothing' } as const),
+      changed: entry ? effectChangedFields(entry.lock, now) : [],
+      chosen: Boolean(entry),
     }
   })
   const listed = new Set([...rows.map((r) => r.id), ...list.seenIds])
@@ -231,6 +275,10 @@ export function summarizeEffects(input: {
     dropped,
     unreadable: list.unreadable,
     problems: list.problems,
-    done: done(rows.map((r) => r.id)),
+    done: {
+      done: rows.filter((r) => r.status === 'chosen').length,
+      total: rows.length,
+      needs: rows.filter((r) => r.status !== 'chosen').map((r) => r.id),
+    },
   }
 }

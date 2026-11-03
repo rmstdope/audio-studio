@@ -329,6 +329,12 @@ const EffectsSchema = z.object({
       .refine((path) => !path.includes('{language}') && !path.includes('{part}'), {
         error: 'must not contain {language} or {part}: sound effects are for the whole game',
       }),
+    /** The effects lock, kept in the repository: the chosen take of each effect. */
+    lock: z.string().min(1),
+    /** The folder of the chosen effects' clips, which the game plays. */
+    clips: z.string().min(1),
+    /** The manifest in the clips folder, which the game reads: `{ effect: { file, duration } }`. */
+    manifest: z.string().min(1),
   }),
 })
 

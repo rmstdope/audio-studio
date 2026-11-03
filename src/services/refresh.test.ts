@@ -280,7 +280,15 @@ describe('refreshing the sound effects', () => {
   const withEffects = (refresh?: string, files: Record<string, unknown> = {}) =>
     tempRepo({
       'content-studio.json': projectJson({
-        effects: { refresh, paths: { list: 'tts/effects.json' } },
+        effects: {
+          refresh,
+          paths: {
+            list: 'tts/effects.json',
+            lock: 'audio/effects.lock.json',
+            clips: 'audio/effects',
+            manifest: 'audio/effects/manifest.json',
+          },
+        },
       }),
       'tts/.keep': '',
       ...files,

@@ -1,0 +1,196 @@
+import { describe, expect, it } from 'bun:test'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { projectJson, tempRepo } from '../../test/helpers'
+import type { EffectBoardTake } from '../core/effectTakes'
+import { ProjectSchema } from '../core/project'
+import type { Encoder, EncodeOptions } from './audio'
+import { acceptEffect, commitEffect, readEffectChosen, uncommitEffect } from './effectClips'
+
+const effects = {
+  paths: {
+    list: 'tts/effects.json',
+    lock: 'audio/effects.lock.json',
+    clips: 'audio/effects',
+    manifest: 'audio/effects/manifest.json',
+  },
+}
+const config = ProjectSchema.parse(projectJson({ effects })).effects!
+
+const inputs = { description: 'A slow wooden door creaks open', seconds: 3 }
+const take = (n: number, over: Partial<EffectBoardTake> = {}): EffectBoardTake => ({
+  n,
+  hash: '0123456789abcdef',
+  seed: 100 + n,
+  model: 'small-sfx',
+  seconds: 1.4,
+  peaks: [],
+  inputs,
+  ...over,
+})
+
+/** An encoder that writes `mp3` and remembers what it was asked. */
+function fakeEncoder(fail = false) {
+  const calls: { file: string; options: EncodeOptions }[] = []
+  const encode: Encoder = async (_wav, file, options) => {
+    calls.push({ file, options })
+    mkdirSync(dirname(file), { recursive: true })
+    if (fail) throw new Error('ffmpeg could not encode the clip: boom')
+    writeFileSync(file, 'mp3')
+  }
+  return { encode, calls }
+}
+
+const at = new Date('2026-11-03T10:00:00.000Z')
+const choose = (root: string, id: string, n: number, encode: Encoder, hash?: string) =>
+  commitEffect({
+    root,
+    effects: config,
+    id,
+    take: take(n, hash ? { hash } : {}),
+    wav: new Uint8Array(4),
+    encode,
+    now: () => at,
+  })
+
+describe('commitEffect', () => {
+  it('writes the clip, the manifest with its real length, and the lock', async () => {
+    const root = tempRepo({})
+    const { encode, calls } = fakeEncoder()
+    expect(await choose(root, 'door-creak', 2, encode)).toEqual({ ok: true })
+    expect(calls[0]!.options).toEqual({ bitrate: '160k', channels: 2 })
+    expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'), 'utf8')).toBe('mp3')
+    expect(JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))).toEqual({
+      'door-creak': { file: 'door-creak.mp3', duration: 1.4 },
+    })
+    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    expect(lock['door-creak']).toEqual({
+      fp: '0123456789abcdef',
+      model: 'small-sfx',
+      seed: 102,
+      take: 2,
+      inputs,
+      at: at.toISOString(),
+    })
+    expect(calls[0]!.file.includes('/.door-creak.')).toBe(true)
+    expect(readdirSync(join(root, 'audio/effects')).sort()).toEqual([
+      'door-creak.mp3',
+      'manifest.json',
+    ])
+  })
+
+  it('replaces the entry when another take is chosen and keeps other effects', async () => {
+    const root = tempRepo({})
+    const { encode } = fakeEncoder()
+    await choose(root, 'door-creak', 1, encode)
+    await choose(root, 'coins', 1, encode)
+    await choose(root, 'door-creak', 3, encode)
+    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    expect(Object.keys(lock)).toEqual(['coins', 'door-creak'])
+    expect(lock['door-creak'].take).toBe(3)
+  })
+
+  it('changes nothing when the encode fails', async () => {
+    const root = tempRepo({})
+    const result = await choose(root, 'door-creak', 1, fakeEncoder(true).encode)
+    expect(result).toMatchObject({ ok: false })
+    expect(existsSync(join(root, 'audio/effects.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'audio/effects/manifest.json'))).toBe(false)
+    expect(readdirSync(join(root, 'audio/effects'))).toEqual([])
+  })
+
+  it('changes nothing when the lock or the manifest cannot be read', async () => {
+    const lockBroken = tempRepo({ 'audio/effects.lock.json': '{ nope' })
+    const one = await choose(lockBroken, 'door-creak', 1, fakeEncoder().encode)
+    expect(one).toEqual({
+      ok: false,
+      message:
+        'Take 1 could not be chosen: the sound effects lock could not be read. Nothing was changed.',
+    })
+    expect(readdirSync(join(lockBroken, 'audio/effects'))).toEqual([])
+    const manifestBroken = tempRepo({ 'audio/effects/manifest.json': '[' })
+    const two = await choose(manifestBroken, 'door-creak', 1, fakeEncoder().encode)
+    expect(two).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('the sound effects manifest could not be read'),
+    })
+  })
+})
+
+describe('uncommitEffect', () => {
+  it('deletes the manifest entry, the clip and the lock entry', async () => {
+    const root = tempRepo({})
+    const { encode } = fakeEncoder()
+    await choose(root, 'door-creak', 1, encode)
+    await choose(root, 'coins', 1, encode)
+    expect(await uncommitEffect({ root, effects: config, id: 'door-creak' })).toEqual({ ok: true })
+    expect(existsSync(join(root, 'audio/effects/door-creak.mp3'))).toBe(false)
+    expect(
+      Object.keys(JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))),
+    ).toEqual(['coins'])
+    expect(
+      Object.keys(JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))),
+    ).toEqual(['coins'])
+  })
+
+  it('refuses an effect with no chosen take, and an unreadable lock', async () => {
+    const root = tempRepo({})
+    expect(await uncommitEffect({ root, effects: config, id: 'coins' })).toEqual({
+      ok: false,
+      message: 'No take is chosen for this effect.',
+    })
+    const broken = tempRepo({ 'audio/effects.lock.json': 'x' })
+    expect(await uncommitEffect({ root: broken, effects: config, id: 'coins' })).toEqual({
+      ok: false,
+      message: 'The sound effects lock could not be read.',
+    })
+  })
+})
+
+describe('acceptEffect', () => {
+  const now = { description: 'A heavy door groans', seconds: 3 }
+  const accept = (root: string, to = now) =>
+    acceptEffect({ root, effects: config, id: 'door-creak', now: to })
+
+  it('counts the chosen take as made from the new description', async () => {
+    const root = tempRepo({})
+    await choose(root, 'door-creak', 1, fakeEncoder().encode)
+    expect(await accept(root)).toEqual({ ok: true })
+    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    expect(lock['door-creak'].inputs).toEqual(now)
+    expect(lock['door-creak'].take).toBe(1)
+  })
+
+  it('refuses a changed length, nothing changed, and an effect with no chosen take', async () => {
+    const root = tempRepo({})
+    expect(await accept(root)).toEqual({ ok: false, message: 'No take is chosen for this effect.' })
+    await choose(root, 'door-creak', 1, fakeEncoder().encode)
+    expect(await accept(root, inputs)).toEqual({
+      ok: false,
+      message: 'Nothing has changed since the take was chosen.',
+    })
+    expect(await accept(root, { ...now, seconds: 4 })).toEqual({
+      ok: false,
+      message: 'A changed length cannot be accepted: the effect needs a new take.',
+    })
+  })
+})
+
+describe('readEffectChosen', () => {
+  it('lists the lock’s effects with whether the clip is a file there; null when unreadable', async () => {
+    const root = tempRepo({})
+    await choose(root, 'door-creak', 1, fakeEncoder().encode)
+    await choose(root, 'coins', 1, fakeEncoder().encode)
+    const { rmSync } = await import('node:fs')
+    rmSync(join(root, 'audio/effects/coins.mp3'))
+    const chosen = await readEffectChosen(root, config, [])
+    expect(Object.entries(chosen!).map(([id, c]) => [id, c.fileExists])).toEqual([
+      ['coins', false],
+      ['door-creak', true],
+    ])
+    const broken = tempRepo({ 'audio/effects.lock.json': '{' })
+    const problems: unknown[] = []
+    expect(await readEffectChosen(broken, config, problems as never)).toBeNull()
+    expect(problems).toHaveLength(1)
+  })
+})

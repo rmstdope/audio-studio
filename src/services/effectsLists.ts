@@ -8,6 +8,8 @@ import {
 } from '../core/effects'
 import { resolveInRoot } from '../core/paths'
 import type { Problem, Project } from '../core/project'
+import { effectsWithTakes } from './effectBoards'
+import { readEffectChosen } from './effectClips'
 import { readJson, readResource } from './files'
 
 /** The studio's own descriptions of sound effects: its state, not the game's. */
@@ -57,5 +59,9 @@ export async function readEffects(
     list,
     overrides: overrides === 'invalid' ? {} : overrides,
     canRefresh: Boolean(effects.refresh),
+    state: {
+      chosen: await readEffectChosen(root, effects, problems),
+      takesMade: await effectsWithTakes(root),
+    },
   })
 }
