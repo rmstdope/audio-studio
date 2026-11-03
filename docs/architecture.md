@@ -1089,11 +1089,11 @@ default APG needs float64, which the Mac's GPU lacks. Takes are shaped as ACE-St
 the recipe `stable-audio-open-1.0` or `-small`. Short's time per take, about 100 s, is measured: the
 effects spike measured Open 1.0 at 95–112 s a take (§13 decision 9), since it always makes its full
 47 seconds at 100 steps. Shortest's 10 s is still an estimate, not measured. ACE-Step and Whisper
-share the one GPU and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`, a process-wide
-`createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a Whisper check at a
-time. In the spike, with both loaded and running together, 42 of the 48 GB were in use (20 GB of it
-compressed), and Whisper ran 2.5 times slower. The setup checklist (§10) names ACE-Step's
-environment and its model download, and, in its own optional row, Stable Audio's.
+share the one GPU and never run at once: both workers stay loaded, and one queue (`services/gpu.ts`,
+a process-wide `createSerial` key; Whisper's checks reach it through `onGpu`) runs a take or a
+Whisper check at a time. In the spike, with both loaded and running together, 42 of the 48 GB were
+in use (20 GB of it compressed), and Whisper ran 2.5 times slower. The setup checklist (§10) names
+ACE-Step's environment and its model download, and, in its own optional row, Stable Audio's.
 
 ### 8.6 ElevenLabs (planned, step 14)
 
