@@ -1,0 +1,1935 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Two sound-effects models — agreed</title>
+    <style>
+            :root {
+              --bg: #06070c;
+              --panel: #10121a;
+              --glass: rgb(255 255 255/3.5%);
+              --edge: rgb(255 255 255/8%);
+              --line: rgb(255 255 255/7%);
+              --line-strong: rgb(255 255 255/11%);
+              --text: #eceef3;
+              --soft: #c7ccd6;
+              --muted: #a9b0bd;
+              --faint: #8a91a0;
+              --accent: #ff6b2c;
+              --grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+              --att-ink: #ffb38f;
+              --att-bg: rgb(255 122 61/10%);
+              --att-line: rgb(255 122 61/25%);
+              --ok: #3ddc97;
+              --ok-bg: #10291f;
+              --warn: #ffc24b;
+              --warn-bg: #2d2412;
+              --danger-bg: #2e1720;
+              --danger-ink: #ff94a8;
+              --untracked: #b8bfcc;
+              --untracked-bg: #1d2029;
+              --ring: rgb(255 255 255/7%);
+              color-scheme: dark;
+            }
+            * {
+              box-sizing: border-box;
+            }
+            body {
+              margin: 0;
+              background: #030407;
+              color: var(--text);
+              font:
+                14px/1.45 system-ui,
+                -apple-system,
+                sans-serif;
+              padding: 24px;
+            }
+            .intro {
+              max-width: 1180px;
+              margin: 0 auto 18px;
+              color: var(--muted);
+            }
+            .intro h1 {
+              color: var(--text);
+              font-size: 20px;
+              margin: 0 0 6px;
+            }
+            .note {
+              max-width: 1180px;
+              margin: 26px auto 8px;
+              color: var(--soft);
+            }
+            .frame {
+              max-width: 1180px;
+              margin: 0 auto;
+              border: 1px solid var(--line-strong);
+              border-radius: 12px;
+              overflow: hidden;
+              display: flex;
+              min-height: 420px;
+              background: var(--bg);
+            }
+            .frame.narrow {
+              max-width: 420px;
+              flex-direction: column;
+            }
+            .side {
+              width: 190px;
+              flex: none;
+              padding: 14px 10px;
+              border-right: 1px solid var(--line);
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+              background: rgb(10 11 18/55%);
+            }
+            .brand {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              font-weight: 600;
+              font-size: 13px;
+            }
+            .logo {
+              width: 20px;
+              height: 20px;
+              border-radius: 6px;
+              background: var(--grad);
+            }
+            .pbox {
+              border: 1px solid var(--edge);
+              background: var(--glass);
+              border-radius: 10px;
+              padding: 8px;
+              font-size: 12px;
+            }
+            .lbl {
+              font-size: 10px;
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+              color: var(--faint);
+            }
+            .ni {
+              display: flex;
+              justify-content: space-between;
+              padding: 5px 8px;
+              border-radius: 7px;
+              color: var(--soft);
+              font-size: 12.5px;
+            }
+            .ni.sub {
+              padding-left: 16px;
+            }
+            .ni.on {
+              background: var(--glass);
+              border: 1px solid var(--edge);
+            }
+            .ni .n {
+              font:
+                11px ui-monospace,
+                monospace;
+              color: var(--faint);
+            }
+            .ni .n.red {
+              color: var(--danger-ink);
+            }
+            .main {
+              flex: 1;
+              padding: 18px 22px;
+              display: flex;
+              flex-direction: column;
+              gap: 14px;
+              min-width: 0;
+            }
+            .crumbs {
+              font-size: 12px;
+              color: var(--muted);
+            }
+            h1 {
+              margin: 2px 0 4px;
+              font-size: 24px;
+            }
+            h2 {
+              margin: 0;
+              font-size: 17px;
+            }
+            .muted {
+              color: var(--muted);
+            }
+            .faint {
+              color: var(--faint);
+            }
+            .small {
+              font-size: 12px;
+            }
+            .mono {
+              font:
+                11.5px ui-monospace,
+                monospace;
+              color: var(--faint);
+            }
+            .row {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            }
+            .grow {
+              flex: 1;
+              min-width: 0;
+            }
+            .btn {
+              border: 1px solid var(--line-strong);
+              background: var(--glass);
+              color: var(--text);
+              border-radius: 8px;
+              padding: 6px 12px;
+              font-size: 12.5px;
+              white-space: nowrap;
+            }
+            .btn.primary {
+              background: var(--grad);
+              border: 0;
+              color: #1a0a02;
+              font-weight: 600;
+            }
+            .panel {
+              border: 1px solid var(--edge);
+              background: var(--glass);
+              border-radius: 12px;
+              padding: 14px;
+            }
+            .panel.flush {
+              padding: 0;
+              overflow: hidden;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th {
+              font-size: 10.5px;
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+              color: var(--faint);
+              font-weight: 500;
+              text-align: left;
+              padding: 9px 12px;
+              border-bottom: 1px solid var(--line);
+            }
+            td {
+              padding: 9px 12px;
+              border-bottom: 1px solid var(--line);
+              vertical-align: top;
+              font-size: 13px;
+            }
+            tr:last-child td {
+              border-bottom: 0;
+            }
+            .chip {
+              display: inline-block;
+              font-size: 11px;
+              padding: 2px 8px;
+              border-radius: 999px;
+              background: var(--untracked-bg);
+              color: var(--untracked);
+              white-space: nowrap;
+            }
+            .chip.warn {
+              background: var(--warn-bg);
+              color: var(--warn);
+            }
+            .chip.ok {
+              background: var(--ok-bg);
+              color: var(--ok);
+            }
+            .att {
+              display: inline-block;
+              font-size: 11px;
+              padding: 2px 9px;
+              border-radius: 999px;
+              background: var(--att-bg);
+              border: 1px solid var(--att-line);
+              color: var(--att-ink);
+            }
+            .stat {
+              display: flex;
+              align-items: center;
+              gap: 16px;
+            }
+            .ringc {
+              width: 62px;
+              height: 62px;
+              border-radius: 50%;
+              border: 6px solid var(--ring);
+              display: grid;
+              place-items: center;
+              font-size: 13px;
+            }
+            .big {
+              font-size: 26px;
+              font-weight: 600;
+            }
+            .field label {
+              display: block;
+              font-size: 10.5px;
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+              color: var(--faint);
+              margin-bottom: 5px;
+            }
+            textarea,
+            input {
+              width: 100%;
+              background: rgb(0 0 0/25%);
+              border: 1px solid var(--line-strong);
+              border-radius: 8px;
+              color: var(--text);
+              font: 13px system-ui;
+              padding: 8px 10px;
+            }
+            textarea {
+              min-height: 58px;
+              resize: vertical;
+            }
+            .changed {
+              color: var(--warn);
+              font-size: 11.5px;
+            }
+            .changed a {
+              color: var(--warn);
+              text-decoration: underline;
+            }
+            .game {
+              color: var(--faint);
+              font-size: 12px;
+              margin-top: 3px;
+            }
+            .game s {
+              color: var(--faint);
+            }
+            .box {
+              border-radius: 10px;
+              padding: 10px 12px;
+              font-size: 13px;
+            }
+            .box.warn {
+              background: var(--warn-bg);
+              border: 1px solid rgb(255 194 75/30%);
+            }
+            .box.err {
+              background: var(--danger-bg);
+              border: 1px solid rgb(255 148 168/30%);
+            }
+            .ed {
+              border: 1px dashed transparent;
+              border-radius: 6px;
+              padding: 3px 6px;
+              margin: -4px -7px;
+            }
+            .ed.hover {
+              border-color: var(--line-strong);
+            }
+            .ed.on {
+              border: 1px solid var(--accent);
+              background: rgb(0 0 0/30%);
+            }
+            .saved {
+              font-size: 11.5px;
+              color: var(--ok);
+            }
+            .dim {
+              opacity: 0.45;
+            }
+
+            .dlg {
+              position: absolute;
+              inset: 0;
+              background: rgb(0 0 0/55%);
+              display: grid;
+              place-items: center;
+            }
+            .dlg .card {
+              width: 420px;
+              background: #141722;
+              border: 1px solid var(--line-strong);
+              border-radius: 12px;
+              padding: 18px;
+            }
+            .disabled {
+              opacity: 0.55;
+            }
+            .narrow .side {
+              width: auto;
+              border-right: 0;
+              border-bottom: 1px solid var(--line);
+              flex-direction: row;
+              align-items: center;
+              gap: 8px;
+              padding: 10px;
+            }
+            .stack td {
+              display: block;
+              border: 0;
+              padding: 2px 12px;
+            }
+            .stack tr {
+              display: block;
+              border-bottom: 1px solid var(--line);
+              padding: 8px 0;
+            }
+            .stack th {
+              display: none;
+            }
+            .focus {
+              outline: 2px solid var(--accent);
+              outline-offset: 2px;
+            }
+
+            .play {
+              width: 28px;
+              height: 28px;
+              border-radius: 99px;
+              border: 1px solid var(--line-strong);
+              background: #1a1d28;
+              color: var(--text);
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 11px;
+              flex: none;
+            }
+            .play.on {
+              background: var(--accent);
+              color: #1a0a02;
+              border: 0;
+            }
+            .wave {
+              height: 30px;
+              flex: 1;
+              min-width: 80px;
+              border-radius: 4px;
+              position: relative;
+              background: repeating-linear-gradient(90deg, #4a5263 0 2px, transparent 2px 4px);
+              mask: linear-gradient(180deg, transparent 0, #000 25%, #000 75%, transparent 100%);
+            }
+            .wave.tail {
+              background:
+                linear-gradient(90deg, transparent 0 0),
+                repeating-linear-gradient(90deg, #4a5263 0 2px, transparent 2px 4px);
+            }
+            .pos {
+              position: absolute;
+              top: -3px;
+              bottom: -3px;
+              width: 2px;
+              background: var(--accent);
+            }
+            .takes {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 10px;
+              margin-top: 12px;
+            }
+            .take {
+              background: #151824;
+              border: 1px solid var(--line-strong);
+              border-radius: 12px;
+              padding: 10px 12px;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            }
+            .ingame {
+              border-radius: 12px;
+              padding: 12px 14px;
+              background: var(--ok-bg);
+              border: 1px solid rgb(61 220 151/30%);
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            }
+            .ingame .lead {
+              font-size: 10.5px;
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+              color: var(--ok);
+            }
+            select {
+              background: rgb(0 0 0/25%);
+              border: 1px solid var(--line-strong);
+              color: var(--text);
+              border-radius: 8px;
+              padding: 6px 9px;
+              font: 12.5px system-ui;
+            }
+            .trow {
+              display: grid;
+              grid-template-columns: 96px 28px 1fr 52px auto;
+              gap: 12px;
+              align-items: center;
+              padding: 9px 12px;
+              border-bottom: 1px solid var(--line);
+            }
+            .trow:last-child {
+              border-bottom: 0;
+            }
+            .trow.chosen {
+              background: var(--ok-bg);
+            }
+            .cmp {
+              display: inline-flex;
+              gap: 6px;
+              align-items: center;
+            }
+            .sil {
+              position: absolute;
+              top: 0;
+              bottom: 0;
+              right: 0;
+              background: repeating-linear-gradient(90deg, #2a2f3a 0 2px, transparent 2px 4px);
+            }
+            .cut {
+              position: absolute;
+              top: -4px;
+              bottom: -4px;
+              width: 0;
+              border-left: 2px dashed var(--faint);
+            }
+            .ann {
+              border: 1px dashed var(--accent);
+              border-radius: 8px;
+              padding: 6px 8px;
+              color: var(--att-ink);
+              font-size: 12px;
+            }
+
+            .ingame.none {
+              background: transparent;
+              border: 1px dashed var(--line-strong);
+            }
+            .ingame.none .lead {
+              color: var(--faint);
+            }
+            .ingame.lost {
+              background: var(--warn-bg);
+              border-color: rgb(255 194 75/35%);
+            }
+            .ingame.lost .lead {
+              color: var(--warn);
+            }
+            .red {
+              color: var(--danger-ink);
+              font-size: 12px;
+            }
+            .empty {
+              border: 1px dashed var(--line-strong);
+              border-radius: 12px;
+              padding: 16px;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              margin-top: 12px;
+            }
+            .narrow .takes {
+              grid-template-columns: 1fr;
+            }
+            .narrow table td {
+              display: block;
+              border: 0;
+              padding: 2px 12px;
+            }
+            .narrow table tr {
+              display: block;
+              border-bottom: 1px solid var(--line);
+              padding: 8px 0;
+            }
+            .narrow table th {
+              display: none;
+            }
+      .tag {
+              display: inline-block;
+              background: var(--warn);
+              color: #1a1200;
+              font-weight: 700;
+              font-size: 11px;
+              padding: 2px 8px;
+              border-radius: 6px;
+              margin-right: 8px;
+            }
+      .saved {
+              color: var(--ok);
+              font-size: 12.5px;
+            }
+      .mrow {
+              display: grid;
+              grid-template-columns: 150px 1fr;
+              gap: 16px;
+              padding: 12px 0;
+              border-top: 1px solid var(--line);
+              align-items: start;
+            }
+      .mrow.first {
+              border-top: 0;
+            }
+      .mname {
+              font-weight: 600;
+            }
+      .mtx {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+            }
+      .free {
+              color: var(--ok);
+            }
+      .warnline {
+              color: var(--warn);
+              font-size: 12.5px;
+            }
+      .check {
+              display: flex;
+              gap: 14px;
+              align-items: flex-start;
+            }
+      .st {
+              font-size: 12.5px;
+              white-space: nowrap;
+              width: 130px;
+              flex: none;
+            }
+      .st.ok {
+              color: var(--ok);
+            }
+      .st.pr {
+              color: var(--warn);
+            }
+      .st.off {
+              color: var(--faint);
+            }
+      .fix {
+              display: block;
+              font-family: ui-monospace, Menlo, monospace;
+              font-size: 12px;
+              background: var(--inset);
+              border: 1px solid var(--line);
+              border-radius: 7px;
+              padding: 6px 9px;
+              margin: 4px 0;
+              color: var(--text-soft);
+              white-space: pre-wrap;
+            }
+      .mlist {
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+              margin: 4px 0;
+            }
+      .mlist .r {
+              display: flex;
+              gap: 10px;
+              align-items: baseline;
+            }
+      .opt {
+              display: flex;
+              justify-content: space-between;
+              gap: 14px;
+              padding: 6px 10px;
+              border-radius: 7px;
+            }
+      .opt.dis {
+              color: var(--faint);
+            }
+      .opt.on {
+              background: var(--raised);
+            }
+      .tag {
+              font-size: 11px;
+              color: var(--faint);
+              text-transform: uppercase;
+              letter-spacing: 0.06em;
+              margin: 0 0 6px;
+            }
+      .check {
+                flex-direction: column;
+                gap: 6px;
+              }
+      .st {
+                width: auto;
+              }
+      .setupwrap {
+              max-width: 1180px;
+              margin: 0 auto;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+            }
+      .new {
+              outline: 2px solid var(--accent);
+              outline-offset: 3px;
+            }
+      .narrowbox {
+              max-width: 380px;
+            }
+      .err {
+              color: var(--danger-ink);
+              font-family: ui-monospace, Menlo, monospace;
+              font-size: 12px;
+            }        border-radius: 7px;
+              padding: 6px 9px;
+              margin: 4px 0;
+              color: var(--text-soft);
+              white-space: pre-wrap;
+            }
+            ol.steps {
+              margin: 6px 0 4px;
+              padding-left: 20px;
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+            }
+            .mlist {
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+              margin: 4px 0;
+            }
+            .mlist .r {
+              display: flex;
+              gap: 10px;
+              align-items: baseline;
+            }
+            .opt {
+              display: flex;
+              justify-content: space-between;
+              gap: 14px;
+              padding: 6px 10px;
+              border-radius: 7px;
+            }
+            .opt.dis {
+              color: var(--faint);
+            }
+            .opt.on {
+              background: var(--raised);
+            }
+            .rec {
+              display: inline-block;
+              background: var(--accent-soft-bg);
+              color: var(--accent-soft-ink);
+              border: 1px solid var(--accent-soft-line);
+              border-radius: 6px;
+              padding: 1px 7px;
+              font-size: 11.5px;
+              font-weight: 600;
+              margin-left: 8px;
+            }
+            .mby {
+              color: var(--faint);
+              font-size: 12px;
+            }
+            a.l {
+              color: var(--info);
+            }
+            .ex {
+              max-width: 1180px;
+              margin: 0 auto;
+            }
+            .tag {
+              font-size: 11px;
+              color: var(--faint);
+              text-transform: uppercase;
+              letter-spacing: 0.06em;
+              margin: 0 0 6px;
+            }
+            .btn.s {
+              margin-top: 4px;
+            }
+            .res {
+              font-size: 12.5px;
+      .opt { display:flex; justify-content:space-between; gap:12px; padding:6px 10px; border-radius:6px }
+      .vlabel { font: 600 12px system-ui; color: var(--accent-soft-ink); background: var(--accent-soft-bg); border:1px solid var(--accent-soft-line); padding:2px 8px; border-radius:99px; display:inline-block; margin-bottom:6px }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Two sound-effects models — agreed</h1>
+      Setup checks both models and saves the project's main one; an effect's takes can use the
+      other. Names, messages and commands are examples. When the project's model can't run and the
+      other can, an effect's page starts on the other, with a line saying why (as the image models
+      do). Frames 1–12 are every state and word agreed.
+    </div>
+    <p class="note">
+      <b>1 — Both models here. The Sound effects row (outlined) is after Images.</b>
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand"><span class="logo"></span>Content Studio</div>
+        <div class="pbox">
+          <div class="lbl">Project</div>
+          <b>RetroQuest</b>
+          <div class="mono">retroquest</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin: 0 0 4px 4px">Workspace</div>
+          <div class="ni">Narration</div>
+          <div class="ni">Music</div>
+          <div class="ni">Images</div>
+          <div class="ni">Sound effects<span class="n red">3/8</span></div>
+        </div>
+        <div style="margin-top: auto"><div class="ni on">Setup</div></div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Project</span>
+          <h1>Setup</h1>
+          <span class="muted"
+            >What recording needs on this machine and in the project, checked each time this page
+            opens.</span
+          >
+        </div>
+        <section class="panel">
+          <h2>Models</h2>
+          <span class="muted"
+            >Which model records each stage of the voices, which makes the music, which makes the
+            images, and which makes the sound effects. Saved in
+            <span class="mono">content-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow first">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free — free, slower</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft · Final</div>
+            <div class="mtx">
+              <span class="faint small">(unchanged — shortened in this drawing)</span>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Music</div>
+            <div class="mtx">
+              <span class="muted"
+                >Loops and stingers, made on this computer. A track's takes can use another.</span
+              >
+              <div class="row">
+                <select>
+                  <option>Balanced · XL turbo · 4B — about 3 min a take</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Images</div>
+            <div class="mtx">
+              <span class="muted"
+                >The game's images, made on this computer. An image's takes can use the other
+                model.</span
+              >
+              <div class="row">
+                <select>
+                  <option>FLUX.2 klein 4B — about 8 s a take</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div style="outline: 1px dashed var(--accent); outline-offset: 4px; border-radius: 6px">
+            <div class="mrow">
+              <div class="mname">Sound effects</div>
+              <div class="mtx">
+                <span class="muted"
+                  >The game's sound effects, made on this computer. An effect's takes can use the
+                  other model.</span
+                >
+                <div class="row">
+                  <select>
+                    <option>Stable Audio 3 Small SFX — about 2 s a take</option></select
+                  ><span class="free">Free</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="panel check">
+          <span class="st ok">✓ Ready</span>
+          <div class="col" style="gap: 4px">
+            <strong>Sound-effect models</strong
+            ><span class="muted"
+              >Stable Audio 3 Small SFX and Stable Audio Open 1.0 are fully downloaded on this
+              computer; a model loads on its first effect.</span
+            >
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >2 — The Sound effects menu, open (on Setup and on an effect's page alike). A model that
+        can't run is marked; one not on this computer or only partly downloaded can't be picked; one
+        whose last effect failed can.</b
+      >
+    </p>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <div class="panel" style="max-width: 560px">
+          <div class="opt on">
+            <span>Stable Audio 3 Small SFX</span><span class="small faint">about 2 s a take</span>
+          </div>
+          <div class="opt dis">
+            <span>Stable Audio Open 1.0</span
+            ><span class="small">about 100 s a take — not on this computer</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <div class="panel" style="max-width: 560px">
+          <div class="opt dis">
+            <span>Stable Audio 3 Small SFX</span
+            ><span class="small">about 2 s a take — download incomplete</span>
+          </div>
+          <div class="opt on">
+            <span>Stable Audio Open 1.0</span><span class="small faint">about 100 s a take</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <div class="panel" style="max-width: 560px">
+          <div class="opt on">
+            <span>Stable Audio 3 Small SFX</span
+            ><span class="small faint">about 2 s a take — last effect failed</span>
+          </div>
+          <div class="opt">
+            <span>Stable Audio Open 1.0</span><span class="small faint">about 100 s a take</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >3 — The rows of the Sound-effect models check, state by state (the game lists effects).
+        What to fix first wins: uv, then a download, then a failed effect. When both models have
+        something, one sentence each.</b
+      >
+    </p>
+    <div class="setupwrap">
+      <p class="tag">a — Open 1.0 not here: optional, effects can be made</p>
+      <section class="panel check">
+        <span class="st off">Not set up</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >Optional: Stable Audio Open 1.0 is not on this computer. Stable Audio 3 Small SFX is in
+            place.</span
+          >
+          <ol class="steps small">
+            <li>
+              Sign in to Hugging Face and accept Stability AI's Community Licence on
+              <a class="l" href="#">stabilityai/stable-audio-open-1.0</a>.
+            </li>
+            <li>Make a read token at <a class="l" href="#">huggingface.co/settings/tokens</a>.</li>
+            <li>
+              Download it into ~/.cache/stable-audio, where the studio looks for it:<code
+                class="fix"
+                >HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/stable-audio-open-1.0
+                --local-dir ~/.cache/stable-audio/stable-audio-open-1.0</code
+              >
+            </li>
+          </ol>
+          <span class="faint small"
+            >The studio never asks for or keeps your token. Then press Check again.</span
+          >
+        </div>
+      </section>
+      <p class="tag">b — The main model not here, Open 1.0 is</p>
+      <section class="panel check">
+        <span class="st pr">⚠ Needs attention</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >The project's sound-effects model, Stable Audio 3 Small SFX, is not on this computer.
+            Stable Audio Open 1.0 is in place: an effect's takes can use it meanwhile.</span
+          >
+          <ol class="steps small">
+            <li>
+              Sign in to Hugging Face and accept Stability AI's Community Licence on
+              <a class="l" href="#">stabilityai/stable-audio-3-small-sfx</a>.
+            </li>
+            <li>Make a read token at <a class="l" href="#">huggingface.co/settings/tokens</a>.</li>
+            <li>
+              Download it, once (about 6.5 GB):<code class="fix"
+                >HF_TOKEN=… uvx --from huggingface_hub hf download
+                stabilityai/stable-audio-3-small-sfx</code
+              >
+            </li>
+          </ol>
+          <span class="faint small"
+            >The studio never asks for or keeps your token. Then press Check again.</span
+          >
+        </div>
+      </section>
+      <p class="tag">c — The main model's download interrupted, Open 1.0 here</p>
+      <section class="panel check">
+        <span class="st pr">⚠ Needs attention</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >The project's sound-effects model, Stable Audio 3 Small SFX, is only partly downloaded,
+            so it can't run. Stable Audio Open 1.0 is in place: an effect's takes can use it
+            meanwhile.</span
+          >
+          <ol class="steps small">
+            <li>
+              Finish the download (it picks up where it stopped):<code class="fix"
+                >HF_TOKEN=… uvx --from huggingface_hub hf download
+                stabilityai/stable-audio-3-small-sfx</code
+              >
+            </li>
+          </ol>
+          <span class="faint small">Then press Check again.</span>
+        </div>
+      </section>
+      <p class="tag">d — The main model's last effect failed, Open 1.0 here</p>
+      <section class="panel check">
+        <span class="st pr">⚠ Needs attention</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >The last effect with Stable Audio 3 Small SFX, the project's sound-effects model,
+            failed on Chest open. Stable Audio Open 1.0 is in place: an effect's takes can use it
+            meanwhile.</span
+          ><span class="err">RuntimeError: Could not load the model weights</span
+          ><a class="l" href="#">Open Chest open</a
+          ><span class="faint small">This clears once an effect made with Small SFX works.</span>
+        </div>
+      </section>
+      <p class="tag">e — Open 1.0's last effect failed</p>
+      <section class="panel check">
+        <span class="st off">Not set up</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >Optional: the last effect with Stable Audio Open 1.0 failed on Chest open. Stable Audio
+            3 Small SFX is in place.</span
+          ><span class="err">MPS backend out of memory</span
+          ><a class="l" href="#">Open Chest open</a
+          ><span class="faint small">This clears once an effect made with Open 1.0 works.</span>
+        </div>
+      </section>
+      <p class="tag">
+        f — The failed effect's takes were dropped: the same, without “on Chest open” and the link
+      </p>
+      <section class="panel check">
+        <span class="st off">Not set up</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >Optional: the last effect with Stable Audio Open 1.0 failed. Stable Audio 3 Small SFX
+            is in place.</span
+          ><span class="err">MPS backend out of memory</span
+          ><span class="faint small">This clears once an effect made with Open 1.0 works.</span>
+        </div>
+      </section>
+      <p class="tag">g — Neither can run (both missing)</p>
+      <section class="panel check">
+        <span class="st pr">⚠ Needs attention</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >Sound effects can't be made: Stable Audio 3 Small SFX and Stable Audio Open 1.0 are not
+            on this computer.</span
+          >
+          <ol class="steps small">
+            <li>
+              Sign in to Hugging Face and accept Stability AI's Community Licence on
+              <a class="l" href="#">stabilityai/stable-audio-3-small-sfx</a>.
+            </li>
+            <li>Make a read token at <a class="l" href="#">huggingface.co/settings/tokens</a>.</li>
+            <li>
+              Download it, once (about 6.5 GB):<code class="fix"
+                >HF_TOKEN=… uvx --from huggingface_hub hf download
+                stabilityai/stable-audio-3-small-sfx</code
+              >
+            </li>
+          </ol>
+          <!-- asks for or keeps your token. Then press -->
+          <ol class="steps small">
+            <li>
+              Sign in to Hugging Face and accept Stability AI's Community Licence on
+              <a class="l" href="#">stabilityai/stable-audio-open-1.0</a>.
+            </li>
+            <li>Make a read token at <a class="l" href="#">huggingface.co/settings/tokens</a>.</li>
+            <li>
+              Download it into ~/.cache/stable-audio, where the studio looks for it:<code
+                class="fix"
+                >HF_TOKEN=… uvx --from huggingface_hub hf download stabilityai/stable-audio-open-1.0
+                --local-dir ~/.cache/stable-audio/stable-audio-open-1.0</code
+              >
+            </li>
+          </ol>
+          <span class="faint small"
+            >The studio never asks for or keeps your token. Then press Check again.</span
+          >
+        </div>
+      </section>
+      <p class="tag">h — uv missing</p>
+      <section class="panel check">
+        <span class="st pr">⚠ Needs attention</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >Sound effects can't be made: uv, which runs the sound-effects models, is not on the
+            PATH.</span
+          >
+          <ol class="steps small">
+            <li>
+              Install uv:<code class="fix">brew install uv</code>(then start the studio again if it
+              is still not found)
+            </li>
+          </ol>
+        </div>
+      </section>
+      <p class="tag">
+        i — The game lists no sound effects: every state above reads grey “Not set up” and opens
+        “Optional: for the game's sound effects.”, as today
+      </p>
+      <section class="panel check">
+        <span class="st off">Not set up</span>
+        <div class="col" style="gap: 4px">
+          <strong>Sound-effect models</strong
+          ><span class="muted"
+            >Optional: for the game's sound effects. Stable Audio Open 1.0 is not on this computer.
+            Stable Audio 3 Small SFX is in place.</span
+          ><span class="faint small">(steps as in a)</span>
+        </div>
+      </section>
+    </div>
+    <p class="note"><b>4 — Saving the pick, and a save that failed (as on the Images row).</b></p>
+    <div class="frame" style="min-height: 0">
+      <main class="main">
+        <section class="panel">
+          <div class="mrow first">
+            <div class="mname">Sound effects</div>
+            <div class="mtx">
+              <span class="muted"
+                >The game's sound effects, made on this computer. An effect's takes can use the
+                other model.</span
+              >
+              <div class="row">
+                <select>
+                  <option>Stable Audio Open 1.0 — about 100 s a take</option></select
+                ><span class="free">Free</span><span class="faint small">Saving…</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Sound effects</div>
+            <div class="mtx">
+              <span class="muted"
+                >The game's sound effects, made on this computer. An effect's takes can use the
+                other model.</span
+              >
+              <div class="row">
+                <select>
+                  <option>Stable Audio 3 Small SFX — about 2 s a take</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="box err" style="margin-top: 8px">
+            <b>Stable Audio Open 1.0 could not be saved as the sound-effects model.</b>
+            <div class="muted small">
+              content-studio.json could not be written: EACCES: permission denied. Nothing was
+              changed.
+            </div>
+            <div class="row" style="margin-top: 8px">
+              <button class="btn">Keep Stable Audio 3 Small SFX</button
+              ><button class="btn primary">Try again</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note"><b>5 — The project's model is missing: the row says so beside the menu.</b></p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand"><span class="logo"></span>Content Studio</div>
+        <div class="pbox">
+          <div class="lbl">Project</div>
+          <b>RetroQuest</b>
+          <div class="mono">retroquest</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin: 0 0 4px 4px">Workspace</div>
+          <div class="ni">Narration</div>
+          <div class="ni">Music</div>
+          <div class="ni">Images</div>
+          <div class="ni">Sound effects<span class="n red">3/8</span></div>
+        </div>
+        <div style="margin-top: auto"><div class="ni on">Setup</div></div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Project</span>
+          <h1>Setup</h1>
+          <span class="muted"
+            >What recording needs on this machine and in the project, checked each time this page
+            opens.</span
+          >
+        </div>
+        <section class="panel">
+          <h2>Models</h2>
+          <span class="muted"
+            >Which model records each stage of the voices, which makes the music, which makes the
+            images, and which makes the sound effects. Saved in
+            <span class="mono">content-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow first">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free — free, slower</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft · Final</div>
+            <div class="mtx">
+              <span class="faint small">(unchanged — shortened in this drawing)</span>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Music</div>
+            <div class="mtx">
+              <span class="muted"
+                >Loops and stingers, made on this computer. A track's takes can use another.</span
+              >
+              <div class="row">
+                <select>
+                  <option>Balanced · XL turbo · 4B — about 3 min a take</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Images</div>
+            <div class="mtx">
+              <span class="muted"
+                >The game's images, made on this computer. An image's takes can use the other
+                model.</span
+              >
+              <div class="row">
+                <select>
+                  <option>FLUX.2 klein 4B — about 8 s a take</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div style="outline: 1px dashed var(--accent); outline-offset: 4px; border-radius: 6px">
+            <div class="mrow">
+              <div class="mname">Sound effects</div>
+              <div class="mtx">
+                <span class="muted"
+                  >The game's sound effects, made on this computer. An effect's takes can use the
+                  other model.</span
+                >
+                <div class="row">
+                  <select>
+                    <option>
+                      Stable Audio 3 Small SFX — about 2 s a take — not on this computer
+                    </option></select
+                  ><span class="free">Free</span><span class="chip warn">not on this computer</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="panel check">
+          <span class="st pr">⚠ Needs attention</span>
+          <div class="col" style="gap: 4px">
+            <strong>Sound-effect models</strong
+            ><span class="muted"
+              >The project's sound-effects model, Stable Audio 3 Small SFX, is not on this computer.
+              Stable Audio Open 1.0 is in place: an effect's takes can use it meanwhile.</span
+            ><span class="faint small">(steps as in 3b)</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >6 — An effect's page: the model menu comes first, starting on Setup's model each time the
+        page opens. A pick lasts while the page stays open. Each take names its model; Try again
+        remakes a failed take with the model it was asked with.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand"><span class="logo"></span>Content Studio</div>
+        <div class="pbox">
+          <div class="lbl">Project</div>
+          <b>RetroQuest</b>
+          <div class="mono">retroquest</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin: 0 0 4px 4px">Workspace</div>
+          <div class="ni">Narration</div>
+          <div class="ni">Music</div>
+          <div class="ni">Images</div>
+          <div class="ni on">Sound effects<span class="n red">3/8</span></div>
+        </div>
+        <div style="margin-top: auto"><div class="ni">Setup</div></div>
+      </aside>
+      <main class="main">
+        <div>
+          <div class="crumbs"><a style="color: var(--muted)">Sound effects</a> ›</div>
+          <h1>Chest open</h1>
+          <div class="mono">chest-open</div>
+        </div>
+        <section class="panel">
+          <div class="row" style="margin-bottom: 10px"><h2 class="grow">Description</h2></div>
+          <div class="field">
+            <div class="row">
+              <label class="grow">What it should sound like</label
+              ><span class="small faint">from the game</span>
+            </div>
+            <textarea>heavy wooden chest lid opening, a little rattle of coins</textarea>
+          </div>
+          <div class="field" style="margin-top: 12px">
+            <label>Length</label><span>2 s · set by the game</span>
+          </div>
+        </section>
+        <section class="ingame">
+          <div class="row"><span class="lead grow">In the game</span></div>
+          <div class="row">
+            <b>Take 2</b><span class="chip ok">chosen</span
+            ><span class="faint small grow">Stable Audio 3 Small SFX</span
+            ><button class="btn">Un-choose</button>
+          </div>
+          <div class="row">
+            <button class="play">▶</button>
+            <div class="wave"></div>
+            <span class="faint small">1.6 s</span>
+          </div>
+          <span class="faint small">Un-choose and the game plays nothing here.</span>
+        </section>
+        <section class="panel">
+          <div class="row" style="flex-wrap: wrap">
+            <h2 class="grow">Takes</h2>
+            <select>
+              <option>Stable Audio 3 Small SFX — about 2 s a take</option></select
+            ><select>
+              <option>4 takes</option></select
+            ><button class="btn primary">Make 4 more takes</button>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 1</b></div>
+              <span class="faint small">Stable Audio 3 Small SFX</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1.4 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 3</b></div>
+              <span class="faint small">Stable Audio Open 1.0</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">2.0 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 4</b></div>
+              <span class="faint small">Stable Audio 3 Small SFX</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1.2 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >7 — The project's model can't run (missing, partly downloaded, or its last effect failed)
+        and Open 1.0 can: the menu starts on Open 1.0, with a faint line. Make works at once; Small
+        SFX can be picked again if only its last effect failed.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand"><span class="logo"></span>Content Studio</div>
+        <div class="pbox">
+          <div class="lbl">Project</div>
+          <b>RetroQuest</b>
+          <div class="mono">retroquest</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin: 0 0 4px 4px">Workspace</div>
+          <div class="ni">Narration</div>
+          <div class="ni">Music</div>
+          <div class="ni">Images</div>
+          <div class="ni on">Sound effects<span class="n red">3/8</span></div>
+        </div>
+        <div style="margin-top: auto"><div class="ni">Setup</div></div>
+      </aside>
+      <main class="main">
+        <div>
+          <div class="crumbs"><a style="color: var(--muted)">Sound effects</a> ›</div>
+          <h1>Chest open</h1>
+          <div class="mono">chest-open</div>
+        </div>
+        <section class="panel">
+          <div class="row" style="margin-bottom: 10px"><h2 class="grow">Description</h2></div>
+          <div class="field">
+            <div class="row">
+              <label class="grow">What it should sound like</label
+              ><span class="small faint">from the game</span>
+            </div>
+            <textarea>heavy wooden chest lid opening, a little rattle of coins</textarea>
+          </div>
+          <div class="field" style="margin-top: 12px">
+            <label>Length</label><span>2 s · set by the game</span>
+          </div>
+        </section>
+        <section class="ingame">
+          <div class="row"><span class="lead grow">In the game</span></div>
+          <div class="row">
+            <b>Take 2</b><span class="chip ok">chosen</span
+            ><span class="faint small grow">Stable Audio 3 Small SFX</span
+            ><button class="btn">Un-choose</button>
+          </div>
+          <div class="row">
+            <button class="play">▶</button>
+            <div class="wave"></div>
+            <span class="faint small">1.6 s</span>
+          </div>
+          <span class="faint small">Un-choose and the game plays nothing here.</span>
+        </section>
+        <section class="panel">
+          <div class="row" style="flex-wrap: wrap">
+            <h2 class="grow">Takes</h2>
+            <select>
+              <option>Stable Audio Open 1.0 — about 100 s a take</option></select
+            ><select>
+              <option>4 takes</option></select
+            ><button class="btn primary">Make 4 more takes</button>
+            <div style="flex-basis: 100%">
+              <span class="faint small"
+                >Stable Audio 3 Small SFX, the project's sound-effects model, isn't on this
+                computer, so these takes use Stable Audio Open 1.0. Setup says how to download
+                it.</span
+              >
+            </div>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 1</b></div>
+              <span class="faint small">Stable Audio 3 Small SFX</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1.4 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 3</b></div>
+              <span class="faint small">Stable Audio Open 1.0</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">2.0 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 4</b></div>
+              <span class="faint small">Stable Audio 3 Small SFX</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1.2 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >8 — Neither can run: the box from before with new words. Both menus and Make can't be
+        pressed; takes already made still play, and can be chosen and dropped.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand"><span class="logo"></span>Content Studio</div>
+        <div class="pbox">
+          <div class="lbl">Project</div>
+          <b>RetroQuest</b>
+          <div class="mono">retroquest</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin: 0 0 4px 4px">Workspace</div>
+          <div class="ni">Narration</div>
+          <div class="ni">Music</div>
+          <div class="ni">Images</div>
+          <div class="ni on">Sound effects<span class="n red">3/8</span></div>
+        </div>
+        <div style="margin-top: auto"><div class="ni">Setup</div></div>
+      </aside>
+      <main class="main">
+        <div>
+          <div class="crumbs"><a style="color: var(--muted)">Sound effects</a> ›</div>
+          <h1>Chest open</h1>
+          <div class="mono">chest-open</div>
+        </div>
+        <section class="panel">
+          <div class="row" style="margin-bottom: 10px"><h2 class="grow">Description</h2></div>
+          <div class="field">
+            <div class="row">
+              <label class="grow">What it should sound like</label
+              ><span class="small faint">from the game</span>
+            </div>
+            <textarea>heavy wooden chest lid opening, a little rattle of coins</textarea>
+          </div>
+          <div class="field" style="margin-top: 12px">
+            <label>Length</label><span>2 s · set by the game</span>
+          </div>
+        </section>
+        <div class="box err row">
+          <div class="grow">
+            <b>Sound effects can't be made yet.</b>
+            <div class="muted small">
+              Neither sound-effects model can run on this computer. Setup says what is missing.
+            </div>
+          </div>
+          <button class="btn">Open Setup</button>
+        </div>
+        <section class="ingame">
+          <div class="row"><span class="lead grow">In the game</span></div>
+          <div class="row">
+            <b>Take 2</b><span class="chip ok">chosen</span
+            ><span class="faint small grow">Stable Audio 3 Small SFX</span
+            ><button class="btn">Un-choose</button>
+          </div>
+          <div class="row">
+            <button class="play">▶</button>
+            <div class="wave"></div>
+            <span class="faint small">1.6 s</span>
+          </div>
+          <span class="faint small">Un-choose and the game plays nothing here.</span>
+        </section>
+        <section class="panel">
+          <div class="row" style="flex-wrap: wrap">
+            <h2 class="grow">Takes</h2>
+            <select>
+              <option>Stable Audio 3 Small SFX — about 2 s a take</option></select
+            ><select>
+              <option>4 takes</option></select
+            ><button class="btn primary">Make 4 more takes</button>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 1</b></div>
+              <span class="faint small">Stable Audio 3 Small SFX</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1.4 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 3</b></div>
+              <span class="faint small">Stable Audio Open 1.0</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">2.0 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+            <div class="take">
+              <div class="row"><b class="grow">Take 4</b></div>
+              <span class="faint small">Stable Audio 3 Small SFX</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1.2 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >9 — Open 1.0 takes being made: the first one waiting says what for; both menus and Make
+        wait until the batch ends; Stop ends it and keeps the finished takes.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand"><span class="logo"></span>Content Studio</div>
+        <div class="pbox">
+          <div class="lbl">Project</div>
+          <b>RetroQuest</b>
+          <div class="mono">retroquest</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin: 0 0 4px 4px">Workspace</div>
+          <div class="ni">Narration</div>
+          <div class="ni">Music</div>
+          <div class="ni">Images</div>
+          <div class="ni on">Sound effects<span class="n red">3/8</span></div>
+        </div>
+        <div style="margin-top: auto"><div class="ni">Setup</div></div>
+      </aside>
+      <main class="main">
+        <div>
+          <div class="crumbs"><a style="color: var(--muted)">Sound effects</a> ›</div>
+          <h1>Chest open</h1>
+          <div class="mono">chest-open</div>
+        </div>
+        <section class="panel">
+          <div class="row" style="margin-bottom: 10px"><h2 class="grow">Description</h2></div>
+          <div class="field">
+            <div class="row">
+              <label class="grow">What it should sound like</label
+              ><span class="small faint">from the game</span>
+            </div>
+            <textarea>heavy wooden chest lid opening, a little rattle of coins</textarea>
+          </div>
+          <div class="field" style="margin-top: 12px">
+            <label>Length</label><span>2 s · set by the game</span>
+          </div>
+        </section>
+        <section class="ingame">
+          <div class="row"><span class="lead grow">In the game</span></div>
+          <div class="row">
+            <b>Take 2</b><span class="chip ok">chosen</span
+            ><span class="faint small grow">Stable Audio 3 Small SFX</span
+            ><button class="btn">Un-choose</button>
+          </div>
+          <div class="row">
+            <button class="play">▶</button>
+            <div class="wave"></div>
+            <span class="faint small">1.6 s</span>
+          </div>
+          <span class="faint small">Un-choose and the game plays nothing here.</span>
+        </section>
+        <section class="panel">
+          <div class="row" style="flex-wrap: wrap">
+            <h2 class="grow">Takes</h2>
+            <button class="btn">Stop</button
+            ><select disabled class="disabled">
+              <option>Stable Audio Open 1.0 — about 100 s a take</option></select
+            ><select disabled class="disabled">
+              <option>4 takes</option></select
+            ><button class="btn primary disabled">Make 4 more takes</button>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 1</b></div>
+              <span class="faint small">Stable Audio 3 Small SFX</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">1.4 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+            <div class="take" style="border-style: dashed; color: var(--muted)">
+              <div class="row">
+                <b class="grow">Take 3</b><span class="small">waiting for the graphics chip</span>
+              </div>
+              <span class="faint small">Stable Audio Open 1.0</span
+              ><span class="faint small">Music is being made first.</span>
+              <div
+                style="
+                  height: 6px;
+                  border-radius: 99px;
+                  background: var(--line-strong);
+                  overflow: hidden;
+                "
+              >
+                <i style="display: block; height: 100%; width: 0%; background: var(--accent)"></i>
+              </div>
+            </div>
+            <div class="take" style="border-style: dashed; color: var(--muted)">
+              <div class="row"><b class="grow">Take 4</b><span class="small">waiting</span></div>
+              <span class="faint small">Stable Audio Open 1.0</span>
+              <div
+                style="
+                  height: 6px;
+                  border-radius: 99px;
+                  background: var(--line-strong);
+                  overflow: hidden;
+                "
+              >
+                <i style="display: block; height: 100%; width: 0%; background: var(--accent)"></i>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >10 — A narrow window: the Sound effects row stacks like the other Models rows; on an
+        effect's page the Takes heading row wraps as one unit and the takes stack.</b
+      >
+    </p>
+    <div class="frame narrow">
+      <aside class="side">
+        <div class="brand"><span class="logo"></span>Content Studio</div>
+        <div class="pbox">
+          <div class="lbl">Project</div>
+          <b>RetroQuest</b>
+          <div class="mono">retroquest</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin: 0 0 4px 4px">Workspace</div>
+          <div class="ni">Narration</div>
+          <div class="ni">Music</div>
+          <div class="ni">Images</div>
+          <div class="ni on">Sound effects<span class="n red">3/8</span></div>
+        </div>
+        <div style="margin-top: auto"><div class="ni">Setup</div></div>
+      </aside>
+      <main class="main">
+        <div>
+          <div class="crumbs"><a style="color: var(--muted)">Sound effects</a> ›</div>
+          <h1>Chest open</h1>
+          <div class="mono">chest-open</div>
+        </div>
+        <section class="panel">
+          <div class="row" style="margin-bottom: 10px"><h2 class="grow">Description</h2></div>
+          <div class="field">
+            <div class="row">
+              <label class="grow">What it should sound like</label
+              ><span class="small faint">from the game</span>
+            </div>
+            <textarea>heavy wooden chest lid opening, a little rattle of coins</textarea>
+          </div>
+          <div class="field" style="margin-top: 12px">
+            <label>Length</label><span>2 s · set by the game</span>
+          </div>
+        </section>
+        <section class="ingame">
+          <div class="row"><span class="lead grow">In the game</span></div>
+          <div class="row">
+            <b>Take 2</b><span class="chip ok">chosen</span
+            ><span class="faint small grow">Stable Audio 3 Small SFX</span
+            ><button class="btn">Un-choose</button>
+          </div>
+          <div class="row">
+            <button class="play">▶</button>
+            <div class="wave"></div>
+            <span class="faint small">1.6 s</span>
+          </div>
+          <span class="faint small">Un-choose and the game plays nothing here.</span>
+        </section>
+        <section class="panel">
+          <div class="row" style="flex-wrap: wrap">
+            <h2 class="grow">Takes</h2>
+            <select>
+              <option>Stable Audio Open 1.0 — about 100 s a take</option></select
+            ><select>
+              <option>4 takes</option></select
+            ><button class="btn primary">Make 4 more takes</button>
+          </div>
+          <div class="takes">
+            <div class="take">
+              <div class="row"><b class="grow">Take 3</b></div>
+              <span class="faint small">Stable Audio Open 1.0</span>
+              <div class="row">
+                <button class="play">▶</button>
+                <div class="wave"></div>
+                <span class="faint small">2.0 s</span>
+              </div>
+              <div class="row"><button class="btn">▶ The chosen, then this</button></div>
+              <div class="row">
+                <button class="btn">Choose</button><button class="btn">Drop</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b
+        >11 — A game that lists no sound effects yet: the Sound effects row and the panel's line are
+        there all the same, so the model can be picked ahead; the check stays optional.</b
+      >
+    </p>
+    <div class="frame">
+      <aside class="side">
+        <div class="brand"><span class="logo"></span>Content Studio</div>
+        <div class="pbox">
+          <div class="lbl">Project</div>
+          <b>RetroQuest</b>
+          <div class="mono">retroquest</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin: 0 0 4px 4px">Workspace</div>
+          <div class="ni">Narration</div>
+          <div class="ni">Music</div>
+          <div class="ni">Images</div>
+          <div class="ni">Sound effects<span class="n red">3/8</span></div>
+        </div>
+        <div style="margin-top: auto"><div class="ni on">Setup</div></div>
+      </aside>
+      <main class="main">
+        <div>
+          <span class="crumbs">Project</span>
+          <h1>Setup</h1>
+          <span class="muted"
+            >What recording needs on this machine and in the project, checked each time this page
+            opens.</span
+          >
+        </div>
+        <section class="panel">
+          <h2>Models</h2>
+          <span class="muted"
+            >Which model records each stage of the voices, which makes the music, which makes the
+            images, and which makes the sound effects. Saved in
+            <span class="mono">content-studio.json</span> for everyone on the project.</span
+          >
+          <div class="mrow first">
+            <div class="mname">Audition</div>
+            <div class="mtx">
+              <span class="muted">Takes of voices you are trying for a character.</span>
+              <div class="row">
+                <select>
+                  <option>s2.1-pro-free — free, slower</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Draft · Final</div>
+            <div class="mtx">
+              <span class="faint small">(unchanged — shortened in this drawing)</span>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Music</div>
+            <div class="mtx">
+              <span class="muted"
+                >Loops and stingers, made on this computer. A track's takes can use another.</span
+              >
+              <div class="row">
+                <select>
+                  <option>Balanced · XL turbo · 4B — about 3 min a take</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div class="mrow">
+            <div class="mname">Images</div>
+            <div class="mtx">
+              <span class="muted"
+                >The game's images, made on this computer. An image's takes can use the other
+                model.</span
+              >
+              <div class="row">
+                <select>
+                  <option>FLUX.2 klein 4B — about 8 s a take</option></select
+                ><span class="free">Free</span>
+              </div>
+            </div>
+          </div>
+          <div style="outline: 1px dashed var(--accent); outline-offset: 4px; border-radius: 6px">
+            <div class="mrow">
+              <div class="mname">Sound effects</div>
+              <div class="mtx">
+                <span class="muted"
+                  >The game's sound effects, made on this computer. An effect's takes can use the
+                  other model.</span
+                >
+                <div class="row">
+                  <select>
+                    <option>Stable Audio 3 Small SFX — about 2 s a take</option></select
+                  ><span class="free">Free</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="panel check">
+          <span class="st off">Not set up</span>
+          <div class="col" style="gap: 4px">
+            <strong>Sound-effect models</strong
+            ><span class="muted"
+              >Optional: for the game's sound effects. Stable Audio Open 1.0 is not on this
+              computer. Stable Audio 3 Small SFX is in place.</span
+            ><span class="faint small">(steps as in 3a)</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <p class="note">
+      <b>12 — The line under “waiting for the graphics chip” names what is using it now.</b>
+    </p>
+    <div class="setupwrap">
+      <p class="tag">Music is being made first.</p>
+      <p class="tag">An image is being made first.</p>
+      <p class="tag">Another effect is being made first.</p>
+      <p class="tag">A recording is being checked first.</p>
+    </div>
+  </body>
+</html>
