@@ -11,6 +11,7 @@ const summary = (extra: Partial<EffectsSummary> = {}): EffectsSummary => ({
     description: 'd',
     gameDescription: 'd',
     seconds: 1,
+    loops: false,
     changedHere: false,
     gameChanged: false,
     status: 'none-yet' as const,

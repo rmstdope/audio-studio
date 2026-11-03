@@ -124,7 +124,11 @@ export async function commitEffect({
         model: take.model,
         ...(take.seed !== undefined && { seed: take.seed }),
         take: take.n,
-        inputs: { description: inUse.description, seconds: take.inputs.seconds },
+        inputs: {
+          description: inUse.description,
+          seconds: take.inputs.seconds,
+          ...(take.inputs.loops && { loops: true }),
+        },
         at: now().toISOString(),
       }
       await rename(temporary, target)

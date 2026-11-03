@@ -15,6 +15,8 @@ export const EffectEntrySchema = z.object({
   description: z.string().min(1),
   /** How long the effect is, in seconds; set by the game. */
   seconds: z.number().positive(),
+  /** The effect plays round and round (ambience); absent: it plays once. */
+  loops: z.boolean().optional(),
 })
 
 /** A sound effect of the game's list. */
@@ -160,6 +162,8 @@ export interface EffectRow {
   /** What the game's list says. */
   gameDescription: string
   seconds: number
+  /** The game plays it round and round. */
+  loops: boolean
   /** The studio's own words are in use. */
   changedHere: boolean
   /** The game reworded the effect since the studio's words were written or last kept. */
@@ -237,7 +241,8 @@ export function summarizeEffects(input: {
   const rows: EffectRow[] = list.effects.map((effect) => {
     const own = overrides[effect.id]
     const description = own?.words ?? effect.description
-    const now = { description, seconds: effect.seconds }
+    const loops = Boolean(effect.loops)
+    const now = { description, seconds: effect.seconds, loops }
     const entry = state.chosen?.[effect.id]
     const status = effectStatus({
       lockUnread: state.chosen === null,
@@ -251,6 +256,7 @@ export function summarizeEffects(input: {
       description,
       gameDescription: effect.description,
       seconds: effect.seconds,
+      loops,
       changedHere: Boolean(own),
       gameChanged: Boolean(own) && own!.gameWas !== effect.description,
       status,

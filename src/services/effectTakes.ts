@@ -14,8 +14,9 @@ import {
   type EffectTakeView,
 } from '../core/effectTakes'
 import { resolveInRoot } from '../core/paths'
+import { shapeEffectLoop, loopRequestSeconds } from '../core/effectLoop'
 import { peaks, wavSeconds } from '../core/musicTake'
-import { readWav } from '../core/wav'
+import { readWav, writeWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { EFFECT_BOARD_DIR, EFFECT_TAKES_DIR, boardFile, readEffectBoard } from './effectBoards'
 import { acceptEffect, commitEffect, readEffectChosen, uncommitEffect } from './effectClips'
@@ -59,12 +60,13 @@ export type EffectChooseResult = CommitResult | null
 /** An effect's takes as the page shows them, a project failure, or null for an unknown effect. */
 export type EffectTakesResult = EffectTakesView | ProjectFailure | null
 
-/** A hash of what went into a take: the model, the description in use and the length. */
+/**
+ * A hash of what went into a take: the model, the description in use, the length, and for a loop
+ * the word "loop" (a one-shot's hash is as it was before effects could loop).
+ */
 export function effectTakeHash(inputs: EffectInputs): string {
-  return createHash('sha256')
-    .update(JSON.stringify([MODEL, inputs.description, inputs.seconds]))
-    .digest('hex')
-    .slice(0, 16)
+  const parts = [MODEL, inputs.description, inputs.seconds, ...(inputs.loops ? ['loop'] : [])]
+  return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16)
 }
 
 /** A take being made or waiting, or one that failed, until it is made. */
@@ -156,7 +158,11 @@ export function createEffectTakes({
     if (!project.effects) return null
     const row = (await readEffects(root, project, []))?.rows.find((r) => r.id === id)
     if (!row) return null
-    const inputs: EffectInputs = { description: row.description, seconds: row.seconds }
+    const inputs: EffectInputs = {
+      description: row.description,
+      seconds: row.seconds,
+      ...(row.loops && { loops: true }),
+    }
     return {
       root,
       id,
@@ -200,12 +206,19 @@ export function createEffectTakes({
     const { inputs } = found
     try {
       const take = await generator.generate(
-        { prompt: inputs.description, seconds: inputs.seconds, seed: newSeed() },
+        {
+          prompt: inputs.description,
+          seconds: inputs.loops ? loopRequestSeconds(inputs.seconds) : inputs.seconds,
+          seed: newSeed(),
+        },
         stop.signal,
       )
       // Stopped while it was made: it is discarded, and no longer in the map.
       if (stop.signal.aborted) return
-      const wav = readWav(take.wav)
+      // A loop is made seamless at the length the game asks; a one-shot ends where its sound does.
+      const shaped = inputs.loops ? shapeEffectLoop(readWav(take.wav), inputs.seconds) : null
+      const wav = shaped ? shaped.wav : readWav(take.wav)
+      const bytes = shaped ? writeWav(wav) : take.wav
       const made: EffectBoardTake = {
         n: entry.n,
         hash: entry.hash,
@@ -214,9 +227,10 @@ export function createEffectTakes({
         seconds: wavSeconds(wav),
         peaks: peaks(wav, WAVEFORM_BARS),
         inputs,
+        ...(shaped?.quietAt != null && { quietAt: shaped.quietAt }),
       }
       // The file first: a take is on the board only once its WAV is there.
-      await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, take.wav)
+      await writeAtomic(found.root, `${found.folder}/${fileOf(made)}`, bytes)
       const saved = await changeBoard(projectFile, found, (board) => {
         if (stop.signal.aborted) return
         board.takes = [...board.takes.filter((t) => t.n !== made.n), made].sort((a, b) => a.n - b.n)
@@ -264,6 +278,8 @@ export function createEffectTakes({
           peaks: take.peaks,
           chosen: chosen?.take === take.n && chosen.fp === take.hash,
           model: name,
+          loops: Boolean(take.inputs.loops),
+          quietAt: take.quietAt ?? null,
         })
       }
       const making: EffectMakingView[] = entries
@@ -387,6 +403,14 @@ export function createEffectTakes({
         if ('ok' in board) return board
         const take = board.takes.find((t) => fileOf(t) === name)
         if (!take) return { ok: false, message: 'That take is not on the board.' }
+        if (Boolean(take.inputs.loops) !== Boolean(found.inputs.loops)) {
+          const made = take.inputs.loops ? 'to loop' : 'to play once'
+          const plays = found.inputs.loops ? 'loops' : 'plays once'
+          return {
+            ok: false,
+            message: `Take ${take.n} was made ${made}, so it can't be chosen for an effect that ${plays}.`,
+          }
+        }
         let wav: Uint8Array
         try {
           wav = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())

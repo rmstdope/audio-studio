@@ -28,6 +28,8 @@ const take = (n: number, over: Partial<EffectTakeView> = {}): EffectTakeView => 
   peaks: [0.2, 0.8, 0.5],
   chosen: false,
   model: MODEL,
+  loops: false,
+  quietAt: null,
   ...over,
 })
 const view = (over: Partial<EffectTakesView> = {}): EffectTakesView => ({
@@ -45,6 +47,7 @@ const row = (over: Partial<EffectRow> = {}): EffectRow => ({
   description: 'a chest opens',
   gameDescription: 'a chest opens',
   seconds: 2,
+  loops: false,
   changedHere: false,
   gameChanged: false,
   status: 'none-yet',

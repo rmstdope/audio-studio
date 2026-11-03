@@ -27,6 +27,7 @@ const row = (id: string, extra: Partial<EffectRow> = {}): EffectRow => ({
   description: `${id} words`,
   gameDescription: `${id} words`,
   seconds: 3,
+  loops: false,
   changedHere: false,
   gameChanged: false,
   status: 'none-yet',

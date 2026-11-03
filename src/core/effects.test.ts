@@ -28,6 +28,61 @@ describe('effectName and effectSeconds', () => {
   })
 })
 
+describe('an effect that loops', () => {
+  it('reads loops from the game’s list, and a row says it, defaulting to plays once', () => {
+    const rain = { id: 'rain', description: 'Steady rain', seconds: 8, loops: true }
+    const read = readEffectEntries([door, rain], 'tts/effects.json')
+    expect(read).toMatchObject({ ok: true, effects: [door, rain], problems: [] })
+    const summary = summarizeEffects({
+      list: {
+        status: 'ok',
+        effects: [door, rain],
+        problems: [],
+        unreadable: 0,
+        seenIds: new Set(),
+      },
+      overrides: {},
+      canRefresh: false,
+    })
+    expect(summary.rows.map((r) => r.loops)).toEqual([false, true])
+  })
+
+  it('leaves out an entry whose loops is not true or false, naming the place', () => {
+    const read = readEffectEntries([{ ...door, loops: 'yes' }], 'tts/effects.json')
+    expect(read).toMatchObject({
+      ok: true,
+      effects: [],
+      problems: [{ file: 'tts/effects.json', path: '[0].loops' }],
+    })
+  })
+
+  it('is changed since chosen when how it plays differs from the chosen take', () => {
+    const lockEntry = {
+      fp: 'a'.repeat(16),
+      model: 'small-sfx',
+      take: 1,
+      inputs: { description: door.description, seconds: 3 },
+      at: '2026-11-03T10:00:00.000Z',
+    }
+    const summary = summarizeEffects({
+      list: {
+        status: 'ok',
+        effects: [{ ...door, loops: true }],
+        problems: [],
+        unreadable: 0,
+        seenIds: new Set(),
+      },
+      overrides: {},
+      canRefresh: false,
+      state: {
+        chosen: { 'door-creak': { lock: lockEntry, fileExists: true } },
+        takesMade: new Set(),
+      },
+    })
+    expect(summary.rows[0]).toMatchObject({ status: 'changed', changed: ['now loops'] })
+  })
+})
+
 describe('readEffectEntries', () => {
   it('reads every entry in the game order', () => {
     const read = readEffectEntries([door, coins], 'tts/effects.json')
