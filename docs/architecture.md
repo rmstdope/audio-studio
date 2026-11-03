@@ -1519,7 +1519,8 @@ in view while the page scrolls (sticky, the first at most the window's height); 
 stand one above the other. A box in the Takes heading, "What the game gets" (ticked when the page
 opens; the page's own, never saved), switches every take shown, on both sides and in the grid,
 between what the model made (with its size, and "cropped to fit" when it had another shape) and
-what the game gets (with the game's size; in its place, while a take has none, "Bringing to the
+what the game gets (with its own size and shape, read from the picture once it loads: one brought
+to the game's look before the image's size changed keeps the old size until it is brought again; in its place, while a take has none, "Bringing to the
 game's look…", "Not brought to the game's look yet." or what to fix in the style file). The image
 the game uses (its game picture is the one the game has now) and the compared take are enlarged by
 the largest whole number of the game's size at which the two fit side by side in their column,

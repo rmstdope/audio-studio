@@ -727,6 +727,26 @@ describe('a take’s picture', () => {
     expect(captions(s, 'right')).toEqual(['320 × 200'])
   })
 
+  it('gives the game’s picture its own size once it loads, as one made before the size changed', async () => {
+    const s = await show(view({ takes: [take(1, { chosen: true }), take(2, { look: 'old' })] }), {
+      width: 1920,
+      height: 1080,
+    })
+    const pictures = [
+      ...s.container.querySelectorAll<HTMLImageElement>('[data-side] .look-side img'),
+    ]
+    expect(pictures).toHaveLength(2)
+    await act(async () => {
+      for (const picture of pictures) {
+        Object.defineProperty(picture, 'naturalWidth', { value: 480 })
+        Object.defineProperty(picture, 'naturalHeight', { value: 360 })
+        picture.dispatchEvent(new Event('load'))
+      }
+    })
+    expect([...captions(s, 'left'), ...captions(s, 'right')]).toEqual(['480 × 360', '480 × 360'])
+    expect(pictures.map((p) => p.style.aspectRatio)).toEqual(['480 / 360', '480 / 360'])
+  })
+
   it('shows what the model made for every take when the box is cleared, and back when it is ticked', async () => {
     const s = await show(
       view({ takes: [take(1, { chosen: true }), take(2), take(3, { width: 1280, height: 720 })] }),

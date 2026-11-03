@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ImageRow } from '../../../core/images'
 import type { ImageTakeView } from '../../../core/imageTakes'
 import { modelCaption, pictureRendering } from '../../imagesText'
@@ -44,7 +45,9 @@ export function modelSource(id: string, take: ImageTakeView): string {
  * take's own game version (the chosen take, whose version the game may still have under an old
  * look). In place of the game's version it says so while the take is being brought to the look, and
  * says what to fix when the style file cannot be used. While the choice of the take shown as
- * `current` is still being saved the game has no such picture yet, so none is asked for.
+ * `current` is still being saved the game has no such picture yet, so none is asked for. The game's
+ * version is captioned and shaped by its own size once it loads, which is the old one for a picture
+ * brought to the look before the image's size changed.
  */
 export function TakePicture({
   id,
@@ -82,6 +85,9 @@ export function TakePicture({
     )
   }
   const src = current && saving ? null : gameSource(id, take, row, lookError, current, saved)
+  // The picture's own size once loaded: one made before the image's size changed keeps the old one.
+  const [loaded, setLoaded] = useState<{ src: string; width: number; height: number } | null>(null)
+  const size = loaded && loaded.src === src ? loaded : row
   const state = src ? 'ready' : current ? 'saving' : lookError ? 'error' : take.look
   return (
     <div className="look-side">
@@ -92,8 +98,12 @@ export function TakePicture({
           alt={`Take ${take.n}, what the game gets`}
           style={{
             width,
-            aspectRatio: `${row.width} / ${row.height}`,
+            aspectRatio: `${size.width} / ${size.height}`,
             imageRendering: pictureRendering(zoom),
+          }}
+          onLoad={(e) => {
+            const { naturalWidth: width, naturalHeight: height } = e.currentTarget
+            if (width && height) setLoaded({ src, width, height })
           }}
         />
       ) : (
@@ -111,7 +121,7 @@ export function TakePicture({
                 : "Bringing to the game's look…"}
         </div>
       )}
-      <span className="faint small">{src ? `${row.width} × ${row.height}` : ''}</span>
+      <span className="faint small">{src ? `${size.width} × ${size.height}` : ''}</span>
     </div>
   )
 }
