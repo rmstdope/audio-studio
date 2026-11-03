@@ -313,7 +313,7 @@ describe('the Stable Audio models in a track’s menu', () => {
     const options = [...page.menu().options]
     expect(options.find((o) => o.value === 'short')!.disabled).toBe(false)
     expect(options.find((o) => o.value === 'short')!.textContent).toBe(
-      'Short · Stable Audio Open 1.0 — about 40 s a take',
+      'Short · Stable Audio Open 1.0 — about 100 s a take',
     )
     expect(options.find((o) => o.value === 'shortest')!.disabled).toBe(true)
   })

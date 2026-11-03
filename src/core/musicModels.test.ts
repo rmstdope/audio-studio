@@ -101,7 +101,7 @@ describe('the Stable Audio models', () => {
   })
   test('the entry shows the reason in place of the time, and the reason wins over missing', () => {
     const track = { kind: 'loop', seconds: 90 } as const
-    expect(menuEntry('short', true)).toBe('Short · Stable Audio Open 1.0 — about 40 s a take')
+    expect(menuEntry('short', true)).toBe('Short · Stable Audio Open 1.0 — about 100 s a take')
     expect(menuEntry('shortest', true)).toBe(
       'Shortest · Stable Audio Open Small — about 10 s a take',
     )
@@ -112,7 +112,7 @@ describe('the Stable Audio models', () => {
       'Short · Stable Audio Open 1.0 — makes loops up to 27 s · this one is 1:30',
     )
     expect(menuEntry('short', false, { kind: 'stinger', seconds: 5 })).toBe(
-      'Short · Stable Audio Open 1.0 — about 40 s a take — not on this computer',
+      'Short · Stable Audio Open 1.0 — about 100 s a take — not on this computer',
     )
   })
   test('under a track’s menu, what the picked model cannot do', () => {
@@ -125,7 +125,7 @@ describe('the Stable Audio models', () => {
     expect(tooLongOnTrack('short', 'loop', 20)).toBeNull()
   })
   test('each take takes about this many seconds', () => {
-    expect(eachWords('short')).toBe('about 40 seconds each')
+    expect(eachWords('short')).toBe('about 100 seconds each')
   })
   test('Setup says what a short default means, and how many loops it leaves out', () => {
     const loops = [20, 90, 100, 130]
@@ -303,7 +303,7 @@ describe('the closed menu’s short label', () => {
     expect(shortMenuLabel('balanced', true)).toBe('Balanced — about 3 min a take')
     expect(shortMenuLabel('careful', true)).toBe('Careful — about 7 min a take')
     expect(shortMenuLabel('quick', true)).toBe('Quick — about 1¼ min a take')
-    expect(shortMenuLabel('short', true)).toBe('Short — about 40 s a take')
+    expect(shortMenuLabel('short', true)).toBe('Short — about 100 s a take')
   })
   test('a missing model says so in place of the time', () => {
     expect(shortMenuLabel('careful', false)).toBe('Careful — not on this computer')
@@ -313,7 +313,7 @@ describe('the closed menu’s short label', () => {
     expect(shortMenuLabel('short', false, loop90)).toBe('Short — makes loops up to 27 s')
     expect(shortMenuLabel('shortest', true, loop90)).toBe('Shortest — makes no loops')
     expect(shortMenuLabel('short', true, { kind: 'stinger', seconds: 5 })).toBe(
-      'Short — about 40 s a take',
+      'Short — about 100 s a take',
     )
   })
 })
