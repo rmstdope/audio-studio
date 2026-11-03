@@ -4,6 +4,7 @@ import type { EffectRow, EffectsSummary } from '../../../core/effects'
 import type { ProjectSummary } from '../../../core/summary'
 import type { EffectsRoute } from '../../route'
 import { installFakeWebAudio, started } from '../../../../test/fakeWebAudio'
+import { readFileSync } from 'node:fs'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -396,6 +397,19 @@ describe('the dropped effects', () => {
     expect(text()).toContain('Lantern hum')
     expect(text()).toContain('lantern-hum')
     expect(text()).toContain('A soft hum')
+  })
+
+  it('stack in a narrow window, as the effects rows do, so Forget is never off the edge', () => {
+    const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8')
+    const at = css.indexOf('@media (max-width: 700px) {\n  .effects-table')
+    const narrow = at < 0 ? '' : css.slice(at, css.indexOf('\n}\n', at))
+    const { container } = render(list, effects({ dropped }))
+    const panel = container.querySelector('[aria-label="No longer in the game\'s list"]')!
+    const table = panel.querySelector('table')!
+    const stacking = [...table.classList].filter((c) =>
+      new RegExp(`\\.${c}\\b[^{}]*\\{[^}]*display:\\s*block[^}]*min-width:\\s*0`).test(narrow),
+    )
+    expect(stacking).not.toEqual([])
   })
 
   it('asks first; Cancel puts focus back on Forget', async () => {
