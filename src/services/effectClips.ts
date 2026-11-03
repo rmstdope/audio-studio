@@ -124,7 +124,11 @@ export async function commitEffect({
         model: take.model,
         ...(take.seed !== undefined && { seed: take.seed }),
         take: take.n,
-        inputs: { description: inUse.description, seconds: take.inputs.seconds },
+        inputs: {
+          description: inUse.description,
+          seconds: take.inputs.seconds,
+          ...(take.inputs.loops && { loops: true }),
+        },
         at: now().toISOString(),
       }
       await rename(temporary, target)
@@ -208,9 +212,12 @@ export async function acceptEffect({
       if (!changed.length)
         return { ok: false, message: 'Nothing has changed since the take was chosen.' }
       if (!effectAcceptable(changed)) {
+        const plays = changed.some((f) => f === 'now loops' || f === 'no longer loops')
         return {
           ok: false,
-          message: 'A changed length cannot be accepted: the effect needs a new take.',
+          message: plays
+            ? 'A change of how the effect plays cannot be accepted: the effect needs a new take.'
+            : 'A changed length cannot be accepted: the effect needs a new take.',
         }
       }
       lock[id] = { ...entry, inputs: { ...entry.inputs, description: now.description } }

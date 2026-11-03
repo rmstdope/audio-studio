@@ -1,4 +1,4 @@
-import type { EffectsSummary } from '../core/effects'
+import { effectSeconds, type EffectsSummary } from '../core/effects'
 
 /** The line under the Sound effects title: how many are chosen, and how many could not be read. */
 export function effectsSubtitle(effects: EffectsSummary): string {
@@ -46,4 +46,9 @@ export function effectsRefreshSummary(
     added: change.added,
     removed: change.removed,
   }
+}
+
+/** The Length line of an effect's page: "10 s · loops · set by the game". */
+export function effectLengthLine(seconds: number, loops: boolean): string {
+  return `${effectSeconds(seconds)} · ${loops ? 'loops · ' : ''}set by the game`
 }

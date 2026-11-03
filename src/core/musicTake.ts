@@ -47,14 +47,14 @@ export function wavSeconds(wav: Wav): number {
 
 /**
  * A loop from a take generated `LOOP_EXTRA_SECONDS` longer: cut at `seconds`, with the
- * `SEAM_SECONDS` after the cut crossfaded (equal power) over its start, so the end runs into
+ * `blendSeconds` (`SEAM_SECONDS`) after the cut crossfaded (equal power) over its start, so the end runs into
  * the beginning without a seam. Where the two sum past full scale the blend is held at it.
  */
-export function shapeLoop(wav: Wav, seconds: number): Wav {
+export function shapeLoop(wav: Wav, seconds: number, blendSeconds = SEAM_SECONDS): Wav {
   const { channels, sampleRate } = wav.format
   const samples = samplesOf(wav)
   const cut = Math.round(seconds * sampleRate)
-  const blend = SEAM_SECONDS * sampleRate
+  const blend = Math.round(blendSeconds * sampleRate)
   if (samples.length / channels < cut + blend) {
     throw new Error(`the take is too short to make a loop of ${seconds} seconds`)
   }

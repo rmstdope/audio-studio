@@ -5,7 +5,7 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import { wavSeconds } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
-import { createEffectTakes } from './effectTakes'
+import { createEffectTakes, effectTakeHash } from './effectTakes'
 import type { EffectGenerator, EffectRequest } from './effects'
 import type { EffectHealthStore } from './effectHealth'
 import { createSerial } from './serial'
@@ -54,6 +54,7 @@ function setup(
     { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
   ],
   extra: Record<string, unknown> = {},
+  length = 1.4,
 ) {
   const root = tempRepo({
     'content-studio.json': projectJson({ effects }),
@@ -61,7 +62,7 @@ function setup(
     ...extra,
   })
   const file = join(root, 'content-studio.json')
-  const { generator, requests } = fakeGenerator(ready)
+  const { generator, requests } = fakeGenerator(ready, length)
   const { health, calls } = fakeHealth()
   let seed = 100
   const encode: Encoder = async (_wav, out) => {
@@ -397,5 +398,102 @@ describe('readEffects with a lock', () => {
     rmSync(join(root, 'audio/effects/coins.mp3'))
     const again = (await loadProject(file)) as typeof summary
     expect(again.summary.effects.rows[1]!.status).toBe('missing')
+  })
+})
+
+describe('takes of an effect that loops', () => {
+  const rain = { id: 'rain', description: 'Steady rain on a tin roof', seconds: 10, loops: true }
+  const rainy = (length: number) => setup(undefined, [rain], {}, length)
+
+  it('asks for the length, the seam and a spare second, and keeps a take exactly the length asked', async () => {
+    const { file, takes, requests, settled } = rainy(12)
+    await takes.make(file, 'rain', { count: 1 })
+    const view = await settled('rain')
+    expect(requests.map((r) => r.seconds)).toEqual([12])
+    expect(view.takes).toMatchObject([{ n: 1, seconds: 10, loops: true, quietAt: null }])
+  })
+
+  it('shades a take whose sound stops early: padded to the length, and where it goes quiet', async () => {
+    const { file, root, takes, settled } = rainy(6.2)
+    await takes.make(file, 'rain', { count: 1 })
+    const view = await settled('rain')
+    expect(view.takes[0]).toMatchObject({ seconds: 10, loops: true, quietAt: 6.2 })
+    const board = JSON.parse(
+      readFileSync(join(root, '.content-studio/effect-boards/rain.json'), 'utf8'),
+    )
+    expect(board.takes[0]).toMatchObject({ quietAt: 6.2, inputs: { loops: true, seconds: 10 } })
+    const wav = readWav(
+      new Uint8Array(
+        readFileSync(join(root, '.content-studio/effect-takes/rain', view.takes[0]!.file)),
+      ),
+    )
+    expect(wavSeconds(wav)).toBe(10)
+  })
+
+  it('is not asked for more than the length for a one-shot, and its take plays once', async () => {
+    const { file, takes, requests, settled } = setup()
+    await takes.make(file, 'door-creak', { count: 1 })
+    const view = await settled('door-creak')
+    expect(requests[0]!.seconds).toBe(3)
+    expect(view.takes[0]).toMatchObject({ loops: false, quietAt: null })
+  })
+
+  it('keeps the hash of a one-shot as it was, and gives a loop another', () => {
+    const once = { description: 'x', seconds: 3 }
+    expect(effectTakeHash({ ...once, loops: false })).toBe(effectTakeHash(once))
+    expect(effectTakeHash({ ...once, loops: true })).not.toBe(effectTakeHash(once))
+  })
+
+  it('refuses to choose a take made the other way, and chooses one made the right way', async () => {
+    const { file, takes, settled, root } = rainy(12)
+    await takes.make(file, 'rain', { count: 1 })
+    const first = (await settled('rain')).takes[0]!
+    expect(await takes.choose(file, 'rain', first.file)).toEqual({ ok: true })
+    // The game makes the effect play once: the loop take can no longer be chosen again.
+    writeFileSync(
+      join(root, 'tts/effects.json'),
+      JSON.stringify([{ id: 'rain', description: rain.description, seconds: 10 }]),
+    )
+    const refused = await takes.choose(file, 'rain', first.file)
+    expect(refused).toEqual({
+      ok: false,
+      message: "Take 1 was made to loop, so it can't be chosen for an effect that plays once.",
+    })
+    await takes.make(file, 'rain', { count: 1 })
+    const view = await settled('rain')
+    expect(view.takes.map((t) => [t.n, t.loops])).toEqual([
+      [1, true],
+      [2, false],
+    ])
+    expect(await takes.choose(file, 'rain', view.takes[1]!.file)).toEqual({ ok: true })
+    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    expect(lock.rain.inputs.loops).toBeUndefined()
+    expect(lock.rain.take).toBe(2)
+  })
+
+  it('records loops in the lock when a looping take is chosen, and the manifest keeps the game’s length', async () => {
+    const { file, takes, settled, root } = rainy(12)
+    await takes.make(file, 'rain', { count: 1 })
+    const first = (await settled('rain')).takes[0]!
+    await takes.choose(file, 'rain', first.file)
+    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    expect(lock.rain.inputs).toEqual({ description: rain.description, seconds: 10, loops: true })
+    const manifest = JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))
+    expect(manifest.rain.duration).toBe(10)
+  })
+
+  it('counts an effect whose play changed as changed since chosen, and refuses to accept it', async () => {
+    const { file, takes, settled, root } = rainy(12)
+    await takes.make(file, 'rain', { count: 1 })
+    await takes.choose(file, 'rain', (await settled('rain')).takes[0]!.file)
+    writeFileSync(
+      join(root, 'tts/effects.json'),
+      JSON.stringify([{ id: 'rain', description: rain.description, seconds: 10 }]),
+    )
+    const accepted = await takes.accept(file, 'rain')
+    expect(accepted).toEqual({
+      ok: false,
+      message: 'A change of how the effect plays cannot be accepted: the effect needs a new take.',
+    })
   })
 })

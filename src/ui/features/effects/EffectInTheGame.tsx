@@ -1,7 +1,10 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
-import type { EffectRow } from '../../../core/effects'
+import { effectSeconds, type EffectRow } from '../../../core/effects'
 import {
   effectInTheGame,
+  effectQuietLine,
+  effectTakeChoosable,
+  effectTakeKind,
   effectTakeLength,
   effectUnchooseQuestion,
   type EffectTakesView,
@@ -12,17 +15,11 @@ import { useChooseEffectTake, useUnchooseEffect } from '../../api'
 import { Confirm } from '../../components/Confirm'
 import type { useClipPlayer } from '../../components/useClipPlayer'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
+import { takePlayId, takeUrl } from '../../effectsPlay'
 import { Wave } from '../music/InTheGame'
 
 /** One clip at a time, shared with the takes below. */
 export type Player = ReturnType<typeof useClipPlayer>
-
-/** The id a take's play button is known by to the player. */
-export const takePlayId = (effect: string, n: number) => `effect-take-${effect}-${n}`
-
-/** Where a take's sound is served from. */
-export const takeUrl = (effect: string, file: string) =>
-  `/api/effects/${encodeURIComponent(effect)}/takes/${encodeURIComponent(file)}`
 
 /**
  * What the game plays for an effect, on its own above the takes: the chosen take, else nothing.
@@ -155,10 +152,12 @@ export function EffectInTheGame({
         ) : (
           <span className="chip chip-ok">chosen</span>
         )}
+        {take && <KindChip take={take} effectLoops={row.loops} />}
         {take && <span className="faint small">{take.model}</span>}
       </div>
       {take && <Playback effect={row.id} take={take} player={player} />}
       <div className="track-in-game-actions">
+        {take?.loops && <HearTheSeam effect={row.id} take={take} player={player} />}
         <span className="grow" />
         <button
           type="button"
@@ -173,7 +172,7 @@ export function EffectInTheGame({
         >
           Un-choose
         </button>
-        {state.missing && take && (
+        {state.missing && take && effectTakeChoosable(take, row.loops) && (
           <button
             type="button"
             className="btn btn-primary btn-small"
@@ -194,7 +193,39 @@ export function EffectInTheGame({
   )
 }
 
-/** A take's play button, waveform (with a line where it plays) and length. */
+/** "made to play once" or "made to loop" beside a take made the other way from how the effect plays now. */
+export function KindChip({ take, effectLoops }: { take: EffectTakeView; effectLoops: boolean }) {
+  const kind = effectTakeKind(take, effectLoops)
+  return kind ? <span className="chip">{kind}</span> : null
+}
+
+/** Plays the last seconds of a looping take and then its first, as the game comes round. */
+export function HearTheSeam({
+  effect,
+  take,
+  player,
+}: {
+  effect: string
+  take: EffectTakeView
+  player: Player
+}) {
+  const seamId = `${takePlayId(effect, take.n)}-seam`
+  return (
+    <button
+      type="button"
+      className="btn btn-small"
+      onClick={() => player.toggle(seamId, `${takeUrl(effect, take.file)}?seam=1`, {})}
+    >
+      {player.playing === seamId ? 'Stop' : 'Hear the seam'}
+    </button>
+  )
+}
+
+/**
+ * A take's play button, waveform (with a line where it plays, the seam of a loop marked and the
+ * quiet part of one that ends early shaded) and length; a loop plays round until stopped, and says
+ * where it goes quiet.
+ */
 export function Playback({
   effect,
   take,
@@ -206,18 +237,31 @@ export function Playback({
 }) {
   const id = takePlayId(effect, take.n)
   const playing = player.playing === id
+  const quiet = take.quietAt !== null ? 1 - take.quietAt / take.seconds : undefined
   return (
-    <div className="take-row">
-      <button
-        type="button"
-        className="play"
-        aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
-        onClick={() => player.toggle(id, takeUrl(effect, take.file), {})}
-      >
-        {playing ? '■' : '▶'}
-      </button>
-      <Wave peaks={take.peaks} loop={false} position={playing ? player.position : undefined} />
-      <span className="faint small">{effectTakeLength(take.seconds)}</span>
-    </div>
+    <>
+      <div className="take-row">
+        <button
+          type="button"
+          className="play"
+          aria-label={`${playing ? 'Stop' : 'Play'} take ${take.n}`}
+          onClick={() =>
+            player.toggle(id, takeUrl(effect, take.file), take.loops ? { loop: true } : {})
+          }
+        >
+          {playing ? '■' : '▶'}
+        </button>
+        <Wave
+          peaks={take.peaks}
+          loop={take.loops}
+          quiet={quiet}
+          position={playing ? player.position : undefined}
+        />
+        <span className="faint small">
+          {take.loops ? effectSeconds(take.seconds) : effectTakeLength(take.seconds)}
+        </span>
+      </div>
+      {take.quietAt !== null && <span className="take-quiet">{effectQuietLine(take.quietAt)}</span>}
+    </>
   )
 }

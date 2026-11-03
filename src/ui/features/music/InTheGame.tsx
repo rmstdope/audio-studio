@@ -14,16 +14,20 @@ type Player = ReturnType<typeof useClipPlayer>
 
 /**
  * A take's waveform, with the seam of a loop marked and, while it plays, a line where it is
- * (`position`, 0 to 1, asked each frame; back at the start as a loop comes round).
+ * (`position`, 0 to 1, asked each frame; back at the start as a loop comes round). `quiet` shades
+ * the tail where a loop's sound has stopped.
  */
 export function Wave({
   peaks,
   loop,
   position,
+  quiet,
 }: {
   peaks: number[]
   loop: boolean
   position?: () => number | null
+  /** The share of the waveform, from its end, where the sound has stopped (shaded), 0 to 1. */
+  quiet?: number
 }) {
   const head = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -42,6 +46,9 @@ export function Wave({
       {peaks.map((peak, i) => (
         <i key={i} style={{ height: `${Math.max(4, peak * 100)}%` }} />
       ))}
+      {quiet !== undefined && quiet > 0 && (
+        <span className="quiet" style={{ width: `${Math.round(quiet * 100)}%` }} />
+      )}
       {loop && <span className="seam" />}
       {position && <span className="playhead" ref={head} />}
     </div>

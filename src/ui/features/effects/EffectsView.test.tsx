@@ -3,6 +3,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { EffectRow, EffectsSummary } from '../../../core/effects'
 import type { ProjectSummary } from '../../../core/summary'
 import type { EffectsRoute } from '../../route'
+import { installFakeWebAudio, started } from '../../../../test/fakeWebAudio'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -27,6 +28,7 @@ const row = (id: string, extra: Partial<EffectRow> = {}): EffectRow => ({
   description: `${id} words`,
   gameDescription: `${id} words`,
   seconds: 3,
+  loops: false,
   changedHere: false,
   gameChanged: false,
   status: 'none-yet',
@@ -123,6 +125,49 @@ describe('the Sound effects list, with takes', () => {
     expect(buttons(0)[0]!.getAttribute('aria-label')).toBe('Play Door creak: take 2')
     expect(buttons(1)).toHaveLength(0)
     expect(buttons(2)).toHaveLength(0)
+  })
+
+  it('tags a looping effect "loops" beside its length, and no other', () => {
+    const { container } = render(
+      list,
+      effects({ rows: [row('door-creak'), row('wind', { loops: true, seconds: 10 })] }),
+    )
+    const lengths = [...container.querySelectorAll('tbody td.effects-length')]
+    expect(lengths.map((td) => td.textContent)).toEqual(['3 s', '10 sloops'])
+    expect(lengths[1]!.querySelector('.loops-tag')!.textContent).toBe('loops')
+    expect(container.querySelectorAll('.loops-tag')).toHaveLength(1)
+  })
+
+  it('plays a looping row round until ■ is pressed, and a one-shot row once', async () => {
+    cleanups.push(installFakeWebAudio())
+    const { container, settle } = render(
+      list,
+      effects({
+        rows: [chosen('wind', { loops: true, seconds: 10 }), chosen('door-creak')],
+      }),
+    )
+    const [wind, door] = [...container.querySelectorAll<HTMLButtonElement>('tbody .icon-btn')]
+    await act(async () => wind!.click())
+    await settle()
+    expect(started).toEqual([{ loop: true }])
+    expect(wind!.getAttribute('aria-label')).toBe('Stop Wind')
+    await act(async () => wind!.click())
+    expect(wind!.getAttribute('aria-label')).toBe('Play Wind: take 2')
+    await act(async () => door!.click())
+    await settle()
+    expect(started).toEqual([{ loop: true }])
+  })
+
+  it('says on the effect’s page that it loops', () => {
+    const { text } = render(
+      page('wind'),
+      effects({ rows: [row('wind', { loops: true, seconds: 10 }), row('coins')] }),
+    )
+    expect(text()).toContain('10 s · loops · set by the game')
+    cleanups.splice(0).forEach((c) => c())
+    const once = render(page('coins'), effects({ rows: [row('coins')] }))
+    expect(once.text()).toContain('3 s · set by the game')
+    expect(once.text()).not.toContain('loops')
   })
 
   it('plays the chosen take without opening the page, and stops on a second press', async () => {

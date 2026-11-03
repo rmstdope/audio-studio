@@ -6,6 +6,8 @@ export interface Clip {
   fade?: boolean
   /** Play it round and round until stopped, as the game plays a loop. */
   loop?: boolean
+  /** A loop that ends after this many rounds, so a list can go on; without it, until stopped. */
+  rounds?: number
   /** In a list: seconds of quiet after it ends on its own, before the next clip. */
   after?: number
 }
@@ -17,6 +19,8 @@ export interface AudioLike {
   volume?: number
   duration?: number
   loop?: boolean
+  /** How many rounds a loop plays before it ends; none: until stopped. */
+  rounds?: number
   play(): Promise<void>
   pause(): void
 }
@@ -144,6 +148,7 @@ export function createPlayer(
     const mine = ++token
     element.src = clip.url
     element.loop = clip.loop ?? false
+    element.rounds = clip.loop ? clip.rounds : undefined
     element.currentTime = 0
     current = clip.id
     fadeMs = lengthMs()

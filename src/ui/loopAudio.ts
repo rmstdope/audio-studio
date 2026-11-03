@@ -10,8 +10,9 @@ interface LoopSource {
   buffer: LoopBuffer | null
   loop: boolean
   connect(node: unknown): unknown
+  onended: ((event: Event) => void) | null
   start(when: number, offset: number): void
-  stop(): void
+  stop(when?: number): void
 }
 
 /** The part of a Web Audio gain node a loop uses. */
@@ -41,6 +42,8 @@ export function loopTime(now: number, startedAt: number, offset: number, duratio
  * decoded once and played round and round on Web Audio, sample for sample. Every other clip plays
  * on `element`. `web.context` is asked for the first time a loop plays (a browser lets audio start
  * only from a press); `web.playing` is told when a loop sounds, as the element's playing event is.
+ * A loop with `rounds` stops after that many rounds, counted from where it began, and `web.ended`
+ * is told, as the element's ended event is; a loop that is stopped says nothing.
  */
 export function createClipAudio(
   element: AudioLike,
@@ -48,10 +51,12 @@ export function createClipAudio(
     context: () => LoopContext
     load: (url: string) => Promise<ArrayBuffer>
     playing: () => void
+    ended: () => void
   },
 ): AudioLike & { loop: boolean } {
   let src = ''
   let loop = false
+  let rounds: number | undefined
   let offset = 0
   let volume = 1
   let using: 'element' | 'web' | null = null
@@ -65,6 +70,7 @@ export function createClipAudio(
   let token = 0
 
   const stopWeb = () => {
+    if (source) source.onended = null
     source?.stop()
     source = null
     gain = null
@@ -94,6 +100,13 @@ export function createClipAudio(
     source.connect(gain)
     const from = decoded.duration > 0 ? offset % decoded.duration : 0
     source.start(0, from)
+    if (rounds !== undefined) {
+      const mine = source
+      mine.onended = () => {
+        if (source === mine) web.ended()
+      }
+      mine.stop(ctx.currentTime + rounds * decoded.duration - from)
+    }
     startedAt = ctx.currentTime
     offset = from
     web.playing()
@@ -111,6 +124,12 @@ export function createClipAudio(
     },
     set loop(value: boolean) {
       loop = value
+    },
+    get rounds() {
+      return rounds
+    },
+    set rounds(value: number | undefined) {
+      rounds = value
     },
     get currentTime() {
       if (using === 'element') return element.currentTime

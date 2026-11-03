@@ -1,7 +1,12 @@
 import { z } from 'zod'
 
 /** What a sound-effect take is made from: the description in use and the length the game asks. */
-export const EffectInputsSchema = z.object({ description: z.string(), seconds: z.number() })
+export const EffectInputsSchema = z.object({
+  description: z.string(),
+  seconds: z.number(),
+  /** The effect loops (the take was made seamless); absent in what was made before loops, which plays once. */
+  loops: z.boolean().optional(),
+})
 
 /** What a sound-effect take is made from. */
 export type EffectInputs = z.infer<typeof EffectInputsSchema>
@@ -52,6 +57,8 @@ export const EffectBoardTakeSchema = z.object({
   seconds: z.number(),
   peaks: z.array(z.number()),
   inputs: EffectInputsSchema,
+  /** For a loop whose sound ended before its length: where, in seconds. */
+  quietAt: z.number().optional(),
 })
 
 /** An effect's board: the takes kept, and the number the next take gets (numbers are never reused). */
@@ -80,8 +87,8 @@ export const MakeEffectTakesBody = z.union([
 /** The body of a choice: the file name of the take on the effect's board. */
 export const ChooseEffectTakeBody = z.object({ file: z.string().min(1) }).strict()
 
-/** What can have changed since a take was chosen. */
-export type EffectChangedField = 'description' | 'length'
+/** What can have changed since a take was chosen: the words, the length, or how the effect plays. */
+export type EffectChangedField = 'description' | 'length' | 'now loops' | 'no longer loops'
 
 /** What differs between the chosen take's own inputs and the effect's now. */
 export function effectChangedFields(
@@ -91,6 +98,9 @@ export function effectChangedFields(
   const changed: EffectChangedField[] = []
   if (lock.inputs.description !== now.description) changed.push('description')
   if (lock.inputs.seconds !== now.seconds) changed.push('length')
+  if (Boolean(lock.inputs.loops) !== Boolean(now.loops)) {
+    changed.push(now.loops ? 'now loops' : 'no longer loops')
+  }
   return changed
 }
 
@@ -129,17 +139,50 @@ export function effectStatus(input: {
   return effectChangedFields(chosen.lock, now).length ? 'changed' : 'chosen'
 }
 
+/** The way of playing a change names, if it names one. */
+const playChange = (fields: EffectChangedField[]) =>
+  fields.find((f) => f === 'now loops' || f === 'no longer loops')
+
 /** The first line of the box saying what changed since the take was chosen. */
 export function effectChangedLine(fields: EffectChangedField[]): string {
-  return `Changed since its take was chosen: ${fields.join(' and ')}.`
+  const play = playChange(fields)
+  const named = fields.filter((f) => f === 'description' || f === 'length').join(' and ')
+  const what = !play ? named : named ? `${named}, and ${play}` : play
+  return `Changed since its take was chosen: ${what}.`
 }
 
 /** The rest of that box: what the game plays meanwhile, and what to do. */
 export function effectChangedAdvice(fields: EffectChangedField[]): string {
   const meanwhile = 'The game plays the chosen take until you choose another.'
+  const play = playChange(fields)
+  if (play === 'now loops') {
+    return `${meanwhile} Make more takes that loop. A take made to play once can't loop without a jump.`
+  }
+  if (play === 'no longer loops') {
+    return `${meanwhile} Make more takes that play once. A take made to loop runs to the full length instead of ending with its sound.`
+  }
   return effectAcceptable(fields)
     ? `${meanwhile} Make more takes to hear the new description, or Accept to count the chosen take as up to date.`
     : `${meanwhile} Make more takes to hear the new length. A changed length needs a new take.`
+}
+
+/** The chip on a take made the other way from how the effect plays now, or null when it is the right kind. */
+export function effectTakeKind(
+  take: { loops: boolean },
+  effectLoops: boolean,
+): 'made to play once' | 'made to loop' | null {
+  if (take.loops === effectLoops) return null
+  return take.loops ? 'made to loop' : 'made to play once'
+}
+
+/** The amber line under a loop whose sound ends early: where it goes quiet. */
+export function effectQuietLine(quietAt: number): string {
+  return `Goes quiet at ${quietAt.toFixed(1)} s, so it loops with a gap.`
+}
+
+/** Whether a take can be chosen: only one made the way the effect plays now. */
+export function effectTakeChoosable(take: { loops: boolean }, effectLoops: boolean): boolean {
+  return effectTakeKind(take, effectLoops) === null
 }
 
 /** What an effect's In the game block shows. */
@@ -198,6 +241,10 @@ export interface EffectTakeView {
   chosen: boolean
   /** The model that made it: "Stable Audio 3 Small SFX". */
   model: string
+  /** It was made to loop (seamless, the length the game asked) rather than to play once. */
+  loops: boolean
+  /** For a loop whose sound ended early: where it goes quiet, in seconds. */
+  quietAt: number | null
 }
 
 /** A take being made or waiting its turn. */

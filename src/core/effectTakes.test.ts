@@ -11,6 +11,9 @@ import {
   effectStatus,
   effectTimeLeft,
   effectUnchooseQuestion,
+  effectTakeChoosable,
+  effectQuietLine,
+  effectTakeKind,
   makeEffectTakesLabel,
   type EffectLockEntry,
 } from './effectTakes'
@@ -59,6 +62,68 @@ describe('what changed since a take was chosen', () => {
       'The game plays the chosen take until you choose another. Make more takes to hear the new length. A changed length needs a new take.',
     )
     expect(effectChangedAdvice(['description', 'length'])).toBe(effectChangedAdvice(['length']))
+  })
+})
+
+describe('how an effect plays, once or looping', () => {
+  it('names a change of how it plays, in the direction it went', () => {
+    expect(effectChangedFields(lock, { ...now, loops: true })).toEqual(['now loops'])
+    const looping = { ...lock, inputs: { ...lock.inputs, loops: true } }
+    expect(effectChangedFields(looping, now)).toEqual(['no longer loops'])
+    expect(effectChangedFields(looping, { ...now, loops: true })).toEqual([])
+    // A lock written before loops existed plays once.
+    expect(effectChangedFields(lock, { ...now, loops: false })).toEqual([])
+    expect(effectChangedFields(lock, { description: 'x', seconds: 4, loops: true })).toEqual([
+      'description',
+      'length',
+      'now loops',
+    ])
+  })
+
+  it('is never accepted', () => {
+    expect(effectAcceptable(['description', 'now loops'])).toBe(false)
+    expect(effectAcceptable(['no longer loops'])).toBe(false)
+  })
+
+  it('words the box as agreed, alone and with the description or length', () => {
+    const head = 'Changed since its take was chosen:'
+    expect(effectChangedLine(['now loops'])).toBe(`${head} now loops.`)
+    expect(effectChangedLine(['no longer loops'])).toBe(`${head} no longer loops.`)
+    expect(effectChangedLine(['description', 'now loops'])).toBe(
+      `${head} description, and now loops.`,
+    )
+    expect(effectChangedLine(['length', 'no longer loops'])).toBe(
+      `${head} length, and no longer loops.`,
+    )
+    expect(effectChangedLine(['description', 'length', 'now loops'])).toBe(
+      `${head} description and length, and now loops.`,
+    )
+  })
+
+  it('gives the advice for the direction of the change', () => {
+    const once =
+      "The game plays the chosen take until you choose another. Make more takes that loop. A take made to play once can't loop without a jump."
+    const loops =
+      'The game plays the chosen take until you choose another. Make more takes that play once. A take made to loop runs to the full length instead of ending with its sound.'
+    expect(effectChangedAdvice(['now loops'])).toBe(once)
+    expect(effectChangedAdvice(['length', 'now loops'])).toBe(once)
+    expect(effectChangedAdvice(['description', 'no longer loops'])).toBe(loops)
+  })
+
+  it('says which kind a take is when it differs from the effect, and lets only the right kind be chosen', () => {
+    expect(effectTakeKind({ loops: false }, true)).toBe('made to play once')
+    expect(effectTakeKind({ loops: true }, false)).toBe('made to loop')
+    expect(effectTakeKind({ loops: true }, true)).toBeNull()
+    expect(effectTakeKind({ loops: false }, false)).toBeNull()
+    expect(effectTakeChoosable({ loops: true }, true)).toBe(true)
+    expect(effectTakeChoosable({ loops: false }, true)).toBe(false)
+  })
+})
+
+describe('the line for a loop that goes quiet early', () => {
+  it('names where, to a tenth of a second', () => {
+    expect(effectQuietLine(6.2)).toBe('Goes quiet at 6.2 s, so it loops with a gap.')
+    expect(effectQuietLine(8.04)).toBe('Goes quiet at 8.0 s, so it loops with a gap.')
   })
 })
 
