@@ -158,7 +158,7 @@ export function TakesPanel({
       className="takes-count"
       aria-label="Number of new takes"
       value={count}
-      disabled={view.making.length > 0 || make.isPending}
+      disabled={view.making.length > 0}
       onChange={(event) => {
         setCount(Number(event.target.value))
         setCountOpen(false)
@@ -173,11 +173,8 @@ export function TakesPanel({
       ))}
     </select>
   )
-  /** Starts the batch the menus say, and sets the count back to 2. */
-  const makeBatch = () => {
-    make.mutate({ count, model })
-    setCount(2)
-  }
+  /** Starts the batch the menus say; the count stays as picked. */
+  const makeBatch = () => make.mutate({ count, model })
   const result = make.data
   const movingTake = view.takes.find((take) => take.n === moving)
   const nowhere = hasNowhere(moveTargets(lists, { id: trackId, kind: view.kind }).groups)

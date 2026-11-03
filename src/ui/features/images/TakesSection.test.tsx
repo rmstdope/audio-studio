@@ -575,6 +575,19 @@ describe('the Takes section’s model menu', () => {
     })
   })
 
+  it('keeps the number of takes picked after Make', async () => {
+    const s = await show(view({ takes: three }))
+    const count = s.container.querySelector<HTMLSelectElement>('select.takes-count')!
+    await act(async () => {
+      count.value = '4'
+      count.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await s.click(s.button('Make 4 more takes'))
+    expect(s.calls.at(-1)).toMatchObject({ body: { count: 4 } })
+    expect(count.value).toBe('4')
+    expect(s.button('Make 4 more takes')).toBeTruthy()
+  })
+
   it('lists a model that is not here as such, and cannot be picked', async () => {
     const s = await show(view({ takes: three, models: only('klein') }))
     const z = modelMenu(s).options[1]!

@@ -384,7 +384,6 @@ export function TakesSection({ row, prompt }: { row: ImageRow; prompt?: ReactNod
           focusQuietly.current = true
           setPendingFocus(onRight ?? 'right')
           make.mutate({ count, model })
-          setCount(2)
         }}
       >
         {makeTakesText(count, !none)}

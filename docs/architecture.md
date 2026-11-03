@@ -974,7 +974,7 @@ computer killed (exit code 137, most often memory running out) says so in plain 
 log: "The music generator was stopped by the computer, most likely because it ran out of memory.
 Close other music jobs, then Try again." The making state is
 in memory (a restart forgets a failure, not a take). The board for a track shows its
-takes as cards: The count menu ("Number of new takes", between the model menu and the button) starts at 2 and goes back to 2 after every press; it is page state, never remembered. **Make N more takes** generates N more (two by default, about six minutes), made in the background, so
+takes as cards: The count menu ("Number of new takes", between the model menu and the button) starts at 2 and keeps what was picked after a press; it is page state, never remembered. **Make N more takes** generates N more (two by default, about six minutes), made in the background, so
 the page can be left meanwhile; **Drop** removes one (not the chosen one); **Choose** writes one at
 once, without asking, since the take it replaces stays on the board to be chosen again. Takes made
 from an earlier brief stay, marked "earlier brief". The board is kept in
@@ -1512,7 +1512,7 @@ choose or drop, in view at once (`docs/ui/image-workspace.html`, layout A). Its 
 the Prompt panel, then **Make takes** (the menu "Model for new takes" on a line of its own, which
 starts on the project's model, or on the model that is here when that one is missing, with a faint
 line saying so, a pick holding only while the page is open; closed it reads "FLUX.2 klein — about 8 s
-a take"; then the count menu and Make N takes, and Stop while takes are made), then **Takes · N**:
+a take"; then the count menu, which keeps its pick after a press while the page is open, and Make N takes, and Stop while takes are made), then **Takes · N**:
 the other takes as a grid of thumbs that scrolls on its own, takes being made among them with their
 progress. The second column holds the image the game uses beside one other take. Both columns stay
 in view while the page scrolls (sticky, the first at most the window's height); below 1000 px they

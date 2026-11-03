@@ -526,31 +526,18 @@ describe('the count menu on a track’s Takes panel', () => {
     expect(first.button('Make 1 take')).toBeDefined()
   })
 
-  it('asks for exactly that many takes, later or first batch, then goes back to 2', async () => {
+  it('asks for exactly that many takes, later or first batch, and keeps the pick', async () => {
     const later = render(view())
     pick(later.count(), '5')
     await click(later.button('Make 5 more takes'))
     expect(posted).toEqual([{ count: 5, model: 'balanced' }])
-    expect(later.count().value).toBe('2')
+    expect(later.count().value).toBe('5')
     posted.length = 0
     const first = render(view({ takes: [] }))
     pick(first.count(), '6')
     await click(first.button('Make 6 takes'))
     expect(posted).toEqual([{ count: 6, model: 'balanced' }])
-    expect(first.count().value).toBe('2')
-  })
-
-  it('is greyed from the press until the answer, so no pick can outlive the reset', async () => {
-    let answer: (response: Response) => void = () => {}
-    globalThis.fetch = (() =>
-      new Promise<Response>((resolve) => (answer = resolve))) as unknown as typeof fetch
-    const page = render(view())
-    await act(async () => {
-      page.button('Make 2 more takes').click()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
-    expect(page.count().disabled).toBe(true)
-    await act(async () => answer(new Response(JSON.stringify({ ok: true }))))
+    expect(first.count().value).toBe('6')
   })
 
   it('keeps the count when the model changes, and the prices follow', () => {
