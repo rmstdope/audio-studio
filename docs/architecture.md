@@ -1595,7 +1595,8 @@ partly downloaded can't be picked, one whose last effect failed can). An effect'
 visit on Setup's model, or on the other when Setup's can't run and the other can (not on this
 computer, partly downloaded, or its last effect failed), with a faint line saying why
 (`defaultEffectModel`, as `defaultTakeModel` for images); a pick lasts while the page stays open.
-Each take keeps the model that made it; Try again remakes with it.
+Each take keeps the model that made it; Try again remakes with it. The menu shows the full entry closed
+too: in a narrow Takes panel it takes a line of its own, the count and the button under it (as-b2t).
 
 **Setup's Sound-effect models row** (one row for every effects model, after Image models) is checked
 afresh each time and writes nothing to the project. It is always checked, since it needs no section

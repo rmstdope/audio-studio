@@ -3186,6 +3186,20 @@ button.cue-chip[aria-expanded='true'] {
     max-width: none;
   }
 }
+/* A sound effect's model entries are long ('Stable Audio 3 Small SFX — about 2 s a take'): in a
+   narrow panel its menu takes a line of its own, so the whole entry shows, with the count and the
+   button under it. */
+@container takes (max-width: 599px) {
+  .effect-takes .takes-controls {
+    flex-wrap: wrap;
+  }
+  .effect-takes .takes-make {
+    flex-wrap: wrap;
+  }
+  .effect-takes .takes-model {
+    flex: 1 1 100%;
+  }
+}
 .takes-missing {
   color: var(--warn);
 }
