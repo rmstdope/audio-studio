@@ -1,9 +1,10 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import type { MusicListSummary, TrackRow } from '../../../core/music'
+import type { MusicListSummary, OrphanRow, TrackRow } from '../../../core/music'
 import type { TrackStatus } from '../../../core/musicChoose'
 import type { ProjectSummary } from '../../../core/summary'
 import type { MusicRoute } from '../../route'
+import { readFileSync } from 'node:fs'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -71,9 +72,11 @@ const list = (id: string, kind: MusicListSummary['kind']): MusicListSummary => (
 })
 
 /** A list page's play buttons, by track title. */
-function render(kind: MusicListSummary['kind'], show?: 'attention') {
+function render(kind: MusicListSummary['kind'], show?: 'attention', orphans: OrphanRow[] = []) {
   const id = kind === 'act' ? 'act1' : 'stingers'
-  const summary = { music: { lists: [list(id, kind)] } } as unknown as ProjectSummary
+  const summary = {
+    music: { lists: [{ ...list(id, kind), orphans }] },
+  } as unknown as ProjectSummary
   const route = (
     kind === 'act'
       ? { view: 'music', page: 'act', part: id, show }
@@ -175,5 +178,31 @@ describe.each(['act', 'stingers'] as const)('what needs attention on a %s page',
     const all = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Show all')!
     expect(all.getAttribute('href')).toBe(href)
     expect(container.textContent).toContain('Showing the 3 tracks that need attention.')
+  })
+})
+
+describe('the music the game no longer asks for', () => {
+  const orphan: OrphanRow = {
+    id: 'old-crypt',
+    title: 'Old crypt',
+    file: 'old-crypt.ogg',
+    chosenAt: '2026-10-01T10:00:00.000Z',
+    fileExists: true,
+  }
+
+  it('stacks in a narrow window, as the dropped effects do, so Remove is never off the edge', () => {
+    const css = readFileSync(new URL('../../styles.css', import.meta.url), 'utf8')
+    // Every rule inside a narrow-window media block (up to 700 px wide).
+    const narrow = [...css.matchAll(/@media \(max-width: (\d+)px\) \{([\s\S]*?)\n\}\n/g)]
+      .filter((m) => Number(m[1]) >= 600)
+      .map((m) => m[2])
+      .join('\n')
+    const { container } = render('act', undefined, [orphan])
+    const panel = container.querySelector('[aria-label="Music the game no longer asks for"]')!
+    const table = panel.querySelector('table')!
+    const stacking = [...table.classList].filter((c) =>
+      new RegExp(`\\.${c}\\b[^{}]*\\{[^}]*display:\\s*block[^}]*min-width:\\s*0`).test(narrow),
+    )
+    expect(stacking).not.toEqual([])
   })
 })

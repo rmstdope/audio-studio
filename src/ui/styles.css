@@ -3964,26 +3964,35 @@ button.cue-chip[aria-expanded='true'] {
   margin-top: 12px;
 }
 
-/* Narrow window: each row stacks its name, description, length and status. */
+/* Narrow window: each row stacks its cells (an effect's name, description, length and status; a
+   dropped track's music, title, date and Remove), so nothing sits off the right edge. */
 @media (max-width: 700px) {
-  .effects-table thead {
+  .effects-table thead,
+  .music-orphans-table thead {
     display: none;
   }
   .effects-table,
   .effects-table tbody,
   .effects-table tr,
-  .effects-table td {
+  .effects-table td,
+  .music-orphans-table,
+  .music-orphans-table tbody,
+  .music-orphans-table tr,
+  .music-orphans-table td {
     display: block;
     min-width: 0;
   }
-  .effects-table td:empty {
+  .effects-table td:empty,
+  .music-orphans-table td:empty {
     display: none;
   }
-  .effects-table td {
+  .effects-table td,
+  .music-orphans-table td {
     border: 0;
     padding: 2px 12px;
   }
-  .effects-table tr {
+  .effects-table tr,
+  .music-orphans-table tr {
     padding: 8px 0;
     border-bottom: 1px solid var(--line);
   }
