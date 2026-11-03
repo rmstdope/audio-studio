@@ -28,6 +28,7 @@ export function useClipPlayer(onFailed?: (id: string) => void) {
     const element = new Audio()
     // Set once `made` is: a loop sounds only after a press, long after this.
     let sounding = () => {}
+    let finished = () => {}
     const clip = createClipAudio(element, {
       context: () => new AudioContext(),
       load: async (url) => {
@@ -36,11 +37,13 @@ export function useClipPlayer(onFailed?: (id: string) => void) {
         return response.arrayBuffer()
       },
       playing: () => sounding(),
+      ended: () => finished(),
     })
     const made = createPlayer(clip, setState, (id) => failed.current?.(id), {
       fadeSeconds: () => fade.current,
     })
     sounding = made.playing
+    finished = made.ended
     element.addEventListener('playing', made.playing)
     element.addEventListener('ended', made.ended)
     element.addEventListener('error', made.failed)

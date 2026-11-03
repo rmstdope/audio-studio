@@ -461,6 +461,19 @@ describe('createPlayer, a loop', () => {
   })
 })
 
+describe('createPlayer, a loop of a number of rounds', () => {
+  it('gives the element the rounds, and none to a clip that has none', () => {
+    const { element, player } = setUp()
+    player.playInTurn([
+      { id: 'a', url: '/a.wav', loop: true, rounds: 2, after: 0 },
+      { id: 'b', url: '/b.wav' },
+    ])
+    expect([element.loop, element.rounds]).toEqual([true, 2])
+    player.ended()
+    expect([element.loop, element.rounds]).toEqual([false, undefined])
+  })
+})
+
 describe('playedShare', () => {
   it('is how far in the playhead is, held between 0 and 1, and unknown without a length', () => {
     expect(playedShare(5, 10)).toBe(0.5)
