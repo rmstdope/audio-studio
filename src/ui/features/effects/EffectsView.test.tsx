@@ -30,6 +30,9 @@ const row = (id: string, extra: Partial<EffectRow> = {}): EffectRow => ({
   changedHere: false,
   gameChanged: false,
   status: 'none-yet',
+  current: { kind: 'nothing' },
+  changed: [],
+  chosen: false,
   ...extra,
 })
 
@@ -54,6 +57,7 @@ function render(
   route: EffectsRoute,
   data: EffectsSummary | null,
   answer: (call: Call) => Response | Promise<Response> = () => Response.json({ ok: true }),
+  seed: [readonly unknown[], unknown][] = [],
 ) {
   const calls: Call[] = []
   globalThis.fetch = ((url: string, init?: RequestInit) => {
@@ -74,6 +78,7 @@ function render(
     container.remove()
   })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  for (const [key, value] of seed) client.setQueryData(key, value)
   act(() =>
     root.render(
       createElement(
@@ -93,6 +98,88 @@ function render(
 const list: EffectsRoute = { view: 'effects', page: null }
 const page = (effect: string): EffectsRoute => ({ view: 'effects', page: 'effect', effect })
 
+describe('the Sound effects list, with takes', () => {
+  const chosen = (id: string, extra: Partial<EffectRow> = {}) =>
+    row(id, {
+      status: 'chosen',
+      chosen: true,
+      current: { kind: 'take', take: 2, exists: true },
+      ...extra,
+    })
+
+  it('has a play button on a row whose chosen clip exists, and on no other', () => {
+    const rows = [
+      chosen('door-creak'),
+      row('coins'),
+      chosen('wind', {
+        status: 'missing',
+        current: { kind: 'take', take: 1, exists: false },
+      }),
+    ]
+    const { container } = render(list, effects({ rows }))
+    const buttons = (i: number) =>
+      container.querySelectorAll('tbody tr')[i]!.querySelectorAll('.icon-btn')
+    expect(buttons(0)).toHaveLength(1)
+    expect(buttons(0)[0]!.getAttribute('aria-label')).toBe('Play Door creak: take 2')
+    expect(buttons(1)).toHaveLength(0)
+    expect(buttons(2)).toHaveLength(0)
+  })
+
+  it('plays the chosen take without opening the page, and stops on a second press', async () => {
+    window.location.hash = '#/sound-effects'
+    const { container, settle } = render(list, effects({ rows: [chosen('door-creak')] }))
+    const play = container.querySelector<HTMLButtonElement>('tbody .icon-btn')!
+    await act(async () => play.click())
+    await settle()
+    expect(window.location.hash).toBe('#/sound-effects')
+    expect(play.getAttribute('aria-label')).toBe('Stop Door creak')
+    await act(async () => play.click())
+    expect(play.getAttribute('aria-label')).toBe('Play Door creak: take 2')
+  })
+
+  it('says each effect’s state in the Status column', () => {
+    const rows = [
+      row('a'),
+      row('b', { status: 'not-chosen' }),
+      chosen('c'),
+      chosen('d', { status: 'changed', changed: ['description'] }),
+      chosen('e', { status: 'missing', current: { kind: 'take', take: 1, exists: false } }),
+      row('f', { status: 'unknown', current: { kind: 'unknown' } }),
+    ]
+    const { container } = render(list, effects({ rows }))
+    const statuses = [...container.querySelectorAll('tbody tr')].map(
+      (tr) => tr.querySelectorAll('td')[4]!.textContent,
+    )
+    expect(statuses).toEqual([
+      'none yet',
+      'not chosen',
+      'chosen',
+      'changed since chosen',
+      'clip missing',
+      'not known',
+    ])
+  })
+
+  it('shows a batch being made in place of the status', () => {
+    const { container } = render(
+      list,
+      effects({ rows: [row('coins', { status: 'not-chosen' })] }),
+      undefined,
+      [[['effects-making'], { coins: { takes: 4, left: 10 } }]],
+    )
+    expect(container.querySelector('tbody tr')!.querySelectorAll('td')[4]!.textContent).toBe(
+      'making 4 takes · about 10 s',
+    )
+  })
+
+  it('counts up to date effects in the ring and the subtitle counts out-of-date ones as chosen', () => {
+    const rows = [chosen('a'), chosen('b', { status: 'changed', changed: ['length'] }), row('c')]
+    const { text } = render(list, effects({ rows, done: { done: 1, total: 3, needs: ['b', 'c'] } }))
+    expect(text()).toContain('2 of 3 chosen.')
+    expect(text()).toContain('1 / 3')
+  })
+})
+
 describe('the Sound effects list', () => {
   it('shows the title, the subtitle, the ring and the columns', () => {
     const { text, container } = render(list, effects())
@@ -102,6 +189,7 @@ describe('the Sound effects list', () => {
     expect(text()).toContain('0 / 2')
     expect(text()).toContain('2 need attention ›')
     expect([...container.querySelectorAll('th')].map((h) => h.textContent)).toEqual([
+      '',
       'Effect',
       'Description',
       'Length',
@@ -115,9 +203,9 @@ describe('the Sound effects list', () => {
     expect(first.querySelector('strong')!.textContent).toBe('Door creak')
     expect(first.querySelector('.mono')!.textContent).toBe('door-creak')
     const cells = [...first.querySelectorAll('td')].map((c) => c.textContent)
-    expect(cells[2]).toBe('3 s')
-    expect(cells[3]).toBe('none yet')
-    expect(container.querySelectorAll('tbody tr')[1]!.querySelectorAll('td')[2]!.textContent).toBe(
+    expect(cells[3]).toBe('3 s')
+    expect(cells[4]).toBe('none yet')
+    expect(container.querySelectorAll('tbody tr')[1]!.querySelectorAll('td')[3]!.textContent).toBe(
       '0.5 s',
     )
   })
@@ -317,7 +405,7 @@ describe('the dropped effects', () => {
 })
 
 describe("an effect's page", () => {
-  it('shows the name, the id, the description box, the length and the takes note', () => {
+  it('shows the name, the id, the description box, the length and the takes panel', () => {
     const { container, text } = render(page('door-creak'), effects())
     expect(container.querySelector('h1')!.textContent).toBe('Door creak')
     expect(text()).toContain('door-creak')
@@ -326,7 +414,7 @@ describe("an effect's page", () => {
     expect(text()).toContain('from the game')
     expect(container.querySelector('textarea')!.value).toBe('door-creak words')
     expect(text()).toContain('3 s · set by the game')
-    expect(text()).toContain('Making takes comes in a later step.')
+    expect(text()).toContain('Loading takes…')
     expect(text()).not.toContain('Saved')
   })
 

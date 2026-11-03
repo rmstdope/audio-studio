@@ -30,6 +30,8 @@ export interface EffectTake {
 export interface EffectGenerator {
   /** How much of the model's weights are in the Hugging Face cache. */
   download(): ImageDownload
+  /** Whether effects can be made on this computer, and what is missing if not. */
+  ready(): { ok: true } | { ok: false; message: string }
   /**
    * One effect; the first one loads the model (about 4 s). Aborting `signal` ends it at once and
    * it rejects; the message differs by when it was aborted, so a caller tells a stopped effect
@@ -67,6 +69,18 @@ export function createEffectsWorker({
   })
   return {
     download: () => hubDownload(hubDir, effectModel('small-sfx').repo),
+    ready() {
+      const { name } = effectModel('small-sfx')
+      if (!Bun.which('uv')) {
+        return { ok: false, message: `uv, which runs ${name}, is not on the PATH.` }
+      }
+      const download = hubDownload(hubDir, effectModel('small-sfx').repo)
+      if (download === 'absent') return { ok: false, message: `${name} is not on this computer.` }
+      if (download === 'partial') {
+        return { ok: false, message: `${name}'s download is incomplete, so it can't run.` }
+      }
+      return { ok: true }
+    },
     async generate(request, signal) {
       const out = join(tmpdir(), `content-studio-effect-${randomUUID()}.wav`)
       const stop = () => worker.close()

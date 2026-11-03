@@ -9,6 +9,7 @@ import {
   summarizeEffects,
   type EffectOverrides,
   type EffectsListState,
+  type EffectsState,
 } from './effects'
 
 const door = { id: 'door-creak', description: 'A slow wooden door creaks open', seconds: 3 }
@@ -223,5 +224,79 @@ describe('summarizeEffects', () => {
   it('is an empty list when the game asks for none', () => {
     const summary = summarizeEffects({ list: ok([]), overrides: {}, canRefresh: false })
     expect(summary).toMatchObject({ status: 'ok', rows: [], done: { done: 0, total: 0 } })
+  })
+
+  describe('with takes', () => {
+    const lock = (take: number, description: string, seconds: number) => ({
+      fp: 'a'.repeat(16),
+      model: 'small-sfx',
+      take,
+      inputs: { description, seconds },
+      at: '2026-11-03T10:00:00.000Z',
+    })
+    const summarize = (state: EffectsState) =>
+      summarizeEffects({ list: ok(), overrides: {}, canRefresh: false, state })
+    const none = { chosen: {}, takesMade: new Set<string>() }
+
+    it('reads none yet, then not chosen once a take exists', () => {
+      const rows = summarize({ ...none, takesMade: new Set(['coins']) }).rows
+      expect(rows.map((r) => r.status)).toEqual(['none-yet', 'not-chosen'])
+    })
+
+    it('reads chosen, with the chosen take and whether its clip is there', () => {
+      const state = {
+        ...none,
+        chosen: {
+          'door-creak': { lock: lock(2, door.description, 3), fileExists: true },
+          coins: { lock: lock(1, coins.description, 0.5), fileExists: false },
+        },
+      }
+      const { rows, done } = summarize(state)
+      expect(rows.map((r) => [r.status, r.current])).toEqual([
+        ['chosen', { kind: 'take', take: 2, exists: true }],
+        ['missing', { kind: 'take', take: 1, exists: false }],
+      ])
+      // Up to date means chosen and not changed since; a missing clip needs attention.
+      expect(done).toEqual({ done: 1, total: 2, needs: ['coins'] })
+    })
+
+    it('reads changed when the description in use or the length differs from the chosen take’s', () => {
+      const state = {
+        ...none,
+        chosen: {
+          'door-creak': { lock: lock(2, 'Other words', 3), fileExists: true },
+          coins: { lock: lock(1, coins.description, 9), fileExists: true },
+        },
+      }
+      const { rows, done } = summarize(state)
+      expect(rows.map((r) => [r.status, r.changed])).toEqual([
+        ['changed', ['description']],
+        ['changed', ['length']],
+      ])
+      expect(done.done).toBe(0)
+    })
+
+    it('compares with the studio’s own words when they are in use', () => {
+      const state = {
+        ...none,
+        chosen: { coins: { lock: lock(1, 'Coins on glass', 0.5), fileExists: true } },
+      }
+      const summary = summarizeEffects({
+        list: ok(),
+        overrides: { coins: { words: 'Coins on glass', gameWas: coins.description } },
+        canRefresh: false,
+        state,
+      })
+      expect(summary.rows[1]!.status).toBe('chosen')
+    })
+
+    it('is not known everywhere while the lock cannot be read', () => {
+      const { rows, done } = summarize({ ...none, chosen: null })
+      expect(rows.map((r) => [r.status, r.current])).toEqual([
+        ['unknown', { kind: 'unknown' }],
+        ['unknown', { kind: 'unknown' }],
+      ])
+      expect(done.done).toBe(0)
+    })
   })
 })

@@ -36,6 +36,51 @@ const clips = [
   { id: 'c', url: '/c.mp3' },
 ]
 
+describe('createPlayer, quiet between clips', () => {
+  const pair = [
+    { id: 'a', url: '/a.mp3', after: 0.02 },
+    { id: 'b', url: '/b.mp3' },
+  ]
+
+  it('waits the quiet after a clip that ends, then plays the next; the list is still in turn meanwhile', async () => {
+    const { element, player, last } = setUp()
+    player.playInTurn(pair)
+    player.ended()
+    expect(last()).toEqual({ playing: null, inTurn: true })
+    expect(element.src).toBe('/a.mp3')
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    expect([element.src, last()]).toEqual(['/b.mp3', { playing: 'b', inTurn: true }])
+    player.ended()
+    expect(last()).toEqual({ playing: null, inTurn: false })
+  })
+
+  it('stops in the quiet: the next clip never starts', async () => {
+    const { element, player, last } = setUp()
+    player.playInTurn(pair)
+    player.ended()
+    player.stop()
+    expect(last()).toEqual({ playing: null, inTurn: false })
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    expect(element.src).toBe('/a.mp3')
+  })
+
+  it('is replaced by a clip played in the quiet', async () => {
+    const { element, player, last } = setUp()
+    player.playInTurn(pair)
+    player.ended()
+    player.toggle('z', '/z.mp3')
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    expect([element.src, last()]).toEqual(['/z.mp3', { playing: 'z', inTurn: false }])
+  })
+
+  it('does not wait when the first clip fails', () => {
+    const { element, player } = setUp()
+    player.playInTurn(pair)
+    player.failed()
+    expect(element.src).toBe('/b.mp3')
+  })
+})
+
 describe('createPlayer', () => {
   it('plays one clip, and stops it when toggled again', () => {
     const { element, player, last } = setUp()

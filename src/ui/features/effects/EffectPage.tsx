@@ -4,6 +4,7 @@ import { useKeepMineEffect, useSetEffectDescription } from '../../api'
 import { Failure } from '../../components/Failure'
 import { WordsField } from '../images/WordsField'
 import { routeHref } from '../../route'
+import { EffectTakesPanel } from './EffectTakesPanel'
 
 const BACK = routeHref({ view: 'effects', page: null })
 
@@ -101,10 +102,7 @@ function Found({ row }: { row: EffectRow }) {
           <span>{effectSeconds(row.seconds)} · set by the game</span>
         </div>
       </section>
-      <section className="panel" aria-label="Takes">
-        <h2 className="section-title">Takes</h2>
-        <span className="muted">Making takes comes in a later step.</span>
-      </section>
+      <EffectTakesPanel key={`takes-${row.id}`} row={row} />
     </>
   )
 }

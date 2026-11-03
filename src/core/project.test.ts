@@ -483,20 +483,35 @@ describe('problemsFrom wording', () => {
 })
 
 describe('the effects section', () => {
+  const effectPaths = {
+    list: 'tts/effects.json',
+    lock: 'audio/effects.lock.json',
+    clips: 'audio/effects',
+    manifest: 'audio/effects/manifest.json',
+  }
   const effects = (paths: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
-    projectJson({ effects: { paths: { list: 'tts/effects.json', ...paths }, ...extra } })
+    projectJson({ effects: { paths: { ...effectPaths, ...paths }, ...extra } })
 
   it('is optional', () => {
     expect(parse(projectJson()).data!.effects).toBeUndefined()
   })
 
-  it('accepts the list path and the refresh command', () => {
+  it('accepts the list, lock, clips and manifest paths and the refresh command', () => {
     const result = parse(effects({}, { refresh: 'node tts/extract-effects.js' }))
     expect(result.success).toBe(true)
     expect(result.data!.effects).toEqual({
       refresh: 'node tts/extract-effects.js',
-      paths: { list: 'tts/effects.json' },
+      paths: effectPaths,
     })
+  })
+
+  it('needs the lock, clips and manifest paths the game reads', () => {
+    const bare = projectJson({ effects: { paths: { list: 'tts/effects.json' } } })
+    expect(problems(bare).map((p) => p.path)).toEqual([
+      'effects.paths.lock',
+      'effects.paths.clips',
+      'effects.paths.manifest',
+    ])
   })
 
   it('refuses {language} and {part} in the list path: the list is for the whole game', () => {

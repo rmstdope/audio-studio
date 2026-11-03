@@ -684,3 +684,29 @@ function onLines(notes: Record<string, string>, lines: { key: string }[]): Recor
   const keys = new Set(lines.map((l) => l.key))
   return Object.fromEntries(Object.entries(notes).filter(([key]) => keys.has(key)))
 }
+
+/**
+ * The absolute path of a clip in the sound effects clips folder, or null if the project has no
+ * effects section or the name is not a plain `.mp3` file there. Folders, links, hidden files and
+ * the manifest are never served.
+ */
+export async function effectClipFile(projectFile: string, file: string): Promise<string | null> {
+  const opened = await openProject(projectFile)
+  if (!opened.ok || !opened.project.effects) return null
+  if (file.startsWith('.') || !file.endsWith('.mp3')) return null
+  const folder = resolveInRoot(dirname(projectFile), opened.project.effects.paths.clips)
+  return (await listFiles(folder)).has(file) ? join(folder, file) : null
+}
+
+/**
+ * The absolute path of the clip an effect plays now: its chosen take's. Null when none is chosen,
+ * it is not on disk, the effect is unknown, or the lock cannot be read (so which it is is not known).
+ */
+export async function effectCurrentFile(projectFile: string, id: string): Promise<string | null> {
+  const opened = await openProject(projectFile)
+  if (!opened.ok || !opened.project.effects) return null
+  const summary = await readEffects(dirname(projectFile), opened.project, [])
+  const row = summary?.rows.find((r) => r.id === id)
+  if (!row || row.current.kind !== 'take' || !row.current.exists) return null
+  return effectClipFile(projectFile, `${id}.mp3`)
+}

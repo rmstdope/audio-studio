@@ -5,7 +5,15 @@ import { projectJson, tempRepo } from '../../test/helpers'
 import { forgetEffect, keepMineEffect, setEffectDescription } from './effectWords'
 import { loadWorkspace } from './workspace'
 
-const effects = { refresh: 'true', paths: { list: 'tts/effects.json' } }
+const effects = {
+  refresh: 'true',
+  paths: {
+    list: 'tts/effects.json',
+    lock: 'audio/effects.lock.json',
+    clips: 'audio/effects',
+    manifest: 'audio/effects/manifest.json',
+  },
+}
 const list = [
   { id: 'door-creak', description: 'A slow wooden door creaks', seconds: 3 },
   { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },

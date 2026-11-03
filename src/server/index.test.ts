@@ -1,3 +1,4 @@
+import { createFakeEffects } from '../services/effectsFake'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { fakePng } from '../services/imagesFake'
@@ -5351,7 +5352,12 @@ describe('server, the sound effects', () => {
     'content-studio.json': projectJson({
       effects: {
         refresh: `printf '%s' '${list}' > tts/effects.json`,
-        paths: { list: 'tts/effects.json' },
+        paths: {
+          list: 'tts/effects.json',
+          lock: 'audio/effects.lock.json',
+          clips: 'audio/effects',
+          manifest: 'audio/effects/manifest.json',
+        },
       },
     }),
     'tts/cast.json': { speakers: {} },
@@ -5411,5 +5417,111 @@ describe('server, the sound effects', () => {
     const answer = await send('POST', '/api/effects/refresh')
     expect(answer.status).toBe(200)
     expect(await answer.json()).toMatchObject({ ok: true, effects: 1 })
+  })
+})
+
+describe('server, sound effect takes', () => {
+  const effectsPaths = {
+    list: 'tts/effects.json',
+    lock: 'audio/effects.lock.json',
+    clips: 'audio/effects',
+    manifest: 'audio/effects/manifest.json',
+  }
+  const effectsRoot = tempRepo({
+    'content-studio.json': projectJson({ effects: { paths: effectsPaths } }),
+    'tts/cast.json': { speakers: {} },
+    'tts/effects.json': [
+      { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
+      { id: 'door-creak', description: 'A door creaks', seconds: 3 },
+    ],
+  })
+  const studio = startServer({
+    projectFile: join(effectsRoot, 'content-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    effects: createFakeEffects(5),
+  })
+  afterAll(() => studio.stop(true))
+  const send = (method: string, path: string, body?: unknown, origin = studio.url.origin) =>
+    fetch(new URL(path, studio.url), {
+      method,
+      headers: { origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  const view = async (id: string) =>
+    (await fetch(new URL(`/api/effects/${id}/takes`, studio.url))).json()
+  const settled = async (id: string) => {
+    for (let i = 0; i < 200; i++) {
+      const v = await view(id)
+      if (!v.making.length) return v
+      await new Promise((r) => setTimeout(r, 10))
+    }
+    throw new Error('never finished')
+  }
+
+  it('refuses every change that does not come from the studio’s page', async () => {
+    for (const [method, path, body] of [
+      ['POST', '/api/effects/coins/takes', { count: 1 }],
+      ['DELETE', '/api/effects/coins/takes/0123456789abcdef.1.wav', undefined],
+      ['POST', '/api/effects/coins/choose', { file: 'x' }],
+      ['POST', '/api/effects/coins/unchoose', undefined],
+      ['POST', '/api/effects/coins/accept', undefined],
+      ['POST', '/api/effects/coins/stop', undefined],
+    ] as const) {
+      expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
+    }
+  })
+
+  it('rejects a request that is not { count } or { retry }, and answers 404 for an unknown effect', async () => {
+    expect((await send('POST', '/api/effects/coins/takes', { count: 9 })).status).toBe(400)
+    expect((await send('POST', '/api/effects/coins/takes', { count: 1, model: 'x' })).status).toBe(
+      400,
+    )
+    expect((await send('POST', '/api/effects/coins/choose', {})).status).toBe(400)
+    expect((await send('POST', '/api/effects/nope/takes', { count: 1 })).status).toBe(404)
+    expect((await fetch(new URL('/api/effects/nope/takes', studio.url))).status).toBe(404)
+  })
+
+  it('makes takes, plays them, chooses one and serves its clip; the summary says chosen', async () => {
+    expect((await send('POST', '/api/effects/coins/takes', { count: 2 })).status).toBe(200)
+    expect(
+      Object.keys(await (await fetch(new URL('/api/effects/making', studio.url))).json()),
+    ).toEqual(['coins'])
+    const made = await settled('coins')
+    expect(made.takes.map((t: { n: number }) => t.n)).toEqual([1, 2])
+    const wav = await fetch(new URL(`/api/effects/coins/takes/${made.takes[0].file}`, studio.url))
+    expect(wav.status).toBe(200)
+    expect(
+      (await send('POST', '/api/effects/coins/choose', { file: made.takes[0].file })).status,
+    ).toBe(200)
+    const project = await (await fetch(new URL('/api/project', studio.url))).json()
+    expect(project.summary.effects.rows[0]).toMatchObject({ id: 'coins', status: 'chosen' })
+    expect((await fetch(new URL('/api/effects/clips/coins.mp3', studio.url))).status).toBe(200)
+    expect((await fetch(new URL('/api/effects/coins/current', studio.url))).status).toBe(200)
+    expect((await fetch(new URL('/api/effects/door-creak/current', studio.url))).status).toBe(404)
+    // Only plain clips are served: not the manifest, not hidden or nested names.
+    expect((await fetch(new URL('/api/effects/clips/manifest.json', studio.url))).status).toBe(404)
+    expect((await fetch(new URL('/api/effects/clips/.coins.mp3', studio.url))).status).toBe(404)
+  })
+
+  it('refuses to drop the chosen take (409), drops another, and un-chooses', async () => {
+    const v = await view('coins')
+    const chosen = v.takes.find((t: { chosen: boolean }) => t.chosen)
+    const other = v.takes.find((t: { chosen: boolean }) => !t.chosen)
+    const refused = await send('DELETE', `/api/effects/coins/takes/${chosen.file}`)
+    expect(refused.status).toBe(409)
+    expect((await send('DELETE', `/api/effects/coins/takes/${other.file}`)).status).toBe(200)
+    expect((await send('POST', '/api/effects/coins/unchoose')).status).toBe(200)
+    expect((await send('POST', '/api/effects/coins/unchoose')).status).toBe(409)
+    expect((await fetch(new URL('/api/effects/clips/coins.mp3', studio.url))).status).toBe(404)
+  })
+
+  it('stops a batch', async () => {
+    await send('POST', '/api/effects/door-creak/takes', { count: 3 })
+    const stopped = await send('POST', '/api/effects/door-creak/stop')
+    expect(await stopped.json()).toEqual({ ok: true, stopped: 3 })
+    expect((await view('door-creak')).making).toEqual([])
   })
 })

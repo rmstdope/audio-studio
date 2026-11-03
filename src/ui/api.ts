@@ -36,7 +36,14 @@ import type { RemoveResult } from '../services/musicOrphans'
 import type { ImageMakeRequest, ImageTakesAnswer } from '../services/imageTakes'
 import type { RefreshEffectsResult, RefreshResult, RefreshSharedResult } from '../services/refresh'
 import type { EffectEditResult } from '../services/effectWords'
-import { useCallback, useState } from 'react'
+import type { EffectMakingSummary, EffectTakesView } from '../core/effectTakes'
+import type {
+  EffectChooseResult,
+  EffectMakeResult,
+  EffectStopResult,
+  MakeEffectRequest,
+} from '../services/effectTakes'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CharacterChange, CharacterVoiceResult } from '../services/auditions'
 import type { GenerationPlan } from '../core/generation'
 import type { ElevenTts, Problem } from '../core/project'
@@ -759,7 +766,12 @@ function useEffectEdit<V>(
       }
       return (await response.json()) as NonNullable<EffectEditResult>
     },
-    onSettled: () => client.invalidateQueries({ queryKey: ['project'] }),
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        // A failed take is shown only for the description it was made from.
+        client.invalidateQueries({ queryKey: ['effect-takes', id] }),
+      ]),
   })
 }
 
@@ -2476,4 +2488,125 @@ export function useJobActions(partId: string, language?: string) {
 export function clipUrl(partId: string, file: string, language?: string): string {
   const query = language ? `?language=${encodeURIComponent(language)}` : ''
   return `/api/parts/${encodeURIComponent(partId)}/clips/${encodeURIComponent(file)}${query}`
+}
+
+/** A sound effect's takes as its page shows them; polled while any is being made. */
+export function useEffectTakes(id: string) {
+  return useQuery({
+    queryKey: ['effect-takes', id],
+    queryFn: () =>
+      getJson<EffectTakesView | ProjectFailure>(`/api/effects/${encodeURIComponent(id)}/takes`),
+    refetchInterval: (query) => {
+      const view = query.state.data
+      return view && 'making' in view && view.making.length > 0 ? 1000 : false
+    },
+  })
+}
+
+/**
+ * One change to a sound effect's takes (make, stop, choose, drop, un-choose, accept), then the
+ * effect's takes and the project are read again: the project's Sound effects pages show the status.
+ */
+function useEffectTakesAction<V, R>(
+  id: string,
+  what: string,
+  request: (value: V) => { method: string; path: string; body?: unknown },
+  tolerated: readonly number[] = [409],
+) {
+  const client = useQueryClient()
+  const base = `/api/effects/${encodeURIComponent(id)}`
+  return useMutation({
+    mutationFn: async (value: V) => {
+      const { method, path, body } = request(value)
+      const response = await fetch(`${base}${path}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      if (!response.ok && !tolerated.includes(response.status)) {
+        throw new Error(`${what} answered ${response.status}`)
+      }
+      return (await response.json()) as R
+    },
+    // Both read again before a question closes, so the block never shows the old choice.
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['effect-takes', id] }),
+        client.invalidateQueries({ queryKey: ['effects-making'] }),
+      ]),
+  })
+}
+
+/** Asks for takes of a sound effect (new ones, or a failed one again). */
+export function useMakeEffectTakes(id: string) {
+  return useEffectTakesAction<MakeEffectRequest, NonNullable<EffectMakeResult>>(
+    id,
+    'asking for takes',
+    (body) => ({ method: 'POST', path: '/takes', body }),
+  )
+}
+
+/** Stops a sound effect's takes (the one being made and those waiting). */
+export function useStopEffectTakes(id: string) {
+  return useEffectTakesAction<void, NonNullable<EffectStopResult>>(
+    id,
+    'stopping the takes',
+    () => ({ method: 'POST', path: '/stop' }),
+    [],
+  )
+}
+
+/** Makes a take the sound effect's clip in the game. */
+export function useChooseEffectTake(id: string) {
+  return useEffectTakesAction<string, NonNullable<EffectChooseResult>>(
+    id,
+    'choosing the take',
+    (file) => ({ method: 'POST', path: '/choose', body: { file } }),
+  )
+}
+
+/** Takes a take off a sound effect's board. */
+export function useDropEffectTake(id: string) {
+  return useEffectTakesAction<string, NonNullable<EffectMakeResult>>(
+    id,
+    'dropping the take',
+    (file) => ({ method: 'DELETE', path: `/takes/${encodeURIComponent(file)}` }),
+  )
+}
+
+/** Takes the chosen take back: its clip is deleted from the game. */
+export function useUnchooseEffect(id: string) {
+  return useEffectTakesAction<void, NonNullable<EffectChooseResult>>(
+    id,
+    'un-choosing the take',
+    () => ({ method: 'POST', path: '/unchoose' }),
+  )
+}
+
+/** Accepts a changed description: the chosen take counts as made from it. */
+export function useAcceptEffect(id: string) {
+  return useEffectTakesAction<void, NonNullable<EffectChooseResult>>(
+    id,
+    'accepting the change',
+    () => ({ method: 'POST', path: '/accept' }),
+  )
+}
+
+/** What is being made for each sound effect, for the list's status; polled meanwhile. */
+export function useEffectsMaking() {
+  const client = useQueryClient()
+  const query = useQuery({
+    queryKey: ['effects-making'],
+    queryFn: () => getJson<Record<string, EffectMakingSummary>>('/api/effects/making'),
+    refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length ? 1000 : false),
+  })
+  // A batch that has just ended changed the effects' statuses: read the project again.
+  const busy = Object.keys(query.data ?? {}).length > 0
+  const was = useRef(false)
+  useEffect(() => {
+    if (was.current && !busy) void client.invalidateQueries({ queryKey: ['project'] })
+    was.current = busy
+  }, [busy, client])
+  return query
 }

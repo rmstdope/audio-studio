@@ -139,6 +139,11 @@ import { onGpu, onGpuFree } from '../services/gpu'
 import { createAceStepWorker, createMusicRouter, type MusicGenerator } from '../services/music'
 import { createStableAudioWorker } from '../services/stableAudio'
 import { createFakeMusic } from '../services/musicFake'
+import { createEffectHealth } from '../services/effectHealth'
+import { createEffectsWorker, type EffectGenerator } from '../services/effects'
+import { createEffectTakes } from '../services/effectTakes'
+import { createFakeEffects } from '../services/effectsFake'
+import { ChooseEffectTakeBody, MakeEffectTakesBody } from '../core/effectTakes'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
 import { createImageHealth } from '../services/imageHealth'
@@ -151,6 +156,8 @@ import {
   adoptPart,
   cacheNameFor,
   clipFile,
+  effectClipFile,
+  effectCurrentFile,
   musicClipFile,
   musicCurrentFile,
   loadPart,
@@ -180,6 +187,18 @@ export interface ServerOptions {
   elevenlabs?: ElevenLabsClient | null
   /** The image generator to use (tests); by default mflux, or a stand-in when `CONTENT_STUDIO_FAKE_IMAGES=1`. */
   images?: ImageGenerator
+  /** The sound effects generator to use (tests); by default the Small SFX worker, or a stand-in when `CONTENT_STUDIO_FAKE_EFFECTS=1`. */
+  effects?: EffectGenerator
+}
+
+/**
+ * The process's one sound effects generator, kept across `--dev` reloads like the music workers:
+ * started with its first effect and ended with the studio.
+ */
+function sharedEffects(): EffectGenerator {
+  const state = globalThis as { contentStudioEffects?: EffectGenerator }
+  return (state.contentStudioEffects ??=
+    process.env.CONTENT_STUDIO_FAKE_EFFECTS === '1' ? createFakeEffects() : createEffectsWorker())
 }
 
 /**
@@ -481,12 +500,18 @@ export function startServer({
   music,
   elevenlabs,
   images,
+  effects,
 }: ServerOptions) {
   const imageGenerator =
     images ??
     (process.env.CONTENT_STUDIO_FAKE_IMAGES === '1' ? createFakeImages() : createMfluxGenerator())
   const imageHealth = createImageHealth()
   const imageTakes = createImageTakes({ generator: imageGenerator, health: imageHealth })
+  const effectTakes = createEffectTakes({
+    generator: effects ?? sharedEffects(),
+    health: createEffectHealth(),
+    ...(encode ? { encode } : {}),
+  })
   const musicGenerator = music ?? sharedMusic(projectFile)
   const musicTakes = createMusicTakes({
     generator: musicGenerator,
@@ -1614,6 +1639,80 @@ export function startServer({
         POST: fromOwnPage(async () => {
           const result = await refreshEffects(projectFile)
           return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/making': {
+        GET: guard(async () => Response.json(await effectTakes.making(projectFile))),
+      },
+      '/api/effects/clips/:file': {
+        GET: guard(async (request) => {
+          const file = await effectClipFile(projectFile, request.params.file)
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
+      },
+      '/api/effects/:id/current': {
+        GET: guard(async (request) => {
+          const file = await effectCurrentFile(projectFile, request.params.id)
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
+      },
+      '/api/effects/:id/takes': {
+        GET: guard(async (request) => {
+          const view = await effectTakes.view(projectFile, request.params.id)
+          return view ? Response.json(view) : notFound()
+        }),
+        POST: fromOwnPage(async (request) => {
+          const body = MakeEffectTakesBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { count } or { retry }' }, { status: 400 })
+          }
+          const result = await effectTakes.make(projectFile, request.params.id, body.data)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/:id/takes/:file': {
+        GET: guard(async (request) => {
+          const file = await effectTakes.takeFile(
+            projectFile,
+            request.params.id,
+            request.params.file,
+          )
+          return file ? new Response(Bun.file(file)) : notFound()
+        }),
+        DELETE: fromOwnPage(async (request) => {
+          const result = await effectTakes.drop(projectFile, request.params.id, request.params.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/:id/choose': {
+        POST: fromOwnPage(async (request) => {
+          const body = ChooseEffectTakeBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { file }' }, { status: 400 })
+          const result = await effectTakes.choose(projectFile, request.params.id, body.data.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/:id/unchoose': {
+        POST: fromOwnPage(async (request) => {
+          const result = await effectTakes.unchoose(projectFile, request.params.id)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/:id/accept': {
+        POST: fromOwnPage(async (request) => {
+          const result = await effectTakes.accept(projectFile, request.params.id)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/:id/stop': {
+        POST: fromOwnPage(async (request) => {
+          const result = await effectTakes.stop(projectFile, request.params.id)
+          return result ? Response.json(result) : notFound()
         }),
       },
       '/api/effects/:id': {
