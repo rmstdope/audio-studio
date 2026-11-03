@@ -9,6 +9,7 @@ import { ChangesView } from './features/changes/ChangesView'
 import { CharacterView } from './features/characters/CharacterView'
 import { CharactersView } from './features/characters/CharactersView'
 import { LinesView } from './features/lines/LinesView'
+import { EffectsView } from './features/effects/EffectsView'
 import { ImagesView } from './features/images/ImagesView'
 import { MusicView } from './features/music/MusicView'
 import { PartOverview } from './features/overview/PartOverview'
@@ -90,6 +91,8 @@ export function App() {
           <SpendingView summary={summary} />
         ) : route.view === 'music' ? (
           <MusicView summary={summary} route={route} />
+        ) : route.view === 'effects' ? (
+          <EffectsView summary={summary} route={route} />
         ) : route.view === 'images' ? (
           <ImagesView summary={summary} route={route} />
         ) : route.view === 'setup' ? (

@@ -37,7 +37,7 @@ The first consumer is RetroQuest, whose current Python tooling (`tts/fish_tts.py
 - Editing dialog text. The dialog comes from the game (RetroQuest extracts it by playing the golden
   path through the engine); the studio only reads it. Per-line _delivery cues_ are editable.
 - Hosting, multi-user, or remote use. It is a localhost tool for one developer.
-- Sound effects: planned (§12 step 16; §13 decision 9); the model is in place (§8.8).
+- Sound effects: the list and the studio's own descriptions are built (§8.9), and the model is in place (§8.8); making takes is planned (§12 step 16; §13 decision 9).
 - Deciding where a track plays. The game decides which track a room or region plays, and when a
   stinger sounds; the studio makes the tracks it lists.
 
@@ -83,7 +83,7 @@ retroquest/                      ← user runs `content-studio` here
    they are plain files in the part's clips folder (no folders, no symbolic links). The one
    exception is the game's own commands: **Refresh dialog**, on a part's overview, and **Refresh
    from the game**, on an act's Music page (the same `refreshDialog` command) and on the Stingers
-   page (`music.refreshShared`), run in the project root, only when the user clicks one on the
+   page (`music.refreshShared`) and the Sound effects page (`effects.refresh`), run in the project root, only when the user clicks one on the
    studio's page; what a command writes is the game's business, and the studio does not check it
    beyond reading the dialog, the loops or the stingers again.
    Besides those paths, the studio writes the project file itself in a few places only: the project's
@@ -1580,6 +1580,47 @@ effect. The last failure is kept in `.content-studio/effect-model-health.json`
 (`createEffectHealth`: `record` when an effect fails, `clear` when one made with the model works,
 nothing when one is stopped); the take flow that calls them comes with the effects page.
 
+### 8.9 Sound effects: the list and the studio’s descriptions
+
+The Sound effects workspace shows the game's **sound effects**: one game-wide list, as the stingers
+are. This section is the reading and the studio's own descriptions (as-5wc.2); making, comparing and
+choosing takes come with as-5wc.3 and as-5wc.4. The screens are drawn in
+`docs/ui/as-5wc.2-sound-effects.html`.
+
+```json
+"effects": {
+  "refresh": "node tts/extract-effects.js",
+  "paths": { "list": "tts/effects.json" }
+}
+```
+
+The `effects` section is optional; without it the page says how to add one. `refresh` is optional:
+the game's command that writes the list, run in the project root, only when the user clicks
+Refresh from the game (the consumer rules in CLAUDE.md name it). `paths.list` may contain neither
+`{part}` nor `{language}`.
+
+**The list** is `[{ "id", "description", "seconds" }]` in the game's order, read only. An id is a
+slug; `seconds` is positive and may be fractional. The list is read entry by entry
+(`readEffectEntries`): an entry with a problem, or an id used twice (both entries), is left out and
+reported with its file and place (`tts/effects.json at [2].seconds`), and the rest still show. A
+file that is not a list is unreadable as a whole. The name shown is made from the id ("door-creak"
+is "Door creak"); the game's list has none.
+
+**The studio's descriptions** are kept in `.content-studio/effects.json` (the studio's own state,
+never the game's files), one line per effect: `{ "<id>": { "words", "gameWas" } }`. `gameWas` is the
+game's description the words were written over. From it the page derives, with nothing else stored,
+that the game reworded an effect you changed (`gameWas` differs from the game's words now): the
+list shows a second tag and the effect's page a notice. **Keep mine** and changing your own words
+set `gameWas` to the game's present words, **Use the game's** drops the entry, so the flag goes only
+when decided and survives reloads. Saving an empty text, the game's own words or null drops the
+entry. The words of an effect the game dropped stay in the file, shown under the table with
+**Forget** (which asks first), and come back if the game lists the id again; an id whose entry is
+merely unreadable is not taken for dropped. A descriptions file that cannot be read is reported and
+never written over.
+
+**Status.** No takes exist yet, so every effect reads "none yet" and counts as needing attention;
+the ring and the sidebar count cover the readable effects only.
+
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),
@@ -1637,6 +1678,10 @@ POST   /api/parts/:part/lines/:key/accept        accept a weak line's clip as it
 POST   /api/parts/:part/lines/:key/check         check a weak line's clip again with Whisper (no new audio)
 POST   /api/parts/:part/refresh                  run refreshDialog (its result names the act's loops added and removed)
 POST   /api/music/stingers/refresh               run music.refreshShared; the stingers added and removed
+POST   /api/effects/refresh                      run effects.refresh; the effect ids added and removed
+PATCH  /api/effects/:id                          the studio's description of a sound effect ({ description }; null or empty: the game's)
+POST   /api/effects/:id/keep-mine                keep the studio's words after the game reworded the effect
+POST   /api/effects/:id/forget                   delete the words of an effect the game no longer lists
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
 PATCH  /api/parts/:part/cues/:key/inside         a cue at a gap inside the line ({ at, cue, text }; empty cue: remove;
@@ -2060,6 +2105,8 @@ Small, independently useful increments:
        their time, memory, licence and how a take ends, on the M5 Pro.
     2. **The model** (as-5wc.3, done: §8.8): a worker making one effect with Small SFX on the CPU, its
        trailing silence trimmed, and Setup's Sound-effect models row.
+    3. **The game's effects list and the studio's descriptions** (as-5wc.2, done: §8.9), read-only,
+       with the studio's own description overrides and the Sound effects workspace.
 
 ---
 

@@ -1,5 +1,6 @@
 import { dirname } from 'node:path'
 import { dialogDiff, type DialogDiff } from '../core/dialogDiff'
+import { effectsDiff, type EffectEntry } from '../core/effects'
 import {
   loopsDiff,
   LoopListSchema,
@@ -10,6 +11,7 @@ import {
 import { partPathFor, type Problem } from '../core/project'
 import { DialogSchema, type Line } from '../core/resources'
 import { readResource } from './files'
+import { readEffectsList } from './effectsLists'
 import { readList } from './musicLists'
 import { createSerial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
@@ -43,6 +45,21 @@ export interface LoopsChange {
 /** What refreshing the stingers did, or why it did not. */
 export type RefreshSharedResult =
   | { ok: true; stingers: number; change: LoopsChange | null; output: string }
+  | { ok: false; reason: 'none'; message: string }
+  | { ok: false; reason: 'failed'; message: string; output: string }
+  | { ok: false; problems: Problem[]; output: string }
+  | ProjectFailure
+
+/** What refreshing the sound effects did, or why it did not. */
+export type RefreshEffectsResult =
+  | {
+      ok: true
+      /** How many effects the list has now (the entries that can be read). */
+      effects: number
+      /** The ids added and removed; null when the list could not be read before. */
+      change: { added: string[]; removed: string[] } | null
+      output: string
+    }
   | { ok: false; reason: 'none'; message: string }
   | { ok: false; reason: 'failed'; message: string; output: string }
   | { ok: false; problems: Problem[]; output: string }
@@ -97,6 +114,31 @@ export function refreshShared(
   active.set(key, (active.get(key) ?? 0) + 1)
   return refreshes
     .run(key, () => refreshStingers(projectFile, timeoutMs))
+    .finally(() => {
+      const left = (active.get(key) ?? 1) - 1
+      if (left) active.set(key, left)
+      else active.delete(key)
+    })
+}
+
+/** The key of the sound effects' refresh: no part id holds a NUL, so it cannot be a part's. */
+function effectsKey(projectFile: string): string {
+  return `${projectFile}\0effects`
+}
+
+/**
+ * Runs the project's `effects.refresh` command in the project root, the way the game lists its
+ * sound effects, then reads the list again and says what changed. Only from the studio's page,
+ * one at a time.
+ */
+export function refreshEffects(
+  projectFile: string,
+  { timeoutMs = TIMEOUT_MS }: { timeoutMs?: number } = {},
+): Promise<RefreshEffectsResult> {
+  const key = effectsKey(projectFile)
+  active.set(key, (active.get(key) ?? 0) + 1)
+  return refreshes
+    .run(key, () => refreshEffectsList(projectFile, timeoutMs))
     .finally(() => {
       const left = (active.get(key) ?? 1) - 1
       if (left) active.set(key, left)
@@ -246,6 +288,43 @@ async function refreshStingers(
   if (read === 'missing' || read === 'invalid') return { ok: false, problems, output: run.output }
   const change = before === 'invalid' ? null : loopsDiff(before.tracks, read)
   return { ok: true, stingers: read.length, change, output: run.output }
+}
+
+async function refreshEffectsList(
+  projectFile: string,
+  timeoutMs: number,
+): Promise<RefreshEffectsResult> {
+  const opened = await openProject(projectFile)
+  if (!opened.ok) return opened
+  const { effects } = opened.project
+  if (!effects?.refresh) {
+    return {
+      ok: false,
+      reason: 'none',
+      message: 'The project file names no effects.refresh command.',
+    }
+  }
+  const root = dirname(projectFile)
+  const before = await readEffectsList(root, effects.paths.list)
+  const run = await shell(effects.refresh, root, timeoutMs)
+  if (!run.ok) return { ok: false, reason: 'failed', message: run.message, output: run.output }
+
+  const after = await readEffectsList(root, effects.paths.list)
+  if (after.status !== 'ok') {
+    const problems =
+      after.status === 'invalid'
+        ? after.problems
+        : [{ file: effects.paths.list, path: '', message: 'the command wrote no effects file' }]
+    return { ok: false, problems, output: run.output }
+  }
+  const was: EffectEntry[] | null =
+    before.status === 'ok' ? before.effects : before.status === 'missing' ? [] : null
+  return {
+    ok: true,
+    effects: after.effects.length,
+    change: was ? effectsDiff(was, after.effects) : null,
+    output: run.output,
+  }
 }
 
 /** A track list as it is now: none if there is no file yet (`found` false), 'invalid' if broken. */

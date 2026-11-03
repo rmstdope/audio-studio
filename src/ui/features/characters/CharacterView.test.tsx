@@ -55,6 +55,7 @@ const summary: ProjectSummary = {
   projectFile: 'content-studio.json',
   music: null,
   images: null,
+  effects: null,
   problems: [],
 }
 

@@ -175,10 +175,19 @@ export function Sidebar({
             </a>
           </>
         )}
-        <span className="nav-item" aria-disabled="true">
-          <SpeakerIcon /> <span className="grow">Sound effects</span>{' '}
-          <span className="meta">Soon</span>
-        </span>
+        <a
+          className="nav-item nav-workspace"
+          href={routeHref({ view: 'effects', page: null })}
+          aria-current={route.view === 'effects' ? 'page' : undefined}
+        >
+          <SpeakerIcon /> <span className="grow">Sound effects</span>
+          {summary.effects?.status === 'ok' && (
+            <DoneCount
+              count={doneCount(summary.effects.done)}
+              title="Sound effects with a take chosen and up to date, out of all"
+            />
+          )}
+        </a>
       </nav>
 
       <nav className="nav sidebar-foot" aria-label="Project">

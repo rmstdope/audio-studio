@@ -5344,3 +5344,72 @@ describe('the image model routes', () => {
     expect(view.images.model).toBe('z-image-turbo')
   })
 })
+
+describe('server, the sound effects', () => {
+  const list = JSON.stringify([{ id: 'coins', description: 'Coins spill', seconds: 0.5 }])
+  const effectsRoot = tempRepo({
+    'content-studio.json': projectJson({
+      effects: {
+        refresh: `printf '%s' '${list}' > tts/effects.json`,
+        paths: { list: 'tts/effects.json' },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/effects.json': [{ id: 'coins', description: 'Coins spill', seconds: 0.5 }],
+  })
+  const studio = startServer({
+    projectFile: join(effectsRoot, 'content-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => studio.stop(true))
+  const send = (method: string, path: string, body?: unknown, origin = studio.url.origin) =>
+    fetch(new URL(path, studio.url), {
+      method,
+      headers: { origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('shows the effects in the project summary', async () => {
+    const body = await (await fetch(new URL('/api/project', studio.url))).json()
+    expect(body.summary.effects.rows.map((r: { id: string }) => r.id)).toEqual(['coins'])
+  })
+
+  it('refuses every change that does not come from the studio’s page', async () => {
+    for (const [method, path, body] of [
+      ['POST', '/api/effects/refresh', undefined],
+      ['PATCH', '/api/effects/coins', { description: 'x' }],
+      ['POST', '/api/effects/coins/keep-mine', undefined],
+      ['POST', '/api/effects/coins/forget', undefined],
+    ] as const) {
+      expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
+    }
+  })
+
+  it('saves a description, and answers 404 for an effect the game does not list', async () => {
+    const saved = await send('PATCH', '/api/effects/coins', { description: 'Coins on glass' })
+    expect(saved.status).toBe(200)
+    expect(await saved.json()).toEqual({ ok: true })
+    const body = await (await fetch(new URL('/api/project', studio.url))).json()
+    expect(body.summary.effects.rows[0]).toMatchObject({
+      description: 'Coins on glass',
+      changedHere: true,
+    })
+    expect((await send('PATCH', '/api/effects/nope', { description: 'x' })).status).toBe(404)
+    expect((await send('PATCH', '/api/effects/coins', { nonsense: 1 })).status).toBe(400)
+  })
+
+  it('keeps mine and forgets', async () => {
+    expect((await send('POST', '/api/effects/coins/keep-mine')).status).toBe(200)
+    expect((await send('POST', '/api/effects/coins/forget')).status).toBe(404)
+    expect((await send('POST', '/api/effects/nope/keep-mine')).status).toBe(404)
+  })
+
+  it('refreshes the list from the studio’s own page', async () => {
+    const answer = await send('POST', '/api/effects/refresh')
+    expect(answer.status).toBe(200)
+    expect(await answer.json()).toMatchObject({ ok: true, effects: 1 })
+  })
+})

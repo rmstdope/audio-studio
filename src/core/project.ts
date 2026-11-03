@@ -317,6 +317,21 @@ const ImagesSchema = z.object({
   }),
 })
 
+/** The optional `effects` section: where the game lists its sound effects, and the command that writes the list. */
+const EffectsSchema = z.object({
+  /** The game's command that writes the effects list; run in the project root, only from Refresh from the game. */
+  refresh: z.string().min(1).optional(),
+  paths: z.object({
+    /** The game's one list of sound effects, written by the game and read only. */
+    list: z
+      .string()
+      .min(1)
+      .refine((path) => !path.includes('{language}') && !path.includes('{part}'), {
+        error: 'must not contain {language} or {part}: sound effects are for the whole game',
+      }),
+  }),
+})
+
 /** The project file, `content-studio.json`, in the consumer repository's root. */
 export const ProjectSchema = z.object({
   $schema: z.string().optional(),
@@ -326,6 +341,7 @@ export const ProjectSchema = z.object({
   narration: NarrationSchema,
   music: MusicSchema.optional(),
   images: ImagesSchema.optional(),
+  effects: EffectsSchema.optional(),
   /**
    * How long a take fades in and out when played in the studio, in seconds (0: no fade); absent is
    * 0.2. Saved from Setup's Playing takes panel; the game's own file never fades.
@@ -341,6 +357,9 @@ export type ElevenTts = Project['narration']['elevenlabs']['tts']
 
 /** The validated `music` section of a project file. */
 export type MusicConfig = z.infer<typeof MusicSchema>
+
+/** The validated `effects` section of a project file. */
+export type EffectsConfig = z.infer<typeof EffectsSchema>
 
 /** The validated `images` section of a project file. */
 export type ImagesConfig = z.infer<typeof ImagesSchema>

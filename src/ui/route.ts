@@ -20,6 +20,11 @@ export type ImagesRoute =
   | { view: 'images'; page: 'style' }
   | { view: 'images'; page: 'image'; image: string; from?: string }
 
+/** The Sound effects pages: the list (only what needs attention, with `show`), or one effect. */
+export type EffectsRoute =
+  | { view: 'effects'; page: null; show?: 'attention' }
+  | { view: 'effects'; page: 'effect'; effect: string }
+
 /**
  * Where the UI is: a part's overview or its lines, every character, one character's page or its
  * audition, or the project's uncommitted changes.
@@ -33,12 +38,13 @@ export type Route =
   | { view: 'setup' }
   | MusicRoute
   | ImagesRoute
+  | EffectsRoute
   | { view: 'character'; character: string; language?: string }
   | { view: 'audition'; character: string; language?: string }
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers` (these two with `?show=attention`), `#/music/tracks/victory`, `#/images`, `#/images/parts/act1` (with `?show=attention`), `#/images/style`, `#/images/items/silver-stag-inn` (with `?from=act1`, the act it was opened from); anything else is the
+ * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers` (these two with `?show=attention`), `#/music/tracks/victory`, `#/images`, `#/images/parts/act1` (with `?show=attention`), `#/images/style`, `#/images/items/silver-stag-inn` (with `?from=act1`, the act it was opened from), `#/effects` (with `?show=attention`), `#/effects/items/door-creak`; anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
@@ -62,6 +68,11 @@ export function parseRoute(hash: string): Route {
     return second === 'stingers'
       ? { view: 'music', page: 'stingers', ...show }
       : { view: 'music', page: null }
+  }
+  if (first === 'effects') {
+    return second === 'items' && third
+      ? { view: 'effects', page: 'effect', effect: decodeURIComponent(third) }
+      : { view: 'effects', page: null, ...show }
   }
   if (first === 'images') {
     if (second === 'parts' && third) {
@@ -102,6 +113,11 @@ export function routeHref(route: Route): string {
       : route.page === 'stingers'
         ? `#/music/stingers${show}`
         : '#/music'
+  }
+  if (route.view === 'effects') {
+    return route.page === 'effect'
+      ? `#/effects/items/${encodeURIComponent(route.effect)}`
+      : `#/effects${show}`
   }
   if (route.view === 'images') {
     if (route.page === 'image') {

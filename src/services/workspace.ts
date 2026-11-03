@@ -55,6 +55,7 @@ import {
   writeAtomic,
 } from './files'
 import { readImages } from './imageLists'
+import { readEffects } from './effectsLists'
 import { gameFilePath, readMusic } from './musicLists'
 import { inPartTurn } from './partFiles'
 
@@ -203,6 +204,7 @@ export async function loadWorkspace(projectFile: string): Promise<
   }
   const music = await readMusic(root, project, problems)
   const images = await readImages(root, project, problems)
+  const effects = await readEffects(root, project, problems)
   return {
     ok: true,
     project,
@@ -216,6 +218,7 @@ export async function loadWorkspace(projectFile: string): Promise<
       cast,
       music,
       images,
+      effects,
       problems,
     }),
   }

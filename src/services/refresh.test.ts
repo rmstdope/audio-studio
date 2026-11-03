@@ -2,7 +2,13 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { isRefreshing, refreshDialog, refreshShared, stopRefreshes } from './refresh'
+import {
+  isRefreshing,
+  refreshDialog,
+  refreshEffects,
+  refreshShared,
+  stopRefreshes,
+} from './refresh'
 
 const before = [
   { key: 'a', speaker: 'mira', text: 'Hello.' },
@@ -265,6 +271,78 @@ describe('refreshing the music lists', () => {
     expect(await refreshShared(join(broken, 'content-studio.json'))).toMatchObject({
       ok: false,
       problems: [{ file: 'tts/stingers.json', path: '[0].seconds' }],
+    })
+  })
+})
+
+describe('refreshing the sound effects', () => {
+  const effect = (id: string) => ({ id, description: `${id} sound`, seconds: 2 })
+  const withEffects = (refresh?: string, files: Record<string, unknown> = {}) =>
+    tempRepo({
+      'content-studio.json': projectJson({
+        effects: { refresh, paths: { list: 'tts/effects.json' } },
+      }),
+      'tts/.keep': '',
+      ...files,
+    })
+
+  it('runs the command in the project root and names the ids added and removed', async () => {
+    const list = JSON.stringify([effect('coins'), effect('wind')])
+    const root = withEffects(`printf '%s' '${list}' > tts/effects.json && echo listed`, {
+      'tts/effects.json': [effect('wind'), effect('lantern-hum')],
+    })
+    expect(await refreshEffects(join(root, 'content-studio.json'))).toEqual({
+      ok: true,
+      effects: 2,
+      change: { added: ['coins'], removed: ['lantern-hum'] },
+      output: 'listed',
+    })
+  })
+
+  it('does not know what changed when the list was unreadable before', async () => {
+    const list = JSON.stringify([effect('coins')])
+    const root = withEffects(`printf '%s' '${list}' > tts/effects.json`, {
+      'tts/effects.json': '{ broken',
+    })
+    expect(await refreshEffects(join(root, 'content-studio.json'))).toMatchObject({
+      ok: true,
+      change: null,
+    })
+  })
+
+  it('says when the project names no command', async () => {
+    const root = withEffects()
+    expect(await refreshEffects(join(root, 'content-studio.json'))).toMatchObject({
+      ok: false,
+      reason: 'none',
+    })
+  })
+
+  it('reports a failing command, no list written and a list that cannot be read', async () => {
+    const failing = withEffects('echo oops >&2; exit 2')
+    expect(await refreshEffects(join(failing, 'content-studio.json'))).toMatchObject({
+      ok: false,
+      reason: 'failed',
+      output: expect.stringContaining('oops'),
+    })
+    const none = withEffects('true')
+    expect(await refreshEffects(join(none, 'content-studio.json'))).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/effects.json', path: '' }],
+    })
+    const broken = withEffects(`printf '%s' '{}' > tts/effects.json`)
+    expect(await refreshEffects(join(broken, 'content-studio.json'))).toMatchObject({
+      ok: false,
+      problems: [{ file: 'tts/effects.json', path: '' }],
+    })
+  })
+
+  it('still succeeds when some entries cannot be read', async () => {
+    const list = JSON.stringify([effect('coins'), { id: 'Bad' }])
+    const root = withEffects(`printf '%s' '${list}' > tts/effects.json`)
+    expect(await refreshEffects(join(root, 'content-studio.json'))).toMatchObject({
+      ok: true,
+      effects: 1,
     })
   })
 })

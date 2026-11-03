@@ -1,6 +1,10 @@
 import { trackFor, type MusicListSummary } from '../../../core/music'
 import type { ProjectSummary } from '../../../core/summary'
-import type { RefreshResult, RefreshSharedResult } from '../../../services/refresh'
+import type {
+  RefreshEffectsResult,
+  RefreshResult,
+  RefreshSharedResult,
+} from '../../../services/refresh'
 import { useMusicMaking, useRefreshDialog, useRefreshShared } from '../../api'
 import { STATUS_LABEL, tracksDone, type TrackStatus } from '../../../core/musicChoose'
 import { useState } from 'react'
@@ -299,7 +303,7 @@ export function FailedPanel({
   error,
   onClose,
 }: {
-  result: RefreshResult | RefreshSharedResult
+  result: RefreshResult | RefreshSharedResult | RefreshEffectsResult
   error: string | null
   onClose: () => void
 }) {

@@ -65,7 +65,13 @@ import {
   type ImageEditResult,
 } from '../services/imageEdits'
 import { ActStyleBody, CompareBody, StyleFieldBody, WordsBody } from '../core/images'
-import { isRefreshing, refreshDialog, refreshShared } from '../services/refresh'
+import { isRefreshing, refreshDialog, refreshEffects, refreshShared } from '../services/refresh'
+import {
+  forgetEffect,
+  keepMineEffect,
+  setEffectDescription,
+  type EffectEditResult,
+} from '../services/effectWords'
 import { acceptLine, measureLine, recordLine, removeOrphans } from '../services/narration'
 import {
   setElevenModel,
@@ -259,6 +265,15 @@ const StageParam = z.enum(['audition', 'draft', 'final'])
 /** The answer to a change of the studio's image words: 404 for an unknown image, 409 with the reason. */
 function imageAnswer(result: ImageEditResult | ImageTakesAnswer): Response {
   if (!result) return Response.json({ error: 'not found' }, { status: 404 })
+  return Response.json(result, { status: result.ok ? 200 : 409 })
+}
+
+/** The new description of a sound effect: text, or null to take the game's back. */
+const EffectDescriptionBody = z.object({ description: z.string().nullable() }).strict()
+
+/** The answer to a change of the studio's sound effect descriptions. */
+function effectAnswer(result: EffectEditResult): Response {
+  if (!result) return notFound()
   return Response.json(result, { status: result.ok ? 200 : 409 })
 }
 
@@ -1594,6 +1609,36 @@ export function startServer({
       },
       '/api/image-style/seen': {
         POST: fromOwnPage(async () => imageAnswer(await markStyleSeen(projectFile))),
+      },
+      '/api/effects/refresh': {
+        POST: fromOwnPage(async () => {
+          const result = await refreshEffects(projectFile)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/:id': {
+        PATCH: fromOwnPage(async (request) => {
+          const body = EffectDescriptionBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json(
+              { error: 'expected { description: string | null }' },
+              { status: 400 },
+            )
+          }
+          return effectAnswer(
+            await setEffectDescription(projectFile, request.params.id, body.data.description),
+          )
+        }),
+      },
+      '/api/effects/:id/keep-mine': {
+        POST: fromOwnPage(async (request) =>
+          effectAnswer(await keepMineEffect(projectFile, request.params.id)),
+        ),
+      },
+      '/api/effects/:id/forget': {
+        POST: fromOwnPage(async (request) =>
+          effectAnswer(await forgetEffect(projectFile, request.params.id)),
+        ),
       },
       '/api/music/stingers/refresh': {
         POST: fromOwnPage(async () => {
