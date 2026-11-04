@@ -22,8 +22,15 @@ describe('the Scenes sound effects table', () => {
   it('lets the chip drop under the name when the table has no room, so the table never scrolls sideways', () => {
     expect(rule('.scene-effect-name')).toMatch(/display:\s*inline-block/)
     const wide = css.slice(0, css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
-    expect(rule('.scene-effect-cell', wide)).toBe('')
-    expect(rule('.scene-effect-cell .chip')).toMatch(/white-space:\s*nowrap/)
+    const nowrapped = [...wide.matchAll(/([^{}]*)\{([^}]*)\}/g)].filter(
+      ([, selector, body]) =>
+        /\.scene-effect(-cell)?\s*$/m.test((selector ?? '').trim().split(',').pop() ?? '') &&
+        /white-space:\s*nowrap/.test(body ?? ''),
+    )
+    expect(nowrapped).toEqual([])
+    expect(wide).toMatch(
+      /\.scene-effect \.chip,\n\.scene-how \.chip,\n\.scene-state \.chip \{\n  white-space:\s*nowrap/,
+    )
   })
 
   it('sizes the effect column to its content, so a short name beside a chip is never cut', () => {
