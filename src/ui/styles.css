@@ -4170,7 +4170,24 @@ button.cue-chip[aria-expanded='true'] {
   width: 40px;
 }
 .scene-effect {
-  overflow-wrap: anywhere;
+  width: 28%;
+  max-width: 0;
+}
+.scene-effect-cell {
+  display: flex;
+  align-items: baseline;
+}
+.scene-effect-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scene-effect-cell .chip {
+  flex: none;
+}
+.scene-effects .table th {
+  white-space: nowrap;
 }
 .scene-how,
 .scene-state {
@@ -4229,6 +4246,7 @@ button.cue-chip[aria-expanded='true'] {
   width: 110px;
 }
 .scene-seconds {
+  white-space: nowrap;
   margin-left: 8px;
   color: var(--text-soft);
 }
@@ -4436,7 +4454,7 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--text-soft);
 }
 .scene-effects th.scene-now-head {
-  width: 14em;
+  width: 11em;
 }
 .scene-effects td.scene-now {
   white-space: normal;
@@ -4536,6 +4554,9 @@ button.cue-chip[aria-expanded='true'] {
   }
   .scene-effects .table td.scene-effect {
     grid-column: 2;
+    width: auto;
+    min-width: 0;
+    max-width: none;
   }
   .scene-effects .table td.scene-m {
     grid-row: 1;
