@@ -32,10 +32,7 @@ export function AddEffect({
   useEffect(() => {
     if (!open) return
     const outside = (event: MouseEvent) => {
-      if (root.current?.contains(event.target as Node)) return
-      // Closed without a pick: the next opening starts from every effect again.
-      setOpen(false)
-      setQuery('')
+      if (!root.current?.contains(event.target as Node)) dismiss()
     }
     document.addEventListener('mousedown', outside)
     return () => document.removeEventListener('mousedown', outside)
@@ -88,9 +85,13 @@ export function AddEffect({
   const matches = choices.filter(
     (c) => c.id.toLowerCase().includes(words) || c.name.toLowerCase().includes(words),
   )
-  const close = () => {
+  // However it closes, the next opening starts from every effect again.
+  const dismiss = () => {
     setOpen(false)
     setQuery('')
+  }
+  const close = () => {
+    dismiss()
     button.current?.focus()
   }
   return (
