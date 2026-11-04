@@ -4552,12 +4552,11 @@ button.cue-chip[aria-expanded='true'] {
   }
   .scene-effects .table .scene-effect-name {
     flex: 0 1 auto;
+    max-width: none;
   }
   .scene-effects .table td.scene-effect {
     grid-column: 2;
-    width: auto;
     min-width: 0;
-    max-width: none;
   }
   .scene-effects .table td.scene-m {
     grid-row: 1;
