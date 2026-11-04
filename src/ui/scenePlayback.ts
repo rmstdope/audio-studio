@@ -176,6 +176,17 @@ export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackV
     param.value = to
   }
 
+  /** Takes a voice out of the lists it is kept in. */
+  const forget = (voice: Voice) => {
+    for (const [slot, list] of voices) {
+      const rest = list.filter((v) => v !== voice)
+      if (rest.length === 0) voices.delete(slot)
+      else if (rest.length !== list.length) voices.set(slot, rest)
+    }
+    const at = overs.indexOf(voice)
+    if (at >= 0) overs.splice(at, 1)
+  }
+
   /** Sounds a decoded clip: through a fade gain (in over `fadeIn`, or at once) and a level gain. */
   const sound = (url: string, loop: boolean, level: number, fadeIn: number): Voice => {
     const context = ctx!
@@ -191,7 +202,10 @@ export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackV
     levelGain.connect(context.destination)
     source.start(0, 0)
     if (fadeIn > 0) ramp(fade, 1, fadeIn)
-    return { source, fade, level: levelGain }
+    const voice = { source, fade, level: levelGain }
+    // A clip that has played out is forgotten, so a long session does not collect them.
+    source.onended = () => forget(voice)
+    return voice
   }
   const end = (voice: Voice, fadeOut: number) => {
     if (fadeOut > 0) {
@@ -367,8 +381,9 @@ export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackV
 
     /** Plays one clip over the scene at `level`, whatever mute and solo say; ■ ends it too. */
     async once(url: string, level: number): Promise<void> {
+      const mine = token
       await loadAll([url])
-      if (ready(url) === null) return
+      if (mine !== token || phase !== 'playing' || ready(url) === null) return
       overs.push(sound(url, false, level, 0))
     },
 

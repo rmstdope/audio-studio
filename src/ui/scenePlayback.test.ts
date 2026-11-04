@@ -11,6 +11,7 @@ import {
 /** A fake Web Audio context and clock: sources and gains are recorded, time moves when told. */
 function rig(failing: string[] = []) {
   const log: string[] = []
+  const sources: { onended: (() => void) | null }[] = []
   const gains: { name: string; value: number; effective: number; ramps: [number, number][] }[] = []
   let time = 0
   let tick: (() => void) | null = null
@@ -56,11 +57,12 @@ function rig(failing: string[] = []) {
       const source = {
         buffer: null as { duration: number } | null,
         loop: false,
-        onended: null,
+        onended: null as (() => void) | null,
         connect: (n: unknown) => n,
         start: () => log.push(`start${source.loop ? ' loop' : ''}`),
         stop: (when?: number) => log.push(`stop${when === undefined ? '' : ` ${when}`}`),
       }
+      sources.push(source)
       return source
     },
   }
@@ -93,6 +95,7 @@ function rig(failing: string[] = []) {
       await Promise.resolve()
       await new Promise((r) => setTimeout(r, 0))
     },
+    ended: () => sources.forEach((source) => source.onended?.()),
     hold: () => {
       gate = new Promise((r) => (release = r))
     },
@@ -319,5 +322,40 @@ describe('playing a scene', () => {
     await settle()
     expect(r.last().rows).toHaveLength(2)
     expect(r.log.filter((l) => l === 'start loop')).toHaveLength(2)
+  })
+
+  test('a clip played over the scene that was still loading when stop came never sounds', async () => {
+    const r = rig()
+    await r.playback.start(scene({ music: { url: null, level: 1 }, rows: [] }))
+    await settle()
+    r.hold()
+    const over = r.playback.once('/other', 1)
+    r.playback.stop()
+    r.open()
+    await over
+    expect(r.log.filter((l) => l === 'start')).toHaveLength(0)
+  })
+
+  test('a voice that has ended is forgotten', async () => {
+    const r = rig()
+    await r.playback.start(
+      scene({
+        music: { url: null, level: 1 },
+        rows: [
+          {
+            id: 'door',
+            play: { mode: 'trigger', trigger: 'go' },
+            state: null,
+            level: 1,
+            url: '/door',
+          },
+        ],
+      }),
+    )
+    await settle()
+    r.playback.fire('go')
+    r.ended()
+    r.playback.stop()
+    expect(r.log.filter((l) => l.startsWith('stop'))).toHaveLength(0)
   })
 })
