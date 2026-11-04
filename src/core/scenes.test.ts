@@ -256,6 +256,31 @@ describe('summarizeScenes', () => {
     expect(missing.music.playable).toBe(false)
   })
 
+  it('says why an act track cannot be played', () => {
+    const problems = (...currents: CurrentMusic[]) =>
+      summarize({
+        declarations: decl(store),
+        music: [musicList(currents.map((c, i) => track(`t${i}`, c)))],
+      }).tracks.map((t) => [t.playable, t.problem])
+    expect(
+      problems(
+        take(true),
+        take(false),
+        { kind: 'game', file: 'music/a.wav', exists: true },
+        { kind: 'game', file: 'music/a.wav', exists: false },
+        { kind: 'none' },
+        { kind: 'unknown' },
+      ),
+    ).toEqual([
+      [true, null],
+      [false, { kind: 'take', take: 1 }],
+      [true, null],
+      [false, { kind: 'file', file: 'music/a.wav' }],
+      [false, { kind: 'nothing' }],
+      [false, null],
+    ])
+  })
+
   it('marks a track the readable music list no longer has as gone', () => {
     const mix = mixOf({ store: { music: { track: 'old', level: 1 }, effects: [] } })
     const scene = summarize({ declarations: decl(store), mix, music: [musicList([])] }).scenes[0]!
@@ -382,8 +407,8 @@ describe('summarizeScenes', () => {
     const act = result.acts[0]!
     expect(act.scenes.map((s) => s.entry)).toEqual([entry, null])
     expect(act.tracks).toEqual([
-      { id: 'store', title: 'Track store', playable: true },
-      { id: 'other', title: 'Track other', playable: false },
+      { id: 'store', title: 'Track store', playable: true, problem: null },
+      { id: 'other', title: 'Track other', playable: false, problem: { kind: 'take', take: 1 } },
     ])
     expect(result.effectsKnown).toBe(true)
     expect(result.effects).toEqual([

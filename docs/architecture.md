@@ -1978,6 +1978,10 @@ crossfade) and a level gain (a level change is heard at once). `src/ui/sceneRun.
 page uses (what is on the page, saved or not, is what plays; State, Mute and Solo live there and
 are never saved); `src/ui/sceneNow.ts` words the Now column. Mute and solo are keyed by the row's
 place in the table and by `music`. Nothing of playing survives opening another scene or a reload.
+A scene's track that plays nothing says why in a chip after the Music menu (as-xdx): each act track
+carries a `problem` derived on every read from what the Music page knows (`take` or `file` missing: a red
+"file not there"; neither chosen nor in the game: an amber "no take chosen"; none when the lock cannot be
+read), and the chip links to the track's page and follows the track chosen in the menu before saving.
 
 ## 9. Server API
 

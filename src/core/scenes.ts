@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { effectName, type EffectsSummary } from './effects'
-import type { MusicListSummary } from './music'
+import type { CurrentMusic, MusicListSummary } from './music'
 import { problemsFrom, type Problem } from './project'
 
 /** A name the game gives an id, a state or a trigger: lower-case words joined by `-`. */
@@ -228,11 +228,31 @@ export interface SceneEffectChoice {
   playable: boolean
 }
 
+/** Why a track plays nothing: its chosen take or the game's file is missing, or there is neither. */
+export type TrackProblem =
+  { kind: 'take'; take: number } | { kind: 'file'; file: string } | { kind: 'nothing' }
+
 /** A track of an act's music list, as the Music menu offers it. */
 export interface SceneTrackChoice {
   id: string
   title: string
   playable: boolean
+  /** Why it plays nothing; null when it plays, or when that is not known (the lock cannot be read). */
+  problem: TrackProblem | null
+}
+
+/** Why a track's current source plays nothing, derived on every read. */
+function trackProblem(current: CurrentMusic): TrackProblem | null {
+  switch (current.kind) {
+    case 'take':
+      return current.exists ? null : { kind: 'take', take: current.take }
+    case 'game':
+      return current.exists ? null : { kind: 'file', file: current.file }
+    case 'none':
+      return { kind: 'nothing' }
+    case 'unknown':
+      return null
+  }
 }
 
 /** An act's scenes. */
@@ -306,7 +326,8 @@ export function summarizeScenes(input: {
       const tracks = (list?.tracks ?? []).map((t) => ({
         id: t.id,
         title: t.title,
-        playable: t.current.kind === 'take' && t.current.exists,
+        playable: (t.current.kind === 'take' || t.current.kind === 'game') && t.current.exists,
+        problem: trackProblem(t.current),
       }))
       if (act.declarations.status !== 'ok') {
         return { ...base, state: act.declarations.status, tracks, scenes: [] }

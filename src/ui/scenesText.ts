@@ -1,4 +1,5 @@
-import type { Play, SceneAct, SceneRow, ScenesSummary } from '../core/scenes'
+import type { Play, SceneAct, SceneRow, ScenesSummary, TrackProblem } from '../core/scenes'
+import { fileName } from './musicPlays'
 import type { ScenesRoute } from './route'
 
 /** How an effect plays, as the Scenes page words it. */
@@ -48,4 +49,27 @@ export function currentSceneAct(scenes: ScenesSummary, route: ScenesRoute): Scen
 /** The scene a Scenes route opens in `act`: the one it names, else the first. */
 export function currentScene(act: SceneAct, route: ScenesRoute): SceneRow | undefined {
   return (route.page === 'act' && act.scenes.find((s) => s.id === route.scene)) || act.scenes[0]
+}
+
+/** The chip beside a scene's track that plays nothing: its words, its hover sentence and its colour. */
+export function trackProblemChip(
+  title: string,
+  problem: TrackProblem,
+): { text: string; title: string | undefined; tone: 'danger' | 'warn' } {
+  switch (problem.kind) {
+    case 'take':
+      return {
+        text: 'file not there',
+        title: `Take ${problem.take} of ${title} is not there.`,
+        tone: 'danger',
+      }
+    case 'file':
+      return {
+        text: 'file not there',
+        title: `The game's file ${fileName(problem.file)} is not there.`,
+        tone: 'danger',
+      }
+    case 'nothing':
+      return { text: 'no take chosen', title: undefined, tone: 'warn' }
+  }
 }
