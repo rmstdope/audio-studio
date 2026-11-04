@@ -54,7 +54,6 @@ export function MakeAllPanel({
   const reasonId = useId()
   const making = useMusicMaking().data ?? {}
   const state = useMusicModelState().data
-  const { batch, dismiss } = useMakeAllBatch(list.id)
   const make = useMakeAll(list.id)
   const stop = useStopAll(list.id)
   const [open, setOpen] = useState(false)
@@ -94,6 +93,7 @@ export function MakeAllPanel({
       : null
   // A question gives way to the running line when takes start elsewhere, and does not come back.
   const busy = running.takes > 0
+  const { batch, dismiss } = useMakeAllBatch(list.id, busy)
   const stopFocus = useStopFocus(busy, () => setFocus(batch ? 'close' : 'button'))
   const { reset: resetStop } = stop
   useEffect(() => {
@@ -130,7 +130,7 @@ export function MakeAllPanel({
         </button>
       </div>
     )
-  } else if (batch) {
+  } else if (batch && !batch.running) {
     const failedTracks = list.tracks.filter(
       (t) =>
         (making[t.id]?.failed ?? 0) - (batch.failedBefore[t.id] ?? 0) > 0 &&
@@ -224,7 +224,6 @@ export function MakeAllPanel({
   }
   let question: ReactNode = null
   if (open && !busy && model && plan?.kind === 'ready' && plan.tracks.length > 0) {
-    const fromFailed = Object.fromEntries(plan.tracks.map((t) => [t.id, making[t.id]?.failed ?? 0]))
     question = (
       <section
         className="make-all-question"
@@ -267,19 +266,16 @@ export function MakeAllPanel({
             title={refreshing ? MAKE_BLOCKED_BY_REFRESH : undefined}
             onClick={() =>
               !refreshing &&
-              make.mutate(
-                { tracks: plan.tracks.map((t) => t.id), failedBefore: fromFailed },
-                {
-                  onSuccess: () => {
-                    setOpen(false)
-                    setFocus('stop')
-                  },
-                  onError: () => {
-                    setOpen(false)
-                    setFocus('button')
-                  },
+              make.mutate(undefined, {
+                onSuccess: () => {
+                  setOpen(false)
+                  setFocus('stop')
                 },
-              )
+                onError: () => {
+                  setOpen(false)
+                  setFocus('button')
+                },
+              })
             }
           >
             {makeAllButton(plan.takes, plan.price)}

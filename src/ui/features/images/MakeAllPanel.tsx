@@ -37,7 +37,6 @@ type Focus = 'button' | 'make' | 'stop' | 'close' | null
 export function MakeAllPanel({ act, children }: { act: ImagesAct; children: ReactNode }) {
   const making = useImageMaking().data ?? {}
   const state = useImageModelState().data
-  const { batch, dismiss } = useImagesBatch(act.id)
   const make = useImagesMakeAll(act.id)
   const stop = useImagesStopAll(act.id)
   const [open, setOpen] = useState(false)
@@ -65,6 +64,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
   }
   // Takes started elsewhere give the question way; it does not come back when they are done.
   const busyNow = running.takes > 0
+  const { batch, dismiss } = useImagesBatch(act.id, busyNow)
   const stopFocus = useStopFocus(busyNow, () => setFocus(batch ? 'close' : 'button'))
   const { reset: resetStop } = stop
   useEffect(() => {
@@ -107,7 +107,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
         </button>
       </div>
     )
-  } else if (batch) {
+  } else if (batch && !batch.running) {
     const failedImages = act.rows.filter(
       (r) =>
         batch.images.includes(r.id) &&
@@ -234,7 +234,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
             className="btn btn-primary"
             disabled={make.isPending}
             onClick={() =>
-              make.mutate(making, {
+              make.mutate(undefined, {
                 onSuccess: () => {
                   setOpen(false)
                   setFocus('stop')

@@ -218,19 +218,14 @@ describe('Make takes for every image with no chosen take', () => {
     expect(page.requests).toEqual([{ url: '/api/image-acts/act1/stop', method: 'POST' }])
   })
 
-  it('remembers what the server queued, and what had failed and been stopped before', async () => {
+  it('asks the studio to make them, and reads the press from the studio afterwards', async () => {
     const page = render(three, {
-      making: { cave: { takes: 0, left: 0, failed: 1, stopped: 2 } },
       started: { lighthouse: { takes: 4, left: 32, failed: 0, stopped: 0 } },
     })
     await page.press('Make 4 takes each')
     await page.press('Make 12 takes')
-    expect(page.client.getQueryData<ImagesBatch>(['images-batch', 'act1'])).toEqual({
-      total: 12,
-      images: ['lighthouse', 'cave', 'inn'],
-      failedBefore: { lighthouse: 0, cave: 1, inn: 0 },
-      stoppedBefore: { lighthouse: 0, cave: 2, inn: 0 },
-    })
+    expect(page.requests[0]).toEqual({ url: '/api/image-acts/act1/make-all', method: 'POST' })
+    expect(page.client.getQueryState(['images-batch', 'act1'])?.isInvalidated).toBe(true)
   })
 
   it('does not bring the question back when takes started elsewhere have finished', async () => {
@@ -258,12 +253,32 @@ describe('Make takes for every image with no chosen take', () => {
         images: ['lighthouse', 'cave', 'inn'],
         failedBefore: {},
         stoppedBefore: {},
+        running: false,
       },
     })
     expect(page.text()).toContain('Made 12 of 12 takes.')
     await page.press('Close')
     expect(page.text()).not.toContain('Made 12 of 12 takes.')
+    expect(page.requests).toContainEqual({
+      url: '/api/image-acts/act1/batch/close',
+      method: 'POST',
+    })
     expect(document.activeElement).toBe(page.button('Make 4 takes each'))
+  })
+
+  it('shows the running line, not the summary, while the studio says the press still runs', () => {
+    const page = render(three, {
+      making: { cave: { takes: 1, left: 8, failed: 0, stopped: 0 } },
+      batch: {
+        total: 12,
+        images: ['lighthouse', 'cave', 'inn'],
+        failedBefore: {},
+        stoppedBefore: {},
+        running: true,
+      },
+    })
+    expect(page.text()).toContain('Making 1 take for 1 image')
+    expect(page.text()).not.toContain('Made 12')
   })
 
   it('summarises failures with a link to each image, and stopped takes after them', () => {
@@ -277,6 +292,7 @@ describe('Make takes for every image with no chosen take', () => {
         images: ['lighthouse', 'cave', 'inn'],
         failedBefore: {},
         stoppedBefore: {},
+        running: false,
       },
     })
     expect(page.text()).toContain(
@@ -293,6 +309,7 @@ describe('Make takes for every image with no chosen take', () => {
         images: ['lighthouse', 'cave', 'inn'],
         failedBefore: {},
         stoppedBefore: { cave: 2 },
+        running: false,
       },
     })
     expect(page.text()).toContain('Made 8 of 12 takes. 4 were stopped.')
@@ -306,6 +323,7 @@ describe('Make takes for every image with no chosen take', () => {
         images: ['lighthouse', 'cave', 'inn'],
         failedBefore: { lighthouse: 1 },
         stoppedBefore: {},
+        running: false,
       },
     })
     expect(page.text()).toContain('Made 12 of 12 takes.')
