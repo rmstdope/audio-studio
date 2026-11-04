@@ -564,6 +564,37 @@ describe('editing a scene', () => {
     expect(status(page)).toBe('Unsaved changes')
   })
 
+  it('says why a track plays nothing, and follows the chosen track', () => {
+    const shown = summary()
+    const tracks = shown.scenes!.acts[0]!.tracks
+    const set = (id: string, playable: boolean, problem: (typeof tracks)[number]['problem']) =>
+      Object.assign(
+        tracks.find((t) => t.id === id)!,
+        { playable, problem },
+      )
+    set('act1-store', false, { kind: 'file', file: 'game/village-lane.wav' })
+    set('act1-forest', false, { kind: 'nothing' })
+    const page = render(open, shown)
+    const chip = page.querySelector<HTMLAnchorElement>('[aria-label="Music"] a.chip')!
+    expect(chip.textContent).toBe('file not there')
+    expect(chip.className).toContain('chip-danger')
+    expect(chip.title).toBe("The game's file village-lane.wav is not there.")
+    expect(chip.getAttribute('href')).toBe('#/music/tracks/act1-store')
+    expect(page.querySelector('[aria-label="Music"] .icon-btn')).toBeNull()
+    choose(menu(page, 'Music'), 'Forest Path')
+    const amber = page.querySelector<HTMLAnchorElement>('[aria-label="Music"] a.chip')!
+    expect(amber.textContent).toBe('no take chosen')
+    expect(amber.className).toContain('chip-warn')
+    expect(amber.getAttribute('href')).toBe('#/music/tracks/act1-forest')
+    choose(menu(page, 'Music'), 'No music')
+    expect(page.querySelector('[aria-label="Music"] a.chip')).toBeNull()
+  })
+
+  it('shows no reason for a track that plays', () => {
+    const page = render(open)
+    expect(page.querySelector('[aria-label="Music"] a.chip')).toBeNull()
+  })
+
   it('removes an effect, and focus goes to the next ✕, or to Add after the last', () => {
     const page = render(open)
     act(() => page.querySelectorAll<HTMLButtonElement>('button[aria-label="Remove"]')[1]!.click())

@@ -27,7 +27,7 @@ const FAILURE: Record<PlayFailure, string> = {
 }
 
 /** The last part of a path: the file's name as the game's list gives it. */
-function fileName(path: string): string {
+export function fileName(path: string): string {
   return path.split(/[/\\]/).pop() ?? path
 }
 

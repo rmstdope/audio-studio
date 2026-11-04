@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import type { SceneRow } from '../core/scenes'
-import { howItPlays, levelText, listCount, statesLine } from './scenesText'
+import { howItPlays, levelText, listCount, statesLine, trackProblemChip } from './scenesText'
 
 describe('how an effect plays', () => {
   it('is written as the page words it', () => {
@@ -55,5 +55,31 @@ describe('the line under the scene’s name', () => {
       'States: none · Triggers: bell-tolls',
     )
     expect(statesLine({ states: ['plain'], triggers: [] })).toBe('States: plain · Triggers: none')
+  })
+})
+
+describe('the chip beside a track that plays nothing', () => {
+  it('is red and names the missing take', () => {
+    expect(trackProblemChip('Village lane', { kind: 'take', take: 3 })).toEqual({
+      text: 'file not there',
+      title: 'Take 3 of Village lane is not there.',
+      tone: 'danger',
+    })
+  })
+  it('is red and names the missing game file', () => {
+    expect(
+      trackProblemChip('Village lane', { kind: 'file', file: 'music/village-lane.wav' }),
+    ).toEqual({
+      text: 'file not there',
+      title: "The game's file village-lane.wav is not there.",
+      tone: 'danger',
+    })
+  })
+  it('is amber when there is nothing to play at all', () => {
+    expect(trackProblemChip('Village lane', { kind: 'nothing' })).toEqual({
+      text: 'no take chosen',
+      title: undefined,
+      tone: 'warn',
+    })
   })
 })

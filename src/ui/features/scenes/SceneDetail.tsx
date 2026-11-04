@@ -8,13 +8,20 @@ import {
   type PlayMode,
   type SceneDraft,
 } from '../../../core/sceneEdit'
-import type { SceneAct, SceneEffectChoice, SceneRow, ScenesSummary } from '../../../core/scenes'
+import type {
+  SceneAct,
+  SceneEffectChoice,
+  SceneRow,
+  ScenesSummary,
+  TrackProblem,
+} from '../../../core/scenes'
 import { Menu } from '../../components/Menu'
 import { CrossIcon, PlayIcon, StopIcon } from '../../components/icons'
 import { routeHref } from '../../route'
 import { audible, nowWords } from '../../sceneNow'
 import { MUSIC_KEY, rowKey } from '../../scenePlayback'
 import type { ScenePlay } from '../../sceneRun'
+import { trackProblemChip } from '../../scenesText'
 import { AddEffect } from './AddEffect'
 import { LevelSlider } from './LevelSlider'
 
@@ -58,6 +65,28 @@ function PlayButton({
 /** A red mark: the game no longer has this. */
 function GoneMark() {
   return <span className="chip chip-danger">gone from the game</span>
+}
+
+/** Why a scene's track plays nothing, linking to the track on the Music page. */
+function TrackProblemChip({
+  track,
+  title,
+  problem,
+}: {
+  track: string
+  title: string
+  problem: TrackProblem
+}) {
+  const chip = trackProblemChip(title, problem)
+  return (
+    <a
+      className={chip.tone === 'danger' ? 'chip chip-danger' : 'chip chip-warn'}
+      href={routeHref({ view: 'music', page: 'track', track })}
+      title={chip.title}
+    >
+      {chip.text}
+    </a>
+  )
 }
 
 /** The words of each way of playing, as the How it plays menu offers them. */
@@ -445,6 +474,9 @@ export function SceneDetail({
             }}
           />
           {trackGone && <GoneMark />}
+          {music.track !== null && track?.problem && !trackGone && (
+            <TrackProblemChip track={music.track} title={track.title} problem={track.problem} />
+          )}
           {music.track !== null && (
             <LevelSlider
               label="Music level"
