@@ -1273,6 +1273,23 @@ describe('playing a scene', () => {
     expect(bar(page).querySelector('[aria-label="Stop the scene"]')).toBeNull()
   })
 
+  it('reserves no count slot in the play bar of a scene with nothing to play (as-0q9)', () => {
+    const page = render({ ...open, scene: 'act1-chapel' })
+    expect(bar(page).querySelector('.scene-bar-count')).toBeNull()
+  })
+
+  it('keeps Clear in the play bar when a scene is edited down to nothing with a solo set (as-0q9)', () => {
+    const page = render(open)
+    press(page, 'Solo the music')
+    choose(menu(page, 'Music'), 'No music')
+    while (rows(page).length > 0)
+      act(() => rows(page)[0]!.querySelector<HTMLButtonElement>('[data-remove]')!.click())
+    expect(text(bar(page))).toContain('Nothing to play in this scene')
+    expect(text(bar(page).querySelector('.scene-bar-count'))).toContain('Solo: 1')
+    act(() => button(bar(page), 'Clear').click())
+    expect(bar(page).querySelector('.scene-bar-count')).toBeNull()
+  })
+
   it('sets the state while stopped, without playing', () => {
     const page = render(open)
     act(() => button(bar(page), 'cat-home').click())
