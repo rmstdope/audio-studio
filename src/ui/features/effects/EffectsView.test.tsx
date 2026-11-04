@@ -96,7 +96,7 @@ function render(
   const text = () => container.textContent!.replace(/\s+/g, ' ')
   const button = (label: string) =>
     [...container.querySelectorAll('button')].find((b) => b.textContent!.trim() === label)!
-  return { container, calls, text, button, settle }
+  return { container, calls, text, button, settle, client }
 }
 
 const list: EffectsRoute = { view: 'effects', page: null }
@@ -594,5 +594,281 @@ describe("an effect's page", () => {
       (a) => a.textContent === 'Back to Sound effects',
     )!
     expect(back.getAttribute('href')).toBe('#/effects')
+  })
+})
+
+describe('Make all, on the Sound effects list', () => {
+  const chosen = (id: string, extra: Partial<EffectRow> = {}) =>
+    row(id, {
+      status: 'chosen',
+      chosen: true,
+      current: { kind: 'take', take: 2, exists: true },
+      ...extra,
+    })
+  const models = (over: { small?: string; open?: string; can?: boolean } = {}) => ({
+    ok: true,
+    canMake: over.can ?? true,
+    projectModel: 'small-sfx',
+    uv: true,
+    models: [
+      { id: 'small-sfx', download: over.small ?? 'whole', failed: false },
+      { id: 'open-1', download: over.open ?? 'whole', failed: false },
+    ],
+  })
+  const seeds = (extra: [readonly unknown[], unknown][] = []): [readonly unknown[], unknown][] => [
+    [['effect-models'], models()],
+    [['effects-making'], {}],
+    [['effects-batch'], null],
+    ...extra,
+  ]
+  const four = [row('door-creak'), row('coins'), row('thunder'), row('wind')]
+  const posts = (calls: Call[]) => calls.filter((c) => c.method === 'POST')
+
+  it('counts the effects with no chosen take, with or without takes, whatever the list is filtered to', () => {
+    const rows = [
+      row('a'),
+      row('b', { status: 'not-chosen' }),
+      chosen('c'),
+      chosen('d', { status: 'changed' }),
+      chosen('e', { status: 'missing', current: { kind: 'take', take: 1, exists: false } }),
+    ]
+    const data = effects({ rows, done: { done: 3, total: 5, needs: ['a', 'b', 'd', 'e'] } })
+    const all = render(list, data, undefined, seeds())
+    expect(all.text()).toContain('2 effects have no chosen take')
+    expect(all.button('Make 4 takes each')).toBeDefined()
+    const filtered = render({ ...list, show: 'attention' }, data, undefined, seeds())
+    expect(filtered.text()).toContain('2 effects have no chosen take')
+  })
+
+  it('says "1 effect has no chosen take" for one', () => {
+    const { text } = render(list, effects({ rows: [row('a'), chosen('b')] }), undefined, seeds())
+    expect(text()).toContain('1 effect has no chosen take')
+  })
+
+  it('opens a question under the button, starts nothing, and puts focus on Make', async () => {
+    const { container, calls, text, button } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds(),
+    )
+    act(() => button('Make 4 takes each').click())
+    expect(text()).toContain('Make 16 takes for 4 effects?')
+    expect(text()).toContain(
+      'Four takes each, on Stable Audio 3 Small SFX, the sound-effects model on Setup. About 1 min in all — they are made one after another, and you can leave the page.',
+    )
+    const names = [...container.querySelectorAll('.make-all-question li')].map(
+      (li) => li.textContent,
+    )
+    expect(names).toEqual(['Door creak', 'Coins', 'Thunder', 'Wind'])
+    expect(document.activeElement).toBe(button('Make 16 takes'))
+    expect(posts(calls)).toEqual([])
+    // The list is still there under the question.
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(4)
+  })
+
+  it('names the left-out effects in the question', () => {
+    const rows = [row('a'), chosen('door-creak'), chosen('footsteps')]
+    const { text, button } = render(list, effects({ rows }), undefined, seeds())
+    act(() => button('Make 4 takes each').click())
+    expect(text()).toContain('Door creak and Footsteps have a chosen take and get none.')
+    expect(text()).not.toContain('already making')
+  })
+
+  it('Cancel and Escape close it, write nothing and put focus back on the button', () => {
+    const { container, calls, text, button } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds(),
+    )
+    act(() => button('Make 4 takes each').click())
+    act(() => button('Cancel').click())
+    expect(text()).not.toContain('Make 16 takes for 4 effects?')
+    expect(document.activeElement).toBe(button('Make 4 takes each'))
+    act(() => button('Make 4 takes each').click())
+    act(() => {
+      container
+        .querySelector('.make-all-question')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(text()).not.toContain('Make 16 takes for 4 effects?')
+    expect(document.activeElement).toBe(button('Make 4 takes each'))
+    expect(posts(calls)).toEqual([])
+  })
+
+  it('Make asks for the listed effects only', async () => {
+    const { calls, button, settle } = render(
+      list,
+      effects({ rows: [...four, chosen('rain')] }),
+      () => Response.json({ ok: true, started: [] }),
+      seeds(),
+    )
+    act(() => button('Make 4 takes each').click())
+    act(() => button('Make 16 takes').click())
+    await settle()
+    const post = posts(calls).find((c) => c.url === '/api/effects/make-all')!
+    expect(JSON.parse(post.body!)).toEqual({ ids: ['door-creak', 'coins', 'thunder', 'wind'] })
+  })
+
+  it('says the takes could not be started, closes the question, and keeps the button', async () => {
+    const { text, button, settle } = render(
+      list,
+      effects({ rows: four }),
+      (call) =>
+        call.method === 'POST'
+          ? Response.json({ ok: false, message: 'x' }, { status: 409 })
+          : Response.json(null),
+      seeds(),
+    )
+    act(() => button('Make 4 takes each').click())
+    act(() => button('Make 16 takes').click())
+    await settle()
+    expect(text()).toContain('The takes could not be started. Nothing was made; try again.')
+    expect(text()).not.toContain('Make 16 takes for 4 effects?')
+    expect(button('Make 4 takes each')).toBeDefined()
+  })
+
+  it('uses the other model, and says so, when Setup’s is not on this computer', () => {
+    const { text, button } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds([[['effect-models'], models({ small: 'absent' })]]),
+    )
+    act(() => button('Make 4 takes each').click())
+    expect(text()).toContain(
+      "Four takes each, on Stable Audio Open 1.0. Stable Audio 3 Small SFX, the project's sound-effects model, isn't on this computer, so these takes use Stable Audio Open 1.0. Setup says how to download it. About 27 min in all — they are made one after another, and you can leave the page.",
+    )
+  })
+
+  it('offers only Open Setup when neither model can run', () => {
+    const { container, text } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds([[['effect-models'], models({ small: 'absent', open: 'absent', can: false })]]),
+    )
+    expect(text()).toContain("Sound effects can't be made yet. Setup says what is missing.")
+    expect(text()).not.toContain('Make 4 takes each')
+    expect(container.querySelector('a[href="#/setup"]')!.textContent).toBe('Open Setup')
+  })
+
+  it('says every effect has a chosen take, with no button', () => {
+    const { text } = render(list, effects({ rows: [chosen('a'), chosen('b')] }), undefined, seeds())
+    expect(text()).toContain('Every effect has a chosen take.')
+    expect(text()).not.toContain('Make 4 takes each')
+  })
+
+  it('shows nothing when which effects are chosen is not known', () => {
+    const rows = [row('a', { status: 'unknown', current: { kind: 'unknown' } })]
+    const { text } = render(list, effects({ rows }), undefined, seeds())
+    expect(text()).not.toContain('chosen take')
+    expect(text()).not.toContain('Make 4 takes each')
+  })
+
+  it('shows what is running instead of the button, with Stop all, hand-started takes counted', async () => {
+    const making = { coins: { takes: 8, left: 20 }, wind: { takes: 8, left: 10 } }
+    const { calls, text, button, settle } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds([[['effects-making'], making]]),
+    )
+    expect(text()).toContain('Making 16 takes for 2 effects · about 30 s left')
+    expect(text()).not.toContain('Make 4 takes each')
+    act(() => button('Stop all').click())
+    await settle()
+    expect(posts(calls).map((c) => c.url)).toContain('/api/effects/stop-all')
+  })
+
+  it('says how it went once the last take is done, and Close puts focus on the button', async () => {
+    const batch = { total: 16, made: 16, stopped: 0, failed: [], running: false }
+    const { text, button, settle } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds([
+        [['effects-batch'], batch],
+        [['effects-summary-open'], true],
+      ]),
+    )
+    expect(text()).toContain('Made 16 of 16 takes.')
+    act(() => button('Close').click())
+    await settle()
+    expect(text()).not.toContain('Made 16 of 16 takes.')
+    expect(document.activeElement).toBe(button('Make 4 takes each'))
+  })
+
+  it('names an effect with a failed take and links its page, and says what was stopped', () => {
+    const batch = {
+      total: 16,
+      made: 4,
+      stopped: 10,
+      failed: [
+        { id: 'thunder', n: 1 },
+        { id: 'thunder', n: 2 },
+      ],
+      running: false,
+    }
+    const { container, text } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds([
+        [['effects-batch'], batch],
+        [['effects-summary-open'], true],
+      ]),
+    )
+    expect(text()).toContain(
+      'Made 4 of 16 takes. 2 could not be made — Thunder says why. 10 were stopped.',
+    )
+    expect(container.querySelector('.make-all-summary a')!.getAttribute('href')).toBe(
+      '#/effects/items/thunder',
+    )
+  })
+
+  it('does not bring the question back after takes started elsewhere have ended', async () => {
+    const { client, text, button, settle } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds(),
+    )
+    act(() => button('Make 4 takes each').click())
+    act(() => client.setQueryData(['effects-making'], { coins: { takes: 1, left: 2 } }))
+    await settle()
+    expect(text()).not.toContain('Make 16 takes for 4 effects?')
+    act(() => client.setQueryData(['effects-making'], {}))
+    await settle()
+    expect(text()).not.toContain('Make 16 takes for 4 effects?')
+    expect(button('Make 4 takes each')).toBeDefined()
+  })
+
+  it('Close puts focus on the panel when no button is left', async () => {
+    const batch = { total: 4, made: 4, stopped: 0, failed: [], running: false }
+    const { container, button, settle } = render(
+      list,
+      effects({ rows: [chosen('a'), chosen('b')] }),
+      undefined,
+      seeds([
+        [['effects-batch'], batch],
+        [['effects-summary-open'], true],
+      ]),
+    )
+    act(() => button('Close').click())
+    await settle()
+    expect(document.activeElement).toBe(container.querySelector('.status-panel'))
+  })
+
+  it('shows no summary on a page that did not see the takes made', () => {
+    const batch = { total: 16, made: 16, stopped: 0, failed: [], running: false }
+    const { text } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds([[['effects-batch'], batch]]),
+    )
+    expect(text()).not.toContain('Made 16 of 16 takes.')
   })
 })

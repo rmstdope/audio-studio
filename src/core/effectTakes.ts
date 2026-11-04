@@ -289,8 +289,8 @@ export interface EffectFailedView {
   message: string
 }
 
-/** An effect's takes as its page shows them. */
-export interface EffectTakesView {
+/** Which sound-effects models can make takes here: what the page and the Make all question need. */
+export interface EffectModelsView {
   ok: true
   /** Whether takes can be made at all: one of the models can run on this computer. */
   canMake: boolean
@@ -300,6 +300,10 @@ export interface EffectTakesView {
   uv: boolean
   /** Each model: how much of it is on this computer, and whether its last effect failed. */
   models: { id: EffectModelId; download: ImageDownload; failed: boolean }[]
+}
+
+/** An effect's takes as its page shows them. */
+export interface EffectTakesView extends EffectModelsView {
   takes: EffectTakeView[]
   making: EffectMakingView[]
   failed: EffectFailedView[]
@@ -314,7 +318,7 @@ export interface EffectMakingSummary {
 }
 
 /** Seconds as a person reads a wait: "12 s", "1 min", "1 min 10 s". */
-function waitOf(seconds: number): string {
+export function waitOf(seconds: number): string {
   if (seconds < 60) return `${seconds} s`
   const rest = seconds % 60
   return `${Math.floor(seconds / 60)} min${rest ? ` ${rest} s` : ''}`

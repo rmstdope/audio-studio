@@ -1832,6 +1832,42 @@ button.cue-chip[aria-expanded='true'] {
   align-self: auto;
 }
 
+/* The Sound effects panel's Make all: beside the count, dropping under it as one unit when narrow */
+.make-all {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.make-all-line,
+.make-all-running,
+.make-all-summary {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 12px;
+}
+
+.make-all-question {
+  flex: 1 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--raised);
+}
+
+.make-all-question p {
+  margin: 0;
+}
+
 .add-voice {
   display: flex;
   flex-wrap: wrap;

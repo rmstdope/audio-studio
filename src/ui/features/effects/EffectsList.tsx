@@ -18,6 +18,7 @@ import { effectsNotice, effectsRefreshSummary, effectsSubtitle } from '../../eff
 import { routeHref } from '../../route'
 import { showingAttentionText } from '../../status'
 import { FailedPanel, RefreshPanel } from '../music/MusicView'
+import { EffectsMakeAll } from './EffectsMakeAll'
 
 /** The chip class of each status: green when chosen, amber when it needs a look. */
 const STATUS_CHIP: Record<EffectStatus, string> = {
@@ -92,7 +93,7 @@ export function EffectsList({
       )}
       {!notice && effects.rows.length > 0 && (
         <>
-          <section className="panel status-panel" aria-label="Effects up to date">
+          <section className="panel status-panel" aria-label="Effects up to date" tabIndex={-1}>
             <div className="stats">
               <DoneStat
                 label="Effects up to date"
@@ -100,6 +101,7 @@ export function EffectsList({
                 total={effects.done.total}
                 href={page('attention')}
               />
+              <EffectsMakeAll effects={effects} />
             </div>
             {attention && (
               <p className="status-note muted">

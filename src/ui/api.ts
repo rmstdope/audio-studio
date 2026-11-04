@@ -37,9 +37,11 @@ import type { RemoveResult } from '../services/musicOrphans'
 import type { ImageMakeRequest, ImageTakesAnswer } from '../services/imageTakes'
 import type { RefreshEffectsResult, RefreshResult, RefreshSharedResult } from '../services/refresh'
 import type { EffectEditResult } from '../services/effectWords'
-import type { EffectMakingSummary, EffectTakesView } from '../core/effectTakes'
+import type { EffectMakingSummary, EffectModelsView, EffectTakesView } from '../core/effectTakes'
+import type { EffectBatch } from '../core/effectsMakeAll'
 import type {
   EffectChooseResult,
+  EffectMakeAllResult,
   EffectMakeResult,
   EffectStopResult,
   MakeEffectRequest,
@@ -2718,6 +2720,67 @@ export function useAcceptEffect(id: string) {
     id,
     'accepting the change',
     () => ({ method: 'POST', path: '/accept' }),
+  )
+}
+
+/** Which sound-effects models can run, for the Sound effects page's Make all question. */
+export function useEffectModels() {
+  return useQuery({
+    queryKey: ['effect-models'],
+    queryFn: () => getJson<EffectModelsView | ProjectFailure>('/api/effects/models'),
+  })
+}
+
+/** What the latest Make all made, stopped and failed so far; polled while takes are made. */
+export function useEffectsBatch(running: boolean) {
+  return useQuery({
+    queryKey: ['effects-batch'],
+    queryFn: () => getJson<EffectBatch | null>('/api/effects/batch'),
+    // Until the batch itself says it is done, so the answer that ends it is never missed.
+    refetchInterval: (query) => (running || query.state.data?.running ? 1000 : false),
+  })
+}
+
+/** One change that reaches every effect (Make all, Stop all), then everything it changes is read again. */
+function useEffectsAll<V, R>(path: string, what: string, bodyOf: (value: V) => unknown) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (value: V) => {
+      const body = bodyOf(value)
+      const response = await fetch(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      if (!response.ok && response.status !== 409)
+        throw new Error(`${what} answered ${response.status}`)
+      return (await response.json()) as R
+    },
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['project'] }),
+        client.invalidateQueries({ queryKey: ['effects-making'] }),
+        client.invalidateQueries({ queryKey: ['effects-batch'] }),
+        client.invalidateQueries({ queryKey: ['effect-takes'] }),
+      ]),
+  })
+}
+
+/** Makes four takes for each of these sound effects. */
+export function useMakeAllEffects() {
+  return useEffectsAll<string[], EffectMakeAllResult>(
+    '/api/effects/make-all',
+    'making the takes',
+    (ids) => ({ ids }),
+  )
+}
+
+/** Stops every sound-effect take waiting or being made. */
+export function useStopAllEffects() {
+  return useEffectsAll<void, NonNullable<EffectStopResult>>(
+    '/api/effects/stop-all',
+    'stopping the takes',
+    () => undefined,
   )
 }
 
