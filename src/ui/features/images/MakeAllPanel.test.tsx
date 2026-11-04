@@ -400,7 +400,7 @@ describe('Make takes for every image with no chosen take', () => {
       expect(document.activeElement).toBe(other)
     })
 
-    it('says when stopping failed, keeps Stop all and its focus, and clears the line when the takes finish', async () => {
+    it('says when stopping failed, keeps Stop all and its focus, and clears the line on the next press and when the takes finish', async () => {
       const page = render(three, { batch, making: running, stopFails: true })
       page.button('Stop all').focus()
       await page.press('Stop all')
@@ -408,7 +408,16 @@ describe('Make takes for every image with no chosen take', () => {
       const words = 'The takes could not be stopped. They are still being made; try again.'
       expect(page.text()).toContain(words)
       expect(document.activeElement).toBe(page.button('Stop all'))
+      const failing = globalThis.fetch
+      let fail = () => {}
+      globalThis.fetch = ((url: string, init?: RequestInit) =>
+        new Promise((resolve) => {
+          fail = () => resolve(failing(url, init))
+        })) as unknown as typeof fetch
       await page.press('Stop all')
+      await settle()
+      expect(page.text()).not.toContain(words)
+      await act(async () => fail())
       await settle()
       expect(page.text()).toContain(words)
       await finish(page)

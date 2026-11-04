@@ -927,12 +927,34 @@ describe('Make all, on the Sound effects list', () => {
       expect(document.activeElement).toBe(other)
     })
 
+    it('waits for the summary before moving focus when the batch ends after the takes', async () => {
+      const { client, button, settle } = render(
+        list,
+        effects({ rows: four }),
+        undefined,
+        seeds([
+          [['effects-making'], making],
+          [['effects-batch'], { ...batch, running: true }],
+          [['effects-summary-open'], true],
+        ]),
+      )
+      button('Stop all').focus()
+      act(() => client.setQueryData(['effects-making'], {}))
+      await settle()
+      expect(button('Close')).toBeUndefined()
+      expect(focused.at(-1)).not.toBe(button('Make 4 takes each'))
+      act(() => client.setQueryData(['effects-batch'], batch))
+      await settle()
+      expect(focused.at(-1)).toBe(button('Close'))
+    })
+
     it('says when stopping failed, keeps Stop all and its focus, and clears the line when the takes finish', async () => {
+      let answer = (call: { url: string }): Response | Promise<Response> =>
+        call.url.endsWith('/stop-all') ? new Response('{}', { status: 500 }) : Response.json({})
       const { client, text, button, settle } = render(
         list,
         effects({ rows: four }),
-        (call) =>
-          call.url.endsWith('/stop-all') ? new Response('{}', { status: 500 }) : Response.json({}),
+        (call) => answer(call),
         withBatch(),
       )
       button('Stop all').focus()
@@ -941,9 +963,12 @@ describe('Make all, on the Sound effects list', () => {
       const words = 'The takes could not be stopped. They are still being made; try again.'
       expect(text()).toContain(words)
       expect(document.activeElement).toBe(button('Stop all'))
-      act(() => button('Stop all').click())
+      act(() => {
+        answer = () => new Promise<Response>(() => {})
+        button('Stop all').click()
+      })
       await settle()
-      expect(text()).toContain(words)
+      expect(text()).not.toContain(words)
       act(() => client.setQueryData(['effects-making'], {}))
       await settle()
       expect(text()).not.toContain(words)

@@ -511,7 +511,7 @@ describe('Make takes for every stinger with no chosen take', () => {
       expect(document.activeElement).toBe(other)
     })
 
-    it('says when stopping failed, keeps Stop all and its focus, and clears the line on the next press', async () => {
+    it('says when stopping failed, keeps Stop all and its focus, and clears the line while the next press is under way', async () => {
       const page = render(four, { batch, making: running, stopFails: true })
       page.button('Stop all').focus()
       await page.press('Stop all')
@@ -520,7 +520,16 @@ describe('Make takes for every stinger with no chosen take', () => {
       expect(page.text()).toContain(words)
       expect(page.button('Stop all')).toBeDefined()
       expect(document.activeElement).toBe(page.button('Stop all'))
+      const failing = globalThis.fetch
+      let fail = () => {}
+      globalThis.fetch = ((url: string, init?: RequestInit) =>
+        new Promise((resolve) => {
+          fail = () => resolve(failing(url, init))
+        })) as unknown as typeof fetch
       await page.press('Stop all')
+      await settle()
+      expect(page.text()).not.toContain(words)
+      await act(async () => fail())
       await settle()
       expect(page.text()).toContain(words)
       await finish(page)

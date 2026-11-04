@@ -80,7 +80,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
     }
   })
   // Where focus goes when Stop all goes away: the summary's Close, else the panel's button or the panel.
-  const stopFocus = useStopFocus(running, () => {
+  const stopFocus = useStopFocus(running || Boolean(batch?.running), () => {
     if (closeButton.current) closeButton.current.focus()
     else if (makeButton.current) makeButton.current.focus()
     else document.querySelector<HTMLElement>('.status-panel')?.focus()
