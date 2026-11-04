@@ -64,4 +64,10 @@ describe('the scene editor’s styles', () => {
     expect(rule(css, '.scene-add-list ul')).toContain('max-height')
     expect(rule(css, '.scene-add-list ul')).toContain('overflow-y: auto')
   })
+
+  it('opens the scene’s Music menu in front of the play bar', () => {
+    const z = (...selectors: string[]) =>
+      Number(selectors.map((s) => /z-index:\s*(\d+)/.exec(rule(css, s))?.[1]).find(Boolean))
+    expect(z('.scene-music .menu-list', '.menu-list')).toBeGreaterThan(z('.scene-playbar'))
+  })
 })

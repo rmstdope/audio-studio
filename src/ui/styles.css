@@ -4330,6 +4330,9 @@ button.cue-chip[aria-expanded='true'] {
   position: relative;
   margin-top: 10px;
 }
+.scene-music .menu-list {
+  z-index: 6;
+}
 .scene-add-list {
   z-index: 6;
   min-width: 320px;
