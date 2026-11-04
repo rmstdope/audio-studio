@@ -6,6 +6,7 @@ import { ActLinks } from './ActLinks'
 import { makingStatusText } from '../../musicTakesText'
 import { routeHref } from '../../route'
 import { showingAttentionText } from '../../status'
+import { MakeAllPanel } from './MakeAllPanel'
 import { DoneStat } from '../../components/DoneStat'
 import { FailedPanel, RefreshPanel } from '../music/MusicView'
 
@@ -84,14 +85,16 @@ export function ActPage({
       {panel}
       {act.state === 'ok' && act.order.length > 0 && (
         <section className="panel status-panel" aria-label="Images up to date">
-          <div className="stats">
-            <DoneStat
-              label="Images up to date"
-              done={done.done}
-              total={done.total}
-              href={page('attention')}
-            />
-          </div>
+          <MakeAllPanel act={act}>
+            <div className="stats">
+              <DoneStat
+                label="Images up to date"
+                done={done.done}
+                total={done.total}
+                href={page('attention')}
+              />
+            </div>
+          </MakeAllPanel>
           {attention && (
             <p className="status-note muted">
               {showingAttentionText(order.length, 'image')} <a href={page()}>Show all</a>
@@ -191,7 +194,7 @@ export function ActPage({
                         {row.width} × {row.height}
                       </td>
                       <td className="images-status">
-                        {making[row.id] ? (
+                        {(making[row.id]?.takes ?? 0) > 0 ? (
                           <span className="chip chip-warn">
                             {makingStatusText(making[row.id]!)}
                           </span>

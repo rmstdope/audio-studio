@@ -34,7 +34,11 @@ import type { BriefChangeResult } from '../services/briefs'
 import type { StyleField } from '../core/images'
 import type { ImageEditResult } from '../services/imageEdits'
 import type { RemoveResult } from '../services/musicOrphans'
-import type { ImageMakeRequest, ImageTakesAnswer } from '../services/imageTakes'
+import type {
+  ImageMakeRequest,
+  ImageModelStateResult,
+  ImageTakesAnswer,
+} from '../services/imageTakes'
 import type { RefreshEffectsResult, RefreshResult, RefreshSharedResult } from '../services/refresh'
 import type { EffectEditResult } from '../services/effectWords'
 import type { EffectMakingSummary, EffectModelsView, EffectTakesView } from '../core/effectTakes'
@@ -1300,7 +1304,96 @@ export function useImageMaking() {
   return useQuery({
     queryKey: ['image-making'],
     queryFn: () => getJson<Record<string, ImageMakingSummary>>('/api/images/making'),
-    refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length ? 3000 : false),
+    refetchInterval: (query) =>
+      Object.values(query.state.data ?? {}).some((m) => m.takes > 0) ? 3000 : false,
+  })
+}
+
+/** Setup's image model, how each model stands, and whether images can be made now. */
+export function useImageModelState() {
+  return useQuery({
+    queryKey: ['image-model-state'],
+    queryFn: () => getJson<ImageModelStateResult>('/api/images/model-state'),
+  })
+}
+
+/**
+ * What one press of Make takes on an act remembers until Close or a reload: how many takes the
+ * server queued, for which images, and for each of those how many of its takes had failed and been
+ * stopped before the press.
+ */
+export interface ImagesBatch {
+  total: number
+  images: string[]
+  failedBefore: Record<string, number>
+  stoppedBefore: Record<string, number>
+}
+
+/** The cache key of an act's batch. */
+const imagesBatchKey = (actId: string) => ['images-batch', actId] as const
+
+/**
+ * An act's last press of Make takes, or null. It lives in the query cache, not the page, so it
+ * survives leaving the act and coming back; a reload forgets it.
+ */
+export function useImagesBatch(actId: string): { batch: ImagesBatch | null; dismiss: () => void } {
+  const client = useQueryClient()
+  const { data } = useQuery({
+    queryKey: imagesBatchKey(actId),
+    queryFn: () => client.getQueryData<ImagesBatch | null>(imagesBatchKey(actId)) ?? null,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+  return {
+    batch: data ?? null,
+    dismiss: () => client.setQueryData<ImagesBatch | null>(imagesBatchKey(actId), null),
+  }
+}
+
+/**
+ * Asks for four takes of every image of an act with no chosen take. The images and takes the
+ * server queued become the remembered batch, after what is being made has been read, so the page
+ * never sees them done before they began. A refusal is an error: nothing was made.
+ */
+export function useImagesMakeAll(actId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (before: Record<string, ImageMakingSummary>) => {
+      const response = await fetch(`/api/image-acts/${encodeURIComponent(actId)}/make-all`, {
+        method: 'POST',
+      })
+      const answer = (await response.json().catch(() => null)) as {
+        ok: boolean
+        images?: string[]
+        takes?: number
+      } | null
+      if (!response.ok || !answer?.ok)
+        throw new Error(`asking for takes answered ${response.status}`)
+      await client.refetchQueries({ queryKey: ['image-making'] })
+      const images = answer.images ?? []
+      if (!images.length) return
+      client.setQueryData<ImagesBatch>(imagesBatchKey(actId), {
+        total: answer.takes ?? 0,
+        images,
+        failedBefore: Object.fromEntries(images.map((id) => [id, before[id]?.failed ?? 0])),
+        stoppedBefore: Object.fromEntries(images.map((id) => [id, before[id]?.stopped ?? 0])),
+      })
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['image-making'] }),
+  })
+}
+
+/** Stops every take of an act that waits or is being made. */
+export function useImagesStopAll(actId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/image-acts/${encodeURIComponent(actId)}/stop`, {
+        method: 'POST',
+      })
+      if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['image-making'] }),
   })
 }
 

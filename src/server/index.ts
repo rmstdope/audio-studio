@@ -154,7 +154,11 @@ import { MakeAllBody } from '../core/effectsMakeAll'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
 import { createImageHealth } from '../services/imageHealth'
-import { createImageTakes, type ImageTakesAnswer } from '../services/imageTakes'
+import {
+  createImageTakes,
+  type ImageMakeAllAnswer,
+  type ImageTakesAnswer,
+} from '../services/imageTakes'
 import { createMfluxGenerator, type ImageGenerator } from '../services/images'
 import { createFakeImages } from '../services/imagesFake'
 import { createWhisperWorker, type Transcriber } from '../services/transcriber'
@@ -295,7 +299,7 @@ const ModelsBody = z
 const StageParam = z.enum(['audition', 'draft', 'final'])
 
 /** The answer to a change of the studio's image words: 404 for an unknown image, 409 with the reason. */
-function imageAnswer(result: ImageEditResult | ImageTakesAnswer): Response {
+function imageAnswer(result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAnswer): Response {
   if (!result) return Response.json({ error: 'not found' }, { status: 404 })
   return Response.json(result, { status: result.ok ? 200 : 409 })
 }
@@ -1574,6 +1578,21 @@ export function startServer({
       },
       '/api/images/making': {
         GET: guard(async () => Response.json(await imageTakes.making(projectFile))),
+      },
+      '/api/images/model-state': {
+        GET: guard(async () => Response.json(await imageTakes.modelState(projectFile))),
+      },
+      '/api/image-acts/:id/make-all': {
+        POST: fromOwnPage(async (request) =>
+          imageAnswer(await imageTakes.makeAll(projectFile, request.params.id)),
+        ),
+      },
+      '/api/image-acts/:id/stop': {
+        POST: fromOwnPage(async (request) => {
+          const result = await imageTakes.stopAll(projectFile, request.params.id)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
       },
       '/api/images/bring-all': {
         GET: guard(async () => Response.json(imageTakes.lookRun(projectFile))),
