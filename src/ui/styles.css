@@ -4169,6 +4169,14 @@ button.cue-chip[aria-expanded='true'] {
 .scene-play {
   width: 40px;
 }
+/* The panel is the container its table measures itself against: below the width the table needs,
+   each effect is a card (the rules after the narrow-window block). */
+.scene-effects {
+  container-type: inline-size;
+  container-name: scene-effects;
+}
+/* The chip goes beside the name when there is room and whole on its own line under it when not, so
+   the column is only as wide as the longer of the two, the name keeping its gap. */
 .scene-effect-name {
   display: inline-block;
   max-width: 12ch;
@@ -4177,8 +4185,28 @@ button.cue-chip[aria-expanded='true'] {
   white-space: nowrap;
   vertical-align: bottom;
 }
+.scene-effect-name:has(+ .chip) {
+  margin-right: 8px;
+}
+.scene-effect-cell .chip {
+  display: inline-block;
+}
 .scene-effects .table th {
   white-space: nowrap;
+}
+.scene-effects .table th,
+.scene-effects .table td {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.scene-level-cell .scene-slider {
+  display: flex;
+  width: 100%;
+}
+.scene-level-cell .scene-slider input {
+  width: 100%;
+  min-width: 48px;
+  max-width: 110px;
 }
 .scene-how,
 .scene-state {
@@ -4193,7 +4221,6 @@ button.cue-chip[aria-expanded='true'] {
 .scene-state .chip {
   white-space: nowrap;
 }
-.scene-effect .chip,
 .scene-how .chip,
 .scene-state .chip,
 .scene-music .chip {
@@ -4534,6 +4561,17 @@ button.cue-chip[aria-expanded='true'] {
     background: var(--glass);
     color: var(--text);
   }
+  .scene-playbar {
+    row-gap: 8px;
+  }
+  .scene-music {
+    flex-wrap: wrap;
+  }
+}
+
+/* Each effect as a card, whenever the panel is narrower than the table needs while a scene plays
+   (about 1285 px of window and below, as-iix), not only in a narrow window. */
+@container scene-effects (max-width: 700px) {
   .scene-effects .table thead {
     display: none;
   }
@@ -4566,8 +4604,12 @@ button.cue-chip[aria-expanded='true'] {
     min-width: 0;
     max-width: none;
   }
+  .scene-effects .table .scene-effect-name:has(+ .chip) {
+    margin-right: 0;
+  }
   .scene-effects .table .scene-effect-cell .chip {
     flex: none;
+    margin-left: 8px;
   }
   .scene-effects .table td.scene-effect {
     grid-column: 2;
@@ -4590,11 +4632,5 @@ button.cue-chip[aria-expanded='true'] {
   .scene-effects .table td.scene-state,
   .scene-effects .table td.scene-level-cell {
     grid-column: 2 / -1;
-  }
-  .scene-playbar {
-    row-gap: 8px;
-  }
-  .scene-music {
-    flex-wrap: wrap;
   }
 }
