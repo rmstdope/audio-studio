@@ -4174,6 +4174,7 @@ button.cue-chip[aria-expanded='true'] {
   align-items: baseline;
 }
 .scene-effect-name {
+  flex: none;
   min-width: 0;
   max-width: 20ch;
   overflow: hidden;
@@ -4548,6 +4549,9 @@ button.cue-chip[aria-expanded='true'] {
   }
   .scene-effects .table td.scene-play {
     grid-row: 1;
+  }
+  .scene-effects .table .scene-effect-name {
+    flex: 0 1 auto;
   }
   .scene-effects .table td.scene-effect {
     grid-column: 2;
