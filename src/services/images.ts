@@ -13,6 +13,7 @@ import {
 } from '../core/imageModels'
 import { freeGpu, gpuQueue, holdGpu, GPU } from './gpu'
 import { quietLines } from './lineWorker'
+import { killGroup, stopWithStudio } from './stopWithStudio'
 import type { Serial } from './serial'
 import type { Machine } from './setup'
 
@@ -240,11 +241,13 @@ export function createMfluxGenerator({
         mfluxArguments(request, join(tmpdir(), `content-studio-image-${randomUUID()}.png`)),
       )
       try {
-        const proc = Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe' })
+        const proc = Bun.spawn(command, { stdout: 'ignore', stderr: 'pipe', detached: true })
+        const forget = stopWithStudio(proc.pid)
+        void proc.exited.then(forget)
         let stopped = ''
         const stop = (why: string) => {
           stopped = why
-          proc.kill()
+          killGroup(proc.pid, 'SIGTERM')
         }
         const onAbort = () => stop('The image generator was stopped.')
         signal?.addEventListener('abort', onAbort, { once: true })

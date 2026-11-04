@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { killGroup, stopWithStudio } from './stopWithStudio'
 
 /**
  * The studio's own worker folder, where every worker runs: what a worker writes beside itself
@@ -63,8 +64,8 @@ export interface LineWorkerOptions {
  * A worker process started on its first request and kept, so a model loads once. Requests are
  * answered by `id`, several may wait at once. A worker that dies fails only the requests waiting
  * for it and is started again next time; one that takes longer than `timeoutMs` on a request is
- * stopped, failing everything it had with that reason. It exits by itself when its input closes,
- * as it does when the studio stops.
+ * stopped, failing everything it had with that reason. It runs in its own process group, stopped
+ * whole (what `uv run` started too) when it is closed or timed out, and when the studio stops.
  */
 export function createLineWorker({
   name,
@@ -83,8 +84,10 @@ export function createLineWorker({
       stdin: 'pipe',
       stdout: 'pipe',
       stderr: 'pipe',
+      detached: true,
       ...(env ? { env: { ...process.env, ...env } } : {}),
     })
+    const forget = stopWithStudio(proc.pid)
     const current: Running = { proc, pending: new Map(), stoppedBecause: null }
     let stderr = ''
     const note = (text: string) => {
@@ -108,6 +111,7 @@ export function createLineWorker({
       }
     })()
     void proc.exited.then((code) => {
+      forget()
       if (worker === current) worker = null
       const why = stderr.trim().split('\n').slice(-3).join(' ')
       const wasKilled = code === 137 || current.proc.signalCode === 'SIGKILL'
@@ -155,7 +159,7 @@ export function createLineWorker({
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           current.stoppedBecause = `${name} took longer than ${timeoutMs / 1000} s; it was stopped`
-          current.proc.kill()
+          killGroup(current.proc.pid, 'SIGTERM')
         }, timeoutMs)
         current.pending.set(id, {
           resolve: (result) => {
@@ -174,7 +178,7 @@ export function createLineWorker({
     async close() {
       const closing = worker
       worker = null
-      closing?.proc.kill()
+      if (closing) killGroup(closing.proc.pid, 'SIGTERM')
       await closing?.proc.exited
     },
   }
