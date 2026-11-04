@@ -94,17 +94,26 @@ interface Voice {
 export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackView) => void) {
   let ctx: PlaybackContext | null = null
   const buffers = new Map<string, Promise<LoopBuffer>>()
+  // The clips that are decoded, so that sounding one needs no waiting.
+  const decoded = new Map<string, LoopBuffer>()
   const failed = new Set<string>()
   let phase: PlaybackView['phase'] = 'stopped'
   let token = 0
   let stopTicking: (() => void) | null = null
   let engine = createSceneEngine({ random: web.random })
   let t0 = 0
-  let scene: PlayScene | null = null
+  // What the page has now; and what the slots describe while playing.
+  let latest: PlayScene | null = null
+  let live: PlayScene | null = null
   let mix: MixSets = { muted: new Set(), soloed: new Set() }
   let slots: number[] = []
-  const voices = new Map<number, Voice>()
+  // A trigger fired again while its clip sounds adds a voice to its slot's list.
+  const voices = new Map<number, Voice[]>()
+  // Clips played once over the scene by a row's ▶.
+  const overs: Voice[] = []
   let music: { url: string; voice: Voice } | null = null
+  // Edits being applied: Mute and Solo wait for them, their keys are about the new rows.
+  let updating = 0
 
   const now = () => (ctx ? ctx.currentTime - t0 : 0)
   const view = (): PlaybackView => ({
@@ -132,17 +141,20 @@ export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackV
         url === null
           ? null
           : load(url).then(
-              () => failed.delete(url),
+              (buffer) => {
+                decoded.set(url, buffer)
+                failed.delete(url)
+              },
               () => void failed.add(url),
             ),
       ),
     )
   }
   const ready = (url: string | null) =>
-    url !== null && !failed.has(url) && buffers.has(url) ? url : null
-  const seconds = (url: string | null): Promise<number | null> => {
+    url !== null && !failed.has(url) && decoded.has(url) ? url : null
+  const seconds = (url: string | null): number | null => {
     const u = ready(url)
-    return u === null ? Promise.resolve(null) : buffers.get(u)!.then((b) => b.duration)
+    return u === null ? null : decoded.get(u)!.duration
   }
 
   const ramp = (gain: RampGain, to: number, over: number) => {
@@ -154,21 +166,25 @@ export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackV
     } else param.value = to
   }
 
-  /** Sounds a clip: through a fade gain (in over `fadeIn`, or at once) and a level gain. */
-  const sound = async (
-    url: string,
-    loop: boolean,
-    level: number,
-    fadeIn: number,
-  ): Promise<Voice | null> => {
+  /** Sets a gain to `to` at once, over anything it was ramping to. */
+  const setNow = (gain: RampGain, to: number) => {
+    const param = gain.gain
+    if (param.setValueAtTime && ctx) {
+      param.cancelScheduledValues?.(ctx.currentTime)
+      param.setValueAtTime(to, ctx.currentTime)
+    }
+    param.value = to
+  }
+
+  /** Sounds a decoded clip: through a fade gain (in over `fadeIn`, or at once) and a level gain. */
+  const sound = (url: string, loop: boolean, level: number, fadeIn: number): Voice => {
     const context = ctx!
-    const buffer = await buffers.get(url)!
     const fade = context.createGain()
     const levelGain = context.createGain()
     fade.gain.value = fadeIn > 0 ? 0 : 1
     levelGain.gain.value = level
     const source = context.createBufferSource()
-    source.buffer = buffer
+    source.buffer = decoded.get(url)!
     source.loop = loop
     source.connect(fade)
     fade.connect(levelGain)
@@ -186,72 +202,66 @@ export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackV
 
   /** The level a row's gain should have: its level, silent when it is not heard. */
   const rowLevel = (index: number) =>
-    audible(rowKey(index), mix.muted, mix.soloed) ? (scene?.rows[index]?.level ?? 0) : 0
+    audible(rowKey(index), mix.muted, mix.soloed) ? (live?.rows[index]?.level ?? 0) : 0
   const musicLevel = () =>
-    audible(MUSIC_KEY, mix.muted, mix.soloed) ? (scene?.music.level ?? 0) : 0
+    audible(MUSIC_KEY, mix.muted, mix.soloed) ? (live?.music.level ?? 0) : 0
 
-  const act = async (cues: Cue[], local: PlayScene, mine: number) => {
+  const act = (cues: Cue[]) => {
     for (const cue of cues) {
-      const index = slots.indexOf(cue.slot)
-      const row = local.rows[index]
       if (cue.kind === 'stop') {
-        const voice = voices.get(cue.slot)
-        if (voice) end(voice, cue.fade ? STATE_FADE_SECONDS : 0)
+        for (const voice of voices.get(cue.slot) ?? [])
+          end(voice, cue.fade ? STATE_FADE_SECONDS : 0)
         voices.delete(cue.slot)
         continue
       }
+      const index = slots.indexOf(cue.slot)
+      const row = live?.rows[index]
       if (!row || ready(row.url) === null) continue
-      const voice = await sound(
-        row.url!,
-        cue.loop,
-        rowLevel(index),
-        cue.fade ? STATE_FADE_SECONDS : 0,
-      )
-      if (mine !== token || !voice) {
-        if (voice) end(voice, 0)
-        continue
-      }
-      voices.set(cue.slot, voice)
+      const voice = sound(row.url!, cue.loop, rowLevel(index), cue.fade ? STATE_FADE_SECONDS : 0)
+      voices.set(cue.slot, [...(voices.get(cue.slot) ?? []), voice])
     }
   }
 
-  const engineRows = async (local: PlayScene): Promise<EngineRow[]> =>
-    Promise.all(
-      local.rows.map(async (row) => ({
-        id: row.id,
-        play: row.play,
-        state: row.state,
-        seconds: await seconds(row.url),
-      })),
-    )
+  const engineRows = (local: PlayScene): EngineRow[] =>
+    local.rows.map((row) => ({
+      id: row.id,
+      play: row.play,
+      state: row.state,
+      seconds: seconds(row.url),
+    }))
 
-  const setMusic = async (mine: number) => {
-    if (!scene) return
-    const url = ready(scene.music.url)
+  /** Makes the music the scene's: another track crossfades. */
+  const setMusic = () => {
+    if (!live) return
+    const url = ready(live.music.url)
     if (music && music.url === url) return
     const old = music
     music = null
     if (old) end(old.voice, MUSIC_CROSSFADE_SECONDS)
     if (url === null) return
-    const voice = await sound(url, true, musicLevel(), old ? MUSIC_CROSSFADE_SECONDS : 0)
-    if (mine !== token || !voice) {
-      if (voice) end(voice, 0)
-      return
-    }
-    music = { url, voice }
+    music = { url, voice: sound(url, true, musicLevel(), old ? MUSIC_CROSSFADE_SECONDS : 0) }
   }
 
   const tick = () => {
     if (phase !== 'playing') return
-    void act(engine.advance(now()), scene!, token)
+    act(engine.advance(now()))
     emit()
   }
 
   const silenceAll = (fade: number) => {
-    for (const voice of voices.values()) end(voice, fade)
+    for (const list of voices.values()) for (const voice of list) end(voice, fade)
     voices.clear()
+    for (const voice of overs.splice(0)) end(voice, fade)
     if (music) end(music.voice, fade)
     music = null
+  }
+
+  /** Every sound takes the level it should have now, at once. */
+  const applyLevels = () => {
+    slots.forEach((slot, index) => {
+      for (const voice of voices.get(slot) ?? []) setNow(voice.level, rowLevel(index))
+    })
+    if (music) setNow(music.voice.level, musicLevel())
   }
 
   return {
@@ -260,21 +270,27 @@ export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackV
       if (phase !== 'stopped') return
       const mine = ++token
       phase = 'loading'
-      scene = first
+      latest = first
       emit()
       ctx ??= web.context()
       await ctx.resume?.()
-      await loadAll([first.music.url, ...first.rows.map((r) => r.url)])
-      if (mine !== token) return
-      const rows = await engineRows(scene!)
-      if (mine !== token) return
+      // Edits made while loading are loaded too: what the page has when the clips are in is played.
+      let loaded: PlayScene | null = null
+      while (loaded !== latest) {
+        loaded = latest
+        await loadAll([loaded!.music.url, ...loaded!.rows.map((r) => r.url)])
+        if (mine !== token) return
+      }
+      const entering = loaded!
       engine = createSceneEngine({ random: web.random })
+      live = entering
+      const rows = engineRows(entering)
       slots = rows.map((_, i) => i)
       t0 = ctx.currentTime
+      const cues = engine.enter(rows, entering.state, 0)
       phase = 'playing'
-      await setMusic(mine)
-      if (mine !== token) return
-      void act(engine.enter(rows, scene!.state, 0), scene!, mine)
+      setMusic()
+      act(cues)
       stopTicking = web.every(tick, TICK_MS)
       emit()
     },
@@ -286,74 +302,74 @@ export function createScenePlayback(web: PlaybackWeb, onChange: (view: PlaybackV
       stopTicking = null
       silenceAll(STATE_FADE_SECONDS)
       slots = []
+      live = null
       phase = 'stopped'
       emit()
     },
 
     /** The scene as the page has it now: an edit, heard at once. */
     async update(next: PlayScene): Promise<void> {
-      const previous = scene
-      scene = next
+      latest = next
       if (phase !== 'playing') return
       const mine = token
-      await loadAll([next.music.url, ...next.rows.map((r) => r.url)])
-      if (mine !== token) return
-      if (previous && previous.music.url !== next.music.url) await setMusic(mine)
-      if (mine !== token) return
-      const rows = await engineRows(next)
-      if (mine !== token) return
-      if (next.state !== previous?.state) void act(engine.setState(next.state, now()), next, mine)
-      const change = engine.setRows(rows, now())
-      slots = change.slots
-      for (const cue of change.cues) if (cue.kind === 'stop') void act([cue], next, mine)
-      void act(
-        change.cues.filter((c) => c.kind === 'start'),
-        next,
-        mine,
-      )
-      this.setLevel()
-      emit()
+      updating++
+      try {
+        await loadAll([next.music.url, ...next.rows.map((r) => r.url)])
+        // A newer edit is on its way (or applied): this one is stale.
+        if (mine !== token || latest !== next) return
+        const t = now()
+        const stateChanged = next.state !== live?.state
+        if (stateChanged) act(engine.setState(next.state, t))
+        const change = engine.setRows(engineRows(next), t)
+        act(change.cues.filter((c) => c.kind === 'stop'))
+        live = next
+        slots = change.slots
+        act(change.cues.filter((c) => c.kind === 'start'))
+        setMusic()
+        applyLevels()
+        emit()
+      } finally {
+        updating--
+      }
     },
 
     /** Mute and solo changed: each sound fades to its level, or to silence. */
     setMix(next: MixSets): void {
       mix = next
-      if (phase !== 'playing') return
+      if (phase !== 'playing' || updating > 0) return
       slots.forEach((slot, index) => {
-        const voice = voices.get(slot)
-        if (voice) ramp(voice.level, rowLevel(index), STATE_FADE_SECONDS)
+        for (const voice of voices.get(slot) ?? [])
+          ramp(voice.level, rowLevel(index), STATE_FADE_SECONDS)
       })
       if (music) ramp(music.voice.level, musicLevel(), STATE_FADE_SECONDS)
     },
 
     /** A level changed: heard at once. */
     setLevel(): void {
-      if (phase !== 'playing' || !scene) return
-      slots.forEach((slot, index) => {
-        const voice = voices.get(slot)
-        if (voice) voice.level.gain.value = rowLevel(index)
-      })
-      if (music) music.voice.level.gain.value = musicLevel()
+      if (phase === 'playing' && live) applyLevels()
     },
 
     /** The scene's state becomes `state`. */
     setState(state: string | null): void {
-      if (scene) scene = { ...scene, state }
-      if (phase === 'playing' && scene) void act(engine.setState(state, now()), scene, token)
+      if (latest && latest.state !== state) latest = { ...latest, state }
+      if (phase === 'playing' && live) {
+        act(engine.setState(state, now()))
+        live = { ...live, state }
+      }
       emit()
     },
 
     /** The game fires `trigger`. */
     fire(trigger: string): void {
-      if (phase === 'playing' && scene) void act(engine.fire(trigger, now()), scene, token)
+      if (phase === 'playing') act(engine.fire(trigger, now()))
       emit()
     },
 
-    /** Plays one clip over the scene at `level`, whatever mute and solo say. */
+    /** Plays one clip over the scene at `level`, whatever mute and solo say; ■ ends it too. */
     async once(url: string, level: number): Promise<void> {
       await loadAll([url])
       if (ready(url) === null) return
-      await sound(url, false, level, 0)
+      overs.push(sound(url, false, level, 0))
     },
 
     /** The current view. */

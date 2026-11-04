@@ -2,13 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { rowProblems, toMix, type SceneDraft } from '../core/sceneEdit'
 import type { RowNow } from '../core/sceneEngine'
 import type { SceneAct, SceneEffectChoice, SceneRow } from '../core/scenes'
-import {
-  createScenePlayback,
-  MUSIC_KEY,
-  rowKey,
-  type PlayScene,
-  type PlaybackView,
-} from './scenePlayback'
+import { createScenePlayback, rowKey, type PlayScene, type PlaybackView } from './scenePlayback'
 
 /** The scene as the page has it, ready to play: urls for what can sound, the state it is in. */
 export function playSceneOf(
@@ -91,7 +85,6 @@ export interface ScenePlay {
   once: (url: string, level: number) => void
   /** Stops playing, resets State and clears Mute and Solo (another scene opened). */
   reset: () => void
-  stop: () => void
 }
 
 /**
@@ -156,7 +149,6 @@ export function useScenePlay(
     if (!next.delete(key)) next.add(key)
     return next
   }
-  const stop = useCallback(() => run.stop(), [run])
   const reset = useCallback(() => {
     run.stop()
     setChosen(null)
@@ -195,8 +187,5 @@ export function useScenePlay(
     },
     once: (url, level) => void run.once(url, level),
     reset,
-    stop,
   }
 }
-
-export { MUSIC_KEY, rowKey }

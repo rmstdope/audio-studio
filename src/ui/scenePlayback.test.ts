@@ -11,7 +11,7 @@ import {
 /** A fake Web Audio context and clock: sources and gains are recorded, time moves when told. */
 function rig(failing: string[] = []) {
   const log: string[] = []
-  const gains: { name: string; value: number; ramps: [number, number][] }[] = []
+  const gains: { name: string; value: number; effective: number; ramps: [number, number][] }[] = []
   let time = 0
   let tick: (() => void) | null = null
   let release: (() => void) | null = null
@@ -24,7 +24,13 @@ function rig(failing: string[] = []) {
     resume: async () => {},
     decodeAudioData: async () => ({ duration: 2 }),
     createGain: () => {
-      const entry = { name: `g${gains.length}`, value: 1, ramps: [] as [number, number][] }
+      const entry = {
+        name: `g${gains.length}`,
+        value: 1,
+        // Where the gain ends up: the last thing set or ramped to, as a real AudioParam would.
+        effective: 1,
+        ramps: [] as [number, number][],
+      }
       gains.push(entry)
       return {
         gain: {
@@ -33,9 +39,15 @@ function rig(failing: string[] = []) {
           },
           set value(v: number) {
             entry.value = v
+            entry.effective = v
           },
-          setValueAtTime: () => {},
-          linearRampToValueAtTime: (v: number, when: number) => entry.ramps.push([v, when]),
+          setValueAtTime: (v: number) => {
+            entry.effective = v
+          },
+          linearRampToValueAtTime: (v: number, when: number) => {
+            entry.effective = v
+            return entry.ramps.push([v, when])
+          },
         },
         connect: (n: unknown) => n,
       }
@@ -230,5 +242,82 @@ describe('playing a scene', () => {
     await r.playback.update(changed)
     expect(windLevel.value).toBe(0.8)
     expect(windLevel.ramps).toEqual([])
+  })
+
+  test('removing a row while playing leaves the rows after it at their own levels', async () => {
+    const r = rig()
+    const two = scene({
+      rows: [
+        { id: 'a', play: { mode: 'loop' }, state: null, level: 1, url: '/a' },
+        { id: 'b', play: { mode: 'loop' }, state: null, level: 0.5, url: '/b' },
+      ],
+    })
+    await r.playback.start(two)
+    await settle()
+    const bLevel = r.gains.find((g) => g.value === 0.5)!
+    // The page shifts the keys and sends the new rows in the same commit.
+    r.playback.setMix({ muted: new Set(), soloed: new Set() })
+    const update = r.playback.update(scene({ rows: [two.rows[1]!] }))
+    r.playback.setMix({ muted: new Set(), soloed: new Set() })
+    await update
+    expect(bLevel.effective).toBe(0.5)
+  })
+
+  test('a level dragged while a mute ramp is pending wins', async () => {
+    const r = rig()
+    await r.playback.start(scene())
+    await settle()
+    const wind = r.gains.find((g) => g.value === 0.5)!
+    r.playback.setMix({ muted: new Set([rowKey(0)]), soloed: new Set() })
+    r.playback.setMix({ muted: new Set(), soloed: new Set() })
+    const louder = scene()
+    louder.rows[0]!.level = 0.9
+    await r.playback.update(louder)
+    expect(wind.effective).toBe(0.9)
+  })
+
+  test('a trigger fired twice while sounding leaves no voice that stop misses', async () => {
+    const r = rig()
+    const door = scene({
+      music: { url: null, level: 1 },
+      rows: [
+        {
+          id: 'door',
+          play: { mode: 'trigger', trigger: 'go' },
+          state: null,
+          level: 1,
+          url: '/door',
+        },
+      ],
+    })
+    await r.playback.start(door)
+    await settle()
+    r.playback.fire('go')
+    r.playback.fire('go')
+    r.playback.stop()
+    expect(r.log.filter((l) => l === 'start')).toHaveLength(2)
+    expect(r.log.filter((l) => l.startsWith('stop'))).toHaveLength(2)
+  })
+
+  test('a clip played over the scene ends with stop', async () => {
+    const r = rig()
+    await r.playback.start(scene({ music: { url: null, level: 1 }, rows: [] }))
+    await settle()
+    await r.playback.once('/wind', 1)
+    r.playback.stop()
+    expect(r.log.filter((l) => l.startsWith('stop'))).toHaveLength(1)
+  })
+
+  test('an edit made while loading is loaded and played', async () => {
+    const r = rig()
+    r.hold()
+    void r.playback.start(scene({ rows: [] }))
+    await settle()
+    void r.playback.update(scene())
+    r.open()
+    await settle()
+    await settle()
+    expect(r.last().rows).toHaveLength(2)
+    expect(r.log.filter((l) => l === 'start loop')).toHaveLength(2)
   })
 })

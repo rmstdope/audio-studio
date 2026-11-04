@@ -1073,4 +1073,56 @@ describe('playing a scene', () => {
     press(page, 'Stop the scene')
     await flush()
   })
+
+  it('does not tint or animate a silent loop row, and says Silent', async () => {
+    const purr = effects.rows.find((r) => r.id === 'cat-purr')!
+    const was = purr.current
+    purr.current = { kind: 'nothing' } as typeof purr.current
+    try {
+      const page = render(open)
+      act(() => button(bar(page), 'cat-home').click())
+      press(page, 'Start the scene')
+      await flush()
+      expect(rowText(page, 'cat-purr')).toContain('Silent')
+      expect(page.querySelectorAll('.scene-sounding')).toHaveLength(0)
+      expect(page.querySelectorAll('.scene-eq')).toHaveLength(0)
+      press(page, 'Stop the scene')
+      await flush()
+    } finally {
+      purr.current = was
+    }
+  })
+
+  it('says Couldn’t load the clip in red by the music, and plays the rest', async () => {
+    const real = globalThis.fetch
+    globalThis.fetch = (async (path: string, init?: RequestInit) =>
+      String(path).startsWith('/api/music/')
+        ? new Response('no', { status: 404 })
+        : real(path, init)) as typeof fetch
+    try {
+      const page = render(open)
+      press(page, 'Start the scene')
+      await flush()
+      const word = page.querySelector('.scene-music-now')!
+      expect(word.textContent).toBe("Couldn't load the clip")
+      expect(word.classList.contains('scene-now-bad')).toBe(true)
+      expect(rowText(page, 'glass-clink')).toContain('Next in')
+      press(page, 'Stop the scene')
+      await flush()
+    } finally {
+      globalThis.fetch = real
+    }
+  })
+
+  it('says Not played by the music when the game no longer has its track', async () => {
+    const shown = summary()
+    const scene = shown.scenes!.acts[0]!.scenes[0]!
+    scene.music = { ...scene.music, track: 'old-track', name: 'old-track', gone: true }
+    const page = render(open, shown)
+    press(page, 'Start the scene')
+    await flush()
+    expect(text(page.querySelector('.scene-music-now'))).toBe('Not played')
+    press(page, 'Stop the scene')
+    await flush()
+  })
 })

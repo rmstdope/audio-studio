@@ -13,7 +13,8 @@ import { Menu } from '../../components/Menu'
 import { CrossIcon, PlayIcon, StopIcon } from '../../components/icons'
 import { routeHref } from '../../route'
 import { audible, nowWords } from '../../sceneNow'
-import { MUSIC_KEY, rowKey, type ScenePlay } from '../../sceneRun'
+import { MUSIC_KEY, rowKey } from '../../scenePlayback'
+import type { ScenePlay } from '../../sceneRun'
 import { AddEffect } from './AddEffect'
 import { LevelSlider } from './LevelSlider'
 
@@ -131,6 +132,39 @@ function MuteSolo({ name, id, play }: { name: string; id: string; play: ScenePla
   )
 }
 
+/** What the music is doing, in the Now word after its level. */
+function MusicNow({
+  play,
+  silent,
+  gone,
+  url,
+}: {
+  play: ScenePlay
+  silent: boolean
+  gone: boolean
+  url: string
+}) {
+  const failed = play.failed.has(url)
+  const words = nowWords(
+    { kind: 'playing' },
+    {
+      state: play.state ?? '',
+      muted: play.muted.has(MUSIC_KEY) && play.soloed.size === 0,
+      notSoloed: play.soloed.size > 0 && !play.soloed.has(MUSIC_KEY),
+      silent,
+      gone,
+      failed,
+    },
+  )
+  return (
+    <span
+      className={failed ? 'scene-now scene-music-now scene-now-bad' : 'scene-now scene-music-now'}
+    >
+      {words}
+    </span>
+  )
+}
+
 /** Moving bars before "Playing". */
 function Bars() {
   return (
@@ -184,12 +218,12 @@ function EffectRowView({
           state: play.state ?? '',
           muted,
           notSoloed,
-          silent: !!choice?.silent,
+          silent: !!choice && (choice.silent || !choice.playable),
           gone: goneEffect || goneState || goneTrigger,
           failed: play.failed.has(url),
         })
       : ''
-  const sounding = now?.kind === 'playing' && heard && !words.startsWith("Couldn't")
+  const sounding = words.startsWith('Playing') && heard
   const dim = now?.kind === 'otherState' || !heard || words === 'Not played'
   return (
     <tr className={sounding ? 'scene-sounding' : dim && showNow ? 'scene-dim' : undefined}>
@@ -422,21 +456,12 @@ export function SceneDetail({
             />
           )}
           {music.track !== null && play.phase === 'playing' && (
-            <span className="scene-now scene-music-now">
-              {nowWords(
-                { kind: 'playing' },
-                {
-                  state: play.state ?? '',
-                  muted: play.muted.has(MUSIC_KEY) && play.soloed.size === 0,
-                  notSoloed: play.soloed.size > 0 && !play.soloed.has(MUSIC_KEY),
-                  silent: !track?.playable,
-                  gone: false,
-                  failed: play.failed.has(
-                    `/api/music/tracks/${encodeURIComponent(music.track)}/current`,
-                  ),
-                },
-              )}
-            </span>
+            <MusicNow
+              play={play}
+              silent={!track?.playable && !trackGone}
+              gone={trackGone}
+              url={`/api/music/tracks/${encodeURIComponent(music.track)}/current`}
+            />
           )}
           {music.track !== null && <MuteSolo name="the music" id={MUSIC_KEY} play={play} />}
         </div>
