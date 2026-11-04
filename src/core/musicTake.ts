@@ -261,6 +261,11 @@ export interface MakingSummary {
   left: number
 }
 
+/** A music track's `MakingSummary`, with how many of its takes failed (kept in memory for Try again). */
+export interface MusicMakingSummary extends MakingSummary {
+  failed: number
+}
+
 /** The most takes one click asks for. */
 export const MAX_TAKES_AT_ONCE = 6
 

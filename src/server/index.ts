@@ -1878,6 +1878,25 @@ export function startServer({
           return result ? Response.json(result) : notFound()
         }),
       },
+      '/api/music/model-state': {
+        GET: guard(async () => {
+          const state = await musicTakes.modelState(projectFile)
+          return state ? Response.json(state) : notFound()
+        }),
+      },
+      '/api/music/lists/:id/make-all': {
+        POST: fromOwnPage(async (request) => {
+          const result = await musicTakes.makeAll(projectFile, request.params.id)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/lists/:id/stop': {
+        POST: fromOwnPage(async (request) => {
+          const result = await musicTakes.stopAll(projectFile, request.params.id)
+          return result ? Response.json(result) : notFound()
+        }),
+      },
       '/api/music/making': {
         GET: guard(async () => Response.json(await musicTakes.making(projectFile))),
       },

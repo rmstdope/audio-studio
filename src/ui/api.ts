@@ -19,8 +19,9 @@ import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
-import type { MakingSummary, MusicTakesView } from '../core/musicTake'
+import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
+import type { MakeAllResult, ModelStateResult } from '../services/musicTakes'
 import type {
   ChooseResult,
   DropResult,
@@ -1141,8 +1142,112 @@ export function useStopTakes(trackId: string) {
 export function useMusicMaking() {
   return useQuery({
     queryKey: ['music-making'],
-    queryFn: () => getJson<Record<string, MakingSummary>>('/api/music/making'),
-    refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length ? 3000 : false),
+    queryFn: () => getJson<Record<string, MusicMakingSummary>>('/api/music/making'),
+    refetchInterval: (query) =>
+      Object.values(query.state.data ?? {}).some((making) => making.takes > 0) ? 3000 : false,
+  })
+}
+
+/** The project's music model and whether takes can be made with it now. */
+export function useMusicModelState() {
+  return useQuery({
+    queryKey: ['music-model-state'],
+    queryFn: () => getJson<NonNullable<ModelStateResult>>('/api/music/model-state'),
+  })
+}
+
+/**
+ * What one press of Make takes on a list remembers until Close or a reload: how many takes it
+ * asked for, for which tracks, how many of each track's takes had failed before it, and how many
+ * Stop all stopped.
+ */
+export interface MakeAllBatch {
+  total: number
+  tracks: string[]
+  failedBefore: Record<string, number>
+  stopped: number
+}
+
+/** The cache key of a list's batch. */
+const batchKey = (listId: string) => ['music-batch', listId] as const
+
+/**
+ * A list's last press of Make takes, or null. It lives in the query cache, not the page, so it
+ * survives leaving the list and coming back; a reload forgets it.
+ */
+export function useMakeAllBatch(listId: string): {
+  batch: MakeAllBatch | null
+  dismiss: () => void
+} {
+  const client = useQueryClient()
+  const { data } = useQuery({
+    queryKey: batchKey(listId),
+    queryFn: () => client.getQueryData<MakeAllBatch | null>(batchKey(listId)) ?? null,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+  return {
+    batch: data ?? null,
+    dismiss: () => client.setQueryData<MakeAllBatch | null>(batchKey(listId), null),
+  }
+}
+
+/**
+ * Asks for four takes of every track with no chosen take on a list. `tracks` are the ones the page
+ * listed, with how many takes of each had failed before. Once they are queued the batch is
+ * remembered, after what is being made has been read, so the page never sees them done before they
+ * began.
+ */
+export function useMakeAll(listId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (request: { tracks: string[]; failedBefore: Record<string, number> }) => {
+      const response = await fetch(`/api/music/lists/${encodeURIComponent(listId)}/make-all`, {
+        method: 'POST',
+      })
+      const answer = (await response.json().catch(() => null)) as MakeAllResult | null
+      if (!answer || !answer.ok || answer.takes === 0) {
+        throw new Error(`asking for takes answered ${response.status}`)
+      }
+      await client.refetchQueries({ queryKey: ['music-making'] })
+      const batch: MakeAllBatch = {
+        total: answer.takes,
+        tracks: request.tracks,
+        failedBefore: request.failedBefore,
+        stopped: 0,
+      }
+      client.setQueryData(batchKey(listId), batch)
+      return answer
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['music-making'] }),
+  })
+}
+
+/**
+ * Stops every take of a list that waits or is being made, and remembers how many of the press's
+ * own tracks' takes were stopped (takes started by hand elsewhere in the list are not its).
+ */
+export function useStopAll(listId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/music/lists/${encodeURIComponent(listId)}/stop`, {
+        method: 'POST',
+      })
+      if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
+      const answer = (await response.json()) as { ok: true; byTrack: Record<string, number> }
+      client.setQueryData<MakeAllBatch | null>(batchKey(listId), (was) =>
+        was
+          ? {
+              ...was,
+              stopped:
+                was.stopped + was.tracks.reduce((sum, id) => sum + (answer.byTrack[id] ?? 0), 0),
+            }
+          : was,
+      )
+      return answer
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['music-making'] }),
   })
 }
 
