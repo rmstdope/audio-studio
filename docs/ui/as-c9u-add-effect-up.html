@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Add a sound effect — opening upward</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --line: rgb(255 255 255/7%);
+        --line-strong: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --warn: #ffc24b;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 900px;
+        margin: 0 auto 16px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro b {
+        color: var(--text);
+      }
+      .row {
+        display: flex;
+        gap: 28px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .cap {
+        color: var(--soft);
+        font-size: 13px;
+        margin: 0 0 6px;
+        max-width: 440px;
+      }
+      .win {
+        width: 440px;
+        height: 560px;
+        border: 2px solid #3a3f4b;
+        border-radius: 10px;
+        background: var(--bg);
+        position: relative;
+        overflow: hidden;
+      }
+      .win .bar {
+        height: 22px;
+        background: #14161d;
+        border-bottom: 1px solid var(--line-strong);
+        font-size: 11px;
+        color: var(--faint);
+        padding: 3px 10px;
+      }
+      .page {
+        position: absolute;
+        left: 0;
+        right: 0;
+        padding: 12px 16px;
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12.5px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 0 0 6px;
+      }
+      .fx {
+        border-bottom: 1px solid var(--line);
+        padding: 7px 0;
+        font-size: 12.5px;
+        color: var(--soft);
+      }
+      .btn {
+        display: inline-block;
+        font-size: 13px;
+        padding: 5px 11px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: #11131a;
+        margin-top: 10px;
+      }
+      .btn.on {
+        border-color: var(--accent);
+      }
+      .playbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 48px;
+        background: #0e1016;
+        border-top: 1px solid var(--line-strong);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        font-size: 12px;
+        color: var(--muted);
+        z-index: 2;
+      }
+      .menu {
+        position: absolute;
+        left: 16px;
+        width: 330px;
+        background: var(--bg);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 4px;
+        z-index: 6;
+        box-shadow: 0 8px 28px rgb(0 0 0/60%);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .find {
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 5px 8px;
+        color: var(--faint);
+        font-size: 12.5px;
+        background: #0b0d13;
+      }
+      .find.focus {
+        outline: 2px solid var(--accent);
+        outline-offset: -1px;
+      }
+      .list {
+        overflow: hidden;
+        position: relative;
+      }
+      .list li {
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 6px;
+        border-radius: 6px;
+        font-size: 12.5px;
+      }
+      .list ul {
+        margin: 0;
+        padding: 0;
+      }
+      .p {
+        width: 22px;
+        height: 22px;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        text-align: center;
+        font-size: 10px;
+        line-height: 20px;
+        color: var(--soft);
+        flex: none;
+      }
+      .chip {
+        font-size: 11px;
+        padding: 0 6px;
+        border-radius: 9px;
+        background: #1b1e27;
+        color: var(--muted);
+      }
+      .chip.w {
+        color: var(--warn);
+      }
+      .scroll {
+        position: absolute;
+        right: 2px;
+        top: 4px;
+        width: 4px;
+        height: 40%;
+        background: #3a3f4b;
+        border-radius: 2px;
+      }
+      .cut {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: repeating-linear-gradient(90deg, #ff94a8 0 6px, transparent 6px 10px);
+        z-index: 9;
+      }
+      .lbl {
+        position: absolute;
+        font-size: 11px;
+        color: #ff94a8;
+        z-index: 9;
+      }
+      .arrow {
+        position: absolute;
+        font-size: 11px;
+        color: var(--accent);
+        z-index: 9;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Add a sound effect — Option A: flip the whole menu</h1>
+      <p>
+        <b>Option A (recommended).</b> When there is not enough room under
+        <b>+ Add a sound effect</b>, the menu opens above it, unchanged: find box on top, list
+        below, its bottom edge just above the button. When there is room below, nothing changes from
+        today.
+      </p>
+      <p>
+        This is how most apps flip a menu that runs out of room; the menu always looks the same,
+        only its side changes. The cost: the find box, where your typing goes, is the part furthest
+        from the button you clicked.
+      </p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="cap">Today: opens downward and runs off the bottom (what we're fixing)</p>
+        <div class="win">
+          <div class="bar">Content Studio — Scenes</div>
+          <div class="page" style="top: 270px">
+            <h2>Lantern hall</h2>
+            <div class="fx" style="color: var(--faint)">…the scene's music and lines above…</div>
+            <h2 style="margin-top: 12px">Sound effects</h2>
+            <div class="fx mono">lantern-hiss · 0:00 → end</div>
+            <div class="fx mono">footsteps-stone · 0:04</div>
+            <div class="fx mono">door-creak · 0:12</div>
+            <span class="btn on" id="b">+ Add a sound effect</span>
+          </div>
+          <div class="menu" style="top: 494px">
+            <div class="find focus">Find a sound effect…</div>
+            <div class="list" style="height: 300px">
+              <ul>
+                <li><span class="p">▶</span><span class="mono">door-creak</span></li>
+                <li><span class="p">▶</span><span class="mono">footsteps-stone</span></li>
+                <li>
+                  <span class="p">▶</span><span class="mono">wind-howl</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li>
+                  <span class="p">▶</span><span class="mono">fire-crackle</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li>
+                  <span class="p">▶</span><span class="mono">rain-soft</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">thunder-far</span></li>
+                <li><span class="p">▶</span><span class="mono">bell-toll</span></li>
+                <li>
+                  <span style="width: 22px"></span><span class="mono">owl-hoot</span>
+                  <span class="chip w">no take chosen</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">chain-rattle</span></li>
+                <li><span class="p">▶</span><span class="mono">water-drip</span></li>
+                <li>
+                  <span class="p">▶</span><span class="mono">crowd-murmur</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">lantern-hiss</span></li>
+                <li><span class="p">▶</span><span class="mono">sword-draw</span></li>
+                <li><span class="p">▶</span><span class="mono">coin-drop</span></li>
+                <li><span class="p">▶</span><span class="mono">horse-trot</span></li>
+              </ul>
+              <div class="scroll"></div>
+            </div>
+          </div>
+          <div class="lbl" style="bottom: 52px; right: 10px">menu continues below the window ↓</div>
+          <div class="playbar">▶ Play scene · 0:00 / 0:42</div>
+        </div>
+      </div>
+      <div>
+        <p class="cap">
+          Option A — the whole menu flips up as it is: the find box stays at the top
+        </p>
+        <div class="win">
+          <div class="bar">Content Studio — Scenes</div>
+          <div class="page" style="top: 270px">
+            <h2>Lantern hall</h2>
+            <div class="fx" style="color: var(--faint)">…the scene's music and lines above…</div>
+            <h2 style="margin-top: 12px">Sound effects</h2>
+            <div class="fx mono">lantern-hiss · 0:00 → end</div>
+            <div class="fx mono">footsteps-stone · 0:04</div>
+            <div class="fx mono">door-creak · 0:12</div>
+            <span class="btn on" id="b">+ Add a sound effect</span>
+          </div>
+          <div class="menu" style="top: 116px">
+            <div class="find focus">Find a sound effect…</div>
+            <div class="list" style="height: 300px">
+              <ul>
+                <li><span class="p">▶</span><span class="mono">door-creak</span></li>
+                <li><span class="p">▶</span><span class="mono">footsteps-stone</span></li>
+                <li>
+                  <span class="p">▶</span><span class="mono">wind-howl</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li>
+                  <span class="p">▶</span><span class="mono">fire-crackle</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li>
+                  <span class="p">▶</span><span class="mono">rain-soft</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">thunder-far</span></li>
+                <li><span class="p">▶</span><span class="mono">bell-toll</span></li>
+                <li>
+                  <span style="width: 22px"></span><span class="mono">owl-hoot</span>
+                  <span class="chip w">no take chosen</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">chain-rattle</span></li>
+                <li><span class="p">▶</span><span class="mono">water-drip</span></li>
+                <li>
+                  <span class="p">▶</span><span class="mono">crowd-murmur</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">lantern-hiss</span></li>
+                <li><span class="p">▶</span><span class="mono">sword-draw</span></li>
+                <li><span class="p">▶</span><span class="mono">coin-drop</span></li>
+                <li><span class="p">▶</span><span class="mono">horse-trot</span></li>
+              </ul>
+              <div class="scroll"></div>
+            </div>
+          </div>
+          <div class="arrow" style="top: 458px; left: 360px">↑ just above the button</div>
+          <div class="playbar">▶ Play scene · 0:00 / 0:42</div>
+        </div>
+      </div>
+    </div>
+    <div style="height: 36px"></div>
+    <div class="intro">
+      <h1>Add a sound effect — short window, Option A: shrink to fit</h1>
+      <p>
+        <b>Option A (recommended).</b> When the window is so short that the full menu fits neither
+        above nor below the button, it opens on whichever side has more room and its list gets
+        shorter so the menu ends at the window's edge. The list scrolls inside, as it already does.
+        Nothing on the page moves.
+      </p>
+      <p>
+        The cost: in a very short window you see only a few effects at a time and scroll the list or
+        type to narrow it.
+      </p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="cap">
+          Option A — opens on the side with more room; the list gets shorter so the whole menu fits,
+          and scrolls
+        </p>
+        <div class="win">
+          <div class="bar">Content Studio — Scenes</div>
+          <div class="page" style="top: 70px">
+            <h2>Lantern hall</h2>
+            <div class="fx" style="color: var(--faint)">…the scene's music and lines above…</div>
+            <h2 style="margin-top: 12px">Sound effects</h2>
+            <div class="fx mono">lantern-hiss · 0:00 → end</div>
+            <div class="fx mono">footsteps-stone · 0:04</div>
+            <div class="fx mono">door-creak · 0:12</div>
+            <span class="btn on" id="b">+ Add a sound effect</span>
+          </div>
+          <div class="menu" style="top: 294px">
+            <div class="find focus">Find a sound effect…</div>
+            <div class="list" style="height: 218px">
+              <ul>
+                <li><span class="p">▶</span><span class="mono">door-creak</span></li>
+                <li><span class="p">▶</span><span class="mono">footsteps-stone</span></li>
+                <li>
+                  <span class="p">▶</span><span class="mono">wind-howl</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li>
+                  <span class="p">▶</span><span class="mono">fire-crackle</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li>
+                  <span class="p">▶</span><span class="mono">rain-soft</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">thunder-far</span></li>
+                <li><span class="p">▶</span><span class="mono">bell-toll</span></li>
+                <li>
+                  <span style="width: 22px"></span><span class="mono">owl-hoot</span>
+                  <span class="chip w">no take chosen</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">chain-rattle</span></li>
+                <li><span class="p">▶</span><span class="mono">water-drip</span></li>
+                <li>
+                  <span class="p">▶</span><span class="mono">crowd-murmur</span>
+                  <span class="chip">loop</span>
+                </li>
+                <li><span class="p">▶</span><span class="mono">lantern-hiss</span></li>
+                <li><span class="p">▶</span><span class="mono">sword-draw</span></li>
+                <li><span class="p">▶</span><span class="mono">coin-drop</span></li>
+                <li><span class="p">▶</span><span class="mono">horse-trot</span></li>
+              </ul>
+              <div class="scroll"></div>
+            </div>
+          </div>
+          <div class="lbl" style="bottom: 52px; right: 10px">ends inside the window</div>
+          <div class="playbar">▶ Play scene · 0:00 / 0:42</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
