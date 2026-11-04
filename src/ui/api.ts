@@ -1316,15 +1316,15 @@ export function useImageModelState() {
 }
 
 /**
- * What one press of Make takes on an act remembers until Close or a reload: how many takes it
- * asked for, for which images, how many of each image's takes had failed before it, and how many
- * Stop all stopped of the press's own images.
+ * What one press of Make takes on an act remembers until Close or a reload: how many takes the
+ * server queued, for which images, and for each of those how many of its takes had failed and been
+ * stopped before the press.
  */
 export interface ImagesBatch {
   total: number
   images: string[]
   failedBefore: Record<string, number>
-  stopped: number
+  stoppedBefore: Record<string, number>
 }
 
 /** The cache key of an act's batch. */
@@ -1349,39 +1349,39 @@ export function useImagesBatch(actId: string): { batch: ImagesBatch | null; dism
 }
 
 /**
- * Asks for four takes of every image of an act with no chosen take. `images` are the ones the page
- * listed, with how many takes of each had failed before. Once they are queued the batch is
- * remembered, after what is being made has been read, so the page never sees them done before they
- * began. A refusal is an error: nothing was made.
+ * Asks for four takes of every image of an act with no chosen take. The images and takes the
+ * server queued become the remembered batch, after what is being made has been read, so the page
+ * never sees them done before they began. A refusal is an error: nothing was made.
  */
 export function useImagesMakeAll(actId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (request: {
-      images: string[]
-      failedBefore: Record<string, number>
-      takes: number
-    }) => {
+    mutationFn: async (before: Record<string, ImageMakingSummary>) => {
       const response = await fetch(`/api/image-acts/${encodeURIComponent(actId)}/make-all`, {
         method: 'POST',
       })
-      if (!response.ok) throw new Error(`asking for takes answered ${response.status}`)
+      const answer = (await response.json().catch(() => null)) as {
+        ok: boolean
+        images?: string[]
+        takes?: number
+      } | null
+      if (!response.ok || !answer?.ok)
+        throw new Error(`asking for takes answered ${response.status}`)
       await client.refetchQueries({ queryKey: ['image-making'] })
+      const images = answer.images ?? []
+      if (!images.length) return
       client.setQueryData<ImagesBatch>(imagesBatchKey(actId), {
-        total: request.takes,
-        images: request.images,
-        failedBefore: request.failedBefore,
-        stopped: 0,
+        total: answer.takes ?? 0,
+        images,
+        failedBefore: Object.fromEntries(images.map((id) => [id, before[id]?.failed ?? 0])),
+        stoppedBefore: Object.fromEntries(images.map((id) => [id, before[id]?.stopped ?? 0])),
       })
     },
     onSettled: () => client.invalidateQueries({ queryKey: ['image-making'] }),
   })
 }
 
-/**
- * Stops every take of an act that waits or is being made, and remembers how many of the press's
- * own images' takes were stopped (takes started by hand elsewhere in the act are not its).
- */
+/** Stops every take of an act that waits or is being made. */
 export function useImagesStopAll(actId: string) {
   const client = useQueryClient()
   return useMutation({
@@ -1390,16 +1390,6 @@ export function useImagesStopAll(actId: string) {
         method: 'POST',
       })
       if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
-      const answer = (await response.json()) as { ok: true; byImage: Record<string, number> }
-      client.setQueryData<ImagesBatch | null>(imagesBatchKey(actId), (was) =>
-        was
-          ? {
-              ...was,
-              stopped:
-                was.stopped + was.images.reduce((sum, id) => sum + (answer.byImage[id] ?? 0), 0),
-            }
-          : was,
-      )
     },
     onSettled: () => client.invalidateQueries({ queryKey: ['image-making'] }),
   })

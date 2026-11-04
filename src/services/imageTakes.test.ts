@@ -131,7 +131,7 @@ describe('making takes', () => {
       [2, 'waiting'],
     ])
     expect(view.making[0]!.expected).toBe(8)
-    expect(await takes.making(file)).toEqual({ inn: { takes: 2, left: 16, failed: 0 } })
+    expect(await takes.making(file)).toEqual({ inn: { takes: 2, left: 16, failed: 0, stopped: 0 } })
     release()
     await settled('inn')
     await takes.make(file, 'inn', { count: 1 })
@@ -171,7 +171,7 @@ describe('making takes', () => {
     })
     await takes.make(file, 'inn', { count: 2 })
     await settled('inn')
-    expect(await takes.making(file)).toEqual({ inn: { takes: 0, left: 0, failed: 2 } })
+    expect(await takes.making(file)).toEqual({ inn: { takes: 0, left: 0, failed: 2, stopped: 0 } })
   })
 
   it('stops the take being made and the ones waiting, and writes nothing for them', async () => {
@@ -520,7 +520,9 @@ describe('image models', () => {
     await s.takes.make(s.file, 'inn', { count: 1, model: 'z-image-turbo' })
     await new Promise((resolve) => setTimeout(resolve, 10))
     expect((await viewOf(s)).making[0]!.expected).toBe(60)
-    expect(await s.takes.making(s.file)).toEqual({ inn: { takes: 1, left: 60, failed: 0 } })
+    expect(await s.takes.making(s.file)).toEqual({
+      inn: { takes: 1, left: 60, failed: 0, stopped: 0 },
+    })
     release()
     await s.settled('inn')
   })
@@ -549,7 +551,11 @@ describe('making for a whole act', () => {
   it('makes four takes for every image with no chosen take, and none for the chosen', async () => {
     const s = setup()
     await chosenInn(s)
-    expect(await s.takes.makeAll(s.file, 'act1')).toEqual({ ok: true })
+    expect(await s.takes.makeAll(s.file, 'act1')).toEqual({
+      ok: true,
+      images: ['hall'],
+      takes: 4,
+    })
     await s.settled('hall')
     const hall = await s.takes.view(s.file, 'hall')
     const inn = await s.takes.view(s.file, 'inn')
@@ -560,7 +566,7 @@ describe('making for a whole act', () => {
 
   it('makes the takes on the other model when Setup’s is not on this computer', async () => {
     const s = setup(undefined, {}, undefined, { here: { klein: false } })
-    expect(await s.takes.makeAll(s.file, 'act1')).toEqual({ ok: true })
+    expect(await s.takes.makeAll(s.file, 'act1')).toMatchObject({ ok: true, takes: 8 })
     await s.settled('inn')
     await s.settled('hall')
     expect(s.requests).toHaveLength(8)
@@ -572,7 +578,11 @@ describe('making for a whole act', () => {
     const gate = new Promise<void>((resolve) => (release = resolve))
     const s = setup(undefined, {}, gate)
     await s.takes.make(s.file, 'inn', { count: 1 })
-    expect(await s.takes.makeAll(s.file, 'act1')).toEqual({ ok: true })
+    expect(await s.takes.makeAll(s.file, 'act1')).toEqual({
+      ok: true,
+      images: ['hall'],
+      takes: 4,
+    })
     expect(await s.takes.making(s.file)).toMatchObject({
       inn: { takes: 1 },
       hall: { takes: 4 },
@@ -587,6 +597,27 @@ describe('making for a whole act', () => {
     expect(await s.takes.making(s.file)).toEqual({})
   })
 
+  it('makes nothing when one image is refused, and stops the ones already queued', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const s = setup(undefined, {}, gate)
+    mkdirSync(join(s.root, '.content-studio/images'), { recursive: true })
+    writeFileSync(join(s.root, '.content-studio/images/hall.json'), '{ not json')
+    expect(await s.takes.makeAll(s.file, 'act1')).toMatchObject({ ok: false })
+    expect(Object.values(await s.takes.making(s.file)).every((m) => m.takes === 0)).toBe(true)
+    release()
+  })
+
+  it('makes a shared image once, and it shows as making in every act', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const s = setup(undefined, { 'tts/act2/images.json': [inn] }, gate)
+    expect(await s.takes.makeAll(s.file, 'act1')).toMatchObject({ ok: true, takes: 8 })
+    expect(await s.takes.makeAll(s.file, 'act2')).toEqual({ ok: true, images: [], takes: 0 })
+    expect((await s.takes.making(s.file)).inn).toMatchObject({ takes: 4 })
+    release()
+  })
+
   it('knows no act the game does not list', async () => {
     const s = setup()
     expect(await s.takes.makeAll(s.file, 'nowhere')).toBeNull()
@@ -599,12 +630,11 @@ describe('making for a whole act', () => {
     const s = setup(undefined, {}, gate)
     await s.takes.makeAll(s.file, 'act1')
     await new Promise((resolve) => setTimeout(resolve, 10))
-    expect(await s.takes.stopAll(s.file, 'act1')).toEqual({
-      ok: true,
-      stopped: 8,
-      byImage: { inn: 4, hall: 4 },
+    expect(await s.takes.stopAll(s.file, 'act1')).toEqual({ ok: true, stopped: 8 })
+    expect(await s.takes.making(s.file)).toEqual({
+      inn: { takes: 0, left: 0, failed: 0, stopped: 4 },
+      hall: { takes: 0, left: 0, failed: 0, stopped: 4 },
     })
-    expect(await s.takes.making(s.file)).toEqual({})
     release()
   })
 })

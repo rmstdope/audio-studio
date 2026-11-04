@@ -108,12 +108,12 @@ export interface ImageTakes {
    * Setup's model (the other when that is unusable). Nothing is made when any image is refused;
    * null for an act the project does not list.
    */
-  makeAll(projectFile: string, actId: string): Promise<ImageTakesAnswer>
-  /** Stops the takes waiting or being made of every image in the act (how many, and per image); null for an act not listed. */
+  makeAll(projectFile: string, actId: string): Promise<ImageMakeAllAnswer>
+  /** Stops the takes waiting or being made of every image in the act (how many); null for an act not listed. */
   stopAll(
     projectFile: string,
     actId: string,
-  ): Promise<{ ok: true; stopped: number; byImage: Record<string, number> } | ProjectFailure | null>
+  ): Promise<{ ok: true; stopped: number } | ProjectFailure | null>
   /** The path of a take's game version, or null for an image not listed, a bad number or a take not brought. */
   gameFile(projectFile: string, id: string, name: string): Promise<string | null>
   /** The path of a take's picture, or null for an image not listed or a name that is not a take's number. */
@@ -121,6 +121,13 @@ export interface ImageTakes {
   /** The picture the game shows now: the chosen one, else the game's own file, else null. */
   currentFile(projectFile: string, id: string): Promise<string | null>
 }
+
+/** What a press on an act answered: the images and takes it queued, or why nothing was made. */
+export type ImageMakeAllAnswer =
+  | { ok: true; images: string[]; takes: number }
+  | { ok: false; message: string }
+  | ProjectFailure
+  | null
 
 /** Setup's image model and the state of each, as the Images pages need them to plan a press. */
 export type ImageModelStateResult =
@@ -178,11 +185,14 @@ export function createImageTakes({
     contentStudioImageTakes?: Map<string, Map<number, Entry>>
     contentStudioImageBringing?: Set<string>
     contentStudioLookRuns?: Map<string, LookRunView>
+    contentStudioImageStopped?: Map<string, number>
   }
   const active = (shared.contentStudioImageTakes ??= new Map())
   /** Takes being brought to the look right now (`<image key>\0<n>`). */
   const bringing = (shared.contentStudioImageBringing ??= new Set())
   const lookRuns = (shared.contentStudioLookRuns ??= new Map())
+  /** How many takes of each image were stopped since the studio started (`<image key>`). */
+  const stoppedCount = (shared.contentStudioImageStopped ??= new Map())
   const boards = boardQueue()
 
   async function resolve(projectFile: string, id: string) {
@@ -531,7 +541,7 @@ export function createImageTakes({
       if (plan.kind === 'not-ready') {
         return { ok: false, message: "Images can't be made yet. Setup says what is missing." }
       }
-      if (plan.kind === 'all-chosen') return { ok: true }
+      if (plan.kind === 'all-chosen') return { ok: true, images: [], takes: 0 }
       const started: string[] = []
       for (const image of plan.images) {
         const answer = await this.make(projectFile, image.id, {
@@ -544,22 +554,20 @@ export function createImageTakes({
         }
         started.push(image.id)
       }
-      return { ok: true }
+      return { ok: true, images: started, takes: started.length * TAKES_EACH }
     },
 
     async stopAll(projectFile, actId) {
       const found = await actOf(projectFile, actId)
       if (!found || !('act' in found)) return found
       let stopped = 0
-      const byImage: Record<string, number> = {}
       for (const id of found.act.order) {
         const answer = await this.stop(projectFile, id)
         if (answer && answer.ok && answer.stopped > 0) {
           stopped += answer.stopped
-          byImage[id] = answer.stopped
         }
       }
-      return { ok: true, stopped, byImage }
+      return { ok: true, stopped }
     },
 
     async view(projectFile, id) {
@@ -689,6 +697,7 @@ export function createImageTakes({
         entries!.delete(n)
         stopped++
       }
+      if (stopped) stoppedCount.set(found.key, (stoppedCount.get(found.key) ?? 0) + stopped)
       return { ok: true, stopped }
     },
 
@@ -847,12 +856,13 @@ export function createImageTakes({
     async making(projectFile) {
       const summary: Record<string, ImageMakingSummary> = {}
       const prefix = `${projectFile}\0`
-      for (const [key, entries] of active) {
+      const keys = new Set([...active.keys(), ...stoppedCount.keys()])
+      for (const key of keys) {
         if (!key.startsWith(prefix)) continue
         let takes = 0
         let left = 0
         let failed = 0
-        for (const entry of entries.values()) {
+        for (const entry of active.get(key)?.values() ?? []) {
           if (entry.state === 'failed') {
             failed++
             continue
@@ -864,7 +874,10 @@ export function createImageTakes({
               ? seconds
               : Math.max(0, seconds - (now() - entry.startedAt) / 1000)
         }
-        if (takes || failed) summary[key.slice(prefix.length)] = { takes, left, failed }
+        const stopped = stoppedCount.get(key) ?? 0
+        if (takes || failed || stopped) {
+          summary[key.slice(prefix.length)] = { takes, left, failed, stopped }
+        }
       }
       return summary
     },

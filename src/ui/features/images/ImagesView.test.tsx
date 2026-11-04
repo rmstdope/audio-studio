@@ -105,7 +105,7 @@ function summary(options: Options = {}): ProjectSummary {
 function render(
   route: ImagesRoute,
   shown: ProjectSummary = summary(),
-  making: Record<string, { takes: number; left: number; failed?: number }> = {},
+  making: Record<string, { takes: number; left: number; failed?: number; stopped?: number }> = {},
   run: unknown = null,
   modelState = false,
 ) {

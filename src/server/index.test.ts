@@ -5278,11 +5278,48 @@ describe('the image takes routes', () => {
     expect((await send('POST', '/api/image-acts/ghost/make-all')).status).toBe(404)
     expect((await send('POST', '/api/image-acts/ghost/stop')).status).toBe(404)
     const before = (await view()).takes.length
-    expect(await (await send('POST', '/api/image-acts/act1/make-all')).json()).toEqual({ ok: true })
+    expect(await (await send('POST', '/api/image-acts/act1/make-all')).json()).toMatchObject({
+      ok: true,
+      images: ['inn'],
+      takes: 4,
+    })
     const made = await settled()
     expect(made.takes).toHaveLength(before + 4)
     const stopped = await (await send('POST', '/api/image-acts/act1/stop')).json()
-    expect(stopped).toEqual({ ok: true, stopped: 0, byImage: {} })
+    expect(stopped).toEqual({ ok: true, stopped: 0 })
+  })
+
+  it('answers 409 when images cannot be made at all', async () => {
+    const none = startServer({
+      projectFile: join(root, 'content-studio.json'),
+      port: 0,
+      transcriber: null,
+      images: {
+        ready: () => ({
+          ok: false,
+          reason: 'mflux',
+          message: 'mflux is not on the PATH',
+          fix: 'x',
+        }),
+        installed: () => true,
+        generate: async () => {
+          throw new Error('unused')
+        },
+      },
+    })
+    try {
+      const answer = await fetch(new URL('/api/image-acts/act1/make-all', none.url), {
+        method: 'POST',
+        headers: { origin: none.url.origin },
+      })
+      expect(answer.status).toBe(409)
+      expect(await answer.json()).toEqual({
+        ok: false,
+        message: "Images can't be made yet. Setup says what is missing.",
+      })
+    } finally {
+      none.stop(true)
+    }
   })
 
   it('refuses a bad body and answers 404 for an image the game does not list', async () => {

@@ -144,8 +144,10 @@ export interface ImageMakingSummary {
   takes: number
   /** Seconds left, all together (a guess). */
   left: number
-  /** Takes of the image that failed and are kept until they are made again or the page is left. */
+  /** Takes of the image that failed; kept until they are made again or the studio restarts. */
   failed: number
+  /** Takes of the image stopped since the studio started (only grows; with a stop the image is listed). */
+  stopped: number
 }
 
 /**

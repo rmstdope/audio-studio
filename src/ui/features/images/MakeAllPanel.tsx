@@ -2,8 +2,13 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { imageModel } from '../../../core/imageModels'
 import type { ImagesAct } from '../../../core/images'
 import { planImagesMakeAll, TAKES_EACH } from '../../../core/imagesMakeAll'
-import { useImageMaking, useImageModelState, useImagesBatch } from '../../api'
-import { useImagesMakeAll, useImagesStopAll } from '../../api'
+import {
+  useImageMaking,
+  useImageModelState,
+  useImagesBatch,
+  useImagesMakeAll,
+  useImagesStopAll,
+} from '../../api'
 import {
   busyLine,
   chosenLine,
@@ -45,7 +50,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
     if (!focus) return
     const target = { button, make: makeButton, stop: stopButton }[focus].current
     if (target) target.focus()
-    else if (focus === 'button') panel.current?.focus()
+    else panel.current?.focus()
     setFocus(null)
   }, [focus])
 
@@ -56,6 +61,11 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
     images: mine.filter(([, m]) => m.takes > 0).length,
     left: mine.reduce((sum, [, m]) => sum + (m.takes > 0 ? m.left : 0), 0),
   }
+  // Takes started elsewhere give the question way; it does not come back when they are done.
+  const busyNow = running.takes > 0
+  useEffect(() => {
+    if (busyNow) setOpen(false)
+  }, [busyNow])
   const plan =
     state && 'states' in state
       ? planImagesMakeAll({
@@ -99,7 +109,11 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
       (sum, r) => sum + (making[r.id]!.failed - (batch.failedBefore[r.id] ?? 0)),
       0,
     )
-    const made = Math.max(0, batch.total - failed - batch.stopped)
+    const stopped = batch.images.reduce(
+      (sum, id) => sum + Math.max(0, (making[id]?.stopped ?? 0) - (batch.stoppedBefore[id] ?? 0)),
+      0,
+    )
+    const made = Math.max(0, batch.total - failed - stopped)
     const words = summaryFailed(
       failed,
       failedImages.map((r) => r.title),
@@ -123,7 +137,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
               {words.after}
             </>
           )}
-          {batch.stopped > 0 && ` ${summaryStopped(batch.stopped)}`}
+          {stopped > 0 && ` ${summaryStopped(stopped)}`}
         </span>
         <button
           type="button"
@@ -173,7 +187,6 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
   let question: ReactNode = null
   if (open && running.takes === 0 && plan?.kind === 'ready' && state && 'main' in state) {
     const heading = makeAllHeading(plan.takes, plan.images.length)
-    const fromFailed = Object.fromEntries(plan.images.map((r) => [r.id, making[r.id]?.failed ?? 0]))
     question = (
       <section
         className="make-all-question"
@@ -212,23 +225,16 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
             className="btn btn-primary"
             disabled={make.isPending}
             onClick={() =>
-              make.mutate(
-                {
-                  images: plan.images.map((r) => r.id),
-                  failedBefore: fromFailed,
-                  takes: plan.takes,
+              make.mutate(making, {
+                onSuccess: () => {
+                  setOpen(false)
+                  setFocus('stop')
                 },
-                {
-                  onSuccess: () => {
-                    setOpen(false)
-                    setFocus('stop')
-                  },
-                  onError: () => {
-                    setOpen(false)
-                    setFocus('button')
-                  },
+                onError: () => {
+                  setOpen(false)
+                  setFocus('button')
                 },
-              )
+              })
             }
           >
             {`Make ${plan.takes} takes`}

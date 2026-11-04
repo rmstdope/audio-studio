@@ -38,7 +38,10 @@ describe('planImagesMakeAll', () => {
   it('leaves out images already making takes, and names the images the lists disagree about', () => {
     const plan = planImagesMakeAll({
       ...base,
-      making: { a: { takes: 2, left: 10, failed: 0 }, b: { takes: 0, left: 0, failed: 1 } },
+      making: {
+        a: { takes: 2, left: 10, failed: 0, stopped: 0 },
+        b: { takes: 0, left: 0, failed: 1, stopped: 0 },
+      },
       conflicts: [{ id: 'x', title: 'X' }],
     })
     if (plan.kind !== 'ready') throw new Error('not ready')
@@ -55,7 +58,7 @@ describe('planImagesMakeAll', () => {
       planImagesMakeAll({
         ...base,
         rows: [image('a')],
-        making: { a: { takes: 1, left: 1, failed: 0 } },
+        making: { a: { takes: 1, left: 1, failed: 0, stopped: 0 } },
       }),
     ).toEqual({ kind: 'all-chosen' })
   })

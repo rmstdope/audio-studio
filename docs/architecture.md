@@ -1577,11 +1577,11 @@ decides: every image with no chosen take (an out-of-date chosen image counts as 
 already making takes gets four, on Setup's model, or on the other one when Setup's is not whole or
 failed its last take (`defaultTakeModel`, as an image's own page does). The press always asks first,
 inside the panel, and writes nothing until Make. `POST /api/image-acts/:id/make-all` plans again on
-the server and queues the takes through `make` per image (one refusal stops those already queued);
-`POST /api/image-acts/:id/stop` stops every take of the act's images and answers how many, per image;
+the server and queues the takes through `make` per image (one refusal stops those already queued), answering the images and takes it queued;
+`POST /api/image-acts/:id/stop` stops every take of the act's images and answers how many;
 `GET /api/images/model-state` gives Setup's model and each model's state. The running line is worked
-out from `GET /api/images/making`, which now also counts `failed` takes (an image with only failed
-takes reports `takes: 0`); the summary is remembered in the page's query cache, not on disk, so a
+out from `GET /api/images/making`, which now also counts `failed` and `stopped` takes (an image with only
+those reports `takes: 0`; both live in memory until the studio restarts, and the summary line takes the difference since the press); the summary is remembered in the page's query cache, not on disk, so a
 reload forgets it. Mockup: `docs/ui/as-23x.3-make-all.html`.
 
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`

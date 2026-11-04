@@ -56,7 +56,6 @@ interface Options {
   batch?: ImagesBatch
   answer?: { status: number }
   started?: Record<string, ImageMakingSummary>
-  stopped?: Record<string, number>
 }
 
 /** The panel on an act, with what the server would have said, and the requests it makes. */
@@ -66,14 +65,15 @@ function render(subject: ImagesAct, options: Options = {}) {
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     requests.push({ url: String(url), method: init?.method ?? 'GET' })
     if (String(url).endsWith('/stop')) {
-      const byImage = options.stopped ?? {}
-      const stopped = Object.values(byImage).reduce((a, b) => a + b, 0)
-      return new Response(JSON.stringify({ ok: true, stopped, byImage }), { status: 200 })
+      return new Response(JSON.stringify({ ok: true, stopped: 2 }), { status: 200 })
     }
     if (options.started && String(url).endsWith('/make-all')) {
       client.setQueryData(['image-making'], options.started)
     }
-    return new Response(JSON.stringify({ ok: true }), { status: options.answer?.status ?? 200 })
+    const body = String(url).endsWith('/make-all')
+      ? { ok: true, images: ['lighthouse', 'cave', 'inn'], takes: 12 }
+      : { ok: true }
+    return new Response(JSON.stringify(body), { status: options.answer?.status ?? 200 })
   }) as unknown as typeof fetch
   client.setQueryData(['image-making'], options.making ?? {})
   client.setQueryData(['image-model-state'], {
@@ -172,9 +172,9 @@ describe('Make takes for every image with no chosen take', () => {
 
   it('asks the server on Make, closes the question and moves focus to Stop all', async () => {
     const started = {
-      lighthouse: { takes: 4, left: 32, failed: 0 },
-      cave: { takes: 4, left: 32, failed: 0 },
-      inn: { takes: 4, left: 32, failed: 0 },
+      lighthouse: { takes: 4, left: 32, failed: 0, stopped: 0 },
+      cave: { takes: 4, left: 32, failed: 0, stopped: 0 },
+      inn: { takes: 4, left: 32, failed: 0, stopped: 0 },
     }
     const page = render(three, { started })
     await page.press('Make 4 takes each')
@@ -198,8 +198,8 @@ describe('Make takes for every image with no chosen take', () => {
   it('shows what is running in the act, from what is being made, after a reload', () => {
     const page = render(three, {
       making: {
-        cave: { takes: 3, left: 100, failed: 0 },
-        elsewhere: { takes: 9, left: 9, failed: 0 },
+        cave: { takes: 3, left: 100, failed: 0, stopped: 0 },
+        elsewhere: { takes: 9, left: 9, failed: 0, stopped: 0 },
       },
     })
     expect(page.text()).toContain('Making 3 takes for 1 image · about 2 min left')
@@ -207,20 +207,55 @@ describe('Make takes for every image with no chosen take', () => {
     expect(page.text()).not.toContain('Make 4 takes each')
   })
 
-  it('stops all and counts the takes stopped in the summary', async () => {
+  it('stops all with one request', async () => {
     const page = render(three, {
-      making: { lighthouse: { takes: 2, left: 16, failed: 0 } },
-      batch: { total: 12, images: ['lighthouse', 'cave', 'inn'], failedBefore: {}, stopped: 0 },
-      stopped: { lighthouse: 2 },
+      making: { lighthouse: { takes: 2, left: 16, failed: 0, stopped: 0 } },
     })
     await page.press('Stop all')
     expect(page.requests).toEqual([{ url: '/api/image-acts/act1/stop', method: 'POST' }])
-    expect(page.client.getQueryData<ImagesBatch>(['images-batch', 'act1'])!.stopped).toBe(2)
+  })
+
+  it('remembers what the server queued, and what had failed and been stopped before', async () => {
+    const page = render(three, {
+      making: { cave: { takes: 0, left: 0, failed: 1, stopped: 2 } },
+      started: { lighthouse: { takes: 4, left: 32, failed: 0, stopped: 0 } },
+    })
+    await page.press('Make 4 takes each')
+    await page.press('Make 12 takes')
+    expect(page.client.getQueryData<ImagesBatch>(['images-batch', 'act1'])).toEqual({
+      total: 12,
+      images: ['lighthouse', 'cave', 'inn'],
+      failedBefore: { lighthouse: 0, cave: 1, inn: 0 },
+      stoppedBefore: { lighthouse: 0, cave: 2, inn: 0 },
+    })
+  })
+
+  it('does not bring the question back when takes started elsewhere have finished', async () => {
+    const page = render(three)
+    await page.press('Make 4 takes each')
+    await act(async () => {
+      page.client.setQueryData(['image-making'], {
+        cave: { takes: 1, left: 8, failed: 0, stopped: 0 },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(page.text()).not.toContain('Make 12 takes for 3 images?')
+    await act(async () => {
+      page.client.setQueryData(['image-making'], {})
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(page.text()).not.toContain('Make 12 takes for 3 images?')
+    expect(page.text()).toContain('Make 4 takes each')
   })
 
   it('summarises a press that made everything, and Close removes it and returns focus', async () => {
     const page = render(three, {
-      batch: { total: 12, images: ['lighthouse', 'cave', 'inn'], failedBefore: {}, stopped: 0 },
+      batch: {
+        total: 12,
+        images: ['lighthouse', 'cave', 'inn'],
+        failedBefore: {},
+        stoppedBefore: {},
+      },
     })
     expect(page.text()).toContain('Made 12 of 12 takes.')
     await page.press('Close')
@@ -230,12 +265,15 @@ describe('Make takes for every image with no chosen take', () => {
 
   it('summarises failures with a link to each image, and stopped takes after them', () => {
     const page = render(three, {
-      making: { lighthouse: { takes: 0, left: 0, failed: 2 } },
+      making: {
+        lighthouse: { takes: 0, left: 0, failed: 2, stopped: 0 },
+        cave: { takes: 0, left: 0, failed: 0, stopped: 3 },
+      },
       batch: {
         total: 12,
         images: ['lighthouse', 'cave', 'inn'],
         failedBefore: {},
-        stopped: 3,
+        stoppedBefore: {},
       },
     })
     expect(page.text()).toContain(
@@ -244,14 +282,27 @@ describe('Make takes for every image with no chosen take', () => {
     expect(page.container.querySelector('a[href*="lighthouse"]')).not.toBeNull()
   })
 
+  it('does not count takes stopped before the press, or stopped from an image’s own page after it as made', () => {
+    const page = render(three, {
+      making: { cave: { takes: 0, left: 0, failed: 0, stopped: 6 } },
+      batch: {
+        total: 12,
+        images: ['lighthouse', 'cave', 'inn'],
+        failedBefore: {},
+        stoppedBefore: { cave: 2 },
+      },
+    })
+    expect(page.text()).toContain('Made 8 of 12 takes. 4 were stopped.')
+  })
+
   it('does not count failures from before the press', () => {
     const page = render(three, {
-      making: { lighthouse: { takes: 0, left: 0, failed: 1 } },
+      making: { lighthouse: { takes: 0, left: 0, failed: 1, stopped: 0 } },
       batch: {
         total: 12,
         images: ['lighthouse', 'cave', 'inn'],
         failedBefore: { lighthouse: 1 },
-        stopped: 0,
+        stoppedBefore: {},
       },
     })
     expect(page.text()).toContain('Made 12 of 12 takes.')
