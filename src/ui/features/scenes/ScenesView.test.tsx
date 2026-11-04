@@ -1324,6 +1324,26 @@ describe('playing a scene', () => {
     await flush()
   })
 
+  it('keeps a blank count slot in the play bar, and focus on Start/Stop after Clear (as-lzp)', async () => {
+    const page = render(open)
+    const slot = () => bar(page).querySelector<HTMLElement>('.scene-bar-count')
+    expect(slot()).not.toBeNull()
+    expect(text(slot())).toBe('')
+    expect(slot()?.querySelector('button')).toBeNull()
+    press(page, 'Solo glass-clink')
+    expect(text(slot())).toContain('Solo: 1')
+    expect(slot()?.querySelector('button')?.textContent).toBe('Clear')
+    press(page, 'Mute shop-bell')
+    expect(text(slot())).toContain('Solo: 1 · Muted: 1')
+    act(() => button(bar(page), 'Clear').click())
+    expect(text(slot())).toBe('')
+    press(page, 'Mute shop-bell')
+    expect(text(slot())).toContain('Muted: 1')
+    act(() => button(bar(page), 'Clear').click())
+    expect(text(slot())).toBe('')
+    expect(document.activeElement).toBe(bar(page).querySelector('[aria-label="Start the scene"]'))
+  })
+
   it('says muted on a muted row that keeps its words', async () => {
     const page = render(open)
     press(page, 'Mute shop-bell')

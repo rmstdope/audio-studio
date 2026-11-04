@@ -61,6 +61,12 @@ describe('the scene editor’s styles', () => {
     expect(rule(css, '.scene-playbar')).toContain('position: sticky')
   })
 
+  it('keeps room for the mute and solo count at its widest in the play bar (as-lzp)', () => {
+    expect(rule(css, '.scene-bar-count')).toContain('display: inline-grid')
+    expect(rule(css, '.scene-bar-count::before')).toContain('visibility: hidden')
+    expect(rule(css, '.scene-bar-count::before')).toContain('Muted: 99')
+  })
+
   it('opens the add-effect menu in front of the play bar, its list scrolling', () => {
     const z = (...selectors: string[]) =>
       Number(selectors.map((s) => /z-index:\s*(\d+)/.exec(rule(css, s))?.[1]).find(Boolean))

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { SceneRow } from '../../../core/scenes'
 import { PlayIcon, StopIcon } from '../../components/icons'
 import { clock, muteSoloText } from '../../sceneNow'
@@ -18,10 +19,12 @@ export function PlayBar({
   nothing: boolean
 }) {
   const running = play.phase !== 'stopped'
+  const startRef = useRef<HTMLButtonElement>(null)
   const count = muteSoloText(play.muted.size, play.soloed.size)
   return (
     <div className="scene-playbar" role="group" aria-label="Scene player">
       <button
+        ref={startRef}
         className={running ? 'icon-btn music-stop' : 'icon-btn'}
         type="button"
         aria-label={running ? 'Stop the scene' : 'Start the scene'}
@@ -72,14 +75,26 @@ export function PlayBar({
         </span>
       )}
       <span className="scene-bar-grow" />
-      {count && (
-        <>
-          <span className="chip">{count}</span>
-          <button className="btn sm" type="button" onClick={play.clear}>
-            Clear
-          </button>
-        </>
-      )}
+      {/* Always present, so the bar's height never depends on a solo or mute (as-lzp): its
+          ::before holds the room for the count at its widest and Clear. */}
+      <span className="scene-bar-count">
+        {count && (
+          <span className="scene-bar-count-now">
+            <span className="chip">{count}</span>
+            <button
+              className="btn sm"
+              type="button"
+              onClick={() => {
+                play.clear()
+                // Clear unmounts with the count, so focus goes to the bar's Start/Stop.
+                startRef.current?.focus()
+              }}
+            >
+              Clear
+            </button>
+          </span>
+        )}
+      </span>
     </div>
   )
 }
