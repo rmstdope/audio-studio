@@ -56,4 +56,11 @@ describe('the scene editor’s styles', () => {
   it('pins the play bar to the bottom', () => {
     expect(rule(css, '.scene-playbar')).toContain('position: sticky')
   })
+
+  it('opens the add-effect menu in front of the play bar, its list scrolling', () => {
+    const z = (selector: string) => Number(/z-index:\s*(\d+)/.exec(rule(css, selector))?.[1] ?? 0)
+    expect(z('.scene-add-list')).toBeGreaterThan(z('.scene-playbar'))
+    expect(rule(css, '.scene-add-list ul')).toContain('max-height')
+    expect(rule(css, '.scene-add-list ul')).toContain('overflow-y: auto')
+  })
 })
