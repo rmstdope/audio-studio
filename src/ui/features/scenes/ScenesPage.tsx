@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { SceneAct } from '../../../core/scenes'
 import { useRefreshDialog } from '../../api'
 import { Problems } from '../../components/Problems'
@@ -17,6 +18,9 @@ export function ScenesPage({ act, route }: { act: SceneAct; route: ScenesRoute }
   const run = useRefreshDialog(act.id)
   const player = useSceneClip()
   const scene = currentScene(act, route)
+  // A clip sounding stops when another scene opens: its ▶ is not on the new scene's page.
+  const { stop } = player
+  useEffect(() => stop(), [scene?.id, stop])
   const refresh = (primary: boolean) =>
     act.canRefresh && (
       <button
@@ -61,6 +65,7 @@ export function ScenesPage({ act, route }: { act: SceneAct; route: ScenesRoute }
             <span className="crumbs">Scenes</span>
             <h1 tabIndex={-1}>{name}</h1>
           </div>
+          {act.state !== 'missing' && <div className="header-actions">{refresh(false)}</div>}
         </header>
         {failed}
         <section className="panel scene-notice">
@@ -100,7 +105,7 @@ export function ScenesPage({ act, route }: { act: SceneAct; route: ScenesRoute }
           {scene.unreadable ? (
             <section className="panel scene-panel">
               <p className="muted">
-                This scene&apos;s entry in the mix can&apos;t be read; see the problems above.
+                This scene&apos;s entry in {act.mixFile} can&apos;t be read; see the problems above.
               </p>
             </section>
           ) : (

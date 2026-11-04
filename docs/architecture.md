@@ -1949,8 +1949,9 @@ game (which invalidates the project) need no route of their own; as-p86.3 adds t
 no `GET /api/scenes/:part` is built. What a scene's rows say of the rest of the studio comes from the
 summaries already read: an effect is _silent_ when its lock has no chosen take, _playable_ when the
 chosen take's clip is there; the music is _playable_ when the act's music list has the track with a
-chosen take whose file is there. A scene the mix has no entry for reads as an empty one (its own
-track at 100% when the act's list has it); a scene whose entry cannot be read is listed as
+chosen take whose file is there. A scene the mix has no entry for reads as an empty one; where the mix has no `music` the page shows the scene's own
+track at 100% when the act's list has it, and "No music" otherwise (the contract's fallback to "the act's loop"
+cannot be told from the files, which name no act-level loop); a scene whose entry cannot be read is listed as
 "unreadable" and shows none of its rows. The page is `src/ui/features/scenes/`: a ▶ plays one clip
 alone at its level through Web Audio (`src/ui/sceneClip.ts`, a gain, since levels reach 300%), over
 `/api/music/tracks/:id/current` and `/api/effects/:id/current`. The unsaved scene lives in the page (one at a

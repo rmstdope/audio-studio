@@ -189,13 +189,11 @@ export function Sidebar({
             />
           )}
         </a>
-        <a
-          className="nav-item nav-workspace"
-          href={routeHref({ view: 'scenes', page: null })}
-          aria-current={route.view === 'scenes' && !summary.scenes ? 'page' : undefined}
-        >
-          <LayersIcon /> <span className="grow">Scenes</span>
-        </a>
+        {summary.scenes && (
+          <a className="nav-item nav-workspace" href={routeHref({ view: 'scenes', page: null })}>
+            <LayersIcon /> <span className="grow">Scenes</span>
+          </a>
+        )}
         {open === 'scenes' &&
           route.view === 'scenes' &&
           summary.scenes?.acts.map((act) => (

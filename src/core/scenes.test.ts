@@ -137,6 +137,7 @@ function summarize(over: {
     id: 'act1',
     title: 'Act 1',
     canRefresh: true,
+    mixFile: 'mix.json',
     declarations: over.declarations ?? decl(),
     mix: over.mix ?? mixOf({}),
   }

@@ -58,7 +58,9 @@ export async function readScenes(
   if (!scenes) return null
   const acts = []
   for (const part of project.narration.parts) {
+    const mixFile = partPathFor(scenes.paths.mix, part.id)
     acts.push({
+      mixFile,
       id: part.id,
       title: part.title,
       canRefresh: Boolean(project.narration.refreshDialog),
@@ -67,7 +69,7 @@ export async function readScenes(
         partPathFor(scenes.paths.declarations, part.id),
         problems,
       ),
-      mix: await readMix(root, partPathFor(scenes.paths.mix, part.id), problems),
+      mix: await readMix(root, mixFile, problems),
     })
   }
   return summarizeScenes({ acts, effects: known.effects, music: known.music?.lists ?? [] })

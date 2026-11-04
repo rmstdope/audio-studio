@@ -222,6 +222,8 @@ export interface SceneAct {
   state: 'ok' | 'missing' | 'invalid'
   /** Whether the project names a command that refreshes the act's lists. */
   canRefresh: boolean
+  /** The act's mix file, relative to the project root. */
+  mixFile: string
   scenes: SceneRow[]
 }
 
@@ -235,6 +237,7 @@ export interface SceneActInput {
   id: string
   title: string
   canRefresh: boolean
+  mixFile: string
   declarations: DeclarationsState
   mix: MixState
 }
@@ -255,7 +258,12 @@ export function summarizeScenes(input: {
   const effectById = new Map(effects?.status === 'ok' ? effects.rows.map((r) => [r.id, r]) : [])
   return {
     acts: input.acts.map((act) => {
-      const base = { id: act.id, title: act.title, canRefresh: act.canRefresh }
+      const base = {
+        id: act.id,
+        title: act.title,
+        canRefresh: act.canRefresh,
+        mixFile: act.mixFile,
+      }
       if (act.declarations.status !== 'ok') {
         return { ...base, state: act.declarations.status, scenes: [] }
       }
@@ -308,7 +316,7 @@ function sceneRow(declared: SceneDeclaration, mix: MixState, known: Known): Scen
   const gone =
     effects.filter((e) => e.goneEffect || e.goneState || e.goneTrigger).length +
     (music.gone ? 1 : 0)
-  const silent = effects.filter((e) => e.silent && !e.goneEffect).length
+  const silent = effects.filter((e) => e.silent).length
   return { ...row, music, effects, unreadable: false, gone, silent }
 }
 
@@ -322,6 +330,7 @@ function sceneMusic(sceneId: string, chosen: SceneMix['music'], { list }: Known)
     name: found?.title ?? track,
     level: chosen?.level ?? 1,
     playable: found?.current.kind === 'take' && found.current.exists,
+    // Only the act's own list is looked in: today no shared loops are listed (§8.11).
     gone: list?.state === 'ok' && !found,
   }
 }

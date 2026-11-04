@@ -112,6 +112,7 @@ function summary(state: 'ok' | 'missing' | 'invalid' = 'ok', canRefresh = true):
         id: 'act1',
         title: 'Act I: The Lantern',
         canRefresh,
+        mixFile: 'game/scenes/act1.mix.json',
         declarations:
           state === 'ok'
             ? { status: 'ok', scenes: [store, forest, chapel], problems: [] }
@@ -255,6 +256,13 @@ describe('an act with its scenes', () => {
     )
   })
 
+  it('names the mix file when a scene cannot be read', () => {
+    const shown = summary()
+    shown.scenes!.acts[0]!.scenes[0]!.unreadable = true
+    const page = render(open, shown)
+    expect(text(page.querySelector('.scene-open'))).toContain('in game/scenes/act1.mix.json can')
+  })
+
   it('says a scene has no states and no triggers', () => {
     const shown = summary()
     shown.scenes!.acts[0]!.scenes[2]!.triggers = []
@@ -309,6 +317,34 @@ describe('playing a clip alone', () => {
     expect(last.getAttribute('aria-label')).toBe('Stop shop-bell')
   })
 
+  it('stops a clip when another scene is opened', async () => {
+    const shown = summary()
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, enabled: false } },
+    })
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => act(() => root.unmount()))
+    const show = (scene: string) =>
+      act(() =>
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client },
+            createElement(ScenesView, { summary: shown, route: { ...open, scene } }),
+          ),
+        ),
+      )
+    show('act1-store')
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Music"] button')!.click())
+    await flush()
+    show('act1-forest')
+    expect(container.querySelector('[aria-label="Music"] button')!.getAttribute('aria-label')).toBe(
+      'Play Forest Path',
+    )
+  })
+
   it('loops an effect the game loops', async () => {
     const page = render(open)
     act(() => page.querySelectorAll<HTMLButtonElement>('tbody button')[2]!.click())
@@ -356,9 +392,10 @@ describe('the game has not listed the scenes', () => {
     expect(page.querySelector('button')).toBeNull()
   })
 
-  it('says a list that cannot be read cannot', () => {
+  it('says a list that cannot be read cannot, and can be refreshed', () => {
     const page = render({ view: 'scenes', page: null }, summary('invalid'))
     expect(text(page.querySelector('.scene-notice'))).toContain('cannot be read')
+    expect(button(page, 'Refresh from the game')).toBeTruthy()
   })
 })
 

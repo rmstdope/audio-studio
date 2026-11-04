@@ -248,6 +248,25 @@ describe('the sidebar’s Scenes', () => {
     expect(texts).not.toContain('Act II')
   })
 
+  it('is not there without a scenes section', () => {
+    const none = { ...summary, scenes: null } as unknown as ProjectSummary
+    const client = new QueryClient()
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => act(() => root.unmount()))
+    act(() =>
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(Sidebar, { summary: none, route: { view: 'setup' }, activePart: 'act1' }),
+        ),
+      ),
+    )
+    expect(container.textContent).not.toContain('Scenes')
+  })
+
   it('lists the acts with their scene counts on a Scenes page, the open one marked', () => {
     const { links } = render({ view: 'scenes', page: 'act', part: 'act2' })
     const i = links.findIndex((l) => l.text === 'Scenes')
