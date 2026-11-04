@@ -4169,10 +4169,16 @@ button.cue-chip[aria-expanded='true'] {
 .scene-play {
   width: 40px;
 }
-.scene-effect,
+.scene-effect {
+  overflow-wrap: anywhere;
+}
 .scene-how,
 .scene-state {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+.scene-how .menu-button,
+.scene-state .menu-button {
+  white-space: nowrap;
 }
 .scene-effect .chip,
 .scene-how .chip,
@@ -4425,6 +4431,12 @@ button.cue-chip[aria-expanded='true'] {
   font-size: 12.5px;
   white-space: nowrap;
   color: var(--text-soft);
+}
+.scene-effects th.scene-now-head {
+  width: 14em;
+}
+.scene-effects td.scene-now {
+  white-space: normal;
 }
 .scene-now-bad {
   color: var(--danger-ink);
