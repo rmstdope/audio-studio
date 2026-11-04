@@ -501,7 +501,7 @@ export function createMusicTakes({
     },
 
     async make(projectFile, id, request) {
-      // Read before anything is awaited: Make all sets it only for the call it makes.
+      // Read before anything is awaited: Make all sets it only around its own synchronous call.
       const press = pressing
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
@@ -615,10 +615,11 @@ export function createMusicTakes({
         stopped: 0,
       }
       for (const track of plan.tracks) {
+        // Only this call reads it, before its first await; a hand start meanwhile does not.
         pressing = press
-        const made = await api
-          .make(projectFile, track.id, { count: TAKES_EACH })
-          .finally(() => (pressing = null))
+        const making = api.make(projectFile, track.id, { count: TAKES_EACH })
+        pressing = null
+        const made = await making
         if (!made || !made.ok) {
           for (const id of started) await api.stop(projectFile, id)
           const message =
