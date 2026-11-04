@@ -345,6 +345,8 @@ describe('an act with its scenes', () => {
     expect(name.textContent).toBe('owl')
     expect(name.title).toBe('owl')
     expect(gone.querySelector('.scene-effect-cell .chip-danger')).not.toBeNull()
+    const silent = [...page.querySelectorAll('tbody tr')][0]!
+    expect(silent.querySelector('.scene-effect-cell a.chip')).not.toBeNull()
   })
 })
 

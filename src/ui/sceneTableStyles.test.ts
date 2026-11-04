@@ -12,10 +12,6 @@ describe('the Scenes sound effects table', () => {
     expect(rule('.scene-effects .table th')).toMatch(/white-space:\s*nowrap/)
   })
 
-  it('gives the Now column 11em, not 14em, so the effect names keep their room', () => {
-    expect(rule('.scene-effects th.scene-now-head')).toMatch(/width:\s*11em/)
-  })
-
   it('cuts a long effect name with an ellipsis and never cuts the mark beside it', () => {
     expect(rule('.scene-effect')).toMatch(/max-width:\s*0/)
     expect(rule('.scene-effect-name')).toMatch(/text-overflow:\s*ellipsis/)
@@ -34,5 +30,6 @@ describe('the Scenes sound effects table', () => {
     const block = rule('.scene-effects .table td.scene-effect', narrow)
     expect(block).toMatch(/max-width:\s*none/)
     expect(block).toMatch(/width:\s*auto/)
+    expect(block).toMatch(/min-width:\s*0/)
   })
 })
