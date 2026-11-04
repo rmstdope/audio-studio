@@ -20,3 +20,9 @@ describe('Make takes for every track, in a narrow window', () => {
     expect(rule('.make-all-question ul')).toContain('overflow-wrap: anywhere')
   })
 })
+
+describe('a button greyed with a reason', () => {
+  it('looks disabled but stays focusable, so its hover reason can be read', () => {
+    expect(rule(".btn:disabled,\n.btn[aria-disabled='true']")).toContain('opacity: 0.55')
+  })
+})

@@ -5,17 +5,32 @@ function minutes(seconds: number): number {
   return Math.max(1, Math.ceil(seconds / 60))
 }
 
-const tracks = (n: number) => `${n} ${n === 1 ? 'track' : 'tracks'}`
+/** What a list calls its entries: an act's music says "track", the Stingers page "stinger". */
+export type Noun = 'track' | 'stinger'
+
+const counted = (n: number, noun: Noun) => `${n} ${n === 1 ? noun : `${noun}s`}`
 
 /** The panel's line: how many tracks one press would make takes for. */
-export function readyLine(n: number): string {
-  return `${tracks(n)} ${n === 1 ? 'has' : 'have'} no chosen take`
+export function readyLine(n: number, noun: Noun = 'track'): string {
+  return `${counted(n, noun)} ${n === 1 ? 'has' : 'have'} no chosen take`
 }
 
 /** The question's heading: "Make 16 takes for 4 tracks?". */
-export function makeAllHeading(takes: number, trackCount: number): string {
-  return `Make ${takes} takes for ${tracks(trackCount)}?`
+export function makeAllHeading(takes: number, trackCount: number, noun: Noun = 'track'): string {
+  return `Make ${takes} takes for ${counted(trackCount, noun)}?`
 }
+
+/** The panel's line when nothing is left to make: "Every track has a chosen take.". */
+export function allChosenLine(noun: Noun): string {
+  return `Every ${noun} has a chosen take.`
+}
+
+/** Why Refresh from the game is greyed on the Stingers page while takes are being made. */
+export const REFRESH_BLOCKED_BY_TAKES =
+  'Takes are being made for the stingers. Refresh when they are done, or Stop all.'
+
+/** Why Make 4 takes each (and the question's Make) is greyed while the Stingers refresh runs. */
+export const MAKE_BLOCKED_BY_REFRESH = 'Wait for the refresh from the game to finish.'
 
 /** The question's line: the model, and the time on a free model or who bills on a paid one. */
 export function makeAllLine({
@@ -80,12 +95,14 @@ export function runningLine({
   takes,
   tracks: trackCount,
   left,
+  noun = 'track',
 }: {
   takes: number
   tracks: number
   left: number
+  noun?: Noun
 }): string {
-  return `Making ${takesCount(takes)} for ${tracks(trackCount)} · about ${minutes(left)} min left`
+  return `Making ${takesCount(takes)} for ${counted(trackCount, noun)} · about ${minutes(left)} min left`
 }
 
 /** The summary's first sentence: how many of the takes asked for were made. */

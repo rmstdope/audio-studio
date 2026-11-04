@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { planMakeAll, TAKES_EACH, type MakeAllTrack } from './musicMakeAll'
-import { takesButton } from './musicModels'
+import { MAX_STINGER_SECONDS } from './music'
+import { MUSIC_MODEL_IDS, takesButton } from './musicModels'
 
 const track = (id: string, over: Partial<MakeAllTrack> = {}): MakeAllTrack => ({
   id,
@@ -112,5 +113,18 @@ describe('planMakeAll', () => {
     if (result.kind !== 'ready') throw new Error(result.kind)
     expect(result.tracks.map((t) => t.id)).toEqual(['a'])
     expect(result.chosen).toEqual([])
+  })
+})
+
+describe('planMakeAll for stingers', () => {
+  test('never leaves a longest stinger out for its length, on any model', () => {
+    for (const model of MUSIC_MODEL_IDS) {
+      const result = plan([track('a', { seconds: MAX_STINGER_SECONDS })], {
+        kind: 'stinger',
+        model,
+      })
+      expect(result.kind).toBe('ready')
+      if (result.kind === 'ready') expect(result.tooLong).toEqual([])
+    }
   })
 })

@@ -14,6 +14,9 @@ import {
   summaryStopped,
   joinSeparators,
   namesText,
+  allChosenLine,
+  REFRESH_BLOCKED_BY_TAKES,
+  MAKE_BLOCKED_BY_REFRESH,
 } from './musicMakeAllText'
 
 describe('the words of Make takes for every track', () => {
@@ -104,5 +107,24 @@ describe('the words of Make takes for every track', () => {
     expect(joinSeparators(1)).toEqual([''])
     expect(joinSeparators(2)).toEqual(['', ' and '])
     expect(joinSeparators(3)).toEqual(['', ', ', ' and '])
+  })
+
+  it('says stinger on the Stingers page', () => {
+    expect(readyLine(3, 'stinger')).toBe('3 stingers have no chosen take')
+    expect(readyLine(1, 'stinger')).toBe('1 stinger has no chosen take')
+    expect(makeAllHeading(12, 3, 'stinger')).toBe('Make 12 takes for 3 stingers?')
+    expect(makeAllHeading(4, 1, 'stinger')).toBe('Make 4 takes for 1 stinger?')
+    expect(runningLine({ takes: 12, tracks: 3, left: 36 * 60, noun: 'stinger' })).toBe(
+      'Making 12 takes for 3 stingers · about 36 min left',
+    )
+    expect(runningLine({ takes: 4, tracks: 1, left: 5, noun: 'stinger' })).toBe(
+      'Making 4 takes for 1 stinger · about 1 min left',
+    )
+    expect(allChosenLine('stinger')).toBe('Every stinger has a chosen take.')
+    expect(allChosenLine('track')).toBe('Every track has a chosen take.')
+    expect(REFRESH_BLOCKED_BY_TAKES).toBe(
+      'Takes are being made for the stingers. Refresh when they are done, or Stop all.',
+    )
+    expect(MAKE_BLOCKED_BY_REFRESH).toBe('Wait for the refresh from the game to finish.')
   })
 })
