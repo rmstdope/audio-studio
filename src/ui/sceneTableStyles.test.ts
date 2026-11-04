@@ -13,23 +13,32 @@ describe('the Scenes sound effects table', () => {
   })
 
   it('cuts a long effect name with an ellipsis and never cuts the mark beside it', () => {
-    expect(rule('.scene-effect')).toMatch(/max-width:\s*0/)
+    expect(rule('.scene-effect-name')).toMatch(/max-width:\s*20ch/)
     expect(rule('.scene-effect-name')).toMatch(/text-overflow:\s*ellipsis/)
     expect(rule('.scene-effect-name')).toMatch(/white-space:\s*nowrap/)
     expect(rule('.scene-effect-name')).toMatch(/min-width:\s*0/)
+    expect(rule('.scene-effect-name')).toMatch(/flex:\s*none/)
     expect(rule('.scene-effect-cell')).toMatch(/display:\s*flex/)
     expect(rule('.scene-effect-cell .chip')).toMatch(/flex:\s*none/)
+  })
+
+  it('sizes the effect column to its content, so a short name beside a chip is never cut', () => {
+    const wide = css.slice(0, css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
+    const fixed = [...wide.matchAll(/([^{}]*\.scene-effect)\s*\{([^}]*)\}/g)].filter(([, , body]) =>
+      /(^|[\s;])(min-|max-)?width:/.test(body ?? ''),
+    )
+    expect(fixed).toEqual([])
   })
 
   it('moves "every 4–9 s" whole under its menu rather than squeezing', () => {
     expect(rule('.scene-seconds')).toMatch(/white-space:\s*nowrap/)
   })
 
-  it('lets the card in a narrow window use its grid column and still cut the name', () => {
+  it('lets the card in a narrow window use its grid column and cut the name only when it does not fit', () => {
     const narrow = css.slice(css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
-    const block = rule('.scene-effects .table td.scene-effect', narrow)
-    expect(block).toMatch(/max-width:\s*none/)
-    expect(block).toMatch(/width:\s*auto/)
-    expect(block).toMatch(/min-width:\s*0/)
+    expect(rule('.scene-effects .table td.scene-effect', narrow)).toMatch(/min-width:\s*0/)
+    const name = rule('.scene-effects .table .scene-effect-name', narrow)
+    expect(name).toMatch(/flex:\s*0 1 auto/)
+    expect(name).toMatch(/max-width:\s*none/)
   })
 })

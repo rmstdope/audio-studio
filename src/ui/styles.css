@@ -4169,16 +4169,14 @@ button.cue-chip[aria-expanded='true'] {
 .scene-play {
   width: 40px;
 }
-.scene-effect {
-  width: 28%;
-  max-width: 0;
-}
 .scene-effect-cell {
   display: flex;
   align-items: baseline;
 }
 .scene-effect-name {
+  flex: none;
   min-width: 0;
+  max-width: 20ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4552,11 +4550,13 @@ button.cue-chip[aria-expanded='true'] {
   .scene-effects .table td.scene-play {
     grid-row: 1;
   }
+  .scene-effects .table .scene-effect-name {
+    flex: 0 1 auto;
+    max-width: none;
+  }
   .scene-effects .table td.scene-effect {
     grid-column: 2;
-    width: auto;
     min-width: 0;
-    max-width: none;
   }
   .scene-effects .table td.scene-m {
     grid-row: 1;
