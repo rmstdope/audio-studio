@@ -962,6 +962,27 @@ describe('adding a sound effect', () => {
       })
       expect(menu(page).classList.contains('scene-add-up')).toBe(true)
     })
+
+    it('is placed again on a resize whose target is the window, as in a browser', () => {
+      // A browser's Node.contains throws on anything that is not a Node; the window is not one.
+      const contains = Node.prototype.contains
+      Node.prototype.contains = function (this: Node, other: Node | null) {
+        if (other !== null && !(other instanceof Node)) throw new TypeError('not of type Node')
+        return contains.call(this, other)
+      }
+      try {
+        const page = render(open)
+        act(() => add(page).click())
+        layout.window = 500
+        Object.defineProperty(window, 'innerHeight', { configurable: true, value: 500 })
+        act(() => {
+          window.dispatchEvent(new Event('resize'))
+        })
+        expect(menu(page).classList.contains('scene-add-up')).toBe(true)
+      } finally {
+        Node.prototype.contains = contains
+      }
+    })
   })
 
   it('closes on Escape and returns to the button', () => {

@@ -69,8 +69,9 @@ export function AddEffect({
   useEffect(() => {
     if (!open) return
     const again = (event: Event) => {
-      // The list scrolling inside the menu moves nothing.
-      if (!menu.current?.contains(event.target as Node)) placeRef.current(false)
+      // The list scrolling inside the menu moves nothing; a resize's target is the window, not a Node.
+      if (event.target instanceof Node && menu.current?.contains(event.target)) return
+      placeRef.current(false)
     }
     window.addEventListener('resize', again)
     window.addEventListener('scroll', again, true)
