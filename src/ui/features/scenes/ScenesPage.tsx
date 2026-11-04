@@ -7,8 +7,10 @@ import { shortTitle } from '../../format'
 import type { ScenesRoute } from '../../route'
 import { currentScene, statesLine } from '../../scenesText'
 import { useSceneClip } from '../../sceneClip'
+import { useScenePlay } from '../../sceneRun'
 import { useLeaveGuard, useSceneEditor, type Leaving } from '../../sceneDraft'
 import { LeaveDialog } from './LeaveDialog'
+import { PlayBar } from './PlayBar'
 import { SceneDetail } from './SceneDetail'
 import { SceneList } from './SceneList'
 
@@ -28,22 +30,40 @@ export function ScenesPage({
 }) {
   const name = shortTitle(act.title)
   const run = useRefreshDialog(act.id)
-  const player = useSceneClip()
+  const clip = useSceneClip()
   const scene = currentScene(act, route)
   const editor = useSceneEditor(act.id, scene)
+  const play = useScenePlay(scene, act, editor.draft, summary.effects, clip.stop)
+  // While the scene plays, a row's ▶ plays its clip once over it, whatever Mute and Solo say.
+  const player = {
+    ...clip,
+    toggle: (id: string, url: string, how: { level: number; loop?: boolean }) =>
+      play.phase === 'playing' ? play.once(url, how.level) : clip.toggle(id, url, how),
+  }
   const [leaving, setLeaving] = useState<Leaving | null>(null)
   useLeaveGuard(editor.dirty, setLeaving)
   const saveButton = useRef<HTMLButtonElement>(null)
   // A clip sounding stops when another scene opens: its ▶ is not on the new scene's page.
-  const { stop } = player
-  useEffect(() => stop(), [scene?.id, stop])
+  const { stop } = clip
+  const { reset } = play
+  useEffect(() => {
+    stop()
+    reset()
+  }, [scene?.id, stop, reset])
   const refresh = (primary: boolean) =>
     act.canRefresh && (
       <button
         className={primary ? 'btn btn-primary' : 'btn'}
         type="button"
         disabled={run.pending}
-        onClick={() => (editor.dirty ? setLeaving({ proceed: run.start }) : run.start())}
+        onClick={() => {
+          const go = () => {
+            play.reset()
+            run.start()
+          }
+          if (editor.dirty) setLeaving({ proceed: go })
+          else go()
+        }}
       >
         {run.pending ? 'Refreshing from the game…' : 'Refresh from the game'}
       </button>
@@ -190,7 +210,15 @@ export function ScenesPage({
               summary={summary}
               draft={editor.draft}
               player={player}
+              play={play}
               onChange={editor.change}
+            />
+          )}
+          {!scene.unreadable && (
+            <PlayBar
+              scene={scene}
+              play={play}
+              nothing={editor.draft.music.track === null && editor.draft.effects.length === 0}
             />
           )}
         </div>
