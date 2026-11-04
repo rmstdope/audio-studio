@@ -1953,6 +1953,9 @@ file or entry, answers `stale` with the entry now saved when `was` differs, and 
 whole file again with only that scene replaced (its entry is written from the fields the studio knows: a field of that scene's entry it does not know is dropped on Save) (scenes in the declarations' order, then the rest in
 their old order, entries that cannot be read kept as they are). The Add menu and Music menu are
 offered `ScenesSummary.effects` and `SceneAct.tracks`.
+The Add menu opens below its button, or above it when it does not fit below but fits above, or on
+the side with more room with a shorter list when it fits neither (`placeMenu` in `core/menuPlacement.ts`,
+measured to the window's bottom edge, as-c9u); typing keeps the side, a resize or scroll chooses again.
 
 The Scenes workspace is read with the rest of the project: `ProjectSummary.scenes` (null without the
 `scenes` section) carries every act's scenes, so the sidebar's counts, the page and Refresh from the

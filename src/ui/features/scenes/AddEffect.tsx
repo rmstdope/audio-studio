@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { placeMenu } from '../../../core/menuPlacement'
 import type { SceneEffectChoice } from '../../../core/scenes'
 import { PlayIcon, StopIcon } from '../../components/icons'
 import type { ScenePlayer } from './SceneDetail'
 
 /**
- * "+ Add a sound effect": a menu under the button, drawn in front of the scene's play bar, with a
+ * "+ Add a sound effect": a menu under the button (above it when it does not fit below, and with a
+ * shorter list when it fits neither), drawn in front of the scene's play bar, with a
  * box that narrows the game's sound effects as you type; every match is listed, and the list
  * scrolls. Each has ▶ to hear it, "loop" beside loops and "no take chosen" beside the silent;
  * clicking one adds it.
@@ -22,6 +24,10 @@ export function AddEffect({
   const [query, setQuery] = useState('')
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+  const [side, setSide] = useState<'below' | 'above'>('below')
+  // The side chosen when the menu opened; typing keeps it, a resize or scroll chooses again.
+  const chosen = useRef<'below' | 'above' | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -30,6 +36,48 @@ export function AddEffect({
     }
     document.addEventListener('mousedown', outside)
     return () => document.removeEventListener('mousedown', outside)
+  }, [open])
+
+  const place = (keep: boolean) => {
+    const el = menu.current
+    const list = el?.querySelector('ul')
+    const btn = button.current
+    if (!el || !list || !btn) return
+    list.style.maxHeight = ''
+    const rect = btn.getBoundingClientRect()
+    const height = el.offsetHeight
+    const { side: next, fit } = placeMenu({
+      buttonTop: rect.top,
+      buttonBottom: rect.bottom,
+      viewportHeight: window.innerHeight,
+      menuHeight: height,
+      keepSide: keep ? (chosen.current ?? undefined) : undefined,
+    })
+    chosen.current = next
+    setSide(next)
+    if (fit !== null) list.style.maxHeight = `${Math.max(48, list.offsetHeight - (height - fit))}px`
+  }
+  const placeRef = useRef(place)
+  placeRef.current = place
+  useLayoutEffect(() => {
+    if (!open) {
+      chosen.current = null
+      return
+    }
+    placeRef.current(chosen.current !== null)
+  }, [open, query])
+  useEffect(() => {
+    if (!open) return
+    const again = (event: Event) => {
+      // The list scrolling inside the menu moves nothing.
+      if (!menu.current?.contains(event.target as Node)) placeRef.current(false)
+    }
+    window.addEventListener('resize', again)
+    window.addEventListener('scroll', again, true)
+    return () => {
+      window.removeEventListener('resize', again)
+      window.removeEventListener('scroll', again, true)
+    }
   }, [open])
 
   const words = query.trim().toLowerCase()
@@ -64,7 +112,14 @@ export function AddEffect({
         + Add a sound effect
       </button>
       {open && (
-        <div className="menu-list scene-add-list" role="dialog" aria-label="Add a sound effect">
+        <div
+          ref={menu}
+          className={
+            side === 'above' ? 'menu-list scene-add-list scene-add-up' : 'menu-list scene-add-list'
+          }
+          role="dialog"
+          aria-label="Add a sound effect"
+        >
           <input
             type="text"
             autoFocus

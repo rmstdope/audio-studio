@@ -869,6 +869,101 @@ describe('adding a sound effect', () => {
     expect(page.querySelector('.scene-add-list .muted')).toBeNull()
   })
 
+  describe('placement', () => {
+    // happy-dom lays nothing out: say where the button is and how tall the menu would be.
+    const layout = { buttonTop: 400, buttonBottom: 430, height: 300, window: 800 }
+    const proto = HTMLElement.prototype as unknown as Record<string, unknown>
+    const saved = {
+      rect: proto.getBoundingClientRect,
+      offsetHeight: Object.getOwnPropertyDescriptor(proto, 'offsetHeight'),
+      innerHeight: window.innerHeight,
+    }
+    beforeEach(() => {
+      proto.getBoundingClientRect = function (this: HTMLElement) {
+        const top = this.hasAttribute('data-add') ? layout.buttonTop : 0
+        const bottom = this.hasAttribute('data-add') ? layout.buttonBottom : 0
+        return {
+          top,
+          bottom,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: bottom - top,
+          x: 0,
+          y: top,
+        } as DOMRect
+      }
+      Object.defineProperty(proto, 'offsetHeight', {
+        configurable: true,
+        get(this: HTMLElement) {
+          if (this.classList.contains('scene-add-list')) return layout.height
+          return this.tagName === 'UL' && this.parentElement?.classList.contains('scene-add-list')
+            ? layout.height - 50
+            : 0
+        },
+      })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: layout.window })
+    })
+    afterEach(() => {
+      proto.getBoundingClientRect = saved.rect
+      if (saved.offsetHeight) Object.defineProperty(proto, 'offsetHeight', saved.offsetHeight)
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: saved.innerHeight })
+      Object.assign(layout, { buttonTop: 400, buttonBottom: 430, height: 300, window: 800 })
+    })
+    const menu = (page: HTMLElement) => page.querySelector<HTMLElement>('.scene-add-list')!
+
+    it('opens below when the whole menu fits under the button', () => {
+      const page = render(open)
+      act(() => add(page).click())
+      expect(menu(page).classList.contains('scene-add-up')).toBe(false)
+    })
+
+    it('opens above when it does not fit below but fits above', () => {
+      layout.buttonTop = 700
+      layout.buttonBottom = 730
+      const page = render(open)
+      act(() => add(page).click())
+      expect(menu(page).classList.contains('scene-add-up')).toBe(true)
+      expect(page.querySelector<HTMLElement>('.scene-add-list ul')!.style.maxHeight).toBe('')
+    })
+
+    it('opens on the side with more room, with a shorter list, when neither fits', () => {
+      layout.window = 400
+      layout.buttonTop = 250
+      layout.buttonBottom = 280
+      layout.height = 500
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 400 })
+      const page = render(open)
+      act(() => add(page).click())
+      // 246 px above, 116 below; the menu is 500 tall, so the list gives up 254 px.
+      expect(menu(page).classList.contains('scene-add-up')).toBe(true)
+      const list = page.querySelector<HTMLElement>('.scene-add-list ul')!
+      expect(list.style.maxHeight).toBe('196px') // 450 - (500 - 246)
+    })
+
+    it('keeps its side while you type', () => {
+      layout.buttonTop = 700
+      layout.buttonBottom = 730
+      const page = render(open)
+      act(() => add(page).click())
+      layout.height = 40 // under the 66 px below: only keeping the side explains 'above'
+      type(find(page), 'purr')
+      expect(menu(page).classList.contains('scene-add-up')).toBe(true)
+    })
+
+    it('is placed again when the window is resized', () => {
+      const page = render(open)
+      act(() => add(page).click())
+      expect(menu(page).classList.contains('scene-add-up')).toBe(false)
+      layout.window = 500
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 500 })
+      act(() => {
+        window.dispatchEvent(new Event('resize'))
+      })
+      expect(menu(page).classList.contains('scene-add-up')).toBe(true)
+    })
+  })
+
   it('closes on Escape and returns to the button', () => {
     const page = render(open)
     act(() => add(page).click())
