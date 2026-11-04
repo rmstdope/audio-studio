@@ -590,6 +590,25 @@ describe('editing a scene', () => {
     expect(page.querySelector('[aria-label="Music"] a.chip')).toBeNull()
   })
 
+  it('reads the reason from the music list: a missing game file gets the chip, a present one the ▶', () => {
+    const store = music[0]!.tracks[0]!
+    const before = store.current
+    try {
+      store.current = { kind: 'game', file: 'game/village-lane.wav', exists: false }
+      const missing = render(open)
+      expect(missing.querySelector('[aria-label="Music"] a.chip')!.getAttribute('title')).toBe(
+        "The game's file village-lane.wav is not there.",
+      )
+      expect(missing.querySelector('[aria-label="Music"] .icon-btn')).toBeNull()
+      store.current = { kind: 'game', file: 'game/village-lane.wav', exists: true }
+      const there = render(open)
+      expect(there.querySelector('[aria-label="Music"] a.chip')).toBeNull()
+      expect(there.querySelector('[aria-label="Music"] .icon-btn')).not.toBeNull()
+    } finally {
+      store.current = before
+    }
+  })
+
   it('shows no reason for a track that plays', () => {
     const page = render(open)
     expect(page.querySelector('[aria-label="Music"] a.chip')).toBeNull()
