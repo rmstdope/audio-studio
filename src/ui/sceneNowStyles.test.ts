@@ -20,7 +20,7 @@ describe('the scene table while it plays', () => {
   })
 
   it('gives the Now column a fixed width and lets its words wrap inside it', () => {
-    expect(rule(css, '.scene-effects th.scene-now-head')).toContain('width: 14em')
+    expect(rule(css, '.scene-effects th.scene-now-head')).toContain('width: 11em')
     expect(rule(css, '.scene-effects td.scene-now')).toContain('white-space: normal')
   })
 })
