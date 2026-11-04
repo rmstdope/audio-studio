@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Option A — keep the Now line's room while stopped</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --line: rgb(255 255 255/7%);
+        --ls: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --okbg: #10291f;
+        --ok: #5be3ae;
+        --warn: #ffc24b;
+        --danger: #ff94a8;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1100px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro b {
+        color: var(--text);
+      }
+      .row {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        position: relative;
+      }
+      .col {
+        flex: 1 1 320px;
+        min-width: 300px;
+      }
+      .cap {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        margin: 0 0 6px;
+      }
+      .frame {
+        border: 1px solid var(--ls);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0px;
+      }
+      .frame.fixed .spacer {
+        flex: 1;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+        padding: 14px;
+      }
+      .panel h2 {
+        font-size: 15px;
+        margin: 0 0 6px;
+      }
+      .card {
+        display: grid;
+        grid-template-columns: 32px 1fr auto auto;
+        gap: 4px 8px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+        align-items: start;
+      }
+      .card.sounding {
+        background: var(--okbg);
+        box-shadow: inset 3px 0 0 var(--ok);
+        margin: 0 -14px;
+        padding: 10px 14px;
+      }
+      .pl {
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--ls);
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        font-size: 10px;
+        color: var(--soft);
+      }
+      .name {
+        font-family: ui-monospace, monospace;
+        font-size: 12.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+      }
+      .ms {
+        display: flex;
+        gap: 4px;
+      }
+      .ms span,
+      .x {
+        width: 24px;
+        height: 24px;
+        border: 1px solid var(--ls);
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        color: var(--soft);
+      }
+      .full {
+        grid-column: 2/-1;
+      }
+      .now {
+        font-size: 12.5px;
+        color: var(--soft);
+        min-height: 18px;
+      }
+      .sounding .now {
+        color: var(--ok);
+      }
+      .now.cut {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .reserved {
+        outline: 1px dashed rgb(255 255 255/18%);
+        outline-offset: 1px;
+        border-radius: 3px;
+      }
+      .menu {
+        display: inline-block;
+        font-size: 12.5px;
+        padding: 2px 8px;
+        border: 1px solid var(--ls);
+        border-radius: 7px;
+        color: var(--soft);
+      }
+      .sec {
+        color: var(--soft);
+        font-size: 12.5px;
+        margin-left: 6px;
+      }
+      .lvl {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12.5px;
+        color: var(--soft);
+      }
+      .lvl i {
+        width: 110px;
+        height: 4px;
+        background: var(--ls);
+        border-radius: 2px;
+      }
+      .add {
+        display: inline-block;
+        margin-top: 10px;
+        font-size: 12.5px;
+        padding: 5px 10px;
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+      }
+      .bar {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+        padding: 10px 12px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        position: relative;
+      }
+      .bar .btn {
+        width: 30px;
+        height: 30px;
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: var(--accent);
+      }
+      .bar .t {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .chipst {
+        background: rgb(255 122 61/14%);
+        color: #ffb38f;
+        border-radius: 7px;
+        padding: 2px 8px;
+        font-size: 12.5px;
+      }
+      .guide {
+        position: absolute;
+        left: -14px;
+        right: -14px;
+        top: -1px;
+        border-top: 2px dashed var(--warn);
+      }
+      .tag {
+        position: absolute;
+        right: 0;
+        top: -20px;
+        font-size: 11px;
+        color: var(--warn);
+      }
+      .tag.bad {
+        color: var(--danger);
+      }
+      .foot {
+        max-width: 1100px;
+        margin: 22px auto 0;
+        color: var(--soft);
+      }
+      .foot li {
+        margin: 4px 0;
+      }
+      .inline {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        min-width: 0;
+      }
+      .inline .now {
+        flex: none;
+        min-height: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Option A — keep the Now line's room while stopped</h1>
+      <p>
+        Scene <b>Old cellar</b>, card layout (a window up to about 1266 px). Every card keeps a
+        blank line under the effect name while the scene is stopped (outlined here only so you can
+        see it; in the studio it is just empty space). Pressing Start fills it. The yellow dashed
+        line is where the play bar's top sits: <b>the same in all three</b>.
+      </p>
+    </div>
+    <div class="row">
+      <div class="col">
+        <p class="cap">Stopped</p>
+        <div class="frame">
+          <div class="panel">
+            <h2>Sound effects</h2>
+            <div class="card">
+              <div class="pl">▶</div>
+              <span class="name">wind-howl</span>
+              <div class="ms"><span>M</span><span>S</span></div>
+              <div class="x">✕</div>
+              <div class="now full reserved">&nbsp;</div>
+              <div class="full">
+                <span class="menu">Once ▾</span><span class="sec">2 s after entering</span>
+              </div>
+              <div class="full"><span class="menu">plain ▾</span></div>
+              <div class="full lvl"><i></i>100%</div>
+            </div>
+            <div class="card">
+              <div class="pl">▶</div>
+              <span class="name">door-creak</span>
+              <div class="ms"><span>M</span><span>S</span></div>
+              <div class="x">✕</div>
+              <div class="now full reserved">&nbsp;</div>
+              <div class="full">
+                <span class="menu">Every ▾</span><span class="sec">4–9 s</span>
+              </div>
+              <div class="full"><span class="menu">plain ▾</span></div>
+              <div class="full lvl"><i></i>100%</div>
+            </div>
+            <span class="add">+ Add a sound effect</span>
+          </div>
+          <div class="bar">
+            <div class="guide"></div>
+            <span class="tag">bar top: same</span>
+            <div class="btn">▶</div>
+            <span class="t">0:00</span><span class="t">State</span><span class="chipst">plain</span>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="cap">Playing</p>
+        <div class="frame">
+          <div class="panel">
+            <h2>Sound effects</h2>
+            <div class="card sounding">
+              <div class="pl">▶</div>
+              <span class="name">wind-howl</span>
+              <div class="ms"><span>M</span><span>S</span></div>
+              <div class="x">✕</div>
+              <div class="now full">Playing</div>
+              <div class="full">
+                <span class="menu">Once ▾</span><span class="sec">2 s after entering</span>
+              </div>
+              <div class="full"><span class="menu">plain ▾</span></div>
+              <div class="full lvl"><i></i>100%</div>
+            </div>
+            <div class="card">
+              <div class="pl">▶</div>
+              <span class="name">door-creak</span>
+              <div class="ms"><span>M</span><span>S</span></div>
+              <div class="x">✕</div>
+              <div class="now full">Next in 6 s</div>
+              <div class="full">
+                <span class="menu">Every ▾</span><span class="sec">4–9 s</span>
+              </div>
+              <div class="full"><span class="menu">plain ▾</span></div>
+              <div class="full lvl"><i></i>100%</div>
+            </div>
+            <span class="add">+ Add a sound effect</span>
+          </div>
+          <div class="bar">
+            <div class="guide"></div>
+            <span class="tag">bar top: same</span>
+            <div class="btn">■</div>
+            <span class="t">0:03</span><span class="t">State</span><span class="chipst">plain</span>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="cap">Playing, long Now line</p>
+        <div class="frame">
+          <div class="panel">
+            <h2>Sound effects</h2>
+            <div class="card">
+              <div class="pl">▶</div>
+              <span class="name">wind-howl</span>
+              <div class="ms"><span>M</span><span>S</span></div>
+              <div class="x">✕</div>
+              <div class="now full cut" title="Playing, not soloed">Playing, not soloed</div>
+              <div class="full">
+                <span class="menu">Once ▾</span><span class="sec">2 s after entering</span>
+              </div>
+              <div class="full"><span class="menu">plain ▾</span></div>
+              <div class="full lvl"><i></i>100%</div>
+            </div>
+            <div class="card">
+              <div class="pl">▶</div>
+              <span class="name">door-creak</span>
+              <div class="ms"><span>M</span><span>S</span></div>
+              <div class="x">✕</div>
+              <div class="now full cut" title="Waits for door-open, not soloed">
+                Waits for door-open, not soloed
+              </div>
+              <div class="full">
+                <span class="menu">Every ▾</span><span class="sec">4–9 s</span>
+              </div>
+              <div class="full"><span class="menu">plain ▾</span></div>
+              <div class="full lvl"><i></i>100%</div>
+            </div>
+            <span class="add">+ Add a sound effect</span>
+          </div>
+          <div class="bar">
+            <div class="guide"></div>
+            <span class="tag">bar top: same</span>
+            <div class="btn">■</div>
+            <span class="t">0:03</span><span class="t">State</span><span class="chipst">plain</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="foot">
+      <li>Stopped cards are one blank line taller than today (about 18 px each).</li>
+      <li>
+        A Now line that is too long for the card is cut with “…”; hovering shows it whole, and a
+        screen reader reads it whole (see the next question).
+      </li>
+      <li>Nothing else in the card moves; the table layout of wider windows is unchanged.</li>
+    </ul>
+  </body>
+</html>
