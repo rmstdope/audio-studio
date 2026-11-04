@@ -103,6 +103,8 @@ describe('the Scenes sound effects table', () => {
     const chip = rule('.scene-effects .table .scene-effect-cell .chip', cards)
     expect(chip).toMatch(/grid-column:\s*2 \/ -1/)
     expect(chip).toMatch(/justify-self:\s*start/)
+    expect(chip).toMatch(/grid-row:\s*2;/)
+    expect(rule('.scene-effects .table td.scene-now', cards)).toMatch(/grid-row:\s*3;/)
     expect(chip).not.toMatch(/margin-left/)
     expect(cards).not.toMatch(/\.scene-effect-cell\s*\{[^}]*display:\s*flex/)
   })
