@@ -73,9 +73,10 @@ export function makeAllHeading(takes: number, effects: number): string {
   return `Make ${takesOf(takes)} for ${effectsOf(effects)}?`
 }
 
-/** How long the takes take in all, they being made one after another. */
+/** How long the takes take in all: seconds below half a minute, else whole minutes ("About 27 min in all"). */
 export function makeAllTime(takes: number, model: EffectModelId): string {
-  return `About ${waitOf(Math.max(1, Math.round(takes * EFFECT_MODELS[model].seconds)))} in all`
+  const seconds = Math.max(1, Math.round(takes * EFFECT_MODELS[model].seconds))
+  return `About ${seconds < 30 ? `${seconds} s` : `${Math.max(1, Math.round(seconds / 60))} min`} in all`
 }
 
 /** The question's model line: the model, and when it is not Setup's, why. */

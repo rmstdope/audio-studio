@@ -1725,6 +1725,21 @@ music's. When the game switches an effect between once and looping, the lock's i
 marked "made to play once" / "made to loop", and can be played, compared and dropped but not
 chosen (the service refuses with 409). Choosing a take of the new kind clears the box.
 
+**Make all** (as-23x.4; drawn in `docs/ui/as-23x.4-make-all.html`). The list's "Effects up to date" panel
+carries, beside the count, "N effects have no chosen take" and "Make 4 takes each" (`EffectsMakeAll.tsx`;
+the sorting and every sentence are `src/core/effectsMakeAll.ts`). An effect is started when no take is
+chosen (a chosen one whose description changed or clip is missing is left out) and it is not already
+making takes; the count ignores the list's filter. The button opens a question in the panel and starts
+nothing; Make posts the listed ids to `POST /api/effects/make-all`, and the service decides again who is
+eligible, then calls the ordinary `make` with 4 takes per effect, so the model is a hand start's (Setup's,
+else the other one when it cannot run, and the question says so). While anything is making takes the
+panel shows the running line (worked out from `GET /api/effects/making`, hand starts included) and
+**Stop all** (`POST /api/effects/stop-all`, every waiting or running take of the project; made takes stay).
+The service keeps the latest press in memory (`contentStudioEffectBatches`, like the entries) as the
+takes it started, so `GET /api/effects/batch` can say how many were made, stopped (by Stop all or an
+effect's own Stop) and failed; the page shows that as a summary, once it has seen the press running, until
+Close. `GET /api/effects/models` says which models can run (the question's model line and "Open Setup").
+
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),
@@ -1794,6 +1809,10 @@ POST   /api/effects/:id/choose|unchoose|accept|stop   choose a take ({ file }), 
 GET    /api/effects/clips/:file                  a chosen clip (plain `.mp3` only)
 GET    /api/effects/:id/current                  the clip the game plays for the effect
 GET    /api/effects/making                       the batches being made, by effect
+GET    /api/effects/models                       which sound-effects models can run, and the project's
+POST   /api/effects/make-all                     four takes for each listed effect with no chosen take ({ ids })
+POST   /api/effects/stop-all                     stop every take waiting or being made
+GET    /api/effects/batch                        what the latest make-all made, stopped and failed (null: none)
 PUT    /api/effect-model                         the project's sound-effects model ({ model, was }; stale `was` 409)
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
