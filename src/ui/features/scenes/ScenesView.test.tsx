@@ -951,6 +951,30 @@ describe('adding a sound effect', () => {
       expect(menu(page).classList.contains('scene-add-up')).toBe(true)
     })
 
+    it('reopens, after a click outside, on the side that fits every effect', () => {
+      // As tall as what it lists: 40 px a line, plus the find box.
+      Object.defineProperty(proto, 'offsetHeight', {
+        configurable: true,
+        get(this: HTMLElement) {
+          const lines = this.querySelectorAll('li').length * 40
+          if (this.classList.contains('scene-add-list')) return lines + 50
+          return this.tagName === 'UL' ? lines : 0
+        },
+      })
+      layout.buttonTop = 520
+      layout.buttonBottom = 550
+      // 196 px below: one effect (90 px) fits there, all four (210 px) only above.
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 750 })
+      const page = render(open)
+      act(() => add(page).click())
+      type(find(page), 'purr')
+      act(() => {
+        document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      })
+      act(() => add(page).click())
+      expect(menu(page).classList.contains('scene-add-up')).toBe(true)
+    })
+
     it('is placed again when the window is resized', () => {
       const page = render(open)
       act(() => add(page).click())
@@ -1008,6 +1032,30 @@ describe('adding a sound effect', () => {
     })
     expect(page.querySelector('.scene-add-list')).toBeNull()
     expect(document.activeElement).toBe(add(page))
+  })
+
+  it('reopens with an empty find box and every effect after a click outside closed it', () => {
+    const page = render(open)
+    act(() => add(page).click())
+    type(find(page), 'purr')
+    act(() => {
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    })
+    expect(page.querySelector('.scene-add-list')).toBeNull()
+    act(() => add(page).click())
+    expect(find(page).value).toBe('')
+    expect(page.querySelectorAll('.scene-add-list li').length).toBe(4)
+  })
+
+  it('reopens with an empty find box after its button closed it', () => {
+    const page = render(open)
+    act(() => add(page).click())
+    type(find(page), 'purr')
+    act(() => add(page).click())
+    expect(page.querySelector('.scene-add-list')).toBeNull()
+    act(() => add(page).click())
+    expect(find(page).value).toBe('')
+    expect(page.querySelectorAll('.scene-add-list li').length).toBe(4)
   })
 })
 
