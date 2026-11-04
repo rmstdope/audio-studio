@@ -143,6 +143,8 @@ interface Entry {
   stop?: AbortController
   /** The music model it is made with; a retry makes it again with the same. */
   model: MusicModelId
+  /** The press of Make all that started it, which counts it if it is stopped; none if by hand. */
+  press?: StoredBatch
 }
 
 /**
@@ -219,8 +221,8 @@ export interface MusicTakes {
 
 /**
  * What one press of Make takes on a list remembers: how many takes it asked for, for which tracks,
- * how many of each track's takes had failed before it, and how many Stop all stopped on those
- * tracks; `running` while any of its tracks still has a take waiting or being made.
+ * how many of each track's takes had failed before it, and how many of its own takes were
+ * stopped; `running` while any of its tracks still has a take waiting or being made.
  */
 export interface MusicBatch {
   total: number
@@ -274,8 +276,8 @@ export function createMusicTakes({
   const active = (shared.contentStudioMakingTakes ??= new Map())
   // The latest press of each list (`<project file>\0<list id>`), so every tab shows its summary.
   const batches = (shared.contentStudioMusicBatches ??= new Map())
-  // Set while Make all starts its own takes, which are not hand starts.
-  let pressing = false
+  // The press while Make all starts its own takes, which are not hand starts.
+  let pressing: StoredBatch | null = null
   // Changes to one track's board, one after another: a take finishing and a drop lose neither.
   const boards = boardQueue()
 
@@ -499,6 +501,8 @@ export function createMusicTakes({
     },
 
     async make(projectFile, id, request) {
+      // Read before anything is awaited: Make all sets it only around its own synchronous call.
+      const press = pressing
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
       const { inputs, hash } = found
@@ -522,7 +526,7 @@ export function createMusicTakes({
       if (!ready.ok) return { ok: false, message: ready.message }
       // Takes started by hand end the summary of a finished press (read before they are added);
       // one still running goes on.
-      const ended = pressing
+      const ended = press
         ? []
         : [...batches]
             .filter(
@@ -563,6 +567,7 @@ export function createMusicTakes({
             message: '',
             hash,
             model,
+            ...(press && { press }),
           }
           entries.set(entry.n, entry)
           queued.push(entry)
@@ -601,11 +606,20 @@ export function createMusicTakes({
         return { ok: true, tracks: 0, takes: 0 }
       const started: string[] = []
       const before = await api.making(projectFile)
+      // Its takes point at it from the start; it is kept only once they have all been started.
+      const press: StoredBatch = {
+        total: plan.takes,
+        tracks: started,
+        members: list.tracks.map((t) => t.id),
+        failedBefore: {},
+        stopped: 0,
+      }
       for (const track of plan.tracks) {
-        pressing = true
-        const made = await api
-          .make(projectFile, track.id, { count: TAKES_EACH })
-          .finally(() => (pressing = false))
+        // Only this call reads it, before its first await; a hand start meanwhile does not.
+        pressing = press
+        const making = api.make(projectFile, track.id, { count: TAKES_EACH })
+        pressing = null
+        const made = await making
         if (!made || !made.ok) {
           for (const id of started) await api.stop(projectFile, id)
           const message =
@@ -614,13 +628,8 @@ export function createMusicTakes({
         }
         started.push(track.id)
       }
-      batches.set(`${projectFile}\0${listId}`, {
-        total: plan.takes,
-        tracks: started,
-        members: list.tracks.map((t) => t.id),
-        failedBefore: Object.fromEntries(started.map((id) => [id, before[id]?.failed ?? 0])),
-        stopped: 0,
-      })
+      press.failedBefore = Object.fromEntries(started.map((id) => [id, before[id]?.failed ?? 0]))
+      batches.set(`${projectFile}\0${listId}`, press)
       return { ok: true, tracks: plan.tracks.length, takes: plan.takes }
     },
 
@@ -653,13 +662,6 @@ export function createMusicTakes({
           byTrack[track.id] = result.stopped
           stopped += result.stopped
         }
-      }
-      const press: StoredBatch | undefined = batches.get(`${projectFile}\0${listId}`)
-      if (press) {
-        press.stopped += press.tracks.reduce(
-          (sum: number, id: string) => sum + (byTrack[id] ?? 0),
-          0,
-        )
       }
       return { ok: true, stopped, byTrack }
     },
@@ -696,6 +698,8 @@ export function createMusicTakes({
         entry.stop?.abort()
         entries.delete(n)
         stopped++
+        // Its press counts it, wherever Stop was pressed, so a take stopped is never one made.
+        if (entry.press) entry.press.stopped++
       }
       return { ok: true, stopped }
     },
