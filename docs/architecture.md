@@ -1031,6 +1031,17 @@ another is chosen; the page says which) or `missing` (a take was chosen but its 
 disk, which is said ahead of `changed`). A manifest entry without a lock entry is reported as a problem (with the orphans, 12.7).
 Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
 while its list is there, is an orphan, shown on the page of the list its lock entry names under
+"Music the game no longer asks for" (built, 12.7): a play button, its name (its id as words, since
+the lock keeps no title) with its file name under it, when it was chosen, and **Remove**. Remove
+asks first ("Remove the music for Castle gates?", saying what goes) and then deletes, in this
+order so a failure can be repeated, its manifest entry, its clip, its board and takes and its lock
+entry, then its briefs entry (which the next save of the briefs would drop anyway) (`POST /api/music/tracks/:id/remove`, 404 for a track that is not
+an orphan; a manifest or lock that cannot be read deletes nothing). A list that is missing or
+unreadable has no orphans, and one another list names is not one. The briefs and board of a track
+never chosen that no list names are dropped at the next save of the briefs, and only when every
+list is there (which list named a track never chosen is not known); while a list is missing,
+nothing is dropped.
+
 **Make takes for every track with no chosen take** (as-23x.1): the "Tracks up to date" panel of an act's
 page and of the Stingers page has, on its right, "N tracks have no chosen take" and **Make 4 takes each**.
 The press only opens a question in the panel (the total, the model and the time, or on Eleven Music
@@ -1046,20 +1057,9 @@ every waiting or running take of the list) instead of the button; it is worked o
 `GET /api/music/making`, which now also counts each track's failed takes (`MusicMakingSummary.failed`,
 a track with only failed takes has no "making" chip), so it survives a reload. The press itself is
 remembered only in the page's query cache (`MakeAllBatch`: total, tracks, failures before it, takes
-stopped by Stop all), for the summary line ("Made 14 of 16 takes. 2 could not be made — X says why.")
+stopped by Stop all on the press's own tracks: `stopAll` answers per track, so takes started by hand on other tracks are not counted), for the summary line ("Made 14 of 16 takes. 2 could not be made — X says why.")
 that stays until Close or a reload; a take stopped from a track's own page during a press counts as
 made in it. No server state is added.
-
-"Music the game no longer asks for" (built, 12.7): a play button, its name (its id as words, since
-the lock keeps no title) with its file name under it, when it was chosen, and **Remove**. Remove
-asks first ("Remove the music for Castle gates?", saying what goes) and then deletes, in this
-order so a failure can be repeated, its manifest entry, its clip, its board and takes and its lock
-entry, then its briefs entry (which the next save of the briefs would drop anyway) (`POST /api/music/tracks/:id/remove`, 404 for a track that is not
-an orphan; a manifest or lock that cannot be read deletes nothing). A list that is missing or
-unreadable has no orphans, and one another list names is not one. The briefs and board of a track
-never chosen that no list names are dropped at the next save of the briefs, and only when every
-list is there (which list named a track never chosen is not known); while a list is missing,
-nothing is dropped.
 
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
 kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Python worker

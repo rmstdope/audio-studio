@@ -63,6 +63,8 @@ interface Options {
   answer?: { status: number; body: unknown }
   /** What the server reports being made once it has queued the takes. */
   started?: Record<string, MusicMakingSummary>
+  /** What Stop all answers: how many takes were stopped on each track. */
+  stopped?: Record<string, number>
 }
 
 /** The panel on a list, with what the server would have said, and the requests it makes. */
@@ -71,6 +73,11 @@ function render(subject: MusicListSummary, options: Options = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     requests.push({ url: String(url), method: init?.method ?? 'GET' })
+    if (String(url).endsWith('/stop')) {
+      const byTrack = options.stopped ?? {}
+      const stopped = Object.values(byTrack).reduce((a, b) => a + b, 0)
+      return new Response(JSON.stringify({ ok: true, stopped, byTrack }), { status: 200 })
+    }
     const answer = options.answer ?? { status: 200, body: { ok: true, tracks: 2, takes: 8 } }
     if (options.started && String(url).endsWith('/make-all')) {
       client.setQueryData(['music-making'], options.started)
@@ -240,6 +247,39 @@ describe('Make takes for every track with no chosen take', () => {
     expect(both.text()).toContain(
       'Made 10 of 16 takes. 2 could not be made — Forest path says why. 4 were stopped.',
     )
+  })
+
+  it('counts as stopped only the takes of the tracks the press made, not those started by hand', async () => {
+    const page = render(four, {
+      batch,
+      making: {
+        forest: { takes: 10, left: 100, failed: 0 },
+        storm: { takes: 6, left: 60, failed: 0 },
+      },
+      stopped: { forest: 10, storm: 6 },
+    })
+    await page.press('Stop all')
+    await act(async () => {
+      page.client.setQueryData(['music-making'], {})
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(page.text()).toContain('Made 6 of 16 takes. 10 were stopped.')
+  })
+
+  it('does not bring the question back by itself when takes started elsewhere are done', async () => {
+    const page = render(four)
+    await page.press('Make 4 takes each')
+    await act(async () => {
+      page.client.setQueryData(['music-making'], { forest: { takes: 2, left: 60, failed: 0 } })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(page.text()).not.toContain('Make 8 takes for')
+    await act(async () => {
+      page.client.setQueryData(['music-making'], {})
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+    expect(page.text()).not.toContain('Make 8 takes for')
+    expect(page.button('Make 4 takes each')).toBeDefined()
   })
 
   it('prefers what is being made to a summary', () => {

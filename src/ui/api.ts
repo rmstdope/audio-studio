@@ -1223,7 +1223,10 @@ export function useMakeAll(listId: string) {
   })
 }
 
-/** Stops every take of a list that waits or is being made, and remembers how many were stopped. */
+/**
+ * Stops every take of a list that waits or is being made, and remembers how many of the press's
+ * own tracks' takes were stopped (takes started by hand elsewhere in the list are not its).
+ */
 export function useStopAll(listId: string) {
   const client = useQueryClient()
   return useMutation({
@@ -1232,9 +1235,15 @@ export function useStopAll(listId: string) {
         method: 'POST',
       })
       if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
-      const answer = (await response.json()) as { ok: true; stopped: number }
+      const answer = (await response.json()) as { ok: true; byTrack: Record<string, number> }
       client.setQueryData<MakeAllBatch | null>(batchKey(listId), (was) =>
-        was ? { ...was, stopped: was.stopped + answer.stopped } : was,
+        was
+          ? {
+              ...was,
+              stopped:
+                was.stopped + was.tracks.reduce((sum, id) => sum + (answer.byTrack[id] ?? 0), 0),
+            }
+          : was,
       )
       return answer
     },

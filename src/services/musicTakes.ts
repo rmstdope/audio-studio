@@ -91,6 +91,10 @@ export type MoveResult =
 /** What stopping answered: how many takes were stopped, made or waiting; null for an unknown track. */
 export type StopResult = { ok: true; stopped: number } | ProjectFailure | null
 
+/** What stopping a whole list answered: how many takes were stopped in all, and on each track. */
+export type StopAllResult =
+  { ok: true; stopped: number; byTrack: Record<string, number> } | ProjectFailure | null
+
 /** What choosing a take answered; null for a track the project does not list. */
 export type ChooseResult = CommitResult | null
 
@@ -183,7 +187,7 @@ export interface MusicTakes {
    */
   makeAll(projectFile: string, listId: string): Promise<MakeAllResult | null>
   /** Stops every take of the list's tracks that waits or is being made. Null for a list that is not there. */
-  stopAll(projectFile: string, listId: string): Promise<StopResult>
+  stopAll(projectFile: string, listId: string): Promise<StopAllResult>
   /** The project's music model, and whether takes can be made with it now. Null without a `music` section. */
   modelState(projectFile: string): Promise<ModelStateResult>
   /** Makes a take on the board the track's music: levelled, encoded, with the manifest and lock. */
@@ -570,11 +574,15 @@ export function createMusicTakes({
       const list = lists.find((l) => l.id === listId)
       if (!list) return null
       let stopped = 0
+      const byTrack: Record<string, number> = {}
       for (const track of list.tracks) {
         const result = await api.stop(projectFile, track.id)
-        if (result && result.ok) stopped += result.stopped
+        if (result && result.ok && result.stopped > 0) {
+          byTrack[track.id] = result.stopped
+          stopped += result.stopped
+        }
       }
-      return { ok: true, stopped }
+      return { ok: true, stopped, byTrack }
     },
 
     async modelState(projectFile) {

@@ -174,7 +174,27 @@ describe('makeAll, stopAll and modelState', () => {
     const gate = new Promise<void>((resolve) => (release = resolve))
     const { file, takes } = setup(undefined, two, [], gate)
     await takes.makeAll(file, 'act1')
-    expect(await takes.stopAll(file, 'act1')).toEqual({ ok: true, stopped: 8 })
+    expect(await takes.stopAll(file, 'act1')).toEqual({
+      ok: true,
+      stopped: 8,
+      byTrack: { hall: 4, cellar: 4 },
+    })
+    expect(await takes.making(file)).toEqual({})
+    release()
+  })
+
+  it('stops what it queued, and says nothing was made, when a track cannot be started', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    // The second track's board cannot be read, so its takes cannot be started.
+    const { file, takes } = setup(
+      undefined,
+      { ...two, '.content-studio/music/cellar.json': '{ not json' },
+      [],
+      gate,
+    )
+    const answer = await takes.makeAll(file, 'act1')
+    expect(answer).toMatchObject({ ok: false })
     expect(await takes.making(file)).toEqual({})
     release()
   })

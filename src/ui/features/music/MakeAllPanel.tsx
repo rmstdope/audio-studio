@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { MusicListSummary } from '../../../core/music'
 import { planMakeAll, TAKES_EACH } from '../../../core/musicMakeAll'
-import { musicModel, type MusicModelId } from '../../../core/musicModels'
+import { musicModel } from '../../../core/musicModels'
 import {
   useMakeAll,
   useMakeAllBatch,
@@ -63,16 +63,23 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
     tracks: mine.filter(([, m]) => m.takes > 0).length,
     left: mine.reduce((sum, [, m]) => sum + m.left, 0),
   }
-  const paid = state?.ok && musicModel(state.model).perMinute !== null
-  const plan = state?.ok
-    ? planMakeAll({
-        kind: list.kind === 'stingers' ? 'stinger' : 'loop',
-        tracks: list.tracks,
-        making,
-        model: state.model as MusicModelId,
-        ready: state.ready,
-      })
-    : null
+  const model = state?.ok ? musicModel(state.model) : null
+  const paid = model !== null && model.perMinute !== null
+  const plan =
+    state?.ok && model
+      ? planMakeAll({
+          kind: list.kind === 'stingers' ? 'stinger' : 'loop',
+          tracks: list.tracks,
+          making,
+          model: model.id,
+          ready: state.ready,
+        })
+      : null
+  // A question gives way to the running line when takes start elsewhere, and does not come back.
+  const busy = running.takes > 0
+  useEffect(() => {
+    if (busy) setOpen(false)
+  }, [busy])
   const setup = (
     <a className="btn" href={routeHref({ view: 'setup' })}>
       Open Setup
@@ -80,7 +87,7 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
   )
 
   let action: ReactNode = null
-  if (running.takes > 0) {
+  if (busy) {
     action = (
       <div className="make-all-line">
         <span>{runningLine(running)}</span>
@@ -188,8 +195,7 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
     setFocus('button')
   }
   let question: ReactNode = null
-  if (open && running.takes === 0 && plan?.kind === 'ready' && plan.tracks.length > 0) {
-    const model = musicModel((state as { model: MusicModelId }).model)
+  if (open && !busy && model && plan?.kind === 'ready' && plan.tracks.length > 0) {
     const fromFailed = Object.fromEntries(plan.tracks.map((t) => [t.id, making[t.id]?.failed ?? 0]))
     question = (
       <section

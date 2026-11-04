@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { planMakeAll, TAKES_EACH, type MakeAllTrack } from './musicMakeAll'
+import { takesButton } from './musicModels'
 
 const track = (id: string, over: Partial<MakeAllTrack> = {}): MakeAllTrack => ({
   id,
@@ -86,6 +87,17 @@ describe('planMakeAll', () => {
     // $0.15 a minute: (40+20)s = $0.15, (100+20)s = $0.30, four takes each.
     expect(result.price).toBeCloseTo(1.8, 5)
     expect(result.seconds).toBe(8 * 60)
+  })
+
+  test('the total agrees with the take buttons on each track', () => {
+    const tracks = [track('a', { seconds: 40 }), track('b', { seconds: 100 })]
+    const result = plan(tracks, { model: 'eleven' })
+    if (result.kind !== 'ready') throw new Error(result.kind)
+    const buttons = tracks.map((t) =>
+      takesButton('Make', 'eleven', { kind: 'loop', seconds: t.seconds }, TAKES_EACH),
+    )
+    const sum = buttons.reduce((total, label) => total + Number(label.split('$')[1]), 0)
+    expect(result.price!.toFixed(2)).toBe(sum.toFixed(2))
   })
 
   test('stingers are generated at their own length', () => {
