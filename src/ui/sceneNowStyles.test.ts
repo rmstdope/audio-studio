@@ -11,14 +11,16 @@ function rule(source: string, selector: string): string {
 
 describe('the scene table while it plays', () => {
   it('never breaks a word inside the how-it-plays and state columns to make room', () => {
-    for (const selector of ['.scene-effect,\n.scene-how,\n.scene-state']) {
-      expect(css).toContain(`${selector} {`)
-    }
-    const block = css.slice(css.indexOf('.scene-effect,\n.scene-how,\n.scene-state {'))
-    expect(block.slice(0, block.indexOf('}'))).not.toContain('anywhere')
+    expect(rule(css, '.scene-how,\n.scene-state')).toContain('overflow-wrap: break-word')
   })
 
-  it('gives the Now column a width that does not follow its words', () => {
-    expect(rule(css, '.scene-effects th.scene-now-head')).toContain('min-width')
+  it('keeps "Now and then" and the state names on one line', () => {
+    const block = rule(css, '.scene-how .menu-button,\n.scene-state .menu-button')
+    expect(block).toContain('white-space: nowrap')
+  })
+
+  it('gives the Now column a fixed width and lets its words wrap inside it', () => {
+    expect(rule(css, '.scene-effects th.scene-now-head')).toContain('width: 14em')
+    expect(rule(css, '.scene-effects td.scene-now')).toContain('white-space: normal')
   })
 })
