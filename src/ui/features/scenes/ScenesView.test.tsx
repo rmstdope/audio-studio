@@ -896,7 +896,10 @@ describe('adding a sound effect', () => {
       Object.defineProperty(proto, 'offsetHeight', {
         configurable: true,
         get(this: HTMLElement) {
-          return this.classList.contains('scene-add-list') ? layout.height : 0
+          if (this.classList.contains('scene-add-list')) return layout.height
+          return this.tagName === 'UL' && this.parentElement?.classList.contains('scene-add-list')
+            ? layout.height - 50
+            : 0
         },
       })
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: layout.window })
@@ -935,7 +938,7 @@ describe('adding a sound effect', () => {
       // 246 px above, 116 below; the menu is 500 tall, so the list gives up 254 px.
       expect(menu(page).classList.contains('scene-add-up')).toBe(true)
       const list = page.querySelector<HTMLElement>('.scene-add-list ul')!
-      expect(list.style.maxHeight).not.toBe('')
+      expect(list.style.maxHeight).toBe('196px') // 450 - (500 - 246)
     })
 
     it('keeps its side while you type', () => {
@@ -943,7 +946,7 @@ describe('adding a sound effect', () => {
       layout.buttonBottom = 730
       const page = render(open)
       act(() => add(page).click())
-      layout.height = 80
+      layout.height = 40 // under the 66 px below: only keeping the side explains 'above'
       type(find(page), 'purr')
       expect(menu(page).classList.contains('scene-add-up')).toBe(true)
     })

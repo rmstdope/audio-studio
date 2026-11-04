@@ -59,21 +59,19 @@ export function AddEffect({
   }
   const placeRef = useRef(place)
   placeRef.current = place
-  const typing = useRef(false)
   useLayoutEffect(() => {
     if (!open) {
       chosen.current = null
       return
     }
-    placeRef.current(typing.current)
-    typing.current = true
+    placeRef.current(chosen.current !== null)
   }, [open, query])
   useEffect(() => {
-    if (!open) {
-      typing.current = false
-      return
+    if (!open) return
+    const again = (event: Event) => {
+      // The list scrolling inside the menu moves nothing.
+      if (!menu.current?.contains(event.target as Node)) placeRef.current(false)
     }
-    const again = () => placeRef.current(false)
     window.addEventListener('resize', again)
     window.addEventListener('scroll', again, true)
     return () => {
