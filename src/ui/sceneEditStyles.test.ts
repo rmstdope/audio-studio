@@ -60,8 +60,15 @@ describe('the scene editor’s styles', () => {
   it('opens the add-effect menu in front of the play bar, its list scrolling', () => {
     const z = (...selectors: string[]) =>
       Number(selectors.map((s) => /z-index:\s*(\d+)/.exec(rule(css, s))?.[1]).find(Boolean))
-    expect(z('.scene-add-list', '.menu-list')).toBeGreaterThan(z('.scene-playbar'))
+    expect(z('.scene-open .menu-list', '.menu-list')).toBeGreaterThan(z('.scene-playbar'))
     expect(rule(css, '.scene-add-list ul')).toContain('max-height')
     expect(rule(css, '.scene-add-list ul')).toContain('overflow-y: auto')
+  })
+
+  it('opens every menu of the scene editor in front of the play bar', () => {
+    const z = (...selectors: string[]) =>
+      Number(selectors.map((s) => /z-index:\s*(\d+)/.exec(rule(css, s))?.[1]).find(Boolean))
+    // The Music menu, an effect's How it plays, Trigger and In which state menus, and Add.
+    expect(z('.scene-open .menu-list', '.menu-list')).toBeGreaterThan(z('.scene-playbar'))
   })
 })

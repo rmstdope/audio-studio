@@ -4330,8 +4330,11 @@ button.cue-chip[aria-expanded='true'] {
   position: relative;
   margin-top: 10px;
 }
-.scene-add-list {
+/* Every menu in the scene editor opens in front of the sticky play bar (z-index 5). */
+.scene-open .menu-list {
   z-index: 6;
+}
+.scene-add-list {
   min-width: 320px;
 }
 .scene-add-list ul {
