@@ -56,6 +56,7 @@ const summary: ProjectSummary = {
   music: null,
   images: null,
   effects: null,
+  scenes: null,
   problems: [],
 }
 
