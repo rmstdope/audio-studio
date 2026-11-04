@@ -132,12 +132,13 @@ export function useLeaveGuard(dirty: boolean, ask: (leaving: Leaving) => void) {
   useEffect(() => {
     const moved = (delta: number): boolean => {
       const to = window.location.hash
+      // No move, or an undo landing: what Don't save allowed is still to come.
+      if (to === accepted.current) return false
       if (allow.current || !dirtyRef.current) {
         accepted.current = to
         allow.current = false
         return false
       }
-      if (to === accepted.current) return false
       // Back to where the user was, then ask. Undone along the history, so the entry moved to stays
       // where it was and going on is the same move again; only a move of unknown length is put
       // back over the entry it reached.

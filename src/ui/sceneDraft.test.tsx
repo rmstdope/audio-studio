@@ -84,4 +84,14 @@ describe('Back after cancelling a move away from unsaved changes', () => {
     expect(shown()).toBe(music)
     expect(history.hashes()).toEqual([music, store])
   })
+
+  it('goes on without asking again when Don’t save comes before the move is undone', async () => {
+    const { history, asked, shown } = await dirtyStore()
+    act(() => history.click(forest))
+    act(() => asked[0]!.proceed())
+    await settle()
+    expect(asked.length).toBe(1)
+    expect(window.location.hash).toBe(forest)
+    expect(shown()).toBe(forest)
+  })
 })

@@ -178,9 +178,9 @@ let here = 0
  */
 function entryAt(fresh: number): number {
   const state: unknown = window.history.state
-  const known = typeof state === 'object' && state !== null ? Reflect.get(state, AT) : undefined
-  if (typeof known === 'number') return known
   const kept = typeof state === 'object' && state !== null ? state : {}
+  const known: unknown = Reflect.get(kept, AT)
+  if (typeof known === 'number') return known
   window.history.replaceState({ ...kept, [AT]: fresh }, '')
   return fresh
 }
@@ -198,11 +198,14 @@ export function holdRoute(check: Hold): () => void {
   }
 }
 
-/** The current route, following the location hash. */
+/**
+ * The current route, following the location hash. It numbers every history entry it sees in
+ * `history.state` (under `contentStudioAt`), so a hold is told how far each move went.
+ */
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash))
   useEffect(() => {
-    // A fresh page load is the last entry.
+    // A fresh page load is the last entry; a reloaded one kept its number.
     here = entryAt(window.history.length - 1)
     const update = () => {
       // A move to an entry never seen before is a new one, pushed after the one the user was at.

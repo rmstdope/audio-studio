@@ -23,7 +23,8 @@ export interface FakeHistory {
  * a hash move pushes an entry with no state, Back and `go` land a moment later, and `hashchange`
  * fires only when the hash actually differs. Installed as `window.history`, starting with one entry
  * at `start`; the address bar follows through the real history's `replaceState`, whose own
- * hashchange is swallowed.
+ * hashchange is swallowed. One difference remains: `click` fires its hashchange at once, where a
+ * browser queues it.
  */
 export function fakeHistory(start: string): FakeHistory {
   const real = window.history
@@ -62,9 +63,10 @@ export function fakeHistory(start: string): FakeHistory {
       show()
     },
     go(delta = 0) {
-      const to = at + delta
-      if (delta === 0 || to < 0 || to >= entries.length) return
+      // Traversals queue: each goes from wherever the one before it landed.
       setTimeout(() => {
+        const to = at + delta
+        if (delta === 0 || to < 0 || to >= entries.length) return
         const before = entries[at]!.hash
         at = to
         show()
