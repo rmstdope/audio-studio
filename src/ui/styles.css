@@ -4169,7 +4169,7 @@ button.cue-chip[aria-expanded='true'] {
 .scene-play {
   width: 40px;
 }
-.scene-effect-cell {
+.scene-effect-cell .chip {
   white-space: nowrap;
 }
 .scene-effect-name {

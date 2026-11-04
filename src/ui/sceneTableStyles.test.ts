@@ -19,10 +19,11 @@ describe('the Scenes sound effects table', () => {
     expect(rule('.scene-effect-name')).not.toMatch(/min-width/)
   })
 
-  it('makes the effect cell as wide as name plus chip, so the chip never runs under the next column', () => {
+  it('lets the chip drop under the name when the table has no room, so the table never scrolls sideways', () => {
     expect(rule('.scene-effect-name')).toMatch(/display:\s*inline-block/)
-    expect(rule('.scene-effect-cell')).toMatch(/white-space:\s*nowrap/)
-    expect(rule('.scene-effect-cell')).not.toMatch(/display:\s*flex/)
+    const wide = css.slice(0, css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
+    expect(rule('.scene-effect-cell', wide)).toBe('')
+    expect(rule('.scene-effect-cell .chip')).toMatch(/white-space:\s*nowrap/)
   })
 
   it('sizes the effect column to its content, so a short name beside a chip is never cut', () => {
