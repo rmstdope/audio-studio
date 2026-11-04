@@ -94,6 +94,24 @@ describe('readSceneMix', () => {
     ])
   })
 
+  it('reads a random wait that starts at 0, and two equal numbers', () => {
+    const read = readSceneMix(
+      {
+        scenes: {
+          a: {
+            effects: [
+              { id: 'x', play: { mode: 'random', everySeconds: [0, 5] }, level: 1 },
+              { id: 'y', play: { mode: 'random', everySeconds: [7, 7] }, level: 1 },
+            ],
+          },
+        },
+      },
+      'mix.json',
+    )
+    if (!read.ok) throw new Error('expected a mix')
+    expect([...read.badIds]).toEqual([])
+  })
+
   it('is unreadable when it has no scenes object', () => {
     expect(readSceneMix([], 'mix.json').ok).toBe(false)
     expect(readSceneMix({ scenes: [] }, 'mix.json').ok).toBe(false)
@@ -322,5 +340,36 @@ describe('summarizeScenes', () => {
       state: 'invalid',
       scenes: [],
     })
+  })
+
+  it("keeps the mix entry as read, and lists the act's tracks and the game's effects", () => {
+    const entry: SceneMix = { effects: [{ id: 'bell', play: { mode: 'loop' }, level: 2 }] }
+    const result = summarizeScenes({
+      acts: [
+        {
+          id: 'act1',
+          title: 'Act 1',
+          canRefresh: true,
+          mixFile: 'mix.json',
+          declarations: decl(store, slug('cottage')),
+          mix: mixOf({ store: entry }),
+        },
+      ],
+      effects: effects([
+        effectRow('bell', { loops: true }),
+        effectRow('quiet', { current: { kind: 'nothing' } }),
+      ]),
+      music: [musicList([track('store', take()), track('other', take(false))])],
+    })
+    const act = result.acts[0]!
+    expect(act.scenes.map((s) => s.entry)).toEqual([entry, null])
+    expect(act.tracks).toEqual([
+      { id: 'store', title: 'Track store', playable: true },
+      { id: 'other', title: 'Track other', playable: false },
+    ])
+    expect(result.effects).toEqual([
+      { id: 'bell', name: 'bell', loops: true, silent: false, playable: true },
+      { id: 'quiet', name: 'quiet', loops: false, silent: true, playable: false },
+    ])
   })
 })
