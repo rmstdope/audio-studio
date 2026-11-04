@@ -19,7 +19,8 @@ import type { Encoder } from './audio'
 import { loadProject } from './workspace'
 import { boardQueue, createMusicTakes, musicTakeHash } from './musicTakes'
 import { GPU, gpuInUse } from './gpu'
-import { refreshDialog, refreshShared, stopRefreshes } from './refresh'
+import { refreshDialog, refreshShared } from './refresh'
+import { stopAll } from './stopWithStudio'
 import type { MusicSpend } from '../core/spending'
 import { createHash } from 'node:crypto'
 
@@ -1342,7 +1343,7 @@ describe('moving a take', () => {
         message: 'Hut is being refreshed from the game.',
       })
     } finally {
-      stopRefreshes()
+      stopAll()
       await refreshing.catch(() => {})
     }
     expect((await viewOf(m, 'hall')).takes).toHaveLength(2)
@@ -1360,7 +1361,7 @@ describe('moving a take', () => {
         message: 'Hall is being refreshed from the game.',
       })
     } finally {
-      stopRefreshes()
+      stopAll()
       await refreshing.catch(() => {})
     }
     await m.takes.make(m.file, 'victory', { count: 1 })
@@ -1373,7 +1374,7 @@ describe('moving a take', () => {
         message: 'Victory is being refreshed from the game.',
       })
     } finally {
-      stopRefreshes()
+      stopAll()
       await shared.catch(() => {})
     }
     expect((await viewOf(m, 'victory')).takes).toHaveLength(1)

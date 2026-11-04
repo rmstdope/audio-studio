@@ -14,6 +14,7 @@ import { readResource } from './files'
 import { readEffectsList } from './effectsLists'
 import { readList } from './musicLists'
 import { createSerial } from './serial'
+import { killGroup, stopWithStudio } from './stopWithStudio'
 import { openProject, type ProjectFailure } from './workspace'
 
 /** What refreshing a part's dialog did, or why it did not. Null for an unknown part. */
@@ -161,49 +162,6 @@ export function isRefreshing(projectFile: string, partId: string): boolean {
 /** Whether a refresh of the stingers' list is running or waiting to run. */
 export function isRefreshingShared(projectFile: string): boolean {
   return active.has(sharedKey(projectFile))
-}
-
-/**
- * The process groups of the commands running now, so they can be stopped with the studio, and
- * whether the studio's exit is watched. Kept on `globalThis`, as `--dev` reruns this module: one
- * set and one set of handlers for the process.
- */
-const studio = globalThis as { contentStudioRefreshes?: { running: Set<number>; watched: boolean } }
-studio.contentStudioRefreshes ??= { running: new Set(), watched: false }
-const { running } = studio.contentStudioRefreshes
-
-/**
- * Stops every refresh command running now, with everything it started. The commands run in their
- * own process group, so they would not get the terminal's Ctrl-C: the studio stops them itself
- * when it exits.
- */
-export function stopRefreshes(): void {
-  for (const pid of studio.contentStudioRefreshes!.running) killGroup(pid)
-}
-
-function killGroup(pid: number): void {
-  try {
-    process.kill(-pid, 'SIGKILL')
-  } catch {
-    // Already gone.
-  }
-}
-
-/** Makes sure the running commands are stopped when the studio exits or is interrupted. */
-function stopWithStudio(): void {
-  const state = studio.contentStudioRefreshes!
-  if (state.watched) return
-  state.watched = true
-  process.once('exit', stopRefreshes)
-  for (const [signal, code] of [
-    ['SIGINT', 130],
-    ['SIGTERM', 143],
-  ] as const) {
-    process.once(signal, () => {
-      stopRefreshes()
-      process.exit(code)
-    })
-  }
 }
 
 async function refresh(
@@ -360,14 +318,13 @@ async function shell(
   cwd: string,
   timeoutMs: number,
 ): Promise<{ ok: true; output: string } | { ok: false; message: string; output: string }> {
-  stopWithStudio()
   const child = Bun.spawn(['sh', '-c', command], {
     cwd,
     stdout: 'pipe',
     stderr: 'pipe',
     detached: true,
   })
-  running.add(child.pid)
+  const forget = stopWithStudio(child.pid)
   let timedOut = false
   let ended = false
   let grace: ReturnType<typeof setTimeout> | undefined
@@ -398,7 +355,7 @@ async function shell(
     clearTimeout(grace)
     // Whatever happened (a stream error too), nothing of it is left running.
     killGroup(child.pid)
-    running.delete(child.pid)
+    forget()
   }
 }
 

@@ -1083,8 +1083,11 @@ kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Py
 studio), the same JSON-lines protocol as the Whisper worker. Both workers run in the studio's own
 `worker/` folder, not in the game's repository the studio runs from, so what they write beside
 themselves (ACE-Step's `.cache/acestep/progress_estimates.json`) stays with the studio, ignored by
-its git. Each request names the pair of models to make the take with (`dit` and `lm`, folders in the
-checkpoints folder); the worker loads a pair on the first take that needs it and swaps it, freeing the
+its git. Every local worker (music, sound effects, Whisper, and each image take) runs in its own
+process group (`services/stopWithStudio.ts`), so stopping it stops what `uv run` started too, and
+the studio stops every one on exit, Ctrl-C, SIGTERM and its terminal closing. Each request names
+the pair of models to make the take with (`dit` and `lm`, folders in the checkpoints folder); the
+worker loads a pair on the first take that needs it and swaps it, freeing the
 old, when a take asks for another. The pairs are the **music models** (`core/musicModels.ts`), each a
 plain name, the generator's own names and a time per take: **Balanced** (XL turbo, 4B planner: the
 model of decision 5, the default), **Quick** (XL turbo, 1.7B), **Quickest** (turbo, 1.7B) and
