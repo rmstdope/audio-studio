@@ -28,7 +28,6 @@ import {
 import { useStopFocus } from '../../components/useStopFocus'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { routeHref } from '../../route'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 /**
  * The panel's action on the Sound effects list: how many effects have no chosen take and a button
@@ -36,7 +35,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
  * all; then how it went, until Close. Nothing starts without the question's Make.
  */
 export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
-  const client = useQueryClient()
   const making = useEffectsMaking().data ?? {}
   const models = useEffectModels().data
   const running = Object.keys(making).length > 0
