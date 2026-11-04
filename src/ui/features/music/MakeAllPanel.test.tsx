@@ -65,6 +65,8 @@ interface Options {
   started?: Record<string, MusicMakingSummary>
   /** What Stop all answers: how many takes were stopped on each track. */
   stopped?: Record<string, number>
+  /** Whether the list's Refresh from the game is running. */
+  refreshing?: boolean
 }
 
 /** The panel on a list, with what the server would have said, and the requests it makes. */
@@ -101,6 +103,8 @@ function render(subject: MusicListSummary, options: Options = {}) {
         { client },
         createElement(MakeAllPanel, {
           list: subject,
+          noun: subject.kind === 'stingers' ? 'stinger' : 'track',
+          refreshing: options.refreshing ?? false,
           children: createElement('div', null, 'COUNT'),
         }),
       ),
@@ -115,7 +119,30 @@ function render(subject: MusicListSummary, options: Options = {}) {
       button(name).click()
     })
   }
-  return { container, client, requests, button, press, text: () => container.textContent ?? '' }
+  const rerender = (next: Options) =>
+    act(() =>
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(MakeAllPanel, {
+            list: subject,
+            noun: subject.kind === 'stingers' ? 'stinger' : 'track',
+            refreshing: next.refreshing ?? false,
+            children: createElement('div', null, 'COUNT'),
+          }),
+        ),
+      ),
+    )
+  return {
+    container,
+    client,
+    requests,
+    button,
+    press,
+    rerender,
+    text: () => container.textContent ?? '',
+  }
 }
 
 describe('Make takes for every track with no chosen take', () => {
@@ -337,5 +364,77 @@ describe('Make takes for every track with no chosen take', () => {
     const page = render(list([track('a', 'Hall', 'chosen'), track('b', 'Cellar', 'changed')]))
     expect(page.text()).toContain('Every track has a chosen take.')
     expect(page.container.querySelector('button')).toBeNull()
+  })
+})
+
+const stingers = (tracks: TrackRow[]): MusicListSummary => ({
+  ...list(tracks),
+  id: 'stingers',
+  kind: 'stingers',
+  title: 'Stingers',
+})
+const three = stingers([
+  track('victory', 'Victory', 'chosen'),
+  track('boss', 'Boss appears', 'changed'),
+  track('treasure', 'Treasure found', 'not-chosen', 10),
+  track('doom', 'Doom', 'not-chosen', 8),
+  track('fanfare', 'Fanfare', 'not-chosen', 10),
+])
+
+describe('Make takes for every stinger with no chosen take', () => {
+  it('says stinger throughout, and counts every stinger that is not chosen', async () => {
+    const page = render(three)
+    expect(page.text()).toContain('3 stingers have no chosen take')
+    await page.press('Make 4 takes each')
+    expect(page.text()).toContain('Make 12 takes for 3 stingers?')
+    expect(page.text()).toContain('Victory and Boss appears have a chosen take and get none.')
+    expect(page.text()).not.toContain('track')
+    expect(page.requests).toEqual([])
+  })
+
+  it('says a stinger already making takes gets none, and then the running line', async () => {
+    const page = render(three, { making: { treasure: { takes: 4, left: 600, failed: 0 } } })
+    expect(page.text()).toContain('Making 4 takes for 1 stinger · about 10 min left')
+    const idle = render(three, { making: { treasure: { takes: 0, left: 0, failed: 0 } } })
+    expect(idle.text()).toContain('3 stingers have no chosen take')
+  })
+
+  it('says every stinger has a chosen take, with no button', () => {
+    const page = render(stingers([track('victory', 'Victory', 'chosen', 10)]))
+    expect(page.text()).toContain('Every stinger has a chosen take.')
+    expect(page.button('Make 4 takes each')).toBeUndefined()
+  })
+
+  it('never leaves a stinger out for its length', async () => {
+    const page = render(three, { model: { model: 'short', ready: true, message: null } })
+    await page.press('Make 4 takes each')
+    expect(page.text()).toContain('Make 12 takes for 3 stingers?')
+    expect(page.text()).not.toContain('Left out')
+  })
+
+  it('greys Make 4 takes each while the refresh runs, keeping it focusable with the reason', async () => {
+    const page = render(three, { refreshing: true })
+    const button = page.button('Make 4 takes each')
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    expect(button.title).toBe('Wait for the refresh from the game to finish.')
+    const described = button.getAttribute('aria-describedby')!
+    expect(document.getElementById(described)!.textContent).toBe(
+      'Wait for the refresh from the game to finish.',
+    )
+    await page.press('Make 4 takes each')
+    expect(page.text()).not.toContain('Make 12 takes for')
+  })
+
+  it("greys the open question's Make when a refresh starts, and starts nothing", async () => {
+    const page = render(three)
+    await page.press('Make 4 takes each')
+    page.rerender({ refreshing: true })
+    const make = page.button('Make 12 takes')
+    expect(make.getAttribute('aria-disabled')).toBe('true')
+    expect(make.title).toBe('Wait for the refresh from the game to finish.')
+    await page.press('Make 12 takes')
+    expect(page.requests).toEqual([])
+    page.rerender({ refreshing: false })
+    expect(page.button('Make 12 takes').getAttribute('aria-disabled')).toBeNull()
   })
 })

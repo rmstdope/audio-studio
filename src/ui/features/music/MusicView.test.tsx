@@ -69,7 +69,7 @@ const list = (id: string, kind: MusicListSummary['kind']): MusicListSummary => (
   ],
   orphans: [],
   dropped: 0,
-  canRefresh: false,
+  canRefresh: true,
 })
 
 /** A list page's play buttons, by track title. */
@@ -96,6 +96,12 @@ function render(
     defaultOptions: { queries: { retry: false, enabled: false } },
   })
   client.setQueryData(['music-making'], making)
+  client.setQueryData(['music-model-state'], {
+    ok: true,
+    model: 'balanced',
+    ready: true,
+    message: null,
+  })
   act(() =>
     root.render(
       createElement(QueryClientProvider, { client }, createElement(MusicView, { summary, route })),
@@ -170,7 +176,9 @@ describe.each(['act', 'stingers'] as const)('what needs attention on a %s page',
     const { container } = render(kind)
     const stat = container.querySelector<HTMLAnchorElement>('a.stat-lead')!
     expect(stat.getAttribute('href')).toBe(`${href}?show=attention`)
-    expect(stat.textContent).toBe('40%Tracks up to date2 / 53 need attention ›')
+    expect(stat.textContent).toBe(
+      `40%${kind === 'act' ? 'Tracks' : 'Stingers'} up to date2 / 53 need attention ›`,
+    )
     expect(titles(container)).toHaveLength(5)
   })
 
@@ -179,7 +187,9 @@ describe.each(['act', 'stingers'] as const)('what needs attention on a %s page',
     expect(titles(container)).toEqual(['Cellar', 'Tower', 'Roof'])
     const all = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Show all')!
     expect(all.getAttribute('href')).toBe(href)
-    expect(container.textContent).toContain('Showing the 3 tracks that need attention.')
+    expect(container.textContent).toContain(
+      `Showing the 3 ${kind === 'act' ? 'tracks' : 'stingers'} that need attention.`,
+    )
   })
 })
 
@@ -232,5 +242,72 @@ describe('a track’s status while takes are made', () => {
         .querySelector('td:last-child')!.textContent
     expect(status('Roof')).toBe('making 2 takes · about 2 min')
     expect(status('Cellar')).toBe('changed since chosen')
+  })
+})
+
+describe('the words of the page', () => {
+  it('says stinger throughout on the Stingers page and track on an act page', () => {
+    const stingers = render('stingers').container
+    expect(stingers.querySelector('section[aria-label="Stingers up to date"]')).not.toBeNull()
+    expect(stingers.querySelector('a.stat-lead')!.textContent).toContain('Stingers up to date')
+    expect([...stingers.querySelectorAll('th')].map((h) => h.textContent)).toContain('Stinger')
+    expect(stingers.textContent).not.toContain('Tracks up to date')
+    expect(stingers.textContent).toContain('1 stinger has no chosen take')
+    const act = render('act').container
+    expect(act.querySelector('section[aria-label="Tracks up to date"]')).not.toBeNull()
+    expect([...act.querySelectorAll('th')].map((h) => h.textContent)).toContain('Track')
+    expect(act.textContent).toContain('1 track has no chosen take')
+  })
+
+  it('counts the whole page while it is filtered to what needs attention', () => {
+    const { container } = render('stingers', 'attention')
+    expect(container.textContent).toContain('1 stinger has no chosen take')
+    expect(container.textContent).toContain('40%Stingers up to date')
+  })
+})
+
+describe('Refresh from the game while takes are made', () => {
+  const refresh = (container: HTMLElement) =>
+    [...container.querySelectorAll('button')].find((b) =>
+      b.textContent!.startsWith('Refresh'),
+    ) as HTMLButtonElement
+
+  it('is greyed with its reason while a stinger is making takes, and open otherwise', () => {
+    const idle = render('stingers').container
+    expect(refresh(idle).getAttribute('aria-disabled')).toBeNull()
+    expect(refresh(idle).title).toBe('')
+    const busy = render('stingers', undefined, [], { roof: { takes: 2, left: 60, failed: 0 } })
+    const button = refresh(busy.container)
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    expect(button.title).toBe(
+      'Takes are being made for the stingers. Refresh when they are done, or Stop all.',
+    )
+    expect(document.getElementById(button.getAttribute('aria-describedby')!)!.textContent).toBe(
+      button.title,
+    )
+  })
+
+  it('is never greyed on an act page', () => {
+    const { container } = render('act', undefined, [], { roof: { takes: 2, left: 60, failed: 0 } })
+    expect(refresh(container).getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('greys Make 4 takes each while the stingers refresh runs', async () => {
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (() => new Promise(() => {})) as unknown as typeof fetch
+    try {
+      const { container } = render('stingers')
+      await act(async () => {
+        refresh(container).click()
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      })
+      expect(refresh(container).textContent).toBe('Refreshing from the game…')
+      const make = [...container.querySelectorAll('button')].find(
+        (b) => b.textContent === 'Make 4 takes each',
+      )!
+      expect(make.getAttribute('aria-disabled')).toBe('true')
+    } finally {
+      globalThis.fetch = realFetch
+    }
   })
 })

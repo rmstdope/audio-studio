@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import type { MusicListSummary } from '../../../core/music'
 import { planMakeAll, TAKES_EACH } from '../../../core/musicMakeAll'
 import { musicModel } from '../../../core/musicModels'
@@ -10,12 +10,15 @@ import {
   useStopAll,
 } from '../../api'
 import {
+  allChosenLine,
   busyLine,
   chosenLine,
   joinSeparators,
   makeAllButton,
   makeAllHeading,
+  MAKE_BLOCKED_BY_REFRESH,
   makeAllLine,
+  type Noun,
   nonePossibleLine,
   readyLine,
   runningLine,
@@ -33,9 +36,21 @@ type Focus = 'button' | 'make' | 'stop' | null
  * The action of the "Tracks up to date" panel on a list: a button that makes four takes for every
  * track with no chosen take, after a question in the panel; while anything in the list is being
  * made, what is being made and Stop all; when the last take is done, a summary until Close. The
- * `children` (the panel's count) sit on its left.
+ * `children` (the panel's count) sit on its left. `noun` is what the list calls its entries;
+ * `refreshing` greys the two Make buttons while the list's refresh from the game runs.
  */
-export function MakeAllPanel({ list, children }: { list: MusicListSummary; children: ReactNode }) {
+export function MakeAllPanel({
+  list,
+  noun = 'track',
+  refreshing = false,
+  children,
+}: {
+  list: MusicListSummary
+  noun?: Noun
+  refreshing?: boolean
+  children: ReactNode
+}) {
+  const reasonId = useId()
   const making = useMusicMaking().data ?? {}
   const state = useMusicModelState().data
   const { batch, dismiss } = useMakeAllBatch(list.id)
@@ -90,7 +105,7 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
   if (busy) {
     action = (
       <div className="make-all-line">
-        <span>{runningLine(running)}</span>
+        <span>{runningLine({ ...running, noun })}</span>
         <button
           ref={stopButton}
           type="button"
@@ -155,7 +170,7 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
       </div>
     )
   } else if (plan?.kind === 'all-chosen') {
-    action = <span className="muted">Every track has a chosen take.</span>
+    action = <span className="muted">{allChosenLine(noun)}</span>
   } else if (plan?.kind === 'not-ready') {
     action = (
       <div className="make-all-line">
@@ -173,12 +188,16 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
   } else if (plan?.kind === 'ready' && plan.tracks.length > 0) {
     action = (
       <div className="make-all-line">
-        <span className="muted">{readyLine(plan.tracks.length)}</span>
+        <span className="muted">{readyLine(plan.tracks.length, noun)}</span>
         <button
           ref={button}
           type="button"
           className="btn btn-primary"
+          aria-disabled={refreshing || undefined}
+          aria-describedby={refreshing ? reasonId : undefined}
+          title={refreshing ? MAKE_BLOCKED_BY_REFRESH : undefined}
           onClick={() => {
+            if (refreshing) return
             make.reset()
             setOpen(true)
             setFocus('make')
@@ -200,12 +219,12 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
     question = (
       <section
         className="make-all-question"
-        aria-label={makeAllHeading(plan.takes, plan.tracks.length)}
+        aria-label={makeAllHeading(plan.takes, plan.tracks.length, noun)}
         onKeyDown={(event) => {
           if (event.key === 'Escape') cancel()
         }}
       >
-        <h3>{makeAllHeading(plan.takes, plan.tracks.length)}</h3>
+        <h3>{makeAllHeading(plan.takes, plan.tracks.length, noun)}</h3>
         <span className="muted">
           {makeAllLine({ name: model.name, paid: model.perMinute !== null, seconds: plan.seconds })}
         </span>
@@ -234,7 +253,11 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
             type="button"
             className="btn btn-primary"
             disabled={make.isPending}
+            aria-disabled={refreshing || undefined}
+            aria-describedby={refreshing ? reasonId : undefined}
+            title={refreshing ? MAKE_BLOCKED_BY_REFRESH : undefined}
             onClick={() =>
+              !refreshing &&
               make.mutate(
                 { tracks: plan.tracks.map((t) => t.id), failedBefore: fromFailed },
                 {
@@ -267,6 +290,11 @@ export function MakeAllPanel({ list, children }: { list: MusicListSummary; child
         {action}
       </div>
       {question}
+      {refreshing && (
+        <span id={reasonId} hidden>
+          {MAKE_BLOCKED_BY_REFRESH}
+        </span>
+      )}
       {make.isError && (
         <p className="make-all-error" role="alert">
           The takes could not be started. Nothing was made; try again.

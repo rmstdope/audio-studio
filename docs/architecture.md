@@ -1061,6 +1061,15 @@ stopped by Stop all on the press's own tracks: `stopAll` answers per track, so t
 that stays until Close or a reload; a take stopped from a track's own page during a press counts as
 made in it. No server state is added.
 
+On the Stingers page (as-23x.2) the same panel says "stinger" throughout (heading "Stingers up to
+date", column "Stinger", every line of the press: `Noun` in `ui/musicMakeAllText.ts`), counts the
+whole page whatever the "needs attention" filter, and never leaves a stinger out for its length (all
+fit every model). Refresh from the game and the press exclude each other there, and the page shows it
+before anyone presses: while any stinger take is being made (from `GET /api/music/making`, so also
+takes made by hand) Refresh from the game is greyed, and while the refresh runs **Make 4 takes each**
+and an open question's **Make N takes** are greyed, each with its reason as hover text and accessible
+description (`aria-disabled`, so they stay focusable). An act's page does not do this.
+
 **Generator.** `MusicGenerator` (`services/music.ts`) generates one take as a WAV, from the brief,
 kind, seconds, bpm, key and seed, so tests run with a fake. The real one is a Python worker
 (`worker/music.py`, ACE-Step through uv, the models loaded on the first take and stopped with the
@@ -2117,6 +2126,8 @@ Small, independently useful increments:
         another stinger, counted as made for the track it joins (§8.5).
     14. **Make takes for every track with no chosen take** (built, as-23x.1): one press on an act's or the
         Stingers page makes four takes for every track with no chosen take, on the project's model (§8.5).
+    15. **The same press on the Stingers page** (built, as-23x.2): the page says "stinger", and Refresh from
+        the game and the press are greyed while the other runs (§8.5).
 13. **Languages** (epic as-170), in small pull requests:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's

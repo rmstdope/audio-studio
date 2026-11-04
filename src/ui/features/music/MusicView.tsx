@@ -7,7 +7,7 @@ import type {
 } from '../../../services/refresh'
 import { useMusicMaking, useRefreshDialog, useRefreshShared } from '../../api'
 import { STATUS_LABEL, tracksDone, type TrackStatus } from '../../../core/musicChoose'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Problems } from '../../components/Problems'
 import { PlayIcon, StopIcon } from '../../components/icons'
 import { useClipPlayer } from '../../components/useClipPlayer'
@@ -16,6 +16,7 @@ import { clock, shortTitle } from '../../format'
 import { makingStatusText } from '../../musicTakesText'
 import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
 import { routeHref, type MusicRoute } from '../../route'
+import { REFRESH_BLOCKED_BY_TAKES, type Noun } from '../../musicMakeAllText'
 import { showingAttentionText } from '../../status'
 import { DoneStat } from '../../components/DoneStat'
 import { MakeAllPanel } from './MakeAllPanel'
@@ -146,6 +147,11 @@ function ListPage({
   const shown = attention ? list.tracks.filter((t) => done.needs.includes(t.id)) : list.tracks
   const notice = listNotice(list, name)
   const making = useMusicMaking().data ?? {}
+  const noun: Noun = list.kind === 'stingers' ? 'stinger' : 'track'
+  const refreshReasonId = useId()
+  // On the Stingers page the refresh and the making of takes cannot run together, and it shows.
+  const takesBlockRefresh =
+    list.kind === 'stingers' && list.tracks.some((t) => (making[t.id]?.takes ?? 0) > 0)
   // Why the last press of play failed, by track; cleared when the row is pressed again.
   const [failed, setFailed] = useState<Record<string, PlayFailure>>({})
   const player = useClipPlayer((id) => {
@@ -172,20 +178,31 @@ function ListPage({
               className="btn"
               type="button"
               disabled={refresh.pending}
-              onClick={refresh.start}
+              aria-disabled={takesBlockRefresh || undefined}
+              aria-describedby={takesBlockRefresh ? refreshReasonId : undefined}
+              title={takesBlockRefresh ? REFRESH_BLOCKED_BY_TAKES : undefined}
+              onClick={takesBlockRefresh ? undefined : refresh.start}
             >
               {refresh.pending ? 'Refreshing from the game…' : 'Refresh from the game'}
             </button>
+            {takesBlockRefresh && (
+              <span id={refreshReasonId} hidden>
+                {REFRESH_BLOCKED_BY_TAKES}
+              </span>
+            )}
           </div>
         )}
       </header>
       {refresh.panel}
       {!notice && list.tracks.length > 0 && (
-        <section className="panel status-panel" aria-label="Tracks up to date">
-          <MakeAllPanel list={list}>
+        <section
+          className="panel status-panel"
+          aria-label={`${noun === 'stinger' ? 'Stingers' : 'Tracks'} up to date`}
+        >
+          <MakeAllPanel list={list} noun={noun} refreshing={refresh.pending}>
             <div className="stats">
               <DoneStat
-                label="Tracks up to date"
+                label={`${noun === 'stinger' ? 'Stingers' : 'Tracks'} up to date`}
                 done={done.done}
                 total={done.total}
                 href={page('attention')}
@@ -194,7 +211,7 @@ function ListPage({
           </MakeAllPanel>
           {attention && (
             <p className="status-note muted">
-              {showingAttentionText(shown.length, 'track')} <a href={page()}>Show all</a>
+              {showingAttentionText(shown.length, noun)} <a href={page()}>Show all</a>
             </p>
           )}
         </section>
@@ -209,7 +226,7 @@ function ListPage({
             <thead>
               <tr>
                 <th aria-label="Play" />
-                <th>Track</th>
+                <th>{noun === 'stinger' ? 'Stinger' : 'Track'}</th>
                 <th className="music-brief-cell">Brief</th>
                 <th>Length</th>
                 <th>Plays</th>
