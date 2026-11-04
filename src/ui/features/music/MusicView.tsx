@@ -199,7 +199,11 @@ function ListPage({
           className="panel status-panel"
           aria-label={`${noun === 'stinger' ? 'Stingers' : 'Tracks'} up to date`}
         >
-          <MakeAllPanel list={list} noun={noun} refreshing={refresh.pending}>
+          <MakeAllPanel
+            list={list}
+            noun={noun}
+            refreshing={list.kind === 'stingers' && refresh.pending}
+          >
             <div className="stats">
               <DoneStat
                 label={`${noun === 'stinger' ? 'Stingers' : 'Tracks'} up to date`}

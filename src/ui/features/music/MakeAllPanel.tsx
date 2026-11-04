@@ -33,7 +33,7 @@ import { routeHref } from '../../route'
 type Focus = 'button' | 'make' | 'stop' | null
 
 /**
- * The action of the "Tracks up to date" panel on a list: a button that makes four takes for every
+ * The action of the "Tracks up to date" (or "Stingers up to date") panel on a list: a button that makes four takes for every
  * track with no chosen take, after a question in the panel; while anything in the list is being
  * made, what is being made and Stop all; when the last take is done, a summary until Close. The
  * `children` (the panel's count) sit on its left. `noun` is what the list calls its entries;

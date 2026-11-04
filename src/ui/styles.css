@@ -573,7 +573,7 @@ article.card:hover {
   align-self: flex-start;
 }
 
-.btn:hover {
+.btn:hover:not([aria-disabled='true']) {
   background: var(--glass-strong);
 }
 
@@ -844,7 +844,7 @@ a.stat-link:focus-visible .stat-more {
   box-shadow: var(--accent-glow);
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not([aria-disabled='true']) {
   background: var(--accent-grad);
   filter: brightness(1.08);
 }

@@ -266,6 +266,11 @@ describe('the words of the page', () => {
   })
 })
 
+/** Resolves once `ready` holds, polling the microtask/timer queue instead of sleeping a fixed time. */
+async function waitFor(ready: () => boolean) {
+  for (let i = 0; i < 100 && !ready(); i++) await new Promise((resolve) => setTimeout(resolve, 1))
+}
+
 describe('Refresh from the game while takes are made', () => {
   const refresh = (container: HTMLElement) =>
     [...container.querySelectorAll('button')].find((b) =>
@@ -292,6 +297,27 @@ describe('Refresh from the game while takes are made', () => {
     expect(refresh(container).getAttribute('aria-disabled')).toBeNull()
   })
 
+  it('leaves Make 4 takes each open while an act refreshes', async () => {
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (() => new Promise(() => {})) as unknown as typeof fetch
+    try {
+      const { container } = render('act')
+      await act(async () => {
+        refresh(container).click()
+      })
+      await act(async () => {
+        await waitFor(() => refresh(container).textContent === 'Refreshing from the game…')
+      })
+      expect(refresh(container).textContent).toBe('Refreshing from the game…')
+      const make = [...container.querySelectorAll('button')].find(
+        (b) => b.textContent === 'Make 4 takes each',
+      )!
+      expect(make.getAttribute('aria-disabled')).toBeNull()
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
   it('greys Make 4 takes each while the stingers refresh runs', async () => {
     const realFetch = globalThis.fetch
     globalThis.fetch = (() => new Promise(() => {})) as unknown as typeof fetch
@@ -299,7 +325,9 @@ describe('Refresh from the game while takes are made', () => {
       const { container } = render('stingers')
       await act(async () => {
         refresh(container).click()
-        await new Promise((resolve) => setTimeout(resolve, 10))
+      })
+      await act(async () => {
+        await waitFor(() => refresh(container).textContent === 'Refreshing from the game…')
       })
       expect(refresh(container).textContent).toBe('Refreshing from the game…')
       const make = [...container.querySelectorAll('button')].find(
