@@ -5687,3 +5687,67 @@ describe('server, sound effect takes', () => {
     expect((await view('door-creak')).making).toEqual([])
   })
 })
+
+describe('server, saving a scene', () => {
+  const mix = 'game/scenes/act1.mix.json'
+  const entry = (level: number) => ({
+    music: { track: null, level },
+    effects: [{ id: 'coins', play: { mode: 'loop' }, level }],
+  })
+  const sceneRoot = tempRepo({
+    'content-studio.json': projectJson({
+      scenes: {
+        paths: { declarations: 'tts/{part}/scenes.json', mix: 'game/scenes/{part}.mix.json' },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/scenes.json': [{ id: 'store', name: 'Store', states: [], triggers: [] }],
+  })
+  const studio = startServer({
+    projectFile: join(sceneRoot, 'content-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+  })
+  afterAll(() => studio.stop(true))
+  const put = (path: string, body?: unknown, origin = studio.url.origin) =>
+    fetch(new URL(path, studio.url), {
+      method: 'PUT',
+      headers: { origin, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+
+  it('saves from the studio’s own page only', async () => {
+    const body = { scene: entry(1), was: null }
+    expect((await put('/api/scenes/act1/store', body, 'https://evil.example')).status).toBe(403)
+    expect(existsSync(join(sceneRoot, mix))).toBe(false)
+    const saved = await put('/api/scenes/act1/store', body)
+    expect([saved.status, await saved.json()]).toEqual([200, { ok: true }])
+    expect(JSON.parse(readFileSync(join(sceneRoot, mix), 'utf8')).scenes.store).toEqual(entry(1))
+  })
+
+  it('answers 409 with what is saved when the page’s copy is stale', async () => {
+    const stale = await put('/api/scenes/act1/store', { scene: entry(2), was: null })
+    expect(stale.status).toBe(409)
+    expect(await stale.json()).toEqual({ ok: false, kind: 'stale', current: entry(1) })
+    expect((await put('/api/scenes/act1/store', { scene: entry(2), was: entry(1) })).status).toBe(
+      200,
+    )
+  })
+
+  it('answers 400 for a body that is not a scene and 404 for an unknown scene or act', async () => {
+    expect((await put('/api/scenes/act1/store', { scene: { effects: 1 }, was: null })).status).toBe(
+      400,
+    )
+    expect((await put('/api/scenes/act1/store', { nonsense: 1 })).status).toBe(400)
+    expect((await put('/api/scenes/act1/nope', { scene: entry(1), was: null })).status).toBe(404)
+    expect((await put('/api/scenes/act9/store', { scene: entry(1), was: null })).status).toBe(404)
+  })
+
+  it('shows the saved scene in the project summary', async () => {
+    const body = await (await fetch(new URL('/api/project', studio.url))).json()
+    const scene = body.summary.scenes.acts[0].scenes[0]
+    expect(scene.effects.map((e: { level: number }) => e.level)).toEqual([2])
+  })
+})

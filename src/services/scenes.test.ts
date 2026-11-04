@@ -166,7 +166,7 @@ describe('saving a scene', () => {
   })
 
   it('takes a stale null as stale when the scene has an entry now', async () => {
-    const { root, projectFile } = await repo({ scenes: { 'act1-store': entry(2) } })
+    const { projectFile } = await repo({ scenes: { 'act1-store': entry(2) } })
     const result = await saveScene(projectFile, 'act1', 'act1-store', entry(1), null)
     expect(result).toMatchObject({ ok: false, kind: 'stale' })
   })
@@ -185,7 +185,7 @@ describe('saving a scene', () => {
   })
 
   it('refuses a scene the game does not declare, an unknown act, and an entry that cannot work', async () => {
-    const { root, projectFile } = await repo()
+    const { projectFile } = await repo()
     expect(await saveScene(projectFile, 'act1', 'nope', entry(1), null)).toMatchObject({
       ok: false,
       kind: 'unknown',
