@@ -58,19 +58,12 @@ export function MakeAllPanel({
   const stop = useStopAll(list.id)
   const [open, setOpen] = useState(false)
   const [focus, setFocus] = useState<Focus>(null)
+  const closing = useRef(false)
   const panel = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const makeButton = useRef<HTMLButtonElement>(null)
   const stopButton = useRef<HTMLButtonElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
-  // Focus moves after the render that shows its target.
-  useEffect(() => {
-    if (!focus) return
-    const target = { button, make: makeButton, stop: stopButton, close: closeButton }[focus].current
-    if (target) target.focus()
-    else if (focus === 'button') panel.current?.focus()
-    setFocus(null)
-  }, [focus])
 
   const ids = new Set(list.tracks.map((t) => t.id))
   const mine = Object.entries(making).filter(([id]) => ids.has(id))
@@ -94,6 +87,17 @@ export function MakeAllPanel({
   // A question gives way to the running line when takes start elsewhere, and does not come back.
   const busy = running.takes > 0
   const { batch, dismiss } = useMakeAllBatch(list.id, busy)
+  // Focus moves after the render that shows its target.
+  useEffect(() => {
+    if (!focus) return
+    // After Close the summary may still be drawn for a moment; focus waits for what replaces it.
+    if (focus === 'button' && closing.current && batch) return
+    const target = { button, make: makeButton, stop: stopButton, close: closeButton }[focus].current
+    if (target) target.focus()
+    else if (focus === 'button') panel.current?.focus()
+    closing.current = false
+    setFocus(null)
+  }, [focus, batch])
   const stopFocus = useStopFocus(busy, () => setFocus(batch ? 'close' : 'button'))
   const { reset: resetStop } = stop
   useEffect(() => {
@@ -170,6 +174,7 @@ export function MakeAllPanel({
           type="button"
           className="btn"
           onClick={() => {
+            closing.current = true
             dismiss()
             setFocus('button')
           }}

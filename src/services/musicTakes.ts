@@ -597,7 +597,8 @@ export function createMusicTakes({
         model: state.model,
         ready: true,
       })
-      if (plan.kind !== 'ready') return { ok: true, tracks: 0, takes: 0 }
+      if (plan.kind !== 'ready' || plan.tracks.length === 0)
+        return { ok: true, tracks: 0, takes: 0 }
       const started: string[] = []
       const before = await api.making(projectFile)
       for (const track of plan.tracks) {

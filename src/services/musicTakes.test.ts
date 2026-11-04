@@ -266,6 +266,20 @@ describe('the summary of a press on a list is kept by the studio', () => {
     })
   })
 
+  it('is kept by a press that starts nothing, and seen by a studio object that never saw it', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes } = setup(undefined, two, [], gate)
+    await takes.makeAll(file, 'act1')
+    const first = await takes.batch(file, 'act1')
+    // Every track is already making takes: the second press starts none and replaces nothing.
+    expect(await takes.makeAll(file, 'act1')).toMatchObject({ takes: 0 })
+    expect(await takes.batch(file, 'act1')).toEqual(first)
+    const other = createMusicTakes({ generator: fakeGenerator().generator, queue: createSerial() })
+    expect(await other.batch(file, 'act1')).toEqual(first)
+    release()
+  })
+
   it('is forgotten by closeBatch, and by takes started by hand once it has ended', async () => {
     const { file, takes, settled } = setup(undefined, two)
     await takes.makeAll(file, 'act1')

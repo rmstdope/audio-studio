@@ -439,6 +439,10 @@ export function createEffectTakes({
       const ready = await generator.ready(model)
       if (!ready.ok) return { ok: false, message: ready.message }
 
+      // Takes started by hand (a retry too) end the summary of a finished press; read before the
+      // entries change. One still running goes on.
+      const press = batches.get(projectFile)
+      const ended = !pressing && press !== undefined && !pressRunning(projectFile, press)
       const entries = active.get(key) ?? new Map<number, Entry>()
       active.set(key, entries)
       const queued: Entry[] = []
@@ -468,11 +472,7 @@ export function createEffectTakes({
           queued.push(entry)
         }
       }
-      // Takes started by hand end the summary of a finished press; one still running goes on.
-      if (!pressing) {
-        const press = batches.get(projectFile)
-        if (press && !pressRunning(projectFile, press)) batches.delete(projectFile)
-      }
+      if (ended) batches.delete(projectFile)
       for (const entry of queued) {
         const make = () => run(projectFile, found, entry, entries)
         void (entry.model === 'open-1' ? gpu.run(GPU, make) : cpu.run(CPU, make))

@@ -1174,6 +1174,17 @@ export type MakeAllBatch = MusicBatch
 const batchKey = (listId: string) => ['music-batch', listId] as const
 
 /**
+ * Close: reads already under way are dropped, the summary goes at once, and the studio is told;
+ * the query is read again afterwards so a read that raced the Close cannot bring it back.
+ */
+function closeKept(client: QueryClient, key: readonly unknown[], path: string) {
+  void client.cancelQueries({ queryKey: key }).then(() => {
+    client.setQueryData(key, null)
+    void fetch(path, { method: 'POST' }).finally(() => client.invalidateQueries({ queryKey: key }))
+  })
+}
+
+/**
  * Keeps a batch query fresh: polled while the press runs or anything is being made, again every
  * few seconds while a finished one shows (a Close in another tab arrives), and read once more
  * when the last take ends.
@@ -1190,11 +1201,13 @@ function useKeptBatch<T extends { running: boolean }>(
     refetchInterval: (query) =>
       busy || query.state.data?.running ? 3000 : query.state.data ? 5000 : false,
   })
+  // The key is rebuilt on every render; its text is what identifies the query.
+  const id = JSON.stringify(key)
   const was = useRef(busy)
   useEffect(() => {
-    if (was.current && !busy) void client.invalidateQueries({ queryKey: key })
+    if (was.current && !busy) void client.invalidateQueries({ queryKey: JSON.parse(id) })
     was.current = busy
-  }, [busy, client, key])
+  }, [busy, client, id])
   return data ?? null
 }
 
@@ -1217,10 +1230,12 @@ export function useMakeAllBatch(
   )
   return {
     batch,
-    dismiss: () => {
-      client.setQueryData<MakeAllBatch | null>(batchKey(listId), null)
-      void fetch(`/api/music/lists/${encodeURIComponent(listId)}/batch/close`, { method: 'POST' })
-    },
+    dismiss: () =>
+      closeKept(
+        client,
+        batchKey(listId),
+        `/api/music/lists/${encodeURIComponent(listId)}/batch/close`,
+      ),
   }
 }
 
@@ -1355,10 +1370,12 @@ export function useImagesBatch(
   )
   return {
     batch,
-    dismiss: () => {
-      client.setQueryData<ImagesBatch | null>(imagesBatchKey(actId), null)
-      void fetch(`/api/image-acts/${encodeURIComponent(actId)}/batch/close`, { method: 'POST' })
-    },
+    dismiss: () =>
+      closeKept(
+        client,
+        imagesBatchKey(actId),
+        `/api/image-acts/${encodeURIComponent(actId)}/batch/close`,
+      ),
   }
 }
 
@@ -2851,10 +2868,7 @@ export function useEffectsBatch(running: boolean): {
   })
   return {
     batch: data ?? null,
-    close: () => {
-      client.setQueryData<EffectBatch | null>(['effects-batch'], null)
-      void fetch('/api/effects/batch/close', { method: 'POST' })
-    },
+    close: () => closeKept(client, ['effects-batch'], '/api/effects/batch/close'),
   }
 }
 

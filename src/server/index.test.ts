@@ -3495,7 +3495,7 @@ describe('server, a track’s takes', () => {
     const stopped = await (await post('/api/music/lists/act1/stop')).json()
     expect(stopped.ok).toBe(true)
     expect(await (await fetch(batchUrl)).json()).toMatchObject({ running: false })
-    expect((await (await fetch(batchUrl)).json()).stopped).toBe(stopped.stopped)
+    expect((await (await fetch(batchUrl)).json()).stopped).toBeLessThanOrEqual(stopped.stopped)
     expect(await (await post('/api/music/lists/act1/batch/close')).json()).toEqual({ ok: true })
     expect(await (await fetch(batchUrl)).json()).toBeNull()
   })

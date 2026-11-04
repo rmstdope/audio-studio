@@ -41,19 +41,12 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
   const stop = useImagesStopAll(act.id)
   const [open, setOpen] = useState(false)
   const [focus, setFocus] = useState<Focus>(null)
+  const closing = useRef(false)
   const panel = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const makeButton = useRef<HTMLButtonElement>(null)
   const stopButton = useRef<HTMLButtonElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
-  // Focus moves after the render that shows its target.
-  useEffect(() => {
-    if (!focus) return
-    const target = { button, make: makeButton, stop: stopButton, close: closeButton }[focus].current
-    if (target) target.focus()
-    else panel.current?.focus()
-    setFocus(null)
-  }, [focus])
 
   const ids = new Set(act.order)
   const mine = Object.entries(making).filter(([id]) => ids.has(id))
@@ -65,6 +58,17 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
   // Takes started elsewhere give the question way; it does not come back when they are done.
   const busyNow = running.takes > 0
   const { batch, dismiss } = useImagesBatch(act.id, busyNow)
+  // Focus moves after the render that shows its target.
+  useEffect(() => {
+    if (!focus) return
+    // After Close the summary may still be drawn for a moment; focus waits for what replaces it.
+    if (focus === 'button' && closing.current && batch) return
+    const target = { button, make: makeButton, stop: stopButton, close: closeButton }[focus].current
+    if (target) target.focus()
+    else panel.current?.focus()
+    closing.current = false
+    setFocus(null)
+  }, [focus, batch])
   const stopFocus = useStopFocus(busyNow, () => setFocus(batch ? 'close' : 'button'))
   const { reset: resetStop } = stop
   useEffect(() => {
@@ -152,6 +156,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
           type="button"
           className="btn"
           onClick={() => {
+            closing.current = true
             dismiss()
             setFocus('button')
           }}

@@ -253,6 +253,7 @@ describe('Make takes for every track with no chosen take', () => {
     const page = render(four, { batch })
     expect(page.text()).toContain('Made 16 of 16 takes.')
     await page.press('Close')
+    await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 5))))
     expect(page.requests).toContainEqual({
       url: '/api/music/lists/act1/batch/close',
       method: 'POST',

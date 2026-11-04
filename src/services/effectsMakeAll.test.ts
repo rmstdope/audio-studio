@@ -209,6 +209,17 @@ describe('the summary of a press is kept until it is closed or replaced', () => 
     expect(await takes.batch(file)).toBeNull()
   })
 
+  it('is dropped, once finished, when one of its own failed takes is tried again', async () => {
+    const { file, takes, idle } = setup()
+    await takes.makeAll(file, ['broken'])
+    await idle()
+    expect(await takes.batch(file)).toMatchObject({ total: 4, running: false })
+    await takes.make(file, 'broken', { retry: 1 })
+    expect(await takes.batch(file)).toBeNull()
+    await idle()
+    expect(await takes.batch(file)).toBeNull()
+  })
+
   it('is kept when takes are started by hand while the press still runs', async () => {
     const { file, takes, release, idle } = setup({ hold: true })
     await takes.makeAll(file, ['coins'])
