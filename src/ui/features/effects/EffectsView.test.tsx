@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { EffectRow, EffectsSummary } from '../../../core/effects'
 import type { ProjectSummary } from '../../../core/summary'
@@ -844,6 +844,136 @@ describe('Make all, on the Sound effects list', () => {
     await settle()
     expect(text()).not.toContain('Make 16 takes for 4 effects?')
     expect(button('Make 4 takes each')).toBeDefined()
+  })
+
+  describe('focus after Stop all', () => {
+    const making = { coins: { takes: 8, left: 20 } }
+    const batch = { total: 8, made: 0, stopped: 0, failed: [], running: false }
+    const withBatch = () =>
+      seeds([
+        [['effects-making'], making],
+        [['effects-batch'], batch],
+        [['effects-summary-open'], true],
+      ])
+    // happy-dom moves focus on by itself when the focused node is removed (a browser drops it to
+    // the body), so these tests record the focus() calls, though the first two cannot go red here.
+    const focused: Element[] = []
+    const realFocus = HTMLElement.prototype.focus
+    beforeEach(() => {
+      focused.length = 0
+      HTMLElement.prototype.focus = function (this: HTMLElement) {
+        focused.push(this)
+        realFocus.call(this)
+      }
+    })
+    afterEach(() => {
+      HTMLElement.prototype.focus = realFocus
+    })
+
+    it('keeps focus on a greyed Stop all while stopping, then moves it to Close', async () => {
+      let release = () => {}
+      const { client, button, settle } = render(
+        list,
+        effects({ rows: four }),
+        (call) =>
+          call.url.endsWith('/stop-all')
+            ? new Promise<Response>((resolve) => {
+                release = () => resolve(Response.json({ ok: true }))
+              })
+            : Response.json({ ok: true }),
+        withBatch(),
+      )
+      button('Stop all').focus()
+      act(() => button('Stop all').click())
+      await settle()
+      expect(button('Stop all').getAttribute('aria-disabled')).toBe('true')
+      expect(button('Stop all').disabled).toBe(false)
+      expect(document.activeElement).toBe(button('Stop all'))
+      await act(async () => release())
+      act(() => client.setQueryData(['effects-making'], {}))
+      await settle()
+      expect(focused.at(-1)).toBe(button('Close'))
+      act(() => button('Close').click())
+      await settle()
+      expect(document.activeElement).toBe(button('Make 4 takes each'))
+    })
+
+    it('goes to the panel button when there is no summary to show', async () => {
+      const { client, button, settle } = render(
+        list,
+        effects({ rows: four }),
+        undefined,
+        seeds([[['effects-making'], making]]),
+      )
+      button('Stop all').focus()
+      act(() => client.setQueryData(['effects-making'], {}))
+      await settle()
+      expect(focused.at(-1)).toBe(button('Make 4 takes each'))
+    })
+
+    it('moves focus when the takes finish on their own only if it was on Stop all', async () => {
+      const on = render(list, effects({ rows: four }), undefined, withBatch())
+      on.button('Stop all').focus()
+      act(() => on.client.setQueryData(['effects-making'], {}))
+      await on.settle()
+      expect(focused.at(-1)).toBe(on.button('Close'))
+      const elsewhere = render(list, effects({ rows: four }), undefined, withBatch())
+      const other = document.createElement('input')
+      document.body.append(other)
+      other.focus()
+      focused.length = 0
+      act(() => elsewhere.client.setQueryData(['effects-making'], {}))
+      await elsewhere.settle()
+      expect(focused).toEqual([])
+      expect(document.activeElement).toBe(other)
+    })
+
+    it('waits for the summary before moving focus when the batch ends after the takes', async () => {
+      const { client, button, settle } = render(
+        list,
+        effects({ rows: four }),
+        undefined,
+        seeds([
+          [['effects-making'], making],
+          [['effects-batch'], { ...batch, running: true }],
+          [['effects-summary-open'], true],
+        ]),
+      )
+      button('Stop all').focus()
+      act(() => client.setQueryData(['effects-making'], {}))
+      await settle()
+      expect(button('Close')).toBeUndefined()
+      expect(focused.at(-1)).not.toBe(button('Make 4 takes each'))
+      act(() => client.setQueryData(['effects-batch'], batch))
+      await settle()
+      expect(focused.at(-1)).toBe(button('Close'))
+    })
+
+    it('says when stopping failed, keeps Stop all and its focus, and clears the line when the takes finish', async () => {
+      let answer = (call: { url: string }): Response | Promise<Response> =>
+        call.url.endsWith('/stop-all') ? new Response('{}', { status: 500 }) : Response.json({})
+      const { client, text, button, settle } = render(
+        list,
+        effects({ rows: four }),
+        (call) => answer(call),
+        withBatch(),
+      )
+      button('Stop all').focus()
+      act(() => button('Stop all').click())
+      await settle()
+      const words = 'The takes could not be stopped. They are still being made; try again.'
+      expect(text()).toContain(words)
+      expect(document.activeElement).toBe(button('Stop all'))
+      act(() => {
+        answer = () => new Promise<Response>(() => {})
+        button('Stop all').click()
+      })
+      await settle()
+      expect(text()).not.toContain(words)
+      act(() => client.setQueryData(['effects-making'], {}))
+      await settle()
+      expect(text()).not.toContain(words)
+    })
   })
 
   it('Close puts focus on the panel when no button is left', async () => {

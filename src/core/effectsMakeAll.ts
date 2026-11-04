@@ -162,3 +162,7 @@ export function batchSummary(batch: Omit<EffectBatch, 'running'>): BatchSummary 
 /** The line under the panel when the press could not start. */
 export const EFFECTS_MAKE_ALL_FAILED =
   'The takes could not be started. Nothing was made; try again.'
+
+/** The line under the panel when Stop all was refused or could not be reached. */
+export const EFFECTS_STOP_FAILED =
+  'The takes could not be stopped. They are still being made; try again.'

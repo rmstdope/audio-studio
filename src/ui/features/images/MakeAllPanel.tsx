@@ -22,10 +22,11 @@ import {
   summaryStopped,
 } from '../../imagesMakeAllText'
 import { listSeparator } from '../../imagesText'
+import { useStopFocus } from '../../components/useStopFocus'
 import { routeHref } from '../../route'
 
 /** What focus goes to once the panel has re-rendered after a press. */
-type Focus = 'button' | 'make' | 'stop' | null
+type Focus = 'button' | 'make' | 'stop' | 'close' | null
 
 /**
  * The action of the "Images up to date" panel on an act: a button that makes four takes for every
@@ -45,10 +46,11 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
   const button = useRef<HTMLButtonElement>(null)
   const makeButton = useRef<HTMLButtonElement>(null)
   const stopButton = useRef<HTMLButtonElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
   // Focus moves after the render that shows its target.
   useEffect(() => {
     if (!focus) return
-    const target = { button, make: makeButton, stop: stopButton }[focus].current
+    const target = { button, make: makeButton, stop: stopButton, close: closeButton }[focus].current
     if (target) target.focus()
     else panel.current?.focus()
     setFocus(null)
@@ -63,6 +65,11 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
   }
   // Takes started elsewhere give the question way; it does not come back when they are done.
   const busyNow = running.takes > 0
+  const stopFocus = useStopFocus(busyNow, () => setFocus(batch ? 'close' : 'button'))
+  const { reset: resetStop } = stop
+  useEffect(() => {
+    if (!busyNow) resetStop()
+  }, [busyNow, resetStop])
   useEffect(() => {
     if (busyNow) setOpen(false)
   }, [busyNow])
@@ -92,8 +99,9 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
           ref={stopButton}
           type="button"
           className="btn btn-ghost"
-          disabled={stop.isPending}
-          onClick={() => stop.mutate()}
+          aria-disabled={stop.isPending || undefined}
+          onClick={() => !stop.isPending && stop.mutate()}
+          {...stopFocus}
         >
           Stop all
         </button>
@@ -140,6 +148,7 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
           {stopped > 0 && ` ${summaryStopped(stopped)}`}
         </span>
         <button
+          ref={closeButton}
           type="button"
           className="btn"
           onClick={() => {
@@ -254,6 +263,11 @@ export function MakeAllPanel({ act, children }: { act: ImagesAct; children: Reac
         {action}
       </div>
       {question}
+      {stop.isError && busyNow && (
+        <p className="make-all-error" role="alert">
+          The takes could not be stopped. They are still being made; try again.
+        </p>
+      )}
       {make.isError && (
         <p className="make-all-error" role="alert">
           The takes could not be started. Nothing was made; try again.
