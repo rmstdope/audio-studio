@@ -1,7 +1,8 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { EffectsSummary } from '../../../core/effects'
 import type { MusicListSummary, TrackRow } from '../../../core/music'
+import type { SceneMix } from '../../../core/scenes'
 import type { ProjectSummary } from '../../../core/summary'
 import type { ScenesRoute } from '../../route'
 
@@ -24,15 +25,35 @@ afterAll(() => {
 // What the page asked the studio for, and what the next refresh answers.
 const asked: { method: string; path: string }[] = []
 let refreshAnswer: { status: number; body: unknown } = { status: 200, body: { ok: true } }
+// What was saved, what the next save answers, and (when set) a gate the answer waits for.
+const puts: { path: string; body: { scene: SceneMix; was: SceneMix | null } }[] = []
+let saveAnswer: { status: number; body: unknown } = { status: 200, body: { ok: true } }
+let saveGate: Promise<void> | null = null
 const gains: number[] = []
 const loops: boolean[] = []
+// A page left mounted would go on guarding its unsaved changes in the next test.
+afterEach(async () => {
+  // Let a queued hashchange (a page going on to another scene) land while the DOM is still there.
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
+  cleanups.splice(0).forEach((c) => c())
+  document.body.innerHTML = ''
+  window.history.replaceState(null, '', '#')
+})
 beforeEach(() => {
   asked.length = 0
   gains.length = 0
   loops.length = 0
   refreshAnswer = { status: 200, body: { ok: true } }
+  puts.length = 0
+  saveAnswer = { status: 200, body: { ok: true } }
+  saveGate = null
   globalThis.fetch = (async (path: string, init?: RequestInit) => {
     asked.push({ method: init?.method ?? 'GET', path })
+    if (init?.method === 'PUT') {
+      puts.push({ path, body: JSON.parse(init.body as string) })
+      await saveGate
+      return Response.json(saveAnswer.body, { status: saveAnswer.status })
+    }
     if (init?.method === 'POST') {
       return Response.json(refreshAnswer.body, { status: refreshAnswer.status })
     }
@@ -222,26 +243,32 @@ describe('an act with its scenes', () => {
       'States: plain, cat-home · Triggers: door-opens',
     )
     expect([...page.querySelectorAll('.page-header button')].map((b) => b.textContent)).toEqual([
+      'Discard',
+      'Save',
       'Refresh from the game',
     ])
-    expect(page.querySelector('input, [role=slider]')).toBeNull()
+    expect(text(page.querySelector('.scene-status'))).toBeUndefined()
     expect(text(page.querySelector('[aria-label="Music"]'))).toBe('MusicGeneral Store100%')
+    expect(page.querySelector<HTMLInputElement>('[aria-label="Music level"]')!.value).toBe('100')
     expect([...page.querySelectorAll('th')].map((th) => th.textContent)).toEqual([
       '',
       'Effect',
       'How it plays',
       'In which state',
       'Level',
+      '',
     ])
     const rows = [...page.querySelectorAll('tbody tr')].map((tr) =>
-      [...tr.querySelectorAll('td')].slice(1).map((td) => text(td)),
+      [...tr.querySelectorAll('td')].slice(1, 5).map((td) => text(td)),
     )
     expect(rows).toEqual([
-      ['shop-bell', 'Once, 1.5 s after entering', 'Always', '60%'],
-      ['glass-clink', 'Now and then, every 15–30 s', 'Always', '50%'],
+      ['shop-bell', 'Once s after entering', 'Always', '60%'],
+      ['glass-clink', 'Now and thenevery – s', 'Always', '50%'],
       ['cat-purr', 'Round and round', 'cat-home', '100%'],
-      ['shop-bell', 'On a trigger: door-opens', 'Always', '250%'],
+      ['shop-bell', 'On a triggerdoor-opens', 'Always', '250%'],
     ])
+    const boxes = [...page.querySelectorAll<HTMLInputElement>('.scene-num')].map((i) => i.value)
+    expect(boxes).toEqual(['1.5', '15', '30'])
   })
 
   it('says a scene has no music and no effects', () => {
@@ -250,9 +277,10 @@ describe('an act with its scenes', () => {
       'States: none · Triggers: bell-tolls',
     )
     expect(text(page.querySelector('[aria-label="Music"]'))).toBe('MusicNo music')
-    expect(page.querySelector('[aria-label="Music"] button')).toBeNull()
+    expect(page.querySelector('[aria-label^="Play"]')).toBeNull()
+    expect(page.querySelector('[aria-label="Music level"]')).toBeNull()
     expect(text(page.querySelector('[aria-label="Sound effects"]'))).toBe(
-      'Sound effectsNo sound effects in this scene.',
+      'Sound effectsNo sound effects in this scene.+ Add a sound effect',
     )
   })
 
@@ -276,21 +304,21 @@ describe('an act with its scenes', () => {
     const silent = rows[0]!
     expect(text(silent.querySelector('.scene-effect'))).toBe('wolf-howlno take chosen')
     expect(silent.querySelector('a.chip')!.getAttribute('href')).toBe('#/effects/items/wolf-howl')
-    expect(silent.querySelector('button')).toBeNull()
+    expect(silent.querySelector('[aria-label^="Play"]')).toBeNull()
     const gone = rows[1]!
     expect(text(gone.querySelector('.scene-effect'))).toBe('owlgone from the game')
-    expect(text(gone.querySelector('.scene-how'))).toBe(
-      'On a trigger: old-triggergone from the game',
-    )
+    expect(text(gone.querySelector('.scene-how'))).toBe('On a triggerold-triggergone from the game')
     expect(text(gone.querySelector('.scene-state'))).toBe('kit-trappedgone from the game')
-    expect(gone.querySelector('button')).toBeNull()
+    expect(gone.querySelector('.scene-how .menu-gone')).not.toBeNull()
+    expect(gone.querySelector('[aria-label^="Play"]')).toBeNull()
+    expect(gone.querySelector('[aria-label="Remove"]')).not.toBeNull()
   })
 })
 
 describe('playing a clip alone', () => {
   it('plays the music at its level, round and round, and stops on a second press', async () => {
     const page = render(open)
-    const play = page.querySelector<HTMLButtonElement>('[aria-label="Music"] button')!
+    const play = page.querySelector<HTMLButtonElement>('[aria-label="Music"] .icon-btn')!
     expect(play.getAttribute('aria-label')).toBe('Play General Store')
     act(() => play.click())
     await flush()
@@ -304,10 +332,10 @@ describe('playing a clip alone', () => {
 
   it('plays an effect at its level, and stops the music', async () => {
     const page = render(open)
-    const music = page.querySelector<HTMLButtonElement>('[aria-label="Music"] button')!
+    const music = page.querySelector<HTMLButtonElement>('[aria-label="Music"] .icon-btn')!
     act(() => music.click())
     await flush()
-    const last = [...page.querySelectorAll<HTMLButtonElement>('tbody button')].at(-1)!
+    const last = [...page.querySelectorAll<HTMLButtonElement>('tbody [aria-label^="Play"]')].at(-1)!
     act(() => last.click())
     await flush()
     expect(asked.at(-1)!.path).toBe('/api/effects/shop-bell/current')
@@ -337,17 +365,17 @@ describe('playing a clip alone', () => {
         ),
       )
     show('act1-store')
-    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Music"] button')!.click())
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label^="Play"]')!.click())
     await flush()
     show('act1-forest')
-    expect(container.querySelector('[aria-label="Music"] button')!.getAttribute('aria-label')).toBe(
+    expect(container.querySelector('[aria-label$="Forest Path"]')!.getAttribute('aria-label')).toBe(
       'Play Forest Path',
     )
   })
 
   it('loops an effect the game loops', async () => {
     const page = render(open)
-    act(() => page.querySelectorAll<HTMLButtonElement>('tbody button')[2]!.click())
+    act(() => page.querySelectorAll<HTMLButtonElement>('tbody [aria-label^="Play"]')[2]!.click())
     await flush()
     expect(loops.at(-1)).toBe(true)
   })
@@ -430,5 +458,496 @@ describe('Refresh from the game', () => {
     act(() => button(page, 'Close').click())
     await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
     expect(page.querySelector('.scenes-failed')).toBeNull()
+  })
+})
+
+// Editing: the page changes the scene in itself and saves it when asked.
+const type = (input: HTMLInputElement, value: string) =>
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+const menu = (page: HTMLElement, label: string, row = 0) =>
+  page.querySelectorAll<HTMLButtonElement>(`[aria-haspopup="listbox"][aria-label^="${label}:"]`)[
+    row
+  ]!
+const choose = (trigger: HTMLButtonElement, option: string) => {
+  act(() => trigger.click())
+  const found = [...trigger.parentElement!.querySelectorAll<HTMLElement>('[role=option]')].find(
+    (o) => o.textContent === option,
+  )
+  if (!found) throw new Error(`no option ${option}`)
+  act(() => found.click())
+}
+const status = (page: HTMLElement) => text(page.querySelector('.scene-status'))
+const rows = (page: HTMLElement) => [...page.querySelectorAll('tbody tr')]
+const musicLevel = (page: HTMLElement) =>
+  page.querySelector<HTMLInputElement>('[aria-label="Music level"]')!
+
+describe('editing a scene', () => {
+  it('starts untouched: Save and Discard dimmed, no status word, no dot', () => {
+    const page = render(open)
+    expect(button(page, 'Save').getAttribute('aria-disabled')).toBe('true')
+    expect(button(page, 'Discard').getAttribute('aria-disabled')).toBe('true')
+    expect(status(page)).toBeUndefined()
+    expect(page.querySelector('.scene-dot')).toBeNull()
+  })
+
+  it('says Unsaved changes at the first change, with a dot in the list, and Discard puts it back', () => {
+    const page = render(open)
+    type(musicLevel(page), '40')
+    expect(status(page)).toBe('Unsaved changes')
+    expect(button(page, 'Save').getAttribute('aria-disabled')).toBeNull()
+    expect(button(page, 'Discard').getAttribute('aria-disabled')).toBeNull()
+    expect(text(page.querySelector('.scene-list li'))).toContain('●')
+    expect(text(page.querySelector('.scene-music'))).toContain('40%')
+    act(() => button(page, 'Discard').click())
+    expect(status(page)).toBeUndefined()
+    expect(musicLevel(page).value).toBe('100')
+    expect(page.querySelector('.scene-dot')).toBeNull()
+  })
+
+  it('moves a level with the slider, 0 to 300 in steps of 5', () => {
+    const page = render(open)
+    const slider = musicLevel(page)
+    expect([slider.min, slider.max, slider.step]).toEqual(['0', '300', '5'])
+    type(page.querySelector<HTMLInputElement>('[aria-label="Level of shop-bell"]')!, '300')
+    expect(text(rows(page)[0]!.querySelector('.scene-level'))).toBe('300%')
+  })
+
+  it('hears a level moved while the clip plays, at once', async () => {
+    const page = render(open)
+    act(() => page.querySelector<HTMLButtonElement>('[aria-label="Music"] .icon-btn')!.click())
+    await flush()
+    type(musicLevel(page), '150')
+    expect(gains.at(-1)).toBe(1.5)
+  })
+
+  it('chooses the music from the act’s tracks, or none (which hides the level)', () => {
+    const page = render(open)
+    const trigger = menu(page, 'Music')
+    expect([...page.querySelectorAll('[role=option]')]).toEqual([])
+    act(() => trigger.click())
+    expect(
+      [...trigger.parentElement!.querySelectorAll('[role=option]')].map((o) => o.textContent),
+    ).toEqual(['No music', 'General Store', 'Forest Path'])
+    act(() => trigger.click())
+    choose(menu(page, 'Music'), 'Forest Path')
+    expect(menu(page, 'Music').textContent).toBe('Forest Path')
+    expect(page.querySelector('[aria-label="Play Forest Path"]')).not.toBeNull()
+    choose(menu(page, 'Music'), 'No music')
+    expect(menu(page, 'Music').textContent).toBe('No music')
+    expect(page.querySelector('[aria-label="Music level"]')).toBeNull()
+    expect(status(page)).toBe('Unsaved changes')
+  })
+
+  it('removes an effect, and focus goes to the next ✕, or to Add after the last', () => {
+    const page = render(open)
+    act(() => page.querySelectorAll<HTMLButtonElement>('button[aria-label="Remove"]')[1]!.click())
+    expect(rows(page).map((r) => text(r.querySelector('.scene-effect')))).toEqual([
+      'shop-bell',
+      'cat-purr',
+      'shop-bell',
+    ])
+    expect(document.activeElement).toBe(rows(page)[1]!.querySelector('[data-remove]'))
+    act(() => rows(page)[2]!.querySelector<HTMLButtonElement>('[data-remove]')!.click())
+    expect(document.activeElement).toBe(page.querySelector('[data-add]'))
+    expect(status(page)).toBe('Unsaved changes')
+  })
+
+  it('changes how an effect plays and keeps what was typed when switching back', () => {
+    const page = render(open)
+    choose(menu(page, 'How it plays', 1), 'Once')
+    expect(rows(page)[1]!.querySelector<HTMLInputElement>('.scene-num')!.value).toBe('0')
+    choose(menu(page, 'How it plays', 1), 'Now and then')
+    const [first, second] = rows(page)[1]!.querySelectorAll<HTMLInputElement>('.scene-num')
+    expect([first!.value, second!.value]).toEqual(['15', '30'])
+    type(first!, '3')
+    choose(menu(page, 'How it plays', 1), 'Once')
+    choose(menu(page, 'How it plays', 1), 'Now and then')
+    expect(rows(page)[1]!.querySelector<HTMLInputElement>('.scene-num')!.value).toBe('3')
+    choose(menu(page, 'How it plays', 1), 'On a trigger')
+    expect(menu(page, 'Trigger').textContent).toBe('door-opens')
+  })
+
+  it('offers On a trigger only when the scene has triggers', () => {
+    const page = render({ ...open, scene: 'act1-forest' })
+    act(() => menu(page, 'How it plays').click())
+    const options = [...page.querySelectorAll('[role=option]')].map((o) => o.textContent)
+    expect(options).toEqual(['Round and round', 'Now and then', 'Once'])
+  })
+
+  it('chooses the state from Always and the scene’s states; no states, plain Always', () => {
+    const page = render(open)
+    choose(menu(page, 'In which state', 0), 'cat-home')
+    expect(menu(page, 'In which state', 0).textContent).toBe('cat-home')
+    const chapel = render({ ...open, scene: 'act1-chapel' })
+    expect(chapel.querySelector('[aria-label^="In which state"]')).toBeNull()
+  })
+
+  it('flags a number that cannot work on its row, blocks Save and counts the red rows', async () => {
+    const page = render(open)
+    const second = rows(page)[1]!.querySelectorAll<HTMLInputElement>('.scene-num')[1]!
+    type(second, '900')
+    expect(text(rows(page)[1]!.querySelector('.scene-error'))).toBe('At most 600 seconds.')
+    expect(second.getAttribute('aria-invalid')).toBe('true')
+    expect(second.getAttribute('aria-describedby')).toBe(
+      rows(page)[1]!.querySelector('.scene-error')!.id,
+    )
+    expect(status(page)).toBe('Fix the 1 red row to save')
+    expect(page.querySelector('.scene-status-red')).not.toBeNull()
+    expect(button(page, 'Save').getAttribute('aria-disabled')).toBe('true')
+    act(() => button(page, 'Save').click())
+    await flush()
+    expect(puts).toEqual([])
+    expect(button(page, 'Discard').getAttribute('aria-disabled')).toBeNull()
+    type(rows(page)[0]!.querySelector<HTMLInputElement>('.scene-num')!, '')
+    expect(status(page)).toBe('Fix the 2 red rows to save')
+    expect(text(rows(page)[0]!.querySelector('.scene-error'))).toBe('Type a number of seconds.')
+    type(second, '40')
+    type(rows(page)[0]!.querySelector<HTMLInputElement>('.scene-num')!, '2')
+    expect(status(page)).toBe('Unsaved changes')
+    expect(page.querySelector('.scene-error')).toBeNull()
+  })
+
+  it('turns both boxes red when the first number is not smaller than the second', () => {
+    const page = render(open)
+    const [first, second] = rows(page)[1]!.querySelectorAll<HTMLInputElement>('.scene-num')
+    type(first!, '30')
+    expect([first!, second!].map((i) => i.getAttribute('aria-invalid'))).toEqual(['true', 'true'])
+    expect(text(rows(page)[1]!.querySelector('.scene-error'))).toBe(
+      'The first number must be smaller than the second.',
+    )
+  })
+
+  it('Discard still works while rows are red', () => {
+    const page = render(open)
+    type(rows(page)[0]!.querySelector<HTMLInputElement>('.scene-num')!, 'abc')
+    act(() => button(page, 'Discard').click())
+    expect(page.querySelector('.scene-error')).toBeNull()
+    expect(status(page)).toBeUndefined()
+  })
+
+  it('saves the scene for the game: Saving…, then Saved, focus staying on Save', async () => {
+    let release = () => {}
+    saveGate = new Promise((resolve) => (release = resolve))
+    const page = render(open)
+    type(musicLevel(page), '40')
+    button(page, 'Save').focus()
+    act(() => button(page, 'Save').click())
+    await flush()
+    expect(puts.map((p) => p.path)).toEqual(['/api/scenes/act1/act1-store'])
+    expect(puts[0]!.body.scene.music).toEqual({ track: 'act1-store', level: 0.4 })
+    expect(puts[0]!.body.scene.effects[0]).toEqual({
+      id: 'shop-bell',
+      play: { mode: 'once', afterSeconds: 1.5 },
+      level: 0.6,
+    })
+    expect(puts[0]!.body.was?.music).toEqual({ track: 'act1-store', level: 1 })
+    expect(button(page, 'Saving…').getAttribute('aria-disabled')).toBe('true')
+    await act(async () => release())
+    expect(status(page)).toBe('Saved')
+    expect(page.querySelector('.scene-status-ok')).not.toBeNull()
+    expect(button(page, 'Save').getAttribute('aria-disabled')).toBe('true')
+    expect(page.querySelector('.scene-dot')).toBeNull()
+    expect(document.activeElement).toBe(button(page, 'Save'))
+    type(musicLevel(page), '50')
+    expect(status(page)).toBe('Unsaved changes')
+  })
+
+  it('writes a number typed with a decimal as a number', async () => {
+    const page = render(open)
+    type(rows(page)[0]!.querySelector<HTMLInputElement>('.scene-num')!, '2.25')
+    act(() => button(page, 'Save').click())
+    await flush()
+    expect(puts[0]!.body.scene.effects[0]?.play).toEqual({ mode: 'once', afterSeconds: 2.25 })
+  })
+
+  it('says it could not save, keeping the changes', async () => {
+    saveAnswer = { status: 409, body: { ok: false, kind: 'failed', message: 'the disk is full' } }
+    const page = render(open)
+    type(musicLevel(page), '40')
+    act(() => button(page, 'Save').click())
+    await flush()
+    const panel = page.querySelector('[aria-label="Save failed"]')!
+    expect(text(panel)).toBe(
+      "Couldn't save General store.Your changes are still here; try Save again.the disk is full",
+    )
+    expect(status(page)).toBe('Unsaved changes')
+    expect(musicLevel(page).value).toBe('40')
+  })
+
+  it('offers to keep mine or load the saved one when the scene was saved elsewhere', async () => {
+    const current = { music: { track: 'act1-store', level: 2 }, effects: [] }
+    saveAnswer = { status: 409, body: { ok: false, kind: 'stale', current } }
+    const page = render(open)
+    type(musicLevel(page), '40')
+    act(() => button(page, 'Save').click())
+    await flush()
+    const panel = page.querySelector('[aria-label="Saved somewhere else"]')!
+    expect(text(panel)).toBe(
+      'General store was saved somewhere else since you opened it.Your changes are still here. Keep yours to save over it, or load the saved one and lose yours.Keep mine and saveLoad the saved one',
+    )
+    expect(document.activeElement).toBe(button(page, 'Keep mine and save'))
+    expect(musicLevel(page).value).toBe('40')
+    saveAnswer = { status: 200, body: { ok: true } }
+    act(() => button(page, 'Keep mine and save').click())
+    await flush()
+    expect(puts[1]!.body.was).toEqual(current)
+    expect(puts[1]!.body.scene.music?.level).toBe(0.4)
+    expect(page.querySelector('[aria-label="Saved somewhere else"]')).toBeNull()
+    expect(status(page)).toBe('Saved')
+    expect(document.activeElement).toBe(button(page, 'Save'))
+  })
+
+  it('loses the draft for the saved scene when asked', async () => {
+    saveAnswer = { status: 409, body: { ok: false, kind: 'stale', current: null } }
+    const page = render(open)
+    type(musicLevel(page), '40')
+    act(() => button(page, 'Save').click())
+    await flush()
+    act(() => button(page, 'Load the saved one').click())
+    await flush()
+    expect(page.querySelector('[aria-label="Saved somewhere else"]')).toBeNull()
+    expect(status(page)).toBeUndefined()
+    expect(page.querySelector('.scene-dot')).toBeNull()
+    expect(musicLevel(page).value).toBe('100')
+    expect(document.activeElement).toBe(button(page, 'Save'))
+  })
+})
+
+describe('adding a sound effect', () => {
+  const add = (page: HTMLElement) => button(page, '+ Add a sound effect')
+  const find = (page: HTMLElement) =>
+    page.querySelector<HTMLInputElement>('[aria-label="Find a sound effect…"]')!
+
+  it('lists the game’s effects with loop and no take chosen, narrowing as you type', () => {
+    const page = render(open)
+    act(() => add(page).click())
+    const list = () =>
+      [...page.querySelectorAll('.scene-add-list li')].map((li) =>
+        text(li.querySelector('.menu-option')),
+      )
+    expect(list()).toEqual(['shop-bell', 'glass-clink', 'cat-purrloop', 'wolf-howlno take chosen'])
+    expect(page.querySelectorAll('.scene-add-list li [aria-label^="Play"]').length).toBe(3)
+    type(find(page), 'PURR')
+    expect(list()).toEqual(['cat-purrloop'])
+  })
+
+  it('adds a loop as Round and round, and a one-shot as Now and then every 10–20 s, at 100%', () => {
+    const page = render({ ...open, scene: 'act1-chapel' })
+    act(() => add(page).click())
+    act(() => page.querySelector<HTMLElement>('.scene-add-list .menu-option')!.click())
+    act(() => add(page).click())
+    type(find(page), 'purr')
+    act(() => page.querySelector<HTMLElement>('.scene-add-list .menu-option')!.click())
+    expect(rows(page).map((r) => text(r.querySelector('.scene-how')))).toEqual([
+      'Now and thenevery – s',
+      'Round and round',
+    ])
+    expect([...page.querySelectorAll<HTMLInputElement>('.scene-num')].map((i) => i.value)).toEqual([
+      '10',
+      '20',
+    ])
+    expect(rows(page).map((r) => text(r.querySelector('.scene-level')))).toEqual(['100%', '100%'])
+    expect(rows(page).map((r) => text(r.querySelector('.scene-state')))).toEqual([
+      'Always',
+      'Always',
+    ])
+    expect(status(page)).toBe('Unsaved changes')
+    expect(page.querySelector('.scene-add-list')).toBeNull()
+  })
+
+  it('adds the same effect twice', () => {
+    const page = render(open)
+    for (let i = 0; i < 2; i++) {
+      act(() => add(page).click())
+      act(() => page.querySelector<HTMLElement>('.scene-add-list .menu-option')!.click())
+    }
+    expect(rows(page).length).toBe(6)
+  })
+
+  it('shows the first matches and says how many more', () => {
+    const shown = summary()
+    for (let i = 0; i < 9; i++) {
+      shown.scenes!.effects.push({
+        id: `extra-${i}`,
+        name: `extra-${i}`,
+        loops: false,
+        silent: false,
+        playable: true,
+      })
+    }
+    const page = render(open, shown)
+    act(() => add(page).click())
+    expect(page.querySelectorAll('.scene-add-list li').length).toBe(8)
+    expect(text(page.querySelector('.scene-add-list .muted'))).toBe('5 more…')
+  })
+
+  it('closes on Escape and returns to the button', () => {
+    const page = render(open)
+    act(() => add(page).click())
+    act(() => {
+      find(page).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(page.querySelector('.scene-add-list')).toBeNull()
+    expect(document.activeElement).toBe(add(page))
+  })
+})
+
+describe('leaving a scene with unsaved changes', () => {
+  const dialog = () => document.querySelector('[role=alertdialog]')
+  const ask = async (page: HTMLElement) => {
+    type(musicLevel(page), '40')
+    act(() => button(page, 'Refresh from the game').click())
+    await flush()
+  }
+
+  it('asks before Refresh from the game, focus on Save, and Cancel goes back', async () => {
+    const page = render(open)
+    button(page, 'Refresh from the game').focus()
+    await ask(page)
+    expect(text(dialog()!.querySelector('h2'))).toBe('Save the changes to General store?')
+    expect(text(dialog()!.querySelector('p'))).toBe("If you don't, they are lost.")
+    expect([...dialog()!.querySelectorAll('button')].map((b) => b.textContent)).toEqual([
+      "Don't save",
+      'Cancel',
+      'Save',
+    ])
+    expect(document.activeElement).toBe(dialog()!.querySelector('.btn-primary'))
+    expect(asked.some((a) => a.method === 'POST')).toBe(false)
+    act(() => {
+      dialog()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(dialog()).toBeNull()
+    expect(document.activeElement).toBe(button(page, 'Refresh from the game'))
+    expect(status(page)).toBe('Unsaved changes')
+  })
+
+  it('refreshes after Don’t save, with the changes gone', async () => {
+    const page = render(open)
+    await ask(page)
+    act(() => button(page, "Don't save").click())
+    await flush()
+    expect(asked).toContainEqual({ method: 'POST', path: '/api/parts/act1/refresh' })
+    expect(status(page)).toBeUndefined()
+  })
+
+  it('saves first and then refreshes', async () => {
+    const page = render(open)
+    await ask(page)
+    act(() => dialog()!.querySelector<HTMLButtonElement>('.btn-primary')!.click())
+    await flush()
+    expect(puts.length).toBe(1)
+    expect(asked).toContainEqual({ method: 'POST', path: '/api/parts/act1/refresh' })
+  })
+
+  it('stays when the save is refused', async () => {
+    saveAnswer = { status: 409, body: { ok: false, kind: 'failed', message: 'no' } }
+    const page = render(open)
+    await ask(page)
+    act(() => dialog()!.querySelector<HTMLButtonElement>('.btn-primary')!.click())
+    await flush()
+    expect(asked.some((a) => a.method === 'POST')).toBe(false)
+    expect(page.querySelector('[aria-label="Save failed"]')).not.toBeNull()
+  })
+
+  it('keeps the dialog’s Save dimmed, and the dialog open, while rows are red', async () => {
+    const page = render(open)
+    type(rows(page)[0]!.querySelector<HTMLInputElement>('.scene-num')!, '')
+    act(() => button(page, 'Refresh from the game').click())
+    await flush()
+    const save = dialog()!.querySelector<HTMLButtonElement>('.btn-primary')!
+    expect(save.getAttribute('aria-disabled')).toBe('true')
+    act(() => save.click())
+    await flush()
+    expect(dialog()).not.toBeNull()
+    expect(puts).toEqual([])
+  })
+
+  it('does not ask when nothing is unsaved', async () => {
+    const page = render(open)
+    act(() => button(page, 'Refresh from the game').click())
+    await flush()
+    expect(dialog()).toBeNull()
+    expect(asked).toContainEqual({ method: 'POST', path: '/api/parts/act1/refresh' })
+  })
+
+  it('undoes a move to another address and asks; Don’t save goes on to it', async () => {
+    const page = render(open)
+    window.history.replaceState(null, '', '#/scenes/parts/act1?scene=act1-store')
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    type(musicLevel(page), '40')
+    const target = '#/scenes/parts/act1?scene=act1-forest'
+    window.history.replaceState(null, '', target)
+    act(() => {
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(dialog()).not.toBeNull()
+    expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-store')
+    act(() => button(page, "Don't save").click())
+    expect(window.location.hash).toBe(target)
+  })
+
+  it('asks the browser before the tab is closed, only while there are unsaved changes', () => {
+    const page = render(open)
+    const close = () => {
+      const event = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    expect(close()).toBe(false)
+    type(musicLevel(page), '40')
+    expect(close()).toBe(true)
+    act(() => button(page, 'Discard').click())
+    expect(close()).toBe(false)
+  })
+})
+
+describe('what the page started from', () => {
+  /** A page that can be shown again with other data, as a refetch does. */
+  function renderLive(route: ScenesRoute, first: ProjectSummary) {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, enabled: false } },
+    })
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => act(() => root.unmount()))
+    const show = (shown: ProjectSummary, at: ScenesRoute = route) =>
+      act(() =>
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client },
+            createElement(ScenesView, { summary: shown, route: at }),
+          ),
+        ),
+      )
+    show(first)
+    return { page: container, show }
+  }
+
+  it('sends the entry the draft began from, even if the project is read again meanwhile', async () => {
+    const { page, show } = renderLive(open, summary())
+    type(musicLevel(page), '40')
+    // Another tab saved the scene, and this page's data was refetched.
+    const changed = summary()
+    changed.scenes!.acts[0]!.scenes[0]!.entry = { music: { track: null, level: 2 }, effects: [] }
+    show(changed)
+    act(() => button(page, 'Save').click())
+    await flush()
+    expect(puts[0]!.body.was?.music).toEqual({ track: 'act1-store', level: 1 })
+  })
+
+  it('does not say Saved again when a scene saved earlier is opened again', async () => {
+    const { page, show } = renderLive(open, summary())
+    type(musicLevel(page), '40')
+    act(() => button(page, 'Save').click())
+    await flush()
+    expect(status(page)).toBe('Saved')
+    show(summary(), { ...open, scene: 'act1-forest' })
+    show(summary(), open)
+    expect(status(page)).toBeUndefined()
   })
 })

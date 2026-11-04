@@ -89,6 +89,8 @@ import type { Busy } from '../core/models'
 import { setFishTier } from '../services/fishTier'
 import { setTakeFade } from '../services/takeFade'
 import { setSoundAlike } from '../services/soundAlike'
+import { saveScene } from '../services/scenes'
+import { SceneMixSchema } from '../core/scenes'
 import { recordTake, takeFile, tryLine } from '../services/takes'
 import { checkSetup } from '../services/setup'
 import { setNote } from '../services/notes'
@@ -303,6 +305,9 @@ function imageAnswer(result: ImageEditResult | ImageTakesAnswer | ImageMakeAllAn
   if (!result) return Response.json({ error: 'not found' }, { status: 404 })
   return Response.json(result, { status: result.ok ? 200 : 409 })
 }
+
+/** A scene as the page saves it, and the entry it was read as (null: the mix had none). */
+const SceneBody = z.object({ scene: SceneMixSchema, was: SceneMixSchema.nullable() }).strict()
 
 /** The new description of a sound effect: text, or null to take the game's back. */
 const EffectDescriptionBody = z.object({ description: z.string().nullable() }).strict()
@@ -1791,6 +1796,23 @@ export function startServer({
         POST: fromOwnPage(async (request) => {
           const result = await effectTakes.stop(projectFile, request.params.id)
           return result ? Response.json(result) : notFound()
+        }),
+      },
+      '/api/scenes/:part/:id': {
+        PUT: fromOwnPage(async (request) => {
+          const body = SceneBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { scene, was }' }, { status: 400 })
+          }
+          const result = await saveScene(
+            projectFile,
+            request.params.part,
+            request.params.id,
+            body.data.scene,
+            body.data.was,
+          )
+          if (!result.ok && result.kind === 'unknown') return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
       },
       '/api/effects/:id': {

@@ -1893,7 +1893,7 @@ consumer rule beyond naming this page).
 - An effect's `id` is one of the game's sound effects (§8.9); the same id may appear twice in a
   scene (two ways to play it). `play` is one of `{ "mode": "loop" }` (round and round),
   `{ "mode": "random", "everySeconds": [N, M] }` (now and then: a random wait of N to M seconds
-  before each start, `0 < N <= M`), `{ "mode": "once", "afterSeconds": N }` (once, N seconds after
+  before each start, `0 <= N <= M`; the studio's page asks for `N < M`, within 0 to 600 s, and the game reads what the file holds), `{ "mode": "once", "afterSeconds": N }` (once, N seconds after
   entering; it does not sound again until the scene is entered again), and
   `{ "mode": "trigger", "trigger": "<name>" }` (each time the game fires that trigger in the
   scene). `state`, when present, is one of the scene's states: the effect plays only while the
@@ -1901,7 +1901,7 @@ consumer rule beyond naming this page).
   (the game's `MAX_EFFECT_VOLUME`); it multiplies, as `effectVolumes.json` did, the music's and the
   player's own levels. Row order is the order of the table; it does not affect playing.
 - The studio writes the whole file again with stable key order (scenes in the declarations' order,
-  then any scene the game no longer declares, in their old order) and two-space indentation, through
+  then any scene the game no longer declares, in their old order) and two-space indentation (a scene's entry with effects has a line to each effect, a short one is on one line, so a Save changes the lines of its own scene), through
   `writeAtomic`. A Save changes one scene's entry only, and only an act's file is rewritten. A
   `PUT /api/scenes/:part/:id` carries `{ scene, was }` (`was` the entry as the page read it); a
   stale `was` is refused with 409, as the model saves are (§8.8).
@@ -1943,10 +1943,20 @@ once each (an effect with both a trigger and a state plays only while the scene 
 **Studio side** (for the children): `src/core/scenes.ts` holds the schemas, the reading of both
 files entry by entry, and `summarizeScenes`, which derives gone and silent and the counts for the
 list (pure, no I/O); `src/services/scenes.ts` reads the two files of every act (`resolveInRoot`,
-`readJson`) and joins their problems to the project's; the studio's writing of the mix is as-p86.3's.
+`readJson`) and joins their problems to the project's; `saveScene` writes the mix.
+**Editing** (as-p86.3): the open scene's unsaved draft lives in the page (`src/ui/sceneDraft.ts`, the
+rules in the pure `src/core/sceneEdit.ts`: defaults, the red boxes and their words, `toMix`); one
+scene at a time, and whatever would leave it (another scene, page or Back, Refresh from the game)
+asks first, the browser asks on closing the tab. Save sends `{ scene, was }`, `was` being the entry
+the page read (`SceneRow.entry`, null for none). The service re-reads the mix, refuses an unreadable
+file or entry, answers `stale` with the entry now saved when `was` differs, and otherwise writes the
+whole file again with only that scene replaced (its entry is written from the fields the studio knows: a field of that scene's entry it does not know is dropped on Save) (scenes in the declarations' order, then the rest in
+their old order, entries that cannot be read kept as they are). The Add menu and Music menu are
+offered `ScenesSummary.effects` and `SceneAct.tracks`.
+
 The Scenes workspace is read with the rest of the project: `ProjectSummary.scenes` (null without the
 `scenes` section) carries every act's scenes, so the sidebar's counts, the page and Refresh from the
-game (which invalidates the project) need no route of their own; as-p86.3 adds the `PUT` above, and
+game (which invalidates the project) need no route of their own; the `PUT` above is built (`saveScene`), and
 no `GET /api/scenes/:part` is built. What a scene's rows say of the rest of the studio comes from the
 summaries already read: an effect is _silent_ when its lock has no chosen take, _playable_ when the
 chosen take's clip is there; the music is _playable_ when the act's music list has the track with a
@@ -2484,8 +2494,9 @@ Small, independently useful increments:
     3. **The Scenes page** (as-p86.2, done: §8.11): the sidebar entry, the act's scene list and the open
        scene read only, with ▶ on the music and each effect, the not-yet-listed, Refresh and failed
        states; the `scenes` section of the project file; the sample project has scenes.
-    4. **Editing a scene** (as-p86.3): the music, effects, add menu, unsaved changes, Save, Discard and the
-       leave dialog, saved to the mix only.
+    4. **Editing a scene** (as-p86.3, done: §8.11): the music, effects, add menu, unsaved changes, Save,
+       Discard and the leave dialog, saved to the mix only (`PUT /api/scenes/:part/:id`, 409 with the
+       saved entry when it changed meanwhile).
     5. **Playing a scene** (as-p86.4): the play bar with states and each effect's own ▶, the
        scheduler of §8.11, edits heard at once.
     6. **Triggers in the game** (RetroQuest rq-xfkn): the game fires the declared triggers and plays the

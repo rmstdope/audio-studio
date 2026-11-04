@@ -66,6 +66,17 @@ describe('a scene clip', () => {
     expect(runs.map((r) => [r.gain, r.loop])).toEqual([[2.5, true]])
   })
 
+  it('hears a new level at once, also one set while the clip is still loading', async () => {
+    const { clip, runs, loaded } = setup()
+    clip.toggle('a', '/a.mp3', { level: 1 })
+    clip.setLevel('a', 0.4)
+    await loaded()
+    expect(runs[0]!.gain).toBe(0.4)
+    clip.setLevel('a', 2)
+    clip.setLevel('b', 0.1)
+    expect(runs[0]!.gain).toBe(2)
+  })
+
   it('stops when pressed again', async () => {
     const { clip, runs, states, loaded } = setup()
     clip.toggle('a', '/a.mp3', { level: 1 })

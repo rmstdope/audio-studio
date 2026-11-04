@@ -4192,6 +4192,158 @@ button.cue-chip[aria-expanded='true'] {
   background: var(--danger-bg);
 }
 
+.scene-status {
+  font-size: 13px;
+  color: var(--text-soft);
+  align-self: center;
+}
+.scene-status-red {
+  color: var(--danger-ink);
+}
+.scene-status-ok {
+  color: var(--ok-ink);
+}
+.scene-dot {
+  color: var(--accent);
+}
+.scene-problem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  border-color: var(--danger-ink);
+  background: var(--danger-bg);
+}
+.scene-slider {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.scene-slider input {
+  width: 110px;
+}
+.scene-seconds {
+  margin-left: 8px;
+  color: var(--text-soft);
+}
+.scene-num {
+  width: 52px;
+  font: inherit;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text);
+}
+.scene-num.scene-bad {
+  border-color: var(--danger-ink);
+  color: var(--danger-ink);
+}
+.scene-error {
+  color: var(--danger-ink);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.menu {
+  position: relative;
+  display: inline-block;
+}
+.menu-button {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 3px 22px 3px 8px;
+  position: relative;
+  cursor: pointer;
+}
+.menu-button::after {
+  content: '▾';
+  position: absolute;
+  right: 7px;
+  color: var(--faint);
+  font-size: 10px;
+}
+.menu-button.menu-gone {
+  color: var(--danger-ink);
+  border-color: var(--danger-ink);
+}
+.menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 50%);
+}
+.menu-option {
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.menu-option:hover,
+.menu-option:focus-visible {
+  background: var(--glass);
+}
+.menu-current {
+  color: var(--accent);
+}
+.scene-add-menu {
+  position: relative;
+  margin-top: 10px;
+}
+.scene-add-list {
+  min-width: 320px;
+}
+.scene-add-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.scene-add-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.scene-add-list .scene-play {
+  width: 28px;
+  flex: none;
+}
+.scene-add-list li .menu-option {
+  flex: 1;
+}
+.scene-leave-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 55%);
+}
+.scene-leave {
+  max-width: 420px;
+  background: var(--bg);
+}
+
 @media (max-width: 700px) {
   .scenes-body {
     flex-direction: column;

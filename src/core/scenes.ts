@@ -35,7 +35,7 @@ export const PlaySchema = z.discriminatedUnion('mode', [
     mode: z.literal('random'),
     everySeconds: z
       .tuple([z.number(), z.number()])
-      .refine(([n, m]) => n > 0 && n <= m, { error: 'must be two numbers, 0 < first <= second' }),
+      .refine(([n, m]) => n >= 0 && n <= m, { error: 'must be two numbers, 0 <= first <= second' }),
   }),
   z.object({ mode: z.literal('once'), afterSeconds: z.number().min(0) }),
   z.object({ mode: z.literal('trigger'), trigger: Slug }),
@@ -207,12 +207,32 @@ export interface SceneRow {
   triggers: string[]
   music: SceneMusic
   effects: SceneEffectRow[]
+  /** The scene's entry in the mix as read; null when the mix has none (or it cannot be read). */
+  entry: SceneMix | null
   /** The scene's entry in the mix cannot be read: nothing of it is shown. */
   unreadable: boolean
   /** Things the game no longer has in this scene: each effect row with a gone mark, and the music. */
   gone: number
   /** Effects with no take chosen, not counting those gone. */
   silent: number
+}
+
+/** A sound effect the game has, as the Add menu offers it. */
+export interface SceneEffectChoice {
+  id: string
+  name: string
+  loops: boolean
+  /** No take is chosen: it plays nothing. */
+  silent: boolean
+  /** A chosen take's clip is there to play. */
+  playable: boolean
+}
+
+/** A track of an act's music list, as the Music menu offers it. */
+export interface SceneTrackChoice {
+  id: string
+  title: string
+  playable: boolean
 }
 
 /** An act's scenes. */
@@ -224,12 +244,18 @@ export interface SceneAct {
   canRefresh: boolean
   /** The act's mix file, relative to the project root. */
   mixFile: string
+  /** The act's music list: what the Music menu offers. */
+  tracks: SceneTrackChoice[]
   scenes: SceneRow[]
 }
 
 /** The Scenes workspace. */
 export interface ScenesSummary {
   acts: SceneAct[]
+  /** The game's sound effects, for the Add menu; empty while the list cannot be read. */
+  effects: SceneEffectChoice[]
+  /** The effects list is read in full, so an effect id it lacks is gone from the game. */
+  effectsKnown: boolean
 }
 
 /** An act with what was read of its two files. */
@@ -256,7 +282,19 @@ export function summarizeScenes(input: {
   const { effects } = input
   const effectsKnown = effects?.status === 'ok' && effects.unreadable === 0
   const effectById = new Map(effects?.status === 'ok' ? effects.rows.map((r) => [r.id, r]) : [])
+  const choices: SceneEffectChoice[] =
+    effects?.status === 'ok'
+      ? effects.rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          loops: r.loops,
+          silent: r.current.kind === 'nothing',
+          playable: r.current.kind === 'take' && r.current.exists,
+        }))
+      : []
   return {
+    effects: choices,
+    effectsKnown,
     acts: input.acts.map((act) => {
       const base = {
         id: act.id,
@@ -264,14 +302,19 @@ export function summarizeScenes(input: {
         canRefresh: act.canRefresh,
         mixFile: act.mixFile,
       }
-      if (act.declarations.status !== 'ok') {
-        return { ...base, state: act.declarations.status, scenes: [] }
-      }
       const list = input.music.find((m) => m.kind === 'act' && m.id === act.id)
+      const tracks = (list?.tracks ?? []).map((t) => ({
+        id: t.id,
+        title: t.title,
+        playable: t.current.kind === 'take' && t.current.exists,
+      }))
+      if (act.declarations.status !== 'ok') {
+        return { ...base, state: act.declarations.status, tracks, scenes: [] }
+      }
       const scenes = act.declarations.scenes.map((declared) =>
         sceneRow(declared, act.mix, { effectById, effectsKnown, list }),
       )
-      return { ...base, state: 'ok' as const, scenes }
+      return { ...base, state: 'ok' as const, tracks, scenes }
     }),
   }
 }
@@ -291,7 +334,15 @@ function sceneRow(declared: SceneDeclaration, mix: MixState, known: Known): Scen
   const row = { id, name, states, triggers }
   const unreadable = mix.status === 'unreadable' || (mix.status === 'ok' && mix.badIds.has(id))
   if (unreadable) {
-    return { ...row, music: NO_MUSIC, effects: [], unreadable: true, gone: 0, silent: 0 }
+    return {
+      ...row,
+      music: NO_MUSIC,
+      effects: [],
+      entry: null,
+      unreadable: true,
+      gone: 0,
+      silent: 0,
+    }
   }
   const entry = mix.status === 'ok' ? mix.scenes[id] : undefined
   const music = sceneMusic(id, entry?.music, known)
@@ -317,7 +368,7 @@ function sceneRow(declared: SceneDeclaration, mix: MixState, known: Known): Scen
     effects.filter((e) => e.goneEffect || e.goneState || e.goneTrigger).length +
     (music.gone ? 1 : 0)
   const silent = effects.filter((e) => e.silent).length
-  return { ...row, music, effects, unreadable: false, gone, silent }
+  return { ...row, music, effects, entry: entry ?? null, unreadable: false, gone, silent }
 }
 
 /** A scene's music: what the mix says, else (no `music`) the scene's own track at 1 if the act has it. */

@@ -19,7 +19,12 @@
     "old-cellar": {
       "music": { "track": null, "level": 1 },
       "effects": [
-        { "id": "coins", "play": { "mode": "once", "afterSeconds": 2 }, "state": "flooded", "level": 1 }
+        {
+          "id": "coins",
+          "play": { "mode": "once", "afterSeconds": 2 },
+          "state": "flooded",
+          "level": 1
+        }
       ]
     },
     "empty-room": { "music": { "track": null, "level": 1 }, "effects": [] }

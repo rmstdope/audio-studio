@@ -1,23 +1,39 @@
-import { useEffect } from 'react'
-import type { SceneAct } from '../../../core/scenes'
+import { useEffect, useRef, useState } from 'react'
+import { fixHeading } from '../../../core/sceneEdit'
+import type { SceneAct, ScenesSummary } from '../../../core/scenes'
 import { useRefreshDialog } from '../../api'
 import { Problems } from '../../components/Problems'
 import { shortTitle } from '../../format'
 import type { ScenesRoute } from '../../route'
 import { currentScene, statesLine } from '../../scenesText'
 import { useSceneClip } from '../../sceneClip'
+import { useLeaveGuard, useSceneEditor, type Leaving } from '../../sceneDraft'
+import { LeaveDialog } from './LeaveDialog'
 import { SceneDetail } from './SceneDetail'
 import { SceneList } from './SceneList'
 
 /**
- * An act's Scenes page: its scenes on the left, the open one on the right (looked at, not yet
- * edited), and Refresh from the game, which reads the act's scenes, states and triggers again.
+ * An act's Scenes page: its scenes on the left, the open one on the right to change and save, and
+ * Refresh from the game, which reads the act's scenes, states and triggers again. One scene at a
+ * time can have unsaved changes; whatever would leave it asks first.
  */
-export function ScenesPage({ act, route }: { act: SceneAct; route: ScenesRoute }) {
+export function ScenesPage({
+  act,
+  route,
+  summary,
+}: {
+  act: SceneAct
+  route: ScenesRoute
+  summary: Pick<ScenesSummary, 'effects' | 'effectsKnown'>
+}) {
   const name = shortTitle(act.title)
   const run = useRefreshDialog(act.id)
   const player = useSceneClip()
   const scene = currentScene(act, route)
+  const editor = useSceneEditor(act.id, scene)
+  const [leaving, setLeaving] = useState<Leaving | null>(null)
+  useLeaveGuard(editor.dirty, setLeaving)
+  const saveButton = useRef<HTMLButtonElement>(null)
   // A clip sounding stops when another scene opens: its ▶ is not on the new scene's page.
   const { stop } = player
   useEffect(() => stop(), [scene?.id, stop])
@@ -27,7 +43,7 @@ export function ScenesPage({ act, route }: { act: SceneAct; route: ScenesRoute }
         className={primary ? 'btn btn-primary' : 'btn'}
         type="button"
         disabled={run.pending}
-        onClick={run.start}
+        onClick={() => (editor.dirty ? setLeaving({ proceed: run.start }) : run.start())}
       >
         {run.pending ? 'Refreshing from the game…' : 'Refresh from the game'}
       </button>
@@ -88,6 +104,20 @@ export function ScenesPage({ act, route }: { act: SceneAct; route: ScenesRoute }
       </>
     )
   }
+  const { status } = editor
+  const red = editor.reds > 0
+  const word = red
+    ? { text: fixHeading(editor.reds), className: 'scene-status scene-status-red' }
+    : editor.dirty
+      ? { text: 'Unsaved changes', className: 'scene-status' }
+      : status.kind === 'saved'
+        ? { text: 'Saved', className: 'scene-status scene-status-ok' }
+        : null
+  const saving = status.kind === 'saving'
+  const save = async () => {
+    await editor.save()
+    saveButton.current?.focus()
+  }
   return (
     <>
       <header className="page-header">
@@ -96,11 +126,55 @@ export function ScenesPage({ act, route }: { act: SceneAct; route: ScenesRoute }
           <h1 tabIndex={-1}>{scene.name}</h1>
           <span className="muted">{statesLine(scene)}</span>
         </div>
-        <div className="header-actions">{refresh(false)}</div>
+        <div className="header-actions">
+          {word && (
+            <span className={word.className} role="status">
+              {word.text}
+            </span>
+          )}
+          <button
+            className="btn"
+            type="button"
+            aria-disabled={!editor.dirty || undefined}
+            onClick={() => editor.dirty && editor.discard()}
+          >
+            Discard
+          </button>
+          <button
+            ref={saveButton}
+            className="btn btn-primary"
+            type="button"
+            aria-disabled={!editor.dirty || red || saving || undefined}
+            onClick={save}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          {refresh(false)}
+        </div>
       </header>
+      {status.kind === 'failed' && (
+        <section className="panel scene-problem" aria-label="Save failed">
+          <strong>Couldn&apos;t save {scene.name}.</strong>
+          <span>Your changes are still here; try Save again.</span>
+          <pre className="refresh-output mono">{status.message}</pre>
+        </section>
+      )}
+      {status.kind === 'conflict' && (
+        <ConflictPanel
+          name={scene.name}
+          onKeep={async () => {
+            await editor.keepMine()
+            saveButton.current?.focus()
+          }}
+          onLoad={async () => {
+            await editor.loadSaved()
+            saveButton.current?.focus()
+          }}
+        />
+      )}
       {failed}
       <div className="scenes-body">
-        <SceneList act={act} open={scene} />
+        <SceneList act={act} open={scene} unsaved={editor.dirty ? scene.id : null} />
         <div className="scene-open">
           {scene.unreadable ? (
             <section className="panel scene-panel">
@@ -109,10 +183,66 @@ export function ScenesPage({ act, route }: { act: SceneAct; route: ScenesRoute }
               </p>
             </section>
           ) : (
-            <SceneDetail key={scene.id} scene={scene} player={player} />
+            <SceneDetail
+              key={scene.id}
+              scene={scene}
+              act={act}
+              summary={summary}
+              draft={editor.draft}
+              player={player}
+              onChange={editor.change}
+            />
           )}
         </div>
       </div>
+      {leaving && (
+        <LeaveDialog
+          name={scene.name}
+          canSave={!red}
+          onCancel={() => setLeaving(null)}
+          onDiscard={() => {
+            editor.discard()
+            leaving.proceed()
+            setLeaving(null)
+          }}
+          onSave={async () => {
+            const to = leaving
+            setLeaving(null)
+            if (await editor.save()) to.proceed()
+          }}
+        />
+      )}
     </>
+  )
+}
+
+/** The red panel for a scene saved somewhere else since the page read it. */
+function ConflictPanel({
+  name,
+  onKeep,
+  onLoad,
+}: {
+  name: string
+  onKeep: () => void
+  onLoad: () => void
+}) {
+  const keep = useRef<HTMLButtonElement>(null)
+  useEffect(() => keep.current?.focus(), [])
+  return (
+    <section className="panel scene-problem" aria-label="Saved somewhere else">
+      <strong>{name} was saved somewhere else since you opened it.</strong>
+      <span>
+        Your changes are still here. Keep yours to save over it, or load the saved one and lose
+        yours.
+      </span>
+      <div className="confirm-actions">
+        <button ref={keep} className="btn btn-primary" type="button" onClick={onKeep}>
+          Keep mine and save
+        </button>
+        <button className="btn" type="button" onClick={onLoad}>
+          Load the saved one
+        </button>
+      </div>
+    </section>
   )
 }
