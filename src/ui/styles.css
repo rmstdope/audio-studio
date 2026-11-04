@@ -4195,6 +4195,10 @@ button.cue-chip[aria-expanded='true'] {
 .scene-state .menu-button {
   white-space: nowrap;
 }
+.scene-how .chip,
+.scene-state .chip {
+  white-space: nowrap;
+}
 .scene-effect .chip,
 .scene-how .chip,
 .scene-state .chip,

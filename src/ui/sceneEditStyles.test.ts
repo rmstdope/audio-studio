@@ -20,6 +20,10 @@ describe('the scene editor’s styles', () => {
     expect(rule(css, '.menu-button.menu-gone')).toContain('var(--danger-ink)')
   })
 
+  it('keeps the gone mark whole, dropping it under its menu rather than breaking it', () => {
+    expect(css).toMatch(/\.scene-how \.chip,\n\.scene-state \.chip \{[^}]*white-space: nowrap/)
+  })
+
   it('uses tokens, not colours, in the editor’s rules', () => {
     const editor = css.slice(
       css.indexOf('.scene-status {'),
