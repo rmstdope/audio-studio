@@ -29,7 +29,10 @@ describe('a button greyed with a reason', () => {
 
 describe('the Sound effects panel’s Make all keeps to its own class names', () => {
   it('leaves the shared question rule to the other pages, so it stays inside its panel', () => {
-    expect(rule('.make-all-question')).not.toContain('flex: 1 0 100%')
+    for (const selector of ['.make-all', '.make-all-line', '.make-all-question']) {
+      const escaped = selector.replace(/\./g, '\\.')
+      expect(css.match(new RegExp(`(?:^|\\n)${escaped} \\{`, 'g'))?.length).toBe(1)
+    }
     expect(rule('.effects-make-all-question')).toContain('flex')
   })
 })

@@ -1779,7 +1779,7 @@ panel shows the running line (worked out from `GET /api/effects/making`, hand st
 **Stop all** (`POST /api/effects/stop-all`, every waiting or running take of the project; made takes stay).
 The service keeps the latest press in memory (`contentStudioEffectBatches`, like the entries) as the
 takes it started, so `GET /api/effects/batch` can say how many were made, stopped (by Stop all or an
-effect's own Stop) and failed; the page shows that as a summary, once it has seen the press running, until
+effect's own Stop) and failed; the page shows that as a summary, once it has seen the press running, in place of the count line and button, until
 Close. `GET /api/effects/models` says which models can run (the question's model line and "Open Setup").
 
 ## 9. Server API
