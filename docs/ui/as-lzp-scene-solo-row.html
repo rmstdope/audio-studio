@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Option A — keep Solo's room blank</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --line: rgb(255 255 255/7%);
+        --ls: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --warn: #ffc24b;
+        --seg: #3a2416;
+        --segink: #ffb48a;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1560px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro b {
+        color: var(--text);
+      }
+      .row {
+        max-width: 1560px;
+        margin: 0 auto 28px;
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      .col {
+        flex: 0 0 500px;
+      }
+      .cap {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        margin: 0 0 6px;
+      }
+      .frame {
+        position: relative;
+        height: 330px;
+        border: 1px solid var(--ls);
+        border-radius: 12px;
+        background: var(--panel);
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .card {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 4px 8px;
+        padding: 10px 6px;
+        border-bottom: 1px solid var(--line);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .chipw {
+        display: inline-block;
+        font-size: 12px;
+        color: var(--warn);
+        background: #2a2110;
+        border-radius: 6px;
+        padding: 1px 8px;
+        text-decoration: underline;
+      }
+      .ms {
+        display: inline-flex;
+        gap: 4px;
+      }
+      .ms span {
+        border: 1px solid var(--ls);
+        border-radius: 6px;
+        padding: 0 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .ms span.on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #000;
+      }
+      .card > * {
+        align-self: start;
+      }
+      .x {
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        padding: 0 8px;
+      }
+      .spacer {
+        flex: 1;
+      }
+      .bar {
+        border: 1px solid var(--ls);
+        border-radius: 10px;
+        background: var(--bg);
+        padding: 10px 14px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 14px;
+      }
+      .play {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+      }
+      .lbl {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .grp {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        overflow: hidden;
+        font-size: 12.5px;
+      }
+      .seg span {
+        padding: 4px 10px;
+      }
+      .seg span.on {
+        background: var(--seg);
+        color: var(--segink);
+      }
+      .btn {
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        padding: 4px 12px;
+        font-size: 13px;
+      }
+      .btn.dis {
+        opacity: 0.45;
+      }
+      .chip {
+        font-size: 12px;
+        background: rgb(255 255 255/8%);
+        border-radius: 999px;
+        padding: 2px 9px;
+        color: var(--muted);
+      }
+      .grow {
+        flex: 1 1 0;
+      }
+      .room {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        min-height: 30px;
+        flex-basis: 100%;
+      }
+      .room.blank {
+        outline: 1px dotted rgb(255 255 255/25%);
+        outline-offset: 2px;
+      }
+      .top {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 2px dashed var(--accent);
+      }
+      .toplbl {
+        position: absolute;
+        right: 8px;
+        font-size: 11px;
+        color: var(--accent);
+        transform: translateY(-16px);
+      }
+      .note {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 6px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>
+        Option A — the bar always keeps the room for "Solo … · Clear", blank when nothing is soloed
+        or muted
+      </h1>
+      <p>
+        When the count and Clear would not fit beside State and Triggers, the bar keeps their row at
+        all times. With nothing soloed or muted the row is empty space (the dotted outline is only
+        in the drawing). Soloing fills it; Clear empties it.
+        <b>The bar's top (dashed) never moves.</b> When everything fits on one row (a wide window,
+        or a scene with no states or triggers), nothing is reserved and the count sits at the end of
+        the row as today.
+      </p>
+      <p>
+        Cost: on a scene like this one, the bar is 44 px taller all the time, so a little less of
+        the list shows.
+      </p>
+    </div>
+    <div class="row">
+      <div class="col">
+        <p class="cap">Before Solo</p>
+        <div class="frame">
+          <div class="card">
+            <div>
+              <div class="mono">coins</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="mono">rain</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="mono">door-creak</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="spacer"></div>
+          <div class="bar">
+            <div class="play">▶</div>
+            <span style="color: var(--muted)">0:00</span
+            ><span class="grp"
+              ><span class="lbl">State</span
+              ><span class="seg"><span class="on">plain</span><span>rainy</span></span></span
+            ><span class="grp"
+              ><span class="lbl">Triggers</span><span class="btn dis">door-opens ⚡</span></span
+            >
+            <div class="room blank"></div>
+          </div>
+          <div class="top"></div>
+          <div class="toplbl">bar top before Solo</div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="cap">After S on coins</p>
+        <div class="frame">
+          <div class="card">
+            <div>
+              <div class="mono">coins</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="on">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="mono">rain</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="mono">door-creak</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="spacer"></div>
+          <div class="bar">
+            <div class="play">▶</div>
+            <span style="color: var(--muted)">0:00</span
+            ><span class="grp"
+              ><span class="lbl">State</span
+              ><span class="seg"><span class="on">plain</span><span>rainy</span></span></span
+            ><span class="grp"
+              ><span class="lbl">Triggers</span><span class="btn dis">door-opens ⚡</span></span
+            >
+            <div class="room"><span class="chip">Solo: 1</span><span class="btn">Clear</span></div>
+          </div>
+          <div class="top"></div>
+          <div class="toplbl">bar top before Solo</div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="cap">Solo and mute</p>
+        <div class="frame">
+          <div class="card">
+            <div>
+              <div class="mono">coins</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="on">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="mono">rain</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="on">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="mono">door-creak</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="spacer"></div>
+          <div class="bar">
+            <div class="play">▶</div>
+            <span style="color: var(--muted)">0:00</span
+            ><span class="grp"
+              ><span class="lbl">State</span
+              ><span class="seg"><span class="on">plain</span><span>rainy</span></span></span
+            ><span class="grp"
+              ><span class="lbl">Triggers</span><span class="btn dis">door-opens ⚡</span></span
+            >
+            <div class="room">
+              <span class="chip">Solo: 1 · Muted: 1</span><span class="btn">Clear</span>
+            </div>
+          </div>
+          <div class="top"></div>
+          <div class="toplbl">bar top before Solo</div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="cap">After Clear</p>
+        <div class="frame">
+          <div class="card">
+            <div>
+              <div class="mono">coins</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="mono">rain</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="card">
+            <div>
+              <div class="mono">door-creak</div>
+              <div class="chipw">no take chosen</div>
+            </div>
+            <div class="ms"><span class="">M</span><span class="">S</span></div>
+            <div class="x">×</div>
+          </div>
+          <div class="spacer"></div>
+          <div class="bar">
+            <div class="play">▶</div>
+            <span style="color: var(--muted)">0:00</span
+            ><span class="grp"
+              ><span class="lbl">State</span
+              ><span class="seg"><span class="on">plain</span><span>rainy</span></span></span
+            ><span class="grp"
+              ><span class="lbl">Triggers</span><span class="btn dis">door-opens ⚡</span></span
+            >
+            <div class="room blank"></div>
+          </div>
+          <div class="top"></div>
+          <div class="toplbl">bar top before Solo</div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const f = document.querySelector('.frame .bar').offsetTop - 1
+      document.querySelectorAll('.top').forEach((e) => (e.style.top = f + 'px'))
+      document.querySelectorAll('.toplbl').forEach((e) => (e.style.top = f + 4 + 'px'))
+    </script>
+  </body>
+</html>
