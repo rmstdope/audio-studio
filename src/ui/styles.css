@@ -4157,8 +4157,10 @@ button.cue-chip[aria-expanded='true'] {
   font-weight: 600;
   margin: 0 0 8px;
 }
+/* The row wraps in every window: beside the scene list its panel is as narrow as 252 px (as-e27). */
 .scene-music {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 16px;
 }
@@ -4580,9 +4582,6 @@ button.cue-chip[aria-expanded='true'] {
   }
   .scene-playbar {
     row-gap: 8px;
-  }
-  .scene-music {
-    flex-wrap: wrap;
   }
 }
 

@@ -107,3 +107,10 @@ describe('the Scenes sound effects table', () => {
     expect(arrow).toMatch(/transform:\s*translateY\(-50%\)/)
   })
 })
+
+describe('the Scenes Music row', () => {
+  it('wraps in every window, so its slider, M and S stay in a panel as narrow as 252 px (800 px of window)', () => {
+    const wide = css.slice(0, css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
+    expect(rule('\n.scene-music', wide)).toMatch(/flex-wrap:\s*wrap/)
+  })
+})
