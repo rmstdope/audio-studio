@@ -4174,8 +4174,7 @@ button.cue-chip[aria-expanded='true'] {
 }
 .scene-effect-name {
   display: inline-block;
-  min-width: 0;
-  max-width: 20ch;
+  max-width: 12ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4561,6 +4560,7 @@ button.cue-chip[aria-expanded='true'] {
   .scene-effects .table .scene-effect-name {
     display: block;
     flex: 0 1 auto;
+    min-width: 0;
     max-width: none;
   }
   .scene-effects .table .scene-effect-cell .chip {
