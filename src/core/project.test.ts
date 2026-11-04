@@ -529,3 +529,27 @@ describe('the effects section', () => {
     )
   })
 })
+
+describe('the scenes section', () => {
+  const scenes = (paths: Record<string, string> = {}) =>
+    projectJson({
+      scenes: {
+        paths: {
+          declarations: 'tts/{part}/scenes.json',
+          mix: 'web/scenes/{part}.mix.json',
+          ...paths,
+        },
+      },
+    })
+
+  it('is optional and names the two files of an act', () => {
+    expect(parse(projectJson()).data!.scenes).toBeUndefined()
+    expect(parse(scenes()).data!.scenes!.paths.mix).toBe('web/scenes/{part}.mix.json')
+  })
+
+  it('needs {part} in both paths and no {language}', () => {
+    expect(parse(scenes({ declarations: 'tts/scenes.json' })).success).toBe(false)
+    expect(parse(scenes({ mix: 'web/scenes.mix.json' })).success).toBe(false)
+    expect(parse(scenes({ mix: 'web/{part}/{language}.json' })).success).toBe(false)
+  })
+})
