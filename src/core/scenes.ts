@@ -254,6 +254,8 @@ export interface ScenesSummary {
   acts: SceneAct[]
   /** The game's sound effects, for the Add menu; empty while the list cannot be read. */
   effects: SceneEffectChoice[]
+  /** The effects list is read in full, so an effect id it lacks is gone from the game. */
+  effectsKnown: boolean
 }
 
 /** An act with what was read of its two files. */
@@ -292,6 +294,7 @@ export function summarizeScenes(input: {
       : []
   return {
     effects: choices,
+    effectsKnown,
     acts: input.acts.map((act) => {
       const base = {
         id: act.id,

@@ -19,11 +19,16 @@ export function createSceneClip(
   onChange: (playing: string | null) => void,
 ): {
   toggle: (id: string, url: string, how: { level: number; loop?: boolean }) => void
+  /** Sets the level of the clip `id` if it is the one playing (or loading): heard at once. */
+  setLevel: (id: string, level: number) => void
   stop: () => void
 } {
   let context: LoopContext | null = null
   let playing: string | null = null
   let source: ReturnType<LoopContext['createBufferSource']> | null = null
+  let gainNode: { gain: { value: number } } | null = null
+  // The level of the clip playing or loading, which a slider may change meanwhile.
+  let level = 1
   // A press that is still loading is dropped when the next press or a stop comes.
   let token = 0
   const buffers = new Map<string, Promise<Awaited<ReturnType<LoopContext['decodeAudioData']>>>>()
@@ -34,6 +39,7 @@ export function createSceneClip(
   }
   const halt = () => {
     token++
+    gainNode = null
     if (source) source.onended = null
     source?.stop()
     source = null
@@ -43,7 +49,7 @@ export function createSceneClip(
     if (playing !== null) set(null)
   }
 
-  const start = async (id: string, url: string, level: number, loop: boolean) => {
+  const start = async (id: string, url: string, loop: boolean) => {
     const mine = token
     try {
       context ??= web.context()
@@ -59,6 +65,7 @@ export function createSceneClip(
       if (mine !== token) return
       const gain = ctx.createGain()
       gain.gain.value = level
+      gainNode = gain
       gain.connect(ctx.destination)
       const made = ctx.createBufferSource()
       made.buffer = buffer
@@ -78,11 +85,18 @@ export function createSceneClip(
   }
 
   return {
-    toggle(id, url, { level, loop = false }) {
+    toggle(id, url, how) {
+      const loop = how.loop ?? false
       if (playing === id) return stop()
       halt()
+      level = how.level
       set(id)
-      void start(id, url, level, loop)
+      void start(id, url, loop)
+    },
+    setLevel(id, next) {
+      if (playing !== id) return
+      level = next
+      if (gainNode) gainNode.gain.value = next
     },
     stop,
   }
@@ -104,5 +118,10 @@ export function useSceneClip() {
     setPlaying,
   )
   useEffect(() => () => clip.current?.stop(), [])
-  return { playing, toggle: clip.current.toggle, stop: clip.current.stop }
+  return {
+    playing,
+    toggle: clip.current.toggle,
+    setLevel: clip.current.setLevel,
+    stop: clip.current.stop,
+  }
 }

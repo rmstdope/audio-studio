@@ -9,5 +9,5 @@ export function ScenesView({ summary, route }: { summary: ProjectSummary; route:
   const { scenes } = summary
   const act = scenes && currentSceneAct(scenes, route)
   if (!act) return <NoScenes />
-  return <ScenesPage key={act.id} act={act} route={route} />
+  return <ScenesPage key={act.id} act={act} route={route} summary={scenes} />
 }

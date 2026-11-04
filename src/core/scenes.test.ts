@@ -367,6 +367,7 @@ describe('summarizeScenes', () => {
       { id: 'store', title: 'Track store', playable: true },
       { id: 'other', title: 'Track other', playable: false },
     ])
+    expect(result.effectsKnown).toBe(true)
     expect(result.effects).toEqual([
       { id: 'bell', name: 'bell', loops: true, silent: false, playable: true },
       { id: 'quiet', name: 'quiet', loops: false, silent: true, playable: false },

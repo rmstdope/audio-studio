@@ -42,6 +42,8 @@ import type {
 } from '../services/imageTakes'
 import type { RefreshEffectsResult, RefreshResult, RefreshSharedResult } from '../services/refresh'
 import type { EffectEditResult } from '../services/effectWords'
+import type { SceneMix } from '../core/scenes'
+import type { SceneSave } from '../services/scenes'
 import type { EffectMakingSummary, EffectModelsView, EffectTakesView } from '../core/effectTakes'
 import type { EffectBatch } from '../core/effectsMakeAll'
 import type {
@@ -749,6 +751,35 @@ export function useRefreshDialog(partId: string) {
       ])
     },
   )
+}
+
+/**
+ * Saves one scene of an act into the act's mix file. A refusal (409) comes back as the answer, not
+ * an error; a saved scene loads the project again before the answer is returned, so the page
+ * shows the saved scene when it lets go of its draft.
+ */
+export function useSaveScene(partId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    scope: { id: `scene-${partId}` },
+    mutationFn: async (change: { sceneId: string; scene: SceneMix; was: SceneMix | null }) => {
+      const response = await fetch(
+        `/api/scenes/${encodeURIComponent(partId)}/${encodeURIComponent(change.sceneId)}`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ scene: change.scene, was: change.was }),
+        },
+      )
+      if (!response.ok && response.status !== 409) {
+        throw new Error(`saving the scene answered ${response.status}`)
+      }
+      return (await response.json()) as SceneSave
+    },
+    onSuccess: async (answer) => {
+      if (answer.ok) await client.invalidateQueries({ queryKey: ['project'] })
+    },
+  })
 }
 
 /** Refreshing the stingers with the project's `music.refreshShared`: see `useRefreshRun`. */

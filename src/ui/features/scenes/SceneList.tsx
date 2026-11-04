@@ -11,7 +11,16 @@ const sceneHref = (act: SceneAct, scene: SceneRow) =>
  * scene, and the arrow keys move through the rest. In a narrow window it is a menu above the scene
  * showing the open scene's name.
  */
-export function SceneList({ act, open }: { act: SceneAct; open: SceneRow }) {
+export function SceneList({
+  act,
+  open,
+  unsaved,
+}: {
+  act: SceneAct
+  open: SceneRow
+  /** The id of the scene with unsaved changes. */
+  unsaved: string | null
+}) {
   const move = (event: React.KeyboardEvent<HTMLUListElement>) => {
     const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
     if (step === 0) return
@@ -38,7 +47,15 @@ export function SceneList({ act, open }: { act: SceneAct; open: SceneRow }) {
                   aria-current={current ? 'page' : undefined}
                   tabIndex={current ? 0 : -1}
                 >
-                  <span className="grow">{scene.name}</span>
+                  <span className="grow">
+                    {scene.name}
+                    {scene.id === unsaved && (
+                      <span className="scene-dot" role="img" aria-label="Unsaved changes">
+                        {' '}
+                        ●
+                      </span>
+                    )}
+                  </span>
                   <span className={count.red ? 'scene-count scene-count-red' : 'scene-count'}>
                     {count.text}
                   </span>
@@ -59,7 +76,7 @@ export function SceneList({ act, open }: { act: SceneAct; open: SceneRow }) {
       >
         {act.scenes.map((scene) => (
           <option key={scene.id} value={scene.id}>
-            {scene.name}
+            {scene.id === unsaved ? `${scene.name} ●` : scene.name}
           </option>
         ))}
       </select>
