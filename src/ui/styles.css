@@ -4610,13 +4610,17 @@ button.cue-chip[aria-expanded='true'] {
   .scene-effects .table td.scene-play {
     grid-row: 1;
   }
+  /* The name and its chip are the card's own grid items (as-ehx): the name takes the column between
+     the play button and M/S, cut with an ellipsis, and the chip its own line under it, the card's
+     full width, so in a 252 px panel neither the name collapses nor the chip runs over M/S. */
+  .scene-effects .table td.scene-effect,
   .scene-effects .table .scene-effect-cell {
-    display: flex;
-    align-items: baseline;
+    display: contents;
   }
   .scene-effects .table .scene-effect-name {
     display: block;
-    flex: 0 1 auto;
+    grid-column: 2;
+    align-self: center;
     min-width: 0;
     max-width: none;
   }
@@ -4624,12 +4628,8 @@ button.cue-chip[aria-expanded='true'] {
     margin-right: 0;
   }
   .scene-effects .table .scene-effect-cell .chip {
-    flex: none;
-    margin-left: 8px;
-  }
-  .scene-effects .table td.scene-effect {
-    grid-column: 2;
-    min-width: 0;
+    grid-column: 2 / -1;
+    justify-self: start;
   }
   .scene-effects .table td.scene-m {
     grid-row: 1;
