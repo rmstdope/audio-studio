@@ -25,6 +25,10 @@ export type EffectsRoute =
   | { view: 'effects'; page: null; show?: 'attention' }
   | { view: 'effects'; page: 'effect'; effect: string }
 
+/** The Scenes pages: none chosen (the first act), or an act's scenes with the open one. */
+export type ScenesRoute =
+  { view: 'scenes'; page: null } | { view: 'scenes'; page: 'act'; part: string; scene?: string }
+
 /**
  * Where the UI is: a part's overview or its lines, every character, one character's page or its
  * audition, or the project's uncommitted changes.
@@ -39,12 +43,13 @@ export type Route =
   | MusicRoute
   | ImagesRoute
   | EffectsRoute
+  | ScenesRoute
   | { view: 'character'; character: string; language?: string }
   | { view: 'audition'; character: string; language?: string }
 
 /**
  * The route in a location hash: `#/parts/act1`, `#/parts/act1/lines` (either with `?language=sv`), `#/characters`,
- * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers` (these two with `?show=attention`), `#/music/tracks/victory`, `#/images`, `#/images/parts/act1` (with `?show=attention`), `#/images/style`, `#/images/items/silver-stag-inn` (with `?from=act1`, the act it was opened from), `#/effects` (with `?show=attention`), `#/effects/items/door-creak`; anything else is the
+ * `#/characters/mira`, `#/characters/mira/audition` (these two too with `?language=sv`), `#/changes`, `#/spending`, `#/setup`, `#/music`, `#/music/parts/act1`, `#/music/stingers` (these two with `?show=attention`), `#/music/tracks/victory`, `#/images`, `#/images/parts/act1` (with `?show=attention`), `#/images/style`, `#/images/items/silver-stag-inn` (with `?from=act1`, the act it was opened from), `#/effects` (with `?show=attention`), `#/effects/items/door-creak`, `#/scenes`, `#/scenes/parts/act1` (with `?scene=act1-general-store`, the open scene); anything else is the
  * default part.
  */
 export function parseRoute(hash: string): Route {
@@ -73,6 +78,14 @@ export function parseRoute(hash: string): Route {
     return second === 'items' && third
       ? { view: 'effects', page: 'effect', effect: decodeURIComponent(third) }
       : { view: 'effects', page: null, ...show }
+  }
+  if (first === 'scenes') {
+    if (second !== 'parts' || !third) return { view: 'scenes', page: null }
+    const scene = new URLSearchParams(query).get('scene') ?? undefined
+    const part = decodeURIComponent(third)
+    return scene
+      ? { view: 'scenes', page: 'act', part, scene }
+      : { view: 'scenes', page: 'act', part }
   }
   if (first === 'images') {
     if (second === 'parts' && third) {
@@ -118,6 +131,11 @@ export function routeHref(route: Route): string {
     return route.page === 'effect'
       ? `#/effects/items/${encodeURIComponent(route.effect)}`
       : `#/effects${show}`
+  }
+  if (route.view === 'scenes') {
+    if (route.page === null) return '#/scenes'
+    const scene = route.scene ? `?scene=${encodeURIComponent(route.scene)}` : ''
+    return `#/scenes/parts/${encodeURIComponent(route.part)}${scene}`
   }
   if (route.view === 'images') {
     if (route.page === 'image') {

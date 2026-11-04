@@ -179,3 +179,19 @@ describe('the sound effects routes', () => {
     expect(routeHref(routes[2])).toBe('#/effects/items/door-creak')
   })
 })
+
+describe('the Scenes routes', () => {
+  it('round-trip the first act, an act and its open scene', () => {
+    const routes = [
+      { view: 'scenes', page: null },
+      { view: 'scenes', page: 'act', part: 'act1' },
+      { view: 'scenes', page: 'act', part: 'act1', scene: 'act1-general-store' },
+    ] as const
+    expect(routes.map((r) => routeHref(r))).toEqual([
+      '#/scenes',
+      '#/scenes/parts/act1',
+      '#/scenes/parts/act1?scene=act1-general-store',
+    ])
+    for (const route of routes) expect(parseRoute(routeHref(route))).toEqual(route)
+  })
+})
