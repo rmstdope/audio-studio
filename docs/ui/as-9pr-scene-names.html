@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Scene table — names on one line</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --glass: rgb(255 255 255/3.5%);
+        --edge: rgb(255 255 255/8%);
+        --line: rgb(255 255 255/7%);
+        --line-strong: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --ok-bg: #10291f;
+        --ok-ink: #5be3ae;
+        --warn: #ffc24b;
+        --danger-ink: #ff94a8;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1000px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin: 26px auto 8px;
+        color: var(--soft);
+      }
+      .note b {
+        color: var(--text);
+      }
+      .frame {
+        max-width: 1000px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 16px 18px;
+      }
+      .frame.narrow {
+        max-width: 760px;
+      }
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 8px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        font-weight: 500;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 12px;
+        border-bottom: 1px solid #181b22;
+        vertical-align: top;
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12.5px;
+      }
+      .menu {
+        font-size: 12.5px;
+        padding: 3px 8px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        white-space: nowrap;
+        display: inline-block;
+      }
+      .sec {
+        color: var(--soft);
+        margin-left: 8px;
+      }
+      .num {
+        display: inline-block;
+        width: 40px;
+        text-align: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 1px 4px;
+      }
+      .slider {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .slider i {
+        display: inline-block;
+        width: 90px;
+        height: 4px;
+        background: var(--line-strong);
+        border-radius: 2px;
+        position: relative;
+      }
+      .slider i:after {
+        content: '';
+        position: absolute;
+        left: 55%;
+        top: -4px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--text);
+      }
+      .ms {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        line-height: 22px;
+        text-align: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--soft);
+        margin-right: 4px;
+      }
+      .now {
+        font-size: 12.5px;
+        color: var(--soft);
+      }
+      .sound td {
+        background: var(--ok-bg);
+      }
+      .sound td:first-child {
+        box-shadow: inset 3px 0 0 var(--ok-ink);
+      }
+      .sound .now {
+        color: var(--ok-ink);
+      }
+      .dim td {
+        opacity: 0.45;
+      }
+      .bar {
+        margin-top: 14px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      .bad {
+        outline: 2px dashed var(--danger-ink);
+        outline-offset: 2px;
+      }
+      .tag {
+        font-size: 11px;
+        color: var(--warn);
+        margin-left: 6px;
+      }
+      .nw {
+        white-space: nowrap;
+      }
+      .now-col {
+        width: 11em;
+      }
+      td.now {
+        white-space: normal;
+      }
+      .cut {
+        display: inline-block;
+        max-width: 150px;
+        overflow: hidden;
+        white-space: nowrap;
+        vertical-align: top;
+      }
+      .tip {
+        position: relative;
+      }
+      .tip:after {
+        content: attr(data-full);
+        position: absolute;
+        left: 0;
+        top: 22px;
+        background: #191c24;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 3px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+        z-index: 2;
+      }
+      .chip {
+        font-size: 11px;
+        padding: 1px 7px;
+        border-radius: 10px;
+        background: #2e1720;
+        color: var(--danger-ink);
+        margin-left: 8px;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>names and headings never break; the other cells make room</h1>
+      Effect names and column headings are kept on one line, always. The Now column is a little
+      narrower (about 11 letters wide instead of 14) and a long Now line wraps inside its own cell.
+      When the window is tight, “every 4–9 s” drops under its menu rather than squeezing the name.
+    </div>
+
+    <div class="note">
+      <b>Village lane, stopped.</b> Same as today, but “door-creak” no longer breaks.
+    </div>
+    <div class="frame">
+      <h2>Sound effects</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 40px"></th>
+            <th class="nw">Effect</th>
+            <th class="nw">How it plays</th>
+            <th class="nw">In which state</th>
+            <th class="nw">Level</th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>▶</td>
+            <td class="mono nw">wind-howl</td>
+            <td>
+              <span class="menu">Now and then</span
+              ><span class="sec"
+                >every <span class="num">4</span>–<span class="num">9</span> s</span
+              >
+            </td>
+            <td><span class="menu">Always</span></td>
+            <td>
+              <span class="slider"><i></i>−6 dB</span>
+            </td>
+            <td class="nw"><span class="ms">M</span><span class="ms">S</span></td>
+            <td>✕</td>
+          </tr>
+          <tr>
+            <td>▶</td>
+            <td class="mono nw">door-creak</td>
+            <td><span class="menu">On a trigger</span> <span class="menu">door-open</span></td>
+            <td><span class="menu">night</span></td>
+            <td>
+              <span class="slider"><i></i>−3 dB</span>
+            </td>
+            <td class="nw"><span class="ms">M</span><span class="ms">S</span></td>
+            <td>✕</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="bar">
+        ▶ 0:00 · State <span class="menu">day</span> · Trigger <span class="menu">door-open</span>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Village lane, playing.</b> The Now column appears; the heading row stays one line high, so
+      the play bar does not move under the pointer. A long Now line (“Waits for door-open, not
+      soloed”) wraps to two lines in its own cell — that row grows, the heading does not.
+    </div>
+    <div class="frame">
+      <h2>Sound effects</h2>
+      <table>
+        <thead>
+          <tr>
+            <th class="now-col nw">Now</th>
+            <th style="width: 40px"></th>
+            <th class="nw">Effect</th>
+            <th class="nw">How it plays</th>
+            <th class="nw">In which state</th>
+            <th class="nw">Level</th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sound">
+            <td class="now">▮▮▮ Playing</td>
+            <td>■</td>
+            <td class="mono nw">wind-howl</td>
+            <td>
+              <span class="menu">Now and then</span>
+              <div class="sec" style="margin: 6px 0 0">
+                every <span class="num">4</span>–<span class="num">9</span> s
+              </div>
+            </td>
+            <td><span class="menu">Always</span></td>
+            <td>
+              <span class="slider"><i></i>−6 dB</span>
+            </td>
+            <td class="nw"><span class="ms">M</span><span class="ms">S</span></td>
+            <td>✕</td>
+          </tr>
+          <tr class="dim">
+            <td class="now">Waits for door-open, not soloed</td>
+            <td>▶</td>
+            <td class="mono nw">door-creak</td>
+            <td><span class="menu">On a trigger</span> <span class="menu">door-open</span></td>
+            <td><span class="menu">night</span></td>
+            <td>
+              <span class="slider"><i></i>−3 dB</span>
+            </td>
+            <td class="nw"><span class="ms">M</span><span class="ms">S</span></td>
+            <td>✕</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="bar">
+        ■ 0:14 · State <span class="menu">day</span> · Trigger <span class="menu">door-open</span>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Narrow window (below 700 px).</b> Unchanged: each effect is already a card with the Now
+      line under its name; the name stays on one line there too.
+    </div>
+
+    <hr
+      style="border: 0; border-top: 1px solid var(--line); max-width: 1000px; margin: 32px auto"
+    />
+
+    <div class="intro">
+      <h1>When an effect name that does not fit</h1>
+      The name is cut where the room runs out and ends in “…”. Two names that differ only at the end
+      look the same until you hover.<br />Hovering the pointer over a cut name shows the whole name.
+      A screen reader always reads the whole name. A short name such as “wind-howl” is never cut.
+    </div>
+    <div class="note"><b>Playing, with two long names. The pointer is over the first one.</b></div>
+    <div class="frame narrow">
+      <h2>Sound effects</h2>
+      <table>
+        <thead>
+          <tr>
+            <th class="now-col nw">Now</th>
+            <th style="width: 40px"></th>
+            <th class="nw">Effect</th>
+            <th class="nw">How it plays</th>
+            <th class="nw">In which state</th>
+            <th class="nw">Level</th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sound">
+            <td class="now">▮▮▮ Playing</td>
+            <td>■</td>
+            <td class="mono nw">
+              <span class="tip" data-full="distant-thunder-rumble-long">distant-thunder-rum…</span>
+            </td>
+            <td>
+              <span class="menu">Now and then</span>
+              <div class="sec" style="margin: 6px 0 0">
+                every <span class="num">4</span>–<span class="num">9</span> s
+              </div>
+            </td>
+            <td><span class="menu">Always</span></td>
+            <td>
+              <span class="slider"><i></i>−6 dB</span>
+            </td>
+            <td class="nw"><span class="ms">M</span><span class="ms">S</span></td>
+            <td>✕</td>
+          </tr>
+          <tr class="dim">
+            <td class="now">Next in 12 s</td>
+            <td>▶</td>
+            <td class="mono nw">distant-thunder-rum…</td>
+            <td><span class="menu">Now and then</span></td>
+            <td><span class="menu">night</span></td>
+            <td>
+              <span class="slider"><i></i>−3 dB</span>
+            </td>
+            <td class="nw"><span class="ms">M</span><span class="ms">S</span></td>
+            <td>✕</td>
+          </tr>
+          <tr>
+            <td class="now">Not played</td>
+            <td></td>
+            <td class="mono nw">
+              distant-thunder-rum…<span class="chip">gone from the game</span>
+            </td>
+            <td><span class="menu">Once</span></td>
+            <td><span class="menu">Always</span></td>
+            <td>
+              <span class="slider"><i></i>0 dB</span>
+            </td>
+            <td class="nw"><span class="ms">M</span><span class="ms">S</span></td>
+            <td>✕</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      The “gone from the game” mark is never cut: the name gives up room first.
+    </div>
+  </body>
+</html>
