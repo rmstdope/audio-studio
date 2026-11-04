@@ -1698,6 +1698,9 @@ export function startServer({
       '/api/effects/batch': {
         GET: guard(async () => Response.json(await effectTakes.batch(projectFile))),
       },
+      '/api/effects/batch/close': {
+        POST: fromOwnPage(async () => Response.json(await effectTakes.closeBatch(projectFile))),
+      },
       '/api/effects/make-all': {
         POST: fromOwnPage(async (request) => {
           const body = MakeAllBody.safeParse(await request.json().catch(() => null))

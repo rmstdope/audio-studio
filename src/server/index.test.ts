@@ -5591,6 +5591,7 @@ describe('server, sound effect takes', () => {
     for (const [path, body] of [
       ['/api/effects/make-all', { ids: ['coins'] }],
       ['/api/effects/stop-all', undefined],
+      ['/api/effects/batch/close', undefined],
     ] as const) {
       expect((await send('POST', path, body, 'https://evil.example')).status).toBe(403)
     }
@@ -5610,6 +5611,9 @@ describe('server, sound effect takes', () => {
     const batch = await (await fetch(new URL('/api/effects/batch', studio.url))).json()
     expect(batch).toMatchObject({ total: 4, running: false })
     expect(batch.made + batch.stopped + batch.failed.length).toBe(4)
+    // Close clears it for every caller.
+    expect(await (await send('POST', '/api/effects/batch/close')).json()).toEqual({ ok: true })
+    expect(await (await fetch(new URL('/api/effects/batch', studio.url))).json()).toBeNull()
   })
 
   it('makes a looping take the length asked and serves its seam: the last 4 seconds, then the first 4', async () => {

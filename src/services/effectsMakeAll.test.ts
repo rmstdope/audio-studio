@@ -189,6 +189,37 @@ describe('stopAll and batch', () => {
   })
 })
 
+describe('the summary of a press is kept until it is closed or replaced', () => {
+  it('is there for a caller who never saw the press, until closeBatch', async () => {
+    const { file, takes, idle } = setup()
+    await takes.makeAll(file, ['coins'])
+    await idle()
+    expect(await takes.batch(file)).toMatchObject({ total: 4, made: 4, running: false })
+    expect(await takes.closeBatch(file)).toEqual({ ok: true })
+    expect(await takes.batch(file)).toBeNull()
+  })
+
+  it('is dropped, once finished, when takes are started by hand', async () => {
+    const { file, takes, idle } = setup()
+    await takes.makeAll(file, ['coins'])
+    await idle()
+    await takes.make(file, 'thunder', { count: 1 })
+    expect(await takes.batch(file)).toBeNull()
+    await idle()
+    expect(await takes.batch(file)).toBeNull()
+  })
+
+  it('is kept when takes are started by hand while the press still runs', async () => {
+    const { file, takes, release, idle } = setup({ hold: true })
+    await takes.makeAll(file, ['coins'])
+    await takes.make(file, 'thunder', { count: 1 })
+    expect(await takes.batch(file)).toMatchObject({ total: 4, running: true })
+    release()
+    await idle()
+    expect(await takes.batch(file)).toMatchObject({ total: 4, made: 4, running: false })
+  })
+})
+
 describe('a press that is stopped, or cannot start one effect', () => {
   it('counts takes stopped while the press is still starting as stopped, not made', async () => {
     const { file, takes, release } = setup({ hold: true })

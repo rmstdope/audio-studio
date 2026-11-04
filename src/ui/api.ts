@@ -2824,14 +2824,30 @@ export function useEffectModels() {
   })
 }
 
-/** What the latest Make all made, stopped and failed so far; polled while takes are made. */
-export function useEffectsBatch(running: boolean) {
-  return useQuery({
+/**
+ * What the latest Make all made, stopped and failed so far, kept by the studio so any tab sees it
+ * (null: none, or it was closed). Polled while takes are made, and while a finished one shows so a
+ * Close in another tab arrives. `close` clears it for every tab.
+ */
+export function useEffectsBatch(running: boolean): {
+  batch: EffectBatch | null
+  close: () => void
+} {
+  const client = useQueryClient()
+  const { data } = useQuery({
     queryKey: ['effects-batch'],
     queryFn: () => getJson<EffectBatch | null>('/api/effects/batch'),
     // Until the batch itself says it is done, so the answer that ends it is never missed.
-    refetchInterval: (query) => (running || query.state.data?.running ? 1000 : false),
+    refetchInterval: (query) =>
+      running || query.state.data?.running ? 1000 : query.state.data ? 5000 : false,
   })
+  return {
+    batch: data ?? null,
+    close: () => {
+      client.setQueryData<EffectBatch | null>(['effects-batch'], null)
+      void fetch('/api/effects/batch/close', { method: 'POST' })
+    },
+  }
 }
 
 /** One change that reaches every effect (Make all, Stop all), then everything it changes is read again. */
