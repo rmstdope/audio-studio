@@ -83,6 +83,12 @@ const summary = {
     ],
   },
   effects: { status: 'ok', done: { done: 0, total: 8, needs: [] } },
+  scenes: {
+    acts: [
+      { id: 'act1', title: 'Act I: The Lantern', state: 'ok', scenes: new Array(16) },
+      { id: 'act2', title: 'Act II: The Road', state: 'missing', scenes: [] },
+    ],
+  },
 } as unknown as ProjectSummary
 
 /** The sidebar's links as `[text, href, current]`, in reading order. */
@@ -231,5 +237,29 @@ describe('the sidebar’s Sound effects', () => {
   it('is not current on another page', () => {
     const { links } = render({ view: 'setup' })
     expect(links.find((l) => l.text.startsWith('Sound effects'))!.current).toBe(false)
+  })
+})
+
+describe('the sidebar’s Scenes', () => {
+  it('comes after Sound effects and folds its acts on another page', () => {
+    const { links } = render({ view: 'setup' })
+    const texts = links.map((l) => l.text)
+    expect(texts.indexOf('Scenes')).toBe(texts.findIndex((t) => t.startsWith('Sound effects')) + 1)
+    expect(texts).not.toContain('Act II')
+  })
+
+  it('lists the acts with their scene counts on a Scenes page, the open one marked', () => {
+    const { links } = render({ view: 'scenes', page: 'act', part: 'act2' })
+    const i = links.findIndex((l) => l.text === 'Scenes')
+    expect(links.slice(i, i + 3).map((l) => [l.text, l.href, l.current])).toEqual([
+      ['Scenes', '#/scenes', false],
+      ['Act I 16', '#/scenes/parts/act1', false],
+      ['Act II', '#/scenes/parts/act2', true],
+    ])
+  })
+
+  it('marks the first act when the address names none', () => {
+    const { links } = render({ view: 'scenes', page: null })
+    expect(links.filter((l) => l.current).map((l) => l.text)).toEqual(['Act I 16'])
   })
 })

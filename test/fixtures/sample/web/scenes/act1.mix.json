@@ -1,0 +1,27 @@
+{
+  "scenes": {
+    "lantern-hall": {
+      "music": { "track": "lantern-hall", "level": 1 },
+      "effects": [
+        { "id": "coins", "play": { "mode": "once", "afterSeconds": 1.5 }, "level": 0.6 },
+        { "id": "wind-howl", "play": { "mode": "random", "everySeconds": [15, 30] }, "level": 0.5 },
+        { "id": "rain", "play": { "mode": "loop" }, "state": "rainy", "level": 1 },
+        { "id": "door-creak", "play": { "mode": "trigger", "trigger": "door-opens" }, "level": 2.5 }
+      ]
+    },
+    "village-lane": {
+      "music": { "track": "village-lane", "level": 0.8 },
+      "effects": [
+        { "id": "wind-howl", "play": { "mode": "loop" }, "level": 0.7 },
+        { "id": "scratching", "play": { "mode": "once", "afterSeconds": 3 }, "level": 0.9 }
+      ]
+    },
+    "old-cellar": {
+      "music": { "track": null, "level": 1 },
+      "effects": [
+        { "id": "coins", "play": { "mode": "once", "afterSeconds": 2 }, "state": "flooded", "level": 1 }
+      ]
+    },
+    "empty-room": { "music": { "track": null, "level": 1 }, "effects": [] }
+  }
+}

@@ -1,0 +1,11 @@
+[
+  {
+    "id": "lantern-hall",
+    "name": "Lantern hall",
+    "states": ["plain", "rainy"],
+    "triggers": ["door-opens"]
+  },
+  { "id": "village-lane", "name": "Village lane", "states": [], "triggers": [] },
+  { "id": "old-cellar", "name": "Old cellar", "states": ["plain"], "triggers": [] },
+  { "id": "empty-room", "name": "Empty room", "states": [], "triggers": ["bell-tolls"] }
+]
