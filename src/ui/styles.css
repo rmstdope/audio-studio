@@ -4216,6 +4216,23 @@ button.cue-chip[aria-expanded='true'] {
 .scene-state .menu-button {
   white-space: nowrap;
 }
+/* A long trigger or state name (not the "How it plays" menu itself) wraps inside its menu, at a
+   hyphen first, so the table never outgrows its panel. */
+.scene-how .menu ~ .menu,
+.scene-state .menu {
+  max-width: 100%;
+}
+.scene-how .menu ~ .menu .menu-button,
+.scene-state .menu .menu-button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.scene-how .menu ~ .menu .menu-button::after,
+.scene-state .menu .menu-button::after {
+  top: 50%;
+  transform: translateY(-50%);
+}
 .scene-effect .chip,
 .scene-how .chip,
 .scene-state .chip {

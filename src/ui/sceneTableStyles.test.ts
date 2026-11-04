@@ -96,4 +96,14 @@ describe('the Scenes sound effects table', () => {
       /margin-right:\s*0/,
     )
   })
+
+  it('wraps a long state or trigger name inside its menu, at a hyphen first and between letters last', () => {
+    const wraps = '.scene-how .menu ~ .menu .menu-button,\n.scene-state .menu .menu-button'
+    expect(rule(wraps)).toMatch(/white-space:\s*normal/)
+    expect(rule(wraps)).toMatch(/overflow-wrap:\s*anywhere/)
+    expect(rule('.scene-how .menu ~ .menu,\n.scene-state .menu')).toMatch(/max-width:\s*100%/)
+    const arrow = rule(`${wraps.replaceAll('.menu-button', '.menu-button::after')}`)
+    expect(arrow).toMatch(/top:\s*50%/)
+    expect(arrow).toMatch(/transform:\s*translateY\(-50%\)/)
+  })
 })
