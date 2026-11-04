@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Make-all summary after reload (agreed)</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft: #2a1b12;
+        --accent-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger: #ff94a8;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 26px;
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 22px 26px;
+      }
+      .frame.narrow {
+        max-width: 420px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        font-weight: 500;
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .play {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .play.on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0a02;
+      }
+      .play[disabled] {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--soft);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .brief {
+        max-width: 280px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .err {
+        color: var(--danger);
+        font-size: 12.5px;
+      }
+      .tag {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .callout {
+        border-left: 3px solid var(--accent);
+        padding: 2px 10px;
+        color: var(--soft);
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      .ncard {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        margin-top: 10px;
+        padding: 12px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .acts {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0d05;
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-top: 16px;
+      }
+      .stat {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .stat .big {
+        font-size: 20px;
+        font-weight: 600;
+      }
+      .grow {
+        flex: 1;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .confirm {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .confirm h3 {
+        margin: 0 0 6px;
+        font-size: 15px;
+      }
+      .confirm ul {
+        margin: 6px 0 10px;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .hint {
+        color: var(--faint);
+        font-size: 12.5px;
+        margin-top: 6px;
+      }
+      .tag-variant {
+        display: inline-block;
+        background: var(--accent);
+        color: #1a0d05;
+        font-weight: 700;
+        border-radius: 6px;
+        padding: 2px 8px;
+        margin-right: 8px;
+      }
+      .statusline {
+        border-left: 3px solid var(--accent);
+        padding: 8px 12px;
+        margin-top: 14px;
+        background: var(--raised);
+        border-radius: 6px;
+      }
+      .errline {
+        color: var(--danger);
+      }
+      .sec {
+        margin-top: 28px;
+      }
+      .sec > h4 {
+        max-width: 1100px;
+        margin: 0 auto 8px;
+        color: var(--soft);
+      }
+    </style>
+    <style>
+      .sec {
+        max-width: 1100px;
+        margin: 22px auto;
+      }
+      .sec h4 {
+        margin: 0 0 8px;
+        color: var(--soft);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+      }
+      .stat {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .big {
+        font-size: 26px;
+        font-weight: 600;
+      }
+      .grow {
+        flex: 1;
+      }
+      .btn {
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0a02;
+      }
+      .errline {
+        color: var(--danger);
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .tab {
+        font-size: 12px;
+        padding: 3px 10px;
+        border-radius: 6px 6px 0 0;
+        background: var(--raised);
+        color: var(--muted);
+      }
+      .tab.on {
+        background: var(--panel);
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Agreed — the studio remembers it until Close or until the studio is quit</h1>
+      The summary of the last press on this page is kept by the running studio. A reload, a new tab,
+      or coming back to the page later all show it. Close in any tab clears it for every tab.
+      Quitting the studio forgets it — just as it already forgets a take that could not be made.
+    </div>
+    <div class="sec">
+      <h4>1 · Press Make, reload while it runs</h4>
+      <p class="faint small" style="margin: 0 0 8px">
+        Unchanged: the running line is worked out from what is being made.
+      </p>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">TRACKS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 6</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">Making 16 takes for 4 tracks · about 31 min left</span
+            ><button class="btn">Stop all</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>
+        2 · The last take ends — in the reloaded tab, a new tab, or when you open the page later
+      </h4>
+      <p class="faint small" style="margin: 0 0 8px">
+        Today this goes straight back to Ready. Now the summary is there, with the same words and
+        Close.
+      </p>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">TRACKS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 6</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">Made 16 of 16 takes.</span><button class="btn ghost">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>3 · Some failed / stopped — unchanged words, after a reload too</h4>
+      <p class="faint small" style="margin: 0 0 8px"></p>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">TRACKS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 6</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted"
+              >Made 14 of 16 takes.
+              <span class="errline"
+                >2 could not be made — <a href="#" style="color: inherit">Market square</a> says
+                why.</span
+              ></span
+            ><button class="btn ghost">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>4 · Close pressed (in any tab)</h4>
+      <p class="faint small" style="margin: 0 0 8px">Back to Ready; a reload stays on Ready.</p>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">TRACKS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 6</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">3 tracks have no chosen take</span
+            ><button class="btn primary">Make 4 takes each</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>5 · The studio was quit and started again</h4>
+      <p class="faint small" style="margin: 0 0 8px">
+        The summary is forgotten. If takes were still waiting when it was quit, they were not made,
+        and the page simply shows Ready.
+      </p>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">TRACKS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 6</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">3 tracks have no chosen take</span
+            ><button class="btn primary">Make 4 takes each</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>6 · A summary is showing and someone starts takes by hand on a track</h4>
+      <p class="faint small" style="margin: 0 0 8px">
+        The running line takes over at once (agreed). When those takes end the old summary is gone
+        for good:
+      </p>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">TRACKS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 6</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">3 tracks have no chosen take</span
+            ><button class="btn primary">Make 4 takes each</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      The same on all four pages: an act's Music page, Stingers, an act's Images page and Sound
+      effects. Words are unchanged from the agreed Make-all panels; there is no finishing time.
+    </div>
+  </body>
+</html>
