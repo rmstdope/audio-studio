@@ -32,7 +32,9 @@ let saveGate: Promise<void> | null = null
 const gains: number[] = []
 const loops: boolean[] = []
 // A page left mounted would go on guarding its unsaved changes in the next test.
-afterEach(() => {
+afterEach(async () => {
+  // Let a queued hashchange (a page going on to another scene) land while the DOM is still there.
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
   cleanups.splice(0).forEach((c) => c())
   document.body.innerHTML = ''
   window.history.replaceState(null, '', '#')
@@ -850,6 +852,19 @@ describe('leaving a scene with unsaved changes', () => {
     expect(page.querySelector('[aria-label="Save failed"]')).not.toBeNull()
   })
 
+  it('keeps the dialog’s Save dimmed, and the dialog open, while rows are red', async () => {
+    const page = render(open)
+    type(rows(page)[0]!.querySelector<HTMLInputElement>('.scene-num')!, '')
+    act(() => button(page, 'Refresh from the game').click())
+    await flush()
+    const save = dialog()!.querySelector<HTMLButtonElement>('.btn-primary')!
+    expect(save.getAttribute('aria-disabled')).toBe('true')
+    act(() => save.click())
+    await flush()
+    expect(dialog()).not.toBeNull()
+    expect(puts).toEqual([])
+  })
+
   it('does not ask when nothing is unsaved', async () => {
     const page = render(open)
     act(() => button(page, 'Refresh from the game').click())
@@ -886,5 +901,53 @@ describe('leaving a scene with unsaved changes', () => {
     expect(close()).toBe(true)
     act(() => button(page, 'Discard').click())
     expect(close()).toBe(false)
+  })
+})
+
+describe('what the page started from', () => {
+  /** A page that can be shown again with other data, as a refetch does. */
+  function renderLive(route: ScenesRoute, first: ProjectSummary) {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, enabled: false } },
+    })
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    cleanups.push(() => act(() => root.unmount()))
+    const show = (shown: ProjectSummary, at: ScenesRoute = route) =>
+      act(() =>
+        root.render(
+          createElement(
+            QueryClientProvider,
+            { client },
+            createElement(ScenesView, { summary: shown, route: at }),
+          ),
+        ),
+      )
+    show(first)
+    return { page: container, show }
+  }
+
+  it('sends the entry the draft began from, even if the project is read again meanwhile', async () => {
+    const { page, show } = renderLive(open, summary())
+    type(musicLevel(page), '40')
+    // Another tab saved the scene, and this page's data was refetched.
+    const changed = summary()
+    changed.scenes!.acts[0]!.scenes[0]!.entry = { music: { track: null, level: 2 }, effects: [] }
+    show(changed)
+    act(() => button(page, 'Save').click())
+    await flush()
+    expect(puts[0]!.body.was?.music).toEqual({ track: 'act1-store', level: 1 })
+  })
+
+  it('does not say Saved again when a scene saved earlier is opened again', async () => {
+    const { page, show } = renderLive(open, summary())
+    type(musicLevel(page), '40')
+    act(() => button(page, 'Save').click())
+    await flush()
+    expect(status(page)).toBe('Saved')
+    show(summary(), { ...open, scene: 'act1-forest' })
+    show(summary(), open)
+    expect(status(page)).toBeUndefined()
   })
 })

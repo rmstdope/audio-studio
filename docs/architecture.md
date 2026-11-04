@@ -1900,7 +1900,7 @@ consumer rule beyond naming this page).
   (the game's `MAX_EFFECT_VOLUME`); it multiplies, as `effectVolumes.json` did, the music's and the
   player's own levels. Row order is the order of the table; it does not affect playing.
 - The studio writes the whole file again with stable key order (scenes in the declarations' order,
-  then any scene the game no longer declares, in their old order) and two-space indentation, through
+  then any scene the game no longer declares, in their old order) and two-space indentation (a scene's entry with effects has a line to each effect, a short one is on one line, so a Save changes the lines of its own scene), through
   `writeAtomic`. A Save changes one scene's entry only, and only an act's file is rewritten. A
   `PUT /api/scenes/:part/:id` carries `{ scene, was }` (`was` the entry as the page read it); a
   stale `was` is refused with 409, as the model saves are (§8.8).
@@ -1949,7 +1949,7 @@ scene at a time, and whatever would leave it (another scene, page or Back, Refre
 asks first, the browser asks on closing the tab. Save sends `{ scene, was }`, `was` being the entry
 the page read (`SceneRow.entry`, null for none). The service re-reads the mix, refuses an unreadable
 file or entry, answers `stale` with the entry now saved when `was` differs, and otherwise writes the
-whole file again with only that scene replaced (scenes in the declarations' order, then the rest in
+whole file again with only that scene replaced (its entry is written from the fields the studio knows: a field of that scene's entry it does not know is dropped on Save) (scenes in the declarations' order, then the rest in
 their old order, entries that cannot be read kept as they are). The Add menu and Music menu are
 offered `ScenesSummary.effects` and `SceneAct.tracks`.
 

@@ -160,15 +160,32 @@ describe('saving a scene', () => {
         { "id": "bell", "play": { "mode": "loop" }, "level": 2 }
       ]
     },
-    "old-room": {
-      "effects": []
-    },
-    "broken": {
-      "effects": "nope"
-    }
+    "old-room": { "effects": [] },
+    "broken": { "effects": "nope" }
   }
 }
 `)
+  })
+
+  it('writes a file it can write again byte for byte, so a save changes only its own scene', async () => {
+    const { root, projectFile } = await repo({
+      scenes: { 'act1-cottage': entry(2), 'act1-store': entry(1) },
+    })
+    await saveScene(projectFile, 'act1', 'act1-store', entry(1), entry(1))
+    const first = text(root)
+    await saveScene(projectFile, 'act1', 'act1-cottage', entry(2), entry(2))
+    expect(text(root)).toBe(first)
+    await saveScene(projectFile, 'act1', 'act1-store', entry(0.5), entry(1))
+    const changed = text(root).split('\n')
+    const before = first.split('\n')
+    expect(changed.length).toBe(before.length)
+    expect(changed.filter((line, i) => line !== before[i]).length).toBe(2)
+  })
+
+  it('keeps a short scene on one line', async () => {
+    const { root, projectFile } = await repo({ scenes: {} })
+    await saveScene(projectFile, 'act1', 'act1-store', { effects: [] }, null)
+    expect(text(root)).toBe('{\n  "scenes": {\n    "act1-store": { "effects": [] }\n  }\n}\n')
   })
 
   it('creates the file and its folder when the mix is not there yet', async () => {

@@ -6,11 +6,14 @@ import { useEffect, useRef } from 'react'
  */
 export function LeaveDialog({
   name,
+  canSave,
   onSave,
   onDiscard,
   onCancel,
 }: {
   name: string
+  /** Whether Save can write the scene: not while a row is red. */
+  canSave: boolean
   onSave: () => void
   onDiscard: () => void
   onCancel: () => void
@@ -44,7 +47,13 @@ export function LeaveDialog({
           <button className="btn" type="button" onClick={onCancel}>
             Cancel
           </button>
-          <button ref={save} className="btn btn-primary" type="button" onClick={onSave}>
+          <button
+            ref={save}
+            className="btn btn-primary"
+            type="button"
+            aria-disabled={!canSave || undefined}
+            onClick={() => canSave && onSave()}
+          >
             Save
           </button>
         </div>

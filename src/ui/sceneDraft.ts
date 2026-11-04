@@ -36,6 +36,8 @@ export interface SceneEditor {
 interface Held {
   sceneId: string
   draft: SceneDraft | null
+  /** The entry the draft began from: what Save compares with the file, however the project is read again. */
+  was: SceneMix | null
   status: SceneStatus
 }
 
@@ -49,20 +51,24 @@ export function useSceneEditor(partId: string, scene: SceneRow | undefined): Sce
   const [held, setHeld] = useState<Held | null>(null)
   const sceneId = scene?.id ?? ''
   const mine: Held =
-    held?.sceneId === sceneId ? held : { sceneId, draft: null, status: { kind: 'idle' } }
+    held?.sceneId === sceneId
+      ? held
+      : { sceneId, draft: null, was: scene?.entry ?? null, status: { kind: 'idle' } }
   const base = scene ? draftOf(scene) : { music: { track: null, level: 1 }, effects: [] }
   const draft = mine.draft ?? base
   const dirty = !sameDraft(draft, base)
   const reds = redRows(draft)
   // The latest, for the saves that finish later.
-  const latest = useRef({ draft, dirty, reds, sceneId, was: scene?.entry ?? null })
-  latest.current = { draft, dirty, reds, sceneId, was: scene?.entry ?? null }
+  const latest = useRef({ draft, dirty, reds, sceneId, was: mine.was })
+  latest.current = { draft, dirty, reds, sceneId, was: mine.was }
+  // A scene saved earlier does not say Saved when it is opened again.
+  useEffect(() => setHeld((h) => (h && h.sceneId !== sceneId && !h.draft ? null : h)), [sceneId])
 
   const send = useCallback(
     async (was: SceneMix | null): Promise<boolean> => {
       const { draft, sceneId } = latest.current
       const set = (status: SceneStatus, kept: SceneDraft | null = draft) =>
-        setHeld({ sceneId, draft: kept, status })
+        setHeld({ sceneId, draft: kept, was: latest.current.was, status })
       set({ kind: 'saving' })
       try {
         const answer = await saving.mutateAsync({ sceneId, scene: toMix(draft), was })
@@ -85,8 +91,9 @@ export function useSceneEditor(partId: string, scene: SceneRow | undefined): Sce
     dirty,
     reds,
     status: mine.status,
-    change: (next) => setHeld({ sceneId, draft: next, status: { kind: 'idle' } }),
-    discard: () => setHeld({ sceneId, draft: null, status: { kind: 'idle' } }),
+    change: (next) => setHeld({ sceneId, draft: next, was: mine.was, status: { kind: 'idle' } }),
+    discard: () =>
+      setHeld({ sceneId, draft: null, was: scene?.entry ?? null, status: { kind: 'idle' } }),
     save: async () => {
       const { dirty, reds, was } = latest.current
       if (!dirty || reds > 0 || mine.status.kind === 'saving') return false
@@ -95,7 +102,7 @@ export function useSceneEditor(partId: string, scene: SceneRow | undefined): Sce
     keepMine: async () => (mine.status.kind === 'conflict' ? send(mine.status.current) : false),
     loadSaved: async () => {
       await client.invalidateQueries({ queryKey: ['project'] })
-      setHeld({ sceneId, draft: null, status: { kind: 'idle' } })
+      setHeld({ sceneId, draft: null, was: null, status: { kind: 'idle' } })
     },
   }
 }

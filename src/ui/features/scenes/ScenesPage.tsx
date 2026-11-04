@@ -198,6 +198,7 @@ export function ScenesPage({
       {leaving && (
         <LeaveDialog
           name={scene.name}
+          canSave={!red}
           onCancel={() => setLeaving(null)}
           onDiscard={() => {
             editor.discard()

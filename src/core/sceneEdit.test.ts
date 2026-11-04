@@ -111,7 +111,7 @@ describe('rowProblems', () => {
   })
 
   it('flags empty, not a number and negative', () => {
-    for (const bad of ['', ' ', 'abc', '-1']) {
+    for (const bad of ['', ' ', 'abc', '-1', '0x1A', '1e2', '1,5', '.5x']) {
       const p = rowProblems(base({ mode: 'once', after: bad }))
       expect(p.after).toBe(true)
       expect(p.lines).toEqual(['Type a number of seconds.'])

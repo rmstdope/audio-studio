@@ -80,7 +80,8 @@ export function switchMode(effect: EffectDraft, mode: PlayMode, triggers: string
 
 /** A box of seconds read as a number, or why it cannot be one. */
 function seconds(text: string): { ok: true; value: number } | { ok: false; line: string } {
-  const value = text.trim() === '' ? NaN : Number(text)
+  // Plain decimals only: Number() would take "0x1A" and "1e2" for numbers.
+  const value = /^\d+(\.\d+)?$/.test(text.trim()) ? Number(text) : NaN
   if (!Number.isFinite(value) || value < 0) return { ok: false, line: 'Type a number of seconds.' }
   if (value > MAX_SECONDS) return { ok: false, line: `At most ${MAX_SECONDS} seconds.` }
   return { ok: true, value }

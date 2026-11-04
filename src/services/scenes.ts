@@ -85,26 +85,32 @@ export async function readScenes(
 const MIX_WIDTH = 100
 
 /**
- * A value as the mix file shows it, two spaces to a level: the file, the scenes and each scene's
- * entry are open; below that an object is on one line while it fits (`"music": { "track": … }`),
- * and a list of effects has a line to each effect, so a change shows as a change to a line.
+ * A value as the mix file shows it, two spaces to a level: the file and the scenes are open, and so
+ * is a scene's entry that has effects, with a line to each effect, so a change shows as a change
+ * to a line. Anything else is on one line while it fits (`"music": { "track": … }`). `at` is the
+ * width already used on the line (the indent and the key).
  */
-function mixText(value: unknown, depth = 0, indent = ''): string {
+function mixText(value: unknown, depth = 0, indent = '', at = 0): string {
   const flat = flatText(value)
-  const open = depth <= 2 || (depth === 3 && Array.isArray(value) && value.length > 0)
-  if (!open && flat.length + indent.length <= MIX_WIDTH) return flat
   if (typeof value !== 'object' || value === null) return flat
+  const list = Array.isArray(value)
+  const effects = !list && Array.isArray((value as { effects?: unknown }).effects)
+  const open =
+    depth <= 1 ||
+    (depth === 2 && effects && (value as { effects: unknown[] }).effects.length > 0) ||
+    (depth === 3 && list && value.length > 0)
+  if (!open && at + flat.length <= MIX_WIDTH) return flat
   const inner = `${indent}  `
-  if (Array.isArray(value)) {
+  if (list) {
     if (value.length === 0) return '[]'
-    return `[\n${value.map((v) => inner + mixText(v, depth + 1, inner)).join(',\n')}\n${indent}]`
+    return `[\n${value.map((v) => inner + mixText(v, depth + 1, inner, inner.length)).join(',\n')}\n${indent}]`
   }
   const keys = Object.keys(value)
   if (keys.length === 0) return '{}'
-  const lines = keys.map(
-    (k) =>
-      `${inner}${JSON.stringify(k)}: ${mixText((value as Record<string, unknown>)[k], depth + 1, inner)}`,
-  )
+  const lines = keys.map((k) => {
+    const head = `${inner}${JSON.stringify(k)}: `
+    return head + mixText((value as Record<string, unknown>)[k], depth + 1, inner, head.length)
+  })
   return `{\n${lines.join(',\n')}\n${indent}}`
 }
 
