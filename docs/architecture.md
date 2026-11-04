@@ -82,7 +82,7 @@ retroquest/                      ← user runs `content-studio` here
    `resolveInRoot`, which refuses anything outside the project root. Clips are served only when
    they are plain files in the part's clips folder (no folders, no symbolic links). The one
    exception is the game's own commands: **Refresh dialog**, on a part's overview, and **Refresh
-   from the game**, on an act's Music page (the same `refreshDialog` command) and on the Stingers
+   from the game**, on an act's Music, Images and Scenes pages (the same `refreshDialog` command) and on the Stingers
    page (`music.refreshShared`) and the Sound effects page (`effects.refresh`), run in the project root, only when the user clicks one on the
    studio's page; what a command writes is the game's business, and the studio does not check it
    beyond reading the dialog, the loops or the stingers again.
@@ -1796,6 +1796,131 @@ effect's own Stop) and failed; the page shows that as a summary, in place of the
 until Close (`POST /api/effects/batch/close`, for every tab), a new press, or takes started by hand once the
 press has ended; a quit forgets it. `GET /api/effects/models` says which models can run (the question's model line and "Open Setup").
 
+### 8.11 Scenes: the files the game and the studio share (as-p86)
+
+A **scene** is a place the game plays sound in (RetroQuest: a room, with its music track): its music
+loop and level, and the sound effects that play with it, how, in which state and how loud. Until
+now this lived in the game's code (`ROOM_AMBIENCE`, `effectVolumes.json`). The Scenes workspace
+edits it and plays it as the game would. The screens are drawn in `docs/ui/as-p86.1-scenes.html`;
+what a person sees is the acceptance of bead as-p86.1. This section is the **contract** the game
+(RetroQuest beads rq-xazj, rq-xfkn) and the studio (as-p86.2 to .4) are built against.
+
+**Two files per act, each with one writer.** The game's refresh writes the **declarations**; the
+studio writes only the **mix**. Neither is ever written by the other, so a Refresh from the game
+cannot lose a setting and a Save cannot change what the game declares. Both are named in an
+optional `scenes` section of the project file, in the `{part}` form of the music lists (an act is
+a part); the project file is only read, so the consumer rules' list of places it is changed does
+not grow.
+
+```json
+"scenes": {
+  "paths": {
+    "declarations": "tts/{part}/scenes.json",
+    "mix": "web/src/lantern/scenes/{part}.mix.json"
+  }
+}
+```
+
+Without the section the sidebar has no Scenes workspace. Neither path may hold `{language}`. The
+mix is a file of the game (the game imports or fetches it, so it takes effect the next time the
+game starts), so its folder is the game's choice; the declarations are the music lists' sibling.
+Refresh from the game on the Scenes page is `narration.refreshDialog` for the part, as on an
+act's Music and Images pages (the game's one command for an act's lists; no new command, no new
+consumer rule beyond naming this page).
+
+**The declarations** (`scenes.paths.declarations`, game-written, read only, in the game's order):
+
+```json
+[
+  {
+    "id": "act1-general-store",
+    "name": "General store",
+    "states": ["plain", "cat-home"],
+    "triggers": ["door-opens"]
+  }
+]
+```
+
+- `id`: the scene's slug (`^[a-z0-9]+(-[a-z0-9]+)*$`), unique across the game's acts. RetroQuest
+  uses the room's music track id (`roomTrackId`), so a scene's own track and its old
+  `effectVolumes.json` key are its id.
+- `name`: what the page calls it. `states`: the scene's **named sound states**, the first being the
+  game's default (drawn "plain"); `[]` or absent when the scene has none. `triggers`: the names the
+  game can fire in the scene; `[]` or absent when none. State and trigger names are slugs, unique
+  within the scene.
+- The list is read entry by entry, as the effects list is (§8.9): an entry with a problem, or an id
+  used twice (both), is left out and reported with its file and place; a file that is not a list
+  is unreadable as a whole. A file that is not there yet is "the game has not listed its scenes".
+
+**The mix** (`scenes.paths.mix`, studio-written, game-read), one object per act:
+
+```json
+{
+  "scenes": {
+    "act1-general-store": {
+      "music": { "track": "act1-general-store", "level": 1 },
+      "effects": [
+        { "id": "shop-bell", "play": { "mode": "once", "afterSeconds": 1.5 }, "level": 0.6 },
+        {
+          "id": "glass-clink",
+          "play": { "mode": "random", "everySeconds": [15, 30] },
+          "level": 0.5
+        },
+        { "id": "cat-purr", "play": { "mode": "loop" }, "state": "cat-home", "level": 1 },
+        { "id": "door-creak", "play": { "mode": "trigger", "trigger": "door-opens" }, "level": 1 }
+      ]
+    }
+  }
+}
+```
+
+- `music`: `track` is a music track id (the act's own or a shared one, §8.5) or `null` for no music;
+  `level` is the loop's level. Absent `music`: the scene's own track (the one with its id) at 1,
+  as the game plays now. `effects` absent or `[]`: no effects. A scene with no entry at all plays
+  its own track and no effects.
+- An effect's `id` is one of the game's sound effects (§8.9); the same id may appear twice in a
+  scene (two ways to play it). `play` is one of `{ "mode": "loop" }` (round and round),
+  `{ "mode": "random", "everySeconds": [N, M] }` (now and then: a random wait of N to M seconds
+  before each start, `0 < N <= M`), `{ "mode": "once", "afterSeconds": N }` (once, N seconds after
+  entering; it does not sound again until the scene is entered again), and
+  `{ "mode": "trigger", "trigger": "<name>" }` (each time the game fires that trigger in the
+  scene). `state`, when present, is one of the scene's states: the effect plays only while the
+  scene is in it; absent means always. `level` is a number from 0 to 3, 1 being the clip as made
+  (the game's `MAX_EFFECT_VOLUME`); it multiplies, as `effectVolumes.json` did, the music's and the
+  player's own levels. Row order is the order of the table; it does not affect playing.
+- The studio writes the whole file again with stable key order (scenes in the declarations' order,
+  then any scene the game no longer declares, in their old order) and two-space indentation, through
+  `writeAtomic`. A Save changes one scene's entry only, and only an act's file is rewritten. A
+  `PUT /api/scenes/:part/:id` carries `{ scene, was }` (`was` the entry as the page read it); a
+  stale `was` is refused with 409, as the model saves are (§8.8).
+- **Gone from the game** is derived on every read, never stored: a state, trigger or effect id in
+  the mix that the declarations or the effects list no longer have. It stays in the file, shown
+  with its mark, and the game ignores it (a state not in the scene never matches; a trigger never
+  fires; an unknown effect id has no clip). The studio never removes it except when the user does.
+  A scene in the mix the game no longer declares is not shown and stays in the file.
+- **Silent**: an effect with no chosen take (§8.10) has no clip in the manifest; the game and the
+  studio play nothing for it. This too is derived.
+- A mix file that cannot be read (not JSON, wrong shape) is reported with its file and JSON path
+  per scene entry and never written over; the page shows the other scenes. An entry with a
+  problem is left out and kept as it is on a Save of another scene.
+
+**How the game plays a scene** (what the studio's play bar copies): entering the scene starts its
+music and every effect whose state is the scene's current one (the first state at entry, unless the
+game says otherwise). Loops loop; a random effect waits a random time in its range before each
+start, including the first; a once effect starts after its delay. When the state changes, an effect
+that plays only in the old state fades out and one that plays only in the new state fades in
+(0.3 s, `STATE_FADE_SECONDS` of `ambience.ts`); the music and effects with no state carry on, and a
+once effect that has sounded does not sound again. A trigger plays the effects bound to it at once,
+once each (an effect with both a trigger and a state plays only while the scene is in that state). Changing the music's track is not something the game does mid-scene.
+
+**Studio side** (for the children): `src/core/scenes.ts` holds the schemas, the reading of both
+files, the gone and silent derivation and the counts for the list (pure, no I/O);
+`src/services/scenes.ts` reads and writes the files (`resolveInRoot`, `writeAtomic`);
+`src/server/scenes.ts` serves `GET /api/scenes/:part` and the `PUT` above; the page is
+`src/ui/Scenes*.tsx`. The unsaved scene lives in the page (one at a time); playing is Web Audio in
+`src/ui/` over the clips the music and effects pages already serve, the same rules as above in a
+small scheduler that takes a clock and a random function so it is tested without audio.
+
 ## 9. Server API
 
 Built so far: `GET /api/project`, `GET /api/narration/progress` (each act's ok lines out of all, in a language), `GET /api/parts/:part` (with every line's status),
@@ -2311,6 +2436,22 @@ Small, independently useful increments:
        effect plays is a change since chosen.
     6. **The second model** (as-5wc.5, done: §8.8): Stable Audio Open 1.0 on the GPU queue, Setup checking both
        models and choosing the main one (`effects.model`), and a model menu on an effect's page.
+
+17. **Scenes** (epic as-p86), in small pull requests:
+    1. **The mockup round and the contract** (as-p86.1, done: §8.11, `docs/ui/as-p86.1-scenes.html`): the
+       Scenes page, its editor and play bar, and the declarations and mix files.
+    2. **The game reads scenes from JSON** (RetroQuest rq-xazj): `ROOM_AMBIENCE` and
+       `effectVolumes.json` become the declarations (written by the game's refresh) and the mix (read by
+       the game); the game sounds as before. The studio's page waits for it.
+    3. **The Scenes page** (as-p86.2): the sidebar entry, the act's scene list and the open scene read
+       only, the not-yet-listed, Refresh and failed states; the section of the project file.
+    4. **Editing a scene** (as-p86.3): the music, effects, add menu, unsaved changes, Save, Discard and the
+       leave dialog, saved to the mix only.
+    5. **Playing a scene** (as-p86.4): the play bar with states and each effect's own ▶, the
+       scheduler of §8.11, edits heard at once.
+    6. **Triggers in the game** (RetroQuest rq-xfkn): the game fires the declared triggers and plays the
+       effects the mix binds to them. The studio's play bar fires them from as-p86.4 on; a scene with no
+       triggers declared shows none.
 
 ---
 

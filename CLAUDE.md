@@ -75,10 +75,11 @@ bundle breaks.
 - Another exception, to reading and writing only the named files: the project's own
   `refreshDialog` command (the game's code, named in its project file) runs in the project root
   only when the user clicks Refresh dialog on a part's page or Refresh from the game on an act's
-  Music or Images page, and so does `music.refreshShared` when the user clicks Refresh from the game on the
+  Music, Images or Scenes page, and so does `music.refreshShared` when the user clicks Refresh from the game on the
   Stingers page, and `effects.refresh` when the user clicks Refresh from the game on the Sound
   effects page; each writes what the game writes.
-  The studio runs nothing else of the consumer's.
+  The studio runs nothing else of the consumer's. The Scenes page writes one file of an act, the
+  mix (`scenes.paths.mix`, §8.11), and never the declarations the game writes.
 - The project file itself is read, and changed in nine kinds of places only: the words that sound
   the same (`narration.quality.soundAlike`, and `narration.quality.soundAlikeByLanguage` for the
   other languages), saved from the Words that sound the same panel, `narration.models.draft` /
