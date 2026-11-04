@@ -963,6 +963,21 @@ describe('adding a sound effect', () => {
       expect(menu(page).classList.contains('scene-add-up')).toBe(true)
     })
 
+    it('ignores the list scrolling inside the menu', () => {
+      const page = render(open)
+      act(() => add(page).click())
+      layout.buttonTop = 700
+      layout.buttonBottom = 730
+      act(() => {
+        page.querySelector('.scene-add-list ul')!.dispatchEvent(new Event('scroll'))
+      })
+      expect(menu(page).classList.contains('scene-add-up')).toBe(false)
+      act(() => {
+        document.dispatchEvent(new Event('scroll'))
+      })
+      expect(menu(page).classList.contains('scene-add-up')).toBe(true)
+    })
+
     it('is placed again on a resize whose target is the window, as in a browser', () => {
       // A browser's Node.contains throws on anything that is not a Node; the window is not one.
       const contains = Node.prototype.contains
