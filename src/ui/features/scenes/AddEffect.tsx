@@ -3,12 +3,10 @@ import type { SceneEffectChoice } from '../../../core/scenes'
 import { PlayIcon, StopIcon } from '../../components/icons'
 import type { ScenePlayer } from './SceneDetail'
 
-/** How many matches the Add menu lists before "N more…". */
-const SHOWN = 8
-
 /**
- * "+ Add a sound effect": a menu under the button with a box that narrows the game's sound effects
- * as you type. Each has ▶ to hear it, "loop" beside loops and "no take chosen" beside the silent;
+ * "+ Add a sound effect": a menu under the button, drawn in front of the scene's play bar, with a
+ * box that narrows the game's sound effects as you type; every match is listed, and the list
+ * scrolls. Each has ▶ to hear it, "loop" beside loops and "no take chosen" beside the silent;
  * clicking one adds it.
  */
 export function AddEffect({
@@ -76,7 +74,7 @@ export function AddEffect({
             onChange={(event) => setQuery(event.target.value)}
           />
           <ul>
-            {matches.slice(0, SHOWN).map((choice) => {
+            {matches.map((choice) => {
               const playing = player.playing === `add-${choice.id}`
               return (
                 <li key={choice.id}>
@@ -115,7 +113,6 @@ export function AddEffect({
               )
             })}
           </ul>
-          {matches.length > SHOWN && <span className="muted">{matches.length - SHOWN} more…</span>}
         </div>
       )}
     </div>

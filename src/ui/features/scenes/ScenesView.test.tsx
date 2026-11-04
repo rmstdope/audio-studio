@@ -852,7 +852,7 @@ describe('adding a sound effect', () => {
     expect(rows(page).length).toBe(6)
   })
 
-  it('shows the first matches and says how many more', () => {
+  it('lists every effect with no filter typed, and no "more…" line', () => {
     const shown = summary()
     for (let i = 0; i < 9; i++) {
       shown.scenes!.effects.push({
@@ -865,8 +865,8 @@ describe('adding a sound effect', () => {
     }
     const page = render(open, shown)
     act(() => add(page).click())
-    expect(page.querySelectorAll('.scene-add-list li').length).toBe(8)
-    expect(text(page.querySelector('.scene-add-list .muted'))).toBe('5 more…')
+    expect(page.querySelectorAll('.scene-add-list li').length).toBe(13)
+    expect(page.querySelector('.scene-add-list .muted')).toBeNull()
   })
 
   it('closes on Escape and returns to the button', () => {
