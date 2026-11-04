@@ -96,4 +96,14 @@ describe('the Scenes sound effects table', () => {
       /margin-right:\s*0/,
     )
   })
+
+  it('wraps a long state or trigger name inside its menu, at a hyphen first and between letters last', () => {
+    for (const cell of ['.scene-how', '.scene-state']) {
+      const button = rule(`${cell} .menu-button`)
+      expect(button).not.toMatch(/white-space:\s*nowrap/)
+      expect(button).toMatch(/overflow-wrap:\s*anywhere/)
+      expect(rule(`${cell} .menu`)).toMatch(/max-width:\s*100%/)
+      expect(rule(`${cell} .menu-button::after`)).toMatch(/top:\s*50%/)
+    }
+  })
 })

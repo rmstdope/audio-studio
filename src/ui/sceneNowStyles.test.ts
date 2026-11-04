@@ -14,8 +14,8 @@ describe('the scene table while it plays', () => {
     expect(rule(css, '.scene-how,\n.scene-state')).toContain('overflow-wrap: break-word')
   })
 
-  it('keeps "Now and then" and the state names on one line', () => {
-    const block = rule(css, '.scene-how .menu-button,\n.scene-state .menu-button')
+  it('keeps the "gone from the game" mark on one line', () => {
+    const block = rule(css, '.scene-how .chip,\n.scene-state .chip')
     expect(block).toContain('white-space: nowrap')
   })
 
