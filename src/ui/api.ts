@@ -1166,7 +1166,7 @@ export function useMusicModelState() {
 /**
  * What one press of Make takes on a list remembers (the studio keeps it, so every tab and a
  * reload see it): how many takes it asked for, for which tracks, how many of each track's takes
- * had failed before it, how many Stop all stopped on those tracks, and whether any is still going.
+ * had failed before it, how many were stopped on those tracks (by Stop all or on a track's page), and whether any is still going.
  */
 export type MakeAllBatch = MusicBatch
 

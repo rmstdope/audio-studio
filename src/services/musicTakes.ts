@@ -219,7 +219,7 @@ export interface MusicTakes {
 
 /**
  * What one press of Make takes on a list remembers: how many takes it asked for, for which tracks,
- * how many of each track's takes had failed before it, and how many Stop all stopped on those
+ * how many of each track's takes had failed before it, and how many were stopped on those
  * tracks; `running` while any of its tracks still has a take waiting or being made.
  */
 export interface MusicBatch {
@@ -654,13 +654,6 @@ export function createMusicTakes({
           stopped += result.stopped
         }
       }
-      const press: StoredBatch | undefined = batches.get(`${projectFile}\0${listId}`)
-      if (press) {
-        press.stopped += press.tracks.reduce(
-          (sum: number, id: string) => sum + (byTrack[id] ?? 0),
-          0,
-        )
-      }
       return { ok: true, stopped, byTrack }
     },
 
@@ -691,12 +684,22 @@ export function createMusicTakes({
       let stopped = 0
       const entries = active.get(`${projectFile}\0${id}`)
       if (!entries) return { ok: true, stopped: 0 }
+      // A press still running on this track counts what is stopped here, wherever Stop was pressed.
+      const presses = [...batches]
+        .filter(
+          ([at, press]) =>
+            at.startsWith(`${projectFile}\0`) &&
+            press.tracks.includes(id) &&
+            pressRunning(projectFile, press),
+        )
+        .map(([, press]) => press)
       for (const [n, entry] of entries) {
         if (entry.state === 'failed') continue
         entry.stop?.abort()
         entries.delete(n)
         stopped++
       }
+      for (const press of presses) press.stopped += stopped
       return { ok: true, stopped }
     },
 
