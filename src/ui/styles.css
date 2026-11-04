@@ -4450,6 +4450,29 @@ button.cue-chip[aria-expanded='true'] {
 .scene-bar-grow {
   flex: 1 1 0;
 }
+.scene-bar-count {
+  display: inline-grid;
+  align-items: center;
+  justify-items: end;
+}
+.scene-bar-count::before,
+.scene-bar-count-now {
+  grid-area: 1 / 1;
+}
+/* The room for the count at its widest, with Clear beside it; never seen. */
+.scene-bar-count::before {
+  content: 'Solo: 99 · Muted: 99';
+  visibility: hidden;
+  padding-right: 90px;
+  min-height: 36px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.scene-bar-count-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px 14px;
+}
 .scene-seg {
   display: inline-flex;
   border: 1px solid var(--line-strong);
