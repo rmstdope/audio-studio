@@ -1,5 +1,6 @@
 import { languageName } from './languages'
 import type { ImagesSummary } from './images'
+import type { ScenesSummary } from './scenes'
 import type { EffectsSummary } from './effects'
 import type { MusicSummary } from './music'
 import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } from './project'
@@ -135,6 +136,8 @@ export interface ProjectSummary {
   images: ImagesSummary | null
   /** The Sound effects pages; null when the project file has no `effects` section. */
   effects: EffectsSummary | null
+  /** The Scenes pages; null when the project file has no `scenes` section. */
+  scenes: ScenesSummary | null
   problems: Problem[]
 }
 
@@ -154,6 +157,8 @@ export interface SummaryInput {
   images?: ImagesSummary | null
   /** The Sound effects pages, from `summarizeEffects`; absent or null without an `effects` section. */
   effects?: EffectsSummary | null
+  /** The Scenes pages, from `summarizeScenes`; absent or null without a `scenes` section. */
+  scenes?: ScenesSummary | null
   problems: Problem[]
 }
 
@@ -176,6 +181,7 @@ export function summarize({
   music = null,
   images = null,
   effects = null,
+  scenes = null,
   problems,
 }: SummaryInput): ProjectSummary {
   const { narration } = project
@@ -295,6 +301,7 @@ export function summarize({
     music,
     images,
     effects,
+    scenes,
     problems,
   }
 }

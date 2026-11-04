@@ -1940,12 +1940,23 @@ starts its wait. A trigger plays the effects bound to it at once,
 once each (an effect with both a trigger and a state plays only while the scene is in that state). Changing the music's track is not something the game does mid-scene.
 
 **Studio side** (for the children): `src/core/scenes.ts` holds the schemas, the reading of both
-files, the gone and silent derivation and the counts for the list (pure, no I/O);
-`src/services/scenes.ts` reads and writes the files (`resolveInRoot`, `writeAtomic`);
-`src/server/scenes.ts` serves `GET /api/scenes/:part` and the `PUT` above; the page is
-`src/ui/Scenes*.tsx`. The unsaved scene lives in the page (one at a time); playing is Web Audio in
-`src/ui/` over the clips the music and effects pages already serve, the same rules as above in a
-small scheduler that takes a clock and a random function so it is tested without audio.
+files entry by entry, and `summarizeScenes`, which derives gone and silent and the counts for the
+list (pure, no I/O); `src/services/scenes.ts` reads the two files of every act (`resolveInRoot`,
+`readJson`) and joins their problems to the project's; the studio's writing of the mix is as-p86.3's.
+The Scenes workspace is read with the rest of the project: `ProjectSummary.scenes` (null without the
+`scenes` section) carries every act's scenes, so the sidebar's counts, the page and Refresh from the
+game (which invalidates the project) need no route of their own; as-p86.3 adds the `PUT` above, and
+no `GET /api/scenes/:part` is built. What a scene's rows say of the rest of the studio comes from the
+summaries already read: an effect is _silent_ when its lock has no chosen take, _playable_ when the
+chosen take's clip is there; the music is _playable_ when the act's music list has the track with a
+chosen take whose file is there. A scene the mix has no entry for reads as an empty one; where the mix has no `music` the page shows the scene's own
+track at 100% when the act's list has it, and "No music" otherwise (the contract's fallback to "the act's loop"
+cannot be told from the files, which name no act-level loop); a scene whose entry cannot be read is listed as
+"unreadable" and shows none of its rows. The page is `src/ui/features/scenes/`: a ▶ plays one clip
+alone at its level through Web Audio (`src/ui/sceneClip.ts`, a gain, since levels reach 300%), over
+`/api/music/tracks/:id/current` and `/api/effects/:id/current`. The unsaved scene lives in the page (one at a
+time); playing is Web Audio in `src/ui/` over the same clips, the same rules as above in a small
+scheduler that takes a clock and a random function so it is tested without audio.
 
 ## 9. Server API
 
@@ -2469,8 +2480,9 @@ Small, independently useful increments:
     2. **The game reads scenes from JSON** (RetroQuest rq-xazj): `ROOM_AMBIENCE` and
        `effectVolumes.json` become the declarations (written by the game's refresh) and the mix (read by
        the game); the game sounds as before. The studio's page waits for it.
-    3. **The Scenes page** (as-p86.2): the sidebar entry, the act's scene list and the open scene read
-       only, the not-yet-listed, Refresh and failed states; the section of the project file.
+    3. **The Scenes page** (as-p86.2, done: §8.11): the sidebar entry, the act's scene list and the open
+       scene read only, with ▶ on the music and each effect, the not-yet-listed, Refresh and failed
+       states; the `scenes` section of the project file; the sample project has scenes.
     4. **Editing a scene** (as-p86.3): the music, effects, add menu, unsaved changes, Save, Discard and the
        leave dialog, saved to the mix only.
     5. **Playing a scene** (as-p86.4): the play bar with states and each effect's own ▶, the

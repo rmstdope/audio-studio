@@ -10,6 +10,11 @@ describe('the workspace open in the sidebar', () => {
     expect(openWorkspace({ view: 'music', page: null })).toBe('music')
     expect(openWorkspace({ view: 'music', page: 'stingers' })).toBe('music')
   })
+  it('is Images on any Images page and Scenes on any Scenes page', () => {
+    expect(openWorkspace({ view: 'images', page: null })).toBe('images')
+    expect(openWorkspace({ view: 'scenes', page: null })).toBe('scenes')
+    expect(openWorkspace({ view: 'scenes', page: 'act', part: 'act1' })).toBe('scenes')
+  })
   it('is none on the project pages and the characters', () => {
     for (const route of [
       { view: 'setup' },

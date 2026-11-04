@@ -341,6 +341,24 @@ const EffectsSchema = z.object({
   }),
 })
 
+/** A scenes path: one file per act, the same in every language. */
+const scenesPath = z
+  .string()
+  .min(1)
+  .refine((path) => path.includes('{part}') && !path.includes('{language}'), {
+    error: "must contain {part} and not {language}: scenes are an act's, in every language",
+  })
+
+/** The optional `scenes` section: the two files of an act, the game's declarations and the studio's mix (§8.11). */
+const ScenesSchema = z.object({
+  paths: z.object({
+    /** An act's scenes with their states and triggers, written by the game and read only. */
+    declarations: scenesPath,
+    /** An act's mix, written by the studio and read by the game. */
+    mix: scenesPath,
+  }),
+})
+
 /** The project file, `content-studio.json`, in the consumer repository's root. */
 export const ProjectSchema = z.object({
   $schema: z.string().optional(),
@@ -351,6 +369,7 @@ export const ProjectSchema = z.object({
   music: MusicSchema.optional(),
   images: ImagesSchema.optional(),
   effects: EffectsSchema.optional(),
+  scenes: ScenesSchema.optional(),
   /**
    * How long a take fades in and out when played in the studio, in seconds (0: no fade); absent is
    * 0.2. Saved from Setup's Playing takes panel; the game's own file never fades.
@@ -369,6 +388,9 @@ export type MusicConfig = z.infer<typeof MusicSchema>
 
 /** The validated `effects` section of a project file. */
 export type EffectsConfig = z.infer<typeof EffectsSchema>
+
+/** The validated `scenes` section of a project file. */
+export type ScenesConfig = z.infer<typeof ScenesSchema>
 
 /** The validated `images` section of a project file. */
 export type ImagesConfig = z.infer<typeof ImagesSchema>

@@ -3,9 +3,10 @@ import type { PartProgress } from '../services/workspace'
 import type { Route } from './route'
 
 /** The workspace whose acts the sidebar lists: the one the page shown belongs to, else none. */
-export function openWorkspace(route: Route): 'narration' | 'music' | 'images' | null {
+export function openWorkspace(route: Route): 'narration' | 'music' | 'images' | 'scenes' | null {
   if (route.view === 'part' || route.view === 'lines') return 'narration'
   if (route.view === 'music') return 'music'
+  if (route.view === 'scenes') return 'scenes'
   return route.view === 'images' ? 'images' : null
 }
 

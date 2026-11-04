@@ -12,6 +12,7 @@ import { LinesView } from './features/lines/LinesView'
 import { EffectsView } from './features/effects/EffectsView'
 import { ImagesView } from './features/images/ImagesView'
 import { MusicView } from './features/music/MusicView'
+import { ScenesView } from './features/scenes/ScenesView'
 import { PartOverview } from './features/overview/PartOverview'
 import { SpendingView } from './features/spending/SpendingView'
 import { SetupView } from './features/setup/SetupView'
@@ -95,6 +96,8 @@ export function App() {
           <MusicView summary={summary} route={route} />
         ) : route.view === 'effects' ? (
           <EffectsView summary={summary} route={route} />
+        ) : route.view === 'scenes' ? (
+          <ScenesView summary={summary} route={route} />
         ) : route.view === 'images' ? (
           <ImagesView summary={summary} route={route} />
         ) : route.view === 'setup' ? (
