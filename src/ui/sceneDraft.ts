@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { draftOf, redRows, sameDraft, toMix, type SceneDraft } from '../core/sceneEdit'
 import type { SceneMix, SceneRow } from '../core/scenes'
 import { useSaveScene } from './api'
+import { holdRoute } from './route'
 
 /** Where a scene's saving stands. */
 export type SceneStatus =
@@ -115,9 +116,9 @@ export interface Leaving {
 
 /**
  * Guards the page's unsaved changes. The browser's own prompt is asked when the tab is closed or
- * reloaded. A move to another address (another scene, another page, Back) is undone at once and
- * handed to `ask`, which puts the question to the user and calls `proceed` to go on. `leave` does
- * the same for something else the page does (Refresh from the game).
+ * reloaded. A move to another address (another scene, another page, Back) is undone before the
+ * router follows it and handed to `ask`, which puts the question to the user and calls `proceed`
+ * to go on. Refresh from the game asks the same way through `ask`, from the page.
  */
 export function useLeaveGuard(dirty: boolean, ask: (leaving: Leaving) => void) {
   const dirtyRef = useRef(dirty)
@@ -129,26 +130,27 @@ export function useLeaveGuard(dirty: boolean, ask: (leaving: Leaving) => void) {
   const allow = useRef(false)
 
   useEffect(() => {
-    const moved = () => {
+    const moved = (): boolean => {
       const to = window.location.hash
       if (allow.current || !dirtyRef.current) {
         accepted.current = to
         allow.current = false
-        return
+        return false
       }
-      if (to === accepted.current) return
+      if (to === accepted.current) return false
       // Back to where the user was, then ask.
       window.history.replaceState(null, '', accepted.current || '#')
-      window.dispatchEvent(new HashChangeEvent('hashchange'))
       askRef.current({
         proceed: () => {
           allow.current = true
           window.location.hash = to
         },
       })
+      return true
     }
-    window.addEventListener('hashchange', moved)
-    return () => window.removeEventListener('hashchange', moved)
+    // The router asks before it follows a move, so nothing of the other page is ever shown (a
+    // listener of its own could run after the router had already left this page).
+    return holdRoute(moved)
   }, [])
 
   useEffect(() => {

@@ -158,11 +158,32 @@ export function routeHref(route: Route): string {
   return `${route.view === 'lines' ? `#/parts/${part}/lines` : `#/parts/${part}`}${query}`
 }
 
+/** A page's check on a move of the address: true when it has put the address back to ask first. */
+type Hold = () => boolean
+
+let hold: Hold | null = null
+
+/**
+ * Lets the open page stop the route from following a move of the address (a page with unsaved
+ * changes asks first). Returns what to call when the page goes away. The router asks it, so the
+ * answer comes before anything of the other page is rendered, whatever the order of the browser's
+ * listeners.
+ */
+export function holdRoute(check: Hold): () => void {
+  hold = check
+  return () => {
+    if (hold === check) hold = null
+  }
+}
+
 /** The current route, following the location hash. */
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash))
   useEffect(() => {
-    const update = () => setRoute(parseRoute(window.location.hash))
+    const update = () => {
+      if (hold?.()) return
+      setRoute(parseRoute(window.location.hash))
+    }
     window.addEventListener('hashchange', update)
     return () => window.removeEventListener('hashchange', update)
   }, [])
