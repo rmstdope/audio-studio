@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Keyboard focus after Stop all (agreed)</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --danger-bg: #2e1720;
+        --danger: #ff94a8;
+        --focus: #7ab8ff;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 900px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .step {
+        max-width: 900px;
+        margin: 0 auto 10px;
+        color: var(--soft);
+        font-weight: 600;
+      }
+      .frame {
+        max-width: 900px;
+        margin: 0 auto 22px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 16px 20px;
+      }
+      .panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .panel .count {
+        color: var(--muted);
+      }
+      .line {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        align-items: center;
+      }
+      .btn {
+        font: inherit;
+        border-radius: 7px;
+        padding: 5px 12px;
+        border: 1px solid var(--line-strong);
+        background: #191c24;
+        color: var(--text);
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #170a03;
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn[disabled] {
+        opacity: 0.5;
+      }
+      .focus {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+      .focustext {
+        outline: 2px solid var(--focus);
+        outline-offset: 3px;
+        border-radius: 4px;
+      }
+      .tag {
+        display: inline-block;
+        margin-left: 8px;
+        font-size: 12px;
+        color: var(--focus);
+        font-weight: 600;
+      }
+      .err {
+        margin-top: 8px;
+        color: var(--danger);
+        background: var(--danger-bg);
+        border-radius: 7px;
+        padding: 6px 10px;
+      }
+      a {
+        color: #ff9a6b;
+      }
+      .note {
+        max-width: 900px;
+        margin: 0 auto 22px;
+        color: var(--muted);
+      }
+      .rows {
+        margin-top: 10px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+      @media (max-width: 520px) {
+        body {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Keyboard focus after Stop all (agreed)</h1>
+      <p>
+        The Make-all panel on an act's Music page, the Stingers page, an act's Images page and the
+        Sound effects page. Only the nouns differ. The blue ring shows where keyboard focus is.
+      </p>
+    </div>
+    <div class="step">1. Focus on Stop all; Enter presses it</div>
+    <div class="frame">
+      <div class="panel">
+        <span class="count">Tracks up to date · 12 tracks</span>
+        <div class="line">
+          <span>Making 16 takes for 4 tracks · about 48 min left</span
+          ><button class="btn ghost focus">Stop all</button
+          ><span class="tag">◀ keyboard focus</span>
+        </div>
+      </div>
+      <div class="rows">Tavern at dusk · Storm at sea · Market square · …</div>
+    </div>
+    <div class="step">2. While stopping: greyed out, words unchanged, focus stays</div>
+    <div class="frame">
+      <div class="panel">
+        <span class="count">Tracks up to date · 12 tracks</span>
+        <div class="line">
+          <span>Making 16 takes for 4 tracks · about 48 min left</span
+          ><button class="btn ghost focus" disabled>Stop all</button
+          ><span class="tag">◀ keyboard focus</span>
+        </div>
+      </div>
+      <div class="rows">Tavern at dusk · Storm at sea · Market square · …</div>
+    </div>
+    <div class="step">
+      3. Stopped: the summary replaces the running line, focus on Close (the summary is still read
+      aloud)
+    </div>
+    <div class="frame">
+      <div class="panel">
+        <span class="count">Tracks up to date · 12 tracks</span>
+        <div class="line">
+          <span>Made 6 of 16 takes. 10 were stopped.</span><button class="btn focus">Close</button
+          ><span class="tag">◀ keyboard focus</span>
+        </div>
+      </div>
+      <div class="rows">Tavern at dusk · Storm at sea · Market square · …</div>
+    </div>
+    <div class="step">4. Close: focus back on the panel&#x27;s button, as today</div>
+    <div class="frame">
+      <div class="panel">
+        <span class="count">Tracks up to date · 12 tracks</span>
+        <div class="line">
+          <span>4 tracks have no chosen take</span
+          ><button class="btn primary focus">Make 4 takes each</button
+          ><span class="tag">◀ keyboard focus</span>
+        </div>
+      </div>
+      <div class="rows">Tavern at dusk · Storm at sea · Market square · …</div>
+    </div>
+    <div class="step">Finishing on its own while focus rests on Stop all: focus on Close</div>
+    <div class="frame">
+      <div class="panel">
+        <span class="count">Tracks up to date · 12 tracks</span>
+        <div class="line">
+          <span>Made 16 of 16 takes.</span><button class="btn focus">Close</button
+          ><span class="tag">◀ keyboard focus</span>
+        </div>
+      </div>
+      <div class="rows">Tavern at dusk · Storm at sea · Market square · …</div>
+    </div>
+    <div class="step">
+      No summary (every take was started by hand on a track): focus on the panel&#x27;s button, or
+      the panel itself if it has none
+    </div>
+    <div class="frame">
+      <div class="panel">
+        <span class="count">Tracks up to date · 12 tracks</span>
+        <div class="line">
+          <span>4 tracks have no chosen take</span
+          ><button class="btn primary focus">Make 4 takes each</button
+          ><span class="tag">◀ keyboard focus</span>
+        </div>
+      </div>
+      <div class="rows">Tavern at dusk · Storm at sea · Market square · …</div>
+    </div>
+    <div class="step">
+      Stopping failed: running line stays, focus stays on Stop all, red line under the panel
+    </div>
+    <div class="frame">
+      <div class="panel">
+        <span class="count">Tracks up to date · 12 tracks</span>
+        <div class="line">
+          <span>Making 16 takes for 4 tracks · about 48 min left</span
+          ><button class="btn ghost focus">Stop all</button
+          ><span class="tag">◀ keyboard focus</span>
+        </div>
+      </div>
+      <div class="err">The takes could not be stopped. They are still being made; try again.</div>
+      <div class="rows">Tavern at dusk · Storm at sea · Market square · …</div>
+    </div>
+    <div class="note">
+      The red line goes when Stop all is pressed again, when the takes finish and the summary
+      appears, or on a reload. If focus was anywhere other than Stop all, nothing moves it.
+    </div>
+  </body>
+</html>
