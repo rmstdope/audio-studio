@@ -105,12 +105,22 @@ function summary(options: Options = {}): ProjectSummary {
 function render(
   route: ImagesRoute,
   shown: ProjectSummary = summary(),
-  making: Record<string, { takes: number; left: number }> = {},
+  making: Record<string, { takes: number; left: number; failed?: number }> = {},
   run: unknown = null,
+  modelState = false,
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   client.setQueryData(['image-making'], making)
   client.setQueryData(['look-run'], run)
+  if (modelState) {
+    const whole = { download: 'whole', failed: false }
+    client.setQueryData(['image-model-state'], {
+      ok: true,
+      main: 'klein',
+      ready: true,
+      states: { klein: whole, 'z-image-turbo': whole },
+    })
+  }
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
@@ -188,6 +198,28 @@ describe('an act’s page', () => {
     const rows = [...page.querySelectorAll('tbody tr')]
     expect(text(rows[0]!.querySelector('.images-status'))).toBe('making 2 takes · about 1 min')
     expect(text(rows[1]!.querySelector('.images-status'))).toBe('none yet')
+  })
+
+  it('shows an image whose takes all failed with its status, not as making', () => {
+    const page = render({ view: 'images', page: 'act', part: 'act1' }, summary(), {
+      inn: { takes: 0, left: 0, failed: 2 },
+    })
+    const rows = [...page.querySelectorAll('tbody tr')]
+    expect(text(rows[0]!.querySelector('.images-status'))).toBe('none yet')
+  })
+
+  it('offers to make takes beside the count, for the whole act even when showing what needs attention', () => {
+    const page = render(
+      { view: 'images', page: 'act', part: 'act1', show: 'attention' },
+      summary(),
+      {},
+      null,
+      true,
+    )
+    const panel = page.querySelector('.status-panel')!
+    expect(text(panel)).toContain('2 images have no chosen take')
+    expect(text(panel.querySelector('.make-all-line'))).toContain('Make 4 takes each')
+    expect(page.querySelector('.page-header')!.textContent).not.toContain('Make 4 takes each')
   })
 
   it('says so when the game asks for no images in an act', () => {

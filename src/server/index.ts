@@ -1574,6 +1574,20 @@ export function startServer({
       '/api/images/making': {
         GET: guard(async () => Response.json(await imageTakes.making(projectFile))),
       },
+      '/api/images/model-state': {
+        GET: guard(async () => Response.json(await imageTakes.modelState(projectFile))),
+      },
+      '/api/image-acts/:id/make-all': {
+        POST: fromOwnPage(async (request) =>
+          imageAnswer(await imageTakes.makeAll(projectFile, request.params.id)),
+        ),
+      },
+      '/api/image-acts/:id/stop': {
+        POST: fromOwnPage(async (request) => {
+          const result = await imageTakes.stopAll(projectFile, request.params.id)
+          return result ? Response.json(result) : notFound()
+        }),
+      },
       '/api/images/bring-all': {
         GET: guard(async () => Response.json(imageTakes.lookRun(projectFile))),
         POST: fromOwnPage(async () => imageAnswer(await imageTakes.bringAll(projectFile))),

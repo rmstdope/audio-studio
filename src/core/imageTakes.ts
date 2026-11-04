@@ -144,6 +144,8 @@ export interface ImageMakingSummary {
   takes: number
   /** Seconds left, all together (a guess). */
   left: number
+  /** Takes of the image that failed and are kept until they are made again or the page is left. */
+  failed: number
 }
 
 /**

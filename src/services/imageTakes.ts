@@ -9,6 +9,7 @@ import {
   type ImageModelId,
   type ImageModelState,
 } from '../core/imageModels'
+import { planImagesMakeAll, TAKES_EACH } from '../core/imagesMakeAll'
 import { bringToLook, isCropped } from '../core/imagePixels'
 import {
   ImageBoardSchema,
@@ -100,6 +101,19 @@ export interface ImageTakes {
   markSeen(projectFile: string, id: string, n: number): Promise<ImageTakesAnswer>
   /** What is being made in the project, by image, for the lists' status. */
   making(projectFile: string): Promise<Record<string, ImageMakingSummary>>
+  /** Setup's image model, each model's state, and whether images can be made at all. */
+  modelState(projectFile: string): Promise<ImageModelStateResult>
+  /**
+   * Makes four takes for every image of the act with no chosen take that is not making takes, on
+   * Setup's model (the other when that is unusable). Nothing is made when any image is refused;
+   * null for an act the project does not list.
+   */
+  makeAll(projectFile: string, actId: string): Promise<ImageTakesAnswer>
+  /** Stops the takes waiting or being made of every image in the act (how many, and per image); null for an act not listed. */
+  stopAll(
+    projectFile: string,
+    actId: string,
+  ): Promise<{ ok: true; stopped: number; byImage: Record<string, number> } | ProjectFailure | null>
   /** The path of a take's game version, or null for an image not listed, a bad number or a take not brought. */
   gameFile(projectFile: string, id: string, name: string): Promise<string | null>
   /** The path of a take's picture, or null for an image not listed or a name that is not a take's number. */
@@ -107,6 +121,16 @@ export interface ImageTakes {
   /** The picture the game shows now: the chosen one, else the game's own file, else null. */
   currentFile(projectFile: string, id: string): Promise<string | null>
 }
+
+/** Setup's image model and the state of each, as the Images pages need them to plan a press. */
+export type ImageModelStateResult =
+  | {
+      ok: true
+      main: ImageModelId
+      ready: boolean
+      states: Record<ImageModelId, ImageModelState>
+    }
+  | ProjectFailure
 
 /** A take's picture, relative to the project root. */
 const pictureOf = (id: string, n: number) => `${IMAGE_TAKES_DIR}/${id}/${n}.png`
@@ -464,7 +488,80 @@ export function createImageTakes({
     return outcome
   }
 
+  /** An act of the project's images with the project's main model, or null when it is not listed. */
+  async function actOf(projectFile: string, actId: string) {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const { project } = opened
+    if (!project.images) return null
+    const summary = await readImages(dirname(projectFile), project, [])
+    const act = summary?.acts.find((a) => a.id === actId)
+    return act ? { act, main: project.images.model ?? DEFAULT_IMAGE_MODEL } : null
+  }
+
+  async function modelState(projectFile: string): Promise<ImageModelStateResult> {
+    const opened = await openProject(projectFile)
+    if (!opened.ok) return opened
+    const ready = await generator.ready()
+    const states = await modelStates(projectFile)
+    return {
+      ok: true,
+      main: opened.project.images?.model ?? DEFAULT_IMAGE_MODEL,
+      ready: ready.ok,
+      states,
+    }
+  }
+
   return {
+    modelState,
+
+    async makeAll(projectFile, actId) {
+      const found = await actOf(projectFile, actId)
+      if (!found || !('act' in found)) return found
+      const state = await modelState(projectFile)
+      if (!('states' in state)) return state
+      const plan = planImagesMakeAll({
+        rows: found.act.rows,
+        conflicts: found.act.conflicts,
+        making: await this.making(projectFile),
+        main: state.main,
+        states: state.states,
+        ready: state.ready,
+      })
+      if (plan.kind === 'not-ready') {
+        return { ok: false, message: "Images can't be made yet. Setup says what is missing." }
+      }
+      if (plan.kind === 'all-chosen') return { ok: true }
+      const started: string[] = []
+      for (const image of plan.images) {
+        const answer = await this.make(projectFile, image.id, {
+          count: TAKES_EACH,
+          model: plan.model,
+        })
+        if (!answer || !answer.ok) {
+          for (const id of started) await this.stop(projectFile, id)
+          return answer ?? { ok: false, message: `${image.title} is not in the game any more.` }
+        }
+        started.push(image.id)
+      }
+      return { ok: true }
+    },
+
+    async stopAll(projectFile, actId) {
+      const found = await actOf(projectFile, actId)
+      if (!found || !('act' in found)) return found
+      let stopped = 0
+      const byImage: Record<string, number> = {}
+      for (const id of found.act.order) {
+        const answer = await this.stop(projectFile, id)
+        if (answer && answer.ok && answer.stopped > 0) {
+          stopped += answer.stopped
+          byImage[id] = answer.stopped
+        }
+      }
+      return { ok: true, stopped, byImage }
+    },
+
     async view(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('row' in found)) return found
@@ -754,8 +851,12 @@ export function createImageTakes({
         if (!key.startsWith(prefix)) continue
         let takes = 0
         let left = 0
+        let failed = 0
         for (const entry of entries.values()) {
-          if (entry.state === 'failed') continue
+          if (entry.state === 'failed') {
+            failed++
+            continue
+          }
           takes++
           const { seconds } = imageModel(entry.model)
           left +=
@@ -763,7 +864,7 @@ export function createImageTakes({
               ? seconds
               : Math.max(0, seconds - (now() - entry.startedAt) / 1000)
         }
-        if (takes) summary[key.slice(prefix.length)] = { takes, left }
+        if (takes || failed) summary[key.slice(prefix.length)] = { takes, left, failed }
       }
       return summary
     },

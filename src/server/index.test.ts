@@ -5221,6 +5221,8 @@ describe('the image takes routes', () => {
       ['POST', '/api/images/inn/stop', undefined],
       ['POST', '/api/images/inn/takes/1/seen', undefined],
       ['POST', '/api/images/bring-all', undefined],
+      ['POST', '/api/image-acts/act1/make-all', undefined],
+      ['POST', '/api/image-acts/act1/stop', undefined],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
     }
@@ -5268,6 +5270,19 @@ describe('the image takes routes', () => {
   it('has nothing to bring to a new look while every picture is up to date', async () => {
     expect(await (await fetch(new URL('/api/images/bring-all', studio.url))).json()).toBeNull()
     expect(await (await send('POST', '/api/images/bring-all')).json()).toEqual({ ok: true })
+  })
+
+  it('makes four takes for every image of an act with no chosen take, and stops them', async () => {
+    const state = await (await fetch(new URL('/api/images/model-state', studio.url))).json()
+    expect(state).toMatchObject({ ok: true, main: 'klein', ready: true })
+    expect((await send('POST', '/api/image-acts/ghost/make-all')).status).toBe(404)
+    expect((await send('POST', '/api/image-acts/ghost/stop')).status).toBe(404)
+    const before = (await view()).takes.length
+    expect(await (await send('POST', '/api/image-acts/act1/make-all')).json()).toEqual({ ok: true })
+    const made = await settled()
+    expect(made.takes).toHaveLength(before + 4)
+    const stopped = await (await send('POST', '/api/image-acts/act1/stop')).json()
+    expect(stopped).toEqual({ ok: true, stopped: 0, byImage: {} })
   })
 
   it('refuses a bad body and answers 404 for an image the game does not list', async () => {

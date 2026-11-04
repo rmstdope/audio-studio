@@ -131,7 +131,7 @@ describe('making takes', () => {
       [2, 'waiting'],
     ])
     expect(view.making[0]!.expected).toBe(8)
-    expect(await takes.making(file)).toEqual({ inn: { takes: 2, left: 16 } })
+    expect(await takes.making(file)).toEqual({ inn: { takes: 2, left: 16, failed: 0 } })
     release()
     await settled('inn')
     await takes.make(file, 'inn', { count: 1 })
@@ -160,6 +160,18 @@ describe('making takes', () => {
     expect(done.takes.map((t) => t.n)).toEqual([1])
     expect(done.failed).toEqual([])
     expect(await takes.make(file, 'inn', { retry: 9 })).toMatchObject({ ok: false })
+  })
+
+  it('reports an image whose takes all failed with no takes being made and its failures counted', async () => {
+    const { takes, file, settled } = setup(undefined, {
+      'images/prompts.json': {
+        images: { inn: { words: 'fail now', gameWas: 'a low inn' } },
+        style: {},
+      },
+    })
+    await takes.make(file, 'inn', { count: 2 })
+    await settled('inn')
+    expect(await takes.making(file)).toEqual({ inn: { takes: 0, left: 0, failed: 2 } })
   })
 
   it('stops the take being made and the ones waiting, and writes nothing for them', async () => {
@@ -508,9 +520,92 @@ describe('image models', () => {
     await s.takes.make(s.file, 'inn', { count: 1, model: 'z-image-turbo' })
     await new Promise((resolve) => setTimeout(resolve, 10))
     expect((await viewOf(s)).making[0]!.expected).toBe(60)
-    expect(await s.takes.making(s.file)).toEqual({ inn: { takes: 1, left: 60 } })
+    expect(await s.takes.making(s.file)).toEqual({ inn: { takes: 1, left: 60, failed: 0 } })
     release()
     await s.settled('inn')
+  })
+})
+
+describe('making for a whole act', () => {
+  const chosenInn = async (s: ReturnType<typeof setup>) => {
+    await s.takes.make(s.file, 'inn', { count: 1 })
+    await s.settled('inn')
+    expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
+  }
+
+  it('reports Setup’s model, each model’s state and whether images can be made', async () => {
+    const s = setup(undefined, {}, undefined, { here: { klein: false } })
+    expect(await s.takes.modelState(s.file)).toEqual({
+      ok: true,
+      main: 'klein',
+      ready: true,
+      states: {
+        klein: { download: 'absent', failed: false },
+        'z-image-turbo': { download: 'whole', failed: false },
+      },
+    })
+  })
+
+  it('makes four takes for every image with no chosen take, and none for the chosen', async () => {
+    const s = setup()
+    await chosenInn(s)
+    expect(await s.takes.makeAll(s.file, 'act1')).toEqual({ ok: true })
+    await s.settled('hall')
+    const hall = await s.takes.view(s.file, 'hall')
+    const inn = await s.takes.view(s.file, 'inn')
+    if (!hall || !('takes' in hall) || !inn || !('takes' in inn)) throw new Error('no view')
+    expect(hall.takes.map((t) => t.n)).toEqual([1, 2, 3, 4])
+    expect(inn.takes.map((t) => t.n)).toEqual([1])
+  })
+
+  it('makes the takes on the other model when Setup’s is not on this computer', async () => {
+    const s = setup(undefined, {}, undefined, { here: { klein: false } })
+    expect(await s.takes.makeAll(s.file, 'act1')).toEqual({ ok: true })
+    await s.settled('inn')
+    await s.settled('hall')
+    expect(s.requests).toHaveLength(8)
+    expect(new Set(s.requests.map((r) => r.model))).toEqual(new Set(['z-image-turbo']))
+  })
+
+  it('leaves out an image already making takes', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const s = setup(undefined, {}, gate)
+    await s.takes.make(s.file, 'inn', { count: 1 })
+    expect(await s.takes.makeAll(s.file, 'act1')).toEqual({ ok: true })
+    expect(await s.takes.making(s.file)).toMatchObject({
+      inn: { takes: 1 },
+      hall: { takes: 4 },
+    })
+    release()
+    await s.settled('hall')
+  })
+
+  it('makes nothing and says so when images cannot be made', async () => {
+    const s = setup(undefined, {}, undefined, { here: { klein: false, 'z-image-turbo': false } })
+    expect(await s.takes.makeAll(s.file, 'act1')).toMatchObject({ ok: false })
+    expect(await s.takes.making(s.file)).toEqual({})
+  })
+
+  it('knows no act the game does not list', async () => {
+    const s = setup()
+    expect(await s.takes.makeAll(s.file, 'nowhere')).toBeNull()
+    expect(await s.takes.stopAll(s.file, 'nowhere')).toBeNull()
+  })
+
+  it('stops every take of the act that is waiting or being made, and counts them', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const s = setup(undefined, {}, gate)
+    await s.takes.makeAll(s.file, 'act1')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(await s.takes.stopAll(s.file, 'act1')).toEqual({
+      ok: true,
+      stopped: 8,
+      byImage: { inn: 4, hall: 4 },
+    })
+    expect(await s.takes.making(s.file)).toEqual({})
+    release()
   })
 })
 

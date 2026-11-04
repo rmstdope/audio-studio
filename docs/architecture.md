@@ -1571,13 +1571,27 @@ grid (on the Comparing label when there is none yet), so the switched-off button
 (as-99s). The status of an image on its act's list says "making 2 takes · about 1 min" while takes
 are made. The model menu's screens are drawn in `docs/ui/as-yag.7-image-models.html`.
 
+**Make takes for the whole act (as-23x.3).** The "Images up to date" panel on an act's page has a
+button, "Make 4 takes each", beside the count. `planImagesMakeAll` (`src/core/imagesMakeAll.ts`)
+decides: every image with no chosen take (an out-of-date chosen image counts as chosen) that is not
+already making takes gets four, on Setup's model, or on the other one when Setup's is not whole or
+failed its last take (`defaultTakeModel`, as an image's own page does). The press always asks first,
+inside the panel, and writes nothing until Make. `POST /api/image-acts/:id/make-all` plans again on
+the server and queues the takes through `make` per image (one refusal stops those already queued);
+`POST /api/image-acts/:id/stop` stops every take of the act's images and answers how many, per image;
+`GET /api/images/model-state` gives Setup's model and each model's state. The running line is worked
+out from `GET /api/images/making`, which now also counts `failed` takes (an image with only failed
+takes reports `takes: 0`); the summary is remembered in the page's query cache, not on disk, so a
+reload forgets it. Mockup: `docs/ui/as-23x.3-make-all.html`.
+
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
 `PATCH /api/image-style` (`{ look }` or `{ keepOut }`) and `POST /api/image-style/seen`; for takes
 `GET` and `POST /api/images/:id/takes` (`{ count, model? }` 1 to 4, or `{ retry }`), `PUT /api/image-model`, `GET /api/images/:id/takes/:n`
 (the model's picture), `…/:n/game` (the game's version), `DELETE` it (drop), `POST …/takes/:n/seen`, `POST /api/images/:id/choose` (`{ n }`),
 `/unchoose`, `/accept`, `/stop`, `GET /api/images/:id/current`, `GET /api/images/making` and
-`GET`/`POST /api/images/bring-all`; every change from
+`GET`/`POST /api/images/bring-all`, `GET /api/images/model-state` and `POST /api/image-acts/:id/make-all` and
+`/stop`; every change from
 the studio's own page only.
 
 ---
@@ -2245,6 +2259,8 @@ Small, independently useful increments:
        takes can be made with the other.
     7. **Shared images** (as-94e, done: §8.7): an image the game lists in several acts is one image shown in each, with one act-style pick; lists that disagree are reported.
     8. **The rename** to Content Studio (as-yag.6), with §1 and the opening of this document, which still speak of a game's audio.
+    9. **Make takes for the whole act** (as-23x.3, done: §8.7): one press on an act's Images page makes four
+       takes for every image with no chosen take, after a question in the panel.
 16. **Sound effects** (epic as-5wc), in small pull requests:
     1. **Spike** (as-5wc.1, done: §13, decision 9): Stable Audio 3 Small SFX against Stable Audio Open 1.0,
        their time, memory, licence and how a take ends, on the M5 Pro.
