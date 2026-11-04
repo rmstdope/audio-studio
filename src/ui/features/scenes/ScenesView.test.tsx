@@ -1261,6 +1261,9 @@ describe('playing a scene', () => {
     expect(cells().some((c) => c.textContent!.includes('Next in'))).toBe(true)
     press(page, 'Stop the scene')
     await flush()
+    expect(
+      cells().every((c) => c.textContent === '' && c.classList.contains('scene-now-idle')),
+    ).toBe(true)
   })
 
   it('leaves State out for a scene with no states, and says when there is nothing to play', () => {
