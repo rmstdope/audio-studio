@@ -283,7 +283,7 @@ describe('an act with its scenes', () => {
       '',
     ])
     const rows = [...page.querySelectorAll('tbody tr')].map((tr) =>
-      [...tr.querySelectorAll('td')].slice(1, 5).map((td) => text(td)),
+      [...tr.querySelectorAll('td:not(.scene-now-idle)')].slice(1, 5).map((td) => text(td)),
     )
     expect(rows).toEqual([
       ['shop-bell', 'Once s after entering', 'Always', '60%'],
@@ -1243,6 +1243,27 @@ describe('playing a scene', () => {
       [...bar(page).querySelectorAll('.btn')].map((b) => b.getAttribute('aria-disabled')),
     ).toEqual(['true'])
     expect([...page.querySelectorAll('th')].map((th) => th.textContent)).not.toContain('Now')
+  })
+
+  it('keeps a blank Now cell on every effect row while stopped, whole in its title once playing (as-h01)', async () => {
+    const page = render(open)
+    const cells = () => [...page.querySelectorAll<HTMLElement>('.scene-effects td.scene-now')]
+    const rows = page.querySelectorAll('.scene-effects tbody tr').length
+    expect(cells().length).toBe(rows)
+    expect(
+      cells().every((c) => c.textContent === '' && c.classList.contains('scene-now-idle')),
+    ).toBe(true)
+    press(page, 'Start the scene')
+    await flush()
+    expect(cells().length).toBe(rows)
+    expect(cells().some((c) => c.classList.contains('scene-now-idle'))).toBe(false)
+    for (const c of cells()) expect(c.getAttribute('title') ?? '').toBe(c.textContent ?? '')
+    expect(cells().some((c) => c.textContent!.includes('Next in'))).toBe(true)
+    press(page, 'Stop the scene')
+    await flush()
+    expect(
+      cells().every((c) => c.textContent === '' && c.classList.contains('scene-now-idle')),
+    ).toBe(true)
   })
 
   it('leaves State out for a scene with no states, and says when there is nothing to play', () => {

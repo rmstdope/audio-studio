@@ -256,14 +256,17 @@ function EffectRowView({
   const dim = now?.kind === 'otherState' || !heard || words === 'Not played'
   return (
     <tr className={sounding ? 'scene-sounding' : dim && showNow ? 'scene-dim' : undefined}>
-      {showNow && (
-        <td className="scene-now">
-          {sounding && <Bars />}
+      <td
+        className={showNow ? 'scene-now' : 'scene-now scene-now-idle'}
+        title={showNow && words ? words : undefined}
+      >
+        {showNow && sounding && <Bars />}
+        {showNow && (
           <span className={words.startsWith("Couldn't") ? 'scene-now-bad' : undefined}>
             {words}
           </span>
-        </td>
-      )}
+        )}
+      </td>
       <td className="scene-play">
         {choice?.playable && (
           <PlayButton
