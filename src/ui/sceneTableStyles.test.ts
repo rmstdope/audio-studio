@@ -83,18 +83,30 @@ describe('the Scenes sound effects table', () => {
     const at = css.indexOf('@container scene-effects (max-width: 700px) {')
     const cards = css.slice(at, css.indexOf('\n}\n', at))
     expect(rule('.scene-effects .table td', cards)).toMatch(/padding:\s*0/)
-    expect(rule('.scene-effects .table td.scene-effect', cards)).toMatch(/min-width:\s*0/)
     const name = rule('.scene-effects .table .scene-effect-name', cards)
-    expect(rule('.scene-effects .table .scene-effect-cell', cards)).toMatch(/display:\s*flex/)
+    expect(name).toMatch(/grid-column:\s*2;/)
     expect(name).toMatch(/min-width:\s*0/)
-    expect(name).toMatch(/flex:\s*0 1 auto/)
     expect(name).toMatch(/max-width:\s*none/)
-    expect(rule('.scene-effects .table .scene-effect-cell .chip', cards)).toMatch(
-      /margin-left:\s*8px/,
-    )
     expect(rule('.scene-effects .table .scene-effect-name:has(+ .chip)', cards)).toMatch(
       /margin-right:\s*0/,
     )
+  })
+
+  it('puts the chip on its own line under the card, so in a 252 px panel (800 px of window) the name keeps its column and the chip never runs over M/S', () => {
+    const at = css.indexOf('@container scene-effects (max-width: 700px) {')
+    const cards = css.slice(at, css.indexOf('\n}\n', at))
+    const cell = rule(
+      '.scene-effects .table td.scene-effect,\n  .scene-effects .table .scene-effect-cell',
+      cards,
+    )
+    expect(cell).toMatch(/display:\s*contents/)
+    const chip = rule('.scene-effects .table .scene-effect-cell .chip', cards)
+    expect(chip).toMatch(/grid-column:\s*2 \/ -1/)
+    expect(chip).toMatch(/justify-self:\s*start/)
+    expect(chip).toMatch(/grid-row:\s*2;/)
+    expect(rule('.scene-effects .table td.scene-now', cards)).toMatch(/grid-row:\s*3;/)
+    expect(chip).not.toMatch(/margin-left/)
+    expect(cards).not.toMatch(/\.scene-effect-cell\s*\{[^}]*display:\s*flex/)
   })
 
   it('wraps a long state or trigger name inside its menu, at a hyphen first and between letters last', () => {
