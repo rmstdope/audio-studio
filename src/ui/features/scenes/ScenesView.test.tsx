@@ -1009,6 +1009,29 @@ describe('adding a sound effect', () => {
     expect(page.querySelector('.scene-add-list')).toBeNull()
     expect(document.activeElement).toBe(add(page))
   })
+
+  it('reopens with an empty find box and every effect after a click outside closed it', () => {
+    const page = render(open)
+    act(() => add(page).click())
+    type(find(page), 'purr')
+    act(() => {
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    })
+    expect(page.querySelector('.scene-add-list')).toBeNull()
+    act(() => add(page).click())
+    expect(find(page).value).toBe('')
+    expect(page.querySelectorAll('.scene-add-list li').length).toBe(4)
+  })
+
+  it('reopens with an empty find box after its button closed it', () => {
+    const page = render(open)
+    act(() => add(page).click())
+    type(find(page), 'purr')
+    act(() => add(page).click())
+    expect(page.querySelector('.scene-add-list')).toBeNull()
+    act(() => add(page).click())
+    expect(find(page).value).toBe('')
+  })
 })
 
 describe('leaving a scene with unsaved changes', () => {

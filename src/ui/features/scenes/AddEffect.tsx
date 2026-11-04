@@ -32,7 +32,10 @@ export function AddEffect({
   useEffect(() => {
     if (!open) return
     const outside = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false)
+      if (root.current?.contains(event.target as Node)) return
+      // Closed without a pick: the next opening starts from every effect again.
+      setOpen(false)
+      setQuery('')
     }
     document.addEventListener('mousedown', outside)
     return () => document.removeEventListener('mousedown', outside)
@@ -108,7 +111,7 @@ export function AddEffect({
         data-add
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen(!open)}
+        onClick={() => (open ? close() : setOpen(true))}
       >
         + Add a sound effect
       </button>
