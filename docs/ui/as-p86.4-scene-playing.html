@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Playing a scene — every state and word</title>
+<style>      :root {
+        --bg: #06070c;
+        --glass: rgb(255 255 255/3.5%);
+        --edge: rgb(255 255 255/8%);
+        --line: rgb(255 255 255/7%);
+        --line-strong: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+        --att-ink: #ffb38f;
+        --att-bg: rgb(255 122 61/10%);
+        --att-line: rgb(255 122 61/25%);
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1180px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin: 26px auto 8px;
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1180px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        min-height: 460px;
+        background: var(--bg);
+      }
+      .frame.narrow {
+        max-width: 420px;
+        flex-direction: column;
+      }
+      .side {
+        width: 190px;
+        flex: none;
+        padding: 14px 10px;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: rgb(10 11 18/55%);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .logo {
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        background: var(--grad);
+      }
+      .lbl {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+      .ni {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 8px;
+        border-radius: 7px;
+        color: var(--soft);
+        font-size: 12.5px;
+      }
+      .ni.sub {
+        padding-left: 18px;
+      }
+      .ni.on {
+        background: var(--glass);
+        border: 1px solid var(--edge);
+      }
+      .n {
+        font:
+          11px ui-monospace,
+          monospace;
+        color: var(--faint);
+      }
+      .main {
+        flex: 1;
+        padding: 18px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-width: 0;
+      }
+      .crumbs {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      h1 {
+        font-size: 20px;
+        margin: 2px 0;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .faint {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .grow {
+        flex: 1;
+        min-width: 0;
+      }
+      .btn {
+        border: 1px solid var(--line-strong);
+        background: var(--glass);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 11px;
+        font: inherit;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .btn.pri {
+        background: var(--grad);
+        border: 0;
+        color: #fff;
+        font-weight: 600;
+      }
+      .btn.sm {
+        padding: 3px 8px;
+        font-size: 12px;
+      }
+      .panel {
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+      .panel.flush {
+        padding: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        font-weight: 500;
+        color: var(--faint);
+        font-size: 11.5px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: middle;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .sel {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        padding: 3px 8px;
+        font-size: 12.5px;
+        background: rgb(255 255 255/2%);
+      }
+      .sel:after {
+        content: '▾';
+        color: var(--faint);
+        font-size: 10px;
+      }
+      .num {
+        display: inline-block;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 2px 6px;
+        min-width: 34px;
+        text-align: center;
+        font:
+          12px ui-monospace,
+          monospace;
+      }
+      .slider {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .track {
+        width: 110px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--line-strong);
+        position: relative;
+      }
+      .track i {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        border-radius: 2px;
+        background: var(--accent);
+      }
+      .track b {
+        position: absolute;
+        top: -5px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #fff;
+        margin-left: -7px;
+      }
+      .chip {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 11.5px;
+        border: 1px solid var(--line-strong);
+        color: var(--soft);
+      }
+      .chip.att {
+        background: var(--att-bg);
+        border-color: var(--att-line);
+        color: var(--att-ink);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+        border-color: transparent;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .seg span {
+        padding: 4px 10px;
+        font-size: 12.5px;
+        border-right: 1px solid var(--line-strong);
+      }
+      .seg span:last-child {
+        border-right: 0;
+      }
+      .seg span.on {
+        background: var(--att-bg);
+        color: var(--att-ink);
+      }
+      .list {
+        width: 220px;
+        flex: none;
+        border-right: 1px solid var(--line);
+        padding: 10px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .li {
+        padding: 7px 9px;
+        border-radius: 8px;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      .li.on {
+        background: var(--glass);
+        border: 1px solid var(--edge);
+      }
+      .li .faint {
+        font-size: 11.5px;
+      }
+      .bar {
+        border-top: 1px solid var(--line);
+        background: rgb(10 11 18/80%);
+        padding: 10px 14px;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .play {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--grad);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 13px;
+      }
+      .x {
+        color: var(--faint);
+      }
+      .tag {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .vs {
+        max-width: 1180px;
+        margin: 0 auto 10px;
+        padding: 8px 12px;
+        border-left: 3px solid var(--accent);
+        color: var(--soft);
+        background: var(--glass);
+        border-radius: 6px;
+      }
+
+      td{white-space:nowrap}
+      .track{width:64px!important}
+      th,td{padding-left:7px!important;padding-right:7px!important}
+      .main{min-width:0}
+      .frame,.intro,.note{max-width:1300px!important}
+      .now{font-size:12px;white-space:nowrap}
+      .now.on{color:var(--ok)}
+      .now.wait{color:var(--soft)}
+      .now.off{color:var(--faint)}
+      tr.sounding td{background:rgb(61 220 151/6%)}
+      tr.sounding td:first-child{box-shadow:inset 3px 0 0 var(--ok)}
+      tr.dim td{opacity:.42}
+      .eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;vertical-align:middle}
+      .eq i{width:3px;background:var(--ok);border-radius:1px;animation:eq 0.9s infinite ease-in-out}
+      .eq i:nth-child(2){animation-delay:.2s}.eq i:nth-child(3){animation-delay:.4s}
+      @keyframes eq{0%,100%{height:3px}50%{height:12px}}
+      .ring{width:14px;height:14px;border-radius:50%;display:inline-block;vertical-align:middle;
+        background:conic-gradient(var(--soft) 0 40%, rgb(255 255 255/12%) 40% 100%)}
+      .tb{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;
+        border:1px solid var(--line-strong);font:600 11px ui-monospace,monospace;color:var(--muted)}
+      .tb.s.on{background:var(--warn);color:#1a1404;border-color:var(--warn)}
+      .tb.m.on{background:var(--danger-ink);color:#2a0d14;border-color:var(--danger-ink)}
+      .stop{font-size:12px}
+      .badge{font-size:11px;color:var(--warn);border:1px solid rgb(255 194 75/40%);border-radius:999px;padding:1px 8px}
+
+      .red{color:var(--danger-ink)} .mk{font-size:11px;color:var(--danger-ink);margin-left:6px}
+      .mk.silent{color:var(--warn)}
+</style></head><body><div class="intro"><h1>Playing a scene — every state and word</h1><p>The play bar agreed in as-p86.1, now playing: the scene as the game plays it, a <i>Now</i> column saying what each row is doing, Mute and Solo for listening. Everything else on the page is as agreed in as-p86.1 and as-p86.3.</p></div><div class="note"><b>1. Stopped.</b> No Now column. State can be set and is the state the scene starts in (here cat-home); Triggers are dimmed until it plays. M and S are on the music and every row and can be set before ▶. Nothing to play (no music, no effects): ▶ dimmed and “Nothing to play in this scene”, as agreed.</div><div class="frame"><aside class="side"><div class="brand"><span class="logo"></span>Content Studio</div><div>
+<div class="lbl" style="margin:0 0 4px 4px">Workspace</div><div class="ni">Narration</div><div class="ni">Music</div>
+<div class="ni">Images</div><div class="ni">Sound effects</div><div class="ni on">Scenes</div>
+<div class="ni sub" style="background:var(--glass);border:1px solid var(--edge)">Act 1 <span class="n">16</span></div>
+<div class="ni sub">Act 2 <span class="n">14</span></div><div class="ni sub">Act 3 <span class="n">12</span></div></div></aside>
+<div class="list"><div class="lbl" style="margin:2px 6px 6px">16 scenes</div>
+<div class="li"><span>Blacksmith’s forge</span><span class="faint">2 effects</span></div>
+<div class="li on"><span>General store</span><span class="faint">4 effects</span></div>
+<div class="li"><span>Village square</span><span class="faint">2 effects</span></div>
+<div class="li"><span>Mira’s hut</span><span class="faint">1 effect</span></div></div><div class="main" style="padding:0">
+<div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+<div class="row"><div class="grow"><div class="crumbs">Scenes · Act 1</div><h1>General store</h1>
+<div class="muted">States: plain, cat-home · Triggers: door-opens</div></div>
+<button class="btn" disabled style="opacity:.5">Discard</button><button class="btn pri" style="opacity:.5">Save</button><button class="btn">Refresh from the game</button></div>
+<section class="panel"><h2>Music</h2><div class="row" style="margin-top:8px;gap:18px"><span>▶</span><span class="sel">General Store</span><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></div></section>
+<section class="panel flush"><div style="padding:10px 12px"><h2>Sound effects</h2></div>
+<table><tr><th style="width:30px"></th><th>Effect</th><th>How it plays</th><th>In which state</th><th>Level</th><th></th><th></th></tr><tr><td>▶</td><td>shop-bell</td><td><span class="sel">Once</span> <span class="num">1.5</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr><td>▶</td><td>glass-clink</td><td><span class="sel">Now and then</span> every <span class="num">15</span>–<span class="num">30</span> s</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:25%"></i><b style="left:25%"></b></span><span class="n">50%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr><td>▶</td><td>cat-purr</td><td><span class="sel">Round and round</span></td><td><span class="sel">cat-home</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr><td>▶</td><td>shop-bell</td><td><span class="sel">On a trigger</span> <span class="sel">door-opens</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:40%"></i><b style="left:40%"></b></span><span class="n">80%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr></table>
+<div style="padding:8px 12px"><button class="btn sm">+ Add a sound effect</button></div></section></div>
+<div class="bar"><span class="play">▶</span><span class="faint">0:00</span><span class="lbl">State</span>
+<span class="seg"><span class="">plain</span><span class="on">cat-home</span></span>
+<span class="lbl">Triggers</span><button class="btn sm" style="opacity:.45">door-opens ⚡</button><span class="grow"></span></div></div></div><div class="note"><b>2. Loading.</b> ▶ pressed while clips load: ■ shows and can cancel, the time reads “Loading…”, and the scene starts at 0:00 once every clip is ready.</div><div class="frame"><aside class="side"><div class="brand"><span class="logo"></span>Content Studio</div><div>
+<div class="lbl" style="margin:0 0 4px 4px">Workspace</div><div class="ni">Narration</div><div class="ni">Music</div>
+<div class="ni">Images</div><div class="ni">Sound effects</div><div class="ni on">Scenes</div>
+<div class="ni sub" style="background:var(--glass);border:1px solid var(--edge)">Act 1 <span class="n">16</span></div>
+<div class="ni sub">Act 2 <span class="n">14</span></div><div class="ni sub">Act 3 <span class="n">12</span></div></div></aside>
+<div class="list"><div class="lbl" style="margin:2px 6px 6px">16 scenes</div>
+<div class="li"><span>Blacksmith’s forge</span><span class="faint">2 effects</span></div>
+<div class="li on"><span>General store</span><span class="faint">4 effects</span></div>
+<div class="li"><span>Village square</span><span class="faint">2 effects</span></div>
+<div class="li"><span>Mira’s hut</span><span class="faint">1 effect</span></div></div><div class="main" style="padding:0">
+<div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+<div class="row"><div class="grow"><div class="crumbs">Scenes · Act 1</div><h1>General store</h1>
+<div class="muted">States: plain, cat-home · Triggers: door-opens</div></div>
+<button class="btn" disabled style="opacity:.5">Discard</button><button class="btn pri" style="opacity:.5">Save</button><button class="btn">Refresh from the game</button></div>
+<section class="panel"><h2>Music</h2><div class="row" style="margin-top:8px;gap:18px"><span>▶</span><span class="sel">General Store</span><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></div></section>
+<section class="panel flush"><div style="padding:10px 12px"><h2>Sound effects</h2></div>
+<table><tr><th style="width:30px"></th><th>Effect</th><th>How it plays</th><th>In which state</th><th>Level</th><th></th><th></th></tr><tr><td>▶</td><td>shop-bell</td><td><span class="sel">Once</span> <span class="num">1.5</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr><td>▶</td><td>glass-clink</td><td><span class="sel">Now and then</span> every <span class="num">15</span>–<span class="num">30</span> s</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:25%"></i><b style="left:25%"></b></span><span class="n">50%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr><td>▶</td><td>cat-purr</td><td><span class="sel">Round and round</span></td><td><span class="sel">cat-home</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr><td>▶</td><td>shop-bell</td><td><span class="sel">On a trigger</span> <span class="sel">door-opens</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:40%"></i><b style="left:40%"></b></span><span class="n">80%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr></table>
+<div style="padding:8px 12px"><button class="btn sm">+ Add a sound effect</button></div></section></div>
+<div class="bar"><span class="play">■</span><span class="faint">Loading…</span><span class="lbl">State</span>
+<span class="seg"><span class="on">plain</span><span class="">cat-home</span></span>
+<span class="lbl">Triggers</span><button class="btn sm" style="opacity:.45">door-opens ⚡</button><span class="grow"></span></div></div></div>
+
+<div class="note"><b>3. Playing, in plain, 14 s in.</b> A <i>Now</i> column says in words what each row is doing and what comes next: sounding rows are tinted green with “Playing”; a Now and then row counts down to its next start; a Once row says when it played (or “In 1 s” before); a trigger row says what it waits for; a row for another state is dimmed with “Not in plain”. The music says Playing too.</div><div class="frame"><aside class="side"><div class="brand"><span class="logo"></span>Content Studio</div><div>
+<div class="lbl" style="margin:0 0 4px 4px">Workspace</div><div class="ni">Narration</div><div class="ni">Music</div>
+<div class="ni">Images</div><div class="ni">Sound effects</div><div class="ni on">Scenes</div>
+<div class="ni sub" style="background:var(--glass);border:1px solid var(--edge)">Act 1 <span class="n">16</span></div>
+<div class="ni sub">Act 2 <span class="n">14</span></div><div class="ni sub">Act 3 <span class="n">12</span></div></div></aside>
+<div class="list"><div class="lbl" style="margin:2px 6px 6px">16 scenes</div>
+<div class="li"><span>Blacksmith’s forge</span><span class="faint">2 effects</span></div>
+<div class="li on"><span>General store</span><span class="faint">4 effects</span></div>
+<div class="li"><span>Village square</span><span class="faint">2 effects</span></div>
+<div class="li"><span>Mira’s hut</span><span class="faint">1 effect</span></div></div><div class="main" style="padding:0">
+<div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+<div class="row"><div class="grow"><div class="crumbs">Scenes · Act 1</div><h1>General store</h1>
+<div class="muted">States: plain, cat-home · Triggers: door-opens</div></div>
+<button class="btn" disabled style="opacity:.5">Discard</button><button class="btn pri" style="opacity:.5">Save</button><button class="btn">Refresh from the game</button></div>
+<section class="panel"><h2>Music</h2><div class="row" style="margin-top:8px;gap:18px"><span>▶</span><span class="sel">General Store</span><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span><span class="now on"><span class="eq"><i></i><i></i><i></i></span> Playing</span> <span class="tb m">M</span> <span class="tb s">S</span></div></section>
+<section class="panel flush"><div style="padding:10px 12px"><h2>Sound effects</h2></div>
+<table><tr><th style="width:118px">Now</th><th style="width:30px"></th><th>Effect</th><th>How it plays</th><th>In which state</th><th>Level</th><th></th><th></th></tr><tr class=""><td class="now off">Played at 0:02</td><td>▶</td><td>shop-bell</td><td><span class="sel">Once</span> <span class="num">1.5</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x" title="Remove">✕</td></tr><tr class=""><td class="now wait">Next in 9 s</td><td>▶</td><td>glass-clink</td><td><span class="sel">Now and then</span> every <span class="num">15</span>–<span class="num">30</span> s</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:25%"></i><b style="left:25%"></b></span><span class="n">50%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x" title="Remove">✕</td></tr><tr class="dim"><td class="now off">Not in plain</td><td>▶</td><td>cat-purr</td><td><span class="sel">Round and round</span></td><td><span class="sel">cat-home</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x" title="Remove">✕</td></tr><tr class=""><td class="now wait">Waits for door-opens</td><td>▶</td><td>shop-bell</td><td><span class="sel">On a trigger</span> <span class="sel">door-opens</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:40%"></i><b style="left:40%"></b></span><span class="n">80%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x" title="Remove">✕</td></tr></table>
+<div style="padding:8px 12px"><button class="btn sm">+ Add a sound effect</button></div></section></div>
+<div class="bar"><span class="play">■</span><span class="faint">0:14</span><span class="lbl">State</span>
+<span class="seg"><span class="on">plain</span><span class="">cat-home</span></span>
+<span class="lbl">Triggers</span><button class="btn sm">door-opens ⚡</button><span class="grow"></span></div></div></div><div class="note"><b>4. A moment later: switched to cat-home, door-opens fired.</b> cat-purr fades in and plays; the trigger row plays once, then goes back to “Waits for door-opens”; glass-clink is in the middle of a play. While stopped, the Now column is empty and hidden.</div><div class="frame"><aside class="side"><div class="brand"><span class="logo"></span>Content Studio</div><div>
+<div class="lbl" style="margin:0 0 4px 4px">Workspace</div><div class="ni">Narration</div><div class="ni">Music</div>
+<div class="ni">Images</div><div class="ni">Sound effects</div><div class="ni on">Scenes</div>
+<div class="ni sub" style="background:var(--glass);border:1px solid var(--edge)">Act 1 <span class="n">16</span></div>
+<div class="ni sub">Act 2 <span class="n">14</span></div><div class="ni sub">Act 3 <span class="n">12</span></div></div></aside>
+<div class="list"><div class="lbl" style="margin:2px 6px 6px">16 scenes</div>
+<div class="li"><span>Blacksmith’s forge</span><span class="faint">2 effects</span></div>
+<div class="li on"><span>General store</span><span class="faint">4 effects</span></div>
+<div class="li"><span>Village square</span><span class="faint">2 effects</span></div>
+<div class="li"><span>Mira’s hut</span><span class="faint">1 effect</span></div></div><div class="main" style="padding:0">
+<div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+<div class="row"><div class="grow"><div class="crumbs">Scenes · Act 1</div><h1>General store</h1>
+<div class="muted">States: plain, cat-home · Triggers: door-opens</div></div>
+<button class="btn" disabled style="opacity:.5">Discard</button><button class="btn pri" style="opacity:.5">Save</button><button class="btn">Refresh from the game</button></div>
+<section class="panel"><h2>Music</h2><div class="row" style="margin-top:8px;gap:18px"><span>▶</span><span class="sel">General Store</span><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span><span class="now on"><span class="eq"><i></i><i></i><i></i></span> Playing</span> <span class="tb m">M</span> <span class="tb s">S</span></div></section>
+<section class="panel flush"><div style="padding:10px 12px"><h2>Sound effects</h2></div>
+<table><tr><th style="width:118px">Now</th><th style="width:30px"></th><th>Effect</th><th>How it plays</th><th>In which state</th><th>Level</th><th></th><th></th></tr><tr class=""><td class="now off">Played at 0:02</td><td>▶</td><td>shop-bell</td><td><span class="sel">Once</span> <span class="num">1.5</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x" title="Remove">✕</td></tr><tr class="sounding"><td class="now on"><span class="eq"><i></i><i></i><i></i></span> Playing</td><td>▶</td><td>glass-clink</td><td><span class="sel">Now and then</span> every <span class="num">15</span>–<span class="num">30</span> s</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:25%"></i><b style="left:25%"></b></span><span class="n">50%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x" title="Remove">✕</td></tr><tr class="sounding"><td class="now on"><span class="eq"><i></i><i></i><i></i></span> Playing</td><td>▶</td><td>cat-purr</td><td><span class="sel">Round and round</span></td><td><span class="sel">cat-home</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x" title="Remove">✕</td></tr><tr class="sounding"><td class="now on"><span class="eq"><i></i><i></i><i></i></span> Playing</td><td>▶</td><td>shop-bell</td><td><span class="sel">On a trigger</span> <span class="sel">door-opens</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:40%"></i><b style="left:40%"></b></span><span class="n">80%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x" title="Remove">✕</td></tr></table>
+<div style="padding:8px 12px"><button class="btn sm">+ Add a sound effect</button></div></section></div>
+<div class="bar"><span class="play">■</span><span class="faint">0:21</span><span class="lbl">State</span>
+<span class="seg"><span class="">plain</span><span class="on">cat-home</span></span>
+<span class="lbl">Triggers</span><button class="btn sm">door-opens ⚡</button><span class="grow"></span></div></div></div>
+
+
+<div class="note"><b>Every word the Now column can show</b>, one per row (a made-up scene, 1 s in, in plain). Top to bottom: sounding; a Once still to come; a Now and then waiting; a Once that has sounded; a trigger row; a row for another state; a silent row (no take chosen); a row gone from the game; a clip that couldn’t be loaded (the rest of the scene plays on). While stopped, the Now column is not shown.</div><div class="frame"><aside class="side"><div class="brand"><span class="logo"></span>Content Studio</div><div>
+<div class="lbl" style="margin:0 0 4px 4px">Workspace</div><div class="ni">Narration</div><div class="ni">Music</div>
+<div class="ni">Images</div><div class="ni">Sound effects</div><div class="ni on">Scenes</div>
+<div class="ni sub" style="background:var(--glass);border:1px solid var(--edge)">Act 1 <span class="n">16</span></div>
+<div class="ni sub">Act 2 <span class="n">14</span></div><div class="ni sub">Act 3 <span class="n">12</span></div></div></aside>
+<div class="list"><div class="lbl" style="margin:2px 6px 6px">16 scenes</div>
+<div class="li"><span>Blacksmith’s forge</span><span class="faint">2 effects</span></div>
+<div class="li on"><span>General store</span><span class="faint">4 effects</span></div>
+<div class="li"><span>Village square</span><span class="faint">2 effects</span></div>
+<div class="li"><span>Mira’s hut</span><span class="faint">1 effect</span></div></div><div class="main" style="padding:0">
+<div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+<div class="row"><div class="grow"><div class="crumbs">Scenes · Act 1</div><h1>General store</h1>
+<div class="muted">States: plain, cat-home · Triggers: door-opens</div></div>
+<button class="btn" disabled style="opacity:.5">Discard</button><button class="btn pri" style="opacity:.5">Save</button><button class="btn">Refresh from the game</button></div>
+<section class="panel"><h2>Music</h2><div class="row" style="margin-top:8px;gap:18px"><span>▶</span><span class="sel">General Store</span><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span><span class="now on"><span class="eq"><i></i><i></i><i></i></span> Playing</span> <span class="tb m">M</span> <span class="tb s">S</span></div></section>
+<section class="panel flush"><div style="padding:10px 12px"><h2>Sound effects</h2></div>
+<table><tr><th style="width:128px">Now</th><th style="width:30px"></th><th>Effect</th><th>How it plays</th><th>In which state</th><th>Level</th><th></th><th></th></tr><tr class="sounding"><td class="now on" style="width:128px"><span class="eq"><i></i><i></i><i></i></span> Playing</td><td>▶</td><td>shop-bell</td><td><span class="sel">Once</span> <span class="num">1.5</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class=""><td class="now wait" style="width:128px">In 2 s</td><td>▶</td><td>door-knock</td><td><span class="sel">Once</span> <span class="num">3</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:40%"></i><b style="left:40%"></b></span><span class="n">80%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class=""><td class="now wait" style="width:128px">Next in 9 s</td><td>▶</td><td>glass-clink</td><td><span class="sel">Now and then</span> every <span class="num">15</span>–<span class="num">30</span> s</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:25%"></i><b style="left:25%"></b></span><span class="n">50%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class=""><td class="now off" style="width:128px">Played at 0:02</td><td>▶</td><td>shop-bell</td><td><span class="sel">Once</span> <span class="num">1.5</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class=""><td class="now wait" style="width:128px">Waits for door-opens</td><td>▶</td><td>shop-bell</td><td><span class="sel">On a trigger</span> <span class="sel">door-opens</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:40%"></i><b style="left:40%"></b></span><span class="n">80%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class="dim"><td class="now off" style="width:128px">Not in plain</td><td>▶</td><td>cat-purr</td><td><span class="sel">Round and round</span></td><td><span class="sel">cat-home</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class=""><td class="now off" style="width:128px">Silent</td><td></td><td>mouse-squeak<a class="mk silent">no take chosen</a></td><td><span class="sel">Now and then</span> every <span class="num">15</span>–<span class="num">30</span> s</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class=""><td class="now off" style="width:128px">Not played</td><td></td><td>old-clock<span class="mk">gone from the game</span></td><td><span class="sel">Round and round</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class=""><td class="now red" style="width:128px">Couldn’t load the clip</td><td>▶</td><td>wind-howl</td><td><span class="sel">Round and round</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr></table>
+<div style="padding:8px 12px"><button class="btn sm">+ Add a sound effect</button></div></section></div>
+<div class="bar"><span class="play">■</span><span class="faint">0:01</span><span class="lbl">State</span>
+<span class="seg"><span class="on">plain</span><span class="">cat-home</span></span>
+<span class="lbl">Triggers</span><button class="btn sm">door-opens ⚡</button><span class="grow"></span></div></div></div>
+
+
+<div class="note"><b>glass-clink muted.</b> The row dims but its Now keeps going, with “, muted” added (“Playing, muted”, “Next in 9 s, muted”), so you still see when it would sound. A row silenced by someone else’s solo says “, not soloed”.</div><div class="frame"><aside class="side"><div class="brand"><span class="logo"></span>Content Studio</div><div>
+<div class="lbl" style="margin:0 0 4px 4px">Workspace</div><div class="ni">Narration</div><div class="ni">Music</div>
+<div class="ni">Images</div><div class="ni">Sound effects</div><div class="ni on">Scenes</div>
+<div class="ni sub" style="background:var(--glass);border:1px solid var(--edge)">Act 1 <span class="n">16</span></div>
+<div class="ni sub">Act 2 <span class="n">14</span></div><div class="ni sub">Act 3 <span class="n">12</span></div></div></aside>
+<div class="list"><div class="lbl" style="margin:2px 6px 6px">16 scenes</div>
+<div class="li"><span>Blacksmith’s forge</span><span class="faint">2 effects</span></div>
+<div class="li on"><span>General store</span><span class="faint">4 effects</span></div>
+<div class="li"><span>Village square</span><span class="faint">2 effects</span></div>
+<div class="li"><span>Mira’s hut</span><span class="faint">1 effect</span></div></div><div class="main" style="padding:0">
+<div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+<div class="row"><div class="grow"><div class="crumbs">Scenes · Act 1</div><h1>General store</h1>
+<div class="muted">States: plain, cat-home · Triggers: door-opens</div></div>
+<button class="btn" disabled style="opacity:.5">Discard</button><button class="btn pri" style="opacity:.5">Save</button><button class="btn">Refresh from the game</button></div>
+<section class="panel"><h2>Music</h2><div class="row" style="margin-top:8px;gap:18px"><span>▶</span><span class="sel">General Store</span><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span><span class="now on"><span class="eq"><i></i><i></i><i></i></span> Playing</span> <span class="tb m">M</span> <span class="tb s">S</span></div></section>
+<section class="panel flush"><div style="padding:10px 12px"><h2>Sound effects</h2></div>
+<table><tr><th style="width:128px">Now</th><th style="width:30px"></th><th>Effect</th><th>How it plays</th><th>In which state</th><th>Level</th><th></th><th></th></tr><tr class=""><td class="now on" style="width:128px"><span class="eq"><i></i><i></i><i></i></span> Playing</td><td>▶</td><td>shop-bell</td><td><span class="sel">Once</span> <span class="num">1.5</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class="dim"><td class="now off" style="width:128px"><span class="eq" style="filter:grayscale(1)"><i></i><i></i><i></i></span> Playing, muted</td><td>▶</td><td>glass-clink</td><td><span class="sel">Now and then</span> every <span class="num">15</span>–<span class="num">30</span> s</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:25%"></i><b style="left:25%"></b></span><span class="n">50%</span></span></td><td><span class="tb m on">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class="sounding"><td class="now on" style="width:128px"><span class="eq"><i></i><i></i><i></i></span> Playing</td><td>▶</td><td>cat-purr</td><td><span class="sel">Round and round</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr><tr class=""><td class="now wait" style="width:128px">Waits for door-opens</td><td>▶</td><td>shop-bell</td><td><span class="sel">On a trigger</span> <span class="sel">door-opens</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:40%"></i><b style="left:40%"></b></span><span class="n">80%</span></span></td><td><span class="tb m">M</span> <span class="tb s">S</span></td><td class="x">✕</td></tr></table>
+<div style="padding:8px 12px"><button class="btn sm">+ Add a sound effect</button></div></section></div>
+<div class="bar"><span class="play">■</span><span class="faint">0:01</span><span class="lbl">State</span>
+<span class="seg"><span class="on">plain</span><span class="">cat-home</span></span>
+<span class="lbl">Triggers</span><button class="btn sm">door-opens ⚡</button><span class="grow"></span><span class="badge">Muted: 1</span> <button class="btn sm">Clear</button></div></div></div>
+
+
+<div class="note"><b>Mute and Solo, as in a mixing desk.</b> <b>M</b> silences a row; <b>S</b> hears only the soloed rows (solo wins over mute). Here glass-clink is muted to hear the scene without it. Two buttons per row: more to read, but “everything but this one” is one press instead of soloing all the others.</div><div class="frame"><aside class="side"><div class="brand"><span class="logo"></span>Content Studio</div><div>
+<div class="lbl" style="margin:0 0 4px 4px">Workspace</div><div class="ni">Narration</div><div class="ni">Music</div>
+<div class="ni">Images</div><div class="ni">Sound effects</div><div class="ni on">Scenes</div>
+<div class="ni sub" style="background:var(--glass);border:1px solid var(--edge)">Act 1 <span class="n">16</span></div>
+<div class="ni sub">Act 2 <span class="n">14</span></div><div class="ni sub">Act 3 <span class="n">12</span></div></div></aside>
+<div class="list"><div class="lbl" style="margin:2px 6px 6px">16 scenes</div>
+<div class="li"><span>Blacksmith’s forge</span><span class="faint">2 effects</span></div>
+<div class="li on"><span>General store</span><span class="faint">4 effects</span></div>
+<div class="li"><span>Village square</span><span class="faint">2 effects</span></div>
+<div class="li"><span>Mira’s hut</span><span class="faint">1 effect</span></div></div><div class="main" style="padding:0">
+<div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;flex:1">
+<div class="row"><div class="grow"><div class="crumbs">Scenes · Act 1</div><h1>General store</h1>
+<div class="muted">States: plain, cat-home · Triggers: door-opens</div></div>
+<button class="btn" disabled style="opacity:.5">Discard</button><button class="btn pri" style="opacity:.5">Save</button><button class="btn">Refresh from the game</button></div>
+<section class="panel"><h2>Music</h2><div class="row" style="margin-top:8px;gap:18px"><span>▶</span><span class="sel">General Store</span><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span><span class="tb m" title="Mute">M</span> <span class="tb s" title="Solo">S</span></div></section>
+<section class="panel flush"><div style="padding:10px 12px"><h2>Sound effects</h2></div>
+<table><tr><th style="width:118px">Now</th><th style="width:30px"></th><th>Effect</th><th>How it plays</th><th>In which state</th><th>Level</th><th></th><th></th></tr><tr class=""><td class="now off" style="width:118px">Played at 0:02</td><td>▶</td><td>shop-bell</td><td><span class="sel">Once</span> <span class="num">1.5</span> s after entering</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></td><td style="white-space:nowrap"><span class="tb m" title="Mute">M</span> <span class="tb s" title="Solo">S</span></td><td class="x" title="Remove">✕</td></tr><tr class="dim"><td class="now off" style="width:118px">Next in 4 s</td><td>▶</td><td>glass-clink</td><td><span class="sel">Now and then</span> every <span class="num">15</span>–<span class="num">30</span> s</td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:25%"></i><b style="left:25%"></b></span><span class="n">50%</span></span></td><td style="white-space:nowrap"><span class="tb m on" title="Mute">M</span> <span class="tb s" title="Solo">S</span></td><td class="x" title="Remove">✕</td></tr><tr class="sounding"><td class="now on" style="width:118px"><span class="eq"><i></i><i></i><i></i></span> Playing</td><td>▶</td><td>cat-purr</td><td><span class="sel">Round and round</span></td><td><span class="sel">cat-home</span></td><td><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></td><td style="white-space:nowrap"><span class="tb m" title="Mute">M</span> <span class="tb s" title="Solo">S</span></td><td class="x" title="Remove">✕</td></tr><tr class=""><td class="now wait" style="width:118px">Waits for door-opens</td><td>▶</td><td>shop-bell</td><td><span class="sel">On a trigger</span> <span class="sel">door-opens</span></td><td><span class="sel">Always</span></td><td><span class="slider"><span class="track"><i style="width:40%"></i><b style="left:40%"></b></span><span class="n">80%</span></span></td><td style="white-space:nowrap"><span class="tb m" title="Mute">M</span> <span class="tb s" title="Solo">S</span></td><td class="x" title="Remove">✕</td></tr></table>
+<div style="padding:8px 12px"><button class="btn sm">+ Add a sound effect</button></div></section></div>
+<div class="bar"><span class="play">■</span><span class="faint">0:21</span><span class="lbl">State</span>
+<span class="seg"><span class="">plain</span><span class="on">cat-home</span></span>
+<span class="lbl">Triggers</span><button class="btn sm">door-opens ⚡</button><span class="grow"></span><span class="badge">Muted: 1</span> <button class="btn sm">Clear</button></div></div></div>
+
+
+<div class="note">Card: ▶, name, M S, ✕; then the Now line; then How it plays and state; then level. The play bar wraps onto two lines.</div><div class="frame narrow"><div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+<div class="crumbs">Scenes · Act 1</div><span class="sel" style="font-size:15px;padding:6px 10px">General store</span>
+<div class="row"><span class="faint grow"></span><button class="btn sm" style="opacity:.5">Discard</button><button class="btn sm pri" style="opacity:.5">Save</button></div>
+<section class="panel"><h2>Music</h2><div class="row" style="margin-top:8px;gap:12px;flex-wrap:wrap"><span>▶</span><span class="sel">General Store</span><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span><span class="now on"><span class="eq"><i></i><i></i><i></i></span> Playing</span><span class="tb m">M</span> <span class="tb s">S</span></div></section>
+<section class="panel"><h2>Sound effects</h2><div style="border-top:1px solid var(--line);padding:8px 0;margin-top:8px;">
+<div class="row"><span>▶</span><b class="grow">shop-bell</b><span class="tb m">M</span> <span class="tb s">S</span><span class="x">✕</span></div>
+<div class="now off" style="margin-top:4px">Played at 0:02</div>
+<div class="row" style="margin-top:6px;flex-wrap:wrap"><span class="sel">Once · 1.5 s after entering</span><span class="sel">Always</span></div>
+<div style="margin-top:6px"><span class="slider"><span class="track"><i style="width:30%"></i><b style="left:30%"></b></span><span class="n">60%</span></span></div></div><div style="border-top:1px solid var(--line);padding:8px 0;margin-top:8px;opacity:.45;">
+<div class="row"><span>▶</span><b class="grow">glass-clink</b><span class="tb m on">M</span> <span class="tb s">S</span><span class="x">✕</span></div>
+<div class="now off" style="margin-top:4px">Next in 9 s, muted</div>
+<div class="row" style="margin-top:6px;flex-wrap:wrap"><span class="sel">Now and then · every 15–30 s</span><span class="sel">Always</span></div>
+<div style="margin-top:6px"><span class="slider"><span class="track"><i style="width:25%"></i><b style="left:25%"></b></span><span class="n">50%</span></span></div></div><div style="border-top:1px solid var(--line);padding:8px 0;margin-top:8px;box-shadow:inset 3px 0 0 var(--ok);background:rgb(61 220 151/6%);padding-left:8px;">
+<div class="row"><span>▶</span><b class="grow">cat-purr</b><span class="tb m">M</span> <span class="tb s">S</span><span class="x">✕</span></div>
+<div class="now on" style="margin-top:4px"><span class="eq"><i></i><i></i><i></i></span> Playing</div>
+<div class="row" style="margin-top:6px;flex-wrap:wrap"><span class="sel">Round and round</span><span class="sel">Always</span></div>
+<div style="margin-top:6px"><span class="slider"><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="n">100%</span></span></div></div><button class="btn sm" style="margin-top:8px">+ Add a sound effect</button></section></div>
+<div class="bar"><span class="play">■</span><span class="faint">0:14</span><span class="lbl">State</span><span class="seg"><span class="on">plain</span><span>cat-home</span></span>
+<span class="lbl">Triggers</span><button class="btn sm">door-opens ⚡</button><span class="grow"></span><span class="badge">Muted: 1</span> <button class="btn sm">Clear</button></div></div>
+<div class="note"><b>Hearing changes while it plays.</b> A level is heard at once. A row whose How it plays, numbers or state change starts afresh as if just entered (a Now and then waits a new time; a Once waits its delay from now and can play again); an added row starts the same way; a removed row fades out over 0.3 s. Another music track crossfades over about a second, the effects playing on. Discard while playing plays on with the saved version, changed rows starting afresh. ■ fades everything out over 0.3 s. ▶ on a row (or the music) while the scene plays plays that clip once over the scene, at its level, whatever its M and S. A trigger fired while its row is for another state plays nothing.</div><div class="note"><b>Mute and Solo.</b> M silences a row; S hears only soloed rows; solo wins over mute; each takes effect at once with the 0.3 s fade. The play bar shows “Muted: N”, “Solo: N”, or “Solo: N · Muted: N” and Clear (clears both); hidden when none. They are for listening only: never saved, never “Unsaved changes”. They last while you stay on the scene, through ■ and ▶, and are cleared by Clear, opening another scene, or a reload.</div><div class="note"><b>Keyboard.</b> As agreed; in each row Tab reaches ▶, the row’s controls, M, S, then ✕. M and S are toggle buttons that say whether they are on. The Now column is read when focused, not announced as it changes. No page-wide shortcut.</div><div class="note"><b>Leaving.</b> Opening another scene or page, Refresh from the game, or a reload stops playing; the play bar resets (state to the first, stopped) and Mute and Solo clear. While the leave dialog is open the scene plays on.</div></body></html>
