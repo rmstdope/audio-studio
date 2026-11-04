@@ -5520,6 +5520,31 @@ describe('server, sound effect takes', () => {
     expect((await fetch(new URL('/api/effects/clips/.coins.mp3', studio.url))).status).toBe(404)
   })
 
+  it('refuses Make all and Stop all from another page, and a body that is not { ids }', async () => {
+    for (const [path, body] of [
+      ['/api/effects/make-all', { ids: ['coins'] }],
+      ['/api/effects/stop-all', undefined],
+    ] as const) {
+      expect((await send('POST', path, body, 'https://evil.example')).status).toBe(403)
+    }
+    expect((await send('POST', '/api/effects/make-all', {})).status).toBe(400)
+    expect((await send('POST', '/api/effects/make-all', { ids: [1] })).status).toBe(400)
+  })
+
+  it('makes four takes for each listed effect, tells how it went, and stops them all', async () => {
+    const models = await (await fetch(new URL('/api/effects/models', studio.url))).json()
+    expect(models).toMatchObject({ ok: true, canMake: true, projectModel: 'small-sfx' })
+    expect((await fetch(new URL('/api/effects/batch', studio.url))).status).toBe(200)
+    const answer = await send('POST', '/api/effects/make-all', { ids: ['door-creak'] })
+    expect(answer.status).toBe(200)
+    expect(await answer.json()).toEqual({ ok: true, started: [{ id: 'door-creak', takes: 4 }] })
+    const stopped = await (await send('POST', '/api/effects/stop-all')).json()
+    expect(stopped.ok).toBe(true)
+    const batch = await (await fetch(new URL('/api/effects/batch', studio.url))).json()
+    expect(batch).toMatchObject({ total: 4, running: false })
+    expect(batch.made + batch.stopped + batch.failed.length).toBe(4)
+  })
+
   it('makes a looping take the length asked and serves its seam: the last 4 seconds, then the first 4', async () => {
     expect((await send('POST', '/api/effects/wind/takes', { count: 1 })).status).toBe(200)
     const made = await settled('wind')

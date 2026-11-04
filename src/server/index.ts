@@ -150,6 +150,7 @@ import {
 import { createEffectTakes } from '../services/effectTakes'
 import { createFakeEffects } from '../services/effectsFake'
 import { ChooseEffectTakeBody, MakeEffectTakesBody } from '../core/effectTakes'
+import { MakeAllBody } from '../core/effectsMakeAll'
 import { removeOrphan } from '../services/musicOrphans'
 import { createMusicTakes } from '../services/musicTakes'
 import { createImageHealth } from '../services/imageHealth'
@@ -1668,6 +1669,26 @@ export function startServer({
       },
       '/api/effects/making': {
         GET: guard(async () => Response.json(await effectTakes.making(projectFile))),
+      },
+      '/api/effects/models': {
+        GET: guard(async () => {
+          const view = await effectTakes.models(projectFile)
+          return view ? Response.json(view) : notFound()
+        }),
+      },
+      '/api/effects/batch': {
+        GET: guard(async () => Response.json(await effectTakes.batch(projectFile))),
+      },
+      '/api/effects/make-all': {
+        POST: fromOwnPage(async (request) => {
+          const body = MakeAllBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) return Response.json({ error: 'expected { ids }' }, { status: 400 })
+          const result = await effectTakes.makeAll(projectFile, body.data.ids)
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/effects/stop-all': {
+        POST: fromOwnPage(async () => Response.json(await effectTakes.stopAll(projectFile))),
       },
       '/api/effects/clips/:file': {
         GET: guard(async (request) => {

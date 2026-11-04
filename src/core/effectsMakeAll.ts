@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { EFFECT_MODELS, type EffectModelId } from './effectModels'
 import type { EffectRow } from './effects'
 import { waitOf, type EffectMakingSummary } from './effectTakes'
@@ -6,9 +7,7 @@ import { waitOf, type EffectMakingSummary } from './effectTakes'
 export const MAKE_ALL_TAKES = 4
 
 /** The body of a request to make takes for these effects (the ones the question listed). */
-export interface MakeAllBody {
-  ids: string[]
-}
+export const MakeAllBody = z.object({ ids: z.array(z.string().min(1)).max(1000) }).strict()
 
 /** What the press made, as the batch ledger counts it: takes, not effects. */
 export interface EffectBatch {
