@@ -17,6 +17,7 @@ import {
   type EffectInputs,
   type EffectMakingSummary,
   type EffectMakingView,
+  type EffectModelsView,
   type EffectTakesView,
   type EffectTakeView,
 } from '../core/effectTakes'
@@ -34,6 +35,7 @@ import { gpuInUse, gpuQueue, GPU, holdGpu } from './gpu'
 import { writeAtomic } from './files'
 import type { CommitResult } from './musicClips'
 import { createSerial, type Serial } from './serial'
+import { MAKE_ALL_TAKES, type EffectBatch } from '../core/effectsMakeAll'
 import { openProject, type ProjectFailure } from './workspace'
 
 export { EFFECT_BOARD_DIR, EFFECT_TAKES_DIR }
@@ -74,6 +76,13 @@ export function effectTakeHash(inputs: EffectInputs): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16)
 }
 
+/** The takes the latest Make all started, by effect, and how many of them were stopped. */
+interface Batch {
+  total: number
+  stopped: number
+  ns: Map<string, Set<number>>
+}
+
 /** A take being made or waiting, or one that failed, until it is made. */
 interface Entry {
   n: number
@@ -88,8 +97,25 @@ interface Entry {
   stop?: AbortController
 }
 
+/** What Make all answered: the effects that got takes, or why nothing was started. */
+export type EffectMakeAllResult =
+  | { ok: true; started: { id: string; takes: number }[] }
+  | { ok: false; message: string }
+  | ProjectFailure
+
+/** What Stop all answered: how many takes were stopped. */
+export type EffectStopAllResult = EffectStopResult
+
 /** What the takes of an effect are made of. */
 export interface EffectTakes {
+  /** Which models can run, for the project as a whole; null when the project has no effects section. */
+  models(projectFile: string): Promise<EffectModelsView | ProjectFailure | null>
+  /** Four takes for each listed effect that has no chosen take and is not making takes; the others are skipped. */
+  makeAll(projectFile: string, ids: string[]): Promise<EffectMakeAllResult>
+  /** Stops every take waiting or being made in the project. */
+  stopAll(projectFile: string): Promise<EffectStopAllResult>
+  /** What the latest Make all made, stopped and failed so far; null when there has been none. */
+  batch(projectFile: string): Promise<EffectBatch | null>
   /** The effect's board, and the takes being made. */
   view(projectFile: string, id: string): Promise<EffectTakesResult>
   /** Queues takes and returns at once; they are made one at a time. */
@@ -159,11 +185,14 @@ export function createEffectTakes({
     contentStudioEffectEntries?: Map<string, Map<number, Entry>>
     contentStudioEffectQueue?: Serial
     contentStudioEffectBoards?: Serial
+    contentStudioEffectBatches?: Map<string, Batch>
   }
   const active = (shared.contentStudioEffectEntries ??= new Map())
   const cpu = queue ?? (shared.contentStudioEffectQueue ??= createSerial())
   // Changes to one effect's board, one after another: a take finishing and a drop lose neither.
   const boards = (shared.contentStudioEffectBoards ??= createSerial())
+  // The latest Make all of each project, so its summary can be worked out from what is running.
+  const batches = (shared.contentStudioEffectBatches ??= new Map())
   const keyOf = (projectFile: string, id: string) => `${projectFile}\0${id}`
 
   async function resolve(projectFile: string, id: string) {
@@ -285,11 +314,39 @@ export function createEffectTakes({
     return states
   }
 
+  /** Which models can run here. */
+  async function modelsOf(projectFile: string, projectModel = DEFAULT_EFFECT_MODEL) {
+    const states = await modelStates(projectFile)
+    const runnable = await Promise.all(
+      EFFECT_MODEL_IDS.map(async (model) => (await generator.ready(model)).ok),
+    )
+    return {
+      ok: true as const,
+      canMake: runnable.some(Boolean),
+      projectModel,
+      uv: hasUv(),
+      models: EFFECT_MODEL_IDS.map((model) => ({ id: model, ...states[model] })),
+    }
+  }
+
+  /** Counts a take stopped into the latest Make all, if it was one of its takes. */
+  function countStopped(projectFile: string, id: string, n: number) {
+    const batch = batches.get(projectFile)
+    if (batch?.ns.get(id)?.has(n)) batch.stopped++
+  }
+
   /** An effect's entries: waiting, being made, or failed. */
   const entriesOf = (projectFile: string, id: string) =>
     [...(active.get(keyOf(projectFile, id))?.values() ?? [])].sort((a, b) => a.n - b.n)
 
-  return {
+  const api: EffectTakes = {
+    async models(projectFile) {
+      const opened = await openProject(projectFile)
+      if (!opened.ok) return opened
+      if (!opened.project.effects) return null
+      return modelsOf(projectFile, opened.project.effects.model ?? DEFAULT_EFFECT_MODEL)
+    },
+
     async view(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
@@ -334,17 +391,9 @@ export function createEffectTakes({
       const failed: EffectFailedView[] = entries
         .filter((entry) => entry.state === 'failed' && entry.hash === hash)
         .map((entry) => ({ n: entry.n, message: entry.message }))
-      const states = await modelStates(projectFile)
-      const uv = hasUv()
-      const runnable = await Promise.all(
-        EFFECT_MODEL_IDS.map(async (model) => (await generator.ready(model)).ok),
-      )
+      const modelsView = await modelsOf(projectFile, found.projectModel)
       return {
-        ok: true,
-        canMake: runnable.some(Boolean),
-        projectModel: found.projectModel,
-        uv,
-        models: EFFECT_MODEL_IDS.map((model) => ({ id: model, ...states[model] })),
+        ...modelsView,
         takes,
         making,
         failed,
@@ -422,6 +471,7 @@ export function createEffectTakes({
         if (entry.state === 'failed') continue
         entry.stop?.abort()
         entries.delete(n)
+        countStopped(projectFile, id, n)
         stopped++
       }
       return { ok: true, stopped }
@@ -538,6 +588,78 @@ export function createEffectTakes({
       return summary
     },
 
+    async makeAll(projectFile, ids) {
+      const opened = await openProject(projectFile)
+      if (!opened.ok) return opened
+      const { project } = opened
+      const root = dirname(projectFile)
+      if (!project.effects) return { ok: false, message: 'The project has no sound effects.' }
+      const listed = new Set(
+        ((await readEffects(root, project, []))?.rows ?? []).map((row) => row.id),
+      )
+      const chosen = await readEffectChosen(root, project.effects, [])
+      if (!chosen) return { ok: false, message: 'The sound effects lock could not be read.' }
+      const busy = (id: string) =>
+        entriesOf(projectFile, id).some((entry) => entry.state !== 'failed')
+      const wanted = [...new Set(ids)].filter((id) => listed.has(id) && !chosen[id] && !busy(id))
+      const started: { id: string; takes: number }[] = []
+      const batch: Batch = { total: 0, stopped: 0, ns: new Map() }
+      for (const id of wanted) {
+        const before = new Set(entriesOf(projectFile, id).map((entry) => entry.n))
+        const result = await api.make(projectFile, id, { count: MAKE_ALL_TAKES })
+        if (!result || !result.ok) {
+          // The same model serves every effect: when it cannot run, none was started.
+          if (!started.length) return result ?? { ok: false, message: 'That effect is not listed.' }
+          break
+        }
+        const made = entriesOf(projectFile, id).filter((entry) => !before.has(entry.n))
+        batch.ns.set(id, new Set(made.map((entry) => entry.n)))
+        batch.total += made.length
+        started.push({ id, takes: made.length })
+      }
+      if (started.length) batches.set(projectFile, batch)
+      return { ok: true, started }
+    },
+
+    async stopAll(projectFile) {
+      const opened = await openProject(projectFile)
+      if (!opened.ok) return opened
+      let stopped = 0
+      const prefix = `${projectFile}\0`
+      for (const [key, entries] of active) {
+        if (!key.startsWith(prefix)) continue
+        for (const [n, entry] of entries) {
+          if (entry.state === 'failed') continue
+          entry.stop?.abort()
+          entries.delete(n)
+          countStopped(projectFile, key.slice(prefix.length), n)
+          stopped++
+        }
+      }
+      return { ok: true, stopped }
+    },
+
+    async batch(projectFile) {
+      const batch = batches.get(projectFile)
+      if (!batch) return null
+      const failed: EffectBatch['failed'] = []
+      let running = 0
+      for (const [id, ns] of batch.ns) {
+        for (const entry of entriesOf(projectFile, id)) {
+          if (!ns.has(entry.n)) continue
+          if (entry.state === 'failed') failed.push({ id, n: entry.n })
+          else running++
+        }
+      }
+      return {
+        total: batch.total,
+        made: batch.total - batch.stopped - failed.length - running,
+        stopped: batch.stopped,
+        failed,
+        running: running > 0,
+      }
+    },
+
     async takeFile(projectFile, id, name) {
       if (!TAKE_FILE.test(name)) return null
       const found = await resolve(projectFile, id)
@@ -546,4 +668,5 @@ export function createEffectTakes({
       return (await Bun.file(file).exists()) ? file : null
     },
   }
+  return api
 }

@@ -289,8 +289,8 @@ export interface EffectFailedView {
   message: string
 }
 
-/** An effect's takes as its page shows them. */
-export interface EffectTakesView {
+/** Which sound-effects models can make takes here: what the page and the Make all question need. */
+export interface EffectModelsView {
   ok: true
   /** Whether takes can be made at all: one of the models can run on this computer. */
   canMake: boolean
@@ -300,6 +300,10 @@ export interface EffectTakesView {
   uv: boolean
   /** Each model: how much of it is on this computer, and whether its last effect failed. */
   models: { id: EffectModelId; download: ImageDownload; failed: boolean }[]
+}
+
+/** An effect's takes as its page shows them. */
+export interface EffectTakesView extends EffectModelsView {
   takes: EffectTakeView[]
   making: EffectMakingView[]
   failed: EffectFailedView[]
