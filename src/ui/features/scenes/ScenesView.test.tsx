@@ -1273,6 +1273,11 @@ describe('playing a scene', () => {
     expect(bar(page).querySelector('[aria-label="Stop the scene"]')).toBeNull()
   })
 
+  it('reserves no count slot in the play bar of a scene with nothing to play (as-0q9)', () => {
+    const page = render({ ...open, scene: 'act1-chapel' })
+    expect(bar(page).querySelector('.scene-bar-count')).toBeNull()
+  })
+
   it('sets the state while stopped, without playing', () => {
     const page = render(open)
     act(() => button(bar(page), 'cat-home').click())

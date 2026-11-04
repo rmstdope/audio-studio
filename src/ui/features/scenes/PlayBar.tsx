@@ -76,25 +76,28 @@ export function PlayBar({
       )}
       <span className="scene-bar-grow" />
       {/* Always present, so the bar's height never depends on a solo or mute (as-lzp): its
-          ::before holds the room for the count at its widest and Clear. */}
-      <span className="scene-bar-count">
-        {count && (
-          <span className="scene-bar-count-now">
-            <span className="chip">{count}</span>
-            <button
-              className="btn sm"
-              type="button"
-              onClick={() => {
-                play.clear()
-                // Clear unmounts with the count, so focus goes to the bar's Start/Stop.
-                startRef.current?.focus()
-              }}
-            >
-              Clear
-            </button>
-          </span>
-        )}
-      </span>
+          ::before holds the room for the count at its widest and Clear. A scene with nothing to
+          play has no rows to solo or mute, so it keeps no room (as-0q9). */}
+      {!nothing && (
+        <span className="scene-bar-count">
+          {count && (
+            <span className="scene-bar-count-now">
+              <span className="chip">{count}</span>
+              <button
+                className="btn sm"
+                type="button"
+                onClick={() => {
+                  play.clear()
+                  // Clear unmounts with the count, so focus goes to the bar's Start/Stop.
+                  startRef.current?.focus()
+                }}
+              >
+                Clear
+              </button>
+            </span>
+          )}
+        </span>
+      )}
     </div>
   )
 }
