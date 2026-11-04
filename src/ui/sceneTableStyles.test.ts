@@ -17,9 +17,12 @@ describe('the Scenes sound effects table', () => {
     expect(rule('.scene-effect-name')).toMatch(/text-overflow:\s*ellipsis/)
     expect(rule('.scene-effect-name')).toMatch(/white-space:\s*nowrap/)
     expect(rule('.scene-effect-name')).toMatch(/min-width:\s*0/)
-    expect(rule('.scene-effect-name')).toMatch(/flex:\s*none/)
-    expect(rule('.scene-effect-cell')).toMatch(/display:\s*flex/)
-    expect(rule('.scene-effect-cell .chip')).toMatch(/flex:\s*none/)
+  })
+
+  it('makes the effect cell as wide as name plus chip, so the chip never runs under the next column', () => {
+    expect(rule('.scene-effect-name')).toMatch(/display:\s*inline-block/)
+    expect(rule('.scene-effect-cell')).toMatch(/white-space:\s*nowrap/)
+    expect(rule('.scene-effect-cell')).not.toMatch(/display:\s*flex/)
   })
 
   it('sizes the effect column to its content, so a short name beside a chip is never cut', () => {
@@ -38,6 +41,7 @@ describe('the Scenes sound effects table', () => {
     const narrow = css.slice(css.indexOf('@media (max-width: 700px) {\n  .scenes-body'))
     expect(rule('.scene-effects .table td.scene-effect', narrow)).toMatch(/min-width:\s*0/)
     const name = rule('.scene-effects .table .scene-effect-name', narrow)
+    expect(rule('.scene-effects .table .scene-effect-cell', narrow)).toMatch(/display:\s*flex/)
     expect(name).toMatch(/flex:\s*0 1 auto/)
     expect(name).toMatch(/max-width:\s*none/)
   })

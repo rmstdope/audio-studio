@@ -4170,19 +4170,16 @@ button.cue-chip[aria-expanded='true'] {
   width: 40px;
 }
 .scene-effect-cell {
-  display: flex;
-  align-items: baseline;
+  white-space: nowrap;
 }
 .scene-effect-name {
-  flex: none;
+  display: inline-block;
   min-width: 0;
   max-width: 20ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.scene-effect-cell .chip {
-  flex: none;
+  vertical-align: bottom;
 }
 .scene-effects .table th {
   white-space: nowrap;
@@ -4557,9 +4554,17 @@ button.cue-chip[aria-expanded='true'] {
   .scene-effects .table td.scene-play {
     grid-row: 1;
   }
+  .scene-effects .table .scene-effect-cell {
+    display: flex;
+    align-items: baseline;
+  }
   .scene-effects .table .scene-effect-name {
+    display: block;
     flex: 0 1 auto;
     max-width: none;
+  }
+  .scene-effects .table .scene-effect-cell .chip {
+    flex: none;
   }
   .scene-effects .table td.scene-effect {
     grid-column: 2;
