@@ -198,6 +198,28 @@ function render(route: ScenesRoute, shown: ProjectSummary = summary()) {
   return container
 }
 
+function renderLive(route: ScenesRoute, first: ProjectSummary) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, enabled: false } },
+  })
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  cleanups.push(() => act(() => root.unmount()))
+  const show = (shown: ProjectSummary, at: ScenesRoute = route) =>
+    act(() =>
+      root.render(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(ScenesView, { summary: shown, route: at }),
+        ),
+      ),
+    )
+  show(first)
+  return { page: container, show }
+}
+
 const text = (node: Element | null | undefined) => node?.textContent?.replace(/\s+/g, ' ').trim()
 const button = (page: HTMLElement, label: string) =>
   [...page.querySelectorAll('button')].find((b) => b.textContent === label)!
@@ -248,7 +270,7 @@ describe('an act with its scenes', () => {
       'Refresh from the game',
     ])
     expect(text(page.querySelector('.scene-status'))).toBeUndefined()
-    expect(text(page.querySelector('[aria-label="Music"]'))).toBe('MusicGeneral Store100%')
+    expect(text(page.querySelector('[aria-label="Music"]'))).toBe('MusicGeneral Store100%MS')
     expect(page.querySelector<HTMLInputElement>('[aria-label="Music level"]')!.value).toBe('100')
     expect([...page.querySelectorAll('th')].map((th) => th.textContent)).toEqual([
       '',
@@ -256,6 +278,7 @@ describe('an act with its scenes', () => {
       'How it plays',
       'In which state',
       'Level',
+      '',
       '',
     ])
     const rows = [...page.querySelectorAll('tbody tr')].map((tr) =>
@@ -906,27 +929,6 @@ describe('leaving a scene with unsaved changes', () => {
 
 describe('what the page started from', () => {
   /** A page that can be shown again with other data, as a refetch does. */
-  function renderLive(route: ScenesRoute, first: ProjectSummary) {
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, enabled: false } },
-    })
-    const container = document.createElement('div')
-    document.body.append(container)
-    const root = createRoot(container)
-    cleanups.push(() => act(() => root.unmount()))
-    const show = (shown: ProjectSummary, at: ScenesRoute = route) =>
-      act(() =>
-        root.render(
-          createElement(
-            QueryClientProvider,
-            { client },
-            createElement(ScenesView, { summary: shown, route: at }),
-          ),
-        ),
-      )
-    show(first)
-    return { page: container, show }
-  }
 
   it('sends the entry the draft began from, even if the project is read again meanwhile', async () => {
     const { page, show } = renderLive(open, summary())
@@ -949,5 +951,178 @@ describe('what the page started from', () => {
     show(summary(), { ...open, scene: 'act1-forest' })
     show(summary(), open)
     expect(status(page)).toBeUndefined()
+  })
+})
+
+describe('playing a scene', () => {
+  const bar = (page: HTMLElement) => page.querySelector<HTMLElement>('.scene-playbar')!
+  const press = (page: HTMLElement, label: string) =>
+    act(() => page.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click())
+  const rowText = (page: HTMLElement, id: string, nth = 0) =>
+    text(
+      [...page.querySelectorAll('.scene-effects tbody tr')].filter((r) =>
+        r.textContent!.includes(id),
+      )[nth],
+    )
+
+  it('shows the play bar stopped: the clock, the first state on, triggers dimmed, no Now column', () => {
+    const page = render(open)
+    expect(text(bar(page))).toBe('0:00Stateplaincat-homeTriggersdoor-opens ⚡')
+    expect(
+      bar(page).querySelector('[aria-label="Start the scene"]')?.getAttribute('aria-disabled'),
+    ).toBeNull()
+    expect(bar(page).querySelector('.scene-seg .on')?.textContent).toBe('plain')
+    expect(
+      [...bar(page).querySelectorAll('.btn')].map((b) => b.getAttribute('aria-disabled')),
+    ).toEqual(['true'])
+    expect([...page.querySelectorAll('th')].map((th) => th.textContent)).not.toContain('Now')
+  })
+
+  it('leaves State out for a scene with no states, and says when there is nothing to play', () => {
+    const page = render({ ...open, scene: 'act1-chapel' })
+    expect(text(bar(page))).toBe('Nothing to play in this sceneTriggersbell-tolls ⚡')
+    press(page, 'Start the scene')
+    expect(bar(page).querySelector('[aria-label="Stop the scene"]')).toBeNull()
+  })
+
+  it('sets the state while stopped, without playing', () => {
+    const page = render(open)
+    act(() => button(bar(page), 'cat-home').click())
+    expect(bar(page).querySelector('.scene-seg .on')?.textContent).toBe('cat-home')
+    expect(page.querySelector('.scene-playbar [aria-label="Stop the scene"]')).toBeNull()
+  })
+
+  it('plays: Now column with the words of each row, state switching, then stops', async () => {
+    const page = render(open)
+    press(page, 'Start the scene')
+    await flush()
+    expect(bar(page).querySelector('[aria-label="Stop the scene"]')).not.toBeNull()
+    expect([...page.querySelectorAll('th')].map((th) => th.textContent)[0]).toBe('Now')
+    expect(text(page.querySelector('.scene-music-now'))).toBe('Playing')
+    expect(rowText(page, 'shop-bell', 0)).toContain('In 2 s')
+    expect(rowText(page, 'glass-clink')).toContain('Next in')
+    expect(rowText(page, 'cat-purr')).toContain('Not in plain')
+    expect(rowText(page, 'shop-bell', 1)).toContain('Waits for door-opens')
+    expect(
+      [...bar(page).querySelectorAll('.btn')].map((b) => b.getAttribute('aria-disabled')),
+    ).toEqual([null])
+    act(() => button(bar(page), 'cat-home').click())
+    await flush()
+    expect(rowText(page, 'cat-purr')).toContain('Playing')
+    expect(page.querySelectorAll('.scene-sounding').length).toBe(1)
+    press(page, 'Stop the scene')
+    await flush()
+    expect([...page.querySelectorAll('th')].map((th) => th.textContent)).not.toContain('Now')
+  })
+
+  it('mutes and solos for listening only, counts them and clears them', async () => {
+    const page = render(open)
+    press(page, 'Mute shop-bell')
+    expect(text(bar(page))).toContain('Muted: 1')
+    press(page, 'Solo glass-clink')
+    expect(text(bar(page))).toContain('Solo: 1 · Muted: 1')
+    expect(page.querySelector('[aria-label="Mute shop-bell"]')?.getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+    expect(text(page.querySelector('.scene-status'))).toBeUndefined()
+    press(page, 'Start the scene')
+    await flush()
+    expect(rowText(page, 'shop-bell', 0)).toContain('not soloed')
+    expect(rowText(page, 'glass-clink')).not.toContain('not soloed')
+    act(() => button(bar(page), 'Clear').click())
+    expect(text(bar(page))).not.toContain('Muted')
+    expect(button(bar(page), 'cat-home')).toBeDefined()
+    press(page, 'Stop the scene')
+    await flush()
+  })
+
+  it('says muted on a muted row that keeps its words', async () => {
+    const page = render(open)
+    press(page, 'Mute shop-bell')
+    press(page, 'Start the scene')
+    await flush()
+    expect(rowText(page, 'shop-bell', 0)).toContain('In 2 s, muted')
+    press(page, 'Stop the scene')
+    await flush()
+  })
+
+  it('stops and clears Mute and Solo when another scene opens', async () => {
+    const { page, show } = renderLive(open, summary())
+    press(page, 'Mute shop-bell')
+    press(page, 'Start the scene')
+    await flush()
+    show(summary(), { ...open, scene: 'act1-forest' })
+    await flush()
+    expect(page.querySelector('[aria-label="Stop the scene"]')).toBeNull()
+    expect(text(bar(page))).not.toContain('Muted')
+    show(summary(), open)
+    await flush()
+    expect(text(bar(page))).not.toContain('Muted')
+  })
+
+  it('plays a row once over the scene when ▶ is pressed while it plays, and the scene keeps going', async () => {
+    const page = render(open)
+    press(page, 'Start the scene')
+    await flush()
+    const before = loops.length
+    press(page, 'Play shop-bell')
+    await flush()
+    expect(loops.length).toBe(before + 1)
+    expect(page.querySelector('[aria-label="Stop the scene"]')).not.toBeNull()
+    expect(page.querySelector('[aria-label="Stop shop-bell"]')).toBeNull()
+    press(page, 'Stop the scene')
+    await flush()
+  })
+
+  it('does not tint or animate a silent loop row, and says Silent', async () => {
+    const purr = effects.rows.find((r) => r.id === 'cat-purr')!
+    const was = purr.current
+    purr.current = { kind: 'nothing' } as typeof purr.current
+    try {
+      const page = render(open)
+      act(() => button(bar(page), 'cat-home').click())
+      press(page, 'Start the scene')
+      await flush()
+      expect(rowText(page, 'cat-purr')).toContain('Silent')
+      expect(page.querySelectorAll('.scene-sounding')).toHaveLength(0)
+      expect(page.querySelectorAll('.scene-eq')).toHaveLength(0)
+      press(page, 'Stop the scene')
+      await flush()
+    } finally {
+      purr.current = was
+    }
+  })
+
+  it('says Couldn’t load the clip in red by the music, and plays the rest', async () => {
+    const real = globalThis.fetch
+    globalThis.fetch = (async (path: string, init?: RequestInit) =>
+      String(path).startsWith('/api/music/')
+        ? new Response('no', { status: 404 })
+        : real(path, init)) as typeof fetch
+    try {
+      const page = render(open)
+      press(page, 'Start the scene')
+      await flush()
+      const word = page.querySelector('.scene-music-now')!
+      expect(word.textContent).toBe("Couldn't load the clip")
+      expect(word.classList.contains('scene-now-bad')).toBe(true)
+      expect(rowText(page, 'glass-clink')).toContain('Next in')
+      press(page, 'Stop the scene')
+      await flush()
+    } finally {
+      globalThis.fetch = real
+    }
+  })
+
+  it('says Not played by the music when the game no longer has its track', async () => {
+    const shown = summary()
+    const scene = shown.scenes!.acts[0]!.scenes[0]!
+    scene.music = { ...scene.music, track: 'old-track', name: 'old-track', gone: true }
+    const page = render(open, shown)
+    press(page, 'Start the scene')
+    await flush()
+    expect(text(page.querySelector('.scene-music-now'))).toBe('Not played')
+    press(page, 'Stop the scene')
+    await flush()
   })
 })

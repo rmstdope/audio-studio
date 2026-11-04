@@ -39,4 +39,21 @@ describe('the scene editor’s styles', () => {
     expect(narrow).toContain('.scene-effects .table tr {')
     expect(narrow).toContain('.scene-effects .table td.scene-how')
   })
+
+  it('draws M on in red and S on in yellow, and the sounding row green', () => {
+    expect(rule(css, '.scene-ms-mute.on')).toContain('var(--danger-ink)')
+    expect(rule(css, '.scene-ms-solo.on')).toContain('var(--warn)')
+    expect(rule(css, '.scene-sounding td')).toContain('var(--ok-bg)')
+    expect(rule(css, '.scene-now-bad')).toContain('var(--danger-ink)')
+  })
+
+  it('uses tokens, not colours, in the playing rules', () => {
+    const from = css.indexOf('/* Playing a scene (as-p86.4) */')
+    const playing = css.slice(from, css.indexOf('@media (max-width: 700px)', from))
+    expect(playing).not.toMatch(/#[0-9a-f]{3,6}\b/i)
+  })
+
+  it('pins the play bar to the bottom', () => {
+    expect(rule(css, '.scene-playbar')).toContain('position: sticky')
+  })
 })

@@ -12,6 +12,9 @@ import type { SceneAct, SceneEffectChoice, SceneRow, ScenesSummary } from '../..
 import { Menu } from '../../components/Menu'
 import { CrossIcon, PlayIcon, StopIcon } from '../../components/icons'
 import { routeHref } from '../../route'
+import { audible, nowWords } from '../../sceneNow'
+import { MUSIC_KEY, rowKey } from '../../scenePlayback'
+import type { ScenePlay } from '../../sceneRun'
 import { AddEffect } from './AddEffect'
 import { LevelSlider } from './LevelSlider'
 
@@ -101,12 +104,85 @@ function Seconds({
   )
 }
 
+/** The M and S toggle buttons of a row (or of the music). */
+function MuteSolo({ name, id, play }: { name: string; id: string; play: ScenePlay }) {
+  return (
+    <>
+      <button
+        className={play.muted.has(id) ? 'scene-ms scene-ms-mute on' : 'scene-ms scene-ms-mute'}
+        type="button"
+        title="Mute"
+        aria-label={`Mute ${name}`}
+        aria-pressed={play.muted.has(id)}
+        onClick={() => play.toggleMute(id)}
+      >
+        M
+      </button>
+      <button
+        className={play.soloed.has(id) ? 'scene-ms scene-ms-solo on' : 'scene-ms scene-ms-solo'}
+        type="button"
+        title="Solo"
+        aria-label={`Solo ${name}`}
+        aria-pressed={play.soloed.has(id)}
+        onClick={() => play.toggleSolo(id)}
+      >
+        S
+      </button>
+    </>
+  )
+}
+
+/** What the music is doing, in the Now word after its level. */
+function MusicNow({
+  play,
+  silent,
+  gone,
+  url,
+}: {
+  play: ScenePlay
+  silent: boolean
+  gone: boolean
+  url: string
+}) {
+  const failed = play.failed.has(url)
+  const words = nowWords(
+    { kind: 'playing' },
+    {
+      state: play.state ?? '',
+      muted: play.muted.has(MUSIC_KEY) && play.soloed.size === 0,
+      notSoloed: play.soloed.size > 0 && !play.soloed.has(MUSIC_KEY),
+      silent,
+      gone,
+      failed,
+    },
+  )
+  return (
+    <span
+      className={failed ? 'scene-now scene-music-now scene-now-bad' : 'scene-now scene-music-now'}
+    >
+      {words}
+    </span>
+  )
+}
+
+/** Moving bars before "Playing". */
+function Bars() {
+  return (
+    <span className="scene-eq" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  )
+}
+
 /** One effect of the scene, with controls: how it plays, in which state, how loud, and ✕. */
 function EffectRowView({
   effect,
   index,
   around,
   player,
+  play,
   onChange,
   onRemove,
 }: {
@@ -114,6 +190,7 @@ function EffectRowView({
   index: number
   around: Around
   player: ScenePlayer
+  play: ScenePlay
   onChange: (next: EffectDraft) => void
   onRemove: () => void
 }) {
@@ -128,14 +205,42 @@ function EffectRowView({
   const modes: PlayMode[] = ['loop', 'random', 'once']
   if (scene.triggers.length > 0 || effect.mode === 'trigger') modes.push('trigger')
   const clipId = `effect-${index}`
+  const key = rowKey(index)
+  const url = `/api/effects/${encodeURIComponent(effect.id)}/current`
+  const now = play.rows[index]
+  const heard = audible(key, play.muted, play.soloed)
+  const muted = play.muted.has(key) && play.soloed.size === 0
+  const notSoloed = play.soloed.size > 0 && !play.soloed.has(key)
+  const showNow = play.phase !== 'stopped'
+  const words =
+    now && problems.lines.length === 0
+      ? nowWords(now, {
+          state: play.state ?? '',
+          muted,
+          notSoloed,
+          silent: !!choice && (choice.silent || !choice.playable),
+          gone: goneEffect || goneState || goneTrigger,
+          failed: play.failed.has(url),
+        })
+      : ''
+  const sounding = words.startsWith('Playing') && heard
+  const dim = now?.kind === 'otherState' || !heard || words === 'Not played'
   return (
-    <tr>
+    <tr className={sounding ? 'scene-sounding' : dim && showNow ? 'scene-dim' : undefined}>
+      {showNow && (
+        <td className="scene-now">
+          {sounding && <Bars />}
+          <span className={words.startsWith("Couldn't") ? 'scene-now-bad' : undefined}>
+            {words}
+          </span>
+        </td>
+      )}
       <td className="scene-play">
         {choice?.playable && (
           <PlayButton
             id={clipId}
             name={choice.name}
-            url={`/api/effects/${encodeURIComponent(effect.id)}/current`}
+            url={url}
             level={effect.level}
             loop={choice.loops}
             player={player}
@@ -249,6 +354,9 @@ function EffectRowView({
           }}
         />
       </td>
+      <td className="scene-m">
+        <MuteSolo name={choice?.name ?? effectName(effect.id)} id={key} play={play} />
+      </td>
       <td className="scene-remove">
         <button
           className="icon-btn"
@@ -275,6 +383,7 @@ export function SceneDetail({
   summary,
   draft,
   player,
+  play,
   onChange,
 }: {
   scene: SceneRow
@@ -282,6 +391,7 @@ export function SceneDetail({
   summary: Pick<ScenesSummary, 'effects' | 'effectsKnown'>
   draft: SceneDraft
   player: ScenePlayer
+  play: ScenePlay
   onChange: (next: SceneDraft) => void
 }) {
   const around: Around = {
@@ -345,6 +455,15 @@ export function SceneDetail({
               }}
             />
           )}
+          {music.track !== null && play.phase === 'playing' && (
+            <MusicNow
+              play={play}
+              silent={!track?.playable && !trackGone}
+              gone={trackGone}
+              url={`/api/music/tracks/${encodeURIComponent(music.track)}/current`}
+            />
+          )}
+          {music.track !== null && <MuteSolo name="the music" id={MUSIC_KEY} play={play} />}
         </div>
       </section>
       <section className="panel scene-panel scene-effects" aria-label="Sound effects">
@@ -355,11 +474,13 @@ export function SceneDetail({
           <table className="table">
             <thead>
               <tr>
+                {play.phase !== 'stopped' && <th>Now</th>}
                 <th aria-label="Play" />
                 <th>Effect</th>
                 <th>How it plays</th>
                 <th>In which state</th>
                 <th>Level</th>
+                <th aria-label="Mute and solo" />
                 <th aria-label="Remove" />
               </tr>
             </thead>
@@ -371,6 +492,7 @@ export function SceneDetail({
                   index={index}
                   around={around}
                   player={player}
+                  play={play}
                   onChange={(next) =>
                     onChange({
                       ...draft,
@@ -379,6 +501,7 @@ export function SceneDetail({
                   }
                   onRemove={() => {
                     player.stop()
+                    play.dropRow(index)
                     focusAfterRemove.current = index
                     onChange({ ...draft, effects: draft.effects.filter((_, i) => i !== index) })
                   }}

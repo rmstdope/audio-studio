@@ -1966,8 +1966,18 @@ cannot be told from the files, which name no act-level loop); a scene whose entr
 "unreadable" and shows none of its rows. The page is `src/ui/features/scenes/`: a ▶ plays one clip
 alone at its level through Web Audio (`src/ui/sceneClip.ts`, a gain, since levels reach 300%), over
 `/api/music/tracks/:id/current` and `/api/effects/:id/current`. The unsaved scene lives in the page (one at a
-time); playing is Web Audio in `src/ui/` over the same clips, the same rules as above in a small
-scheduler that takes a clock and a random function so it is tested without audio.
+time). **Playing** (as-p86.4): the rules above are `src/core/sceneEngine.ts`, a pure engine that is
+told the time (seconds since the scene was entered) and answers with cues (start or stop a row's clip,
+with a fade or not) and what each row is doing (`RowNow`); it takes a `random` function and has no
+clock, so it is tested without audio. Rows are matched across an edit by id, play and state (not
+level): an unchanged row carries on, a changed or added one begins afresh, a removed one fades out.
+A random row's next wait counts from the end of its clip. `src/ui/scenePlayback.ts` runs the engine
+on Web Audio: it loads every clip first (Loading…), then enters the scene, ticks every 250 ms, and
+gives each sounding clip a fade gain (0.3 s on state changes, mute and solo, ■; one second for a music
+crossfade) and a level gain (a level change is heard at once). `src/ui/sceneRun.ts` is the hook the
+page uses (what is on the page, saved or not, is what plays; State, Mute and Solo live there and
+are never saved); `src/ui/sceneNow.ts` words the Now column. Mute and solo are keyed by the row's
+place in the table and by `music`. Nothing of playing survives opening another scene or a reload.
 
 ## 9. Server API
 
@@ -2497,8 +2507,8 @@ Small, independently useful increments:
     4. **Editing a scene** (as-p86.3, done: §8.11): the music, effects, add menu, unsaved changes, Save,
        Discard and the leave dialog, saved to the mix only (`PUT /api/scenes/:part/:id`, 409 with the
        saved entry when it changed meanwhile).
-    5. **Playing a scene** (as-p86.4): the play bar with states and each effect's own ▶, the
-       scheduler of §8.11, edits heard at once.
+    5. **Playing a scene** (as-p86.4, done: §8.11): the play bar with State and Triggers, the
+       scheduler of §8.11, the Now column, Mute and Solo, edits heard at once.
     6. **Triggers in the game** (RetroQuest rq-xfkn): the game fires the declared triggers and plays the
        effects the mix binds to them. The studio's play bar fires them from as-p86.4 on; a scene with no
        triggers declared shows none.
