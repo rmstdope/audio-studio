@@ -337,6 +337,17 @@ describe('an act with its scenes', () => {
     expect(gone.querySelector('[aria-label^="Play"]')).toBeNull()
     expect(gone.querySelector('[aria-label="Remove"]')).not.toBeNull()
   })
+
+  it('keeps the whole effect name as text and shows it on hover, beside the mark', () => {
+    const page = render({ ...open, scene: 'act1-forest' })
+    const gone = [...page.querySelectorAll('tbody tr')][1]!
+    const name = gone.querySelector('.scene-effect .scene-effect-name') as HTMLElement
+    expect(name.textContent).toBe('owl')
+    expect(name.title).toBe('owl')
+    expect(gone.querySelector('.scene-effect-cell .chip-danger')).not.toBeNull()
+    const silent = [...page.querySelectorAll('tbody tr')][0]!
+    expect(silent.querySelector('.scene-effect-cell a.chip')).not.toBeNull()
+  })
 })
 
 describe('playing a clip alone', () => {

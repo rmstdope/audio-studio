@@ -277,19 +277,23 @@ function EffectRowView({
         )}
       </td>
       <td className="scene-effect">
-        <span className="mono">{effect.id}</span>
-        {goneEffect ? (
-          <GoneMark />
-        ) : (
-          choice?.silent && (
-            <a
-              className="chip chip-warn"
-              href={routeHref({ view: 'effects', page: 'effect', effect: effect.id })}
-            >
-              no take chosen
-            </a>
-          )
-        )}
+        <div className="scene-effect-cell">
+          <span className="mono scene-effect-name" title={effect.id}>
+            {effect.id}
+          </span>
+          {goneEffect ? (
+            <GoneMark />
+          ) : (
+            choice?.silent && (
+              <a
+                className="chip chip-warn"
+                href={routeHref({ view: 'effects', page: 'effect', effect: effect.id })}
+              >
+                no take chosen
+              </a>
+            )
+          )}
+        </div>
       </td>
       <td className="scene-how">
         <Menu
