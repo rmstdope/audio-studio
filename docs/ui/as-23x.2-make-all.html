@@ -1,0 +1,770 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Make takes for every stinger not yet chosen (agreed)</title>
+    <style>
+      :root {
+        --bg: #0b0c10;
+        --panel: #12141a;
+        --raised: #191c24;
+        --line: #1f232d;
+        --line-strong: #2a2e39;
+        --text: #eceef3;
+        --soft: #c7ccd6;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-soft: #2a1b12;
+        --accent-ink: #ff9a6b;
+        --ok: #3ddc97;
+        --ok-bg: #10291f;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger: #ff94a8;
+        --chip: #1a1d26;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #07080b;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro,
+      .note {
+        max-width: 1100px;
+        margin: 0 auto 14px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .note {
+        margin-top: 26px;
+        color: var(--soft);
+      }
+      .frame {
+        max-width: 1100px;
+        margin: 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 22px 26px;
+      }
+      .frame.narrow {
+        max-width: 420px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .crumbs {
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12.5px;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        font-weight: 500;
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .play {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .play.on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0a02;
+      }
+      .play[disabled] {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--soft);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .brief {
+        max-width: 280px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .err {
+        color: var(--danger);
+        font-size: 12.5px;
+      }
+      .tag {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+      }
+      .callout {
+        border-left: 3px solid var(--accent);
+        padding: 2px 10px;
+        color: var(--soft);
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      .ncard {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        margin-top: 10px;
+        padding: 12px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .acts {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #1a0d05;
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn[disabled] {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-top: 16px;
+      }
+      .stat {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .stat .big {
+        font-size: 20px;
+        font-weight: 600;
+      }
+      .grow {
+        flex: 1;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--chip);
+        font-size: 12px;
+        color: var(--soft);
+      }
+      .chip.ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .chip.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .confirm {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .confirm h3 {
+        margin: 0 0 6px;
+        font-size: 15px;
+      }
+      .confirm ul {
+        margin: 6px 0 10px;
+        padding-left: 18px;
+        color: var(--soft);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .hint {
+        color: var(--faint);
+        font-size: 12.5px;
+        margin-top: 6px;
+      }
+      .tag-variant {
+        display: inline-block;
+        background: var(--accent);
+        color: #1a0d05;
+        font-weight: 700;
+        border-radius: 6px;
+        padding: 2px 8px;
+        margin-right: 8px;
+      }
+      .statusline {
+        border-left: 3px solid var(--accent);
+        padding: 8px 12px;
+        margin-top: 14px;
+        background: var(--raised);
+        border-radius: 6px;
+      }
+      .errline {
+        color: var(--danger);
+      }
+      .sec {
+        margin-top: 28px;
+      }
+      .sec > h4 {
+        max-width: 1100px;
+        margin: 0 auto 8px;
+        color: var(--soft);
+      }
+    </style>
+    <style>
+      .tip {
+        display: inline-block;
+        background: #000;
+        color: #eee;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 12px;
+        margin-left: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Make takes for every stinger not yet chosen (agreed)</h1>
+      The Stingers page works as an act’s Music page does (docs/ui/as-23x.1-make-all.html), and says
+      “stinger” throughout, including the panel heading “Stingers up to date” and the table’s
+      “Stinger” column. The <b>Stingers up to date</b> panel offers <b>Make 4 takes each</b> for
+      every stinger with no chosen take that is not already making takes. It asks first, inside the
+      panel. While takes are being made, Refresh from the game is greyed, and while a refresh runs
+      the panel’s button is greyed; each says why on hover. Every stinger fits every music model, so
+      nothing is ever left out for its length.
+    </div>
+    <div class="frame">
+      <div class="head">
+        <div>
+          <span class="crumbs">Music</span>
+          <h2>Stingers</h2>
+          <span class="muted">Played once, for a moment, anywhere in the game. 2 of 5 chosen.</span>
+        </div>
+        <div class="acts"><button class="btn">Refresh from the game</button></div>
+      </div>
+      <div class="panel">
+        <div class="stat">
+          <div>
+            <div class="label faint small">STINGERS UP TO DATE</div>
+            <span class="big">1</span> <span class="muted">of 5</span>
+          </div>
+          <div class="grow"></div>
+          <span class="muted">3 stingers have no chosen take</span
+          ><button class="btn primary">Make 4 takes each</button>
+        </div>
+        <div class="confirm panel">
+          <h3>Make 12 takes for 3 stingers?</h3>
+          <span class="muted"
+            >Four takes each, on <b>Balanced</b>, the music model on Setup. About 36 min in all —
+            they are made one after another, and you can leave the page.</span
+          >
+          <ul>
+            <li>Game over</li>
+            <li>Level up</li>
+            <li>Treasure found</li>
+          </ul>
+          <span class="hint">Victory and Boss appears have a chosen take and get none.</span>
+          <div class="row">
+            <button class="btn primary">Make 12 takes</button
+            ><button class="btn ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Stinger</th>
+            <th>Brief</th>
+            <th>Length</th>
+            <th>Plays</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><button class="play">▶</button></td>
+            <td>
+              <strong>Victory</strong>
+              <div class="mono faint">victory</div>
+            </td>
+            <td><div class="brief">Short triumphant brass fanfare</div></td>
+            <td>0:06</td>
+            <td>Take 2</td>
+            <td><span class="chip ok">chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play">▶</button></td>
+            <td>
+              <strong>Game over</strong>
+              <div class="mono faint">game-over</div>
+            </td>
+            <td><div class="brief">Short sad descending melody, strings and harp</div></td>
+            <td>0:05</td>
+            <td><span class="faint">Nothing to play yet</span></td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play">▶</button></td>
+            <td>
+              <strong>Level up</strong>
+              <div class="mono faint">level-up</div>
+            </td>
+            <td><div class="brief">Bright rising harp glissando with chimes</div></td>
+            <td>0:04</td>
+            <td>The game's file</td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play">▶</button></td>
+            <td>
+              <strong>Treasure found</strong>
+              <div class="mono faint">treasure</div>
+            </td>
+            <td><div class="brief">Sparkling bells, a quick upward run</div></td>
+            <td>0:03</td>
+            <td><span class="faint">Nothing to play yet</span></td>
+            <td><span class="chip">not chosen</span></td>
+          </tr>
+          <tr>
+            <td><button class="play">▶</button></td>
+            <td>
+              <strong>Boss appears</strong>
+              <div class="mono faint">boss</div>
+            </td>
+            <td><div class="brief">Low brass hit, timpani roll</div></td>
+            <td>0:05</td>
+            <td>Take 1</td>
+            <td><span class="chip warn">brief changed</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="sec">
+      <h4>Ready</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">3 stingers have no chosen take</span
+            ><button class="btn primary">Make 4 takes each</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Paid model (Eleven Music): the price is on the question’s button</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">3 stingers have no chosen take</span
+            ><button class="btn primary">Make 4 takes each</button>
+          </div>
+          <div class="confirm panel">
+            <h3>Make 12 takes for 3 stingers?</h3>
+            <span class="muted"
+              >Four takes each, on <b>Eleven Music</b>, the music model on Setup. ElevenLabs bills
+              each take.</span
+            >
+            <ul>
+              <li>Game over</li>
+              <li>Level up</li>
+              <li>Treasure found</li>
+            </ul>
+            <div class="row">
+              <button class="btn primary">Make 12 takes · $1.90</button
+              ><button class="btn ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>A stinger already making takes is left out</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">2 stingers have no chosen take</span
+            ><button class="btn primary">Make 4 takes each</button>
+          </div>
+          <div class="confirm panel">
+            <h3>Make 8 takes for 2 stingers?</h3>
+            <span class="muted"
+              >Four takes each, on <b>Balanced</b>, the music model on Setup. About 24 min in all —
+              they are made one after another, and you can leave the page.</span
+            >
+            <ul>
+              <li>Game over</li>
+              <li>Level up</li>
+            </ul>
+            <span class="hint"
+              >Treasure found is already making takes and gets none.<br />Victory and Boss appears
+              have a chosen take and get none.</span
+            >
+            <div class="row">
+              <button class="btn primary">Make 8 takes</button
+              ><button class="btn ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Music can’t be made yet (nothing installed)</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">Music can’t be made yet. Setup says what is missing.</span
+            ><button class="btn">Open Setup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Every stinger has a chosen take</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">5</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">Every stinger has a chosen take.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Starting failed</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">3 stingers have no chosen take</span
+            ><button class="btn primary">Make 4 takes each</button>
+          </div>
+        </div>
+        <div class="hint errline">The takes could not be started. Nothing was made; try again.</div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>
+        Being made (anything being made for a stinger, including takes started by hand; still shown
+        after a reload). Refresh from the game is greyed and says why on hover
+      </h4>
+      <div class="frame">
+        <div class="head">
+          <div>
+            <span class="crumbs">Music</span>
+            <h2>Stingers</h2>
+            <span class="muted"
+              >Played once, for a moment, anywhere in the game. 2 of 5 chosen.</span
+            >
+          </div>
+          <div class="acts">
+            <button class="btn" disabled>Refresh from the game</button
+            ><span class="tip"
+              >Takes are being made for the stingers. Refresh when they are done, or Stop all.</span
+            >
+          </div>
+        </div>
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+          </div>
+          <div class="statusline">
+            Making 12 takes for 3 stingers · about 36 min left
+            <button class="btn ghost">Stop all</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Stinger</th>
+              <th>Brief</th>
+              <th>Length</th>
+              <th>Plays</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><button class="play">▶</button></td>
+              <td>
+                <strong>Victory</strong>
+                <div class="mono faint">victory</div>
+              </td>
+              <td><div class="brief">Short triumphant brass fanfare</div></td>
+              <td>0:06</td>
+              <td>Take 2</td>
+              <td><span class="chip ok">chosen</span></td>
+            </tr>
+            <tr>
+              <td><button class="play">▶</button></td>
+              <td>
+                <strong>Game over</strong>
+                <div class="mono faint">game-over</div>
+              </td>
+              <td><div class="brief">Short sad descending melody, strings and harp</div></td>
+              <td>0:05</td>
+              <td><span class="faint">Nothing to play yet</span></td>
+              <td><span class="chip">making 4 takes · about 12 min</span></td>
+            </tr>
+            <tr>
+              <td><button class="play">▶</button></td>
+              <td>
+                <strong>Level up</strong>
+                <div class="mono faint">level-up</div>
+              </td>
+              <td><div class="brief">Bright rising harp glissando with chimes</div></td>
+              <td>0:04</td>
+              <td>The game's file</td>
+              <td><span class="chip">making 4 takes · about 24 min</span></td>
+            </tr>
+            <tr>
+              <td><button class="play">▶</button></td>
+              <td>
+                <strong>Treasure found</strong>
+                <div class="mono faint">treasure</div>
+              </td>
+              <td><div class="brief">Sparkling bells, a quick upward run</div></td>
+              <td>0:03</td>
+              <td><span class="faint">Nothing to play yet</span></td>
+              <td><span class="chip">making 4 takes · about 36 min</span></td>
+            </tr>
+            <tr>
+              <td><button class="play">▶</button></td>
+              <td>
+                <strong>Boss appears</strong>
+                <div class="mono faint">boss</div>
+              </td>
+              <td><div class="brief">Low brass hit, timpani roll</div></td>
+              <td>0:05</td>
+              <td>Take 1</td>
+              <td><span class="chip warn">brief changed</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>While refreshing from the game: the panel’s button is greyed and says why on hover</h4>
+      <div class="frame">
+        <div class="head">
+          <div>
+            <span class="crumbs">Music</span>
+            <h2>Stingers</h2>
+            <span class="muted"
+              >Played once, for a moment, anywhere in the game. 2 of 5 chosen.</span
+            >
+          </div>
+          <div class="acts"><button class="btn" disabled>Refreshing from the game…</button></div>
+        </div>
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">3 stingers have no chosen take</span
+            ><button class="btn primary" disabled>Make 4 takes each</button
+            ><span class="tip">Wait for the refresh from the game to finish.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Finished: every take made</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">Made 12 of 12 takes.</span><button class="btn ghost">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Finished: some failed</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted"
+              >Made 10 of 12 takes. 2 could not be made —
+              <a style="color: var(--accent-ink)">Level up</a> says why.</span
+            ><button class="btn ghost">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h4>Finished: stopped part-way</h4>
+      <div class="frame">
+        <div class="panel">
+          <div class="stat">
+            <div>
+              <div class="label faint small">STINGERS UP TO DATE</div>
+              <span class="big">1</span> <span class="muted">of 5</span>
+            </div>
+            <div class="grow"></div>
+            <span class="muted">Made 4 of 12 takes. 8 were stopped.</span
+            ><button class="btn ghost">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame narrow" style="margin-top: 28px">
+      <h4 style="margin: 0 0 8px; color: var(--soft)">
+        Narrow window: the line and button drop under the count
+      </h4>
+      <div class="panel">
+        <div class="label faint small">STINGERS UP TO DATE</div>
+        <span class="big">1</span> <span class="muted">of 5</span>
+        <div class="row">
+          <span class="muted">3 stingers have no chosen take</span
+          ><button class="btn primary">Make 4 takes each</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
