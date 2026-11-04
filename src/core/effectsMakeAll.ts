@@ -7,7 +7,7 @@ import { waitOf, type EffectMakingSummary } from './effectTakes'
 export const MAKE_ALL_TAKES = 4
 
 /** The body of a request to make takes for these effects (the ones the question listed). */
-export const MakeAllBody = z.object({ ids: z.array(z.string().min(1)).max(1000) }).strict()
+export const MakeAllBody = z.object({ ids: z.array(z.string().min(1)).max(500) }).strict()
 
 /** What the press made, as the batch ledger counts it: takes, not effects. */
 export interface EffectBatch {
@@ -136,9 +136,11 @@ export function runningLine(making: Record<string, EffectMakingSummary>): string
 
 /** What shows when the last take of the press is done: text around the names of effects that failed. */
 export interface BatchSummary {
+  /** The sentence up to the names of the effects that failed (all of it when none did). */
   before: string
   /** Effects with a failed take, once each, in the order they failed; each links to its page. */
   failed: string[]
+  /** What follows the names: "says why.", and the stopped sentence. */
   after: string
 }
 

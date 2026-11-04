@@ -602,22 +602,40 @@ export function createEffectTakes({
       const busy = (id: string) =>
         entriesOf(projectFile, id).some((entry) => entry.state !== 'failed')
       const wanted = [...new Set(ids)].filter((id) => listed.has(id) && !chosen[id] && !busy(id))
+      if (!wanted.length) return { ok: true, started: [] }
+      // The model every effect uses is a hand start's; when it cannot run, none is started.
+      const model = defaultEffectModel(
+        project.effects.model ?? DEFAULT_EFFECT_MODEL,
+        await modelStates(projectFile),
+        hasUv(),
+      )
+      const ready = await generator.ready(model)
+      if (!ready.ok) return { ok: false, message: ready.message }
       const started: { id: string; takes: number }[] = []
+      // Registered before the first take is queued, so a stop that arrives while the rest are
+      // being started is counted in this press.
+      const before = batches.get(projectFile)
       const batch: Batch = { total: 0, stopped: 0, ns: new Map() }
+      batches.set(projectFile, batch)
+      let failure: EffectMakeAllResult | null = null
       for (const id of wanted) {
-        const before = new Set(entriesOf(projectFile, id).map((entry) => entry.n))
+        const had = new Set(entriesOf(projectFile, id).map((entry) => entry.n))
         const result = await api.make(projectFile, id, { count: MAKE_ALL_TAKES })
         if (!result || !result.ok) {
-          // The same model serves every effect: when it cannot run, none was started.
-          if (!started.length) return result ?? { ok: false, message: 'That effect is not listed.' }
-          break
+          // This effect cannot be started (its board cannot be read); the others still are.
+          failure = result ?? { ok: false, message: `${id} is not listed.` }
+          continue
         }
-        const made = entriesOf(projectFile, id).filter((entry) => !before.has(entry.n))
+        const made = entriesOf(projectFile, id).filter((entry) => !had.has(entry.n))
         batch.ns.set(id, new Set(made.map((entry) => entry.n)))
         batch.total += made.length
         started.push({ id, takes: made.length })
       }
-      if (started.length) batches.set(projectFile, batch)
+      if (!started.length) {
+        if (before) batches.set(projectFile, before)
+        else batches.delete(projectFile)
+        return failure ?? { ok: true, started }
+      }
       return { ok: true, started }
     },
 

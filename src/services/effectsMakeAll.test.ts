@@ -105,7 +105,7 @@ describe('makeAll', () => {
   })
 
   it('skips an effect with a chosen take, one already making takes, an unknown id and a repeat', async () => {
-    const { file, takes, idle } = setup({ hold: true })
+    const { file, takes, idle, release } = setup({ hold: true })
     await takes.make(file, 'thunder', { count: 1 })
     const done = setup()
     await done.takes.make(done.file, 'coins', { count: 1 })
@@ -124,7 +124,8 @@ describe('makeAll', () => {
       started: [{ id: 'door-creak', takes: 4 }],
     })
     expect(await takes.batch(file)).toMatchObject({ total: 4 })
-    void idle
+    release()
+    await idle()
   })
 
   it('uses the other model when Setup’s is not on this computer', async () => {
@@ -185,6 +186,32 @@ describe('stopAll and batch', () => {
     const batch = await takes.batch(file)
     expect(batch).toMatchObject({ total: 8, made: 4, stopped: 0, running: false })
     expect(batch?.failed.map((f) => f.id)).toEqual(['broken', 'broken', 'broken', 'broken'])
+  })
+})
+
+describe('a press that is stopped, or cannot start one effect', () => {
+  it('counts takes stopped while the press is still starting as stopped, not made', async () => {
+    const { file, takes, release } = setup({ hold: true })
+    const pressing = takes.makeAll(file, ['door-creak', 'coins', 'thunder'])
+    // Stop all arrives while the later effects are still being started.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await takes.stopAll(file)
+    await pressing
+    await takes.stopAll(file)
+    release()
+    const batch = await takes.batch(file)
+    expect(batch?.total).toBe(12)
+    expect(batch?.made).toBe(0)
+    expect(batch?.stopped).toBe(12)
+  })
+
+  it('goes on past an effect whose board cannot be read', async () => {
+    const { root, file, takes, idle } = setup()
+    mkdirSync(join(root, '.content-studio/effect-boards'), { recursive: true })
+    writeFileSync(join(root, '.content-studio/effect-boards/door-creak.json'), '{ nope')
+    const result = await takes.makeAll(file, ['door-creak', 'coins'])
+    expect(result).toEqual({ ok: true, started: [{ id: 'coins', takes: 4 }] })
+    await idle()
   })
 })
 

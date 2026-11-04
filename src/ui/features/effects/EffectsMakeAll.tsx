@@ -52,7 +52,8 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   // until the page is reloaded, so a reload ends it, and so does Close.
   const wanted = useQuery({
     queryKey: ['effects-summary-open'],
-    queryFn: () => false,
+    // A refetch of everything (Setup's saves do that) keeps what the page already holds.
+    queryFn: () => client.getQueryData<boolean>(['effects-summary-open']) ?? false,
     initialData: false,
     staleTime: Infinity,
   }).data
@@ -60,6 +61,15 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   useEffect(() => {
     if (seen) client.setQueryData(['effects-summary-open'], true)
   }, [seen, client])
+  useEffect(() => {
+    // Takes started elsewhere take the question's place; it does not come back by itself.
+    if (running) setAsking(false)
+  }, [running])
+  const finished = Boolean(batch && !batch.running && !running)
+  useEffect(() => {
+    // The press ended before the running line was ever drawn: nothing is left to focus.
+    if (finished) focusStop.current = false
+  }, [finished])
   useEffect(() => {
     if (running && focusStop.current && stopButton.current) {
       focusStop.current = false
@@ -175,7 +185,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
               {
                 onSuccess: (result) => {
                   setAsking(false)
-                  if (result.ok) focusStop.current = true
+                  if (result.ok && result.started.length > 0) focusStop.current = true
                   else setFailed(true)
                 },
                 onError: () => {

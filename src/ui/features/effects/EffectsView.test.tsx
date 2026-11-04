@@ -96,7 +96,7 @@ function render(
   const text = () => container.textContent!.replace(/\s+/g, ' ')
   const button = (label: string) =>
     [...container.querySelectorAll('button')].find((b) => b.textContent!.trim() === label)!
-  return { container, calls, text, button, settle }
+  return { container, calls, text, button, settle, client }
 }
 
 const list: EffectsRoute = { view: 'effects', page: null }
@@ -826,6 +826,39 @@ describe('Make all, on the Sound effects list', () => {
     expect(container.querySelector('.make-all-summary a')!.getAttribute('href')).toBe(
       '#/effects/items/thunder',
     )
+  })
+
+  it('does not bring the question back after takes started elsewhere have ended', async () => {
+    const { client, text, button, settle } = render(
+      list,
+      effects({ rows: four }),
+      undefined,
+      seeds(),
+    )
+    act(() => button('Make 4 takes each').click())
+    act(() => client.setQueryData(['effects-making'], { coins: { takes: 1, left: 2 } }))
+    await settle()
+    expect(text()).not.toContain('Make 16 takes for 4 effects?')
+    act(() => client.setQueryData(['effects-making'], {}))
+    await settle()
+    expect(text()).not.toContain('Make 16 takes for 4 effects?')
+    expect(button('Make 4 takes each')).toBeDefined()
+  })
+
+  it('Close puts focus on the panel when no button is left', async () => {
+    const batch = { total: 4, made: 4, stopped: 0, failed: [], running: false }
+    const { container, button, settle } = render(
+      list,
+      effects({ rows: [chosen('a'), chosen('b')] }),
+      undefined,
+      seeds([
+        [['effects-batch'], batch],
+        [['effects-summary-open'], true],
+      ]),
+    )
+    act(() => button('Close').click())
+    await settle()
+    expect(document.activeElement).toBe(container.querySelector('.status-panel'))
   })
 
   it('shows no summary on a page that did not see the takes made', () => {

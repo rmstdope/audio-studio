@@ -2631,7 +2631,8 @@ export function useEffectsBatch(running: boolean) {
   return useQuery({
     queryKey: ['effects-batch'],
     queryFn: () => getJson<EffectBatch | null>('/api/effects/batch'),
-    refetchInterval: running ? 1000 : false,
+    // Until the batch itself says it is done, so the answer that ends it is never missed.
+    refetchInterval: (query) => (running || query.state.data?.running ? 1000 : false),
   })
 }
 
