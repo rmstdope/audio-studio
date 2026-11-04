@@ -47,6 +47,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   const makeButton = useRef<HTMLButtonElement | null>(null)
   const stopButton = useRef<HTMLButtonElement | null>(null)
   const focusStop = useRef(false)
+  const focusAfterClose = useRef(false)
   const refocus = useFocusWhenClosed(asking, opener)
   // The summary is wanted once this page has seen the press's takes being made; the client lives
   // until the page is reloaded, so a reload ends it, and so does Close.
@@ -71,6 +72,13 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
     if (finished) focusStop.current = false
   }, [finished])
   useEffect(() => {
+    // Close removes the summary and brings the button back: focus it once it is there.
+    if (!focusAfterClose.current) return
+    focusAfterClose.current = false
+    if (makeButton.current) makeButton.current.focus()
+    else document.querySelector<HTMLElement>('.status-panel')?.focus()
+  })
+  useEffect(() => {
     if (running && focusStop.current && stopButton.current) {
       focusStop.current = false
       stopButton.current.focus()
@@ -82,11 +90,10 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   const summary = wanted && batch && !batch.running && !running ? batchSummary(batch) : null
   const close = () => {
     client.setQueryData(['effects-summary-open'], false)
-    if (makeButton.current) makeButton.current.focus()
-    else document.querySelector<HTMLElement>('.status-panel')?.focus()
+    focusAfterClose.current = true
   }
   const summaryLine = summary && (
-    <p className="make-all-summary" role="status">
+    <p className="effects-make-all-summary" role="status">
       <span>
         {summary.before}
         {summary.failed.map((id, i) => (
@@ -106,8 +113,8 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   )
   if (running) {
     return (
-      <div className="make-all">
-        <p className="make-all-running">
+      <div className="effects-make-all">
+        <p className="effects-make-all-running">
           <span>{runningLine(making)}</span>
           <button
             ref={stopButton}
@@ -125,13 +132,13 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   const ready = (() => {
     if (!plan.startable.length) {
       return plan.chosen.length > 0 ? (
-        <p className="make-all-line muted">Every effect has a chosen take.</p>
+        <p className="effects-make-all-line muted">Every effect has a chosen take.</p>
       ) : null
     }
     if (!models || !('canMake' in models)) return null
     if (!models.canMake) {
       return (
-        <p className="make-all-line">
+        <p className="effects-make-all-line">
           <span>Sound effects can&apos;t be made yet. Setup says what is missing.</span>
           <a className="btn" href={routeHref({ view: 'setup' })}>
             Open Setup
@@ -140,7 +147,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
       )
     }
     return (
-      <p className="make-all-line">
+      <p className="effects-make-all-line">
         <span>{makeAllLine(plan.startable.length)}</span>
         <button
           ref={(element) => {
@@ -161,9 +168,9 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   })()
   return (
     <>
-      <div className="make-all">
+      <div className="effects-make-all">
         {summaryLine}
-        {ready}
+        {summaryLine ? null : ready}
         {failed && !asking && (
           <span className="adopt-error" role="alert">
             {EFFECTS_MAKE_ALL_FAILED}
@@ -238,7 +245,7 @@ function Question({
   const heading = makeAllHeading(takes, plan.startable.length)
   return (
     <div
-      className="make-all-question"
+      className="effects-make-all-question"
       role="alertdialog"
       aria-label={heading}
       onKeyDown={(event) => {
