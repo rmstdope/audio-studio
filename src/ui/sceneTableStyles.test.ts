@@ -13,12 +13,16 @@ describe('the Scenes sound effects table', () => {
   })
 
   it('cuts a long effect name with an ellipsis and never cuts the mark beside it', () => {
-    expect(rule('.scene-effect')).toMatch(/max-width:\s*0/)
+    expect(rule('.scene-effect-name')).toMatch(/max-width:\s*20ch/)
     expect(rule('.scene-effect-name')).toMatch(/text-overflow:\s*ellipsis/)
     expect(rule('.scene-effect-name')).toMatch(/white-space:\s*nowrap/)
     expect(rule('.scene-effect-name')).toMatch(/min-width:\s*0/)
     expect(rule('.scene-effect-cell')).toMatch(/display:\s*flex/)
     expect(rule('.scene-effect-cell .chip')).toMatch(/flex:\s*none/)
+  })
+
+  it('sizes the effect column to its content, so a short name beside a chip is never cut', () => {
+    expect(css).not.toContain('\n.scene-effect {')
   })
 
   it('moves "every 4–9 s" whole under its menu rather than squeezing', () => {

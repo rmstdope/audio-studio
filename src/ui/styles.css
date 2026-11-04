@@ -4169,16 +4169,13 @@ button.cue-chip[aria-expanded='true'] {
 .scene-play {
   width: 40px;
 }
-.scene-effect {
-  width: 28%;
-  max-width: 0;
-}
 .scene-effect-cell {
   display: flex;
   align-items: baseline;
 }
 .scene-effect-name {
   min-width: 0;
+  max-width: 20ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
