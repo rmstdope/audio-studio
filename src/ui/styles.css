@@ -4212,30 +4212,24 @@ button.cue-chip[aria-expanded='true'] {
 .scene-state {
   overflow-wrap: break-word;
 }
-/* A long name wraps inside its menu (at a hyphen first), so the table never outgrows its panel. */
-.scene-how .menu {
-  max-width: 100%;
+.scene-how .menu-button,
+.scene-state .menu-button {
+  white-space: nowrap;
 }
-.scene-how .menu-button {
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  text-align: left;
-}
-.scene-how .menu-button::after {
-  top: 50%;
-  transform: translateY(-50%);
-}
+/* A long trigger or state name (not the "How it plays" menu itself) wraps inside its menu, at a
+   hyphen first, so the table never outgrows its panel. */
+.scene-how .menu ~ .menu,
 .scene-state .menu {
   max-width: 100%;
 }
-.scene-state .menu-button {
-  max-width: 100%;
+.scene-how .menu ~ .menu .menu-button,
+.scene-state .menu .menu-button {
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: left;
 }
-.scene-state .menu-button::after {
+.scene-how .menu ~ .menu .menu-button::after,
+.scene-state .menu .menu-button::after {
   top: 50%;
   transform: translateY(-50%);
 }

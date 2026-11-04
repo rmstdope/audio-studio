@@ -98,12 +98,12 @@ describe('the Scenes sound effects table', () => {
   })
 
   it('wraps a long state or trigger name inside its menu, at a hyphen first and between letters last', () => {
-    for (const cell of ['.scene-how', '.scene-state']) {
-      const button = rule(`${cell} .menu-button`)
-      expect(button).not.toMatch(/white-space:\s*nowrap/)
-      expect(button).toMatch(/overflow-wrap:\s*anywhere/)
-      expect(rule(`${cell} .menu`)).toMatch(/max-width:\s*100%/)
-      expect(rule(`${cell} .menu-button::after`)).toMatch(/top:\s*50%/)
-    }
+    const wraps = '.scene-how .menu ~ .menu .menu-button,\n.scene-state .menu .menu-button'
+    expect(rule(wraps)).toMatch(/white-space:\s*normal/)
+    expect(rule(wraps)).toMatch(/overflow-wrap:\s*anywhere/)
+    expect(rule('.scene-how .menu ~ .menu,\n.scene-state .menu')).toMatch(/max-width:\s*100%/)
+    const arrow = rule(`${wraps.replaceAll('.menu-button', '.menu-button::after')}`)
+    expect(arrow).toMatch(/top:\s*50%/)
+    expect(arrow).toMatch(/transform:\s*translateY\(-50%\)/)
   })
 })
