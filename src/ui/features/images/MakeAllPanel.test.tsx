@@ -349,6 +349,7 @@ describe('Make takes for every image with no chosen take', () => {
       images: ['lighthouse'],
       failedBefore: {},
       stoppedBefore: {},
+      running: false,
     }
     // happy-dom moves focus on by itself when the focused node is removed (a browser drops it to
     // the body), so these tests record the focus() calls, though the first two cannot go red here.

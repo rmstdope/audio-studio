@@ -454,7 +454,13 @@ describe('Make takes for every stinger with no chosen take', () => {
   })
   describe('focus after Stop all', () => {
     const running = { forest: { takes: 3, left: 60, failed: 0 } }
-    const batch: MakeAllBatch = { total: 3, tracks: ['forest'], failedBefore: {}, stopped: 0 }
+    const batch: MakeAllBatch = {
+      total: 3,
+      tracks: ['forest'],
+      failedBefore: {},
+      stopped: 0,
+      running: false,
+    }
     // happy-dom moves focus on by itself when the focused node is removed (a browser drops it to
     // the body), so these tests record the focus() calls, though the first two cannot go red here.
     const focused: Element[] = []
@@ -497,6 +503,7 @@ describe('Make takes for every stinger with no chosen take', () => {
       await finish(page)
       expect(focused.at(-1)).toBe(page.button('Close'))
       await page.press('Close')
+      await settle()
       expect(document.activeElement).toBe(page.button('Make 4 takes each'))
     })
 
