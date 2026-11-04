@@ -158,10 +158,32 @@ export function routeHref(route: Route): string {
   return `${route.view === 'lines' ? `#/parts/${part}/lines` : `#/parts/${part}`}${query}`
 }
 
-/** A page's check on a move of the address: true when it has put the address back to ask first. */
-type Hold = () => boolean
+/**
+ * A page's check on a move of the address, `delta` entries along the session history (1 for a new
+ * entry or Forward, -1 for Back, 0 when unknown): true when it has undone the move to ask first.
+ */
+type Hold = (delta: number) => boolean
 
 let hold: Hold | null = null
+
+/** The key in `history.state` that numbers each entry, so a move tells how far it went. */
+const AT = 'contentStudioAt'
+
+/** The number of the entry the router follows. */
+let here = 0
+
+/**
+ * The number of the entry the browser is at. An entry without one is new, and is given `fresh`;
+ * the rest keep theirs, across Back, Forward and reloads.
+ */
+function entryAt(fresh: number): number {
+  const state: unknown = window.history.state
+  const known = typeof state === 'object' && state !== null ? Reflect.get(state, AT) : undefined
+  if (typeof known === 'number') return known
+  const kept = typeof state === 'object' && state !== null ? state : {}
+  window.history.replaceState({ ...kept, [AT]: fresh }, '')
+  return fresh
+}
 
 /**
  * Lets the open page stop the route from following a move of the address (a page with unsaved
@@ -180,8 +202,13 @@ export function holdRoute(check: Hold): () => void {
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash))
   useEffect(() => {
+    // A fresh page load is the last entry.
+    here = entryAt(window.history.length - 1)
     const update = () => {
-      if (hold?.()) return
+      // A move to an entry never seen before is a new one, pushed after the one the user was at.
+      const at = entryAt(here + 1)
+      if (hold?.(at - here)) return
+      here = at
       setRoute(parseRoute(window.location.hash))
     }
     window.addEventListener('hashchange', update)

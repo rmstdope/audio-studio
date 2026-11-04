@@ -130,7 +130,7 @@ export function useLeaveGuard(dirty: boolean, ask: (leaving: Leaving) => void) {
   const allow = useRef(false)
 
   useEffect(() => {
-    const moved = (): boolean => {
+    const moved = (delta: number): boolean => {
       const to = window.location.hash
       if (allow.current || !dirtyRef.current) {
         accepted.current = to
@@ -138,12 +138,16 @@ export function useLeaveGuard(dirty: boolean, ask: (leaving: Leaving) => void) {
         return false
       }
       if (to === accepted.current) return false
-      // Back to where the user was, then ask.
-      window.history.replaceState(null, '', accepted.current || '#')
+      // Back to where the user was, then ask. Undone along the history, so the entry moved to stays
+      // where it was and going on is the same move again; only a move of unknown length is put
+      // back over the entry it reached.
+      if (delta !== 0) window.history.go(-delta)
+      else window.history.replaceState(window.history.state, '', accepted.current || '#')
       askRef.current({
         proceed: () => {
           allow.current = true
-          window.location.hash = to
+          if (delta !== 0) window.history.go(delta)
+          else window.location.hash = to
         },
       })
       return true

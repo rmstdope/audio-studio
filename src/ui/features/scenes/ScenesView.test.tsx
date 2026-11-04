@@ -4,6 +4,7 @@ import type { EffectsSummary } from '../../../core/effects'
 import type { MusicListSummary, TrackRow } from '../../../core/music'
 import type { SceneMix } from '../../../core/scenes'
 import type { ProjectSummary } from '../../../core/summary'
+import { fakeHistory } from '../../../../test/fakeHistory'
 import { useRoute, type ScenesRoute } from '../../route'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
@@ -951,7 +952,7 @@ describe('leaving a scene with unsaved changes', () => {
     ['another page', '#/music'],
   ])(
     'undoes a move to %s before the router follows it and asks; Don’t save goes on',
-    (_name, target) => {
+    async (_name, target) => {
       // The page's own router, as in the app (`routeHold.test.tsx` pins that it asks the page first).
       const Routed = () => {
         const route = useRoute()
@@ -959,29 +960,31 @@ describe('leaving a scene with unsaved changes', () => {
           ? createElement(ScenesView, { summary: summary(), route })
           : null
       }
-      window.history.replaceState(null, '', '#/scenes/parts/act1?scene=act1-store')
+      // A browser's history: the move is undone along it (`sceneDraft.test.tsx` pins Back too).
+      const history = fakeHistory('#/scenes/parts/act1?scene=act1-store')
       const client = new QueryClient({
         defaultOptions: { queries: { retry: false, enabled: false } },
       })
       const container = document.createElement('div')
       document.body.append(container)
       const root = createRoot(container)
-      cleanups.push(() => act(() => root.unmount()))
+      cleanups.push(() => {
+        act(() => root.unmount())
+        history.restore()
+      })
       act(() => root.render(createElement(QueryClientProvider, { client }, createElement(Routed))))
       type(musicLevel(container), '40')
-      window.history.replaceState(null, '', target)
-      act(() => {
-        window.dispatchEvent(new HashChangeEvent('hashchange'))
-      })
+      act(() => history.click(target))
       expect(dialog()).not.toBeNull()
-      expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-store')
       expect(text(container.querySelector('h1'))).toBe('General store')
+      // The browser's moves along the history land a moment later.
+      const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 5)))
+      await settle()
+      expect(window.location.hash).toBe('#/scenes/parts/act1?scene=act1-store')
       act(() => button(container, "Don't save").click())
-      // The browser fires hashchange on its own; happy-dom does so late, so say it here.
-      act(() => {
-        window.dispatchEvent(new HashChangeEvent('hashchange'))
-      })
+      await settle()
       expect(window.location.hash).toBe(target)
+      expect(history.hashes()).toEqual(['#/scenes/parts/act1?scene=act1-store', target])
       expect(text(container.querySelector('h1'))).not.toBe('General store')
     },
   )
