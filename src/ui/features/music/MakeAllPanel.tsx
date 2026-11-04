@@ -27,10 +27,11 @@ import {
   summaryStopped,
   tooLongLine,
 } from '../../musicMakeAllText'
+import { useStopFocus } from '../../components/useStopFocus'
 import { routeHref } from '../../route'
 
 /** What focus goes to once the panel has re-rendered after a press. */
-type Focus = 'button' | 'make' | 'stop' | null
+type Focus = 'button' | 'make' | 'stop' | 'close' | null
 
 /**
  * The action of the "Tracks up to date" (or "Stingers up to date") panel on a list: a button that makes four takes for every
@@ -62,10 +63,11 @@ export function MakeAllPanel({
   const button = useRef<HTMLButtonElement>(null)
   const makeButton = useRef<HTMLButtonElement>(null)
   const stopButton = useRef<HTMLButtonElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
   // Focus moves after the render that shows its target.
   useEffect(() => {
     if (!focus) return
-    const target = { button, make: makeButton, stop: stopButton }[focus].current
+    const target = { button, make: makeButton, stop: stopButton, close: closeButton }[focus].current
     if (target) target.focus()
     else if (focus === 'button') panel.current?.focus()
     setFocus(null)
@@ -92,6 +94,11 @@ export function MakeAllPanel({
       : null
   // A question gives way to the running line when takes start elsewhere, and does not come back.
   const busy = running.takes > 0
+  const stopFocus = useStopFocus(busy, () => setFocus(batch ? 'close' : 'button'))
+  const { reset: resetStop } = stop
+  useEffect(() => {
+    if (!busy) resetStop()
+  }, [busy, resetStop])
   useEffect(() => {
     if (busy) setOpen(false)
   }, [busy])
@@ -110,13 +117,14 @@ export function MakeAllPanel({
           ref={stopButton}
           type="button"
           className="btn btn-ghost"
-          disabled={stop.isPending}
+          aria-disabled={stop.isPending || undefined}
           title={
             paid
               ? 'ElevenLabs may still bill a take that is stopped while it is being made.'
               : undefined
           }
-          onClick={() => stop.mutate()}
+          onClick={() => !stop.isPending && stop.mutate()}
+          {...stopFocus}
         >
           Stop all
         </button>
@@ -158,6 +166,7 @@ export function MakeAllPanel({
           {batch.stopped > 0 && ` ${summaryStopped(batch.stopped)}`}
         </span>
         <button
+          ref={closeButton}
           type="button"
           className="btn"
           onClick={() => {
@@ -294,6 +303,11 @@ export function MakeAllPanel({
         <span id={reasonId} hidden>
           {MAKE_BLOCKED_BY_REFRESH}
         </span>
+      )}
+      {stop.isError && busy && (
+        <p className="make-all-error" role="alert">
+          The takes could not be stopped. They are still being made; try again.
+        </p>
       )}
       {make.isError && (
         <p className="make-all-error" role="alert">

@@ -7,6 +7,7 @@ import {
 } from '../../../core/effectModels'
 import {
   EFFECTS_MAKE_ALL_FAILED,
+  EFFECTS_STOP_FAILED,
   MAKE_ALL_TAKES,
   batchSummary,
   leftOutLines,
@@ -24,6 +25,7 @@ import {
   useMakeAllEffects,
   useStopAllEffects,
 } from '../../api'
+import { useStopFocus } from '../../components/useStopFocus'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { routeHref } from '../../route'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -46,6 +48,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   const opener = useRef<HTMLButtonElement | null>(null)
   const makeButton = useRef<HTMLButtonElement | null>(null)
   const stopButton = useRef<HTMLButtonElement | null>(null)
+  const closeButton = useRef<HTMLButtonElement | null>(null)
   const focusStop = useRef(false)
   const refocus = useFocusWhenClosed(asking, opener)
   // The summary is wanted once this page has seen the press's takes being made; the client lives
@@ -76,6 +79,16 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
       stopButton.current.focus()
     }
   })
+  // Where focus goes when Stop all goes away: the summary's Close, else the panel's button or the panel.
+  const stopFocus = useStopFocus(running, () => {
+    if (closeButton.current) closeButton.current.focus()
+    else if (makeButton.current) makeButton.current.focus()
+    else document.querySelector<HTMLElement>('.status-panel')?.focus()
+  })
+  const { reset: resetStop } = stopAll
+  useEffect(() => {
+    if (!running) resetStop()
+  }, [running, resetStop])
   const plan = planMakeAll(effects.rows, making)
   if (plan.lockUnread) return null
   const names = Object.fromEntries(effects.rows.map((row) => [row.id, row.name]))
@@ -99,7 +112,7 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
         ))}
         {summary.after}
       </span>
-      <button className="btn btn-ghost" type="button" onClick={close}>
+      <button ref={closeButton} className="btn btn-ghost" type="button" onClick={close}>
         Close
       </button>
     </p>
@@ -113,12 +126,18 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
             ref={stopButton}
             className="btn"
             type="button"
-            disabled={stopAll.isPending}
-            onClick={() => stopAll.mutate()}
+            aria-disabled={stopAll.isPending || undefined}
+            onClick={() => !stopAll.isPending && stopAll.mutate()}
+            {...stopFocus}
           >
             Stop all
           </button>
         </p>
+        {stopAll.isError && (
+          <span className="adopt-error" role="alert">
+            {EFFECTS_STOP_FAILED}
+          </span>
+        )}
       </div>
     )
   }

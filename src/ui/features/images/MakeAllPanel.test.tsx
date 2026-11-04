@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImageModelId, ImageModelState } from '../../../core/imageModels'
 import type { ImageMakingSummary } from '../../../core/imageTakes'
@@ -56,6 +56,8 @@ interface Options {
   batch?: ImagesBatch
   answer?: { status: number }
   started?: Record<string, ImageMakingSummary>
+  /** Whether Stop all is refused. */
+  stopFails?: boolean
 }
 
 /** The panel on an act, with what the server would have said, and the requests it makes. */
@@ -65,6 +67,7 @@ function render(subject: ImagesAct, options: Options = {}) {
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     requests.push({ url: String(url), method: init?.method ?? 'GET' })
     if (String(url).endsWith('/stop')) {
+      if (options.stopFails) return new Response('{}', { status: 500 })
       return new Response(JSON.stringify({ ok: true, stopped: 2 }), { status: 200 })
     }
     if (options.started && String(url).endsWith('/make-all')) {
@@ -320,5 +323,96 @@ describe('Make takes for every image with no chosen take', () => {
     expect(page.text()).toContain("Images can't be made yet. Setup says what is missing.")
     expect(page.button('Open Setup').getAttribute('href')).toContain('setup')
     expect(page.text()).not.toContain('Make 4 takes each')
+  })
+  describe('focus after Stop all', () => {
+    const running = { lighthouse: { takes: 2, left: 16, failed: 0, stopped: 0 } }
+    const batch: ImagesBatch = {
+      total: 2,
+      images: ['lighthouse'],
+      failedBefore: {},
+      stoppedBefore: {},
+    }
+    // happy-dom moves focus on by itself when the focused node is removed (a browser drops it to
+    // the body), so these tests record the focus() calls, though the first two cannot go red here.
+    const focused: Element[] = []
+    const realFocus = HTMLElement.prototype.focus
+    beforeEach(() => {
+      focused.length = 0
+      HTMLElement.prototype.focus = function (this: HTMLElement) {
+        focused.push(this)
+        realFocus.call(this)
+      }
+    })
+    afterEach(() => {
+      HTMLElement.prototype.focus = realFocus
+    })
+    // The query client tells the page about a mutation a moment after it changes.
+    const settle = () => act(async () => void (await new Promise((r) => setTimeout(r, 10))))
+    const finish = (page: ReturnType<typeof render>) =>
+      act(async () => {
+        page.client.setQueryData(['image-making'], {})
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      })
+
+    it('keeps focus on a greyed Stop all while stopping, then moves it to Close', async () => {
+      const page = render(three, { batch, making: running })
+      page.button('Stop all').focus()
+      const answered = globalThis.fetch
+      let release = () => {}
+      globalThis.fetch = ((url: string, init?: RequestInit) =>
+        new Promise((resolve) => {
+          release = () => resolve(answered(url, init))
+        })) as unknown as typeof fetch
+      await act(async () => {
+        page.button('Stop all').click()
+      })
+      await settle()
+      expect(page.button('Stop all').getAttribute('aria-disabled')).toBe('true')
+      expect(page.button('Stop all').textContent).toBe('Stop all')
+      expect(document.activeElement).toBe(page.button('Stop all'))
+      await act(async () => release())
+      await finish(page)
+      expect(focused.at(-1)).toBe(page.button('Close'))
+      await page.press('Close')
+      expect(document.activeElement).toBe(page.button('Make 4 takes each'))
+    })
+
+    it('goes to the panel button when there is no summary to show', async () => {
+      const page = render(three, { making: running })
+      page.button('Stop all').focus()
+      await page.press('Stop all')
+      await finish(page)
+      expect(focused.at(-1)).toBe(page.button('Make 4 takes each'))
+    })
+
+    it('moves focus when the takes finish on their own only if it was on Stop all', async () => {
+      const on = render(three, { batch, making: running })
+      on.button('Stop all').focus()
+      await finish(on)
+      expect(focused.at(-1)).toBe(on.button('Close'))
+      const elsewhere = render(three, { batch, making: running })
+      const other = document.createElement('input')
+      document.body.append(other)
+      other.focus()
+      focused.length = 0
+      await finish(elsewhere)
+      expect(focused).toEqual([])
+      expect(document.activeElement).toBe(other)
+    })
+
+    it('says when stopping failed, keeps Stop all and its focus, and clears the line when the takes finish', async () => {
+      const page = render(three, { batch, making: running, stopFails: true })
+      page.button('Stop all').focus()
+      await page.press('Stop all')
+      await settle()
+      const words = 'The takes could not be stopped. They are still being made; try again.'
+      expect(page.text()).toContain(words)
+      expect(document.activeElement).toBe(page.button('Stop all'))
+      await page.press('Stop all')
+      await settle()
+      expect(page.text()).toContain(words)
+      await finish(page)
+      expect(page.text()).not.toContain(words)
+    })
   })
 })

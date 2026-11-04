@@ -2440,3 +2440,12 @@ Small, independently useful increments:
    ACE-Step and Whisper (42 of the 48 GB in use with both loaded, §8.5; Small SFX adds about 5),
    Small SFX's memory on the GPU, its time beside a running Whisper check, offline loading
    (`HF_HUB_OFFLINE`) once downloaded, and effects RetroQuest actually lists.
+
+**Focus after Stop all (as-dxo; drawn in `docs/ui/as-dxo-stop-all-focus.html`).** On the four Make-all panels
+(Music, Stingers, Images, Sound effects) Stop all is greyed with `aria-disabled` while the stop is under
+way, so it keeps focus and its words. `useStopFocus` (`src/ui/components/useStopFocus.ts`) remembers whether
+focus was on Stop all when the running line ends, whether by the stop or by the takes finishing, and then
+moves it to the summary's Close, or to the panel's button (the panel itself without one) when there is no
+summary; focus anywhere else is left alone. A refused or unreachable stop keeps the running line and Stop
+all and shows "The takes could not be stopped. They are still being made; try again." under the panel until
+the next press, the end of the takes, or a reload. Nothing is persisted.
