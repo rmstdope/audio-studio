@@ -3482,13 +3482,22 @@ describe('server, a track’s takes', () => {
     expect((await post('/api/music/lists/act1/stop', 'https://evil.example')).status).toBe(403)
     expect((await post('/api/music/lists/nobody/make-all')).status).toBe(404)
     expect((await post('/api/music/lists/nobody/stop')).status).toBe(404)
+    expect((await post('/api/music/lists/act1/batch/close', 'https://evil.example')).status).toBe(
+      403,
+    )
     const state = await (await fetch(new URL('/api/music/model-state', studio.url))).json()
     expect(state).toMatchObject({ ok: true, model: 'balanced' })
     const made = await post('/api/music/lists/act1/make-all')
     expect(made.status).toBe(200)
     expect(await made.json()).toEqual({ ok: true, tracks: 1, takes: 4 })
+    const batchUrl = new URL('/api/music/lists/act1/batch', studio.url)
+    expect(await (await fetch(batchUrl)).json()).toMatchObject({ total: 4, tracks: ['hall'] })
     const stopped = await (await post('/api/music/lists/act1/stop')).json()
     expect(stopped.ok).toBe(true)
+    expect(await (await fetch(batchUrl)).json()).toMatchObject({ running: false })
+    expect((await (await fetch(batchUrl)).json()).stopped).toBe(stopped.stopped)
+    expect(await (await post('/api/music/lists/act1/batch/close')).json()).toEqual({ ok: true })
+    expect(await (await fetch(batchUrl)).json()).toBeNull()
   })
 })
 
@@ -5223,6 +5232,7 @@ describe('the image takes routes', () => {
       ['POST', '/api/images/bring-all', undefined],
       ['POST', '/api/image-acts/act1/make-all', undefined],
       ['POST', '/api/image-acts/act1/stop', undefined],
+      ['POST', '/api/image-acts/act1/batch/close', undefined],
     ] as const) {
       expect((await send(method, path, body, 'https://evil.example')).status).toBe(403)
     }
@@ -5287,6 +5297,16 @@ describe('the image takes routes', () => {
     expect(made.takes).toHaveLength(before + 4)
     const stopped = await (await send('POST', '/api/image-acts/act1/stop')).json()
     expect(stopped).toEqual({ ok: true, stopped: 0 })
+    const batchUrl = new URL('/api/image-acts/act1/batch', studio.url)
+    expect(await (await fetch(batchUrl)).json()).toMatchObject({
+      total: 4,
+      images: ['inn'],
+      running: false,
+    })
+    expect(await (await send('POST', '/api/image-acts/act1/batch/close')).json()).toEqual({
+      ok: true,
+    })
+    expect(await (await fetch(batchUrl)).json()).toBeNull()
   })
 
   it('answers 409 when images cannot be made at all', async () => {

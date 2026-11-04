@@ -217,6 +217,91 @@ describe('makeAll, stopAll and modelState', () => {
   })
 })
 
+describe('the summary of a press on a list is kept by the studio', () => {
+  const two = {
+    'tts/act1/music.json': [
+      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
+      { id: 'cellar', title: 'Cellar', brief: 'drips fail', seconds: 20 },
+    ],
+  }
+
+  it('is there for a caller who never saw the press, says it runs, and is per list', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes, settled } = setup(undefined, two, [], gate)
+    expect(await takes.batch(file, 'act1')).toBeNull()
+    await takes.makeAll(file, 'act1')
+    expect(await takes.batch(file, 'act1')).toEqual({
+      total: 8,
+      tracks: ['hall', 'cellar'],
+      failedBefore: { hall: 0, cellar: 0 },
+      stopped: 0,
+      running: true,
+    })
+    expect(await takes.batch(file, 'stingers')).toBeNull()
+    release()
+    await settled('hall')
+    await settled('cellar')
+    expect(await takes.batch(file, 'act1')).toMatchObject({ total: 8, running: false })
+    expect(await takes.batch(file, 'nobody')).toBeNull()
+  })
+
+  it('counts the takes Stop all stopped on the press’s own tracks', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes } = setup(undefined, two, [], gate)
+    await takes.makeAll(file, 'act1')
+    await takes.stopAll(file, 'act1')
+    expect(await takes.batch(file, 'act1')).toMatchObject({ stopped: 8, running: false })
+    release()
+  })
+
+  it('remembers how many takes had failed before the press', async () => {
+    const { file, takes, settled } = setup(undefined, two)
+    await takes.make(file, 'cellar', { count: 1 })
+    await settled('cellar')
+    await takes.makeAll(file, 'act1')
+    expect(await takes.batch(file, 'act1')).toMatchObject({
+      failedBefore: { hall: 0, cellar: 1 },
+    })
+  })
+
+  it('is forgotten by closeBatch, and by takes started by hand once it has ended', async () => {
+    const { file, takes, settled } = setup(undefined, two)
+    await takes.makeAll(file, 'act1')
+    await settled('hall')
+    await settled('cellar')
+    expect(await takes.closeBatch(file, 'act1')).toEqual({ ok: true })
+    expect(await takes.batch(file, 'act1')).toBeNull()
+    await takes.makeAll(file, 'act1')
+    await settled('hall')
+    await settled('cellar')
+    await takes.make(file, 'hall', { count: 1 })
+    expect(await takes.batch(file, 'act1')).toBeNull()
+  })
+
+  it('goes on while takes are started by hand during the press, and a new press replaces it', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes, settled } = setup(undefined, two, [], gate)
+    await takes.makeAll(file, 'act1')
+    await takes.make(file, 'hall', { count: 1 })
+    expect(await takes.batch(file, 'act1')).toMatchObject({ total: 8, running: true })
+    release()
+    await settled('hall')
+    await settled('cellar')
+    await takes.closeBatch(file, 'act1')
+    await takes.makeAll(file, 'act1')
+    await settled('hall')
+    await settled('cellar')
+    expect(await takes.batch(file, 'act1')).toMatchObject({
+      total: 8,
+      failedBefore: { hall: 0, cellar: 4 },
+      running: false,
+    })
+  })
+})
+
 describe('createMusicTakes', () => {
   it('makes two takes of a loop, shaped to its length, and lists them with their seeds', async () => {
     const { file, takes, requests, settled } = setup()

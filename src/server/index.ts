@@ -1587,6 +1587,16 @@ export function startServer({
           imageAnswer(await imageTakes.makeAll(projectFile, request.params.id)),
         ),
       },
+      '/api/image-acts/:id/batch': {
+        GET: guard(async (request) =>
+          Response.json(await imageTakes.batch(projectFile, request.params.id)),
+        ),
+      },
+      '/api/image-acts/:id/batch/close': {
+        POST: fromOwnPage(async (request) =>
+          Response.json(await imageTakes.closeBatch(projectFile, request.params.id)),
+        ),
+      },
       '/api/image-acts/:id/stop': {
         POST: fromOwnPage(async (request) => {
           const result = await imageTakes.stopAll(projectFile, request.params.id)
@@ -1933,6 +1943,16 @@ export function startServer({
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),
+      },
+      '/api/music/lists/:id/batch': {
+        GET: guard(async (request) =>
+          Response.json(await musicTakes.batch(projectFile, request.params.id)),
+        ),
+      },
+      '/api/music/lists/:id/batch/close': {
+        POST: fromOwnPage(async (request) =>
+          Response.json(await musicTakes.closeBatch(projectFile, request.params.id)),
+        ),
       },
       '/api/music/lists/:id/stop': {
         POST: fromOwnPage(async (request) => {
