@@ -27,16 +27,16 @@ export function App() {
   if (project.isPending) {
     return <div className="center-page muted">Opening project…</div>
   }
-  const result = project.data
-  // A failed refetch keeps the page that is open, so a brief outage leaves its own lines to say so.
-  if (result === undefined) {
+  // Only a first read that failed: a failed refetch keeps the open page, so the page and its panels
+  // can show their own error lines through a brief outage.
+  if (project.isLoadingError) {
     return (
       <div className="center-page">
         <div className="empty-state">
           <strong>The studio server did not answer</strong>
           <span>
             Is <span className="mono">content-studio</span> still running in the terminal?{' '}
-            {project.error?.message}
+            {project.error.message}
           </span>
           <button className="btn" style={{ alignSelf: 'center' }} onClick={() => project.refetch()}>
             Try again
@@ -46,6 +46,7 @@ export function App() {
     )
   }
 
+  const result = project.data
   if (!result.ok) {
     return (
       <div className="center-page">

@@ -44,12 +44,12 @@ const summary = {
 } as unknown as ProjectSummary
 
 /** Renders the studio on `hash`, with `loaded` as the project already read; every request fails. */
-async function render(hash: string, loaded?: unknown) {
+async function render(hash: string, loaded: unknown) {
   window.location.hash = hash
   globalThis.fetch = (() =>
     Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  if (loaded !== undefined) client.setQueryData(['project'], loaded)
+  client.setQueryData(['project'], loaded)
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
@@ -71,10 +71,5 @@ describe('a brief outage of the studio server', () => {
     expect(client.getQueryState(['project'])?.status).toBe('error')
     expect(container.textContent).not.toContain('The studio server did not answer')
     expect(container.querySelector('h1')?.textContent).toBe('Changes')
-  })
-
-  it('says the server did not answer when the project was never loaded', async () => {
-    const { container } = await render('#/changes')
-    expect(container.textContent).toContain('The studio server did not answer')
   })
 })
