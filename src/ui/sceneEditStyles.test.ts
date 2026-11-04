@@ -58,8 +58,9 @@ describe('the scene editor’s styles', () => {
   })
 
   it('opens the add-effect menu in front of the play bar, its list scrolling', () => {
-    const z = (selector: string) => Number(/z-index:\s*(\d+)/.exec(rule(css, selector))?.[1] ?? 0)
-    expect(z('.scene-add-list')).toBeGreaterThan(z('.scene-playbar'))
+    const z = (...selectors: string[]) =>
+      Number(selectors.map((s) => /z-index:\s*(\d+)/.exec(rule(css, s))?.[1]).find(Boolean))
+    expect(z('.scene-add-list', '.menu-list')).toBeGreaterThan(z('.scene-playbar'))
     expect(rule(css, '.scene-add-list ul')).toContain('max-height')
     expect(rule(css, '.scene-add-list ul')).toContain('overflow-y: auto')
   })
