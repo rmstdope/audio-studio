@@ -1886,7 +1886,8 @@ consumer rule beyond naming this page).
   with a gain, not the element's volume. The shared loops are what `music.refreshShared` lists;
   today it lists only stingers, which are not loops, so the menu's "shared tracks" are none until
   the game lists some. Absent `music`: what the game chooses for the scene now (its own track when
-  it has a chosen take, else the act's loop) at 1. A track with no chosen take plays no music; the
+  it has a chosen take or a file of the game's own, else the act's loop) at 1. A track with neither
+  plays no music; the
   scene's effects play all the same. `effects` absent or `[]`: no effects. A scene with no entry at all plays
   its own track and no effects.
 - An effect's `id` is one of the game's sound effects (§8.9); the same id may appear twice in a
@@ -1926,7 +1927,7 @@ consumer rule beyond naming this page).
 
 **How the game plays a scene** (what the studio's play bar copies): the **effects belong to the
 scene, not to its music** (rq-xazj moves them off the track's voice): they play with `track: null`
-and with a track that has no chosen take. Entering a scene whose music is already playing carries
+and with a track that has neither a chosen take nor a file of the game's own. Entering a scene whose music is already playing carries
 the music on and swaps the effects: those of the scene left stop, those of the new one start.
 Entering the scene starts its music and every effect whose state is the scene's current one (the first state at entry, unless the
 game says otherwise). Loops loop; a random effect waits a random time in its range before each
@@ -1949,7 +1950,7 @@ game (which invalidates the project) need no route of their own; as-p86.3 adds t
 no `GET /api/scenes/:part` is built. What a scene's rows say of the rest of the studio comes from the
 summaries already read: an effect is _silent_ when its lock has no chosen take, _playable_ when the
 chosen take's clip is there; the music is _playable_ when the act's music list has the track with a
-chosen take whose file is there. A scene the mix has no entry for reads as an empty one; where the mix has no `music` the page shows the scene's own
+chosen take, or with the game's own file, that is there. A scene the mix has no entry for reads as an empty one; where the mix has no `music` the page shows the scene's own
 track at 100% when the act's list has it, and "No music" otherwise (the contract's fallback to "the act's loop"
 cannot be told from the files, which name no act-level loop); a scene whose entry cannot be read is listed as
 "unreadable" and shows none of its rows. The page is `src/ui/features/scenes/`: a ▶ plays one clip

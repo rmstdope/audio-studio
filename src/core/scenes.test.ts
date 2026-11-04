@@ -220,6 +220,24 @@ describe('summarizeScenes', () => {
     expect(missing.music.playable).toBe(false)
   })
 
+  it('plays a track the game still plays from its own file, when the file is there', () => {
+    const game = (exists: boolean): CurrentMusic => ({
+      kind: 'game',
+      file: 'music/store.wav',
+      exists,
+    })
+    const there = summarize({
+      declarations: decl(store),
+      music: [musicList([track('store', game(true))])],
+    }).scenes[0]!
+    expect(there.music).toMatchObject({ track: 'store', playable: true, gone: false })
+    const missing = summarize({
+      declarations: decl(store),
+      music: [musicList([track('store', game(false))])],
+    }).scenes[0]!
+    expect(missing.music.playable).toBe(false)
+  })
+
   it('marks a track the readable music list no longer has as gone', () => {
     const mix = mixOf({ store: { music: { track: 'old', level: 1 }, effects: [] } })
     const scene = summarize({ declarations: decl(store), mix, music: [musicList([])] }).scenes[0]!

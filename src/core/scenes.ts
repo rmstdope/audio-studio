@@ -193,7 +193,7 @@ export interface SceneMusic {
   /** The track's title, else its id; null when there is no music. */
   name: string | null
   level: number
-  /** The track has a chosen take whose file is there. */
+  /** What the track plays, a chosen take or the game's own file, is there. */
   playable: boolean
   /** The act's music list, readable, no longer has this track. */
   gone: boolean
@@ -329,7 +329,8 @@ function sceneMusic(sceneId: string, chosen: SceneMix['music'], { list }: Known)
     track,
     name: found?.title ?? track,
     level: chosen?.level ?? 1,
-    playable: found?.current.kind === 'take' && found.current.exists,
+    playable:
+      (found?.current.kind === 'take' || found?.current.kind === 'game') && found.current.exists,
     // Only the act's own list is looked in: today no shared loops are listed (§8.11).
     gone: list?.state === 'ok' && !found,
   }
