@@ -146,7 +146,29 @@ describe('saving a scene', () => {
     expect(written.scenes['act1-store']).toEqual(entry(0.5))
     expect(written.scenes['act1-cottage']).toEqual(entry(2))
     expect(written.scenes.broken).toEqual({ effects: 'nope' })
-    expect(text(root)).toBe(`${JSON.stringify(written, null, 2)}\n`)
+    expect(text(root)).toBe(`{
+  "scenes": {
+    "act1-store": {
+      "music": { "track": "act1-store", "level": 0.5 },
+      "effects": [
+        { "id": "bell", "play": { "mode": "loop" }, "level": 0.5 }
+      ]
+    },
+    "act1-cottage": {
+      "music": { "track": "act1-store", "level": 2 },
+      "effects": [
+        { "id": "bell", "play": { "mode": "loop" }, "level": 2 }
+      ]
+    },
+    "old-room": {
+      "effects": []
+    },
+    "broken": {
+      "effects": "nope"
+    }
+  }
+}
+`)
   })
 
   it('creates the file and its folder when the mix is not there yet', async () => {

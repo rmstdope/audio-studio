@@ -81,6 +81,43 @@ export async function readScenes(
   return summarizeScenes({ acts, effects: known.effects, music: known.music?.lists ?? [] })
 }
 
+/** The widest a line of the mix may be before its object is written over several lines. */
+const MIX_WIDTH = 100
+
+/**
+ * A value as the mix file shows it, two spaces to a level: the file, the scenes and each scene's
+ * entry are open; below that an object is on one line while it fits (`"music": { "track": … }`),
+ * and a list of effects has a line to each effect, so a change shows as a change to a line.
+ */
+function mixText(value: unknown, depth = 0, indent = ''): string {
+  const flat = flatText(value)
+  const open = depth <= 2 || (depth === 3 && Array.isArray(value) && value.length > 0)
+  if (!open && flat.length + indent.length <= MIX_WIDTH) return flat
+  if (typeof value !== 'object' || value === null) return flat
+  const inner = `${indent}  `
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]'
+    return `[\n${value.map((v) => inner + mixText(v, depth + 1, inner)).join(',\n')}\n${indent}]`
+  }
+  const keys = Object.keys(value)
+  if (keys.length === 0) return '{}'
+  const lines = keys.map(
+    (k) =>
+      `${inner}${JSON.stringify(k)}: ${mixText((value as Record<string, unknown>)[k], depth + 1, inner)}`,
+  )
+  return `{\n${lines.join(',\n')}\n${indent}}`
+}
+
+/** A value on one line, with spaces inside braces and after commas: `{ "a": 1, "b": [1, 2] }`. */
+function flatText(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(flatText).join(', ')}]`
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value).map(([k, v]) => `${JSON.stringify(k)}: ${flatText(v)}`)
+    return entries.length ? `{ ${entries.join(', ')} }` : '{}'
+  }
+  return JSON.stringify(value)
+}
+
 /** What saving a scene answered. */
 export type SceneSave =
   | { ok: true }
@@ -153,7 +190,7 @@ export function saveScene(
     }
     for (const id of Object.keys(old)) if (!(id in entries)) entries[id] = old[id]
     try {
-      await writeAtomic(root, mixFile, `${JSON.stringify({ ...raw, scenes: entries }, null, 2)}\n`)
+      await writeAtomic(root, mixFile, `${mixText({ ...raw, scenes: entries })}\n`)
     } catch (error) {
       return { ok: false, kind: 'failed', message: writeFailure(error) }
     }
