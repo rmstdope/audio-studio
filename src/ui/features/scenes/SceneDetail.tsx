@@ -506,7 +506,7 @@ export function SceneDetail({
           <table className="table">
             <thead>
               <tr>
-                {play.phase !== 'stopped' && <th>Now</th>}
+                {play.phase !== 'stopped' && <th className="scene-now-head">Now</th>}
                 <th aria-label="Play" />
                 <th>Effect</th>
                 <th>How it plays</th>

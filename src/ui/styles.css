@@ -4172,7 +4172,7 @@ button.cue-chip[aria-expanded='true'] {
 .scene-effect,
 .scene-how,
 .scene-state {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .scene-effect .chip,
 .scene-how .chip,
@@ -4425,6 +4425,9 @@ button.cue-chip[aria-expanded='true'] {
   font-size: 12.5px;
   white-space: nowrap;
   color: var(--text-soft);
+}
+.scene-effects th.scene-now-head {
+  min-width: 11.5em;
 }
 .scene-now-bad {
   color: var(--danger-ink);
