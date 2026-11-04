@@ -1,6 +1,7 @@
 import type { ProjectSummary } from '../../core/summary'
 import { useChanges, useCredit, useNarrationProgress, useSetup, useSpending } from '../api'
 import { currentAct } from '../imagesText'
+import { currentSceneAct } from '../scenesText'
 import { listFor } from '../musicText'
 import { routeHref, type Route } from '../route'
 import {
@@ -188,6 +189,32 @@ export function Sidebar({
             />
           )}
         </a>
+        <a
+          className="nav-item nav-workspace"
+          href={routeHref({ view: 'scenes', page: null })}
+          aria-current={route.view === 'scenes' && !summary.scenes ? 'page' : undefined}
+        >
+          <LayersIcon /> <span className="grow">Scenes</span>
+        </a>
+        {open === 'scenes' &&
+          route.view === 'scenes' &&
+          summary.scenes?.acts.map((act) => (
+            <a
+              key={act.id}
+              className="nav-item music-subnav"
+              href={routeHref({ view: 'scenes', page: 'act', part: act.id })}
+              aria-current={
+                currentSceneAct(summary.scenes!, route)?.id === act.id ? 'page' : undefined
+              }
+            >
+              <span className="grow">{shortTitle(act.title)}</span>
+              {act.state === 'ok' && (
+                <span className="meta" title="Scenes">
+                  {act.scenes.length}
+                </span>
+              )}
+            </a>
+          ))}
       </nav>
 
       <nav className="nav sidebar-foot" aria-label="Project">

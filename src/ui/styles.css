@@ -4091,3 +4091,152 @@ button.cue-chip[aria-expanded='true'] {
     border-bottom: 1px solid var(--line);
   }
 }
+
+/* The Scenes pages */
+
+.scenes-body {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+.scene-list {
+  width: 240px;
+  flex: none;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.scene-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.scene-list a {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13.5px;
+}
+.scene-list a:hover {
+  background: var(--glass);
+}
+.scene-list a[aria-current='page'] {
+  background: var(--glass);
+  border-color: var(--edge);
+}
+.scene-count {
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.scene-count-red {
+  color: var(--danger-ink);
+}
+.scene-menu {
+  display: none;
+}
+.scene-open {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.scene-panel h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.scene-music {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.scene-level {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+.scene-play {
+  width: 40px;
+}
+.scene-effect,
+.scene-how,
+.scene-state {
+  overflow-wrap: anywhere;
+}
+.scene-effect .chip,
+.scene-how .chip,
+.scene-state .chip,
+.scene-music .chip {
+  margin-left: 8px;
+}
+.scene-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 520px;
+}
+.scenes-failed {
+  border-color: var(--danger-ink);
+  background: var(--danger-bg);
+}
+
+@media (max-width: 700px) {
+  .scenes-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .scene-list {
+    display: none;
+  }
+  .scene-menu {
+    display: block;
+    font: inherit;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border: 1px solid var(--line-strong);
+    background: var(--glass);
+    color: var(--text);
+  }
+  .scene-effects .table thead {
+    display: none;
+  }
+  .scene-effects .table,
+  .scene-effects .table tbody {
+    display: block;
+  }
+  .scene-effects .table tr {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 2px 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .scene-effects .table td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+  .scene-effects .table td.scene-play {
+    grid-row: 1;
+  }
+  .scene-effects .table td.scene-effect {
+    grid-column: 2;
+  }
+  .scene-effects .table td.scene-how,
+  .scene-effects .table td.scene-state,
+  .scene-effects .table td.scene-level {
+    grid-column: 2;
+  }
+}

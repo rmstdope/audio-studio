@@ -1,4 +1,5 @@
-import type { Play, SceneRow } from '../core/scenes'
+import type { Play, SceneAct, SceneRow, ScenesSummary } from '../core/scenes'
+import type { ScenesRoute } from './route'
 
 /** How an effect plays, as the Scenes page words it. */
 export function howItPlays(play: Play): string {
@@ -37,4 +38,14 @@ export function statesLine(scene: Pick<SceneRow, 'states' | 'triggers'>): string
   if (states.length === 0 && triggers.length === 0) return 'No states · No triggers'
   const states_ = `States: ${states.length ? states.join(', ') : 'none'}`
   return `${states_} · Triggers: ${triggers.length ? triggers.join(', ') : 'none'}`
+}
+
+/** The act a Scenes route shows: the one it names, else the first. Undefined without acts. */
+export function currentSceneAct(scenes: ScenesSummary, route: ScenesRoute): SceneAct | undefined {
+  return (route.page === 'act' && scenes.acts.find((a) => a.id === route.part)) || scenes.acts[0]
+}
+
+/** The scene a Scenes route opens in `act`: the one it names, else the first. */
+export function currentScene(act: SceneAct, route: ScenesRoute): SceneRow | undefined {
+  return (route.page === 'act' && act.scenes.find((s) => s.id === route.scene)) || act.scenes[0]
 }
