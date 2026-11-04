@@ -1833,7 +1833,7 @@ button.cue-chip[aria-expanded='true'] {
 }
 
 /* The Sound effects panel's Make all: beside the count, dropping under it as one unit when narrow */
-.make-all {
+.effects-make-all {
   margin-left: auto;
   display: flex;
   flex-direction: column;
@@ -1842,9 +1842,9 @@ button.cue-chip[aria-expanded='true'] {
   max-width: 100%;
 }
 
-.make-all-line,
-.make-all-running,
-.make-all-summary {
+.effects-make-all-line,
+.effects-make-all-running,
+.effects-make-all-summary {
   margin: 0;
   display: flex;
   flex-wrap: wrap;
@@ -1853,7 +1853,7 @@ button.cue-chip[aria-expanded='true'] {
   gap: 8px 12px;
 }
 
-.make-all-question {
+.effects-make-all-question {
   flex: 1 0 100%;
   display: flex;
   flex-direction: column;
@@ -1864,7 +1864,7 @@ button.cue-chip[aria-expanded='true'] {
   background: var(--raised);
 }
 
-.make-all-question p {
+.effects-make-all-question p {
   margin: 0;
 }
 

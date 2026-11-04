@@ -657,7 +657,7 @@ describe('Make all, on the Sound effects list', () => {
     expect(text()).toContain(
       'Four takes each, on Stable Audio 3 Small SFX, the sound-effects model on Setup. About 1 min in all — they are made one after another, and you can leave the page.',
     )
-    const names = [...container.querySelectorAll('.make-all-question li')].map(
+    const names = [...container.querySelectorAll('.effects-make-all-question li')].map(
       (li) => li.textContent,
     )
     expect(names).toEqual(['Door creak', 'Coins', 'Thunder', 'Wind'])
@@ -689,7 +689,7 @@ describe('Make all, on the Sound effects list', () => {
     act(() => button('Make 4 takes each').click())
     act(() => {
       container
-        .querySelector('.make-all-question')!
+        .querySelector('.effects-make-all-question')!
         .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
     expect(text()).not.toContain('Make 16 takes for 4 effects?')
@@ -794,6 +794,7 @@ describe('Make all, on the Sound effects list', () => {
       ]),
     )
     expect(text()).toContain('Made 16 of 16 takes.')
+    expect(text()).not.toContain('Make 4 takes each')
     act(() => button('Close').click())
     await settle()
     expect(text()).not.toContain('Made 16 of 16 takes.')
@@ -823,7 +824,7 @@ describe('Make all, on the Sound effects list', () => {
     expect(text()).toContain(
       'Made 4 of 16 takes. 2 could not be made — Thunder says why. 10 were stopped.',
     )
-    expect(container.querySelector('.make-all-summary a')!.getAttribute('href')).toBe(
+    expect(container.querySelector('.effects-make-all-summary a')!.getAttribute('href')).toBe(
       '#/effects/items/thunder',
     )
   })

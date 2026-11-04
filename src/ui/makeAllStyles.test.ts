@@ -26,3 +26,10 @@ describe('a button greyed with a reason', () => {
     expect(rule(".btn:disabled,\n.btn[aria-disabled='true']")).toContain('opacity: 0.55')
   })
 })
+
+describe('the Sound effects panel’s Make all keeps to its own class names', () => {
+  it('leaves the shared question rule to the other pages, so it stays inside its panel', () => {
+    expect(rule('.make-all-question')).not.toContain('flex: 1 0 100%')
+    expect(rule('.effects-make-all-question')).toContain('flex')
+  })
+})
