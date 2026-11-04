@@ -314,7 +314,7 @@ export interface EffectMakingSummary {
 }
 
 /** Seconds as a person reads a wait: "12 s", "1 min", "1 min 10 s". */
-function waitOf(seconds: number): string {
+export function waitOf(seconds: number): string {
   if (seconds < 60) return `${seconds} s`
   const rest = seconds % 60
   return `${Math.floor(seconds / 60)} min${rest ? ` ${rest} s` : ''}`
