@@ -1845,7 +1845,12 @@ consumer rule beyond naming this page).
   uses the room's music track id (`roomTrackId`), so a scene's own track and its old
   `effectVolumes.json` key are its id.
 - `name`: what the page calls it. `states`: the scene's **named sound states**, the first being the
-  game's default (drawn "plain"); `[]` or absent when the scene has none. `triggers`: the names the
+  game's default; `[]` or absent when the scene has none. The game names its default state: where
+  a room's `soundState()` answers `''` today (GeneralStore, ForestPath) the declarations call it
+  `plain` and the game reads a runtime `''` as that state (rq-xazj does the mapping, once, where
+  the scene is entered; the mix always holds the names). A room whose states are all named
+  (`withered`/`green`, `dim`/`lit`) lists just those, the first being the default; the studio draws
+  each state under its own name, so "plain" appears only where the game names a state so. `triggers`: the names the
   game can fire in the scene; `[]` or absent when none. State and trigger names are slugs, unique
   within the scene.
 - The list is read entry by entry, as the effects list is (§8.9): an entry with a problem, or an id
@@ -1874,9 +1879,15 @@ consumer rule beyond naming this page).
 }
 ```
 
-- `music`: `track` is a music track id (the act's own or a shared one, §8.5) or `null` for no music;
-  `level` is the loop's level. Absent `music`: the scene's own track (the one with its id) at 1,
-  as the game plays now. `effects` absent or `[]`: no effects. A scene with no entry at all plays
+- `music`: `track` is the id of a loop in the act's music list (§8.5) or of a shared loop, or `null`
+  for no music; `level` is the loop's level, 0 to 3 like an effect's, 1 as chosen. The music level
+  is the music's alone: it does not change the effects, which the game keeps following the music's
+  fades (a crossfade, a dip under a voice) but not its level. Above 1 the game raises the music
+  with a gain, not the element's volume. The shared loops are what `music.refreshShared` lists;
+  today it lists only stingers, which are not loops, so the menu's "shared tracks" are none until
+  the game lists some. Absent `music`: what the game chooses for the scene now (its own track when
+  it has a chosen take, else the act's loop) at 1. A track with no chosen take plays no music; the
+  scene's effects play all the same. `effects` absent or `[]`: no effects. A scene with no entry at all plays
   its own track and no effects.
 - An effect's `id` is one of the game's sound effects (§8.9); the same id may appear twice in a
   scene (two ways to play it). `play` is one of `{ "mode": "loop" }` (round and round),
@@ -1900,17 +1911,32 @@ consumer rule beyond naming this page).
   A scene in the mix the game no longer declares is not shown and stays in the file.
 - **Silent**: an effect with no chosen take (§8.10) has no clip in the manifest; the game and the
   studio play nothing for it. This too is derived.
-- A mix file that cannot be read (not JSON, wrong shape) is reported with its file and JSON path
+- **Unreadable is not gone**: while `tts/effects.json` cannot be read, no effect is marked gone; while
+  a declarations entry is left out for a problem, none of its states or triggers is (§8.9's rule for
+  an id whose entry is merely unreadable).
+- The same effect id twice in a scene is two rows with two levels: the game must key levels by row,
+  not by effect id (`Ambience.setVolume`, `solo` and `audition` are id-keyed today; rq-xazj changes
+  that). `afterSeconds` is 0 or more.
+- A mix file that does not exist yet is an empty mix; the first Save creates it, its folder
+  included. A mix file that cannot be read (not JSON, wrong shape) is reported with its file and JSON path
   per scene entry and never written over; the page shows the other scenes. An entry with a
-  problem is left out and kept as it is on a Save of another scene.
+  problem is left out and kept as it is on a Save of another scene. The game reads the mix scene by
+  scene in the same way (a bad entry plays that scene as if it had none, the rest play), not as a
+  whole file, so a hand edit cannot silence every scene.
 
-**How the game plays a scene** (what the studio's play bar copies): entering the scene starts its
-music and every effect whose state is the scene's current one (the first state at entry, unless the
+**How the game plays a scene** (what the studio's play bar copies): the **effects belong to the
+scene, not to its music** (rq-xazj moves them off the track's voice): they play with `track: null`
+and with a track that has no chosen take. Entering a scene whose music is already playing carries
+the music on and swaps the effects: those of the scene left stop, those of the new one start.
+Entering the scene starts its music and every effect whose state is the scene's current one (the first state at entry, unless the
 game says otherwise). Loops loop; a random effect waits a random time in its range before each
 start, including the first; a once effect starts after its delay. When the state changes, an effect
 that plays only in the old state fades out and one that plays only in the new state fades in
 (0.3 s, `STATE_FADE_SECONDS` of `ambience.ts`); the music and effects with no state carry on, and a
-once effect that has sounded does not sound again. A trigger plays the effects bound to it at once,
+once effect that has sounded does not sound again. Leaving a state cancels the wait of a random or
+once effect that plays only in it, and coming back starts the wait afresh (a once effect that has
+not sounded waits its full `afterSeconds` again); only loops fade, a random or once effect simply
+starts its wait. A trigger plays the effects bound to it at once,
 once each (an effect with both a trigger and a state plays only while the scene is in that state). Changing the music's track is not something the game does mid-scene.
 
 **Studio side** (for the children): `src/core/scenes.ts` holds the schemas, the reading of both
