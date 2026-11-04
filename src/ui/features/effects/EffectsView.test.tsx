@@ -784,19 +784,17 @@ describe('Make all, on the Sound effects list', () => {
 
   it('says how it went once the last take is done, and Close puts focus on the button', async () => {
     const batch = { total: 16, made: 16, stopped: 0, failed: [], running: false }
-    const { text, button, settle } = render(
+    const { text, button, settle, calls } = render(
       list,
       effects({ rows: four }),
       undefined,
-      seeds([
-        [['effects-batch'], batch],
-        [['effects-summary-open'], true],
-      ]),
+      seeds([[['effects-batch'], batch]]),
     )
     expect(text()).toContain('Made 16 of 16 takes.')
     expect(text()).not.toContain('Make 4 takes each')
     act(() => button('Close').click())
     await settle()
+    expect(posts(calls).map((c) => c.url)).toContain('/api/effects/batch/close')
     expect(text()).not.toContain('Made 16 of 16 takes.')
     expect(document.activeElement).toBe(button('Make 4 takes each'))
   })
@@ -816,10 +814,7 @@ describe('Make all, on the Sound effects list', () => {
       list,
       effects({ rows: four }),
       undefined,
-      seeds([
-        [['effects-batch'], batch],
-        [['effects-summary-open'], true],
-      ]),
+      seeds([[['effects-batch'], batch]]),
     )
     expect(text()).toContain(
       'Made 4 of 16 takes. 2 could not be made — Thunder says why. 10 were stopped.',
@@ -982,17 +977,14 @@ describe('Make all, on the Sound effects list', () => {
       list,
       effects({ rows: [chosen('a'), chosen('b')] }),
       undefined,
-      seeds([
-        [['effects-batch'], batch],
-        [['effects-summary-open'], true],
-      ]),
+      seeds([[['effects-batch'], batch]]),
     )
     act(() => button('Close').click())
     await settle()
     expect(document.activeElement).toBe(container.querySelector('.status-panel'))
   })
 
-  it('shows no summary on a page that did not see the takes made', () => {
+  it('shows the summary on a page that never saw the takes made (a reload, a new tab)', () => {
     const batch = { total: 16, made: 16, stopped: 0, failed: [], running: false }
     const { text } = render(
       list,
@@ -1000,6 +992,6 @@ describe('Make all, on the Sound effects list', () => {
       undefined,
       seeds([[['effects-batch'], batch]]),
     )
-    expect(text()).not.toContain('Made 16 of 16 takes.')
+    expect(text()).toContain('Made 16 of 16 takes.')
   })
 })

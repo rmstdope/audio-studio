@@ -28,7 +28,6 @@ import {
 import { useStopFocus } from '../../components/useStopFocus'
 import { useFocusWhenClosed } from '../../components/useFocusWhenClosed'
 import { routeHref } from '../../route'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 /**
  * The panel's action on the Sound effects list: how many effects have no chosen take and a button
@@ -36,11 +35,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
  * all; then how it went, until Close. Nothing starts without the question's Make.
  */
 export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
-  const client = useQueryClient()
   const making = useEffectsMaking().data ?? {}
   const models = useEffectModels().data
   const running = Object.keys(making).length > 0
-  const batch = useEffectsBatch(running).data
+  const { batch, close: closeBatch } = useEffectsBatch(running)
   const make = useMakeAllEffects()
   const stopAll = useStopAllEffects()
   const [asking, setAsking] = useState(false)
@@ -52,19 +50,6 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   const focusStop = useRef(false)
   const focusAfterClose = useRef(false)
   const refocus = useFocusWhenClosed(asking, opener)
-  // The summary is wanted once this page has seen the press's takes being made; the client lives
-  // until the page is reloaded, so a reload ends it, and so does Close.
-  const wanted = useQuery({
-    queryKey: ['effects-summary-open'],
-    // A refetch of everything (Setup's saves do that) keeps what the page already holds.
-    queryFn: () => client.getQueryData<boolean>(['effects-summary-open']) ?? false,
-    initialData: false,
-    staleTime: Infinity,
-  }).data
-  const seen = Boolean(batch?.running)
-  useEffect(() => {
-    if (seen) client.setQueryData(['effects-summary-open'], true)
-  }, [seen, client])
   useEffect(() => {
     // Takes started elsewhere take the question's place; it does not come back by itself.
     if (running) setAsking(false)
@@ -100,9 +85,9 @@ export function EffectsMakeAll({ effects }: { effects: EffectsSummary }) {
   const plan = planMakeAll(effects.rows, making)
   if (plan.lockUnread) return null
   const names = Object.fromEntries(effects.rows.map((row) => [row.id, row.name]))
-  const summary = wanted && batch && !batch.running && !running ? batchSummary(batch) : null
+  const summary = batch && !batch.running && !running ? batchSummary(batch) : null
   const close = () => {
-    client.setQueryData(['effects-summary-open'], false)
+    closeBatch()
     focusAfterClose.current = true
   }
   const summaryLine = summary && (

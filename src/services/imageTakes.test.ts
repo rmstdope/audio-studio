@@ -639,6 +639,66 @@ describe('making for a whole act', () => {
   })
 })
 
+describe('the summary of a press on an act is kept by the studio', () => {
+  it('is there for a caller who never saw the press, says it runs, and is per act', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const s = setup(
+      undefined,
+      { 'tts/act2/images.json': [{ ...inn, id: 'yard', title: 'Yard' }] },
+      gate,
+    )
+    expect(await s.takes.batch(s.file, 'act1')).toBeNull()
+    await s.takes.makeAll(s.file, 'act1')
+    expect(await s.takes.batch(s.file, 'act1')).toEqual({
+      total: 8,
+      images: ['inn', 'hall'],
+      failedBefore: { inn: 0, hall: 0 },
+      stoppedBefore: { inn: 0, hall: 0 },
+      running: true,
+    })
+    expect(await s.takes.batch(s.file, 'act2')).toBeNull()
+    release()
+    await s.settled('inn')
+    await s.settled('hall')
+    expect(await s.takes.batch(s.file, 'act1')).toMatchObject({ total: 8, running: false })
+    expect(await s.takes.batch(s.file, 'nowhere')).toBeNull()
+  })
+
+  it('is forgotten by closeBatch, and by takes started by hand once it has ended', async () => {
+    const s = setup()
+    await s.takes.makeAll(s.file, 'act1')
+    await s.settled('inn')
+    await s.settled('hall')
+    expect(await s.takes.closeBatch(s.file, 'act1')).toEqual({ ok: true })
+    expect(await s.takes.batch(s.file, 'act1')).toBeNull()
+    await s.takes.makeAll(s.file, 'act1')
+    await s.settled('inn')
+    await s.settled('hall')
+    expect(await s.takes.batch(s.file, 'act1')).toMatchObject({
+      stoppedBefore: { inn: 0, hall: 0 },
+    })
+    await s.takes.make(s.file, 'inn', { count: 1 })
+    expect(await s.takes.batch(s.file, 'act1')).toBeNull()
+  })
+
+  it('goes on while takes are started by hand during the press, and takes the stops before it as given', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const s = setup(undefined, {}, gate)
+    await s.takes.make(s.file, 'inn', { count: 1 })
+    await s.takes.stop(s.file, 'inn')
+    await s.takes.makeAll(s.file, 'act1')
+    await s.takes.make(s.file, 'inn', { count: 1 })
+    expect(await s.takes.batch(s.file, 'act1')).toMatchObject({
+      total: 8,
+      stoppedBefore: { inn: 1, hall: 0 },
+      running: true,
+    })
+    release()
+  })
+})
+
 describe('the game’s look', () => {
   const warm = ['#000000', '#ffffff', '#ff0000']
   const style = (extra: object = {}) => ({

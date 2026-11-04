@@ -246,12 +246,18 @@ describe('Make takes for every track with no chosen take', () => {
     tracks: ['forest', 'cave'],
     failedBefore: {},
     stopped: 0,
+    running: false,
   }
 
   it('sums up a press when the last take is done, until Close', async () => {
     const page = render(four, { batch })
     expect(page.text()).toContain('Made 16 of 16 takes.')
     await page.press('Close')
+    await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 5))))
+    expect(page.requests).toContainEqual({
+      url: '/api/music/lists/act1/batch/close',
+      method: 'POST',
+    })
     expect(page.text()).not.toContain('Made 16 of 16')
     expect(document.activeElement).toBe(page.button('Make 4 takes each'))
   })
@@ -279,7 +285,7 @@ describe('Make takes for every track with no chosen take', () => {
     )
   })
 
-  it('counts as stopped only the takes of the tracks the press made, not those started by hand', async () => {
+  it('asks the studio to stop everything, which counts only the press’s own tracks', async () => {
     const page = render(four, {
       batch,
       making: {
@@ -289,11 +295,17 @@ describe('Make takes for every track with no chosen take', () => {
       stopped: { forest: 10, storm: 6 },
     })
     await page.press('Stop all')
-    await act(async () => {
-      page.client.setQueryData(['music-making'], {})
-      await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(page.requests[0]).toEqual({ url: '/api/music/lists/act1/stop', method: 'POST' })
+    expect(page.client.getQueryState(['music-batch', 'act1'])?.isInvalidated).toBe(true)
+  })
+
+  it('shows the running line, not the summary, while the studio says the press still runs', () => {
+    const page = render(four, {
+      batch: { ...batch, running: true },
+      making: { forest: { takes: 1, left: 60, failed: 0 } },
     })
-    expect(page.text()).toContain('Made 6 of 16 takes. 10 were stopped.')
+    expect(page.text()).toContain('Making 1 take for 1 track')
+    expect(page.text()).not.toContain('Made 16')
   })
 
   it('does not bring the question back by itself when takes started elsewhere are done', async () => {
@@ -442,7 +454,13 @@ describe('Make takes for every stinger with no chosen take', () => {
   })
   describe('focus after Stop all', () => {
     const running = { forest: { takes: 3, left: 60, failed: 0 } }
-    const batch: MakeAllBatch = { total: 3, tracks: ['forest'], failedBefore: {}, stopped: 0 }
+    const batch: MakeAllBatch = {
+      total: 3,
+      tracks: ['forest'],
+      failedBefore: {},
+      stopped: 0,
+      running: false,
+    }
     // happy-dom moves focus on by itself when the focused node is removed (a browser drops it to
     // the body), so these tests record the focus() calls, though the first two cannot go red here.
     const focused: Element[] = []
@@ -485,6 +503,7 @@ describe('Make takes for every stinger with no chosen take', () => {
       await finish(page)
       expect(focused.at(-1)).toBe(page.button('Close'))
       await page.press('Close')
+      await settle()
       expect(document.activeElement).toBe(page.button('Make 4 takes each'))
     })
 

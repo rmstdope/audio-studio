@@ -109,6 +109,10 @@ export interface ImageTakes {
    * null for an act the project does not list.
    */
   makeAll(projectFile: string, actId: string): Promise<ImageMakeAllAnswer>
+  /** The latest press on the act, kept until Close, a hand start or a new press; null when none. */
+  batch(projectFile: string, actId: string): Promise<ImagesBatch | null>
+  /** Forgets the act's finished press (Close); one that still runs is not forgotten. */
+  closeBatch(projectFile: string, actId: string): Promise<{ ok: true }>
   /** Stops the takes waiting or being made of every image in the act (how many); null for an act not listed. */
   stopAll(
     projectFile: string,
@@ -120,6 +124,24 @@ export interface ImageTakes {
   takeFile(projectFile: string, id: string, name: string): Promise<string | null>
   /** The picture the game shows now: the chosen one, else the game's own file, else null. */
   currentFile(projectFile: string, id: string): Promise<string | null>
+}
+
+/**
+ * What one press of Make takes on an act remembers: how many takes the server queued, for which
+ * images, and for each of those how many of its takes had failed and been stopped before the
+ * press; `running` while any of them still has a take waiting or being made.
+ */
+export interface ImagesBatch {
+  total: number
+  images: string[]
+  failedBefore: Record<string, number>
+  stoppedBefore: Record<string, number>
+  running: boolean
+}
+
+/** A press as the studio keeps it: `members` are all the act's images, whose hand starts end it. */
+interface StoredBatch extends Omit<ImagesBatch, 'running'> {
+  members: string[]
 }
 
 /** What a press on an act answered: the images and takes it queued, or why nothing was made. */
@@ -186,6 +208,7 @@ export function createImageTakes({
     contentStudioImageBringing?: Set<string>
     contentStudioLookRuns?: Map<string, LookRunView>
     contentStudioImageStopped?: Map<string, number>
+    contentStudioImageBatches?: Map<string, StoredBatch>
   }
   const active = (shared.contentStudioImageTakes ??= new Map())
   /** Takes being brought to the look right now (`<image key>\0<n>`). */
@@ -193,7 +216,17 @@ export function createImageTakes({
   const lookRuns = (shared.contentStudioLookRuns ??= new Map())
   /** How many takes of each image were stopped since the studio started (`<image key>`). */
   const stoppedCount = (shared.contentStudioImageStopped ??= new Map())
+  // The latest press of each act (`<project file>\0<act id>`), so every tab shows its summary.
+  const batches = (shared.contentStudioImageBatches ??= new Map())
+  // Set while Make all starts its own takes, which are not hand starts.
+  let pressing = false
   const boards = boardQueue()
+
+  /** Whether any take of the press is still waiting or being made. */
+  const pressRunning = (projectFile: string, press: StoredBatch) =>
+    press.images.some((id) =>
+      [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])].some((e) => e.state !== 'failed'),
+    )
 
   async function resolve(projectFile: string, id: string) {
     if (!isSafeId(id)) return null
@@ -543,18 +576,41 @@ export function createImageTakes({
       }
       if (plan.kind === 'all-chosen') return { ok: true, images: [], takes: 0 }
       const started: string[] = []
+      const before = await this.making(projectFile)
       for (const image of plan.images) {
+        pressing = true
         const answer = await this.make(projectFile, image.id, {
           count: TAKES_EACH,
           model: plan.model,
-        })
+        }).finally(() => (pressing = false))
         if (!answer || !answer.ok) {
           for (const id of started) await this.stop(projectFile, id)
           return answer ?? { ok: false, message: `${image.title} is not in the game any more.` }
         }
         started.push(image.id)
       }
+      batches.set(`${projectFile}\0${actId}`, {
+        total: started.length * TAKES_EACH,
+        images: started,
+        members: found.act.order,
+        failedBefore: Object.fromEntries(started.map((id) => [id, before[id]?.failed ?? 0])),
+        stoppedBefore: Object.fromEntries(started.map((id) => [id, before[id]?.stopped ?? 0])),
+      })
       return { ok: true, images: started, takes: started.length * TAKES_EACH }
+    },
+
+    async batch(projectFile, actId) {
+      const press = batches.get(`${projectFile}\0${actId}`)
+      if (!press) return null
+      const { members: _members, ...kept } = press
+      return { ...kept, running: pressRunning(projectFile, press) }
+    },
+
+    async closeBatch(projectFile, actId) {
+      const key = `${projectFile}\0${actId}`
+      const press = batches.get(key)
+      if (press && !pressRunning(projectFile, press)) batches.delete(key)
+      return { ok: true }
     },
 
     async stopAll(projectFile, actId) {
@@ -640,6 +696,18 @@ export function createImageTakes({
       if (!found || !('row' in found)) return found
       const ready = await generator.ready()
       if (!ready.ok) return { ok: false, message: ready.message }
+      // Takes started by hand end the summary of a finished press (read before they are added);
+      // one still running goes on.
+      const ended = pressing
+        ? []
+        : [...batches]
+            .filter(
+              ([at, press]) =>
+                at.startsWith(`${projectFile}\0`) &&
+                press.members.includes(id) &&
+                !pressRunning(projectFile, press),
+            )
+            .map(([at]) => at)
       const entries = active.get(found.key) ?? new Map<number, Entry>()
       active.set(found.key, entries)
       const queued: Entry[] = []
@@ -681,6 +749,7 @@ export function createImageTakes({
           queued.push(entry)
         }
       }
+      for (const key of ended) batches.delete(key)
       const asked = { prompt: found.row.prompt, madeFrom: found.row.madeFrom }
       for (const entry of queued) void run(found, entry, asked, entries)
       return { ok: true }

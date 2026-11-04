@@ -21,7 +21,7 @@ import type { BriefChange } from '../core/music'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
 import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
-import type { MakeAllResult, ModelStateResult } from '../services/musicTakes'
+import type { MakeAllResult, ModelStateResult, MusicBatch } from '../services/musicTakes'
 import type {
   ChooseResult,
   DropResult,
@@ -37,6 +37,7 @@ import type { RemoveResult } from '../services/musicOrphans'
 import type {
   ImageMakeRequest,
   ImageModelStateResult,
+  ImagesBatch as ImageBatch,
   ImageTakesAnswer,
 } from '../services/imageTakes'
 import type { RefreshEffectsResult, RefreshResult, RefreshSharedResult } from '../services/refresh'
@@ -1163,51 +1164,89 @@ export function useMusicModelState() {
 }
 
 /**
- * What one press of Make takes on a list remembers until Close or a reload: how many takes it
- * asked for, for which tracks, how many of each track's takes had failed before it, and how many
- * Stop all stopped.
+ * What one press of Make takes on a list remembers (the studio keeps it, so every tab and a
+ * reload see it): how many takes it asked for, for which tracks, how many of each track's takes
+ * had failed before it, how many Stop all stopped on those tracks, and whether any is still going.
  */
-export interface MakeAllBatch {
-  total: number
-  tracks: string[]
-  failedBefore: Record<string, number>
-  stopped: number
-}
+export type MakeAllBatch = MusicBatch
 
 /** The cache key of a list's batch. */
 const batchKey = (listId: string) => ['music-batch', listId] as const
 
 /**
- * A list's last press of Make takes, or null. It lives in the query cache, not the page, so it
- * survives leaving the list and coming back; a reload forgets it.
+ * Close: reads already under way are dropped, the summary goes at once, and the studio is told;
+ * the query is read again afterwards so a read that raced the Close cannot bring it back.
  */
-export function useMakeAllBatch(listId: string): {
+function closeKept(client: QueryClient, key: readonly unknown[], path: string) {
+  void client.cancelQueries({ queryKey: key }).then(() => {
+    client.setQueryData(key, null)
+    void fetch(path, { method: 'POST' }).finally(() => client.invalidateQueries({ queryKey: key }))
+  })
+}
+
+/**
+ * Keeps a batch query fresh: polled while the press runs or anything is being made, again every
+ * few seconds while a finished one shows (a Close in another tab arrives), and read once more
+ * when the last take ends.
+ */
+function useKeptBatch<T extends { running: boolean }>(
+  key: readonly unknown[],
+  path: string,
+  busy: boolean,
+): T | null {
+  const client = useQueryClient()
+  const { data } = useQuery({
+    queryKey: key,
+    queryFn: () => getJson<T | null>(path),
+    refetchInterval: (query) =>
+      busy || query.state.data?.running ? 3000 : query.state.data ? 5000 : false,
+  })
+  // The key is rebuilt on every render; its text is what identifies the query.
+  const id = JSON.stringify(key)
+  const was = useRef(busy)
+  useEffect(() => {
+    if (was.current && !busy) void client.invalidateQueries({ queryKey: JSON.parse(id) })
+    was.current = busy
+  }, [busy, client, id])
+  return data ?? null
+}
+
+/**
+ * A list's latest press of Make takes, or null, and `dismiss` (Close), which clears it for every
+ * tab. `busy` says that takes are being made in the list.
+ */
+export function useMakeAllBatch(
+  listId: string,
+  busy = false,
+): {
   batch: MakeAllBatch | null
   dismiss: () => void
 } {
   const client = useQueryClient()
-  const { data } = useQuery({
-    queryKey: batchKey(listId),
-    queryFn: () => client.getQueryData<MakeAllBatch | null>(batchKey(listId)) ?? null,
-    staleTime: Infinity,
-    gcTime: Infinity,
-  })
+  const batch = useKeptBatch<MakeAllBatch>(
+    batchKey(listId),
+    `/api/music/lists/${encodeURIComponent(listId)}/batch`,
+    busy,
+  )
   return {
-    batch: data ?? null,
-    dismiss: () => client.setQueryData<MakeAllBatch | null>(batchKey(listId), null),
+    batch,
+    dismiss: () =>
+      closeKept(
+        client,
+        batchKey(listId),
+        `/api/music/lists/${encodeURIComponent(listId)}/batch/close`,
+      ),
   }
 }
 
 /**
- * Asks for four takes of every track with no chosen take on a list. `tracks` are the ones the page
- * listed, with how many takes of each had failed before. Once they are queued the batch is
- * remembered, after what is being made has been read, so the page never sees them done before they
- * began.
+ * Asks for four takes of every track with no chosen take on a list. The studio plans again and
+ * remembers the press; the page reads what is being made and the press afterwards.
  */
 export function useMakeAll(listId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (request: { tracks: string[]; failedBefore: Record<string, number> }) => {
+    mutationFn: async () => {
       const response = await fetch(`/api/music/lists/${encodeURIComponent(listId)}/make-all`, {
         method: 'POST',
       })
@@ -1216,23 +1255,17 @@ export function useMakeAll(listId: string) {
         throw new Error(`asking for takes answered ${response.status}`)
       }
       await client.refetchQueries({ queryKey: ['music-making'] })
-      const batch: MakeAllBatch = {
-        total: answer.takes,
-        tracks: request.tracks,
-        failedBefore: request.failedBefore,
-        stopped: 0,
-      }
-      client.setQueryData(batchKey(listId), batch)
       return answer
     },
-    onSettled: () => client.invalidateQueries({ queryKey: ['music-making'] }),
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['music-making'] }),
+        client.invalidateQueries({ queryKey: batchKey(listId) }),
+      ]),
   })
 }
 
-/**
- * Stops every take of a list that waits or is being made, and remembers how many of the press's
- * own tracks' takes were stopped (takes started by hand elsewhere in the list are not its).
- */
+/** Stops every take of a list that waits or is being made; the studio counts them into the press. */
 export function useStopAll(listId: string) {
   const client = useQueryClient()
   return useMutation({
@@ -1241,19 +1274,13 @@ export function useStopAll(listId: string) {
         method: 'POST',
       })
       if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
-      const answer = (await response.json()) as { ok: true; byTrack: Record<string, number> }
-      client.setQueryData<MakeAllBatch | null>(batchKey(listId), (was) =>
-        was
-          ? {
-              ...was,
-              stopped:
-                was.stopped + was.tracks.reduce((sum, id) => sum + (answer.byTrack[id] ?? 0), 0),
-            }
-          : was,
-      )
-      return answer
+      return (await response.json()) as { ok: true; byTrack: Record<string, number> }
     },
-    onSettled: () => client.invalidateQueries({ queryKey: ['music-making'] }),
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['music-making'] }),
+        client.invalidateQueries({ queryKey: batchKey(listId) }),
+      ]),
   })
 }
 
@@ -1318,68 +1345,62 @@ export function useImageModelState() {
 }
 
 /**
- * What one press of Make takes on an act remembers until Close or a reload: how many takes the
- * server queued, for which images, and for each of those how many of its takes had failed and been
- * stopped before the press.
+ * What one press of Make takes on an act remembers (the studio keeps it, so every tab and a
+ * reload see it): how many takes the server queued, for which images, for each of those how many
+ * of its takes had failed and been stopped before the press, and whether any is still going.
  */
-export interface ImagesBatch {
-  total: number
-  images: string[]
-  failedBefore: Record<string, number>
-  stoppedBefore: Record<string, number>
-}
+export type ImagesBatch = ImageBatch
 
 /** The cache key of an act's batch. */
 const imagesBatchKey = (actId: string) => ['images-batch', actId] as const
 
 /**
- * An act's last press of Make takes, or null. It lives in the query cache, not the page, so it
- * survives leaving the act and coming back; a reload forgets it.
+ * An act's latest press of Make takes, or null, and `dismiss` (Close), which clears it for every
+ * tab. `busy` says that takes are being made in the act.
  */
-export function useImagesBatch(actId: string): { batch: ImagesBatch | null; dismiss: () => void } {
+export function useImagesBatch(
+  actId: string,
+  busy = false,
+): { batch: ImagesBatch | null; dismiss: () => void } {
   const client = useQueryClient()
-  const { data } = useQuery({
-    queryKey: imagesBatchKey(actId),
-    queryFn: () => client.getQueryData<ImagesBatch | null>(imagesBatchKey(actId)) ?? null,
-    staleTime: Infinity,
-    gcTime: Infinity,
-  })
+  const batch = useKeptBatch<ImagesBatch>(
+    imagesBatchKey(actId),
+    `/api/image-acts/${encodeURIComponent(actId)}/batch`,
+    busy,
+  )
   return {
-    batch: data ?? null,
-    dismiss: () => client.setQueryData<ImagesBatch | null>(imagesBatchKey(actId), null),
+    batch,
+    dismiss: () =>
+      closeKept(
+        client,
+        imagesBatchKey(actId),
+        `/api/image-acts/${encodeURIComponent(actId)}/batch/close`,
+      ),
   }
 }
 
 /**
- * Asks for four takes of every image of an act with no chosen take. The images and takes the
- * server queued become the remembered batch, after what is being made has been read, so the page
- * never sees them done before they began. A refusal is an error: nothing was made.
+ * Asks for four takes of every image of an act with no chosen take. The studio remembers the
+ * press; the page reads what is being made and the press afterwards. A refusal is an error:
+ * nothing was made.
  */
 export function useImagesMakeAll(actId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async (before: Record<string, ImageMakingSummary>) => {
+    mutationFn: async () => {
       const response = await fetch(`/api/image-acts/${encodeURIComponent(actId)}/make-all`, {
         method: 'POST',
       })
-      const answer = (await response.json().catch(() => null)) as {
-        ok: boolean
-        images?: string[]
-        takes?: number
-      } | null
+      const answer = (await response.json().catch(() => null)) as { ok: boolean } | null
       if (!response.ok || !answer?.ok)
         throw new Error(`asking for takes answered ${response.status}`)
       await client.refetchQueries({ queryKey: ['image-making'] })
-      const images = answer.images ?? []
-      if (!images.length) return
-      client.setQueryData<ImagesBatch>(imagesBatchKey(actId), {
-        total: answer.takes ?? 0,
-        images,
-        failedBefore: Object.fromEntries(images.map((id) => [id, before[id]?.failed ?? 0])),
-        stoppedBefore: Object.fromEntries(images.map((id) => [id, before[id]?.stopped ?? 0])),
-      })
     },
-    onSettled: () => client.invalidateQueries({ queryKey: ['image-making'] }),
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['image-making'] }),
+        client.invalidateQueries({ queryKey: imagesBatchKey(actId) }),
+      ]),
   })
 }
 
@@ -1393,7 +1414,11 @@ export function useImagesStopAll(actId: string) {
       })
       if (!response.ok) throw new Error(`stopping the takes answered ${response.status}`)
     },
-    onSettled: () => client.invalidateQueries({ queryKey: ['image-making'] }),
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['image-making'] }),
+        client.invalidateQueries({ queryKey: imagesBatchKey(actId) }),
+      ]),
   })
 }
 
@@ -2824,14 +2849,27 @@ export function useEffectModels() {
   })
 }
 
-/** What the latest Make all made, stopped and failed so far; polled while takes are made. */
-export function useEffectsBatch(running: boolean) {
-  return useQuery({
+/**
+ * What the latest Make all made, stopped and failed so far, kept by the studio so any tab sees it
+ * (null: none, or it was closed). Polled while takes are made, and while a finished one shows so a
+ * Close in another tab arrives. `close` clears it for every tab.
+ */
+export function useEffectsBatch(running: boolean): {
+  batch: EffectBatch | null
+  close: () => void
+} {
+  const client = useQueryClient()
+  const { data } = useQuery({
     queryKey: ['effects-batch'],
     queryFn: () => getJson<EffectBatch | null>('/api/effects/batch'),
     // Until the batch itself says it is done, so the answer that ends it is never missed.
-    refetchInterval: (query) => (running || query.state.data?.running ? 1000 : false),
+    refetchInterval: (query) =>
+      running || query.state.data?.running ? 1000 : query.state.data ? 5000 : false,
   })
+  return {
+    batch: data ?? null,
+    close: () => closeKept(client, ['effects-batch'], '/api/effects/batch/close'),
+  }
 }
 
 /** One change that reaches every effect (Make all, Stop all), then everything it changes is read again. */

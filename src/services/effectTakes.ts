@@ -116,6 +116,8 @@ export interface EffectTakes {
   stopAll(projectFile: string): Promise<EffectStopAllResult>
   /** What the latest Make all made, stopped and failed so far; null when there has been none. */
   batch(projectFile: string): Promise<EffectBatch | null>
+  /** Forgets the latest Make all's summary (Close); a press that still runs is not forgotten. */
+  closeBatch(projectFile: string): Promise<{ ok: true }>
   /** The effect's board, and the takes being made. */
   view(projectFile: string, id: string): Promise<EffectTakesResult>
   /** Queues takes and returns at once; they are made one at a time. */
@@ -194,6 +196,8 @@ export function createEffectTakes({
   // The latest Make all of each project, so its summary can be worked out from what is running.
   const batches = (shared.contentStudioEffectBatches ??= new Map())
   const keyOf = (projectFile: string, id: string) => `${projectFile}\0${id}`
+  // Set while Make all starts its own takes, which are not hand starts.
+  let pressing = false
 
   async function resolve(projectFile: string, id: string) {
     if (!SAFE_ID.test(id)) return null
@@ -335,6 +339,16 @@ export function createEffectTakes({
     if (batch?.ns.get(id)?.has(n)) batch.stopped++
   }
 
+  /** Whether any take of the press is still waiting or being made. */
+  function pressRunning(projectFile: string, press: Batch) {
+    for (const [id, ns] of press.ns) {
+      for (const entry of entriesOf(projectFile, id)) {
+        if (ns.has(entry.n) && entry.state !== 'failed') return true
+      }
+    }
+    return false
+  }
+
   /** An effect's entries: waiting, being made, or failed. */
   const entriesOf = (projectFile: string, id: string) =>
     [...(active.get(keyOf(projectFile, id))?.values() ?? [])].sort((a, b) => a.n - b.n)
@@ -425,6 +439,10 @@ export function createEffectTakes({
       const ready = await generator.ready(model)
       if (!ready.ok) return { ok: false, message: ready.message }
 
+      // Takes started by hand (a retry too) end the summary of a finished press; read before the
+      // entries change. One still running goes on.
+      const press = batches.get(projectFile)
+      const ended = !pressing && press !== undefined && !pressRunning(projectFile, press)
       const entries = active.get(key) ?? new Map<number, Entry>()
       active.set(key, entries)
       const queued: Entry[] = []
@@ -454,6 +472,7 @@ export function createEffectTakes({
           queued.push(entry)
         }
       }
+      if (ended) batches.delete(projectFile)
       for (const entry of queued) {
         const make = () => run(projectFile, found, entry, entries)
         void (entry.model === 'open-1' ? gpu.run(GPU, make) : cpu.run(CPU, make))
@@ -620,7 +639,10 @@ export function createEffectTakes({
       let failure: EffectMakeAllResult | null = null
       for (const id of wanted) {
         const had = new Set(entriesOf(projectFile, id).map((entry) => entry.n))
-        const result = await api.make(projectFile, id, { count: MAKE_ALL_TAKES })
+        pressing = true
+        const result = await api.make(projectFile, id, { count: MAKE_ALL_TAKES }).finally(() => {
+          pressing = false
+        })
         if (!result || !result.ok) {
           // This effect cannot be started (its board cannot be read); the others still are.
           failure = result ?? { ok: false, message: `${id} is not listed.` }
@@ -676,6 +698,12 @@ export function createEffectTakes({
         failed,
         running: running > 0,
       }
+    },
+
+    async closeBatch(projectFile) {
+      const press = batches.get(projectFile)
+      if (press && !pressRunning(projectFile, press)) batches.delete(projectFile)
+      return { ok: true }
     },
 
     async takeFile(projectFile, id, name) {

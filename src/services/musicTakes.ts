@@ -186,6 +186,10 @@ export interface MusicTakes {
    * stopped). Null for a list that is not there.
    */
   makeAll(projectFile: string, listId: string): Promise<MakeAllResult | null>
+  /** The latest press on the list, kept until Close, a hand start or a new press; null when none. */
+  batch(projectFile: string, listId: string): Promise<MusicBatch | null>
+  /** Forgets the list's finished press (Close); one that still runs is not forgotten. */
+  closeBatch(projectFile: string, listId: string): Promise<{ ok: true }>
   /** Stops every take of the list's tracks that waits or is being made. Null for a list that is not there. */
   stopAll(projectFile: string, listId: string): Promise<StopAllResult>
   /** The project's music model, and whether takes can be made with it now. Null without a `music` section. */
@@ -211,6 +215,24 @@ export interface MusicTakes {
   making(projectFile: string): Promise<Record<string, MusicMakingSummary>>
   /** The path of a take's WAV, or null for a track not listed or a name that is not a take's. */
   takeFile(projectFile: string, id: string, name: string): Promise<string | null>
+}
+
+/**
+ * What one press of Make takes on a list remembers: how many takes it asked for, for which tracks,
+ * how many of each track's takes had failed before it, and how many Stop all stopped on those
+ * tracks; `running` while any of its tracks still has a take waiting or being made.
+ */
+export interface MusicBatch {
+  total: number
+  tracks: string[]
+  failedBefore: Record<string, number>
+  stopped: number
+  running: boolean
+}
+
+/** A press as the studio keeps it: `members` are all the list's tracks, whose hand starts end it. */
+interface StoredBatch extends Omit<MusicBatch, 'running'> {
+  members: string[]
 }
 
 /** A take's file name on the board. */
@@ -245,8 +267,15 @@ export function createMusicTakes({
   spent?: (projectFile: string, take: MusicSpend) => void | Promise<void>
 }): MusicTakes {
   // On `globalThis` like the GPU queue the jobs run on, so a `--dev` reload keeps what is being made.
-  const shared = globalThis as { contentStudioMakingTakes?: Map<string, Map<number, Entry>> }
+  const shared = globalThis as {
+    contentStudioMakingTakes?: Map<string, Map<number, Entry>>
+    contentStudioMusicBatches?: Map<string, StoredBatch>
+  }
   const active = (shared.contentStudioMakingTakes ??= new Map())
+  // The latest press of each list (`<project file>\0<list id>`), so every tab shows its summary.
+  const batches = (shared.contentStudioMusicBatches ??= new Map())
+  // Set while Make all starts its own takes, which are not hand starts.
+  let pressing = false
   // Changes to one track's board, one after another: a take finishing and a drop lose neither.
   const boards = boardQueue()
 
@@ -395,6 +424,10 @@ export function createMusicTakes({
     }
   }
 
+  /** Whether any take of the press is still waiting or being made. */
+  const pressRunning = (projectFile: string, press: StoredBatch) =>
+    press.tracks.some((id) => entriesOf(projectFile, id).some((entry) => entry.state !== 'failed'))
+
   /** A track's entries: waiting, being made, or failed. */
   const entriesOf = (projectFile: string, id: string) =>
     [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])].sort((a, b) => a.n - b.n)
@@ -487,6 +520,18 @@ export function createMusicTakes({
       }
       const ready = await generator.ready(model)
       if (!ready.ok) return { ok: false, message: ready.message }
+      // Takes started by hand end the summary of a finished press (read before they are added);
+      // one still running goes on.
+      const ended = pressing
+        ? []
+        : [...batches]
+            .filter(
+              ([at, press]) =>
+                at.startsWith(`${projectFile}\0`) &&
+                press.members.includes(id) &&
+                !pressRunning(projectFile, press),
+            )
+            .map(([at]) => at)
       const key = `${projectFile}\0${id}`
       const entries = active.get(key) ?? new Map<number, Entry>()
       active.set(key, entries)
@@ -523,6 +568,7 @@ export function createMusicTakes({
           queued.push(entry)
         }
       }
+      for (const key of ended) batches.delete(key)
       for (const entry of queued) {
         // Takes made on this computer wait for its GPU; takes made in the cloud wait only for
         // each other.
@@ -551,10 +597,15 @@ export function createMusicTakes({
         model: state.model,
         ready: true,
       })
-      if (plan.kind !== 'ready') return { ok: true, tracks: 0, takes: 0 }
+      if (plan.kind !== 'ready' || plan.tracks.length === 0)
+        return { ok: true, tracks: 0, takes: 0 }
       const started: string[] = []
+      const before = await api.making(projectFile)
       for (const track of plan.tracks) {
-        const made = await api.make(projectFile, track.id, { count: TAKES_EACH })
+        pressing = true
+        const made = await api
+          .make(projectFile, track.id, { count: TAKES_EACH })
+          .finally(() => (pressing = false))
         if (!made || !made.ok) {
           for (const id of started) await api.stop(projectFile, id)
           const message =
@@ -563,7 +614,28 @@ export function createMusicTakes({
         }
         started.push(track.id)
       }
+      batches.set(`${projectFile}\0${listId}`, {
+        total: plan.takes,
+        tracks: started,
+        members: list.tracks.map((t) => t.id),
+        failedBefore: Object.fromEntries(started.map((id) => [id, before[id]?.failed ?? 0])),
+        stopped: 0,
+      })
       return { ok: true, tracks: plan.tracks.length, takes: plan.takes }
+    },
+
+    async batch(projectFile, listId) {
+      const press = batches.get(`${projectFile}\0${listId}`)
+      if (!press) return null
+      const { members: _members, ...kept } = press
+      return { ...kept, running: pressRunning(projectFile, press) }
+    },
+
+    async closeBatch(projectFile, listId) {
+      const key = `${projectFile}\0${listId}`
+      const press = batches.get(key)
+      if (press && !pressRunning(projectFile, press)) batches.delete(key)
+      return { ok: true }
     },
 
     async stopAll(projectFile, listId) {
@@ -581,6 +653,13 @@ export function createMusicTakes({
           byTrack[track.id] = result.stopped
           stopped += result.stopped
         }
+      }
+      const press: StoredBatch | undefined = batches.get(`${projectFile}\0${listId}`)
+      if (press) {
+        press.stopped += press.tracks.reduce(
+          (sum: number, id: string) => sum + (byTrack[id] ?? 0),
+          0,
+        )
       }
       return { ok: true, stopped, byTrack }
     },

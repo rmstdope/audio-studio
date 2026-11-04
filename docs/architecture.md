@@ -1055,11 +1055,18 @@ those already queued are stopped (the page says nothing was made). While any tra
 making takes, the panel shows the running line and **Stop all** (`POST /api/music/lists/:id/stop`,
 every waiting or running take of the list) instead of the button; it is worked out from
 `GET /api/music/making`, which now also counts each track's failed takes (`MusicMakingSummary.failed`,
-a track with only failed takes has no "making" chip), so it survives a reload. The press itself is
-remembered only in the page's query cache (`MakeAllBatch`: total, tracks, failures before it, takes
-stopped by Stop all on the press's own tracks: `stopAll` answers per track, so takes started by hand on other tracks are not counted), for the summary line ("Made 14 of 16 takes. 2 could not be made — X says why.")
-that stays until Close or a reload; a take stopped from a track's own page during a press counts as
-made in it. No server state is added.
+a track with only failed takes has no "making" chip), so it survives a reload. The latest press of each list is
+remembered by the running studio (as-4m0; `contentStudioMusicBatches` in `services/musicTakes.ts`, one per
+list, so an act's page and the Stingers page each have their own; `GET /api/music/lists/:id/batch`):
+total, tracks, failures before it, takes stopped by Stop all on the press's own tracks (`stopAll`
+counts them per track, so takes started by hand on other tracks are not), and `running` while any of
+those tracks has a take waiting or being made. The page shows the summary line ("Made 14 of 16 takes.
+2 could not be made — X says why.") whenever the press is there and not running, so a reload, a new tab
+or a page opened later shows it too, until Close (`POST /api/music/lists/:id/batch/close`, for every
+tab), a new press, or takes started by hand on a track of the list (they end a finished summary for
+good; a press still running is left alone). A quit forgets it, like a failed take; nothing is written to
+the project. Open tabs poll it (3 s while takes are made, 5 s while a summary shows) so a Close elsewhere
+arrives. A take stopped from a track's own page during a press counts as made in it.
 
 On the Stingers page (as-23x.2) the same panel says "stinger" throughout (heading "Stingers up to
 date", column "Stinger", every line of the press: `Noun` in `ui/musicMakeAllText.ts`), counts the
@@ -1581,8 +1588,10 @@ the server and queues the takes through `make` per image (one refusal stops thos
 `POST /api/image-acts/:id/stop` stops every take of the act's images and answers how many;
 `GET /api/images/model-state` gives Setup's model and each model's state. The running line is worked
 out from `GET /api/images/making`, which now also counts `failed` and `stopped` takes (an image with only
-those reports `takes: 0`; both live in memory until the studio restarts, and the summary line takes the difference since the press); the summary is remembered in the page's query cache, not on disk, so a
-reload forgets it. Mockup: `docs/ui/as-23x.3-make-all.html`.
+those reports `takes: 0`; both live in memory until the studio restarts, and the summary line takes the difference since the press); the summary is remembered by the running studio, not on disk (as-4m0: `contentStudioImageBatches`
+in `services/imageTakes.ts`, one per act, `GET /api/image-acts/:id/batch`, `POST …/batch/close`),
+with the same rules as the music lists': it survives a reload and shows in every tab, until Close, a
+new press or a hand start on an image of the act, and a quit forgets it. Mockup: `docs/ui/as-23x.3-make-all.html`.
 
 **API.** The pages are in `GET /api/project` (`summary.images`). `PATCH /api/images/:id`
 (`{ words }`, null takes them back), `POST /api/images/:id/compare` (`{ choice: keep | game }`),
@@ -1779,8 +1788,9 @@ panel shows the running line (worked out from `GET /api/effects/making`, hand st
 **Stop all** (`POST /api/effects/stop-all`, every waiting or running take of the project; made takes stay).
 The service keeps the latest press in memory (`contentStudioEffectBatches`, like the entries) as the
 takes it started, so `GET /api/effects/batch` can say how many were made, stopped (by Stop all or an
-effect's own Stop) and failed; the page shows that as a summary, once it has seen the press running, in place of the count line and button, until
-Close. `GET /api/effects/models` says which models can run (the question's model line and "Open Setup").
+effect's own Stop) and failed; the page shows that as a summary, in place of the count line and button, in every tab and after a reload (as-4m0),
+until Close (`POST /api/effects/batch/close`, for every tab), a new press, or takes started by hand once the
+press has ended; a quit forgets it. `GET /api/effects/models` says which models can run (the question's model line and "Open Setup").
 
 ## 9. Server API
 
@@ -1855,6 +1865,9 @@ GET    /api/effects/models                       which sound-effects models can 
 POST   /api/effects/make-all                     four takes for each listed effect with no chosen take ({ ids })
 POST   /api/effects/stop-all                     stop every take waiting or being made
 GET    /api/effects/batch                        what the latest make-all made, stopped and failed (null: none)
+POST   /api/effects/batch/close                  forgets that summary (Close)
+GET    /api/music/lists/:id/batch                the latest make-all of a list; POST …/batch/close forgets it
+GET    /api/image-acts/:id/batch                 the latest make-all of an act; POST …/batch/close forgets it
 PUT    /api/effect-model                         the project's sound-effects model ({ model, was }; stale `was` 409)
 POST   /api/parts/:part/adopt                    write lock from existing clips
 PATCH  /api/parts/:part/cues/:key                line cue ({ cue }; empty: the style again)
