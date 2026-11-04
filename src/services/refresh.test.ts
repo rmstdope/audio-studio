@@ -2,13 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import {
-  isRefreshing,
-  refreshDialog,
-  refreshEffects,
-  refreshShared,
-  stopRefreshes,
-} from './refresh'
+import { isRefreshing, refreshDialog, refreshEffects, refreshShared } from './refresh'
+import { stopAll } from './stopWithStudio'
 
 const before = [
   { key: 'a', speaker: 'mira', text: 'Hello.' },
@@ -109,7 +104,7 @@ describe('refreshDialog', () => {
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(isRefreshing(projectFile, 'act1')).toBe(true)
     expect(isRefreshing(projectFile, 'act2')).toBe(false)
-    stopRefreshes()
+    stopAll()
     expect(await running).toMatchObject({ ok: false, reason: 'failed' })
     expect(isRefreshing(projectFile, 'act1')).toBe(false)
     await new Promise((resolve) => setTimeout(resolve, 1500))

@@ -164,14 +164,6 @@ export function isRefreshingShared(projectFile: string): boolean {
   return active.has(sharedKey(projectFile))
 }
 
-/** The process groups of the refresh commands running now. */
-const running = new Set<number>()
-
-/** Stops every refresh command running now, with everything it started. */
-export function stopRefreshes(): void {
-  for (const pid of running) killGroup(pid)
-}
-
 async function refresh(
   projectFile: string,
   partId: string,
@@ -332,7 +324,6 @@ async function shell(
     stderr: 'pipe',
     detached: true,
   })
-  running.add(child.pid)
   const forget = stopWithStudio(child.pid)
   let timedOut = false
   let ended = false
@@ -364,7 +355,6 @@ async function shell(
     clearTimeout(grace)
     // Whatever happened (a stream error too), nothing of it is left running.
     killGroup(child.pid)
-    running.delete(child.pid)
     forget()
   }
 }

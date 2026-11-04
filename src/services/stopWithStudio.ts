@@ -1,7 +1,7 @@
 /**
  * The process groups the studio started on this computer (the game's refresh commands, the local
  * music, image, sound-effect and Whisper workers), stopped with everything they started when the
- * studio exits or is interrupted. Each runs in its own process group, so that stopping it stops its
+ * studio exits or is interrupted (`watch`). Each runs in its own process group, so that stopping it stops its
  * children too (`uv run` leaves python running otherwise), and so it does not get the terminal's
  * Ctrl-C: the studio stops it itself.
  *
@@ -36,7 +36,10 @@ export function stopAll(): void {
   for (const pid of state.running) killGroup(pid)
 }
 
-/** Makes sure the groups are stopped when the studio exits or is interrupted. */
+/**
+ * Makes sure the groups are stopped when the studio exits or is interrupted: Ctrl-C, SIGTERM, and
+ * its terminal closing (SIGHUP), which no longer reaches the groups themselves.
+ */
 function watch(): void {
   if (state.watched) return
   state.watched = true
@@ -44,6 +47,7 @@ function watch(): void {
   for (const [signal, code] of [
     ['SIGINT', 130],
     ['SIGTERM', 143],
+    ['SIGHUP', 129],
   ] as const) {
     process.once(signal, () => {
       stopAll()
