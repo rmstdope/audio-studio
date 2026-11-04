@@ -27,7 +27,9 @@ export function App() {
   if (project.isPending) {
     return <div className="center-page muted">Opening project…</div>
   }
-  if (project.isError) {
+  // Only a first read that failed: a failed refetch keeps the open page, so the page and its panels
+  // can show their own error lines through a brief outage.
+  if (project.isLoadingError) {
     return (
       <div className="center-page">
         <div className="empty-state">
