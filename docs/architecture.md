@@ -1031,6 +1031,25 @@ another is chosen; the page says which) or `missing` (a take was chosen but its 
 disk, which is said ahead of `changed`). A manifest entry without a lock entry is reported as a problem (with the orphans, 12.7).
 Nothing is generated again by itself: a new brief means new takes. A track the game no longer lists,
 while its list is there, is an orphan, shown on the page of the list its lock entry names under
+**Make takes for every track with no chosen take** (as-23x.1): the "Tracks up to date" panel of an act's
+page and of the Stingers page has, on its right, "N tracks have no chosen take" and **Make 4 takes each**.
+The press only opens a question in the panel (the total, the model and the time, or on Eleven Music
+that ElevenLabs bills each take and the total price on the button; the tracks by name; who is left out
+and why); **Make N takes** then calls `POST /api/music/lists/:id/make-all`, which runs `planMakeAll`
+(`core/musicMakeAll.ts`) on the list: four takes (`TAKES_EACH`) through the ordinary `make` for every
+track whose status is `not-chosen` (a changed or missing chosen take counts as chosen), that is not
+already making takes and that the project's model can make at its length (`canMake`); nothing is
+started if music cannot be made yet (`GET /api/music/model-state`), and if one track fails to start
+those already queued are stopped (the page says nothing was made). While any track of the list is
+making takes, the panel shows the running line and **Stop all** (`POST /api/music/lists/:id/stop`,
+every waiting or running take of the list) instead of the button; it is worked out from
+`GET /api/music/making`, which now also counts each track's failed takes (`MusicMakingSummary.failed`,
+a track with only failed takes has no "making" chip), so it survives a reload. The press itself is
+remembered only in the page's query cache (`MakeAllBatch`: total, tracks, failures before it, takes
+stopped by Stop all), for the summary line ("Made 14 of 16 takes. 2 could not be made — X says why.")
+that stays until Close or a reload; a take stopped from a track's own page during a press counts as
+made in it. No server state is added.
+
 "Music the game no longer asks for" (built, 12.7): a play button, its name (its id as words, since
 the lock keeps no title) with its file name under it, when it was chosen, and **Remove**. Remove
 asks first ("Remove the music for Castle gates?", saying what goes) and then deletes, in this
@@ -2096,6 +2115,8 @@ Small, independently useful increments:
         that can be un-chosen (§8.5).
     13. **Move a take** (built, as-824): Move… on a take card moves it to another loop in any act, or
         another stinger, counted as made for the track it joins (§8.5).
+    14. **Make takes for every track with no chosen take** (built, as-23x.1): one press on an act's or the
+        Stingers page makes four takes for every track with no chosen take, on the project's model (§8.5).
 13. **Languages** (epic as-170), in small pull requests:
     1. **Show a part's lines in each declared language** (built): `narration.languages`,
        `{language}` in the paths, a language switch on the lines page with each language's

@@ -18,6 +18,7 @@ import { changeSummary, listFor, listLine, listNotice } from '../../musicText'
 import { routeHref, type MusicRoute } from '../../route'
 import { showingAttentionText } from '../../status'
 import { DoneStat } from '../../components/DoneStat'
+import { MakeAllPanel } from './MakeAllPanel'
 import { NoMusic } from './NoMusic'
 import { OrphansPanel } from './OrphansPanel'
 import { TrackView } from './TrackView'
@@ -181,14 +182,16 @@ function ListPage({
       {refresh.panel}
       {!notice && list.tracks.length > 0 && (
         <section className="panel status-panel" aria-label="Tracks up to date">
-          <div className="stats">
-            <DoneStat
-              label="Tracks up to date"
-              done={done.done}
-              total={done.total}
-              href={page('attention')}
-            />
-          </div>
+          <MakeAllPanel list={list}>
+            <div className="stats">
+              <DoneStat
+                label="Tracks up to date"
+                done={done.done}
+                total={done.total}
+                href={page('attention')}
+              />
+            </div>
+          </MakeAllPanel>
           {attention && (
             <p className="status-note muted">
               {showingAttentionText(shown.length, 'track')} <a href={page()}>Show all</a>

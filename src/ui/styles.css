@@ -740,6 +740,58 @@ a.stat-link:focus-visible .stat-more {
   text-decoration: underline;
 }
 
+/* Make takes for every track with no chosen take: beside the count, wrapping under it in a narrow window */
+.make-all {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  outline: none;
+}
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.make-all-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.make-all-line a:not(.btn) {
+  color: inherit;
+}
+.make-all-question {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--glass);
+  border: 1px solid var(--edge);
+}
+.make-all-question h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.make-all-question ul {
+  margin: 0;
+  padding-left: 20px;
+  overflow-wrap: anywhere;
+}
+.make-all-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.make-all-error {
+  margin: 0;
+  color: var(--danger-ink);
+}
+
 .status-note {
   display: flex;
   align-items: center;

@@ -73,7 +73,12 @@ const list = (id: string, kind: MusicListSummary['kind']): MusicListSummary => (
 })
 
 /** A list page's play buttons, by track title. */
-function render(kind: MusicListSummary['kind'], show?: 'attention', orphans: OrphanRow[] = []) {
+function render(
+  kind: MusicListSummary['kind'],
+  show?: 'attention',
+  orphans: OrphanRow[] = [],
+  making: Record<string, unknown> = {},
+) {
   const id = kind === 'act' ? 'act1' : 'stingers'
   const summary = {
     music: { lists: [{ ...list(id, kind), orphans }] },
@@ -87,17 +92,13 @@ function render(kind: MusicListSummary['kind'], show?: 'attention', orphans: Orp
   document.body.append(container)
   const root = createRoot(container)
   cleanups.push(() => act(() => root.unmount()))
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, enabled: false } },
+  })
+  client.setQueryData(['music-making'], making)
   act(() =>
     root.render(
-      createElement(
-        QueryClientProvider,
-        {
-          client: new QueryClient({
-            defaultOptions: { queries: { retry: false, enabled: false } },
-          }),
-        },
-        createElement(MusicView, { summary, route }),
-      ),
+      createElement(QueryClientProvider, { client }, createElement(MusicView, { summary, route })),
     ),
   )
   const button = (title: string) =>
@@ -216,5 +217,20 @@ describe('the music the game no longer asks for', () => {
     const table = panel.querySelector('table')!
     expect(table.closest('.table-box')).toBeNull()
     expect(minWidthsInEveryWindow(table)).toEqual([])
+  })
+})
+
+describe('a track’s status while takes are made', () => {
+  it('says what is being made, but not for a track whose takes only failed', () => {
+    const { container } = render('act', undefined, [], {
+      roof: { takes: 2, left: 120, failed: 0 },
+      cellar: { takes: 0, left: 0, failed: 1 },
+    })
+    const status = (title: string) =>
+      [...container.querySelectorAll('tbody tr')]
+        .find((tr) => tr.textContent!.includes(title))!
+        .querySelector('td:last-child')!.textContent
+    expect(status('Roof')).toBe('making 2 takes · about 2 min')
+    expect(status('Cellar')).toBe('changed since chosen')
   })
 })
