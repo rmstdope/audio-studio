@@ -3475,6 +3475,21 @@ describe('server, a track’s takes', () => {
     expect(summary.hall.takes).toBeGreaterThan(0)
     expect(summary.hall.left).toBeGreaterThan(0)
   })
+  it('makes and stops takes for a whole list from the studio’s own page only', async () => {
+    const post = (path: string, origin = studio.url.origin) =>
+      fetch(new URL(path, studio.url), { method: 'POST', headers: { origin } })
+    expect((await post('/api/music/lists/act1/make-all', 'https://evil.example')).status).toBe(403)
+    expect((await post('/api/music/lists/act1/stop', 'https://evil.example')).status).toBe(403)
+    expect((await post('/api/music/lists/nobody/make-all')).status).toBe(404)
+    expect((await post('/api/music/lists/nobody/stop')).status).toBe(404)
+    const state = await (await fetch(new URL('/api/music/model-state', studio.url))).json()
+    expect(state).toMatchObject({ ok: true, model: 'balanced' })
+    const made = await post('/api/music/lists/act1/make-all')
+    expect(made.status).toBe(200)
+    expect(await made.json()).toEqual({ ok: true, tracks: 1, takes: 4 })
+    const stopped = await (await post('/api/music/lists/act1/stop')).json()
+    expect(stopped.ok).toBe(true)
+  })
 })
 
 describe('server, choosing a take', () => {

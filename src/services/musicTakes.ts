@@ -10,7 +10,7 @@ import {
   MusicBoardSchema,
   type BoardTake,
   type FailedView,
-  type MakingSummary,
+  type MusicMakingSummary,
   type MakingView,
   type MusicBoard,
   type MusicTakesView,
@@ -31,6 +31,7 @@ import { trackFor, type TrackRow } from '../core/music'
 import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
 import { movedBoardTake } from '../core/musicMove'
+import { TAKES_EACH, planMakeAll } from '../core/musicMakeAll'
 import { readWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
@@ -71,6 +72,14 @@ export type MakeRequest = { count: number; model?: MusicModelId } | { retry: num
 
 /** What asking for takes answered; null for a track the project does not list. */
 export type MakeResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
+
+/** What making takes for a whole list answered: how many tracks and takes were queued; null for an unknown list. */
+export type MakeAllResult =
+  { ok: true; tracks: number; takes: number } | { ok: false; message: string } | ProjectFailure
+
+/** The project's music model, and whether takes can be made with it now (`message` says what is missing). */
+export type ModelStateResult =
+  { ok: true; model: MusicModelId; ready: boolean; message: string | null } | ProjectFailure | null
 
 /** What dropping a take answered; null for a track the project does not list. */
 export type DropResult = { ok: true } | { ok: false; message: string } | ProjectFailure | null
@@ -166,6 +175,17 @@ export interface MusicTakes {
   make(projectFile: string, id: string, request: MakeRequest): Promise<MakeResult>
   /** Stops the track's takes: the one being made ends and is discarded, the waiting ones never start. */
   stop(projectFile: string, id: string): Promise<StopResult>
+  /**
+   * Queues four takes, on the project's model, for every track of the list with no chosen take that
+   * is not already making takes and that the model can make at its length (`planMakeAll`). Starts
+   * nothing when music cannot be made yet, or when one track fails to start (the ones queued are
+   * stopped). Null for a list that is not there.
+   */
+  makeAll(projectFile: string, listId: string): Promise<MakeAllResult | null>
+  /** Stops every take of the list's tracks that waits or is being made. Null for a list that is not there. */
+  stopAll(projectFile: string, listId: string): Promise<StopResult>
+  /** The project's music model, and whether takes can be made with it now. Null without a `music` section. */
+  modelState(projectFile: string): Promise<ModelStateResult>
   /** Makes a take on the board the track's music: levelled, encoded, with the manifest and lock. */
   choose(projectFile: string, id: string, name: string): Promise<ChooseResult>
   /** Takes the track's chosen take back: its music file, manifest entry and lock entry go; the take stays on the board. */
@@ -184,7 +204,7 @@ export interface MusicTakes {
    */
   move(projectFile: string, id: string, name: string, toId: string): Promise<MoveResult>
   /** What is being made in the project, by track, for the lists' status. */
-  making(projectFile: string): Promise<Record<string, MakingSummary>>
+  making(projectFile: string): Promise<Record<string, MusicMakingSummary>>
   /** The path of a take's WAV, or null for a track not listed or a name that is not a take's. */
   takeFile(projectFile: string, id: string, name: string): Promise<string | null>
 }
@@ -375,7 +395,7 @@ export function createMusicTakes({
   const entriesOf = (projectFile: string, id: string) =>
     [...(active.get(`${projectFile}\0${id}`)?.values() ?? [])].sort((a, b) => a.n - b.n)
 
-  return {
+  const api: MusicTakes = {
     async view(projectFile, id) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
@@ -507,6 +527,75 @@ export function createMusicTakes({
         void queue.run(turn, turn === GPU ? () => holdGpu('music', make) : make)
       }
       return { ok: true }
+    },
+
+    async makeAll(projectFile, listId) {
+      const opened = await openProject(projectFile)
+      if (!opened.ok) return opened
+      const { project } = opened
+      if (!project.music) return null
+      const lists = (await readMusic(dirname(projectFile), project, []))?.lists ?? []
+      const list = lists.find((l) => l.id === listId)
+      if (!list) return null
+      const state = await api.modelState(projectFile)
+      if (!state || !state.ok) return state
+      if (!state.ready) return { ok: false, message: state.message ?? 'Music cannot be made yet.' }
+      const plan = planMakeAll({
+        kind: list.kind === 'stingers' ? 'stinger' : 'loop',
+        tracks: list.tracks,
+        making: await api.making(projectFile),
+        model: state.model,
+        ready: true,
+      })
+      if (plan.kind !== 'ready') return { ok: true, tracks: 0, takes: 0 }
+      const started: string[] = []
+      for (const track of plan.tracks) {
+        const made = await api.make(projectFile, track.id, { count: TAKES_EACH })
+        if (!made || !made.ok) {
+          for (const id of started) await api.stop(projectFile, id)
+          const message =
+            made && 'message' in made ? made.message : 'The takes could not be started.'
+          return { ok: false, message }
+        }
+        started.push(track.id)
+      }
+      return { ok: true, tracks: plan.tracks.length, takes: plan.takes }
+    },
+
+    async stopAll(projectFile, listId) {
+      const opened = await openProject(projectFile)
+      if (!opened.ok) return opened
+      if (!opened.project.music) return null
+      const lists = (await readMusic(dirname(projectFile), opened.project, []))?.lists ?? []
+      const list = lists.find((l) => l.id === listId)
+      if (!list) return null
+      let stopped = 0
+      for (const track of list.tracks) {
+        const result = await api.stop(projectFile, track.id)
+        if (result && result.ok) stopped += result.stopped
+      }
+      return { ok: true, stopped }
+    },
+
+    async modelState(projectFile) {
+      const opened = await openProject(projectFile)
+      if (!opened.ok) return opened
+      const { music } = opened.project
+      if (!music) return null
+      const model = music.model ?? DEFAULT_MUSIC_MODEL
+      if (!(await generator.installed(model))) {
+        const { name } = musicModel(model)
+        return {
+          ok: true,
+          model,
+          ready: false,
+          message: onThisComputer(model)
+            ? `${name} is not on this computer.`
+            : `${name} needs an ElevenLabs key.`,
+        }
+      }
+      const ready = await generator.ready(model)
+      return { ok: true, model, ready: ready.ok, message: ready.ok ? null : ready.message }
     },
 
     async stop(projectFile, id) {
@@ -672,14 +761,18 @@ export function createMusicTakes({
     },
 
     async making(projectFile) {
-      const summary: Record<string, MakingSummary> = {}
+      const summary: Record<string, MusicMakingSummary> = {}
       const prefix = `${projectFile}\0`
       for (const [key, entries] of active) {
         if (!key.startsWith(prefix)) continue
         let takes = 0
         let left = 0
+        let failed = 0
         for (const entry of entries.values()) {
-          if (entry.state === 'failed') continue
+          if (entry.state === 'failed') {
+            failed++
+            continue
+          }
           takes++
           const expected = musicModel(entry.model).seconds
           left +=
@@ -687,7 +780,7 @@ export function createMusicTakes({
               ? expected
               : Math.max(0, expected - (now() - entry.startedAt) / 1000)
         }
-        if (takes) summary[key.slice(prefix.length)] = { takes, left }
+        if (takes || failed) summary[key.slice(prefix.length)] = { takes, left, failed }
       }
       return summary
     },
@@ -700,4 +793,5 @@ export function createMusicTakes({
       return (await Bun.file(file).exists()) ? file : null
     },
   }
+  return api
 }

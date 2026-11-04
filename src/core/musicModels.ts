@@ -202,7 +202,7 @@ export interface TrackLength {
 }
 
 /** An amount in US dollars, to the cent. */
-function cents(amount: number): string {
+export function cents(amount: number): string {
   return `$${(Math.round(amount * 100) / 100).toFixed(2)}`
 }
 

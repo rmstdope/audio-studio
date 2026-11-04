@@ -246,7 +246,7 @@ function ListPage({
                     <td>{clock(track.seconds)}</td>
                     <PlaysCell text={playsText(track.current, failed[track.id])} />
                     <td>
-                      {making[track.id] ? (
+                      {making[track.id]?.takes ? (
                         <span className="chip">{makingStatusText(making[track.id]!)}</span>
                       ) : (
                         <span className={STATUS_CHIP[track.status]}>

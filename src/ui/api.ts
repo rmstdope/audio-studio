@@ -19,7 +19,7 @@ import type { ChangesResult } from '../services/git'
 import type { CreditResult } from '../services/fish'
 import type { BriefChange } from '../core/music'
 import type { ImageMakingSummary, ImageTakesView, LookRunView } from '../core/imageTakes'
-import type { MakingSummary, MusicTakesView } from '../core/musicTake'
+import type { MusicMakingSummary, MusicTakesView } from '../core/musicTake'
 import { takesAreBeingMade } from './musicTakesText'
 import type {
   ChooseResult,
@@ -1141,8 +1141,9 @@ export function useStopTakes(trackId: string) {
 export function useMusicMaking() {
   return useQuery({
     queryKey: ['music-making'],
-    queryFn: () => getJson<Record<string, MakingSummary>>('/api/music/making'),
-    refetchInterval: (query) => (Object.keys(query.state.data ?? {}).length ? 3000 : false),
+    queryFn: () => getJson<Record<string, MusicMakingSummary>>('/api/music/making'),
+    refetchInterval: (query) =>
+      Object.values(query.state.data ?? {}).some((making) => making.takes > 0) ? 3000 : false,
   })
 }
 

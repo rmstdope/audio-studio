@@ -106,6 +106,97 @@ function setup(
   return { root, file, takes, requests, settled }
 }
 
+describe('makeAll, stopAll and modelState', () => {
+  const two = {
+    'tts/act1/music.json': [
+      { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 30 },
+      { id: 'cellar', title: 'Cellar', brief: 'drips', seconds: 20 },
+    ],
+  }
+
+  it('makes four takes for every track with no chosen take, and none for a chosen one', async () => {
+    const { file, takes, requests, settled } = setup(undefined, two)
+    await takes.make(file, 'hall', { count: 1 })
+    const first = await settled('hall')
+    if (!first || !('ok' in first) || !first.ok) throw new Error('expected a view')
+    expect(await takes.choose(file, 'hall', first.takes[0]!.file)).toMatchObject({ ok: true })
+    requests.length = 0
+    expect(await takes.makeAll(file, 'act1')).toEqual({ ok: true, tracks: 1, takes: 4 })
+    const cellar = await settled('cellar')
+    if (!cellar || !('ok' in cellar) || !cellar.ok) throw new Error('expected a view')
+    expect(cellar.takes).toHaveLength(4)
+    expect(requests).toHaveLength(4)
+    const hall = await settled('hall')
+    expect(hall).toMatchObject({ takes: [{ n: 1, chosen: true }] })
+  })
+
+  it('leaves out a track already making takes', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes } = setup(undefined, two, [], gate)
+    await takes.make(file, 'hall', { count: 1 })
+    expect(await takes.makeAll(file, 'act1')).toEqual({ ok: true, tracks: 1, takes: 4 })
+    expect(await takes.making(file)).toMatchObject({
+      hall: { takes: 1 },
+      cellar: { takes: 4 },
+    })
+    release()
+  })
+
+  it('leaves out a track the project’s model cannot make at its length', async () => {
+    const root = tempRepo({
+      'content-studio.json': projectJson({ music: { ...music, model: 'short' } }),
+      'tts/act1/music.json': [
+        { id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 20 },
+        { id: 'cellar', title: 'Cellar', brief: 'drips', seconds: 120 },
+      ],
+    })
+    const file = join(root, 'content-studio.json')
+    const { generator } = fakeGenerator()
+    const takes = createMusicTakes({ generator, queue: createSerial(), newSeed: () => 1 })
+    expect(await takes.makeAll(file, 'act1')).toEqual({ ok: true, tracks: 1, takes: 4 })
+  })
+
+  it('starts nothing when music cannot be made yet', async () => {
+    const { file, takes } = setup({ ok: false, message: 'no GPU', fix: 'x' }, two)
+    expect(await takes.makeAll(file, 'act1')).toEqual({ ok: false, message: 'no GPU' })
+    expect(await takes.making(file)).toEqual({})
+  })
+
+  it('knows no list that is not there', async () => {
+    const { file, takes } = setup(undefined, two)
+    expect(await takes.makeAll(file, 'nobody')).toBeNull()
+    expect(await takes.stopAll(file, 'nobody')).toBeNull()
+  })
+
+  it('stops every take of the list that waits or is being made, and keeps the rest', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes } = setup(undefined, two, [], gate)
+    await takes.makeAll(file, 'act1')
+    expect(await takes.stopAll(file, 'act1')).toEqual({ ok: true, stopped: 8 })
+    expect(await takes.making(file)).toEqual({})
+    release()
+  })
+
+  it('says which model the project makes music with and whether it can', async () => {
+    const { file, takes } = setup()
+    expect(await takes.modelState(file)).toEqual({
+      ok: true,
+      model: 'balanced',
+      ready: true,
+      message: null,
+    })
+    const unready = setup({ ok: false, message: 'no GPU', fix: 'x' })
+    expect(await unready.takes.modelState(unready.file)).toMatchObject({
+      ready: false,
+      message: 'no GPU',
+    })
+    const missing = setup(undefined, {}, [], undefined, ['balanced'])
+    expect(await missing.takes.modelState(missing.file)).toMatchObject({ ready: false })
+  })
+})
+
 describe('createMusicTakes', () => {
   it('makes two takes of a loop, shaped to its length, and lists them with their seeds', async () => {
     const { file, takes, requests, settled } = setup()
@@ -365,14 +456,21 @@ describe('createMusicTakes', () => {
     await takes.make(file, 'victory', { count: 1 })
     clock = 60_000
     expect(await takes.making(file)).toEqual({
-      hall: { takes: 2, left: 120 + 180 },
-      victory: { takes: 1, left: 180 },
+      hall: { takes: 2, left: 120 + 180, failed: 0 },
+      victory: { takes: 1, left: 180, failed: 0 },
     })
     release()
     for (let i = 0; i < 200 && Object.keys(await takes.making(file)).length; i++) {
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
     expect(await takes.making(file)).toEqual({})
+  })
+
+  it('counts the takes that failed in the making summary, with none left to make', async () => {
+    const { file, takes, settled } = setup(undefined, {}, [0, 1])
+    await takes.make(file, 'hall', { count: 2 })
+    await settled('hall')
+    expect(await takes.making(file)).toEqual({ hall: { takes: 0, left: 0, failed: 2 } })
   })
 
   it('keeps the other takes when one fails, saying why', async () => {
@@ -738,7 +836,7 @@ describe('createMusicTakes', () => {
         { n: 2, model: 'Quickest · Turbo · 1.7B', expected: 60, paid: false },
       ],
     })
-    expect(await takes.making(file)).toEqual({ hall: { takes: 2, left: 480 } })
+    expect(await takes.making(file)).toEqual({ hall: { takes: 2, left: 480, failed: 0 } })
     release()
   })
 
