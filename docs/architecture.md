@@ -1058,9 +1058,9 @@ every waiting or running take of the list) instead of the button; it is worked o
 a track with only failed takes has no "making" chip), so it survives a reload. The latest press of each list is
 remembered by the running studio (as-4m0; `contentStudioMusicBatches` in `services/musicTakes.ts`, one per
 list, so an act's page and the Stingers page each have their own; `GET /api/music/lists/:id/batch`):
-total, tracks, failures before it, takes stopped on the press's own tracks while it runs, by Stop all
-or on a track's own page (`stop` counts them into the running press that holds the track, so takes
-started by hand on other tracks are not, and a take stopped is never counted as made; as-z1l), and `running` while any of
+total, tracks, failures before it, the press's own takes that were stopped, by Stop all or on a track's
+own page (each take Make all starts points at its press, and `stop` counts it there, so takes
+started by hand, on any track, are not, and a take stopped is never counted as made; as-z1l), and `running` while any of
 those tracks has a take waiting or being made. The page shows the summary line ("Made 14 of 16 takes.
 2 could not be made — X says why.") whenever the press is there and not running, so a reload, a new tab
 or a page opened later shows it too, until Close (`POST /api/music/lists/:id/batch/close`, for every

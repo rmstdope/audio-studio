@@ -269,6 +269,20 @@ describe('the summary of a press on a list is kept by the studio', () => {
     release()
   })
 
+  it('does not count takes started by hand on its tracks among the ones it stopped', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { file, takes } = setup(undefined, two, [], gate)
+    await takes.makeAll(file, 'act1')
+    await takes.make(file, 'hall', { count: 1 })
+    expect(await takes.stop(file, 'hall')).toEqual({ ok: true, stopped: 5 })
+    expect(await takes.batch(file, 'act1')).toMatchObject({ stopped: 4 })
+    await takes.make(file, 'cellar', { count: 2 })
+    await takes.stopAll(file, 'act1')
+    expect(await takes.batch(file, 'act1')).toMatchObject({ stopped: 8, running: false })
+    release()
+  })
+
   it('remembers how many takes had failed before the press', async () => {
     const { file, takes, settled } = setup(undefined, two)
     await takes.make(file, 'cellar', { count: 1 })
