@@ -47,19 +47,6 @@ export const EffectLockEntrySchema = z.object({
 /** `content-studio/effects/lock.json`: the chosen take of each effect, by effect id. */
 export const EffectLockSchema = z.record(z.string(), EffectLockEntrySchema)
 
-/** The lock file's text: one entry per line in id order, each entry's description written as `text`. */
-export function formatEffectLock(lock: EffectLock): string {
-  const ids = Object.keys(lock).sort()
-  if (!ids.length) return '{}\n'
-  const lines = ids.map((id) => {
-    const entry = lock[id]!
-    const { description, ...rest } = entry.inputs
-    const written = { ...entry, inputs: { text: description, ...rest } }
-    return ` ${JSON.stringify(id)}: ${JSON.stringify(written)}`
-  })
-  return `{\n${lines.join(',\n')}\n}\n`
-}
-
 /** The manifest in the effects clips folder, which the game reads: `{ effect: { file, duration } }`. */
 export const EffectManifestSchema = z.record(
   z.string(),

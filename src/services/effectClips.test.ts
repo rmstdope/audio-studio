@@ -2,10 +2,16 @@ import { describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import type { EffectBoardTake } from '../core/effectTakes'
+import { EffectLockSchema, type EffectBoardTake } from '../core/effectTakes'
 import { ProjectSchema } from '../core/project'
 import type { Encoder, EncodeOptions } from './audio'
-import { acceptEffect, commitEffect, readEffectChosen, uncommitEffect } from './effectClips'
+import {
+  acceptEffect,
+  commitEffect,
+  formatEffectLock,
+  readEffectChosen,
+  uncommitEffect,
+} from './effectClips'
 
 const effects = {
   from: { shared: 'tts/effects.json' },
@@ -253,5 +259,23 @@ describe('readEffectChosen', () => {
     const problems: unknown[] = []
     expect(await readEffectChosen(broken, config, problems as never)).toBeNull()
     expect(problems).toHaveLength(1)
+  })
+})
+
+describe('formatEffectLock', () => {
+  const line = (id: string, inputs: string) =>
+    ` "${id}": {"fp":"${'a'.repeat(16)}","model":"small-sfx","seed":7,"take":2,"inputs":${inputs},"at":"2026-11-03T10:00:00.000Z"}`
+  const text = [
+    '{',
+    `${line('coins', '{"text":"Coins spill","seconds":0.5}')},`,
+    line('rain', '{"text":"Steady rain","seconds":8,"loops":true}'),
+    '}',
+    '',
+  ].join('\n')
+
+  it('writes one entry per line in id order, the words as text, as it read them', () => {
+    const { coins, rain } = EffectLockSchema.parse(JSON.parse(text))
+    expect(formatEffectLock({ rain: rain!, coins: coins! })).toBe(text)
+    expect(formatEffectLock({})).toBe('{}\n')
   })
 })

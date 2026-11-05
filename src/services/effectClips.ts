@@ -7,7 +7,6 @@ import {
   EffectManifestSchema,
   effectAcceptable,
   effectChangedFields,
-  formatEffectLock,
   type EffectBoardTake,
   type EffectInputs,
   type EffectLock,
@@ -18,11 +17,20 @@ import { resolveInRoot } from '../core/paths'
 import { EFFECTS_LOCK_FILE, type EffectsConfig, type Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import type { Encoder } from './audio'
-import { listFiles, readResource, writeAtomic } from './files'
+import { formatEntriesPerLine, listFiles, readResource, writeAtomic } from './files'
 import { choices, sorted, type CommitResult } from './musicClips'
 
 /** How the game's sound effects are encoded: stereo, 160 kbps, at the level the model made them. */
 export const EFFECT_OUTPUT = { bitrate: '160k', channels: 2 } as const
+
+/** The lock file's text: one entry per line in id order, each entry's description written as `text`. */
+export function formatEffectLock(lock: EffectLock): string {
+  const written = Object.entries(lock).map(([id, entry]) => {
+    const { description, ...rest } = entry.inputs
+    return [id, { ...entry, inputs: { text: description, ...rest } }]
+  })
+  return formatEntriesPerLine(Object.fromEntries(written))
+}
 
 /** The effects lock as it is now: empty if there is none; null (with the problems added) if broken. */
 async function lockNow(root: string, problems: Problem[]): Promise<EffectLock | null> {

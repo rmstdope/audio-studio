@@ -17,7 +17,6 @@ import {
   effectTakeKind,
   makeEffectTakesLabel,
   EffectLockSchema,
-  formatEffectLock,
   type EffectLockEntry,
 } from './effectTakes'
 
@@ -265,13 +264,6 @@ describe('the effects lock file', () => {
     expect(read.coins!.inputs).toEqual({ description: 'Coins spill', seconds: 0.5 })
     expect(read.rain!.inputs).toEqual({ description: 'Steady rain', seconds: 8, loops: true })
     expect(read.rain).toMatchObject({ fp: 'a'.repeat(16), model: 'small-sfx', seed: 7, take: 2 })
-  })
-
-  it('writes one entry per line in id order, the words as text, as it read them', () => {
-    const read = EffectLockSchema.parse(JSON.parse(text))
-    const { coins, rain } = read
-    expect(formatEffectLock({ rain: rain!, coins: coins! })).toBe(text)
-    expect(formatEffectLock({})).toBe('{}\n')
   })
 
   it('refuses an entry whose words are written as description, as before version 2', () => {
