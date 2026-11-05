@@ -92,6 +92,19 @@ describe.skipIf(!hasFfmpeg)('ffmpegSceneAudio', () => {
     expect(mix).not.toContain(root)
   })
 
+  it('names a clip with no length by its project path', async () => {
+    // A still image: ffprobe opens it and reports no duration.
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==',
+      'base64',
+    )
+    mkdirSync(join(root, 'audio/effects'), { recursive: true })
+    writeFileSync(join(root, 'audio/effects/still.png'), png)
+    await expect(audio.seconds(join(root, 'audio/effects/still.png'))).rejects.toThrow(
+      'audio/effects/still.png has no length',
+    )
+  })
+
   it('names every clip of a mix, in order, in full', async () => {
     mkdirSync(join(root, '.content-studio/effect-takes'), { recursive: true })
     const a = join(root, '.content-studio/effect-takes/a.mp3')

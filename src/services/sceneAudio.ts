@@ -9,7 +9,7 @@ function projectPath(root: string, file: string): string {
   return relative(root, file).split(sep).join('/')
 }
 
-/** `text` with the computer's path to each of `files` taken out: a leading copy goes, others shorten. */
+/** `text` with the computer's path to each of `files` taken out: each `<path>: ` goes, other copies shorten. */
 function withoutAbsolutePaths(root: string, files: string[], text: string): string {
   let out = text
   for (const file of files) {
