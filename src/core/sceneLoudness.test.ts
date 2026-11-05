@@ -10,6 +10,8 @@ import {
   planStateMix,
   sceneStateNames,
   sceneVerdict,
+  statesPlaying,
+  withoutName,
   targetLine,
   WINDOW_SECONDS,
   type PlanEffect,
@@ -273,5 +275,48 @@ describe('expectedFigures', () => {
   it('shifts every figure and keeps what reads nothing', () => {
     const shifted = shiftStates(measure([-23.4, null as never]), 4)
     expect(shifted.states.map((s) => s.lufs)).toEqual([-19.4, null])
+  })
+})
+
+describe('statesPlaying', () => {
+  const states = ['calm', 'rainy']
+  it('plays a loop in every state, or only in its own', () => {
+    expect(statesPlaying({ play: { mode: 'loop' }, state: null }, states)).toEqual(states)
+    expect(statesPlaying({ play: { mode: 'loop' }, state: 'rainy' }, states)).toEqual(['rainy'])
+  })
+  it('never plays a trigger, or an effect of a state the scene lacks', () => {
+    expect(
+      statesPlaying({ play: { mode: 'trigger', trigger: 'open' }, state: null }, states),
+    ).toEqual([])
+    expect(statesPlaying({ play: { mode: 'loop' }, state: 'flooded' }, states)).toEqual([])
+  })
+  it('plays once only inside the minute, and a random one when its first wait is', () => {
+    expect(
+      statesPlaying({ play: { mode: 'once', afterSeconds: 90 }, state: null }, [null]),
+    ).toEqual([])
+    expect(
+      statesPlaying({ play: { mode: 'once', afterSeconds: 10 }, state: null }, [null]),
+    ).toEqual([null])
+    expect(
+      statesPlaying({ play: { mode: 'random', everySeconds: [100, 140] }, state: null }, [null]),
+    ).toEqual([])
+    expect(
+      statesPlaying({ play: { mode: 'random', everySeconds: [10, 30] }, state: null }, [null]),
+    ).toEqual([null])
+  })
+})
+
+describe('withoutName', () => {
+  const all = ['calm', 'rainy', 'storm']
+  it('adds no state for every state, or a scene without states', () => {
+    expect(withoutName('fire', all, all)).toBe('fire')
+    expect(withoutName('fire', [null], [null])).toBe('fire')
+  })
+  it('lists the states like a sentence', () => {
+    expect(withoutName('rain', ['rainy'], all)).toBe('rain in rainy')
+    expect(withoutName('rain', ['rainy', 'storm'], all)).toBe('rain in rainy and storm')
+    expect(withoutName('rain', ['calm', 'rainy', 'storm'], ['calm', 'rainy', 'storm', 'dry'])).toBe(
+      'rain in calm, rainy and storm',
+    )
   })
 })

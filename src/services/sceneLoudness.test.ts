@@ -207,6 +207,79 @@ describe('measureScenes', () => {
     expect(asked[0]!.map((p) => p.file)).toEqual(['/music/theme.mp3', '/clips/hum.mp3'])
   })
 
+  it('names only effects the measured minute would have played, and in which states', async () => {
+    const built = actOf(
+      [declared('a', ['calm', 'rainy', 'storm'])],
+      {
+        a: {
+          music: { track: 'theme', level: 1 },
+          effects: [
+            { id: 'creak', play: { mode: 'trigger', trigger: 'open' }, level: 1 },
+            { id: 'coins', play: { mode: 'loop' }, state: 'flooded', level: 1 },
+            { id: 'late', play: { mode: 'once', afterSeconds: 90 }, level: 1 },
+            { id: 'rain', play: { mode: 'loop' }, state: 'rainy', level: 1 },
+            { id: 'fire', play: { mode: 'loop' }, level: 1 },
+          ],
+        },
+      },
+      ['creak', 'coins', 'late', 'rain', 'fire'].map((id) =>
+        choice(id, { silent: true, playable: false, clip: null }),
+      ),
+    )
+    const kept: [string, SceneMeasure, boolean][] = []
+    await run(built, { kept })
+    expect(kept[0]![1].without).toEqual([
+      'rain in rainy, which has no take chosen',
+      'fire, which has no take chosen',
+    ])
+  })
+
+  it('names an effect once however many rows it has, with all its states', async () => {
+    const mixOf = (effects: SceneMix['effects']) => ({ a: { effects } })
+    const none = { silent: true, playable: false, clip: null }
+    const loop = { mode: 'loop' } as const
+    const states = ['calm', 'rainy', 'storm']
+    const two = actOf(
+      [declared('a', states)],
+      mixOf([
+        { id: 'rain', play: loop, state: 'rainy', level: 1 },
+        { id: 'rain', play: loop, state: 'storm', level: 1 },
+      ]),
+      [choice('rain', none)],
+    )
+    const kept: [string, SceneMeasure, boolean][] = []
+    await run(two, { kept })
+    expect(kept[0]![1].without).toEqual(['rain in rainy and storm, which has no take chosen'])
+    const mixed = actOf(
+      [declared('a', states)],
+      mixOf([
+        { id: 'rain', play: loop, level: 1 },
+        { id: 'rain', play: loop, state: 'rainy', level: 1 },
+      ]),
+      [choice('rain', none)],
+    )
+    const kept2: [string, SceneMeasure, boolean][] = []
+    await run(mixed, { kept: kept2 })
+    expect(kept2[0]![1].without).toEqual(['rain, which has no take chosen'])
+  })
+
+  it('applies the same rule to the open scene on the page', async () => {
+    const built = actOf([declared('a', ['calm', 'rainy'])], { a: { effects: [] } }, [
+      choice('creak', { silent: true, playable: false, clip: null }),
+      choice('rain', { silent: true, playable: false, clip: null }),
+    ])
+    const entry: SceneMix = {
+      effects: [
+        { id: 'creak', play: { mode: 'trigger', trigger: 'open' }, level: 1 },
+        { id: 'rain', play: { mode: 'loop' }, state: 'rainy', level: 1 },
+      ],
+    }
+    const kept: [string, SceneMeasure, boolean][] = []
+    await run(built, { open: { scene: 'a', entry }, kept })
+    expect(kept[0]![2]).toBe(true)
+    expect(kept[0]![1].without).toEqual(['rain in rainy, which has no take chosen'])
+  })
+
   it('records why a scene could not be measured and goes on with the others', async () => {
     const built = actOf([declared('a', ['x', 'y']), declared('b')], {
       a: { music: { track: 'theme', level: 1 }, effects: [] },

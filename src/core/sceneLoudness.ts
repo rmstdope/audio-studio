@@ -83,6 +83,38 @@ export function planStateMix(input: {
   return parts
 }
 
+/**
+ * The states, of those measured, in which an effect would sound in the minute, whatever its clip
+ * (a random one counts by its first wait). Mirrors `planStateMix`; empty for one never heard.
+ */
+export function statesPlaying(
+  row: { play: Play; state: string | null },
+  states: (string | null)[],
+): (string | null)[] {
+  const { play } = row
+  const heard =
+    play.mode === 'loop' ||
+    (play.mode === 'random' &&
+      (play.everySeconds[0] + play.everySeconds[1]) / 2 < WINDOW_SECONDS) ||
+    (play.mode === 'once' && play.afterSeconds < WINDOW_SECONDS)
+  return heard ? states.filter((s) => row.state === null || row.state === s) : []
+}
+
+/**
+ * How the note names an effect left out: its id, then "in rainy and storm" when it plays in only
+ * some of the scene's states (listed like a sentence, in the game's order).
+ */
+export function withoutName(
+  id: string,
+  playing: (string | null)[],
+  all: (string | null)[],
+): string {
+  const names = playing.filter((s): s is string => s !== null)
+  if (names.length === 0 || playing.length === all.length) return id
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
+  return `${id} in ${list}`
+}
+
 /** The states a scene is measured in, in the game's order; `null` is a scene that has none. */
 export function sceneStateNames(scene: { states: string[] }): (string | null)[] {
   return scene.states.length > 0 ? scene.states : [null]
