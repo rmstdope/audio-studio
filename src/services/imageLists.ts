@@ -96,7 +96,7 @@ export async function readImages(
   project: Project,
   problems: Problem[],
 ): Promise<ImagesSummary | null> {
-  const { images, narration } = project
+  const { images } = project
   if (!images) return null
   const lists = []
   for (const part of project.parts) {
@@ -109,7 +109,7 @@ export async function readImages(
       title: part.title,
       file,
       state,
-      canRefresh: Boolean(narration.refreshDialog),
+      canRefresh: Boolean(project.refresh?.part),
     })
   }
   const styleRead = await readResource(root, images.paths.style, StyleSchema, problems)

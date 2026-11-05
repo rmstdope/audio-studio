@@ -23,6 +23,10 @@
     "sv",
     "de"
   ],
+  "refresh": {
+    "part": "sh tools/refresh.sh {part}",
+    "shared": "sh tools/refresh-shared.sh"
+  },
   "narration": {
     "characters": "tts/cast.json",
     "paths": {
@@ -31,11 +35,9 @@
       "lock": "tts/{part}/{language}/narration.lock.json",
       "clips": "audio/narration/{part}/{language}",
       "manifest": "audio/narration/{part}/{language}/manifest.json"
-    },
-    "refreshDialog": "sh tools/refresh.sh {part}"
+    }
   },
   "music": {
-    "refreshShared": "sh tools/refresh-stingers.sh",
     "paths": {
       "loops": "tts/{part}/music.json",
       "stingers": "tts/stingers.json",

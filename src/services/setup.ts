@@ -95,7 +95,7 @@ export async function checkSetup(
     envPath: project.env,
     key,
     fish: fishAnswer,
-    refreshDialog: Boolean(narration.refreshDialog),
+    refreshPart: Boolean(project.refresh?.part),
     parallel: narration.quality.parallel,
     fishTier: narration.quality.fishTier ?? null,
     music: project.music

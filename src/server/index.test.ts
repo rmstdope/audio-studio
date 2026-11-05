@@ -1364,8 +1364,7 @@ describe('server, generating a part', () => {
 })
 
 describe('server, refreshing and generating', () => {
-  const json = projectJson()
-  ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 0.5'
+  const json = projectJson({ refresh: { part: 'sleep 0.5 # {part}' } })
   const busyRoot = tempRepo({
     'content-studio.json': json,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
@@ -2035,8 +2034,8 @@ describe('server, paid recording and what changes meanwhile', () => {
 describe('server, a paid job refused for a refresh', () => {
   const json = projectJson({
     narration: { ...(projectJson().narration as object), models: { draft: 's2-pro' } },
+    refresh: { part: 'sleep 1 # {part}' },
   })
-  ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
   const root = tempRepo({
     'content-studio.json': json,
     'tts/cast.json': { speakers: { narrator: { voice: 'v1' } } },
@@ -3152,8 +3151,8 @@ describe('server, the music pages', () => {
   const list = JSON.stringify([{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5 }])
   const musicRoot = tempRepo({
     'content-studio.json': projectJson({
+      refresh: { shared: `printf '%s' '${list}' > tts/stingers.json` },
       music: {
-        refreshShared: `printf '%s' '${list}' > tts/stingers.json`,
         paths: {
           loops: 'tts/{part}/music.json',
           stingers: 'tts/stingers.json',
@@ -5437,8 +5436,8 @@ describe('server, the sound effects', () => {
   const list = JSON.stringify([{ id: 'coins', description: 'Coins spill', seconds: 0.5 }])
   const effectsRoot = tempRepo({
     'content-studio.json': projectJson({
+      refresh: { shared: `printf '%s' '${list}' > tts/effects.json` },
       effects: {
-        refresh: `printf '%s' '${list}' > tts/effects.json`,
         paths: {
           list: 'tts/effects.json',
           lock: 'audio/effects.lock.json',

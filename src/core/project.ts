@@ -94,7 +94,6 @@ const NarrationSchema = z
       clips: partPath,
       manifest: partPath,
     }),
-    refreshDialog: z.string().optional(),
     /**
      * The speakers (cast ids) whose lines follow their scene's cue unless they have a cue of
      * their own; the others keep their own cue or their style. Edited by hand in this file.
@@ -217,8 +216,6 @@ const musicPath = z
 
 /** The optional `music` section: where the game lists its tracks and where their files go. */
 const MusicSchema = z.object({
-  /** The game's command for what belongs to no act (the stingers); run in the project root. */
-  refreshShared: z.string().min(1).optional(),
   /** The music model new takes are made with unless a track asks for another; absent is Balanced. */
   model: z.enum(MUSIC_MODEL_IDS).optional(),
   paths: z.object({
@@ -270,8 +267,6 @@ const ImagesSchema = z.object({
 const EffectsSchema = z.object({
   /** The effects model new takes are made with unless an effect asks for the other; absent is Small SFX. */
   model: z.enum(EFFECT_MODEL_IDS).optional(),
-  /** The game's command that writes the effects list; run in the project root, only from Refresh from the game. */
-  refresh: z.string().min(1).optional(),
   paths: z.object({
     /** The game's one list of sound effects, written by the game and read only. */
     list: z
@@ -357,6 +352,22 @@ export const ProjectSchema = z
         error: 'languages must be unique',
       })
       .default(['en']),
+    /**
+     * The game's commands that write its lists, run in the project root only when the user presses
+     * Refresh: `part` writes one part's lists of every kind, `shared` every list of no part.
+     */
+    refresh: z
+      .object({
+        part: z
+          .string()
+          .min(1)
+          .refine((command) => command.includes('{part}'), {
+            error: 'must contain {part}: the command is run for one part, given its id',
+          })
+          .optional(),
+        shared: z.string().min(1).optional(),
+      })
+      .optional(),
     narration: NarrationSchema,
     music: MusicSchema.optional(),
     images: ImagesSchema.optional(),

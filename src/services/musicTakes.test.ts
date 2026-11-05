@@ -1364,8 +1364,7 @@ describe('moving a take', () => {
   })
 
   it('refuses while the destination’s list is being refreshed from the game', async () => {
-    const json = projectJson({ music })
-    ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
+    const json = projectJson({ music, refresh: { part: 'sleep 1 # {part}' } })
     const m = await made(2, { 'content-studio.json': json })
     const [one] = (await viewOf(m, 'hall')).takes
     const refreshing = refreshDialog(m.file, 'act2')
@@ -1382,8 +1381,7 @@ describe('moving a take', () => {
   })
 
   it('refuses while the source’s list is being refreshed, and while the stingers are', async () => {
-    const json = projectJson({ music: { ...music, refreshShared: 'sleep 1' } })
-    ;(json.narration as Record<string, unknown>).refreshDialog = 'sleep 1'
+    const json = projectJson({ music, refresh: { part: 'sleep 1 # {part}', shared: 'sleep 1' } })
     const m = await made(2, { 'content-studio.json': json })
     const [one] = (await viewOf(m, 'hall')).takes
     const refreshing = refreshDialog(m.file, 'act1')

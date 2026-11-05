@@ -746,7 +746,6 @@ describe('a part in several languages', () => {
 
 describe('loadProject with a music section', () => {
   const musicSection = {
-    refreshShared: 'true',
     paths: {
       loops: 'tts/{part}/music.json',
       stingers: 'tts/stingers.json',
@@ -773,7 +772,7 @@ describe('loadProject with a music section', () => {
 
   it('lists each act’s loops and the stingers, and tells a missing list from an empty one', async () => {
     const root = tempRepo({
-      'content-studio.json': projectJson({ music: musicSection }),
+      'content-studio.json': projectJson({ music: musicSection, refresh: { shared: 'true' } }),
       'tts/act1/music.json': [loop('a'), loop('b')],
       'tts/act2/music.json': [],
       'tts/stingers.json': [loop('victory', { seconds: 5 })],

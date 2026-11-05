@@ -2,7 +2,6 @@ import { useState } from 'react'
 
 /** The example `music` section the page shows under "How to set it up". */
 const EXAMPLE = `"music": {
-  "refreshShared": "node tts/extract-shared.js",
   "paths": {
     "loops": "tts/{part}/music.json",
     "stingers": "tts/stingers.json",

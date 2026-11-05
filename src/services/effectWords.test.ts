@@ -6,7 +6,6 @@ import { forgetEffect, keepMineEffect, setEffectDescription } from './effectWord
 import { loadWorkspace } from './workspace'
 
 const effects = {
-  refresh: 'true',
   paths: {
     list: 'tts/effects.json',
     lock: 'audio/effects.lock.json',
@@ -21,7 +20,7 @@ const list = [
 
 function repo(files: Record<string, unknown> = {}) {
   const root = tempRepo({
-    'content-studio.json': projectJson({ effects }),
+    'content-studio.json': projectJson({ effects, refresh: { shared: 'true' } }),
     'tts/effects.json': list,
     ...files,
   })

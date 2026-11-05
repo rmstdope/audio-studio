@@ -10,7 +10,7 @@ const ready: SetupFacts = {
   envPath: '.env',
   key: true,
   fish: { ok: true, credit: 12.5 },
-  refreshDialog: true,
+  refreshPart: true,
   parallel: 4,
   fishTier: null,
   music: { ready: { ok: true }, checkpoints: '/models', model: 'balanced', stableAudioMissing: [] },
@@ -134,8 +134,8 @@ describe('setupChecks', () => {
     expect(noKey.fish!.state).toBe('off')
   })
 
-  it('treats refreshDialog as optional', () => {
-    expect(byId({ ...ready, refreshDialog: false }).refresh!.state).toBe('off')
+  it('treats refresh.part as optional', () => {
+    expect(byId({ ...ready, refreshPart: false }).refresh!.state).toBe('off')
   })
 })
 

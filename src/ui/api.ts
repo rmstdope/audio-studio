@@ -844,7 +844,7 @@ export function useSceneLoudness(partId: string) {
   return { running, start: start.mutate, refused: start.data ?? null }
 }
 
-/** Refreshing the stingers with the project's `music.refreshShared`: see `useRefreshRun`. */
+/** Refreshing the stingers with the project's `refresh.shared`: see `useRefreshRun`. */
 export function useRefreshShared() {
   return useRefreshRun<RefreshSharedResult>(
     ['refresh-shared'],
@@ -853,7 +853,7 @@ export function useRefreshShared() {
   )
 }
 
-/** Refreshing the sound effects with the project's `effects.refresh`: see `useRefreshRun`. */
+/** Refreshing the sound effects with the project's `refresh.shared`: see `useRefreshRun`. */
 export function useRefreshEffects() {
   return useRefreshRun<RefreshEffectsResult>(
     ['refresh-effects'],

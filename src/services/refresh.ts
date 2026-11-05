@@ -43,7 +43,7 @@ export interface LoopsChange {
   removed: TrackRef[]
 }
 
-/** What refreshing the stingers did, or why it did not. */
+/** What refreshing the stingers (with `refresh.shared`) did, or why it did not. */
 export type RefreshSharedResult =
   | { ok: true; stingers: number; change: LoopsChange | null; output: string }
   | { ok: false; reason: 'none'; message: string }
@@ -51,7 +51,7 @@ export type RefreshSharedResult =
   | { ok: false; problems: Problem[]; output: string }
   | ProjectFailure
 
-/** What refreshing the sound effects did, or why it did not. */
+/** What refreshing the sound effects (with `refresh.shared`) did, or why it did not. */
 export type RefreshEffectsResult =
   | {
       ok: true
@@ -76,7 +76,7 @@ const OUTPUT_LIMIT = 4000
 const refreshes = createSerial()
 
 /**
- * Runs the project's `refreshDialog` command for a part (with `{part}` replaced by its id) in the
+ * Runs the project's `refresh.part` command for a part (with `{part}` replaced by its id) in the
  * project root, the way the game extracts its dialog, then reads the dialog again and says what
  * changed. The command is the project's own (its project file), run only from the studio's page.
  */
@@ -97,15 +97,18 @@ export function refreshDialog(
     })
 }
 
-/** The key of the stingers' refresh: no part id holds a NUL, so it cannot be a part's. */
+/**
+ * The key of the shared command's runs, for the stingers and the effects alike: it writes both, so
+ * one runs at a time. No part id holds a NUL, so it cannot be a part's.
+ */
 function sharedKey(projectFile: string): string {
   return `${projectFile}\0shared`
 }
 
 /**
- * Runs the project's `music.refreshShared` command in the project root, the way the game lists
- * what belongs to no act (the stingers), then reads the list again and says what changed. Only
- * from the studio's page, one at a time.
+ * Runs the project's `refresh.shared` command in the project root, the way the game lists what
+ * belongs to no part, then reads the stingers again and says what changed. Only from the studio's
+ * page, one shared command at a time.
  */
 export function refreshShared(
   projectFile: string,
@@ -122,21 +125,16 @@ export function refreshShared(
     })
 }
 
-/** The key of the sound effects' refresh: no part id holds a NUL, so it cannot be a part's. */
-function effectsKey(projectFile: string): string {
-  return `${projectFile}\0effects`
-}
-
 /**
- * Runs the project's `effects.refresh` command in the project root, the way the game lists its
- * sound effects, then reads the list again and says what changed. Only from the studio's page,
- * one at a time.
+ * Runs the project's `refresh.shared` command in the project root, the way the game lists what
+ * belongs to no part, then reads the sound effects again and says what changed. Only from the
+ * studio's page, one shared command at a time.
  */
 export function refreshEffects(
   projectFile: string,
   { timeoutMs = TIMEOUT_MS }: { timeoutMs?: number } = {},
 ): Promise<RefreshEffectsResult> {
-  const key = effectsKey(projectFile)
+  const key = sharedKey(projectFile)
   active.set(key, (active.get(key) ?? 0) + 1)
   return refreshes
     .run(key, () => refreshEffectsList(projectFile, timeoutMs))
@@ -159,7 +157,7 @@ export function isRefreshing(projectFile: string, partId: string): boolean {
   return active.has(partKey(projectFile, partId))
 }
 
-/** Whether a refresh of the stingers' list is running or waiting to run. */
+/** Whether the shared command, which writes the stingers' list, is running or waiting to run. */
 export function isRefreshingShared(projectFile: string): boolean {
   return active.has(sharedKey(projectFile))
 }
@@ -175,11 +173,12 @@ async function refresh(
   const { narration } = project
   const part = project.parts.find((p) => p.id === partId)
   if (!part) return null
-  if (!narration.refreshDialog) {
+  const partCommand = project.refresh?.part
+  if (!partCommand) {
     return {
       ok: false,
       reason: 'none',
-      message: 'The project file names no refreshDialog command.',
+      message: 'The project file names no refresh.part command.',
     }
   }
   const root = dirname(projectFile)
@@ -190,7 +189,7 @@ async function refresh(
     : null
   const loopsBefore = loopsFile ? await readTracks(root, loopsFile, LoopListSchema) : 'invalid'
 
-  const command = partPathFor(narration.refreshDialog, part.id)
+  const command = partPathFor(partCommand, part.id)
   const run = await shell(command, root, timeoutMs)
   if (!run.ok) {
     return { ok: false, reason: 'failed', message: run.message, output: run.output }
@@ -222,17 +221,18 @@ async function refreshStingers(
 ): Promise<RefreshSharedResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
-  const { music } = opened.project
-  if (!music?.refreshShared) {
+  const { music, refresh } = opened.project
+  const command = refresh?.shared
+  if (!music || !command) {
     return {
       ok: false,
       reason: 'none',
-      message: 'The project file names no music.refreshShared command.',
+      message: 'The project file names no refresh.shared command.',
     }
   }
   const root = dirname(projectFile)
   const before = await readTracks(root, music.paths.stingers, StingerListSchema)
-  const run = await shell(music.refreshShared, root, timeoutMs)
+  const run = await shell(command, root, timeoutMs)
   if (!run.ok) return { ok: false, reason: 'failed', message: run.message, output: run.output }
 
   const problems: Problem[] = []
@@ -255,17 +255,18 @@ async function refreshEffectsList(
 ): Promise<RefreshEffectsResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
-  const { effects } = opened.project
-  if (!effects?.refresh) {
+  const { effects, refresh } = opened.project
+  const command = refresh?.shared
+  if (!effects || !command) {
     return {
       ok: false,
       reason: 'none',
-      message: 'The project file names no effects.refresh command.',
+      message: 'The project file names no refresh.shared command.',
     }
   }
   const root = dirname(projectFile)
   const before = await readEffectsList(root, effects.paths.list)
-  const run = await shell(effects.refresh, root, timeoutMs)
+  const run = await shell(command, root, timeoutMs)
   if (!run.ok) return { ok: false, reason: 'failed', message: run.message, output: run.output }
 
   const after = await readEffectsList(root, effects.paths.list)

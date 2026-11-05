@@ -31,7 +31,7 @@ export async function readMusic(
   project: Project,
   problems: Problem[],
 ): Promise<MusicSummary | null> {
-  const { music, narration } = project
+  const { music } = project
   if (!music) return null
   const lists: MusicListInput[] = []
   for (const part of project.parts) {
@@ -42,7 +42,7 @@ export async function readMusic(
       title: part.title,
       file,
       state: await readList(root, file, LoopListSchema, problems),
-      canRefresh: Boolean(narration.refreshDialog),
+      canRefresh: Boolean(project.refresh?.part),
     })
   }
   lists.push({
@@ -51,7 +51,7 @@ export async function readMusic(
     title: 'Stingers',
     file: music.paths.stingers,
     state: await readList(root, music.paths.stingers, StingerListSchema, problems),
-    canRefresh: Boolean(music.refreshShared),
+    canRefresh: Boolean(project.refresh?.shared),
   })
   const briefs = await readResource(root, music.paths.briefs, BriefsSchema, problems)
   const shown: Briefs = briefs === 'missing' || briefs === 'invalid' ? {} : briefs

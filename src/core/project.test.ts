@@ -258,6 +258,34 @@ describe('ProjectSchema', () => {
   })
 })
 
+describe('refresh', () => {
+  it('is optional, and so is each of its commands', () => {
+    expect(parse(projectJson()).data!.refresh).toBeUndefined()
+    expect(parse(projectJson({ refresh: {} })).data!.refresh).toEqual({})
+  })
+
+  it('names the command for a part and the one for every shared list', () => {
+    const refresh = { part: 'sh tools/refresh.sh {part}', shared: 'sh tools/refresh-shared.sh' }
+    expect(parse(projectJson({ refresh })).data!.refresh).toEqual(refresh)
+  })
+
+  it('needs {part} in the part command, which is run for one part', () => {
+    expect(problems(projectJson({ refresh: { part: 'sh tools/refresh.sh' } }))).toEqual([
+      {
+        file: 'content-studio.json',
+        path: 'refresh.part',
+        message: 'must contain {part}: the command is run for one part, given its id',
+      },
+    ])
+  })
+
+  it('refuses an empty command', () => {
+    expect(problems(projectJson({ refresh: { shared: '' } })).map((p) => p.path)).toEqual([
+      'refresh.shared',
+    ])
+  })
+})
+
 describe('partPathFor', () => {
   it('replaces every {part}', () => {
     expect(partPathFor('tts/{part}/x-{part}.json', 'act2')).toBe('tts/act2/x-act2.json')
@@ -375,10 +403,10 @@ describe('the music section', () => {
     expect(parse(projectJson()).data!.music).toBeUndefined()
   })
 
-  it('accepts the paths and the shared refresh command', () => {
-    const result = parse(music({}, { refreshShared: 'node extract-shared.js' }))
+  it('accepts the paths', () => {
+    const result = parse(music())
     expect(result.success).toBe(true)
-    expect(result.data!.music!.refreshShared).toBe('node extract-shared.js')
+    expect(result.data!.music!.paths.stingers).toBe('tts/stingers.json')
   })
 
   it('needs {part} in the loops path', () => {
@@ -536,13 +564,10 @@ describe('the effects section', () => {
     expect(parse(projectJson()).data!.effects).toBeUndefined()
   })
 
-  it('accepts the list, lock, clips and manifest paths and the refresh command', () => {
-    const result = parse(effects({}, { refresh: 'node tts/extract-effects.js' }))
+  it('accepts the list, lock, clips and manifest paths', () => {
+    const result = parse(effects())
     expect(result.success).toBe(true)
-    expect(result.data!.effects).toEqual({
-      refresh: 'node tts/extract-effects.js',
-      paths: effectPaths,
-    })
+    expect(result.data!.effects).toEqual({ paths: effectPaths })
   })
 
   it('needs the lock, clips and manifest paths the game reads', () => {

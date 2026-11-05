@@ -149,9 +149,7 @@ describe('summarize, words that sound the same', () => {
 describe('summarize, refreshing', () => {
   it('says whether the project can refresh its dialog', () => {
     expect(summarize(input()).canRefresh).toBe(false)
-    const withCommand = ProjectSchema.parse(
-      projectJson({ narration: { ...(projectJson().narration as object), refreshDialog: 'make' } }),
-    )
+    const withCommand = ProjectSchema.parse(projectJson({ refresh: { part: 'make {part}' } }))
     expect(summarize(input({ project: withCommand })).canRefresh).toBe(true)
   })
 })

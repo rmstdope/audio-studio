@@ -71,7 +71,7 @@ export async function readScenes(
       mixFile,
       id: part.id,
       title: part.title,
-      canRefresh: Boolean(project.narration.refreshDialog),
+      canRefresh: Boolean(project.refresh?.part),
       declarations: await readDeclarations(
         root,
         partPathFor(scenes.paths.declarations, part.id),

@@ -58,7 +58,7 @@ export async function readEffects(
   return summarizeEffects({
     list,
     overrides: overrides === 'invalid' ? {} : overrides,
-    canRefresh: Boolean(effects.refresh),
+    canRefresh: Boolean(project.refresh?.shared),
     state: {
       chosen: await readEffectChosen(root, effects, problems),
       takesMade: await effectsWithTakes(root),

@@ -111,7 +111,7 @@ export interface ProjectSummary {
   charactersPath: string
   parts: PartSummary[]
   characters: CharacterSummary[]
-  /** Whether the project file names a `refreshDialog` command. */
+  /** Whether the project file names a `refresh.part` command. */
   canRefresh: boolean
   /** The pronunciation table in file order; null when the cast cannot be read. */
   pronounce: Pronunciation[] | null
@@ -282,7 +282,7 @@ export function summarize({
     charactersPath: narration.characters,
     parts,
     characters: characters.sort((a, b) => b.totalLines - a.totalLines || a.id.localeCompare(b.id)),
-    canRefresh: Boolean(narration.refreshDialog),
+    canRefresh: Boolean(project.refresh?.part),
     pronounce: cast ? Object.entries(cast.pronounce) : null,
     soundAlike: narration.quality.soundAlike,
     perLanguage: Object.fromEntries(
