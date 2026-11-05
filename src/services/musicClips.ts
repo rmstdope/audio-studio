@@ -193,8 +193,15 @@ export async function uncommitChoice({
       return { ok: true }
     })
   } catch (error) {
+    if (notWritable(error)) return { ok: false, message: 'The game’s file could not be written.' }
     return { ok: false, message: error instanceof Error ? error.message : String(error) }
   }
+}
+
+/** Whether a failed write was refused by the file system (no permission, a read-only disk). */
+function notWritable(error: unknown): boolean {
+  const code = error instanceof Error && 'code' in error ? error.code : undefined
+  return code === 'EACCES' || code === 'EPERM' || code === 'EROFS'
 }
 
 /**
