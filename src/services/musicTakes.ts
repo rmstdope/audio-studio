@@ -856,7 +856,11 @@ export function createMusicTakes({
         }
         board.takes = board.takes.map((t) => (t === take ? next : t))
         return { ok: true }
-      }).catch((): DropResult => ({ ok: false, message: 'The take board could not be written.' }))
+      }).catch((error): DropResult => {
+        // Kept in the server log: the person is told the plain reason, not the stack.
+        console.error('saving the fades failed', error)
+        return { ok: false, message: 'The take board could not be written.' }
+      })
     },
 
     async choose(projectFile, id, name) {

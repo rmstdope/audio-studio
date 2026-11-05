@@ -1554,14 +1554,38 @@ describe('fading a stinger take', () => {
     const made = await stinger()
     const folder = join(made.root, '.content-studio/music')
     chmodSync(folder, 0o555)
+    const quiet = console.error
+    console.error = () => {}
     try {
       expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({
         ok: false,
         message: 'The take board could not be written.',
       })
     } finally {
+      console.error = quiet
       chmodSync(folder, 0o755)
     }
+    expect((await takeOf(made)).fades).toBeUndefined()
+  })
+
+  it('says why when the board cannot be written for the chosen take, the lock untouched', async () => {
+    const made = await stinger()
+    await made.takes.choose(made.file, 'victory', made.name)
+    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    const folder = join(made.root, '.content-studio/music')
+    chmodSync(folder, 0o555)
+    const quiet = console.error
+    console.error = () => {}
+    try {
+      expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({
+        ok: false,
+        message: 'The take board could not be written.',
+      })
+    } finally {
+      console.error = quiet
+      chmodSync(folder, 0o755)
+    }
+    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
     expect((await takeOf(made)).fades).toBeUndefined()
   })
 

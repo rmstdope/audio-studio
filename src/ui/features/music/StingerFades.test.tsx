@@ -167,6 +167,8 @@ describe('fading a stinger take on its page', () => {
     act(() => cancel.click())
     expect(game.textContent).not.toContain('fading')
     expect(game.querySelector('.track-in-game-actions')).not.toBeNull()
+    expect(document.activeElement?.textContent).toBe('Fades…')
+    expect(game.contains(document.activeElement)).toBe(true)
   })
 
   it('says one line under a take with fades, and nothing under one without', () => {
