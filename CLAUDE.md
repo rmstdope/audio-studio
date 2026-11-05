@@ -72,7 +72,8 @@ bundle breaks.
   `content-studio/` (narration's cast, edits and locks in `content-studio/narration/`, music's
   edits and lock in `content-studio/music/`, images' edits, which hold the image style, the
   studio's own and never a game file, and lock in `content-studio/images/`, sound effects' edits
-  and lock in `content-studio/effects/`), through
+  and lock in `content-studio/effects/`, and the scenes' locks, one per part with the loudness each
+  scene was last measured at, in `content-studio/scenes/`), through
   `resolveInRoot` and `writeAtomic`; nothing outside the project root. Clips are the one exception to `writeAtomic`: the encoder
   writes a hidden temporary file in the clips folder (through `resolveInRoot`), renamed into place
   only together with the manifest and lock update.
@@ -84,7 +85,7 @@ bundle breaks.
   shared command rewrites the stingers and the effects lists alike, but each page reports only its
   own list's changes.
   The studio runs nothing else of the consumer's. The Scenes page writes one file of an act, the
-  mix (`scenes.paths.mix`, §8.11), and never the declarations the game writes.
+  mix (`scenes.mix`, §8.11), and never the declarations the game writes.
 - The project file itself is read, and changed in seven kinds of places only: the words that sound
   the same (`narration.generate.soundAlike.<language>`), saved from the Words that sound the same
   panel, `narration.models.fish.draft` / `final`, moved from `s1` to `s2.1-pro` when the user
@@ -102,12 +103,11 @@ bundle breaks.
   file and in the studio folder `content-studio/` beside the project file (a fixed name): its
   `.gitignore`, written at start when missing, keeps out `content-studio/cache/`, which holds the
   rest (the sound effects' takes in `content-studio/cache/effect-boards/` and
-  `content-studio/cache/effect-takes/`, the scenes' kept
-  loudness in `content-studio/cache/scene-loudness.json`, and the person's own settings, the Fish
+  `content-studio/cache/effect-takes/`, and the person's own settings, the Fish
   tier and the take fade, in `content-studio/cache/settings.json`, never in the project file).
 - Write JSON with stable key order and small diffs (`formatEntriesPerLine` for the lock,
   `formatMusicLock` and `formatBriefs` for music's, `formatImageLock` and `formatImageEdits` for
-  images', `formatEffectLock` for effects').
+  images', `formatEffectLock` for effects', `formatEntriesPerLine` for the scenes' locks).
 - Never delete clips without the user confirming it in the UI.
 - Only changes from the studio's own page are accepted (the Origin check on POST routes).
 

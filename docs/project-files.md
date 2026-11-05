@@ -8,16 +8,10 @@ The examples start from the studio's sample project (`test/fixtures/sample`), a 
 three acts in English, Swedish and German, with values added where the sample leaves a field at its
 default, so that every field is shown.
 
-> **Status.** This is version 2 of the format, which the studio is moving to one section at a time
-> (epic as-6u9). In effect now: the project file's top level (`$schema`, `version`, `partLabel`,
-> `parts`, `languages`, `refresh`), the studio folder `content-studio/` with its `.gitignore`, the
-> cache with your own settings, narration (the `narration` section, the dialog list, and
-> `narration/cast.json` with each part's edits and lock), music (the `music` section, the track
-> lists, `music/edits.json` and `music/lock.json`), images (the `images` section, the image
-> lists, `images/edits.json` with the style, and `images/lock.json`) and sound effects (the
-> `effects` section, the effects list, `effects/edits.json` and `effects/lock.json`). The other
-> section (`scenes`) and its lock have not moved yet: until it has, the studio reads that section
-> as `docs/architecture.md` §5 and §8.11 describe it, and this document is the plan for it.
+> **Status.** This is version 2 of the format, and every part of it is in effect: the project
+> file (its top level and the `narration`, `music`, `images`, `effects` and `scenes` sections),
+> the game's lists, the studio folder `content-studio/` with its `.gitignore`, edits, locks and
+> cache, and what the game plays. The studio reads no earlier version (epic as-6u9).
 
 ## The four kinds of file
 
@@ -561,7 +555,9 @@ Two locks record something else, in the same layout:
 - **Scenes** record the loudness each scene was measured at, not a take: under `saved` for the mix
   as saved and `draft` for unsaved changes, each with `measuredAt`, the mix `entry` measured, the
   `clips` each sound came from, `states` (`{ state, lufs }` each), what was left `without`, an
-  `error` when it could not be measured, and `moved` after a suggested change.
+  `error` when it could not be measured, and `moved` after a suggested change. While a part's
+  lock cannot be read, its scenes show no figures and the studio refuses to measure that part, so
+  nothing in it is lost.
 
 ### The cache
 
