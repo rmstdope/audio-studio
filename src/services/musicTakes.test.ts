@@ -1669,6 +1669,29 @@ describe('trimming a stinger take', () => {
     expect(new Int16Array(readWav(heard!).data.buffer.slice(0, 2))[0]).not.toBe(0)
   })
 
+  it('keeps the fades through a trim and its undo, on the chosen take', async () => {
+    const m = await made()
+    const take = (await viewOf(m)).takes[0]!
+    const fades = { in: 2, out: 2, shape: 'straight' } as const
+    expect(await m.takes.setFades(m.file, 'victory', take.file, fades)).toEqual({ ok: true })
+    expect(await m.takes.choose(m.file, 'victory', take.file)).toEqual({ ok: true })
+    expect(await m.takes.trim(m.file, 'victory', take.file, false)).toEqual({ ok: true })
+    const ends = (bytes: Uint8Array) => {
+      const wav = readWav(bytes)
+      const samples = new Int16Array(wav.data.buffer, wav.data.byteOffset, wav.data.length / 2)
+      return { seconds: wavSeconds(wav), first: samples[0], last: samples[samples.length - 1] }
+    }
+    const trimmed = (await viewOf(m)).takes[0]!
+    expect(trimmed.fades).toEqual(fades)
+    expect(ends(m.encoded.at(-1)!)).toEqual({
+      seconds: expect.closeTo(trimmed.trim!.seconds, 3),
+      first: 0,
+      last: 0,
+    })
+    expect(await m.takes.trim(m.file, 'victory', take.file, true)).toEqual({ ok: true })
+    expect(ends(m.encoded.at(-1)!)).toEqual({ seconds: expect.closeTo(6, 3), first: 0, last: 0 })
+  })
+
   it('says what a stinger take has to cut, and a loop never does', async () => {
     const m = await made()
     expect((await viewOf(m)).takes[0]).toMatchObject({ trimmable: 'cut' })

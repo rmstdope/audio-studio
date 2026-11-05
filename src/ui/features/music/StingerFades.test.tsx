@@ -176,4 +176,31 @@ describe('fading a stinger take on its page', () => {
       'Choosing, dropping, moving, trimming and fading wait until the music lock can be read. You can still listen and make more takes.',
     )
   })
+
+  it('fades a trimmed take by the part between its cuts', () => {
+    const { container, fadesButtons } = render('stinger', [
+      take(2, { seconds: 6, trim: { start: 1, end: 0.9, seconds: 4.1 } }),
+    ])
+    act(() => fadesButtons()[0]!.click())
+    const box = (label: string) =>
+      [...container.querySelectorAll('label')]
+        .find((l) => l.textContent?.startsWith(label))
+        ?.querySelector('input') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    for (const [label, value] of [
+      ['Fade in', '3'],
+      ['Fade out', '3'],
+    ] as const) {
+      act(() => {
+        setter.call(box(label), value)
+        box(label).dispatchEvent(new Event('input', { bubbles: true }))
+      })
+    }
+    expect(container.textContent).toContain(
+      "The fades together can't be longer than the take (4.1 s).",
+    )
+    expect(
+      container.querySelector('[aria-label="Fade in length"]')?.getAttribute('aria-valuemax'),
+    ).toBe('4.1')
+  })
 })

@@ -5898,6 +5898,24 @@ describe('server, trimming a stinger take', () => {
     const undone = await (await fetch(at(`${base}?trimmed=1`))).arrayBuffer()
     expect(undone.byteLength).toBe(whole.byteLength)
   })
+
+  it('serves a trimmed take with the fades asked for over the part between the cuts, once', async () => {
+    const view = await (await fetch(at('/api/music/tracks/victory/takes'))).json()
+    const file = view.takes[0].file
+    await post('/api/music/tracks/victory/trim', { file })
+    const base = `/api/music/tracks/victory/takes/${file}`
+    const read = async (query: string) => {
+      const wav = readWav(new Uint8Array(await (await fetch(at(`${base}${query}`))).arrayBuffer()))
+      return new Int16Array(wav.data.buffer, wav.data.byteOffset, wav.data.length / 2)
+    }
+    const plain = await read('?trimmed=1')
+    const faded = await read('?trimmed=1&fadeIn=0.5&fadeOut=0&shape=straight')
+    expect(faded.length).toBe(plain.length)
+    expect(faded[0]).toBe(0)
+    expect(Math.abs(faded[250]!)).toBeLessThan(Math.abs(plain[250]!))
+    // Past the fade it is the cut sound as it was, so the fades were applied once.
+    expect(faded[1000]).toBe(plain[1000])
+  })
 })
 
 describe('server, a stinger take’s fades', () => {
