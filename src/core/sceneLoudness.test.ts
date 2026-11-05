@@ -151,6 +151,8 @@ describe('sceneVerdict', () => {
   })
   it('flags nothing for a measure that failed', () => {
     expect(sceneVerdict(measure([-40], { error: 'no' }), t)).toBeNull()
+  })
+  it('judges the figure as shown', () => {
     expect(sceneVerdict(measure([-22.04]), t)).toBeNull()
     expect(sceneVerdict(measure([-22.05]), t)).toBe('too quiet')
   })
@@ -237,8 +239,10 @@ describe('suggestChange', () => {
     expect(change([-19.4, -20.6])).toBeNull()
     expect(change([null as never])).toBeNull()
     expect(suggestChange(measure([-24], { error: 'x' }), t2, mix)).toBeNull()
+  })
+  it('judges the figures as shown', () => {
     expect(change([-22.04])).toBeNull()
-    expect(change([-22.05])).not.toBeNull()
+    expect(change([-22.05])).toMatchObject({ kind: 'change', db: 2.1 })
   })
 })
 
