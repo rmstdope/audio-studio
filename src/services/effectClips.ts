@@ -7,6 +7,7 @@ import {
   EffectManifestSchema,
   effectAcceptable,
   effectChangedFields,
+  formatEffectLock,
   type EffectBoardTake,
   type EffectInputs,
   type EffectLock,
@@ -17,7 +18,7 @@ import { resolveInRoot } from '../core/paths'
 import { EFFECTS_LOCK_FILE, type EffectsConfig, type Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import type { Encoder } from './audio'
-import { formatEntriesPerLine, listFiles, readResource, writeAtomic } from './files'
+import { listFiles, readResource, writeAtomic } from './files'
 import { choices, sorted, type CommitResult } from './musicClips'
 
 /** How the game's sound effects are encoded: stereo, 160 kbps, at the level the model made them. */
@@ -129,7 +130,7 @@ export async function commitEffect({
       }
       await rename(temporary, target)
       await writeAtomic(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
-      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEntriesPerLine(sorted(lock)))
+      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
       return { ok: true }
     })
   } catch (error) {
@@ -171,7 +172,7 @@ export async function uncommitEffect({
       }
       await rm(resolveInRoot(root, join(effects.clips, `${id}.mp3`)), { force: true })
       delete lock[id]
-      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEntriesPerLine(sorted(lock)))
+      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
       return { ok: true }
     })
   } catch (error) {
@@ -215,7 +216,7 @@ export async function acceptEffect({
         }
       }
       lock[id] = { ...entry, inputs: { ...entry.inputs, description: now.description } }
-      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEntriesPerLine(sorted(lock)))
+      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEffectLock(lock))
       return { ok: true }
     })
   } catch (error) {

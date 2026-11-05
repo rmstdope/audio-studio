@@ -67,7 +67,7 @@ describe('commitEffect', () => {
       model: 'small-sfx',
       seed: 102,
       take: 2,
-      inputs,
+      inputs: { text: inputs.description, seconds: 3 },
       at: at.toISOString(),
     })
     expect(calls[0]!.file.includes('/.door-creak.')).toBe(true)
@@ -130,7 +130,7 @@ describe('choosing a take made for an earlier description', () => {
       now: () => at,
     })
     const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
-    expect(lock['door-creak'].inputs).toEqual({ description: 'A heavy door groans', seconds: 3 })
+    expect(lock['door-creak'].inputs).toEqual({ text: 'A heavy door groans', seconds: 3 })
     // A take made for another length stays changed: a changed length needs a new take.
     await commitEffect({
       root,
@@ -143,7 +143,7 @@ describe('choosing a take made for an earlier description', () => {
       now: () => at,
     })
     const again = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
-    expect(again['door-creak'].inputs).toEqual({ description: 'A heavy door groans', seconds: 2 })
+    expect(again['door-creak'].inputs).toEqual({ text: 'A heavy door groans', seconds: 2 })
   })
 })
 
@@ -216,9 +216,10 @@ describe('acceptEffect', () => {
     const root = tempRepo({})
     await choose(root, 'door-creak', 1, fakeEncoder().encode)
     expect(await accept(root)).toEqual({ ok: true })
-    const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
-    expect(lock['door-creak'].inputs).toEqual(now)
-    expect(lock['door-creak'].take).toBe(1)
+    const written = readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8')
+    expect(JSON.parse(written)['door-creak'].inputs).toEqual({ text: now.description, seconds: 3 })
+    expect(written.split('\n')).toHaveLength(4)
+    expect(JSON.parse(written)['door-creak'].take).toBe(1)
   })
 
   it('refuses a changed length, nothing changed, and an effect with no chosen take', async () => {

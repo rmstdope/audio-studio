@@ -414,7 +414,7 @@ describe('createEffectTakes', () => {
     expect(
       JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8')).coins.inputs,
     ).toEqual({
-      description: 'Coins on glass',
+      text: 'Coins on glass',
       seconds: 0.5,
     })
     writeFileSync(
@@ -680,7 +680,7 @@ describe('takes of an effect that loops', () => {
     const first = (await settled('rain')).takes[0]!
     await takes.choose(file, 'rain', first.file)
     const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
-    expect(lock.rain.inputs).toEqual({ description: rain.text, seconds: 10, loops: true })
+    expect(lock.rain.inputs).toEqual({ text: rain.text, seconds: 10, loops: true })
     const manifest = JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))
     expect(manifest.rain.duration).toBe(10)
   })

@@ -16,6 +16,8 @@ import {
   effectQuietLine,
   effectTakeKind,
   makeEffectTakesLabel,
+  EffectLockSchema,
+  formatEffectLock,
   type EffectLockEntry,
 } from './effectTakes'
 
@@ -244,5 +246,37 @@ describe('effectTakeLength', () => {
     expect(effectTakeLength(1.4)).toBe('1.4 s')
     expect(effectTakeLength(2)).toBe('2.0 s')
     expect(effectTakeLength(0.5004)).toBe('0.5 s')
+  })
+})
+
+describe('the effects lock file', () => {
+  const line = (id: string, inputs: string) =>
+    ` "${id}": {"fp":"${'a'.repeat(16)}","model":"small-sfx","seed":7,"take":2,"inputs":${inputs},"at":"2026-11-03T10:00:00.000Z"}`
+  const text = [
+    '{',
+    `${line('coins', '{"text":"Coins spill","seconds":0.5}')},`,
+    line('rain', '{"text":"Steady rain","seconds":8,"loops":true}'),
+    '}',
+    '',
+  ].join('\n')
+
+  it('reads a take’s words as text, given to the studio as its description', () => {
+    const read = EffectLockSchema.parse(JSON.parse(text))
+    expect(read.coins!.inputs).toEqual({ description: 'Coins spill', seconds: 0.5 })
+    expect(read.rain!.inputs).toEqual({ description: 'Steady rain', seconds: 8, loops: true })
+    expect(read.rain).toMatchObject({ fp: 'a'.repeat(16), model: 'small-sfx', seed: 7, take: 2 })
+  })
+
+  it('writes one entry per line in id order, the words as text, as it read them', () => {
+    const read = EffectLockSchema.parse(JSON.parse(text))
+    const { coins, rain } = read
+    expect(formatEffectLock({ rain: rain!, coins: coins! })).toBe(text)
+    expect(formatEffectLock({})).toBe('{}\n')
+  })
+
+  it('refuses an entry whose words are written as description, as before version 2', () => {
+    const old = { coins: { ...lock, inputs: { description: 'Coins', seconds: 1 } } }
+    const parsed = EffectLockSchema.safeParse(old)
+    expect(parsed.error?.issues.map((issue) => issue.path.join('.'))).toEqual(['coins.inputs.text'])
   })
 })
