@@ -2004,7 +2004,8 @@ out and named. The minute is mixed by ffmpeg (`services/sceneAudio.ts`: `amix` w
 `volume`, then loudnorm's first pass, as `levelClip` measures) and the figure is the integrated
 loudness (BS.1770), so silence between sparse effects is gated out as in any LUFS reading; a state
 with nothing playing has no figure ("nothing plays") and is never flagged. A figure is judged
-against the target in `core/sceneLoudness.ts`: within the tolerance is "on target", else "N dB too
+against the target in `core/sceneLoudness.ts` as it is shown (rounded to one decimal, so the figure,
+the distance and the chip agree): within the tolerance is "on target", else "N dB too
 quiet / too loud" by how far from the target; a scene whose states disagree is "off target" in the
 list. The figures are **kept** in `.content-studio/scene-loudness.json` (act, then scene: `saved`,
 the measure of the saved scene, and `draft`, the open scene's measure with its unsaved changes,
