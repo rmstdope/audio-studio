@@ -102,7 +102,7 @@ describe('dialogGonePanel', () => {
       before:
         ' is not there, but 12 clips and 3 cues were recorded for Act 1 in Svenska. The studio keeps them as they are and offers to remove none of them until the dialog is back.',
       advice:
-        'Refresh dialog writes it again from the game. If the game no longer has Svenska lines for this act, delete the clips and their manifest yourself.',
+        'Refresh dialog writes it again from the game. If the game no longer has Svenska lines for this act, delete the clips and their manifest, and the act’s Svenska edits and lock in content-studio/narration/, yourself.',
       lines:
         '12 clips and 3 cues were recorded for these lines. Nothing can be generated or removed until the dialog is back.',
       refresh: true,
@@ -128,10 +128,10 @@ describe('dialogGonePanel', () => {
     })
   })
 
-  it('names the cues file, not clips and a manifest, when only cues were recorded', () => {
+  it('names the act’s edits and lock, not clips and a manifest, when only cues were recorded', () => {
     expect(dialogGonePanel({ ...several, recorded: { clips: 0, cues: 3 } })).toMatchObject({
       advice:
-        'Refresh dialog writes it again from the game. If the game no longer has Svenska lines for this act, delete the cues file yourself.',
+        'Refresh dialog writes it again from the game. If the game no longer has Svenska lines for this act, delete the act’s Svenska edits and lock in content-studio/narration/ yourself.',
     })
     expect(
       dialogGonePanel({
@@ -142,14 +142,14 @@ describe('dialogGonePanel', () => {
       }),
     ).toMatchObject({
       advice:
-        'Once the game writes it again, the studio reads it in. If the game no longer has this act, delete the cues file yourself.',
+        'Once the game writes it again, the studio reads it in. If the game no longer has this act, delete the act’s edits and lock in content-studio/narration/ yourself.',
     })
   })
 
   it('has other advice without a refresh command', () => {
     expect(dialogGonePanel({ ...several, canRefresh: false })).toMatchObject({
       advice:
-        'Once the game writes it again, the studio reads it in. If the game no longer has Svenska lines for this act, delete the clips and their manifest yourself.',
+        'Once the game writes it again, the studio reads it in. If the game no longer has Svenska lines for this act, delete the clips and their manifest, and the act’s Svenska edits and lock in content-studio/narration/, yourself.',
       refresh: false,
     })
   })
@@ -162,7 +162,7 @@ describe('dialogGonePanel', () => {
       before:
         ' is not there, but 34 clips and 5 cues were recorded for Act 1. The studio keeps them as they are and offers to remove none of them until the dialog is back.',
       advice:
-        'Refresh dialog writes it again from the game. If the game no longer has this act, delete the clips and their manifest yourself.',
+        'Refresh dialog writes it again from the game. If the game no longer has this act, delete the clips and their manifest, and the act’s edits and lock in content-studio/narration/, yourself.',
     })
   })
 })
