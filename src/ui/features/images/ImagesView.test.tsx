@@ -494,6 +494,53 @@ describe('the Style page', () => {
     expect(sent[0]).toEqual({ method: 'PATCH', path: '/api/image-style', body: { look: 'oil' } })
   })
 
+  it('never says Saved while a refused look is still on the page, and clears the refusal once a look saves', async () => {
+    globalThis.fetch = (async (path: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, string | null>
+      sent.push({ method: init?.method ?? 'GET', path, body })
+      if ('look' in body && body.look === null)
+        return Response.json(
+          {
+            ok: false,
+            problems: [
+              {
+                file: 'content-studio/images/edits.json',
+                path: 'style.look',
+                message: 'the look cannot be empty',
+              },
+            ],
+          },
+          { status: 409 },
+        )
+      return Response.json({ ok: true })
+    }) as unknown as typeof fetch
+    const page = render(route)
+    const [look, keepOut] = [...page.querySelectorAll('textarea')]
+    const typeAndLeave = async (field: HTMLTextAreaElement, value: string) => {
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+          field,
+          value,
+        )
+        field.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      await act(async () => {
+        field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+      })
+      await act(async () => new Promise((r) => setTimeout(r, 20)))
+    }
+    const panel = () => text(page.querySelector('.brief-panel'))
+    await typeAndLeave(look!, '')
+    expect(panel()).toContain('Could not be saved')
+    await typeAndLeave(keepOut!, 'words')
+    expect(sent.at(-1)?.body).toEqual({ keepOut: 'words' })
+    expect(panel()).toContain('Could not be saved')
+    expect(page.querySelector('.saved')).toBeNull()
+    await typeAndLeave(look!, 'oil')
+    expect(panel()).not.toContain('Could not be saved')
+    expect(text(page.querySelector('.saved'))).toBe('Saved')
+  })
+
   it('keeps the Added per act table to the panel, so it never scrolls the page sideways', () => {
     const page = render(route)
     const panel = [...page.querySelectorAll('section')].find((s) =>
