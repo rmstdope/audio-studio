@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { fixHeading } from '../../../core/sceneEdit'
-import type { SceneAct, ScenesSummary } from '../../../core/scenes'
+import { draftOf, fixHeading, toMix, type SceneDraft } from '../../../core/sceneEdit'
+import { expectedFigures, shiftStates, type SceneMeasure } from '../../../core/sceneLoudness'
+import type { SceneAct, SceneRow, ScenesSummary } from '../../../core/scenes'
 import { useRefreshDialog, useSceneLoudness } from '../../api'
 import { Problems } from '../../components/Problems'
 import { shortTitle } from '../../format'
@@ -14,6 +15,15 @@ import { LoudnessPanel } from './LoudnessPanel'
 import { PlayBar } from './PlayBar'
 import { SceneDetail } from './SceneDetail'
 import { SceneList } from './SceneList'
+
+/** The saved scene's draft, when it has the effects the page has (a press moved their levels, not their number). */
+function levelsBefore(scene: SceneRow, draft: SceneDraft): SceneDraft | null {
+  const before = draftOf(scene)
+  const same =
+    before.effects.length === draft.effects.length &&
+    before.effects.every((e, i) => e.id === draft.effects[i]!.id)
+  return same ? before : null
+}
 
 /**
  * An act's Scenes page: its scenes on the left, the open one on the right to change and save, and
@@ -127,6 +137,18 @@ export function ScenesPage({
     )
   }
   const { status } = editor
+  // An unsaved press moves the figures the list judges the open scene by.
+  const pressedOn = [scene.loudness.draft, scene.loudness.saved].find(
+    (m) => m && editor.moved && m.measuredAt === editor.moved.measuredAt,
+  )
+  const expected: SceneMeasure | null =
+    pressedOn &&
+    editor.moved &&
+    editor.reds === 0 &&
+    expectedFigures(pressedOn, editor.moved, { entry: toMix(editor.draft), clips: scene.clips }) ===
+      'expected'
+      ? shiftStates(pressedOn, editor.moved.db)
+      : null
   const red = editor.reds > 0
   const word = red
     ? { text: fixHeading(editor.reds), className: 'scene-status scene-status-red' }
@@ -201,6 +223,7 @@ export function ScenesPage({
           open={scene}
           unsaved={editor.dirty ? scene.id : null}
           target={summary.loudnessTarget}
+          expected={expected}
         />
         <div className="scene-open">
           {scene.unreadable ? (
@@ -219,9 +242,14 @@ export function ScenesPage({
                 target={summary.loudnessTarget}
                 draft={editor.draft}
                 dirty={editor.dirty}
+                pressed={editor.moved}
                 running={loudness.running}
                 refused={loudness.refused}
                 onMeasure={loudness.start}
+                onApply={(next, moved) => {
+                  editor.apply(next, moved)
+                  saveButton.current?.focus()
+                }}
               />
               <SceneDetail
                 key={scene.id}
@@ -231,6 +259,7 @@ export function ScenesPage({
                 draft={editor.draft}
                 player={player}
                 play={play}
+                was={editor.moved ? levelsBefore(scene, editor.draft) : null}
                 onChange={editor.change}
               />
             </>

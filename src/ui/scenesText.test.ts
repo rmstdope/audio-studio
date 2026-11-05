@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import type { SceneRow } from '../core/scenes'
 import {
+  changeWord,
+  suggestionLine,
+  limitLine,
   howItPlays,
   levelText,
   listCount,
@@ -164,6 +167,158 @@ describe('when a scene was measured', () => {
     )
     expect(measuredLine(new Date(2026, 10, 3, 9, 5).toISOString(), now)).toBe(
       'Measured 3 Nov 09:05',
+    )
+  })
+})
+
+describe('the loudness suggestion line', () => {
+  const full = (l: ReturnType<typeof suggestionLine>) => l.before + l.strong + l.after
+  it('words a change, with one decimal', () => {
+    expect(changeWord(4)).toBe('4.0 dB louder')
+    expect(changeWord(-3.4)).toBe('3.4 dB quieter')
+  })
+  it('words the plain change for both states, one state and more', () => {
+    const base = { kind: 'change', db: 4, closest: null, ceiling: null } as const
+    expect(full(suggestionLine({ ...base, states: 2 }, 2))).toBe(
+      'Make the whole scene 4.0 dB louder — music and every effect by the same amount — to bring both states within the target.',
+    )
+    expect(suggestionLine({ ...base, states: 1 }, 2).after).toContain('to bring it within')
+    expect(suggestionLine({ ...base, states: 3 }, 2).after).toContain('to bring every state within')
+    expect(suggestionLine({ ...base, states: 2 }, 2).button).toBe('Make 4.0 dB louder')
+  })
+  it('words the closest change, the ceiling and the change that helps nothing', () => {
+    expect(
+      full(
+        suggestionLine(
+          {
+            kind: 'change',
+            db: 1.6,
+            states: 2,
+            closest: { apart: 4.4, leaving: 0.2 },
+            ceiling: null,
+          },
+          2,
+        ),
+      ),
+    ).toBe(
+      'No single change brings both states within ± 2 dB: they are 4.4 dB apart. 1.6 dB louder comes closest, leaving each 0.2 dB off.',
+    )
+    expect(
+      full(
+        suggestionLine(
+          {
+            kind: 'change',
+            db: 1.2,
+            states: 2,
+            closest: null,
+            ceiling: {
+              sound: 'cat-purr',
+              still: [
+                { name: 'plain', db: 2.2 },
+                { name: 'cat-home', db: 3.4 },
+              ],
+            },
+          },
+          2,
+        ),
+      ),
+    ).toBe(
+      'Make the whole scene 1.2 dB louder — as far as it goes before cat-purr passes 300%. plain would still be 2.2 dB and cat-home 3.4 dB too quiet; turn cat-purr down or the others up by hand to go further.',
+    )
+    const words = (still: { name: string; db: number }[]) =>
+      full(
+        suggestionLine(
+          {
+            kind: 'change',
+            db: 1.2,
+            states: still.length,
+            closest: null,
+            ceiling: { sound: 'cat-purr', still },
+          },
+          2,
+        ),
+      )
+    expect(words([{ name: 'The scene', db: 13.6 }])).toContain(
+      'cat-purr passes 300%. The scene would still be 13.6 dB too quiet; turn',
+    )
+    expect(words([{ name: 'cat-home', db: 2.2 }])).toContain(
+      '300%. cat-home would still be 2.2 dB too quiet; turn',
+    )
+    expect(
+      words([
+        { name: 'plain', db: 1 },
+        { name: 'rain', db: 2.2 },
+        { name: 'night', db: 3.4 },
+      ]),
+    ).toContain('300%. plain would still be 1.0 dB, rain 2.2 dB and night 3.4 dB too quiet; turn')
+    const none = suggestionLine({ kind: 'none', loud: ['plain'], quiet: ['cat-home'] }, 2)
+    expect(none.before).toBe(
+      'No single change helps: plain is too loud and cat-home too quiet. Bring them closer in the scene’s levels.',
+    )
+    expect(none.button).toBeNull()
+  })
+})
+
+describe('limitLine', () => {
+  const head = 'No change can make the whole scene louder: '
+  const say = (sounds: { name: string; level: number }[], every = false) =>
+    limitLine({ kind: 'limit', sounds, every })
+  const plain = (l: ReturnType<typeof limitLine>) => l.map((p) => p.text).join('')
+  const bold = (l: ReturnType<typeof limitLine>) => l.filter((p) => p.strong).map((p) => p.text)
+
+  it('words one sound, with its real level', () => {
+    const l = say([{ name: 'door-creak', level: 299 }])
+    expect(plain(l)).toBe(
+      head +
+        'door-creak is at 299%, as loud as it goes. Turn door-creak down or the others up by hand.',
+    )
+    expect(bold(l)).toEqual(['door-creak'])
+  })
+  it('words several sounds at the same level', () => {
+    const l = say([
+      { name: 'door-creak', level: 300 },
+      { name: 'rain', level: 300 },
+      { name: 'wind-howl', level: 300 },
+    ])
+    expect(plain(l)).toBe(
+      head +
+        'door-creak, rain and wind-howl are at 300%, as loud as they go. Turn them down or the others up by hand.',
+    )
+    expect(bold(l)).toEqual(['door-creak', 'rain', 'wind-howl'])
+  })
+  it('gives each sound its level when they differ', () => {
+    expect(
+      plain(
+        say([
+          { name: 'door-creak', level: 299 },
+          { name: 'rain', level: 300 },
+        ]),
+      ),
+    ).toBe(
+      head +
+        'door-creak (299%) and rain (300%) are as loud as they go. Turn them down or the others up by hand.',
+    )
+  })
+  it('words the music', () => {
+    expect(plain(say([{ name: 'the music', level: 300 }]))).toBe(
+      head +
+        'the music is at 300%, as loud as it goes. Turn the music down or the others up by hand.',
+    )
+  })
+  it('words a scene where every sound is at the limit', () => {
+    expect(
+      plain(
+        say(
+          [
+            { name: 'a', level: 300 },
+            { name: 'b', level: 300 },
+          ],
+          true,
+        ),
+      ),
+    ).toBe(
+      head +
+        'every sound in it is at 300%, as loud as it goes. The sounds themselves are too quiet for the target.',
     )
   })
 })

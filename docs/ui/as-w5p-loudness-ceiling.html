@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>No louder suggestion at the 300% limit — agreed (as-w5p)</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --line: rgb(255 255 255/7%);
+        --ls: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --warn: #ffc24b;
+        --warnbg: #2d2412;
+        --ok: #3ddc97;
+        --okbg: #10291f;
+        --dang: #ff94a8;
+        --dangbg: #2e1720;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1180px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro b {
+        color: var(--text);
+      }
+      .page {
+        max-width: 1180px;
+        margin: 0 auto 30px;
+        border: 1px solid var(--ls);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 18px;
+      }
+      .cap {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        margin: 0 auto 6px;
+        max-width: 1180px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .crumbs {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      h2 {
+        margin: 2px 0;
+        font-size: 22px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .btn {
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        padding: 5px 12px;
+        font-size: 13px;
+        display: inline-block;
+        background: var(--raised);
+      }
+      .btn.pri {
+        background: var(--accent);
+        color: #1a0a02;
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .btn.dis {
+        opacity: 0.45;
+      }
+      .acts {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .body {
+        display: grid;
+        grid-template-columns: 270px 1fr;
+        gap: 16px;
+      }
+      .list {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 8px;
+      }
+      .list .lbl {
+        font-size: 12px;
+        color: var(--faint);
+        padding: 4px 8px;
+        display: block;
+      }
+      .li {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 7px 8px;
+        border-radius: 7px;
+        align-items: baseline;
+      }
+      .li.cur {
+        background: var(--raised);
+      }
+      .cnt {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .red {
+        color: var(--dang);
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+      .rowx {
+        display: grid;
+        grid-template-columns: 1fr 150px 90px;
+        gap: 8px;
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--line);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .chip {
+        font-size: 12px;
+        border-radius: 6px;
+        padding: 1px 8px;
+        display: inline-block;
+        white-space: nowrap;
+      }
+      .cw {
+        color: var(--warn);
+        background: var(--warnbg);
+      }
+      .co {
+        color: var(--ok);
+        background: var(--okbg);
+      }
+      .cd {
+        color: var(--dang);
+        background: var(--dangbg);
+      }
+      .cn {
+        color: var(--muted);
+        background: rgb(255 255 255/7%);
+      }
+      .lu {
+        font-variant-numeric: tabular-nums;
+        font-size: 12.5px;
+      }
+      .bar {
+        border: 1px solid var(--ls);
+        border-radius: 10px;
+        background: var(--bg);
+        padding: 10px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        overflow: hidden;
+        font-size: 12.5px;
+      }
+      .seg span {
+        padding: 4px 10px;
+      }
+      .seg span.on {
+        background: #3a2416;
+        color: #ffb48a;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td,
+      th {
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        font-size: 13px;
+      }
+      th {
+        font-weight: 500;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        align-items: center;
+        margin-top: 6px;
+        font-size: 13px;
+      }
+      .note {
+        max-width: 1180px;
+        margin: -18px auto 30px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .spin {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border: 2px solid var(--faint);
+        border-top-color: transparent;
+        border-radius: 50%;
+      }
+
+      .sug {
+        margin-top: 10px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        background: var(--warnbg);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        font-size: 13px;
+      }
+      .sug.n {
+        background: rgb(255 255 255/5%);
+      }
+      .amber {
+        color: var(--warn);
+      }
+      .grid {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+      }
+      .grid > div {
+        flex: 0 1 560px;
+      }
+      .chg {
+        color: #ffb48a;
+      }
+    </style>
+    <style>
+      .sug.n {
+        color: var(--muted);
+      }
+      .sug.dis .btn {
+        opacity: 0.45;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>No louder suggestion at the 300% limit — agreed (as-w5p)</h1>
+      <p>
+        Chosen: <b>a short muted line</b> in place of the suggestion when a scene is too quiet and a
+        sound is already as loud as it goes, naming that sound with its real level. There is no
+        button. Every sound at the limit is named; when every sound is at the limit, the line says
+        the sounds themselves are too quiet.
+      </p>
+    </div>
+    <p class="cap">The page — Empty room, both states too quiet, door-creak at 300%</p>
+    <div class="page">
+      <header>
+        <div>
+          <span class="crumbs">Scenes · Act 1</span>
+          <h2>Empty room</h2>
+          <span class="muted">States: dark, lit · Triggers: door-opens</span>
+        </div>
+        <div class="acts">
+          <span class="btn dis">Discard</span><span class="btn pri dis">Save</span
+          ><span class="btn">Refresh from the game</span>
+        </div>
+      </header>
+      <div class="body">
+        <div class="list">
+          <span class="lbl">4 scenes</span>
+          <div class="li"><span>Lantern hall</span><span class="cnt">4 effects</span></div>
+          <div class="li"><span>Village lane</span><span class="cnt">2 effects</span></div>
+          <div class="li"><span>Old cellar</span><span class="cnt">1 effect</span></div>
+          <div class="li cur">
+            <span>Empty room</span><span class="cnt"><span class="amber">too quiet</span></span>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+            >
+              <span
+                ><b>Loudness</b
+                ><span class="faint" style="font-size: 12px"
+                  >&nbsp;target −20 LUFS ± 2 dB</span
+                ></span
+              ><span class="btn">Measure loudness</span>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>dark</td>
+                <td class="lu">−48.5 LUFS</td>
+                <td><span class="chip cw">28.5 dB too quiet</span></td>
+              </tr>
+              <tr>
+                <td>lit</td>
+                <td class="lu">−43.5 LUFS</td>
+                <td><span class="chip cw">23.5 dB too quiet</span></td>
+              </tr>
+            </table>
+            <div class="sug n" role="status">
+              <span
+                >No change can make the whole scene louder: <b>door-creak</b> is at 300%, as loud as
+                it goes. Turn door-creak down or the others up by hand.</span
+              >
+            </div>
+            <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          </div>
+          <div class="panel">
+            <div class="faint" style="font-size: 12px; margin-bottom: 6px">Music</div>
+            <div class="rowx">
+              <span><span class="faint">no music</span></span
+              ><span></span><span></span>
+            </div>
+            <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+            <div class="rowx">
+              <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+              ><span>300%</span>
+            </div>
+            <div class="rowx">
+              <span class="mono">wind-howl</span><span class="muted">Round and round · dark</span
+              ><span>40%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">The states</p>
+    <div class="grid">
+      <div>
+        <p class="cap" style="margin: 0 0 6px">1 · One sound at the limit (exactly 300%)</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−43.5 LUFS</td>
+              <td><span class="chip cw">23.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >No change can make the whole scene louder: <b>door-creak</b> is at 300%, as loud as
+              it goes. Turn door-creak down or the others up by hand.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">no music</span><span></span><span></span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span>300%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">wind-howl</span><span class="muted">Round and round · dark</span
+            ><span>40%</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">2 · Close to the limit (299%)</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−43.5 LUFS</td>
+              <td><span class="chip cw">23.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >No change can make the whole scene louder: <b>door-creak</b> is at 299%, as loud as
+              it goes. Turn door-creak down or the others up by hand.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">no music</span><span></span><span></span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span>299%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">wind-howl</span><span class="muted">Round and round · dark</span
+            ><span>40%</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">3 · Two sounds at the limit</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−43.5 LUFS</td>
+              <td><span class="chip cw">23.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >No change can make the whole scene louder: <b>door-creak</b> and <b>rain</b> are at
+              300%, as loud as they go. Turn them down or the others up by hand.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">no music</span><span></span><span></span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span>300%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">rain</span><span class="muted">Round and round · lit</span
+            ><span>300%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">wind-howl</span><span class="muted">Round and round · dark</span
+            ><span>40%</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">4 · Three or more at the limit — every one named</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−43.5 LUFS</td>
+              <td><span class="chip cw">23.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >No change can make the whole scene louder: <b>door-creak</b>, <b>rain</b> and
+              <b>wind-howl</b> are at 300%, as loud as they go. Turn them down or the others up by
+              hand.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">no music</span><span></span><span></span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span>300%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">rain</span><span class="muted">Round and round · lit</span
+            ><span>300%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">wind-howl</span><span class="muted">Round and round · dark</span
+            ><span>300%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">coins</span><span class="muted">Once, 2 s after entering</span
+            ><span>50%</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">5 · The music at the limit</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−43.5 LUFS</td>
+              <td><span class="chip cw">23.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >No change can make the whole scene louder: <b>the music</b> is at 300%, as loud as it
+              goes. Turn the music down or the others up by hand.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">empty-room</span><span></span><span>300%</span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span>90%</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">
+          6 · Every sound in the scene at the limit — nothing to turn up
+        </p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−43.5 LUFS</td>
+              <td><span class="chip cw">23.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >No change can make the whole scene louder: every sound in it is at 300%, as loud as
+              it goes. The sounds themselves are too quiet for the target.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">empty-room</span><span></span><span>300%</span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <span class="faint">none</span>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">7 · A scene with no states</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>The scene</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >No change can make the whole scene louder: <b>door-creak</b> is at 300%, as loud as
+              it goes. Turn door-creak down or the others up by hand.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">no music</span><span></span><span></span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span>300%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">wind-howl</span><span class="muted">Round and round</span
+            ><span>40%</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">
+          8 · A level changed by hand since measuring — the existing “changed” line wins
+        </p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px"
+                >&nbsp;target −20 LUFS ± 2 dB
+                <span class="amber">· changed since measured</span></span
+              ></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−43.5 LUFS</td>
+              <td><span class="chip cw">23.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >The scene changed since it was measured. Measure loudness again for a
+              suggestion.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">no music</span><span></span><span></span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span><span class="chg">200%</span></span>
+          </div>
+          <div class="rowx">
+            <span class="mono">wind-howl</span><span class="muted">Round and round · dark</span
+            ><span>40%</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">9 · While measuring — the line stays as it is</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn dis"><span class="spin"></span> Measuring…</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−48.5 LUFS</td>
+              <td><span class="chip cw">28.5 dB too quiet</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−43.5 LUFS</td>
+              <td><span class="chip cw">23.5 dB too quiet</span></td>
+            </tr>
+          </table>
+          <div class="sug n" role="status">
+            <span
+              >No change can make the whole scene louder: <b>door-creak</b> is at 300%, as loud as
+              it goes. Turn door-creak down or the others up by hand.</span
+            >
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">no music</span><span></span><span></span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span>300%</span>
+          </div>
+          <div class="rowx">
+            <span class="mono">wind-howl</span><span class="muted">Round and round · dark</span
+            ><span>40%</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin: 0 0 6px">
+          10 · Too loud with a sound at 300% — the normal suggestion; quieter is always possible
+        </p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b
+              ><span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dark</td>
+              <td class="lu">−16.0 LUFS</td>
+              <td><span class="chip cw">4.0 dB too loud</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−17.0 LUFS</td>
+              <td><span class="chip cw">3.0 dB too loud</span></td>
+            </tr>
+          </table>
+          <div class="sug">
+            <span
+              >Make the whole scene <b>3.5 dB quieter</b> — music and every effect by the same
+              amount — to bring both states within the target.</span
+            ><span class="btn">Make 3.5 dB quieter</span>
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 06:40</p>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Music</div>
+          <div class="rowx"><span class="mono">no music</span><span></span><span></span></div>
+          <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+          <div class="rowx">
+            <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+            ><span>300%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

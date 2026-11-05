@@ -1,6 +1,8 @@
 import {
   planStateMix,
   sceneStateNames,
+  statesPlaying,
+  withoutName,
   WINDOW_SECONDS,
   type MixPart,
   type PlanEffect,
@@ -84,6 +86,9 @@ async function measureScene(
   }
   const chosen = entry?.music ?? (scene.music.track ? { track: scene.music.track, level: 1 } : null)
   const paths = new Map<string, string>()
+  const stateNames = sceneStateNames(scene)
+  // Effects with no clip that the minute would play, by id: a row for each state adds to one note.
+  const silent = new Map<string, { states: Set<string | null>; why: string }>()
 
   let music: PlanMusic | null = null
   const track = act.tracks.find((t) => t.id === chosen?.track)
@@ -104,7 +109,14 @@ async function measureScene(
       ? await once(found.effect, row.id, () => files.effect(row.id))
       : null
     if (!file) {
-      left(row.id, choice.silent ? NO_TAKE : NO_FILE)
+      // Named only if the measured minute would have played it, and in which states.
+      const playing = statesPlaying({ play: row.play, state: row.state ?? null }, stateNames)
+      if (playing.length > 0) {
+        const soFar = silent.get(row.id) ?? { states: new Set<string | null>(), why: '' }
+        playing.forEach((s) => soFar.states.add(s))
+        soFar.why = choice.silent ? NO_TAKE : NO_FILE
+        silent.set(row.id, soFar)
+      }
     } else {
       paths.set(`effect:${row.id}`, file)
     }
@@ -117,8 +129,19 @@ async function measureScene(
     })
   }
 
+  for (const [id, { states, why }] of silent) {
+    left(
+      withoutName(
+        id,
+        stateNames.filter((s) => states.has(s)),
+        stateNames,
+      ),
+      why,
+    )
+  }
+
   const states: StateLoudness[] = []
-  for (const state of sceneStateNames(scene)) {
+  for (const state of stateNames) {
     const parts = planStateMix({ music, effects, state }).map((part): RenderPart => ({
       ...part,
       file: paths.get(`${part.source.kind}:${part.source.id}`)!,
@@ -254,7 +277,7 @@ export async function startMeasure(
     act,
     effects: loaded.summary.scenes!.effects,
     open: open && act.scenes.some((s) => s.id === open.scene) ? open : null,
-    audio: deps.audio ?? ffmpegSceneAudio(),
+    audio: deps.audio ?? ffmpegSceneAudio(dirname(projectFile)),
     files,
     now: () => new Date(),
     keep: (id, measure, draft) => keepMeasure(projectFile, part, id, measure, draft),

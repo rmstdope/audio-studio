@@ -5727,6 +5727,20 @@ describe('server, saving a scene', () => {
     expect(JSON.parse(readFileSync(join(sceneRoot, mix), 'utf8')).scenes.store).toEqual(entry(1))
   })
 
+  it('takes the move of the loudness figures with a save, and nothing else extra', async () => {
+    const moved = { db: 4, measuredAt: '2026-11-05T14:02:00.000Z' }
+    const file = join(sceneRoot, mix)
+    const was = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')).scenes.store : null
+    const ok = await put('/api/scenes/act1/store', { scene: entry(1), was, moved })
+    expect(ok.status).toBe(200)
+    const bad = await put('/api/scenes/act1/store', {
+      scene: entry(1),
+      was,
+      moved: { ...moved, extra: 1 },
+    })
+    expect(bad.status).toBe(400)
+  })
+
   it('answers 409 with what is saved when the page’s copy is stale', async () => {
     const stale = await put('/api/scenes/act1/store', { scene: entry(2), was: null })
     expect(stale.status).toBe(409)

@@ -18,6 +18,7 @@ import {
   type RenderPart,
   type SceneAudio,
 } from './sceneLoudness'
+import { scaleMix } from '../core/sceneLoudness'
 import { saveScene } from './scenes'
 
 const choice = (id: string, over: Partial<SceneEffectChoice> = {}): SceneEffectChoice => ({
@@ -206,6 +207,79 @@ describe('measureScenes', () => {
     expect(asked[0]!.map((p) => p.file)).toEqual(['/music/theme.mp3', '/clips/hum.mp3'])
   })
 
+  it('names only effects the measured minute would have played, and in which states', async () => {
+    const built = actOf(
+      [declared('a', ['calm', 'rainy', 'storm'])],
+      {
+        a: {
+          music: { track: 'theme', level: 1 },
+          effects: [
+            { id: 'creak', play: { mode: 'trigger', trigger: 'open' }, level: 1 },
+            { id: 'coins', play: { mode: 'loop' }, state: 'flooded', level: 1 },
+            { id: 'late', play: { mode: 'once', afterSeconds: 90 }, level: 1 },
+            { id: 'rain', play: { mode: 'loop' }, state: 'rainy', level: 1 },
+            { id: 'fire', play: { mode: 'loop' }, level: 1 },
+          ],
+        },
+      },
+      ['creak', 'coins', 'late', 'rain', 'fire'].map((id) =>
+        choice(id, { silent: true, playable: false, clip: null }),
+      ),
+    )
+    const kept: [string, SceneMeasure, boolean][] = []
+    await run(built, { kept })
+    expect(kept[0]![1].without).toEqual([
+      'rain in rainy, which has no take chosen',
+      'fire, which has no take chosen',
+    ])
+  })
+
+  it('names an effect once however many rows it has, with all its states', async () => {
+    const mixOf = (effects: SceneMix['effects']) => ({ a: { effects } })
+    const none = { silent: true, playable: false, clip: null }
+    const loop = { mode: 'loop' } as const
+    const states = ['calm', 'rainy', 'storm']
+    const two = actOf(
+      [declared('a', states)],
+      mixOf([
+        { id: 'rain', play: loop, state: 'rainy', level: 1 },
+        { id: 'rain', play: loop, state: 'storm', level: 1 },
+      ]),
+      [choice('rain', none)],
+    )
+    const kept: [string, SceneMeasure, boolean][] = []
+    await run(two, { kept })
+    expect(kept[0]![1].without).toEqual(['rain in rainy and storm, which has no take chosen'])
+    const mixed = actOf(
+      [declared('a', states)],
+      mixOf([
+        { id: 'rain', play: loop, level: 1 },
+        { id: 'rain', play: loop, state: 'rainy', level: 1 },
+      ]),
+      [choice('rain', none)],
+    )
+    const kept2: [string, SceneMeasure, boolean][] = []
+    await run(mixed, { kept: kept2 })
+    expect(kept2[0]![1].without).toEqual(['rain, which has no take chosen'])
+  })
+
+  it('applies the same rule to the open scene on the page', async () => {
+    const built = actOf([declared('a', ['calm', 'rainy'])], { a: { effects: [] } }, [
+      choice('creak', { silent: true, playable: false, clip: null }),
+      choice('rain', { silent: true, playable: false, clip: null }),
+    ])
+    const entry: SceneMix = {
+      effects: [
+        { id: 'creak', play: { mode: 'trigger', trigger: 'open' }, level: 1 },
+        { id: 'rain', play: { mode: 'loop' }, state: 'rainy', level: 1 },
+      ],
+    }
+    const kept: [string, SceneMeasure, boolean][] = []
+    await run(built, { open: { scene: 'a', entry }, kept })
+    expect(kept[0]![2]).toBe(true)
+    expect(kept[0]![1].without).toEqual(['rain in rainy, which has no take chosen'])
+  })
+
   it('records why a scene could not be measured and goes on with the others', async () => {
     const built = actOf([declared('a', ['x', 'y']), declared('b')], {
       a: { music: { track: 'theme', level: 1 }, effects: [] },
@@ -350,6 +424,44 @@ describe('the kept figures', () => {
     expect((await saveScene(projectFile, 'act1', 'a', other, entry)).ok).toBe(true)
     expect(kept(root).act1.a.draft).toBeNull()
     expect(kept(root).act1.a.saved.entry).toEqual(entry)
+  })
+
+  it('keep the expected figures when a scene is saved as the measured one moved', async () => {
+    const { root, projectFile } = repo()
+    const entry: SceneMix = {
+      music: { track: null, level: 1 },
+      effects: [{ id: 'bell', play: { mode: 'loop' }, level: 0.6 }],
+    }
+    const moved = scaleMix(entry, 4)
+    await keepMeasure(projectFile, 'act1', 'a', measureOf(entry), false)
+    const answer = await saveScene(
+      projectFile,
+      'act1',
+      'a',
+      { ...moved, music: entry.music },
+      null,
+      {
+        db: 4,
+        measuredAt: '2026-11-05T14:02:00.000Z',
+      },
+    )
+    expect(answer.ok).toBe(true)
+    expect(kept(root).act1.a.saved.moved).toEqual({ db: 4 })
+    expect(kept(root).act1.a.saved.entry).toEqual(entry)
+  })
+
+  it('ignore a move that is not what was saved', async () => {
+    const { root, projectFile } = repo()
+    const entry: SceneMix = {
+      music: { track: null, level: 1 },
+      effects: [{ id: 'bell', play: { mode: 'loop' }, level: 0.6 }],
+    }
+    await keepMeasure(projectFile, 'act1', 'a', measureOf(entry), true)
+    await saveScene(projectFile, 'act1', 'a', { ...scaleMix(entry, 2), music: entry.music }, null, {
+      db: 4,
+      measuredAt: '2026-11-05T14:02:00.000Z',
+    })
+    expect(kept(root).act1.a.saved ?? null).toBeNull()
   })
 
   it('write nothing when a scene is saved that has no kept figures', async () => {

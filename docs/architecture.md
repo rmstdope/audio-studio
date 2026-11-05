@@ -2000,21 +2000,47 @@ same every time. The music loops at its level; a loop effect fills the minute; a
 starts in the middle of its range and again after each clip and wait; a once effect sounds at its
 delay if that falls inside the minute; a trigger effect is not counted (the player fires it). An
 effect plays in a state if it has none or that one. Sounds with no take chosen, or no file, are left
-out and named. The minute is mixed by ffmpeg (`services/sceneAudio.ts`: `amix` with each level as a
+out and named, but an effect only when the minute would have played it (`statesPlaying`), once
+however many rows it has, with the states when that is only some of them ("rain in rainy and
+storm"). The minute is mixed by ffmpeg (`services/sceneAudio.ts`: `amix` with each level as a
 `volume`, then loudnorm's first pass, as `levelClip` measures) and the figure is the integrated
 loudness (BS.1770), so silence between sparse effects is gated out as in any LUFS reading; a state
 with nothing playing has no figure ("nothing plays") and is never flagged. A figure is judged
-against the target in `core/sceneLoudness.ts`: within the tolerance is "on target", else "N dB too
+against the target in `core/sceneLoudness.ts` as it is shown (rounded to one decimal, so the figure,
+the distance and the chip agree): within the tolerance is "on target", else "N dB too
 quiet / too loud" by how far from the target; a scene whose states disagree is "off target" in the
 list. The figures are **kept** in `.content-studio/scene-loudness.json` (act, then scene: `saved`,
 the measure of the saved scene, and `draft`, the open scene's measure with its unsaved changes,
 kept beside it so Discard puts the saved figures back). Each measure remembers the scene's entry
 and the clip each sound played (its take or the game's file); the page says "changed since
-measured" when the saved entry or one of those clips is no longer the same. A Save makes a draft
+measured" when the saved entry or one of those clips is no longer the same, or, before Save, when
+the levels on the page differ from those measured. A Save makes a draft
 measured from exactly the saved entry the saved figures, and drops any other draft
 (`services/sceneMeasures.ts`). The kept file only holds figures that can be measured again, so
 one that cannot be read is reported and read as empty. The figures reach the page with
 `ProjectSummary.scenes` (`SceneRow.loudness`, `ScenesSummary.loudnessTarget`).
+
+**Bringing a scene back to the target** (as-gdf.2; `docs/ui/as-gdf.2-loudness-suggestion.html`). When
+a measure puts a scene off the target, one line under the Loudness table offers a single change for
+the whole scene (`suggestChange` in `core/sceneLoudness.ts`): the even dB that puts the middle of the
+measured states on the target, one decimal; the closest one when no change fits every state; only as
+much as keeps every level within 300%, and the line then names each state ("The scene" when it has none) still too quiet, with its own figure; nothing when the states disagree and the best change is under
+0.5 dB. The press (`scaleDraft`) multiplies the music and every effect by the same factor, to a whole
+percent, **on the page only**: Save keeps it, Discard undoes it. The table then shows the expected
+figures (measured + dB). The page sends the move with Save (`moved: { db, measuredAt }`); if the
+measure made at `measuredAt`, moved by `db`, is exactly the scene saved, `sceneSaved` keeps that
+measure as the saved one with `moved: { db }`, and the figures stay the expected ones while the saved
+scene is still that (`expectedFigures`) until the act is measured again. A scene changed by hand
+after the press, or saved differently since the measure, gets no suggestion: while the scene has unsaved changes the
+page is what the measure is compared with, saved press or not. A music with no track has no level, so the
+press leaves it alone and the expected scene does too. The levels a press moved show in amber on the page
+(with "was N%" for a screen reader) until saved or discarded.
+
+**When a louder change has no room** (as-w5p; `docs/ui/as-w5p-loudness-ceiling.html`). A scene that
+needs to be louder while a sound is within 0.1 dB of 300% gets `suggestChange` kind `limit` instead
+of nothing: a muted line, no button, naming every sound at the limit with its real level (the music
+as "the music"), or saying the sounds themselves are too quiet when every playing sound is there
+(`limitLine` in `ui/scenesText.ts`). A too loud scene always gets the ordinary change.
 
 ## 9. Server API
 
@@ -2553,7 +2579,7 @@ Small, independently useful increments:
        triggers declared shows none.
     7. **Loudness of the scenes** (as-gdf.1, done: §8.11): a kept loudness per scene and state against
        the target in the project file, warnings in the Loudness panel and the scene list. Suggesting
-       and applying a change is as-gdf.2.
+       and applying a change (as-gdf.2, done) is in the same section.
 
 ---
 

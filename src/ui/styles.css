@@ -4195,6 +4195,35 @@ button.cue-chip[aria-expanded='true'] {
 .scene-loud-table + .scene-problem {
   margin-top: 10px;
 }
+.scene-suggest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--warn-bg);
+  overflow-wrap: anywhere;
+}
+.scene-suggest-muted {
+  background: none;
+  padding: 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+.scene-suggest .btn {
+  flex: none;
+}
+.scene-suggest-note {
+  margin: 10px 0 0;
+}
+@media (max-width: 640px) {
+  .scene-suggest {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 .scene-menu {
   display: none;
 }
@@ -4220,6 +4249,10 @@ button.cue-chip[aria-expanded='true'] {
 .scene-level {
   font-variant-numeric: tabular-nums;
   color: var(--text-soft);
+}
+.scene-level-moved {
+  color: var(--warn);
+  font-weight: 600;
 }
 .scene-play {
   width: 40px;
@@ -4325,6 +4358,7 @@ button.cue-chip[aria-expanded='true'] {
   color: var(--accent);
 }
 .scene-problem {
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -4742,4 +4776,10 @@ button.cue-chip[aria-expanded='true'] {
   .scene-effects .table td.scene-level-cell {
     grid-column: 2 / -1;
   }
+}
+
+/* A clip path in the Loudness panel's error box: the code font, nothing else. */
+.scene-clip-path {
+  font-family: var(--mono);
+  font-size: 12.5px;
 }

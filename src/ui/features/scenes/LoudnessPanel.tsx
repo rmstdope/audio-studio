@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { sameMix, toMix, type SceneDraft } from '../../../core/sceneEdit'
+import { sameMix, scaleDraft, toMix, type SceneDraft } from '../../../core/sceneEdit'
 import {
   chipFor,
+  expectedFigures,
+  shiftStates,
+  splitClipPaths,
+  suggestChange,
   formatLufs,
-  measureChanged,
   targetLine,
   type LoudnessTarget,
   type SceneMeasure,
@@ -15,7 +18,8 @@ import {
   type SceneMix,
   type SceneRow,
 } from '../../../core/scenes'
-import { measuredLine } from '../../scenesText'
+import type { Moved } from '../../sceneDraft'
+import { changeWord, limitLine, measuredLine, suggestionLine } from '../../scenesText'
 
 /** How far a measure of the act has got. */
 export interface Running {
@@ -28,11 +32,18 @@ function shown(
   scene: SceneRow,
   page: SceneMix,
   dirty: boolean,
+  pressed: Moved | null,
 ): { measure: SceneMeasure; unsaved: boolean } | null {
   const draft = scene.loudness.draft
-  // The unsaved scene's measure shows while the page is what it was made from, or while the scene
-  // has no other (then it says it changed).
-  if (dirty && draft && (sameMix(draft.entry, page) || !scene.loudness.saved)) {
+  // The unsaved scene's measure shows while the page is what it was made from (or what a press on
+  // it made), or while the scene has no other (then it says it changed).
+  if (
+    dirty &&
+    draft &&
+    (sameMix(draft.entry, page) ||
+      pressed?.measuredAt === draft.measuredAt ||
+      !scene.loudness.saved)
+  ) {
     return { measure: draft, unsaved: true }
   }
   return scene.loudness.saved ? { measure: scene.loudness.saved, unsaved: false } : null
@@ -50,9 +61,11 @@ export function LoudnessPanel({
   target,
   draft,
   dirty,
+  pressed,
   running,
   refused,
   onMeasure,
+  onApply,
 }: {
   scene: SceneRow
   act: SceneAct
@@ -61,17 +74,27 @@ export function LoudnessPanel({
   target: LoudnessTarget | null
   draft: SceneDraft
   dirty: boolean
+  /** The press of "Make … louder / quieter" the page holds unsaved, if any. */
+  pressed: Moved | null
   running: Running | null
   /** Why the last press was refused (the studio's words), if it was. */
   refused: string | null
   /** Starts the measure; given the open scene as the page has it when that has unsaved changes. */
   onMeasure: (open: { scene: string; entry: SceneMix } | null) => void
+  /** Puts the levels the suggestion moved on the page. */
+  onApply: (next: SceneDraft, moved: Moved) => void
 }) {
   const page = toMix(draft)
-  const found = shown(scene, page, dirty)
+  const found = shown(scene, page, dirty, pressed)
   // What the measure was made from, against what is there now: the page's scene for an unsaved
   // measure, the saved scene otherwise.
-  const now = found?.unsaved
+  // The page is the scene to compare with when the measure is an unsaved one, or when a press
+  // (unsaved, or kept with the saved scene) is on it and the page may have moved on from it.
+  const onPage =
+    found !== null &&
+    (found.unsaved ||
+      (dirty && (pressed?.measuredAt === found.measure.measuredAt || !!found.measure.moved)))
+  const now = onPage
     ? {
         entry: page,
         clips: clipsOf(
@@ -82,11 +105,38 @@ export function LoudnessPanel({
         ),
       }
     : { entry: scene.entry, clips: scene.clips }
-  const changed = found ? measureChanged(found.measure, now) : false
-  const measure = found?.measure ?? null
+  const kept = found?.measure ?? null
+  // A press made on this measure, unsaved or kept with the saved scene.
+  const moved = kept && pressed?.measuredAt === kept.measuredAt ? pressed : (kept?.moved ?? null)
+  const status = kept ? expectedFigures(kept, moved, now) : null
+  const expected = status === 'expected'
+  const changed = status === 'changed'
+  // The figures a person can trust: as measured, or moved by the change that was made.
+  const measure = kept && moved && status !== 'measured' ? shiftStates(kept, moved.db) : kept
+  const made = moved && status !== 'measured' ? `then made ${changeWord(moved.db)}` : null
+  // Edits on the page since the measure make its figures wrong, whether or not they are saved.
+  const edited = kept !== null && dirty && !sameMix(kept.entry, page)
+  const suggestion =
+    kept && status === 'measured' && !edited && target ? suggestChange(kept, target, page) : null
+  // The measured figures no longer match the page: the saved scene changed, or the page was edited.
+  const figuresOff = changed || (edited && status === 'measured')
+  // The scene changed after a measure that was off the target (or after a press on one).
+  const stale =
+    figuresOff &&
+    kept &&
+    target &&
+    (moved !== null || suggestChange(kept, target, now.entry ?? page) !== null)
+  const line =
+    suggestion && suggestion.kind !== 'limit'
+      ? suggestionLine(suggestion, target?.tolerance ?? 0)
+      : null
+  const justMade =
+    expected && dirty && moved && pressed?.measuredAt === kept?.measuredAt
+      ? `Made ${changeWord(moved.db)}. Save to keep it, Discard to undo.`
+      : null
   const when = measure
     ? [
-        measuredLine(measure.measuredAt, new Date()),
+        [measuredLine(measure.measuredAt, new Date()), made].filter(Boolean).join(', '),
         ...(running ? ['being measured again'] : []),
         ...measure.without.map((phrase) => `without ${phrase}`),
         ...(target
@@ -117,8 +167,11 @@ export function LoudnessPanel({
       <div className="scene-loud-head">
         <h2>
           Loudness <span className="faint scene-loud-target">{targetLine(target)}</span>
-          {changed && <span className="scene-loud-warn"> · changed since measured</span>}
-          {found?.unsaved && <span className="scene-loud-warn"> · with your unsaved changes</span>}
+          {expected && <span className="scene-loud-warn"> · expected after your change</span>}
+          {figuresOff && <span className="scene-loud-warn"> · changed since measured</span>}
+          {!expected && found?.unsaved && (
+            <span className="scene-loud-warn"> · with your unsaved changes</span>
+          )}
         </h2>
         <button
           className="btn"
@@ -168,14 +221,69 @@ export function LoudnessPanel({
       )}
       {measure?.error != null && (
         <div className="panel scene-problem">
-          Couldn’t measure {scene.name}: {measure.error.replace(/\.+$/, '')}. The other scenes were
-          measured.
+          <span>
+            Couldn’t measure {scene.name}:{' '}
+            {splitClipPaths(measure.error.replace(/\.+$/, '')).map((piece, i) =>
+              piece.path ? (
+                <code key={i} className="scene-clip-path">
+                  {piece.text}
+                </code>
+              ) : (
+                piece.text
+              ),
+            )}
+            . The other scenes were measured.
+          </span>
         </div>
       )}
       {refused && <div className="panel scene-problem">{refused}</div>}
+      {line && (
+        <div
+          className={
+            suggestion?.kind === 'none' ? 'scene-suggest scene-suggest-muted' : 'scene-suggest'
+          }
+        >
+          <span>
+            {line.before}
+            {line.strong && <strong>{line.strong}</strong>}
+            {line.after}
+          </span>
+          {line.button && suggestion?.kind === 'change' && kept && (
+            <button
+              className="btn"
+              type="button"
+              aria-disabled={running ? true : undefined}
+              onClick={() => {
+                if (running) return
+                onApply(scaleDraft(draft, suggestion.db), {
+                  db: suggestion.db,
+                  measuredAt: kept.measuredAt,
+                })
+              }}
+            >
+              {line.button}
+            </button>
+          )}
+        </div>
+      )}
+      {suggestion?.kind === 'limit' && (
+        <div className="scene-suggest scene-suggest-muted">
+          <span>
+            {limitLine(suggestion).map((part, i) =>
+              part.strong ? <strong key={i}>{part.text}</strong> : part.text,
+            )}
+          </span>
+        </div>
+      )}
+      {justMade && <p className="faint scene-suggest-note">{justMade}</p>}
+      {stale && (
+        <p className="faint scene-suggest-note">
+          The scene changed since it was measured. Measure loudness again for a suggestion.
+        </p>
+      )}
       <p className="faint scene-loud-when">{when}</p>
       <span className="sr-only" role="status">
-        {said}
+        {justMade ?? said}
       </span>
     </section>
   )

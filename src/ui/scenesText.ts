@@ -1,4 +1,11 @@
-import { sceneVerdict, type LoudnessTarget } from '../core/sceneLoudness'
+import {
+  expectedFigures,
+  sceneVerdict,
+  shiftStates,
+  type LoudnessTarget,
+  type SceneMeasure,
+  type Suggestion,
+} from '../core/sceneLoudness'
 import type { Play, SceneAct, SceneRow, ScenesSummary, TrackProblem } from '../core/scenes'
 import { fileName } from './musicPlays'
 import type { ScenesRoute } from './route'
@@ -30,15 +37,29 @@ export function levelText(level: number): string {
 export function listCount(
   scene: SceneRow,
   target: LoudnessTarget | null = null,
+  /** The open scene's figures when they are the expected ones of a press not yet saved. */
+  expected: SceneMeasure | null = null,
 ): { text: string; red: boolean; warn?: true } {
   if (scene.unreadable) return { text: 'unreadable', red: true }
   if (scene.gone > 0) return { text: `${scene.gone} gone`, red: true }
   if (scene.silent > 0) return { text: `${scene.silent} silent`, red: true }
   // Off the target, from the last measure of the saved scene (else of the unsaved one), stays until measured again.
-  const verdict = target && sceneVerdict(scene.loudness.saved ?? scene.loudness.draft, target)
+  // A saved "Make … louder / quieter" shows the figures it expects while the scene is as it was saved.
+  const verdict = target && sceneVerdict(expected ?? keptFigures(scene), target)
   if (verdict) return { text: verdict, red: false, warn: true }
   const n = scene.effects.length
   return { text: n === 0 ? 'none' : n === 1 ? '1 effect' : `${n} effects`, red: false }
+}
+
+/** The figures the list judges a scene by: the saved measure (moved, if a saved press still holds), else the draft's. */
+function keptFigures(scene: SceneRow): SceneMeasure | null {
+  const saved = scene.loudness.saved
+  const moved = saved?.moved
+  return saved &&
+    moved &&
+    expectedFigures(saved, moved, { entry: scene.entry, clips: scene.clips }) === 'expected'
+    ? shiftStates(saved, moved.db)
+    : (saved ?? scene.loudness.draft)
 }
 
 /** The line under a scene's name: its states and its triggers, or that it has none. */
@@ -99,4 +120,100 @@ export function measuredLine(measuredAt: string, now: Date): string {
   if (ago === 0) return `Measured today ${clock(at)}`
   if (ago === 1) return `Measured yesterday ${clock(at)}`
   return `Measured ${at.getDate()} ${MONTHS[at.getMonth()]} ${clock(at)}`
+}
+
+/** A change in dB as the suggestion says it: "4.0 dB louder", "3.4 dB quieter". */
+export function changeWord(db: number): string {
+  return `${Math.abs(db).toFixed(1)} dB ${db > 0 ? 'louder' : 'quieter'}`
+}
+
+/** Names in a sentence: "a", "a and b", "a, b and c". */
+function joined(names: string[]): string {
+  return names.length < 2
+    ? names.join('')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/** A piece of a line; a strong one is shown bold. */
+export interface Segment {
+  text: string
+  strong: boolean
+}
+
+/** The muted line saying why no change can make the scene louder: the sounds at 300%, each named in bold. */
+export function limitLine(suggestion: Extract<Suggestion, { kind: 'limit' }>): Segment[] {
+  const { sounds, every } = suggestion
+  const head = { text: 'No change can make the whole scene louder: ', strong: false }
+  if (every) {
+    const top = Math.max(...sounds.map((s) => s.level))
+    return [
+      {
+        strong: false,
+        text: `${head.text}every sound in it is at ${top}%, as loud as it goes. The sounds themselves are too quiet for the target.`,
+      },
+    ]
+  }
+  const one = sounds.length === 1
+  const same = sounds.every((s) => s.level === sounds[0]?.level)
+  const out: Segment[] = [head]
+  sounds.forEach((sound, i) => {
+    if (i > 0) out.push({ text: i === sounds.length - 1 ? ' and ' : ', ', strong: false })
+    out.push({ text: sound.name, strong: true })
+    if (!same) out.push({ text: ` (${sound.level}%)`, strong: false })
+  })
+  const verb = same
+    ? `${one ? 'is' : 'are'} at ${sounds[0]?.level}%, as loud as ${one ? 'it goes' : 'they go'}`
+    : 'are as loud as they go'
+  out.push({
+    text: ` ${verb}. Turn ${one ? sounds[0]?.name : 'them'} down or the others up by hand.`,
+    strong: false,
+  })
+  return out
+}
+
+/** The suggestion line: its text around the amount (shown strong), and the button ("Make 4.0 dB louder"), if any. */
+export function suggestionLine(
+  suggestion: Exclude<Suggestion, { kind: 'limit' }>,
+  tolerance: number,
+): { before: string; strong: string; after: string; button: string | null } {
+  if (suggestion.kind === 'none') {
+    const { loud, quiet } = suggestion
+    return {
+      before: `No single change helps: ${joined(loud)} ${loud.length === 1 ? 'is' : 'are'} too loud and ${joined(quiet)} too quiet. Bring them closer in the scene’s levels.`,
+      strong: '',
+      after: '',
+      button: null,
+    }
+  }
+  const { db, states, closest, ceiling } = suggestion
+  const strong = changeWord(db)
+  const button = `Make ${strong}`
+  if (ceiling) {
+    const still = joined(
+      ceiling.still.map(
+        (s, i) => `${s.name}${i === 0 ? ' would still be' : ''} ${s.db.toFixed(1)} dB`,
+      ),
+    )
+    return {
+      before: 'Make the whole scene ',
+      strong,
+      after: ` — as far as it goes before ${ceiling.sound} passes 300%. ${still} too quiet; turn ${ceiling.sound} down or the others up by hand to go further.`,
+      button,
+    }
+  }
+  const every = states === 1 ? 'it' : states === 2 ? 'both states' : 'every state'
+  if (closest) {
+    return {
+      before: `No single change brings ${every} within ± ${Number(tolerance.toFixed(1))} dB: they are ${closest.apart.toFixed(1)} dB apart. `,
+      strong,
+      after: ` comes closest, leaving each ${closest.leaving.toFixed(1)} dB off.`,
+      button,
+    }
+  }
+  return {
+    before: 'Make the whole scene ',
+    strong,
+    after: ` — music and every effect by the same amount — to bring ${every} within the target.`,
+    button,
+  }
 }

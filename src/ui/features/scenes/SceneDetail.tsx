@@ -212,10 +212,13 @@ function EffectRowView({
   around,
   player,
   play,
+  was,
   onChange,
   onRemove,
 }: {
   effect: EffectDraft
+  /** The effect's level before a press of the loudness suggestion, while that is unsaved. */
+  was?: number
   index: number
   around: Around
   player: ScenePlayer
@@ -384,6 +387,7 @@ function EffectRowView({
         <LevelSlider
           label={`Level of ${choice?.name ?? effectName(effect.id)}`}
           level={effect.level}
+          was={was}
           onChange={(level) => {
             player.setLevel(clipId, level)
             onChange({ ...effect, level })
@@ -420,6 +424,7 @@ export function SceneDetail({
   draft,
   player,
   play,
+  was,
   onChange,
 }: {
   scene: SceneRow
@@ -428,6 +433,8 @@ export function SceneDetail({
   draft: SceneDraft
   player: ScenePlayer
   play: ScenePlay
+  /** The scene as saved, while a press of the loudness suggestion is unsaved: its moved levels show as changed. */
+  was?: SceneDraft | null
   onChange: (next: SceneDraft) => void
 }) {
   const around: Around = {
@@ -488,6 +495,7 @@ export function SceneDetail({
             <LevelSlider
               label="Music level"
               level={music.level}
+              was={was?.music.level}
               onChange={(level) => {
                 player.setLevel('music', level)
                 onChange({ ...draft, music: { ...music, level } })
@@ -532,6 +540,7 @@ export function SceneDetail({
                   around={around}
                   player={player}
                   play={play}
+                  was={was?.effects[index]?.level}
                   onChange={(next) =>
                     onChange({
                       ...draft,

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { sameMix } from './sceneEdit'
+import { sameMix, scaleLevel } from './sceneEdit'
 import { SceneMixSchema, type Play, type SceneMix } from './scenes'
 
 /** How much of a scene's sound is measured: a steady-state minute in each state. */
@@ -83,6 +83,38 @@ export function planStateMix(input: {
   return parts
 }
 
+/**
+ * The states, of those measured, in which an effect would sound in the minute, whatever its clip
+ * (a random one counts by its first wait). Mirrors `planStateMix`; empty for one never heard.
+ */
+export function statesPlaying(
+  row: { play: Play; state: string | null },
+  states: (string | null)[],
+): (string | null)[] {
+  const { play } = row
+  const heard =
+    play.mode === 'loop' ||
+    (play.mode === 'random' &&
+      (play.everySeconds[0] + play.everySeconds[1]) / 2 < WINDOW_SECONDS) ||
+    (play.mode === 'once' && play.afterSeconds < WINDOW_SECONDS)
+  return heard ? states.filter((s) => row.state === null || row.state === s) : []
+}
+
+/**
+ * How the note names an effect left out: its id, then "in rainy and storm" when it plays in only
+ * some of the scene's states (listed like a sentence, in the game's order).
+ */
+export function withoutName(
+  id: string,
+  playing: (string | null)[],
+  all: (string | null)[],
+): string {
+  const names = playing.filter((s): s is string => s !== null)
+  if (names.length === 0 || playing.length === all.length) return id
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
+  return `${id} in ${list}`
+}
+
 /** The states a scene is measured in, in the game's order; `null` is a scene that has none. */
 export function sceneStateNames(scene: { states: string[] }): (string | null)[] {
   return scene.states.length > 0 ? scene.states : [null]
@@ -102,6 +134,8 @@ export const SceneMeasureSchema = z.object({
   entry: SceneMixSchema.nullable(),
   /** The clip each sound came from (a take number or the game's file), to tell when one changed. */
   clips: z.record(z.string(), z.string()),
+  /** Set once a scene was saved after "Make … louder / quieter": the figures are then expected ones (measured + db). */
+  moved: z.object({ db: z.number() }).nullable().optional(),
   states: z.array(z.object({ state: z.string().nullable(), lufs: z.number().nullable() })),
   /** What was left out, worded "glass-clink, which has no take chosen". */
   without: z.array(z.string()),
@@ -149,13 +183,21 @@ export function targetLine(target: LoudnessTarget | null): string {
     : 'no target set'
 }
 
+/**
+ * How far a figure is from the target, judged on the figure as shown ("−22.0 LUFS", one decimal):
+ * the figure, the distance and the chip then always agree. Rounded again to shed float noise.
+ */
+function shownOff(lufs: number, target: LoudnessTarget): number {
+  return Number((Number(lufs.toFixed(1)) - target.target).toFixed(1))
+}
+
 /** A state's chip: on target, or how far off, one decimal. Null: nothing to say. */
 export function chipFor(
   lufs: number | null,
   target: LoudnessTarget | null,
 ): { kind: 'on' | 'quiet' | 'loud'; text: string } | null {
   if (lufs === null || !target) return null
-  const off = lufs - target.target
+  const off = shownOff(lufs, target)
   if (Math.abs(off) <= target.tolerance) return { kind: 'on', text: 'on target' }
   const by = Math.abs(off).toFixed(1)
   return off < 0
@@ -190,4 +232,186 @@ export function measureChanged(
   const was = Object.keys(measure.clips)
   const now = Object.keys(scene.clips)
   return was.length !== now.length || was.some((key) => measure.clips[key] !== scene.clips[key])
+}
+
+/** The highest level the mix takes. */
+const MAX_LEVEL = 3
+
+/** A number of dB to one decimal, without a negative zero. */
+function oneDecimal(n: number): number {
+  return Math.round(n * 10) / 10 || 0
+}
+
+/**
+ * The mix with the music and every effect moved by the same `db`: each level times the factor,
+ * to a whole percent, 0% staying 0% and none above 300%.
+ */
+export function scaleMix(mix: SceneMix, db: number): SceneMix {
+  const scale = (level: number) => scaleLevel(level, db)
+  return {
+    ...mix,
+    ...(mix.music ? { music: { ...mix.music, level: scale(mix.music.level) } } : {}),
+    effects: mix.effects.map((e) => ({ ...e, level: scale(e.level) })),
+  }
+}
+
+/** How many dB (one decimal, rounded down) a level can go up before it passes 300%. */
+function roomDb(level: number): number {
+  return Math.floor(20 * Math.log10(MAX_LEVEL / level) * 10) / 10
+}
+
+/** What the panel offers to bring a scene within the target. */
+export type Suggestion =
+  | {
+      kind: 'change'
+      /** dB, one decimal; positive is louder. */
+      db: number
+      /** How many states were measured (the wording says "both", "every" or "it"). */
+      states: number
+      /** No single change fits every state: how far apart they are, and how far the best one leaves each outside the tolerance. */
+      closest: { apart: number; leaving: number } | null
+      /** A level would pass 300%: which sound, and each state still too quiet with how far (dB) it is, in table order ('The scene' when it has none). */
+      ceiling: { sound: string; still: { name: string; db: number }[] } | null
+    }
+  /** States on both sides of the target and the best change under 0.5 dB: nothing to press. */
+  | { kind: 'none'; loud: string[]; quiet: string[] }
+  /** The scene needs to be louder but a sound is within 0.1 dB of 300%: nothing to press, only a reason. */
+  | {
+      kind: 'limit'
+      /** Every sound at the limit, with its level in whole percent; the music is "the music". */
+      sounds: { name: string; level: number }[]
+      /** Every sound that plays is at the limit, so there is nothing to turn up. */
+      every: boolean
+    }
+
+/**
+ * The one change for the whole scene that comes closest to bringing every measured state within the
+ * target, aimed at putting the states' middle on the target (§8.11). Null when there is nothing to
+ * say: no target, nothing off, nothing measured, or the scene could not be measured.
+ */
+export function suggestChange(
+  measure: SceneMeasure,
+  target: LoudnessTarget | null,
+  mix: SceneMix,
+): Suggestion | null {
+  if (!target || measure.error !== null) return null
+  const read = measure.states.flatMap((s) =>
+    s.lufs === null ? [] : [{ name: s.state ?? 'The scene', off: shownOff(s.lufs, target) }],
+  )
+  if (read.length === 0 || read.every((s) => Math.abs(s.off) <= target.tolerance)) return null
+  const low = Math.min(...read.map((s) => s.off))
+  const high = Math.max(...read.map((s) => s.off))
+  let db = oneDecimal(-(low + high) / 2)
+  const loud = read.filter((s) => s.off > target.tolerance).map((s) => s.name)
+  const quiet = read.filter((s) => s.off < -target.tolerance).map((s) => s.name)
+  if (Math.abs(db) < 0.5 && loud.length > 0 && quiet.length > 0)
+    return { kind: 'none', loud, quiet }
+  if (db === 0) return null
+  const apart = high - low
+  const closest =
+    apart > 2 * target.tolerance
+      ? { apart: oneDecimal(apart), leaving: oneDecimal(apart / 2 - target.tolerance) }
+      : null
+  const sounds = [
+    ...(mix.music?.track ? [{ id: mix.music.track, level: mix.music.level }] : []),
+    ...mix.effects.map((e) => ({ id: e.id, level: e.level })),
+  ]
+  const top = sounds.reduce((a, b) => (b.level > a.level ? b : a), { id: '', level: 0 })
+  let ceiling: Extract<Suggestion, { kind: 'change' }>['ceiling'] = null
+  if (db > 0 && top.level > 0) {
+    const room = roomDb(top.level)
+    if (room < db) {
+      if (room < 0.1) {
+        const playing = [
+          ...(mix.music?.track ? [{ name: 'the music', level: mix.music.level }] : []),
+          ...mix.effects.map((e) => ({ name: e.id, level: e.level })),
+        ].filter((x) => x.level > 0)
+        const sounds = playing
+          .filter((x) => roomDb(x.level) < 0.1)
+          .map((x) => ({ name: x.name, level: Math.round(x.level * 100) }))
+        return { kind: 'limit', sounds, every: sounds.length === playing.length }
+      }
+      db = room
+      const still = read
+        .filter((s) => s.off + db < -target.tolerance)
+        .map((s) => ({ name: s.name, db: oneDecimal(-(s.off + db)) }))
+      // Within the tolerance after all: an ordinary change, with nothing left to explain.
+      if (still.length > 0) ceiling = { sound: top.id, still }
+    }
+  }
+  return { kind: 'change', db, states: read.length, closest, ceiling }
+}
+
+/** The measure with every figure moved by `db`; a state that reads nothing stays so. */
+export function shiftStates(measure: SceneMeasure, db: number): SceneMeasure {
+  return {
+    ...measure,
+    states: measure.states.map((s) => ({ ...s, lufs: s.lufs === null ? null : s.lufs + db })),
+  }
+}
+
+/**
+ * Which figures to show for a measure: the `measured` ones, the `expected` ones (the scene is
+ * exactly the measured one moved by `moved.db`), or none that can be trusted (`changed`).
+ */
+export function expectedFigures(
+  measure: SceneMeasure,
+  moved: { db: number } | null | undefined,
+  now: { entry: SceneMix | null; clips: Record<string, string> },
+): 'measured' | 'expected' | 'changed' {
+  if (!measureChanged(measure, now)) return 'measured'
+  if (
+    moved &&
+    now.entry &&
+    measureChanged({ ...measure, entry: movedEntry(measure.entry, moved.db, now.entry) }, now) ===
+      false
+  ) {
+    return 'expected'
+  }
+  return 'changed'
+}
+
+/**
+ * The measured entry moved by `db`, as the page has it: a scene with no entry or no music key
+ * has the page fill in its track (`like`) at 100% before the move.
+ */
+export function movedEntry(entry: SceneMix | null, db: number, like: SceneMix): SceneMix {
+  const moved = scaleMix(entry ?? { effects: [] }, db)
+  // The press leaves a music with no track alone: it has no level to move.
+  if (like.music && like.music.track === null && !entry?.music?.track)
+    return { ...moved, music: like.music }
+  return !moved.music && like.music
+    ? { ...moved, music: { track: like.music.track, level: scaleLevel(1, db) } }
+    : moved
+}
+
+/**
+ * A measuring error cut into pieces, the project paths of the clips it names marked so the panel
+ * can set them in the code font. The two shapes that name clips are the ones the scene audio
+ * service writes ("<tool> could not read <a>, <b>: <why>" and "<a> has no length"); any other
+ * message is one plain piece. The pieces always join back into the message. A file name that
+ * itself holds ", " or ": " is cut at it (the font is wrong, never the words), since the message
+ * carries no other mark.
+ */
+export function splitClipPaths(message: string): { text: string; path: boolean }[] {
+  const read = /^(\S+ could not read )(.+?)(: |$)/.exec(message)
+  if (read) {
+    const lead = read[1]!
+    const rest = message.slice(lead.length + read[2]!.length)
+    const pieces: { text: string; path: boolean }[] = [{ text: lead, path: false }]
+    read[2]!.split(', ').forEach((path, i) => {
+      if (i > 0) pieces.push({ text: ', ', path: false })
+      pieces.push({ text: path, path: true })
+    })
+    if (rest) pieces.push({ text: rest, path: false })
+    return pieces
+  }
+  const tail = ' has no length'
+  if (message.endsWith(tail) && message.length > tail.length) {
+    return [
+      { text: message.slice(0, -tail.length), path: true },
+      { text: tail, path: false },
+    ]
+  }
+  return [{ text: message, path: false }]
 }
