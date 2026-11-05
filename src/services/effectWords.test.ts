@@ -11,8 +11,8 @@ const effects = {
   manifest: 'audio/effects/manifest.json',
 }
 const list = [
-  { id: 'door-creak', description: 'A slow wooden door creaks', seconds: 3 },
-  { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
+  { id: 'door-creak', text: 'A slow wooden door creaks', seconds: 3 },
+  { id: 'coins', text: 'Coins spill on stone', seconds: 0.5 },
 ]
 
 function repo(files: Record<string, unknown> = {}) {
@@ -52,7 +52,7 @@ describe('reading the effects into the summary', () => {
 
   it('shows the readable effects and reports the others', async () => {
     const { file } = repo({
-      'tts/effects.json': [...list, { id: 'Bad', description: 'x', seconds: 1 }],
+      'tts/effects.json': [...list, { id: 'Bad', text: 'x', seconds: 1 }],
     })
     const s = await summary(file)
     expect(s.rows.map((r) => r.id)).toEqual(['door-creak', 'coins'])
@@ -117,7 +117,7 @@ describe('setEffectDescription', () => {
 })
 
 describe('the game rewording an effect you changed', () => {
-  const game = (description: string) => [{ ...list[0]!, description }, list[1]]
+  const game = (text: string) => [{ ...list[0]!, text }, list[1]]
   const mine = { 'door-creak': { words: 'Mine', gameWas: 'A slow wooden door creaks' } }
 
   it('flags it, across reads, until Keep mine', async () => {

@@ -15,6 +15,12 @@ import {
 const door = { id: 'door-creak', description: 'A slow wooden door creaks open', seconds: 3 }
 const coins = { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 }
 
+/** An effect as the game's list writes it: its words are `text`, read as its description. */
+function listed<T extends { description: string }>(effect: T) {
+  const { description, ...rest } = effect
+  return { ...rest, text: description }
+}
+
 describe('effectName and effectSeconds', () => {
   it('makes a readable name from the id', () => {
     expect(effectName('door-creak')).toBe('Door creak')
@@ -31,7 +37,7 @@ describe('effectName and effectSeconds', () => {
 describe('an effect that loops', () => {
   it('reads loops from the game’s list, and a row says it, defaulting to plays once', () => {
     const rain = { id: 'rain', description: 'Steady rain', seconds: 8, loops: true }
-    const read = readEffectEntries([door, rain], 'tts/effects.json')
+    const read = readEffectEntries([listed(door), listed(rain)], 'tts/effects.json')
     expect(read).toMatchObject({ ok: true, effects: [door, rain], problems: [] })
     const summary = summarizeEffects({
       list: {
@@ -48,7 +54,7 @@ describe('an effect that loops', () => {
   })
 
   it('leaves out an entry whose loops is not true or false, naming the place', () => {
-    const read = readEffectEntries([{ ...door, loops: 'yes' }], 'tts/effects.json')
+    const read = readEffectEntries([{ ...listed(door), loops: 'yes' }], 'tts/effects.json')
     expect(read).toMatchObject({
       ok: true,
       effects: [],
@@ -85,7 +91,7 @@ describe('an effect that loops', () => {
 
 describe('readEffectEntries', () => {
   it('reads every entry in the game order', () => {
-    const read = readEffectEntries([door, coins], 'tts/effects.json')
+    const read = readEffectEntries([listed(door), listed(coins)], 'tts/effects.json')
     expect(read).toMatchObject({ ok: true, effects: [door, coins], problems: [], unreadable: 0 })
   })
 
@@ -98,7 +104,7 @@ describe('readEffectEntries', () => {
 
   it('leaves out an entry with a problem and names its file and place', () => {
     const read = readEffectEntries(
-      [door, { id: 'Bad Id', description: 'x', seconds: 2 }, { id: 'wind', seconds: 0 }],
+      [listed(door), { id: 'Bad Id', text: 'x', seconds: 2 }, { id: 'wind', seconds: 0 }],
       'tts/effects.json',
     )
     if (!read.ok) throw new Error('expected a list')
@@ -106,7 +112,7 @@ describe('readEffectEntries', () => {
     expect(read.unreadable).toBe(2)
     expect(read.problems.map((p) => [p.file, p.path])).toEqual([
       ['tts/effects.json', '[1].id'],
-      ['tts/effects.json', '[2].description'],
+      ['tts/effects.json', '[2].text'],
       ['tts/effects.json', '[2].seconds'],
     ])
     // The ids of the entries that failed are known, so their overrides are not taken for dropped.
@@ -114,7 +120,10 @@ describe('readEffectEntries', () => {
   })
 
   it('leaves out both entries of an id used twice', () => {
-    const read = readEffectEntries([door, coins, { ...door, seconds: 4 }], 'tts/effects.json')
+    const read = readEffectEntries(
+      [listed(door), listed(coins), { ...listed(door), seconds: 4 }],
+      'tts/effects.json',
+    )
     if (!read.ok) throw new Error('expected a list')
     expect(read.effects).toEqual([coins])
     expect(read.unreadable).toBe(2)
@@ -125,10 +134,48 @@ describe('readEffectEntries', () => {
   })
 })
 
+describe('the words and the title of an effect', () => {
+  it('reads the game’s text as the effect’s description', () => {
+    const read = readEffectEntries([listed(door)], 'tts/effects.json')
+    expect(read).toMatchObject({ ok: true, effects: [door], problems: [] })
+  })
+
+  it('leaves out an entry that gives its words as description, as before version 2', () => {
+    const read = readEffectEntries([door], 'tts/effects.json')
+    expect(read).toMatchObject({
+      ok: true,
+      effects: [],
+      problems: [{ file: 'tts/effects.json', path: '[0].text' }],
+    })
+  })
+
+  it('reads an optional title and shows it as the effect’s name', () => {
+    const titled = { ...listed(door), title: 'The cellar door' }
+    const read = readEffectEntries([titled, listed(coins)], 'tts/effects.json')
+    if (!read.ok) throw new Error('expected a list')
+    expect(read.effects).toEqual([{ ...door, title: 'The cellar door' }, coins])
+    const summary = summarizeEffects({
+      list: { status: 'ok', ...read },
+      overrides: {},
+      canRefresh: false,
+    })
+    expect(summary.rows.map((r) => r.name)).toEqual(['The cellar door', 'Coins'])
+  })
+
+  it('leaves out an entry with an empty title, naming the place', () => {
+    const read = readEffectEntries([{ ...listed(door), title: '' }], 'tts/effects.json')
+    expect(read).toMatchObject({
+      ok: true,
+      effects: [],
+      problems: [{ file: 'tts/effects.json', path: '[0].title' }],
+    })
+  })
+})
+
 describe('an id used twice with one copy unreadable', () => {
   it('leaves out the readable copy too', () => {
     const read = readEffectEntries(
-      [door, { id: 'door-creak', description: '', seconds: 1 }],
+      [listed(door), { id: 'door-creak', text: '', seconds: 1 }],
       'tts/effects.json',
     )
     if (!read.ok) throw new Error('expected a list')

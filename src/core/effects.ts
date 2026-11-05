@@ -9,18 +9,32 @@ import {
 } from './effectTakes'
 import { problemsFrom, type Problem } from './project'
 
-/** A sound effect as the game lists it. The id names the effect everywhere, so it is a slug. */
-export const EffectEntrySchema = z.object({
-  id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lower-case letters, digits and - only'),
-  description: z.string().min(1),
-  /** How long the effect is, in seconds; set by the game. */
-  seconds: z.number().positive(),
-  /** The effect plays round and round (ambience); absent: it plays once. */
-  loops: z.boolean().optional(),
-})
+/**
+ * A sound effect as the game lists it. The id names the effect everywhere, so it is a slug. Its
+ * words are `text` in the list; the studio calls them the effect's description.
+ */
+export const EffectEntrySchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lower-case letters, digits and - only'),
+    /** What the studio calls the effect; absent, a name is made from the id. */
+    title: z.string().min(1).optional(),
+    /** What the effect sounds like, in the game's words. */
+    text: z.string().min(1),
+    /** How long the effect is, in seconds; set by the game. */
+    seconds: z.number().positive(),
+    /** The effect plays round and round (ambience); absent: it plays once. */
+    loops: z.boolean().optional(),
+  })
+  .transform(({ text, ...rest }): EffectEntry => ({ ...rest, description: text }))
 
-/** A sound effect of the game's list. */
-export type EffectEntry = z.infer<typeof EffectEntrySchema>
+/** A sound effect of the game's list, its words as its description. */
+export interface EffectEntry {
+  id: string
+  title?: string
+  description: string
+  seconds: number
+  loops?: boolean
+}
 
 /** The studio's own words for an effect, with the game's words they were written over. */
 const OwnWords = z.object({ words: z.string().min(1), gameWas: z.string() })
@@ -252,7 +266,7 @@ export function summarizeEffects(input: {
     })
     return {
       id: effect.id,
-      name: effectName(effect.id),
+      name: effect.title ?? effectName(effect.id),
       description,
       gameDescription: effect.description,
       seconds: effect.seconds,

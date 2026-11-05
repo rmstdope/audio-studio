@@ -17,10 +17,10 @@ const effects = {
 }
 
 const LIST = [
-  { id: 'door-creak', description: 'A slow wooden door creaks open', seconds: 3 },
-  { id: 'coins', description: 'Coins spill on stone', seconds: 0.5 },
-  { id: 'thunder', description: 'Thunder rolls', seconds: 4 },
-  { id: 'broken', description: 'fail always', seconds: 1 },
+  { id: 'door-creak', text: 'A slow wooden door creaks open', seconds: 3 },
+  { id: 'coins', text: 'Coins spill on stone', seconds: 0.5 },
+  { id: 'thunder', text: 'Thunder rolls', seconds: 4 },
+  { id: 'broken', text: 'fail always', seconds: 1 },
 ]
 
 /** The studio over a fake generator; `hold` keeps every take waiting until released. */

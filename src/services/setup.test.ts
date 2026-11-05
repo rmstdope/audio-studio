@@ -410,7 +410,7 @@ describe('checkSetup: the sound-effect models', () => {
         ...extra,
       },
     })
-  const listed = [{ id: 'chest-open', description: 'A chest opens', seconds: 2 }]
+  const listed = [{ id: 'chest-open', text: 'A chest opens', seconds: 2 }]
   const row = async (
     machine: Machine,
     downloads: Partial<Record<EffectModelId, ImageDownload>>,
