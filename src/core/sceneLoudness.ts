@@ -324,7 +324,8 @@ export function expectedFigures(
 export function movedEntry(entry: SceneMix | null, db: number, like: SceneMix): SceneMix {
   const moved = scaleMix(entry ?? { effects: [] }, db)
   // The press leaves a music with no track alone: it has no level to move.
-  if (like.music && like.music.track === null) return { ...moved, music: like.music }
+  if (like.music && like.music.track === null && !entry?.music?.track)
+    return { ...moved, music: like.music }
   return !moved.music && like.music
     ? { ...moved, music: { track: like.music.track, level: scaleLevel(1, db) } }
     : moved

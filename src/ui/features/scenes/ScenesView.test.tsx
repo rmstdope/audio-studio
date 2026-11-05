@@ -1937,6 +1937,27 @@ describe('the loudness suggestion', () => {
     expect(text(panel(page))).toContain('The scene changed since it was measured.')
   })
 
+  it('leaves the header alone for a hand edit on a measure nothing was pressed on', async () => {
+    const page = render(open, withMeasure(saved()))
+    await drag(page, '50')
+    expect(text(panel(page).querySelector('h2'))).not.toContain('changed since measured')
+  })
+
+  it('drops the amber marks once an effect is removed after a press', async () => {
+    const page = render(open, withMeasure(saved()))
+    await press(page, 'Make 4.0 dB louder')
+    const remove = page.querySelector('button[aria-label^="Remove"]') as HTMLButtonElement
+    await act(async () => remove.click())
+    expect(page.querySelectorAll('.scene-level-moved').length).toBe(0)
+  })
+
+  it('tells a screen reader what a moved level was', async () => {
+    const page = render(open, withMeasure(saved()))
+    await press(page, 'Make 4.0 dB louder')
+    const slider = page.querySelector('input[type="range"]') as HTMLInputElement
+    expect(slider.getAttribute('aria-valuetext')).toBe('158% (was 100%)')
+  })
+
   it('shows the levels the press moved as changed, and not once discarded', async () => {
     const page = render(open, withMeasure(saved()))
     await press(page, 'Make 4.0 dB louder')
