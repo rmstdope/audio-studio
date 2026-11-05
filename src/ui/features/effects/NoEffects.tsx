@@ -2,10 +2,9 @@ import { useState } from 'react'
 
 /** The example `effects` section the page shows under "How to set it up". */
 const EXAMPLE = `"effects": {
-  "refresh": "node tts/extract-effects.js",
-  "paths": {
-    "list": "tts/effects.json"
-  }
+  "from": { "shared": "tts/effects.json" },
+  "clips": "web/public/audio/effects",
+  "manifest": "web/public/audio/effects/manifest.json"
 }`
 
 /** Sound effects in a project whose file has no `effects` section: what to add, with an example. */

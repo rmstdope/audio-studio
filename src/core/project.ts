@@ -259,25 +259,31 @@ const ImagesSchema = z.object({
   manifest: imagesPath,
 })
 
-/** The optional `effects` section: where the game lists its sound effects, and the command that writes the list. */
+/** A sound effects path: the same in every part and every language, so it has neither placeholder. */
+const effectsPath = z
+  .string()
+  .min(1)
+  .refine((path) => !path.includes('{language}') && !path.includes('{part}'), {
+    error: 'must not contain {language} or {part}: sound effects are for the whole game',
+  })
+
+/**
+ * The optional `effects` section: where the game lists its sound effects, the model, and where the
+ * chosen takes go. The studio's changes are in its edits, the chosen takes in its lock, both at
+ * fixed places in the studio folder.
+ */
 const EffectsSchema = z.object({
+  /** The game's list. */
+  from: z.object({
+    /** The game's one list of sound effects, written by the game and read only. */
+    shared: effectsPath,
+  }),
   /** The effects model new takes are made with unless an effect asks for the other; absent is Small SFX. */
   model: z.enum(EFFECT_MODEL_IDS).optional(),
-  paths: z.object({
-    /** The game's one list of sound effects, written by the game and read only. */
-    list: z
-      .string()
-      .min(1)
-      .refine((path) => !path.includes('{language}') && !path.includes('{part}'), {
-        error: 'must not contain {language} or {part}: sound effects are for the whole game',
-      }),
-    /** The effects lock, kept in the repository: the chosen take of each effect. */
-    lock: z.string().min(1),
-    /** The folder of the chosen effects' clips, which the game plays. */
-    clips: z.string().min(1),
-    /** The manifest in the clips folder, which the game reads: `{ effect: { file, duration } }`. */
-    manifest: z.string().min(1),
-  }),
+  /** The folder of the chosen effects' clips, which the game plays. */
+  clips: effectsPath,
+  /** The manifest in the clips folder, which the game reads: `{ effect: { file, duration } }`. */
+  manifest: effectsPath,
 })
 
 /** A scenes path: one file per act, the same in every language. */
@@ -520,6 +526,15 @@ export const IMAGES_EDITS_FILE = `${IMAGES_DIR}/edits.json`
 
 /** The chosen take of each image, and what it was made from. */
 export const IMAGES_LOCK_FILE = `${IMAGES_DIR}/lock.json`
+
+/** Sound effects' folder in the studio folder: the edits and the lock of every effect. */
+export const EFFECTS_DIR = `${STUDIO_DIR}/effects`
+
+/** The studio's changes to the game's sound effects, by effect id. */
+export const EFFECTS_EDITS_FILE = `${EFFECTS_DIR}/edits.json`
+
+/** The chosen take of each sound effect, and what it was made from. */
+export const EFFECTS_LOCK_FILE = `${EFFECTS_DIR}/lock.json`
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */
 export interface Problem {

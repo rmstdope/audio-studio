@@ -11,12 +11,9 @@ import type { ImageDownload } from '../core/imageModels'
 import { createSerial } from './serial'
 
 const effects = {
-  paths: {
-    list: 'tts/effects.json',
-    lock: 'audio/effects.lock.json',
-    clips: 'audio/effects',
-    manifest: 'audio/effects/manifest.json',
-  },
+  from: { shared: 'tts/effects.json' },
+  clips: 'audio/effects',
+  manifest: 'audio/effects/manifest.json',
 }
 
 const LIST = [

@@ -291,12 +291,9 @@ describe('refreshing the sound effects', () => {
       'content-studio.json': projectJson({
         refresh: { shared },
         effects: {
-          paths: {
-            list: 'tts/effects.json',
-            lock: 'audio/effects.lock.json',
-            clips: 'audio/effects',
-            manifest: 'audio/effects/manifest.json',
-          },
+          from: { shared: 'tts/effects.json' },
+          clips: 'audio/effects',
+          manifest: 'audio/effects/manifest.json',
         },
       }),
       'tts/.keep': '',
@@ -384,12 +381,9 @@ describe('the one shared command', () => {
           manifest: 'audio/music/manifest.json',
         },
         effects: {
-          paths: {
-            list: 'tts/effects.json',
-            lock: 'audio/effects.lock.json',
-            clips: 'audio/effects',
-            manifest: 'audio/effects/manifest.json',
-          },
+          from: { shared: 'tts/effects.json' },
+          clips: 'audio/effects',
+          manifest: 'audio/effects/manifest.json',
         },
       }),
       'tts/.keep': '',

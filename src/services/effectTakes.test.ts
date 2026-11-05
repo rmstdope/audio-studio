@@ -14,12 +14,9 @@ import type { EffectHealthStore } from './effectHealth'
 import { createSerial, type Serial } from './serial'
 
 const effects = {
-  paths: {
-    list: 'tts/effects.json',
-    lock: 'audio/effects.lock.json',
-    clips: 'audio/effects',
-    manifest: 'audio/effects/manifest.json',
-  },
+  from: { shared: 'tts/effects.json' },
+  clips: 'audio/effects',
+  manifest: 'audio/effects/manifest.json',
 }
 
 /** A generator that makes a tone `length` seconds long (shorter than asked, as the model does), and fails for a description saying "fail". */
@@ -137,7 +134,7 @@ describe('createEffectTakes', () => {
 
   it('makes takes from the studio’s own words when they are in use', async () => {
     const { file, takes, requests, settled } = setup(undefined, undefined, {
-      'content-studio/cache/effects.json': {
+      'content-studio/effects/edits.json': {
         coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' },
       },
     })
@@ -330,7 +327,7 @@ describe('createEffectTakes', () => {
     const view = await settled('door-creak')
     expect(await takes.choose(file, 'door-creak', view.takes[1]!.file)).toEqual({ ok: true })
     expect(readFileSync(join(root, 'audio/effects/door-creak.mp3'), 'utf8')).toBe('mp3')
-    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
     expect(lock['door-creak']).toMatchObject({ take: 2, model: 'small-sfx', seed: 101 })
     expect(JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))).toEqual({
       'door-creak': { file: 'door-creak.mp3', duration: 1.4 },
@@ -377,7 +374,7 @@ describe('createEffectTakes', () => {
 
   it('refuses to drop while the lock cannot be read, and shows the lock as unread', async () => {
     const { file, takes, settled } = setup(undefined, undefined, {
-      'audio/effects.lock.json': '{ nope',
+      'content-studio/effects/lock.json': '{ nope',
     })
     await takes.make(file, 'coins', { count: 1 })
     const view = await settled('coins')
@@ -407,13 +404,15 @@ describe('createEffectTakes', () => {
     await takes.make(file, 'coins', { count: 1 })
     const view = await settled('coins')
     await takes.choose(file, 'coins', view.takes[0]!.file)
+    const edits = join(root, 'content-studio/effects/edits.json')
+    mkdirSync(dirname(edits), { recursive: true })
     writeFileSync(
-      join(root, 'content-studio/cache/effects.json'),
+      edits,
       JSON.stringify({ coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
     )
     expect(await takes.accept(file, 'coins')).toEqual({ ok: true })
     expect(
-      JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8')).coins.inputs,
+      JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8')).coins.inputs,
     ).toEqual({
       description: 'Coins on glass',
       seconds: 0.5,
@@ -440,8 +439,10 @@ describe('createEffectTakes', () => {
     const { root, file, takes, settled } = setup()
     await takes.make(file, 'coins', { count: 1 })
     await settled('coins')
+    const edits = join(root, 'content-studio/effects/edits.json')
+    mkdirSync(dirname(edits), { recursive: true })
     writeFileSync(
-      join(root, 'content-studio/cache/effects.json'),
+      edits,
       JSON.stringify({ coins: { words: 'Coins on glass', gameWas: 'Coins spill on stone' } }),
     )
     await takes.make(file, 'coins', { count: 1 })
@@ -668,7 +669,7 @@ describe('takes of an effect that loops', () => {
       [2, false],
     ])
     expect(await takes.choose(file, 'rain', view.takes[1]!.file)).toEqual({ ok: true })
-    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
     expect(lock.rain.inputs.loops).toBeUndefined()
     expect(lock.rain.take).toBe(2)
   })
@@ -678,7 +679,7 @@ describe('takes of an effect that loops', () => {
     await takes.make(file, 'rain', { count: 1 })
     const first = (await settled('rain')).takes[0]!
     await takes.choose(file, 'rain', first.file)
-    const lock = JSON.parse(readFileSync(join(root, 'audio/effects.lock.json'), 'utf8'))
+    const lock = JSON.parse(readFileSync(join(root, 'content-studio/effects/lock.json'), 'utf8'))
     expect(lock.rain.inputs).toEqual({ description: rain.description, seconds: 10, loops: true })
     const manifest = JSON.parse(readFileSync(join(root, 'audio/effects/manifest.json'), 'utf8'))
     expect(manifest.rain.duration).toBe(10)

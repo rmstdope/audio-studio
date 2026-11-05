@@ -404,12 +404,9 @@ describe('checkSetup: the sound-effect models', () => {
   const effectsProject = (extra: Record<string, unknown> = {}) =>
     projectJson({
       effects: {
-        paths: {
-          list: 'tts/effects.json',
-          lock: 'audio/effects.lock.json',
-          clips: 'audio/effects',
-          manifest: 'audio/effects/manifest.json',
-        },
+        from: { shared: 'tts/effects.json' },
+        clips: 'audio/effects',
+        manifest: 'audio/effects/manifest.json',
         ...extra,
       },
     })

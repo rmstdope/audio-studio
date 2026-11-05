@@ -14,7 +14,7 @@ import {
   type EffectManifest,
 } from '../core/effectTakes'
 import { resolveInRoot } from '../core/paths'
-import type { EffectsConfig, Problem } from '../core/project'
+import { EFFECTS_LOCK_FILE, type EffectsConfig, type Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import type { Encoder } from './audio'
 import { formatEntriesPerLine, listFiles, readResource, writeAtomic } from './files'
@@ -24,12 +24,8 @@ import { choices, sorted, type CommitResult } from './musicClips'
 export const EFFECT_OUTPUT = { bitrate: '160k', channels: 2 } as const
 
 /** The effects lock as it is now: empty if there is none; null (with the problems added) if broken. */
-async function lockNow(
-  root: string,
-  effects: EffectsConfig,
-  problems: Problem[],
-): Promise<EffectLock | null> {
-  const read = await readResource(root, effects.paths.lock, EffectLockSchema, problems)
+async function lockNow(root: string, problems: Problem[]): Promise<EffectLock | null> {
+  const read = await readResource(root, EFFECTS_LOCK_FILE, EffectLockSchema, problems)
   return read === 'invalid' ? null : read === 'missing' ? {} : read
 }
 
@@ -39,7 +35,7 @@ async function manifestNow(
   effects: EffectsConfig,
   problems: Problem[],
 ): Promise<EffectManifest | null> {
-  const read = await readResource(root, effects.paths.manifest, EffectManifestSchema, problems)
+  const read = await readResource(root, effects.manifest, EffectManifestSchema, problems)
   return read === 'invalid' ? null : read === 'missing' ? {} : read
 }
 
@@ -52,9 +48,9 @@ export async function readEffectChosen(
   effects: EffectsConfig,
   problems: Problem[],
 ): Promise<Record<string, { lock: EffectLockEntry; fileExists: boolean }> | null> {
-  const lock = await lockNow(root, effects, problems)
+  const lock = await lockNow(root, problems)
   if (!lock) return null
-  const files = await listFiles(resolveInRoot(root, effects.paths.clips))
+  const files = await listFiles(resolveInRoot(root, effects.clips))
   return Object.fromEntries(
     Object.entries(lock).map(([id, entry]) => [
       id,
@@ -100,8 +96,8 @@ export async function commitEffect({
   now?: () => Date
 }): Promise<CommitResult> {
   const file = `${id}.mp3`
-  const target = resolveInRoot(root, join(effects.paths.clips, file))
-  const temporary = resolveInRoot(root, join(effects.paths.clips, `.${id}.${randomUUID()}.mp3`))
+  const target = resolveInRoot(root, join(effects.clips, file))
+  const temporary = resolveInRoot(root, join(effects.clips, `.${id}.${randomUUID()}.mp3`))
   try {
     await encode(wav, temporary, EFFECT_OUTPUT)
   } catch (error) {
@@ -112,7 +108,7 @@ export async function commitEffect({
     return await choices().run(turn(projectFile), async (): Promise<CommitResult> => {
       const found: Problem[] = []
       const manifest = await manifestNow(root, effects, found)
-      const lock = await lockNow(root, effects, found)
+      const lock = await lockNow(root, found)
       if (!manifest || !lock) {
         const unread = !manifest ? 'manifest' : 'lock'
         const message = `Take ${take.n} could not be chosen: the sound effects ${unread} could not be read.`
@@ -132,8 +128,8 @@ export async function commitEffect({
         at: now().toISOString(),
       }
       await rename(temporary, target)
-      await writeAtomic(root, effects.paths.manifest, `${pythonJson(sorted(manifest))}\n`)
-      await writeAtomic(root, effects.paths.lock, formatEntriesPerLine(sorted(lock)))
+      await writeAtomic(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
+      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEntriesPerLine(sorted(lock)))
       return { ok: true }
     })
   } catch (error) {
@@ -165,17 +161,17 @@ export async function uncommitEffect({
     return await choices().run(turn(projectFile), async (): Promise<CommitResult> => {
       const found: Problem[] = []
       const manifest = await manifestNow(root, effects, found)
-      const lock = await lockNow(root, effects, found)
+      const lock = await lockNow(root, found)
       if (!manifest) return { ok: false, message: 'The sound effects manifest could not be read.' }
       if (!lock) return { ok: false, message: 'The sound effects lock could not be read.' }
       if (!(id in lock)) return { ok: false, message: 'No take is chosen for this effect.' }
       if (id in manifest) {
         delete manifest[id]
-        await writeAtomic(root, effects.paths.manifest, `${pythonJson(sorted(manifest))}\n`)
+        await writeAtomic(root, effects.manifest, `${pythonJson(sorted(manifest))}\n`)
       }
-      await rm(resolveInRoot(root, join(effects.paths.clips, `${id}.mp3`)), { force: true })
+      await rm(resolveInRoot(root, join(effects.clips, `${id}.mp3`)), { force: true })
       delete lock[id]
-      await writeAtomic(root, effects.paths.lock, formatEntriesPerLine(sorted(lock)))
+      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEntriesPerLine(sorted(lock)))
       return { ok: true }
     })
   } catch (error) {
@@ -191,20 +187,18 @@ export async function uncommitEffect({
 export async function acceptEffect({
   root,
   projectFile = root,
-  effects,
   id,
   now,
 }: {
   root: string
   projectFile?: string
-  effects: EffectsConfig
   id: string
   /** The effect's inputs now. */
   now: EffectInputs
 }): Promise<CommitResult> {
   try {
     return await choices().run(turn(projectFile), async (): Promise<CommitResult> => {
-      const lock = await lockNow(root, effects, [])
+      const lock = await lockNow(root, [])
       if (!lock) return { ok: false, message: 'The sound effects lock could not be read.' }
       const entry = lock[id]
       if (!entry) return { ok: false, message: 'No take is chosen for this effect.' }
@@ -221,7 +215,7 @@ export async function acceptEffect({
         }
       }
       lock[id] = { ...entry, inputs: { ...entry.inputs, description: now.description } }
-      await writeAtomic(root, effects.paths.lock, formatEntriesPerLine(sorted(lock)))
+      await writeAtomic(root, EFFECTS_LOCK_FILE, formatEntriesPerLine(sorted(lock)))
       return { ok: true }
     })
   } catch (error) {

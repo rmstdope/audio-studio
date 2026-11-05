@@ -25,7 +25,7 @@ export type EffectEntry = z.infer<typeof EffectEntrySchema>
 /** The studio's own words for an effect, with the game's words they were written over. */
 const OwnWords = z.object({ words: z.string().min(1), gameWas: z.string() })
 
-/** `content-studio/cache/effects.json`: the studio's own descriptions, by effect id. */
+/** `content-studio/effects/edits.json`: the studio's own descriptions, by effect id. */
 export const EffectOverridesSchema = z.record(z.string(), OwnWords)
 
 /** The studio's own descriptions, by effect id. */
