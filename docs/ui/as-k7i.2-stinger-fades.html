@@ -1,0 +1,1854 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Fades — every state</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --glass: rgb(255 255 255/3.5%);
+        --glass-strong: rgb(255 255 255/6%);
+        --edge: rgb(255 255 255/8%);
+        --accent-grad: linear-gradient(135deg, #ff7a3d, #ff4f8b);
+        --accent-glow: 0 8px 24px rgb(255 90 100/30%);
+        --raised: #191c24;
+        --inset: #0d0f14;
+        --panel: #10121a;
+        --line: rgb(255 255 255/7%);
+        --line-strong: rgb(255 255 255/11%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --accent-ink: #1a0a02;
+        --ok-bg: #10291f;
+        --ok-ink: #5be3ae;
+        --warn: #ffc24b;
+        --warn-bg: #2d2412;
+        --danger-bg: #2e1720;
+        --danger-ink: #ff94a8;
+        --kept-bg: #0f1a16;
+        --kept-line: #1f5a40;
+        --info: #7aa7ff;
+        --font: 'Geist', system-ui, -apple-system, sans-serif;
+        --mono: 'Geist Mono', ui-monospace, Menlo, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(900px 600px at 90% -10%, rgb(255 90 120/14%), transparent 60%), var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 16px 80px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .note {
+        max-width: 980px;
+        margin: 16px auto 0;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: #142033;
+        color: #cfe0ff;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .note b {
+        color: #fff;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 0;
+      }
+      h2 {
+        font-size: 16px;
+        margin: 0;
+      }
+      .crumb {
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .panel {
+        padding: 20px 22px;
+        border-radius: 20px;
+        background: var(--glass);
+        border: 1px solid var(--edge);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .muted {
+        color: var(--faint);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .grow {
+        flex: 1;
+      }
+      .mono {
+        font-family: var(--mono);
+      }
+      .btn {
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 14px;
+        border-radius: 11px;
+        border: 1px solid var(--edge);
+        background: var(--glass);
+        color: var(--text);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn-primary {
+        background: var(--accent-grad);
+        border-color: transparent;
+        color: var(--accent-ink);
+        font-weight: 600;
+        box-shadow: var(--accent-glow);
+      }
+      .btn-ghost {
+        background: transparent;
+        border-color: transparent;
+        color: var(--muted);
+      }
+      .btn-small {
+        min-height: 28px;
+        padding: 0 8px;
+        font-size: 12px;
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+      .chip {
+        font-size: 11.5px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--glass-strong);
+        color: var(--muted);
+      }
+      .chip-ok {
+        background: var(--ok-bg);
+        color: var(--ok-ink);
+      }
+      .chip-fade {
+        background: #142033;
+        color: #8fb5ff;
+      }
+      .takes-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .takes-head h2 {
+        flex: 1;
+      }
+      select {
+        font: inherit;
+        font-size: 13px;
+        color: var(--text);
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        min-height: 36px;
+        padding: 0 10px;
+      }
+      .takes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      @media (max-width: 700px) {
+        .takes {
+          grid-template-columns: 1fr;
+        }
+      }
+      .take {
+        background: var(--raised);
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+      }
+      .take.editing {
+        border-color: #2a3f66;
+        box-shadow: 0 0 0 1px #2a3f66;
+      }
+      .take-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .play {
+        width: 28px;
+        height: 28px;
+        border-radius: 99px;
+        border: 1px solid var(--line-strong);
+        background: var(--panel);
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        flex: none;
+      }
+      .wave {
+        position: relative;
+        flex: 1;
+        height: 34px;
+        min-width: 80px;
+        display: flex;
+        align-items: center;
+        gap: 1px;
+      }
+      .wave-big {
+        flex: none;
+        height: 80px;
+        background: var(--inset);
+        border-radius: 8px;
+        padding: 0 6px;
+      }
+      .wave i {
+        flex: 1;
+        min-width: 1px;
+        height: 100%;
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .wave i span {
+        display: block;
+        width: 100%;
+        background: var(--faint);
+        border-radius: 1px;
+        position: relative;
+        z-index: 1;
+      }
+      .wave i b {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgb(255 255 255/7%);
+        border-radius: 1px;
+      }
+      .wave .env {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .wave-big .env {
+        inset: 4px 6px;
+        width: calc(100% - 12px);
+        height: calc(100% - 8px);
+      }
+      .wave .env polyline {
+        fill: none;
+        stroke: #8fb5ff;
+        stroke-width: 1.5;
+        vector-effect: non-scaling-stroke;
+      }
+      .wave .handle {
+        position: absolute;
+        top: -2px;
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        background: #8fb5ff;
+        border: 2px solid #06070c;
+        z-index: 3;
+        cursor: ew-resize;
+      }
+      .wave-big .handle {
+        top: -1px;
+      }
+      .wave .playhead {
+        position: absolute;
+        top: -3px;
+        bottom: -3px;
+        width: 2px;
+        background: var(--text);
+        z-index: 4;
+      }
+      .in-game {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--kept-bg);
+        border: 1px solid var(--kept-line);
+      }
+      .in-game-label {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--ok-ink);
+      }
+      .field {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .field input[type='number'] {
+        width: 64px;
+        font: inherit;
+        font-size: 13px;
+        color: var(--text);
+        background: var(--inset);
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        min-height: 30px;
+        padding: 0 8px;
+      }
+      .field input:disabled {
+        opacity: 0.5;
+      }
+      .fades {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        align-items: center;
+      }
+      .editor {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-top: 8px;
+        border-top: 1px solid var(--line);
+      }
+      .errline {
+        color: var(--danger-ink);
+        font-size: 12px;
+      }
+      .statehead {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin-top: 18px;
+      }
+      .dialog-back {
+        position: relative;
+        border-radius: 16px;
+        background: rgb(0 0 0/55%);
+        padding: 28px 16px;
+        display: flex;
+        justify-content: center;
+      }
+      .dialog {
+        width: min(560px, 100%);
+        background: #141720;
+        border: 1px solid var(--line-strong);
+        border-radius: 16px;
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        box-shadow: 0 20px 60px rgb(0 0 0/60%);
+      }
+      .dialog-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="note">
+      <b
+        >Every state of the agreed fade editor (Option A, with the chosen take saving straight into
+        the game and a Shape menu).</b
+      >
+      Words in grey under each heading describe what happens. Everything inside the cards is shown
+      exactly as it would appear.
+    </div>
+    <main>
+      <div class="crumb">Music › Stingers</div>
+      <h1>Victory fanfare</h1>
+      <div class="statehead">1 · At rest: what a take says about its fades</div>
+      <div class="faint small">
+        No fades says nothing. One fade or both: one line under the waveform, which shows the fade
+        line.
+      </div>
+      <div class="takes">
+        <div class="take">
+          <div class="take-row"><b class="grow">Take 2</b></div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="take-row">
+            <span class="play">▶</span>
+            <div class="wave">
+              <i><span style="height: 4%"></span><b style="height: 8%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 8%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 70%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 81%"></span></i><i><span style="height: 82%"></span></i
+              ><i><span style="height: 71%"></span></i><i><span style="height: 78%"></span></i
+              ><i><span style="height: 77%"></span></i><i><span style="height: 75%"></span></i
+              ><i><span style="height: 63%"></span></i><i><span style="height: 69%"></span></i
+              ><i><span style="height: 67%"></span></i><i><span style="height: 73%"></span></i
+              ><i><span style="height: 79%"></span></i><i><span style="height: 76%"></span></i
+              ><i><span style="height: 65%"></span></i><i><span style="height: 62%"></span></i
+              ><i><span style="height: 57%"></span></i><i><span style="height: 51%"></span></i
+              ><i><span style="height: 50%"></span></i><i><span style="height: 57%"></span></i
+              ><i><span style="height: 53%"></span></i><i><span style="height: 53%"></span></i
+              ><i><span style="height: 62%"></span></i><i><span style="height: 54%"></span></i
+              ><i><span style="height: 53%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 41%"></span></i><i><span style="height: 45%"></span></i
+              ><i><span style="height: 41%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 52%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 37%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 43%"></span></i><i><span style="height: 41%"></span></i
+              ><i><span style="height: 42%"></span></i><i><span style="height: 38%"></span></i
+              ><i><span style="height: 37%"></span><b style="height: 37%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 31%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 36%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 35%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 23%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 28%"></b></i
+              ><i><span style="height: 16%"></span><b style="height: 24%"></b></i
+              ><i><span style="height: 15%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 13%"></span><b style="height: 22%"></b></i
+              ><i><span style="height: 13%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 19%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 19%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 5%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 11%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline points="0,100 7.1,0 64.3,0 100,100" />
+              </svg>
+            </div>
+            <span class="faint small">0:04</span>
+          </div>
+          <span class="faint small">Fades in 0.3 s · out 1.5 s · smooth</span>
+          <div class="take-row">
+            <button class="btn btn-small">Fades…</button><span class="grow"></span
+            ><button class="btn btn-ghost btn-small">Move…</button
+            ><button class="btn btn-ghost btn-small">Drop</button
+            ><button class="btn btn-small">Choose</button>
+          </div>
+        </div>
+        <div class="take">
+          <div class="take-row"><b class="grow">Take 4</b></div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="take-row">
+            <span class="play">▶</span>
+            <div class="wave">
+              <i><span style="height: 6%"></span></i><i><span style="height: 6%"></span></i
+              ><i><span style="height: 7%"></span></i><i><span style="height: 45%"></span></i
+              ><i><span style="height: 53%"></span></i><i><span style="height: 72%"></span></i
+              ><i><span style="height: 89%"></span></i><i><span style="height: 85%"></span></i
+              ><i><span style="height: 82%"></span></i><i><span style="height: 67%"></span></i
+              ><i><span style="height: 74%"></span></i><i><span style="height: 66%"></span></i
+              ><i><span style="height: 62%"></span></i><i><span style="height: 60%"></span></i
+              ><i><span style="height: 61%"></span></i><i><span style="height: 77%"></span></i
+              ><i><span style="height: 73%"></span></i><i><span style="height: 71%"></span></i
+              ><i><span style="height: 70%"></span></i><i><span style="height: 55%"></span></i
+              ><i><span style="height: 57%"></span></i><i><span style="height: 62%"></span></i
+              ><i><span style="height: 63%"></span></i><i><span style="height: 64%"></span></i
+              ><i><span style="height: 63%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 55%"></span></i><i><span style="height: 55%"></span></i
+              ><i><span style="height: 51%"></span></i><i><span style="height: 44%"></span></i
+              ><i><span style="height: 48%"></span></i><i><span style="height: 40%"></span></i
+              ><i><span style="height: 53%"></span></i><i><span style="height: 50%"></span></i
+              ><i><span style="height: 44%"></span></i><i><span style="height: 39%"></span></i
+              ><i><span style="height: 46%"></span></i><i><span style="height: 40%"></span></i
+              ><i><span style="height: 43%"></span></i><i><span style="height: 41%"></span></i
+              ><i><span style="height: 35%"></span></i
+              ><i><span style="height: 32%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 32%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 27%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 22%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 21%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 23%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 16%"></span><b style="height: 22%"></b></i
+              ><i><span style="height: 14%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 15%"></span><b style="height: 24%"></b></i
+              ><i><span style="height: 12%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 11%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 19%"></b></i
+              ><i><span style="height: 8%"></span><b style="height: 16%"></b></i
+              ><i><span style="height: 8%"></span><b style="height: 19%"></b></i
+              ><i><span style="height: 5%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 10%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline points="0,0 0,0 64.3,0 100,100" />
+              </svg>
+            </div>
+            <span class="faint small">0:04</span>
+          </div>
+          <span class="faint small">Fade out 1.5 s · straight</span>
+          <div class="take-row">
+            <button class="btn btn-small">Fades…</button><span class="grow"></span
+            ><button class="btn btn-ghost btn-small">Move…</button
+            ><button class="btn btn-ghost btn-small">Drop</button
+            ><button class="btn btn-small">Choose</button>
+          </div>
+        </div>
+        <div class="take">
+          <div class="take-row"><b class="grow">Take 5</b></div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="take-row">
+            <span class="play">▶</span>
+            <div class="wave">
+              <i><span style="height: 4%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 8%"></span></i><i><span style="height: 59%"></span></i
+              ><i><span style="height: 69%"></span></i><i><span style="height: 86%"></span></i
+              ><i><span style="height: 65%"></span></i><i><span style="height: 76%"></span></i
+              ><i><span style="height: 87%"></span></i><i><span style="height: 78%"></span></i
+              ><i><span style="height: 83%"></span></i><i><span style="height: 62%"></span></i
+              ><i><span style="height: 70%"></span></i><i><span style="height: 63%"></span></i
+              ><i><span style="height: 69%"></span></i><i><span style="height: 69%"></span></i
+              ><i><span style="height: 54%"></span></i><i><span style="height: 58%"></span></i
+              ><i><span style="height: 58%"></span></i><i><span style="height: 71%"></span></i
+              ><i><span style="height: 66%"></span></i><i><span style="height: 52%"></span></i
+              ><i><span style="height: 64%"></span></i><i><span style="height: 50%"></span></i
+              ><i><span style="height: 58%"></span></i><i><span style="height: 47%"></span></i
+              ><i><span style="height: 44%"></span></i><i><span style="height: 59%"></span></i
+              ><i><span style="height: 45%"></span></i><i><span style="height: 44%"></span></i
+              ><i><span style="height: 56%"></span></i><i><span style="height: 53%"></span></i
+              ><i><span style="height: 42%"></span></i><i><span style="height: 51%"></span></i
+              ><i><span style="height: 44%"></span></i><i><span style="height: 44%"></span></i
+              ><i><span style="height: 36%"></span></i><i><span style="height: 45%"></span></i
+              ><i><span style="height: 40%"></span></i><i><span style="height: 42%"></span></i
+              ><i><span style="height: 40%"></span></i><i><span style="height: 31%"></span></i
+              ><i><span style="height: 31%"></span></i><i><span style="height: 28%"></span></i
+              ><i><span style="height: 26%"></span></i><i><span style="height: 24%"></span></i
+              ><i><span style="height: 25%"></span></i><i><span style="height: 27%"></span></i
+              ><i><span style="height: 20%"></span></i><i><span style="height: 24%"></span></i
+              ><i><span style="height: 20%"></span></i><i><span style="height: 19%"></span></i
+              ><i><span style="height: 21%"></span></i><i><span style="height: 17%"></span></i
+              ><i><span style="height: 15%"></span></i><i><span style="height: 14%"></span></i
+              ><i><span style="height: 14%"></span></i><i><span style="height: 10%"></span></i
+              ><i><span style="height: 6%"></span></i><i><span style="height: 6%"></span></i
+              ><i><span style="height: 6%"></span></i><i><span style="height: 6%"></span></i
+              ><i><span style="height: 6%"></span></i><i><span style="height: 6%"></span></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline points="0,100 2.4,0 100,0" />
+              </svg>
+            </div>
+            <span class="faint small">0:04</span>
+          </div>
+          <span class="faint small">Fade in 0.1 s · smooth</span>
+          <div class="take-row">
+            <button class="btn btn-small">Fades…</button><span class="grow"></span
+            ><button class="btn btn-ghost btn-small">Move…</button
+            ><button class="btn btn-ghost btn-small">Drop</button
+            ><button class="btn btn-small">Choose</button>
+          </div>
+        </div>
+        <div class="take">
+          <div class="take-row"><b class="grow">Take 6</b></div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="take-row">
+            <span class="play">▶</span>
+            <div class="wave">
+              <i><span style="height: 8%"></span></i><i><span style="height: 8%"></span></i
+              ><i><span style="height: 7%"></span></i><i><span style="height: 47%"></span></i
+              ><i><span style="height: 52%"></span></i><i><span style="height: 79%"></span></i
+              ><i><span style="height: 77%"></span></i><i><span style="height: 84%"></span></i
+              ><i><span style="height: 72%"></span></i><i><span style="height: 81%"></span></i
+              ><i><span style="height: 67%"></span></i><i><span style="height: 79%"></span></i
+              ><i><span style="height: 76%"></span></i><i><span style="height: 67%"></span></i
+              ><i><span style="height: 69%"></span></i><i><span style="height: 71%"></span></i
+              ><i><span style="height: 59%"></span></i><i><span style="height: 66%"></span></i
+              ><i><span style="height: 70%"></span></i><i><span style="height: 57%"></span></i
+              ><i><span style="height: 67%"></span></i><i><span style="height: 63%"></span></i
+              ><i><span style="height: 65%"></span></i><i><span style="height: 54%"></span></i
+              ><i><span style="height: 48%"></span></i><i><span style="height: 60%"></span></i
+              ><i><span style="height: 59%"></span></i><i><span style="height: 51%"></span></i
+              ><i><span style="height: 43%"></span></i><i><span style="height: 44%"></span></i
+              ><i><span style="height: 50%"></span></i><i><span style="height: 43%"></span></i
+              ><i><span style="height: 53%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 38%"></span></i><i><span style="height: 44%"></span></i
+              ><i><span style="height: 38%"></span></i><i><span style="height: 45%"></span></i
+              ><i><span style="height: 43%"></span></i><i><span style="height: 37%"></span></i
+              ><i><span style="height: 37%"></span></i><i><span style="height: 36%"></span></i
+              ><i><span style="height: 36%"></span></i><i><span style="height: 36%"></span></i
+              ><i><span style="height: 25%"></span></i><i><span style="height: 27%"></span></i
+              ><i><span style="height: 28%"></span></i><i><span style="height: 24%"></span></i
+              ><i><span style="height: 25%"></span></i><i><span style="height: 20%"></span></i
+              ><i><span style="height: 25%"></span></i><i><span style="height: 20%"></span></i
+              ><i><span style="height: 16%"></span></i><i><span style="height: 18%"></span></i
+              ><i><span style="height: 15%"></span></i><i><span style="height: 13%"></span></i
+              ><i><span style="height: 13%"></span></i><i><span style="height: 10%"></span></i
+              ><i><span style="height: 6%"></span></i><i><span style="height: 6%"></span></i
+              ><i><span style="height: 6%"></span></i><i><span style="height: 6%"></span></i
+              ><i><span style="height: 6%"></span></i><i><span style="height: 6%"></span></i>
+            </div>
+            <span class="faint small">0:04</span>
+          </div>
+          <div class="take-row">
+            <button class="btn btn-small">Fades…</button><span class="grow"></span
+            ><button class="btn btn-ghost btn-small">Move…</button
+            ><button class="btn btn-ghost btn-small">Drop</button
+            ><button class="btn btn-small">Choose</button>
+          </div>
+        </div>
+      </div>
+      <div class="statehead">2 · Fades… on a take with none yet</div>
+      <div class="faint small">
+        Focus goes to the Fade in box. Boxes start at 0 and Shape at Smooth. Save fades is greyed
+        until something changes, and Remove fades isn't shown. Every other Fades… is greyed while
+        this one is open; hover it and it says why.
+      </div>
+      <div class="takes">
+        <div class="take editing">
+          <div class="take-row">
+            <b class="grow">Take 3</b><span class="chip chip-fade">fading</span>
+          </div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="editor">
+            <div class="take-row">
+              <span class="play">▶</span
+              ><span class="small muted grow">Hear it with the fades</span>
+            </div>
+            <div class="wave wave-big">
+              <i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 53%"></span><b style="height: 53%"></b></i
+              ><i><span style="height: 66%"></span><b style="height: 66%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 79%"></span><b style="height: 79%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 73%"></span><b style="height: 73%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 45%"></span><b style="height: 45%"></b></i
+              ><i><span style="height: 60%"></span><b style="height: 60%"></b></i
+              ><i><span style="height: 51%"></span><b style="height: 51%"></b></i
+              ><i><span style="height: 55%"></span><b style="height: 55%"></b></i
+              ><i><span style="height: 56%"></span><b style="height: 56%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 54%"></span><b style="height: 54%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 49%"></b></i
+              ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 48%"></b></i
+              ><i><span style="height: 46%"></span><b style="height: 46%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 29%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 27%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 27%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 25%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 23%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 23%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 21%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 17%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 13%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 15%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 14%"></span><b style="height: 14%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline
+                  points="0.00,0.0 0.50,0.0 1.00,0.0 1.50,0.0 2.00,0.0 2.50,0.0 3.00,0.0 3.50,0.0 4.00,0.0 4.50,0.0 5.00,0.0 5.50,0.0 6.00,0.0 6.50,0.0 7.00,0.0 7.50,0.0 8.00,0.0 8.50,0.0 9.00,0.0 9.50,0.0 10.00,0.0 10.50,0.0 11.00,0.0 11.50,0.0 12.00,0.0 12.50,0.0 13.00,0.0 13.50,0.0 14.00,0.0 14.50,0.0 15.00,0.0 15.50,0.0 16.00,0.0 16.50,0.0 17.00,0.0 17.50,0.0 18.00,0.0 18.50,0.0 19.00,0.0 19.50,0.0 20.00,0.0 20.50,0.0 21.00,0.0 21.50,0.0 22.00,0.0 22.50,0.0 23.00,0.0 23.50,0.0 24.00,0.0 24.50,0.0 25.00,0.0 25.50,0.0 26.00,0.0 26.50,0.0 27.00,0.0 27.50,0.0 28.00,0.0 28.50,0.0 29.00,0.0 29.50,0.0 30.00,0.0 30.50,0.0 31.00,0.0 31.50,0.0 32.00,0.0 32.50,0.0 33.00,0.0 33.50,0.0 34.00,0.0 34.50,0.0 35.00,0.0 35.50,0.0 36.00,0.0 36.50,0.0 37.00,0.0 37.50,0.0 38.00,0.0 38.50,0.0 39.00,0.0 39.50,0.0 40.00,0.0 40.50,0.0 41.00,0.0 41.50,0.0 42.00,0.0 42.50,0.0 43.00,0.0 43.50,0.0 44.00,0.0 44.50,0.0 45.00,0.0 45.50,0.0 46.00,0.0 46.50,0.0 47.00,0.0 47.50,0.0 48.00,0.0 48.50,0.0 49.00,0.0 49.50,0.0 50.00,0.0 50.50,0.0 51.00,0.0 51.50,0.0 52.00,0.0 52.50,0.0 53.00,0.0 53.50,0.0 54.00,0.0 54.50,0.0 55.00,0.0 55.50,0.0 56.00,0.0 56.50,0.0 57.00,0.0 57.50,0.0 58.00,0.0 58.50,0.0 59.00,0.0 59.50,0.0 60.00,0.0 60.50,0.0 61.00,0.0 61.50,0.0 62.00,0.0 62.50,0.0 63.00,0.0 63.50,0.0 64.00,0.0 64.50,0.0 65.00,0.0 65.50,0.0 66.00,0.0 66.50,0.0 67.00,0.0 67.50,0.0 68.00,0.0 68.50,0.0 69.00,0.0 69.50,0.0 70.00,0.0 70.50,0.0 71.00,0.0 71.50,0.0 72.00,0.0 72.50,0.0 73.00,0.0 73.50,0.0 74.00,0.0 74.50,0.0 75.00,0.0 75.50,0.0 76.00,0.0 76.50,0.0 77.00,0.0 77.50,0.0 78.00,0.0 78.50,0.0 79.00,0.0 79.50,0.0 80.00,0.0 80.50,0.0 81.00,0.0 81.50,0.0 82.00,0.0 82.50,0.0 83.00,0.0 83.50,0.0 84.00,0.0 84.50,0.0 85.00,0.0 85.50,0.0 86.00,0.0 86.50,0.0 87.00,0.0 87.50,0.0 88.00,0.0 88.50,0.0 89.00,0.0 89.50,0.0 90.00,0.0 90.50,0.0 91.00,0.0 91.50,0.0 92.00,0.0 92.50,0.0 93.00,0.0 93.50,0.0 94.00,0.0 94.50,0.0 95.00,0.0 95.50,0.0 96.00,0.0 96.50,0.0 97.00,0.0 97.50,0.0 98.00,0.0 98.50,0.0 99.00,0.0 99.50,0.0 100.00,0.0"
+                /></svg
+              ><span class="handle" style="left: calc(0% - 6px)"></span
+              ><span class="handle" style="left: calc(100% - 6px)"></span>
+            </div>
+            <div class="fades">
+              <label class="field">Fade in <input type="number" value="0" step="0.05" /> s</label
+              ><label class="field">Fade out <input type="number" value="0" step="0.05" /> s</label
+              ><label class="field"
+                >Shape
+                <select class="small">
+                  <option selected>Smooth</option>
+                  <option>Straight</option>
+                </select></label
+              >
+            </div>
+            <span class="faint small">Drag the handles or type a length; 0 is no fade.</span>
+            <div class="take-row">
+              <span class="grow"></span><button class="btn btn-small">Cancel</button
+              ><button class="btn btn-primary btn-small" disabled>Save fades</button>
+            </div>
+          </div>
+        </div>
+        <div class="take">
+          <div class="take-row"><b class="grow">Take 2</b></div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="take-row">
+            <span class="play">▶</span>
+            <div class="wave">
+              <i><span style="height: 4%"></span><b style="height: 8%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 8%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 70%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 81%"></span></i><i><span style="height: 82%"></span></i
+              ><i><span style="height: 71%"></span></i><i><span style="height: 78%"></span></i
+              ><i><span style="height: 77%"></span></i><i><span style="height: 75%"></span></i
+              ><i><span style="height: 63%"></span></i><i><span style="height: 69%"></span></i
+              ><i><span style="height: 67%"></span></i><i><span style="height: 73%"></span></i
+              ><i><span style="height: 79%"></span></i><i><span style="height: 76%"></span></i
+              ><i><span style="height: 65%"></span></i><i><span style="height: 62%"></span></i
+              ><i><span style="height: 57%"></span></i><i><span style="height: 51%"></span></i
+              ><i><span style="height: 50%"></span></i><i><span style="height: 57%"></span></i
+              ><i><span style="height: 53%"></span></i><i><span style="height: 53%"></span></i
+              ><i><span style="height: 62%"></span></i><i><span style="height: 54%"></span></i
+              ><i><span style="height: 53%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 41%"></span></i><i><span style="height: 45%"></span></i
+              ><i><span style="height: 41%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 52%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 37%"></span></i><i><span style="height: 46%"></span></i
+              ><i><span style="height: 43%"></span></i><i><span style="height: 41%"></span></i
+              ><i><span style="height: 42%"></span></i><i><span style="height: 38%"></span></i
+              ><i><span style="height: 37%"></span><b style="height: 37%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 31%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 36%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 35%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 23%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 28%"></b></i
+              ><i><span style="height: 16%"></span><b style="height: 24%"></b></i
+              ><i><span style="height: 15%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 13%"></span><b style="height: 22%"></b></i
+              ><i><span style="height: 13%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 19%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 19%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 5%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 11%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline points="0,100 7.1,0 64.3,0 100,100" />
+              </svg>
+            </div>
+            <span class="faint small">0:04</span>
+          </div>
+          <span class="faint small">Fades in 0.3 s · out 1.5 s · smooth</span>
+          <div class="take-row">
+            <button class="btn btn-small" disabled title="Close the fades of Take 3 first.">
+              Fades…</button
+            ><span class="grow"></span><button class="btn btn-ghost btn-small">Move…</button
+            ><button class="btn btn-ghost btn-small">Drop</button
+            ><button class="btn btn-small">Choose</button>
+          </div>
+        </div>
+      </div>
+      <div class="statehead">3 · Working on it</div>
+      <div class="faint small">
+        The handles and boxes move together. A handle can be reached with Tab and moved with ← →
+        (0.05 s, or Shift for 0.5 s). ▶ plays the take with the fades as they are now; changing a
+        length while it plays starts it again from the top. Enter saves and Escape cancels.
+      </div>
+      <div class="takes">
+        <div class="take editing">
+          <div class="take-row">
+            <b class="grow">Take 3</b><span class="chip chip-fade">fading</span>
+          </div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="editor">
+            <div class="take-row">
+              <span class="play">▶</span
+              ><span class="small muted grow">Hear it with the fades</span>
+            </div>
+            <div class="wave wave-big">
+              <i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 53%"></span><b style="height: 53%"></b></i
+              ><i><span style="height: 66%"></span><b style="height: 66%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 79%"></span><b style="height: 79%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 73%"></span><b style="height: 73%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 45%"></span><b style="height: 45%"></b></i
+              ><i><span style="height: 60%"></span><b style="height: 60%"></b></i
+              ><i><span style="height: 51%"></span><b style="height: 51%"></b></i
+              ><i><span style="height: 55%"></span><b style="height: 55%"></b></i
+              ><i><span style="height: 56%"></span><b style="height: 56%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 54%"></span><b style="height: 54%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 49%"></b></i
+              ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 48%"></b></i
+              ><i><span style="height: 46%"></span><b style="height: 46%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 29%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 27%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 24%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 25%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 21%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 16%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 12%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 14%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline
+                  points="0.00,100.0 0.50,78.2 1.00,57.4 1.50,38.7 2.00,22.9 2.50,10.9 3.00,3.1 3.50,0.0 4.00,0.0 4.50,0.0 5.00,0.0 5.50,0.0 6.00,0.0 6.50,0.0 7.00,0.0 7.50,0.0 8.00,0.0 8.50,0.0 9.00,0.0 9.50,0.0 10.00,0.0 10.50,0.0 11.00,0.0 11.50,0.0 12.00,0.0 12.50,0.0 13.00,0.0 13.50,0.0 14.00,0.0 14.50,0.0 15.00,0.0 15.50,0.0 16.00,0.0 16.50,0.0 17.00,0.0 17.50,0.0 18.00,0.0 18.50,0.0 19.00,0.0 19.50,0.0 20.00,0.0 20.50,0.0 21.00,0.0 21.50,0.0 22.00,0.0 22.50,0.0 23.00,0.0 23.50,0.0 24.00,0.0 24.50,0.0 25.00,0.0 25.50,0.0 26.00,0.0 26.50,0.0 27.00,0.0 27.50,0.0 28.00,0.0 28.50,0.0 29.00,0.0 29.50,0.0 30.00,0.0 30.50,0.0 31.00,0.0 31.50,0.0 32.00,0.0 32.50,0.0 33.00,0.0 33.50,0.0 34.00,0.0 34.50,0.0 35.00,0.0 35.50,0.0 36.00,0.0 36.50,0.0 37.00,0.0 37.50,0.0 38.00,0.0 38.50,0.0 39.00,0.0 39.50,0.0 40.00,0.0 40.50,0.0 41.00,0.0 41.50,0.0 42.00,0.0 42.50,0.0 43.00,0.0 43.50,0.0 44.00,0.0 44.50,0.0 45.00,0.0 45.50,0.0 46.00,0.0 46.50,0.0 47.00,0.0 47.50,0.0 48.00,0.0 48.50,0.0 49.00,0.0 49.50,0.0 50.00,0.0 50.50,0.0 51.00,0.0 51.50,0.0 52.00,0.0 52.50,0.0 53.00,0.0 53.50,0.0 54.00,0.0 54.50,0.0 55.00,0.0 55.50,0.0 56.00,0.0 56.50,0.0 57.00,0.0 57.50,0.0 58.00,0.0 58.50,0.0 59.00,0.0 59.50,0.0 60.00,0.0 60.50,0.0 61.00,0.0 61.50,0.0 62.00,0.0 62.50,0.0 63.00,0.0 63.50,0.0 64.00,0.0 64.50,0.0 65.00,0.0 65.50,0.0 66.00,0.0 66.50,0.0 67.00,0.0 67.50,0.0 68.00,0.0 68.50,0.0 69.00,0.0 69.50,0.0 70.00,0.0 70.50,0.0 71.00,0.0 71.50,0.0 72.00,0.0 72.50,0.2 73.00,0.4 73.50,0.6 74.00,1.0 74.50,1.4 75.00,1.9 75.50,2.5 76.00,3.1 76.50,3.9 77.00,4.7 77.50,5.5 78.00,6.5 78.50,7.5 79.00,8.5 79.50,9.7 80.00,10.9 80.50,12.2 81.00,13.5 81.50,14.9 82.00,16.4 82.50,18.0 83.00,19.6 83.50,21.2 84.00,22.9 84.50,24.7 85.00,26.6 85.50,28.5 86.00,30.4 86.50,32.4 87.00,34.5 87.50,36.6 88.00,38.7 88.50,40.9 89.00,43.1 89.50,45.4 90.00,47.8 90.50,50.1 91.00,52.5 91.50,55.0 92.00,57.4 92.50,59.9 93.00,62.5 93.50,65.0 94.00,67.6 94.50,70.2 95.00,72.9 95.50,75.5 96.00,78.2 96.50,80.9 97.00,83.6 97.50,86.3 98.00,89.0 98.50,91.8 99.00,94.5 99.50,97.3 100.00,100.0"
+                /></svg
+              ><span class="handle" style="left: calc(3.6% - 6px)"></span
+              ><span class="handle" style="left: calc(71.4% - 6px)"></span>
+            </div>
+            <div class="fades">
+              <label class="field">Fade in <input type="number" value="0.15" step="0.05" /> s</label
+              ><label class="field"
+                >Fade out <input type="number" value="1.2" step="0.05" /> s</label
+              ><label class="field"
+                >Shape
+                <select class="small">
+                  <option selected>Smooth</option>
+                  <option>Straight</option>
+                </select></label
+              >
+            </div>
+            <span class="faint small">Drag the handles or type a length; 0 is no fade.</span>
+            <div class="take-row">
+              <span class="grow"></span><button class="btn btn-small">Cancel</button
+              ><button class="btn btn-primary btn-small">Save fades</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statehead">4 · Lengths that can't be used</div>
+      <div class="faint small">
+        Save fades is greyed and the line says why, in red. The handles stay where they last could
+        be.
+      </div>
+      <div class="takes">
+        <div class="take editing">
+          <div class="take-row">
+            <b class="grow">Take 3</b><span class="chip chip-fade">fading</span>
+          </div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="editor">
+            <div class="take-row">
+              <span class="play">▶</span
+              ><span class="small muted grow">Hear it with the fades</span>
+            </div>
+            <div class="wave wave-big">
+              <i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 8%"></span><b style="height: 53%"></b></i
+              ><i><span style="height: 12%"></span><b style="height: 66%"></b></i
+              ><i><span style="height: 14%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 17%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 24%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 36%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 32%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 39%"></span><b style="height: 79%"></b></i
+              ><i><span style="height: 36%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 40%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 35%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 43%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 73%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 39%"></span><b style="height: 50%"></b></i
+              ><i><span style="height: 51%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 39%"></span><b style="height: 45%"></b></i
+              ><i><span style="height: 53%"></span><b style="height: 60%"></b></i
+              ><i><span style="height: 47%"></span><b style="height: 51%"></b></i
+              ><i><span style="height: 50%"></span><b style="height: 55%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 56%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 54%"></b></i
+              ><i><span style="height: 43%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 49%"></b></i
+              ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 48%"></b></i
+              ><i><span style="height: 45%"></span><b style="height: 46%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 32%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 31%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 38%"></span><b style="height: 41%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 25%"></span><b style="height: 29%"></b></i
+              ><i><span style="height: 25%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 22%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 15%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 14%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 12%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 11%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 8%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 5%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 14%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline
+                  points="0.00,100.0 0.50,98.7 1.00,97.4 1.50,96.0 2.00,94.7 2.50,93.4 3.00,92.1 3.50,90.8 4.00,89.5 4.50,88.2 5.00,86.8 5.50,85.5 6.00,84.2 6.50,82.9 7.00,81.6 7.50,80.3 8.00,79.0 8.50,77.8 9.00,76.5 9.50,75.2 10.00,73.9 10.50,72.6 11.00,71.4 11.50,70.1 12.00,68.9 12.50,67.6 13.00,66.4 13.50,65.1 14.00,63.9 14.50,62.7 15.00,61.4 15.50,60.2 16.00,59.0 16.50,57.8 17.00,56.6 17.50,55.4 18.00,54.3 18.50,53.1 19.00,51.9 19.50,50.8 20.00,49.6 20.50,48.5 21.00,47.4 21.50,46.3 22.00,45.2 22.50,44.1 23.00,43.0 23.50,41.9 24.00,40.8 24.50,39.8 25.00,38.7 25.50,37.7 26.00,36.6 26.50,35.6 27.00,34.6 27.50,33.6 28.00,32.7 28.50,31.7 29.00,30.7 29.50,29.8 30.00,28.8 30.50,27.9 31.00,27.0 31.50,26.1 32.00,25.2 32.50,24.4 33.00,23.5 33.50,22.7 34.00,21.8 34.50,21.0 35.00,20.2 35.50,19.4 36.00,18.7 36.50,17.9 37.00,17.2 37.50,16.4 38.00,15.7 38.50,15.0 39.00,14.3 39.50,13.6 40.00,13.0 40.50,12.3 41.00,11.7 41.50,11.1 42.00,10.5 42.50,9.9 43.00,9.4 43.50,8.8 44.00,8.3 44.50,7.8 45.00,7.3 45.50,6.8 46.00,6.3 46.50,5.8 47.00,5.4 47.50,5.0 48.00,4.6 48.50,4.2 49.00,3.8 49.50,3.5 50.00,3.1 50.50,2.8 51.00,2.5 51.50,2.2 52.00,2.0 52.50,1.7 53.00,1.5 53.50,1.3 54.00,1.2 54.50,1.1 55.00,1.1 55.50,1.1 56.00,1.1 56.50,1.2 57.00,1.4 57.50,1.6 58.00,1.8 58.50,2.1 59.00,2.4 59.50,2.7 60.00,3.1 60.50,3.6 61.00,4.0 61.50,4.5 62.00,5.0 62.50,5.5 63.00,6.1 63.50,6.7 64.00,7.3 64.50,7.9 65.00,8.5 65.50,9.2 66.00,9.9 66.50,10.7 67.00,11.4 67.50,12.2 68.00,13.0 68.50,13.8 69.00,14.7 69.50,15.5 70.00,16.4 70.50,17.3 71.00,18.3 71.50,19.2 72.00,20.2 72.50,21.2 73.00,22.3 73.50,23.3 74.00,24.4 74.50,25.5 75.00,26.6 75.50,27.7 76.00,28.8 76.50,30.0 77.00,31.2 77.50,32.4 78.00,33.6 78.50,34.9 79.00,36.1 79.50,37.4 80.00,38.7 80.50,40.0 81.00,41.3 81.50,42.7 82.00,44.1 82.50,45.4 83.00,46.8 83.50,48.2 84.00,49.6 84.50,51.1 85.00,52.5 85.50,54.0 86.00,55.4 86.50,56.9 87.00,58.4 87.50,59.9 88.00,61.4 88.50,63.0 89.00,64.5 89.50,66.1 90.00,67.6 90.50,69.2 91.00,70.7 91.50,72.3 92.00,73.9 92.50,75.5 93.00,77.1 93.50,78.7 94.00,80.3 94.50,82.0 95.00,83.6 95.50,85.2 96.00,86.8 96.50,88.5 97.00,90.1 97.50,91.8 98.00,93.4 98.50,95.1 99.00,96.7 99.50,98.4 100.00,100.0"
+                /></svg
+              ><span class="handle" style="left: calc(59.5% - 6px)"></span
+              ><span class="handle" style="left: calc(52.4% - 6px)"></span>
+            </div>
+            <div class="fades">
+              <label class="field"
+                >Fade in
+                <input
+                  type="number"
+                  value="2.5"
+                  step="0.05"
+                  style="border-color: var(--danger-ink)"
+                />
+                s</label
+              ><label class="field"
+                >Fade out
+                <input
+                  type="number"
+                  value="2"
+                  step="0.05"
+                  style="border-color: var(--danger-ink)"
+                />
+                s</label
+              ><label class="field"
+                >Shape
+                <select class="small">
+                  <option selected>Smooth</option>
+                  <option>Straight</option>
+                </select></label
+              >
+            </div>
+            <span class="errline" role="alert"
+              >The fades together can't be longer than the take (4.2 s).</span
+            ><span class="faint small">Drag the handles or type a length; 0 is no fade.</span>
+            <div class="take-row">
+              <span class="grow"></span><button class="btn btn-small">Cancel</button
+              ><button class="btn btn-primary btn-small" disabled>Save fades</button>
+            </div>
+          </div>
+        </div>
+        <div class="take editing">
+          <div class="take-row">
+            <b class="grow">Take 3</b><span class="chip chip-fade">fading</span>
+          </div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="editor">
+            <div class="take-row">
+              <span class="play">▶</span
+              ><span class="small muted grow">Hear it with the fades</span>
+            </div>
+            <div class="wave wave-big">
+              <i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 53%"></span><b style="height: 53%"></b></i
+              ><i><span style="height: 66%"></span><b style="height: 66%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 79%"></span><b style="height: 79%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 73%"></span><b style="height: 73%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 45%"></span><b style="height: 45%"></b></i
+              ><i><span style="height: 60%"></span><b style="height: 60%"></b></i
+              ><i><span style="height: 51%"></span><b style="height: 51%"></b></i
+              ><i><span style="height: 55%"></span><b style="height: 55%"></b></i
+              ><i><span style="height: 56%"></span><b style="height: 56%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 54%"></span><b style="height: 54%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 49%"></b></i
+              ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 48%"></b></i
+              ><i><span style="height: 46%"></span><b style="height: 46%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 29%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 27%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 24%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 25%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 21%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 16%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 12%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 14%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline
+                  points="0.00,0.0 0.50,0.0 1.00,0.0 1.50,0.0 2.00,0.0 2.50,0.0 3.00,0.0 3.50,0.0 4.00,0.0 4.50,0.0 5.00,0.0 5.50,0.0 6.00,0.0 6.50,0.0 7.00,0.0 7.50,0.0 8.00,0.0 8.50,0.0 9.00,0.0 9.50,0.0 10.00,0.0 10.50,0.0 11.00,0.0 11.50,0.0 12.00,0.0 12.50,0.0 13.00,0.0 13.50,0.0 14.00,0.0 14.50,0.0 15.00,0.0 15.50,0.0 16.00,0.0 16.50,0.0 17.00,0.0 17.50,0.0 18.00,0.0 18.50,0.0 19.00,0.0 19.50,0.0 20.00,0.0 20.50,0.0 21.00,0.0 21.50,0.0 22.00,0.0 22.50,0.0 23.00,0.0 23.50,0.0 24.00,0.0 24.50,0.0 25.00,0.0 25.50,0.0 26.00,0.0 26.50,0.0 27.00,0.0 27.50,0.0 28.00,0.0 28.50,0.0 29.00,0.0 29.50,0.0 30.00,0.0 30.50,0.0 31.00,0.0 31.50,0.0 32.00,0.0 32.50,0.0 33.00,0.0 33.50,0.0 34.00,0.0 34.50,0.0 35.00,0.0 35.50,0.0 36.00,0.0 36.50,0.0 37.00,0.0 37.50,0.0 38.00,0.0 38.50,0.0 39.00,0.0 39.50,0.0 40.00,0.0 40.50,0.0 41.00,0.0 41.50,0.0 42.00,0.0 42.50,0.0 43.00,0.0 43.50,0.0 44.00,0.0 44.50,0.0 45.00,0.0 45.50,0.0 46.00,0.0 46.50,0.0 47.00,0.0 47.50,0.0 48.00,0.0 48.50,0.0 49.00,0.0 49.50,0.0 50.00,0.0 50.50,0.0 51.00,0.0 51.50,0.0 52.00,0.0 52.50,0.0 53.00,0.0 53.50,0.0 54.00,0.0 54.50,0.0 55.00,0.0 55.50,0.0 56.00,0.0 56.50,0.0 57.00,0.0 57.50,0.0 58.00,0.0 58.50,0.0 59.00,0.0 59.50,0.0 60.00,0.0 60.50,0.0 61.00,0.0 61.50,0.0 62.00,0.0 62.50,0.0 63.00,0.0 63.50,0.0 64.00,0.0 64.50,0.0 65.00,0.0 65.50,0.0 66.00,0.0 66.50,0.0 67.00,0.0 67.50,0.0 68.00,0.0 68.50,0.0 69.00,0.0 69.50,0.0 70.00,0.0 70.50,0.0 71.00,0.0 71.50,0.0 72.00,0.0 72.50,0.2 73.00,0.4 73.50,0.6 74.00,1.0 74.50,1.4 75.00,1.9 75.50,2.5 76.00,3.1 76.50,3.9 77.00,4.7 77.50,5.5 78.00,6.5 78.50,7.5 79.00,8.5 79.50,9.7 80.00,10.9 80.50,12.2 81.00,13.5 81.50,14.9 82.00,16.4 82.50,18.0 83.00,19.6 83.50,21.2 84.00,22.9 84.50,24.7 85.00,26.6 85.50,28.5 86.00,30.4 86.50,32.4 87.00,34.5 87.50,36.6 88.00,38.7 88.50,40.9 89.00,43.1 89.50,45.4 90.00,47.8 90.50,50.1 91.00,52.5 91.50,55.0 92.00,57.4 92.50,59.9 93.00,62.5 93.50,65.0 94.00,67.6 94.50,70.2 95.00,72.9 95.50,75.5 96.00,78.2 96.50,80.9 97.00,83.6 97.50,86.3 98.00,89.0 98.50,91.8 99.00,94.5 99.50,97.3 100.00,100.0"
+                /></svg
+              ><span class="handle" style="left: calc(0% - 6px)"></span
+              ><span class="handle" style="left: calc(71.4% - 6px)"></span>
+            </div>
+            <div class="fades">
+              <label class="field"
+                >Fade in
+                <input type="number" value="" step="0.05" style="border-color: var(--danger-ink)" />
+                s</label
+              ><label class="field"
+                >Fade out <input type="number" value="1.2" step="0.05" /> s</label
+              ><label class="field"
+                >Shape
+                <select class="small">
+                  <option selected>Smooth</option>
+                  <option>Straight</option>
+                </select></label
+              >
+            </div>
+            <span class="errline" role="alert">Type a length of 0 s or more.</span
+            ><span class="faint small">Drag the handles or type a length; 0 is no fade.</span>
+            <div class="take-row">
+              <span class="grow"></span><button class="btn btn-small">Cancel</button
+              ><button class="btn btn-primary btn-small" disabled>Save fades</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statehead">5 · Saving, and when saving fails</div>
+      <div class="faint small">
+        While it saves, the button says Saving… and nothing in the editor can be changed. If it
+        fails, the editor stays open with your lengths, and a red line says why.
+      </div>
+      <div class="takes">
+        <div class="take editing">
+          <div class="take-row">
+            <b class="grow">Take 3</b><span class="chip chip-fade">fading</span>
+          </div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="editor">
+            <div class="take-row">
+              <span class="play">▶</span
+              ><span class="small muted grow">Hear it with the fades</span>
+            </div>
+            <div class="wave wave-big">
+              <i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 53%"></span><b style="height: 53%"></b></i
+              ><i><span style="height: 66%"></span><b style="height: 66%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 79%"></span><b style="height: 79%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 73%"></span><b style="height: 73%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 45%"></span><b style="height: 45%"></b></i
+              ><i><span style="height: 60%"></span><b style="height: 60%"></b></i
+              ><i><span style="height: 51%"></span><b style="height: 51%"></b></i
+              ><i><span style="height: 55%"></span><b style="height: 55%"></b></i
+              ><i><span style="height: 56%"></span><b style="height: 56%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 54%"></span><b style="height: 54%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 49%"></b></i
+              ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 48%"></b></i
+              ><i><span style="height: 46%"></span><b style="height: 46%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 29%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 27%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 24%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 25%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 21%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 16%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 12%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 14%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline
+                  points="0.00,100.0 0.50,78.2 1.00,57.4 1.50,38.7 2.00,22.9 2.50,10.9 3.00,3.1 3.50,0.0 4.00,0.0 4.50,0.0 5.00,0.0 5.50,0.0 6.00,0.0 6.50,0.0 7.00,0.0 7.50,0.0 8.00,0.0 8.50,0.0 9.00,0.0 9.50,0.0 10.00,0.0 10.50,0.0 11.00,0.0 11.50,0.0 12.00,0.0 12.50,0.0 13.00,0.0 13.50,0.0 14.00,0.0 14.50,0.0 15.00,0.0 15.50,0.0 16.00,0.0 16.50,0.0 17.00,0.0 17.50,0.0 18.00,0.0 18.50,0.0 19.00,0.0 19.50,0.0 20.00,0.0 20.50,0.0 21.00,0.0 21.50,0.0 22.00,0.0 22.50,0.0 23.00,0.0 23.50,0.0 24.00,0.0 24.50,0.0 25.00,0.0 25.50,0.0 26.00,0.0 26.50,0.0 27.00,0.0 27.50,0.0 28.00,0.0 28.50,0.0 29.00,0.0 29.50,0.0 30.00,0.0 30.50,0.0 31.00,0.0 31.50,0.0 32.00,0.0 32.50,0.0 33.00,0.0 33.50,0.0 34.00,0.0 34.50,0.0 35.00,0.0 35.50,0.0 36.00,0.0 36.50,0.0 37.00,0.0 37.50,0.0 38.00,0.0 38.50,0.0 39.00,0.0 39.50,0.0 40.00,0.0 40.50,0.0 41.00,0.0 41.50,0.0 42.00,0.0 42.50,0.0 43.00,0.0 43.50,0.0 44.00,0.0 44.50,0.0 45.00,0.0 45.50,0.0 46.00,0.0 46.50,0.0 47.00,0.0 47.50,0.0 48.00,0.0 48.50,0.0 49.00,0.0 49.50,0.0 50.00,0.0 50.50,0.0 51.00,0.0 51.50,0.0 52.00,0.0 52.50,0.0 53.00,0.0 53.50,0.0 54.00,0.0 54.50,0.0 55.00,0.0 55.50,0.0 56.00,0.0 56.50,0.0 57.00,0.0 57.50,0.0 58.00,0.0 58.50,0.0 59.00,0.0 59.50,0.0 60.00,0.0 60.50,0.0 61.00,0.0 61.50,0.0 62.00,0.0 62.50,0.0 63.00,0.0 63.50,0.0 64.00,0.0 64.50,0.0 65.00,0.0 65.50,0.0 66.00,0.0 66.50,0.0 67.00,0.0 67.50,0.0 68.00,0.0 68.50,0.0 69.00,0.0 69.50,0.0 70.00,0.0 70.50,0.0 71.00,0.0 71.50,0.0 72.00,0.0 72.50,0.2 73.00,0.4 73.50,0.6 74.00,1.0 74.50,1.4 75.00,1.9 75.50,2.5 76.00,3.1 76.50,3.9 77.00,4.7 77.50,5.5 78.00,6.5 78.50,7.5 79.00,8.5 79.50,9.7 80.00,10.9 80.50,12.2 81.00,13.5 81.50,14.9 82.00,16.4 82.50,18.0 83.00,19.6 83.50,21.2 84.00,22.9 84.50,24.7 85.00,26.6 85.50,28.5 86.00,30.4 86.50,32.4 87.00,34.5 87.50,36.6 88.00,38.7 88.50,40.9 89.00,43.1 89.50,45.4 90.00,47.8 90.50,50.1 91.00,52.5 91.50,55.0 92.00,57.4 92.50,59.9 93.00,62.5 93.50,65.0 94.00,67.6 94.50,70.2 95.00,72.9 95.50,75.5 96.00,78.2 96.50,80.9 97.00,83.6 97.50,86.3 98.00,89.0 98.50,91.8 99.00,94.5 99.50,97.3 100.00,100.0"
+                /></svg
+              ><span class="handle" style="left: calc(3.6% - 6px)"></span
+              ><span class="handle" style="left: calc(71.4% - 6px)"></span>
+            </div>
+            <div class="fades">
+              <label class="field">Fade in <input type="number" value="0.15" step="0.05" /> s</label
+              ><label class="field"
+                >Fade out <input type="number" value="1.2" step="0.05" /> s</label
+              ><label class="field"
+                >Shape
+                <select class="small">
+                  <option selected>Smooth</option>
+                  <option>Straight</option>
+                </select></label
+              >
+            </div>
+            <span class="faint small">Drag the handles or type a length; 0 is no fade.</span>
+            <div class="take-row">
+              <span class="grow"></span><button class="btn btn-small">Cancel</button
+              ><button class="btn btn-primary btn-small" disabled>Saving…</button>
+            </div>
+          </div>
+        </div>
+        <div class="take editing">
+          <div class="take-row">
+            <b class="grow">Take 3</b><span class="chip chip-fade">fading</span>
+          </div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="editor">
+            <div class="take-row">
+              <span class="play">▶</span
+              ><span class="small muted grow">Hear it with the fades</span>
+            </div>
+            <div class="wave wave-big">
+              <i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 53%"></span><b style="height: 53%"></b></i
+              ><i><span style="height: 66%"></span><b style="height: 66%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 79%"></span><b style="height: 79%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 73%"></span><b style="height: 73%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 45%"></span><b style="height: 45%"></b></i
+              ><i><span style="height: 60%"></span><b style="height: 60%"></b></i
+              ><i><span style="height: 51%"></span><b style="height: 51%"></b></i
+              ><i><span style="height: 55%"></span><b style="height: 55%"></b></i
+              ><i><span style="height: 56%"></span><b style="height: 56%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 54%"></span><b style="height: 54%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 49%"></b></i
+              ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 48%"></b></i
+              ><i><span style="height: 46%"></span><b style="height: 46%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 29%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 27%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 24%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 25%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 21%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 16%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 12%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 14%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline
+                  points="0.00,100.0 0.50,78.2 1.00,57.4 1.50,38.7 2.00,22.9 2.50,10.9 3.00,3.1 3.50,0.0 4.00,0.0 4.50,0.0 5.00,0.0 5.50,0.0 6.00,0.0 6.50,0.0 7.00,0.0 7.50,0.0 8.00,0.0 8.50,0.0 9.00,0.0 9.50,0.0 10.00,0.0 10.50,0.0 11.00,0.0 11.50,0.0 12.00,0.0 12.50,0.0 13.00,0.0 13.50,0.0 14.00,0.0 14.50,0.0 15.00,0.0 15.50,0.0 16.00,0.0 16.50,0.0 17.00,0.0 17.50,0.0 18.00,0.0 18.50,0.0 19.00,0.0 19.50,0.0 20.00,0.0 20.50,0.0 21.00,0.0 21.50,0.0 22.00,0.0 22.50,0.0 23.00,0.0 23.50,0.0 24.00,0.0 24.50,0.0 25.00,0.0 25.50,0.0 26.00,0.0 26.50,0.0 27.00,0.0 27.50,0.0 28.00,0.0 28.50,0.0 29.00,0.0 29.50,0.0 30.00,0.0 30.50,0.0 31.00,0.0 31.50,0.0 32.00,0.0 32.50,0.0 33.00,0.0 33.50,0.0 34.00,0.0 34.50,0.0 35.00,0.0 35.50,0.0 36.00,0.0 36.50,0.0 37.00,0.0 37.50,0.0 38.00,0.0 38.50,0.0 39.00,0.0 39.50,0.0 40.00,0.0 40.50,0.0 41.00,0.0 41.50,0.0 42.00,0.0 42.50,0.0 43.00,0.0 43.50,0.0 44.00,0.0 44.50,0.0 45.00,0.0 45.50,0.0 46.00,0.0 46.50,0.0 47.00,0.0 47.50,0.0 48.00,0.0 48.50,0.0 49.00,0.0 49.50,0.0 50.00,0.0 50.50,0.0 51.00,0.0 51.50,0.0 52.00,0.0 52.50,0.0 53.00,0.0 53.50,0.0 54.00,0.0 54.50,0.0 55.00,0.0 55.50,0.0 56.00,0.0 56.50,0.0 57.00,0.0 57.50,0.0 58.00,0.0 58.50,0.0 59.00,0.0 59.50,0.0 60.00,0.0 60.50,0.0 61.00,0.0 61.50,0.0 62.00,0.0 62.50,0.0 63.00,0.0 63.50,0.0 64.00,0.0 64.50,0.0 65.00,0.0 65.50,0.0 66.00,0.0 66.50,0.0 67.00,0.0 67.50,0.0 68.00,0.0 68.50,0.0 69.00,0.0 69.50,0.0 70.00,0.0 70.50,0.0 71.00,0.0 71.50,0.0 72.00,0.0 72.50,0.2 73.00,0.4 73.50,0.6 74.00,1.0 74.50,1.4 75.00,1.9 75.50,2.5 76.00,3.1 76.50,3.9 77.00,4.7 77.50,5.5 78.00,6.5 78.50,7.5 79.00,8.5 79.50,9.7 80.00,10.9 80.50,12.2 81.00,13.5 81.50,14.9 82.00,16.4 82.50,18.0 83.00,19.6 83.50,21.2 84.00,22.9 84.50,24.7 85.00,26.6 85.50,28.5 86.00,30.4 86.50,32.4 87.00,34.5 87.50,36.6 88.00,38.7 88.50,40.9 89.00,43.1 89.50,45.4 90.00,47.8 90.50,50.1 91.00,52.5 91.50,55.0 92.00,57.4 92.50,59.9 93.00,62.5 93.50,65.0 94.00,67.6 94.50,70.2 95.00,72.9 95.50,75.5 96.00,78.2 96.50,80.9 97.00,83.6 97.50,86.3 98.00,89.0 98.50,91.8 99.00,94.5 99.50,97.3 100.00,100.0"
+                /></svg
+              ><span class="handle" style="left: calc(3.6% - 6px)"></span
+              ><span class="handle" style="left: calc(71.4% - 6px)"></span>
+            </div>
+            <div class="fades">
+              <label class="field"
+                >Fade in
+                <input
+                  type="number"
+                  value="0.15"
+                  step="0.05"
+                  style="border-color: var(--danger-ink)"
+                />
+                s</label
+              ><label class="field"
+                >Fade out <input type="number" value="1.2" step="0.05" /> s</label
+              ><label class="field"
+                >Shape
+                <select class="small">
+                  <option selected>Smooth</option>
+                  <option>Straight</option>
+                </select></label
+              >
+            </div>
+            <span class="errline" role="alert">The fades could not be saved. The disk is full.</span
+            ><span class="faint small">Drag the handles or type a length; 0 is no fade.</span>
+            <div class="take-row">
+              <span class="grow"></span><button class="btn btn-small">Cancel</button
+              ><button class="btn btn-primary btn-small">Save fades</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statehead">6 · Remove fades</div>
+      <div class="faint small">
+        Shown only on a take that has fades saved. One press, no question: both fades go and the
+        editor closes, and the take is back as it was made. On the chosen take, the game's file goes
+        back too.
+      </div>
+      <div class="takes">
+        <div class="take editing">
+          <div class="take-row">
+            <b class="grow">Take 2</b><span class="chip chip-fade">fading</span>
+          </div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="editor">
+            <div class="take-row">
+              <span class="play">▶</span
+              ><span class="small muted grow">Hear it with the fades</span>
+            </div>
+            <div class="wave wave-big">
+              <i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 5%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 53%"></b></i
+              ><i><span style="height: 66%"></span><b style="height: 66%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 79%"></span><b style="height: 79%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 73%"></span><b style="height: 73%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 45%"></span><b style="height: 45%"></b></i
+              ><i><span style="height: 60%"></span><b style="height: 60%"></b></i
+              ><i><span style="height: 51%"></span><b style="height: 51%"></b></i
+              ><i><span style="height: 55%"></span><b style="height: 55%"></b></i
+              ><i><span style="height: 56%"></span><b style="height: 56%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 54%"></span><b style="height: 54%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 49%"></b></i
+              ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 48%"></b></i
+              ><i><span style="height: 46%"></span><b style="height: 46%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 29%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 24%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 24%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 22%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 22%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 15%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 14%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 10%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 14%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline
+                  points="0.00,100.0 0.50,89.0 1.00,78.2 1.50,67.6 2.00,57.4 2.50,47.8 3.00,38.7 3.50,30.4 4.00,22.9 4.50,16.4 5.00,10.9 5.50,6.5 6.00,3.1 6.50,1.0 7.00,0.0 7.50,0.0 8.00,0.0 8.50,0.0 9.00,0.0 9.50,0.0 10.00,0.0 10.50,0.0 11.00,0.0 11.50,0.0 12.00,0.0 12.50,0.0 13.00,0.0 13.50,0.0 14.00,0.0 14.50,0.0 15.00,0.0 15.50,0.0 16.00,0.0 16.50,0.0 17.00,0.0 17.50,0.0 18.00,0.0 18.50,0.0 19.00,0.0 19.50,0.0 20.00,0.0 20.50,0.0 21.00,0.0 21.50,0.0 22.00,0.0 22.50,0.0 23.00,0.0 23.50,0.0 24.00,0.0 24.50,0.0 25.00,0.0 25.50,0.0 26.00,0.0 26.50,0.0 27.00,0.0 27.50,0.0 28.00,0.0 28.50,0.0 29.00,0.0 29.50,0.0 30.00,0.0 30.50,0.0 31.00,0.0 31.50,0.0 32.00,0.0 32.50,0.0 33.00,0.0 33.50,0.0 34.00,0.0 34.50,0.0 35.00,0.0 35.50,0.0 36.00,0.0 36.50,0.0 37.00,0.0 37.50,0.0 38.00,0.0 38.50,0.0 39.00,0.0 39.50,0.0 40.00,0.0 40.50,0.0 41.00,0.0 41.50,0.0 42.00,0.0 42.50,0.0 43.00,0.0 43.50,0.0 44.00,0.0 44.50,0.0 45.00,0.0 45.50,0.0 46.00,0.0 46.50,0.0 47.00,0.0 47.50,0.0 48.00,0.0 48.50,0.0 49.00,0.0 49.50,0.0 50.00,0.0 50.50,0.0 51.00,0.0 51.50,0.0 52.00,0.0 52.50,0.0 53.00,0.0 53.50,0.0 54.00,0.0 54.50,0.0 55.00,0.0 55.50,0.0 56.00,0.0 56.50,0.0 57.00,0.0 57.50,0.0 58.00,0.0 58.50,0.0 59.00,0.0 59.50,0.0 60.00,0.0 60.50,0.0 61.00,0.0 61.50,0.0 62.00,0.0 62.50,0.0 63.00,0.0 63.50,0.0 64.00,0.0 64.50,0.0 65.00,0.0 65.50,0.1 66.00,0.3 66.50,0.5 67.00,0.7 67.50,1.0 68.00,1.3 68.50,1.7 69.00,2.1 69.50,2.6 70.00,3.1 70.50,3.7 71.00,4.3 71.50,5.0 72.00,5.7 72.50,6.5 73.00,7.3 73.50,8.1 74.00,9.0 74.50,9.9 75.00,10.9 75.50,11.9 76.00,13.0 76.50,14.1 77.00,15.2 77.50,16.4 78.00,17.6 78.50,18.9 79.00,20.2 79.50,21.6 80.00,22.9 80.50,24.4 81.00,25.8 81.50,27.3 82.00,28.8 82.50,30.4 83.00,32.0 83.50,33.6 84.00,35.3 84.50,37.0 85.00,38.7 85.50,40.5 86.00,42.2 86.50,44.1 87.00,45.9 87.50,47.8 88.00,49.6 88.50,51.5 89.00,53.5 89.50,55.4 90.00,57.4 90.50,59.4 91.00,61.4 91.50,63.5 92.00,65.5 92.50,67.6 93.00,69.7 93.50,71.8 94.00,73.9 94.50,76.0 95.00,78.2 95.50,80.3 96.00,82.5 96.50,84.7 97.00,86.8 97.50,89.0 98.00,91.2 98.50,93.4 99.00,95.6 99.50,97.8 100.00,100.0"
+                /></svg
+              ><span class="handle" style="left: calc(7.1% - 6px)"></span
+              ><span class="handle" style="left: calc(64.3% - 6px)"></span>
+            </div>
+            <div class="fades">
+              <label class="field">Fade in <input type="number" value="0.3" step="0.05" /> s</label
+              ><label class="field"
+                >Fade out <input type="number" value="1.5" step="0.05" /> s</label
+              ><label class="field"
+                >Shape
+                <select class="small">
+                  <option selected>Smooth</option>
+                  <option>Straight</option>
+                </select></label
+              >
+            </div>
+            <span class="faint small">Drag the handles or type a length; 0 is no fade.</span>
+            <div class="take-row">
+              <button class="btn btn-ghost btn-small">Remove fades</button><span class="grow"></span
+              ><button class="btn btn-small">Cancel</button
+              ><button class="btn btn-primary btn-small">Save fades</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statehead">7 · The chosen take</div>
+      <div class="faint small">
+        Fades… is in the In the game block too. Saving or removing there writes the game's file
+        straight away. The line under the boxes says so. Choosing a take with fades puts the faded
+        sound in the game.
+      </div>
+      <section class="in-game">
+        <div class="take-row">
+          <span class="in-game-label">In the game</span><span class="chip chip-ok">chosen</span
+          ><span class="chip chip-fade">fading</span
+          ><span class="faint small">Take 1 · ElevenLabs Music</span>
+        </div>
+        <div class="editor" style="border-top-color: #1f5a40">
+          <div class="take-row">
+            <span class="play">▶</span><span class="small muted grow">Hear it with the fades</span>
+          </div>
+          <div class="wave wave-big">
+            <i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 8%"></span><b style="height: 8%"></b></i
+            ><i><span style="height: 7%"></span><b style="height: 7%"></b></i
+            ><i><span style="height: 47%"></span><b style="height: 47%"></b></i
+            ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+            ><i><span style="height: 73%"></span><b style="height: 73%"></b></i
+            ><i><span style="height: 82%"></span><b style="height: 82%"></b></i
+            ><i><span style="height: 84%"></span><b style="height: 84%"></b></i
+            ><i><span style="height: 65%"></span><b style="height: 65%"></b></i
+            ><i><span style="height: 62%"></span><b style="height: 62%"></b></i
+            ><i><span style="height: 82%"></span><b style="height: 82%"></b></i
+            ><i><span style="height: 70%"></span><b style="height: 70%"></b></i
+            ><i><span style="height: 77%"></span><b style="height: 77%"></b></i
+            ><i><span style="height: 57%"></span><b style="height: 57%"></b></i
+            ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+            ><i><span style="height: 72%"></span><b style="height: 72%"></b></i
+            ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+            ><i><span style="height: 74%"></span><b style="height: 74%"></b></i
+            ><i><span style="height: 72%"></span><b style="height: 72%"></b></i
+            ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+            ><i><span style="height: 51%"></span><b style="height: 51%"></b></i
+            ><i><span style="height: 60%"></span><b style="height: 60%"></b></i
+            ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+            ><i><span style="height: 55%"></span><b style="height: 55%"></b></i
+            ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+            ><i><span style="height: 53%"></span><b style="height: 53%"></b></i
+            ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+            ><i><span style="height: 47%"></span><b style="height: 47%"></b></i
+            ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+            ><i><span style="height: 49%"></span><b style="height: 49%"></b></i
+            ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+            ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+            ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+            ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+            ><i><span style="height: 40%"></span><b style="height: 40%"></b></i
+            ><i><span style="height: 35%"></span><b style="height: 35%"></b></i
+            ><i><span style="height: 45%"></span><b style="height: 45%"></b></i
+            ><i><span style="height: 40%"></span><b style="height: 40%"></b></i
+            ><i><span style="height: 40%"></span><b style="height: 40%"></b></i
+            ><i><span style="height: 32%"></span><b style="height: 32%"></b></i
+            ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+            ><i><span style="height: 38%"></span><b style="height: 38%"></b></i
+            ><i><span style="height: 28%"></span><b style="height: 28%"></b></i
+            ><i><span style="height: 29%"></span><b style="height: 29%"></b></i
+            ><i><span style="height: 32%"></span><b style="height: 32%"></b></i
+            ><i><span style="height: 31%"></span><b style="height: 31%"></b></i
+            ><i><span style="height: 31%"></span><b style="height: 31%"></b></i
+            ><i><span style="height: 25%"></span><b style="height: 25%"></b></i
+            ><i><span style="height: 26%"></span><b style="height: 27%"></b></i
+            ><i><span style="height: 23%"></span><b style="height: 24%"></b></i
+            ><i><span style="height: 18%"></span><b style="height: 20%"></b></i
+            ><i><span style="height: 18%"></span><b style="height: 21%"></b></i
+            ><i><span style="height: 18%"></span><b style="height: 21%"></b></i
+            ><i><span style="height: 15%"></span><b style="height: 20%"></b></i
+            ><i><span style="height: 12%"></span><b style="height: 16%"></b></i
+            ><i><span style="height: 10%"></span><b style="height: 15%"></b></i
+            ><i><span style="height: 7%"></span><b style="height: 11%"></b></i
+            ><i><span style="height: 6%"></span><b style="height: 11%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <polyline
+                points="0.00,100.0 0.50,67.6 1.00,38.7 1.50,16.4 2.00,3.1 2.50,0.0 3.00,0.0 3.50,0.0 4.00,0.0 4.50,0.0 5.00,0.0 5.50,0.0 6.00,0.0 6.50,0.0 7.00,0.0 7.50,0.0 8.00,0.0 8.50,0.0 9.00,0.0 9.50,0.0 10.00,0.0 10.50,0.0 11.00,0.0 11.50,0.0 12.00,0.0 12.50,0.0 13.00,0.0 13.50,0.0 14.00,0.0 14.50,0.0 15.00,0.0 15.50,0.0 16.00,0.0 16.50,0.0 17.00,0.0 17.50,0.0 18.00,0.0 18.50,0.0 19.00,0.0 19.50,0.0 20.00,0.0 20.50,0.0 21.00,0.0 21.50,0.0 22.00,0.0 22.50,0.0 23.00,0.0 23.50,0.0 24.00,0.0 24.50,0.0 25.00,0.0 25.50,0.0 26.00,0.0 26.50,0.0 27.00,0.0 27.50,0.0 28.00,0.0 28.50,0.0 29.00,0.0 29.50,0.0 30.00,0.0 30.50,0.0 31.00,0.0 31.50,0.0 32.00,0.0 32.50,0.0 33.00,0.0 33.50,0.0 34.00,0.0 34.50,0.0 35.00,0.0 35.50,0.0 36.00,0.0 36.50,0.0 37.00,0.0 37.50,0.0 38.00,0.0 38.50,0.0 39.00,0.0 39.50,0.0 40.00,0.0 40.50,0.0 41.00,0.0 41.50,0.0 42.00,0.0 42.50,0.0 43.00,0.0 43.50,0.0 44.00,0.0 44.50,0.0 45.00,0.0 45.50,0.0 46.00,0.0 46.50,0.0 47.00,0.0 47.50,0.0 48.00,0.0 48.50,0.0 49.00,0.0 49.50,0.0 50.00,0.0 50.50,0.0 51.00,0.0 51.50,0.0 52.00,0.0 52.50,0.0 53.00,0.0 53.50,0.0 54.00,0.0 54.50,0.0 55.00,0.0 55.50,0.0 56.00,0.0 56.50,0.0 57.00,0.0 57.50,0.0 58.00,0.0 58.50,0.0 59.00,0.0 59.50,0.0 60.00,0.0 60.50,0.0 61.00,0.0 61.50,0.0 62.00,0.0 62.50,0.0 63.00,0.0 63.50,0.0 64.00,0.0 64.50,0.0 65.00,0.0 65.50,0.0 66.00,0.0 66.50,0.0 67.00,0.0 67.50,0.0 68.00,0.0 68.50,0.0 69.00,0.0 69.50,0.0 70.00,0.0 70.50,0.0 71.00,0.0 71.50,0.0 72.00,0.0 72.50,0.2 73.00,0.4 73.50,0.6 74.00,1.0 74.50,1.4 75.00,1.9 75.50,2.5 76.00,3.1 76.50,3.9 77.00,4.7 77.50,5.5 78.00,6.5 78.50,7.5 79.00,8.5 79.50,9.7 80.00,10.9 80.50,12.2 81.00,13.5 81.50,14.9 82.00,16.4 82.50,18.0 83.00,19.6 83.50,21.2 84.00,22.9 84.50,24.7 85.00,26.6 85.50,28.5 86.00,30.4 86.50,32.4 87.00,34.5 87.50,36.6 88.00,38.7 88.50,40.9 89.00,43.1 89.50,45.4 90.00,47.8 90.50,50.1 91.00,52.5 91.50,55.0 92.00,57.4 92.50,59.9 93.00,62.5 93.50,65.0 94.00,67.6 94.50,70.2 95.00,72.9 95.50,75.5 96.00,78.2 96.50,80.9 97.00,83.6 97.50,86.3 98.00,89.0 98.50,91.8 99.00,94.5 99.50,97.3 100.00,100.0"
+              /></svg
+            ><span class="handle" style="left: calc(2.4% - 6px)"></span
+            ><span class="handle" style="left: calc(71.4% - 6px)"></span>
+          </div>
+          <div class="fades">
+            <label class="field">Fade in <input type="number" value="0.1" step="0.05" /> s</label
+            ><label class="field">Fade out <input type="number" value="1.2" step="0.05" /> s</label
+            ><label class="field"
+              >Shape
+              <select class="small">
+                <option selected>Smooth</option>
+                <option>Straight</option>
+              </select></label
+            >
+          </div>
+          <span class="faint small">Saving puts the faded sound in the game at once.</span>
+          <div class="take-row">
+            <button class="btn btn-ghost btn-small">Remove fades</button><span class="grow"></span
+            ><button class="btn btn-small">Cancel</button
+            ><button class="btn btn-primary btn-small">Save fades</button>
+          </div>
+        </div>
+      </section>
+      <section class="in-game">
+        <div class="take-row">
+          <span class="in-game-label">In the game</span><span class="chip chip-ok">chosen</span
+          ><span class="faint small">Take 1 · ElevenLabs Music</span>
+        </div>
+        <div class="take-row">
+          <span class="play">▶</span>
+          <div class="wave">
+            <i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 8%"></span><b style="height: 8%"></b></i
+            ><i><span style="height: 7%"></span></i><i><span style="height: 47%"></span></i
+            ><i><span style="height: 63%"></span></i><i><span style="height: 73%"></span></i
+            ><i><span style="height: 82%"></span></i><i><span style="height: 84%"></span></i
+            ><i><span style="height: 65%"></span></i><i><span style="height: 62%"></span></i
+            ><i><span style="height: 82%"></span></i><i><span style="height: 70%"></span></i
+            ><i><span style="height: 77%"></span></i><i><span style="height: 57%"></span></i
+            ><i><span style="height: 67%"></span></i><i><span style="height: 72%"></span></i
+            ><i><span style="height: 59%"></span></i><i><span style="height: 74%"></span></i
+            ><i><span style="height: 72%"></span></i><i><span style="height: 52%"></span></i
+            ><i><span style="height: 51%"></span></i><i><span style="height: 60%"></span></i
+            ><i><span style="height: 67%"></span></i><i><span style="height: 55%"></span></i
+            ><i><span style="height: 50%"></span></i><i><span style="height: 53%"></span></i
+            ><i><span style="height: 44%"></span></i><i><span style="height: 47%"></span></i
+            ><i><span style="height: 50%"></span></i><i><span style="height: 49%"></span></i
+            ><i><span style="height: 44%"></span></i><i><span style="height: 42%"></span></i
+            ><i><span style="height: 41%"></span></i><i><span style="height: 44%"></span></i
+            ><i><span style="height: 40%"></span></i><i><span style="height: 35%"></span></i
+            ><i><span style="height: 45%"></span></i><i><span style="height: 40%"></span></i
+            ><i><span style="height: 40%"></span></i><i><span style="height: 32%"></span></i
+            ><i><span style="height: 41%"></span></i><i><span style="height: 38%"></span></i
+            ><i><span style="height: 28%"></span></i><i><span style="height: 29%"></span></i
+            ><i><span style="height: 32%"></span></i><i><span style="height: 31%"></span></i
+            ><i><span style="height: 30%"></span><b style="height: 31%"></b></i
+            ><i><span style="height: 23%"></span><b style="height: 25%"></b></i
+            ><i><span style="height: 23%"></span><b style="height: 27%"></b></i
+            ><i><span style="height: 19%"></span><b style="height: 24%"></b></i
+            ><i><span style="height: 15%"></span><b style="height: 20%"></b></i
+            ><i><span style="height: 14%"></span><b style="height: 21%"></b></i
+            ><i><span style="height: 13%"></span><b style="height: 21%"></b></i
+            ><i><span style="height: 11%"></span><b style="height: 20%"></b></i
+            ><i><span style="height: 8%"></span><b style="height: 16%"></b></i
+            ><i><span style="height: 7%"></span><b style="height: 15%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 11%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 11%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+            ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <polyline points="0,100 2.4,0 71.4,0 100,100" />
+            </svg>
+          </div>
+          <span class="faint small">0:04</span>
+        </div>
+        <span class="faint small">Fades in 0.1 s · out 1.2 s · smooth</span>
+        <div class="take-row">
+          <button class="btn btn-small">Fades…</button><span class="grow"></span
+          ><button class="btn btn-small">Un-choose</button>
+        </div>
+      </section>
+      <div class="statehead">8 · When the music lock can't be read</div>
+      <div class="faint small">
+        Fades… waits, like Choose, Drop and Move…. The line that is already there gets one more word
+        (a change to settled wording).
+      </div>
+      <section class="panel">
+        <span class="small" style="color: var(--warn)"
+          >Choosing, dropping, moving and fading wait until the music lock can be read. You can
+          still listen and make more takes.</span
+        >
+        <div class="takes">
+          <div class="take">
+            <div class="take-row"><b class="grow">Take 2</b></div>
+            <span class="faint small">ElevenLabs Music</span>
+            <div class="take-row">
+              <span class="play">▶</span>
+              <div class="wave">
+                <i><span style="height: 4%"></span><b style="height: 8%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 8%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+                ><i><span style="height: 33%"></span><b style="height: 44%"></b></i
+                ><i><span style="height: 70%"></span><b style="height: 71%"></b></i
+                ><i><span style="height: 81%"></span></i><i><span style="height: 82%"></span></i
+                ><i><span style="height: 71%"></span></i><i><span style="height: 78%"></span></i
+                ><i><span style="height: 77%"></span></i><i><span style="height: 75%"></span></i
+                ><i><span style="height: 63%"></span></i><i><span style="height: 69%"></span></i
+                ><i><span style="height: 67%"></span></i><i><span style="height: 73%"></span></i
+                ><i><span style="height: 79%"></span></i><i><span style="height: 76%"></span></i
+                ><i><span style="height: 65%"></span></i><i><span style="height: 62%"></span></i
+                ><i><span style="height: 57%"></span></i><i><span style="height: 51%"></span></i
+                ><i><span style="height: 50%"></span></i><i><span style="height: 57%"></span></i
+                ><i><span style="height: 53%"></span></i><i><span style="height: 53%"></span></i
+                ><i><span style="height: 62%"></span></i><i><span style="height: 54%"></span></i
+                ><i><span style="height: 53%"></span></i><i><span style="height: 46%"></span></i
+                ><i><span style="height: 41%"></span></i><i><span style="height: 45%"></span></i
+                ><i><span style="height: 41%"></span></i><i><span style="height: 46%"></span></i
+                ><i><span style="height: 52%"></span></i><i><span style="height: 46%"></span></i
+                ><i><span style="height: 37%"></span></i><i><span style="height: 46%"></span></i
+                ><i><span style="height: 43%"></span></i><i><span style="height: 41%"></span></i
+                ><i><span style="height: 42%"></span></i><i><span style="height: 38%"></span></i
+                ><i><span style="height: 37%"></span><b style="height: 37%"></b></i
+                ><i><span style="height: 29%"></span><b style="height: 31%"></b></i
+                ><i><span style="height: 33%"></span><b style="height: 36%"></b></i
+                ><i><span style="height: 30%"></span><b style="height: 35%"></b></i
+                ><i><span style="height: 20%"></span><b style="height: 25%"></b></i
+                ><i><span style="height: 23%"></span><b style="height: 30%"></b></i
+                ><i><span style="height: 20%"></span><b style="height: 28%"></b></i
+                ><i><span style="height: 16%"></span><b style="height: 24%"></b></i
+                ><i><span style="height: 15%"></span><b style="height: 23%"></b></i
+                ><i><span style="height: 13%"></span><b style="height: 22%"></b></i
+                ><i><span style="height: 13%"></span><b style="height: 23%"></b></i
+                ><i><span style="height: 9%"></span><b style="height: 19%"></b></i
+                ><i><span style="height: 9%"></span><b style="height: 19%"></b></i
+                ><i><span style="height: 6%"></span><b style="height: 15%"></b></i
+                ><i><span style="height: 6%"></span><b style="height: 17%"></b></i
+                ><i><span style="height: 5%"></span><b style="height: 15%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 11%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+                ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+                ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <polyline points="0,100 7.1,0 64.3,0 100,100" />
+                </svg>
+              </div>
+              <span class="faint small">0:04</span>
+            </div>
+            <span class="faint small">Fades in 0.3 s · out 1.5 s · smooth</span>
+            <div class="take-row">
+              <button class="btn btn-small" disabled>Fades…</button><span class="grow"></span
+              ><button class="btn btn-ghost btn-small">Move…</button
+              ><button class="btn btn-ghost btn-small">Drop</button
+              ><button class="btn btn-small">Choose</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <div class="statehead">9 · A narrow window</div>
+      <div class="faint small">
+        The take cards stack into one column. In the editor, the boxes and Shape wrap onto their own
+        lines, and the buttons wrap under Remove fades.
+      </div>
+      <div style="max-width: 360px">
+        <div class="take editing">
+          <div class="take-row">
+            <b class="grow">Take 3</b><span class="chip chip-fade">fading</span>
+          </div>
+          <span class="faint small">ElevenLabs Music</span>
+          <div class="editor">
+            <div class="take-row">
+              <span class="play">▶</span
+              ><span class="small muted grow">Hear it with the fades</span>
+            </div>
+            <div class="wave wave-big">
+              <i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 7%"></b></i
+              ><i><span style="height: 6%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 53%"></span><b style="height: 53%"></b></i
+              ><i><span style="height: 66%"></span><b style="height: 66%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 86%"></span><b style="height: 86%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 79%"></span><b style="height: 79%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 71%"></span><b style="height: 71%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 69%"></span><b style="height: 69%"></b></i
+              ><i><span style="height: 73%"></span><b style="height: 73%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 67%"></span><b style="height: 67%"></b></i
+              ><i><span style="height: 64%"></span><b style="height: 64%"></b></i
+              ><i><span style="height: 50%"></span><b style="height: 50%"></b></i
+              ><i><span style="height: 63%"></span><b style="height: 63%"></b></i
+              ><i><span style="height: 59%"></span><b style="height: 59%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 45%"></span><b style="height: 45%"></b></i
+              ><i><span style="height: 60%"></span><b style="height: 60%"></b></i
+              ><i><span style="height: 51%"></span><b style="height: 51%"></b></i
+              ><i><span style="height: 55%"></span><b style="height: 55%"></b></i
+              ><i><span style="height: 56%"></span><b style="height: 56%"></b></i
+              ><i><span style="height: 52%"></span><b style="height: 52%"></b></i
+              ><i><span style="height: 54%"></span><b style="height: 54%"></b></i
+              ><i><span style="height: 44%"></span><b style="height: 44%"></b></i
+              ><i><span style="height: 49%"></span><b style="height: 49%"></b></i
+              ><i><span style="height: 42%"></span><b style="height: 42%"></b></i
+              ><i><span style="height: 48%"></span><b style="height: 48%"></b></i
+              ><i><span style="height: 46%"></span><b style="height: 46%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 41%"></span><b style="height: 41%"></b></i
+              ><i><span style="height: 33%"></span><b style="height: 33%"></b></i
+              ><i><span style="height: 34%"></span><b style="height: 34%"></b></i
+              ><i><span style="height: 29%"></span><b style="height: 29%"></b></i
+              ><i><span style="height: 30%"></span><b style="height: 30%"></b></i
+              ><i><span style="height: 27%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 26%"></span><b style="height: 27%"></b></i
+              ><i><span style="height: 24%"></span><b style="height: 25%"></b></i
+              ><i><span style="height: 25%"></span><b style="height: 26%"></b></i
+              ><i><span style="height: 21%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 20%"></span><b style="height: 23%"></b></i
+              ><i><span style="height: 18%"></span><b style="height: 21%"></b></i
+              ><i><span style="height: 16%"></span><b style="height: 20%"></b></i
+              ><i><span style="height: 12%"></span><b style="height: 17%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 13%"></b></i
+              ><i><span style="height: 9%"></span><b style="height: 15%"></b></i
+              ><i><span style="height: 7%"></span><b style="height: 14%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><i><span style="height: 4%"></span><b style="height: 6%"></b></i
+              ><svg class="env" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline
+                  points="0.00,100.0 0.50,78.2 1.00,57.4 1.50,38.7 2.00,22.9 2.50,10.9 3.00,3.1 3.50,0.0 4.00,0.0 4.50,0.0 5.00,0.0 5.50,0.0 6.00,0.0 6.50,0.0 7.00,0.0 7.50,0.0 8.00,0.0 8.50,0.0 9.00,0.0 9.50,0.0 10.00,0.0 10.50,0.0 11.00,0.0 11.50,0.0 12.00,0.0 12.50,0.0 13.00,0.0 13.50,0.0 14.00,0.0 14.50,0.0 15.00,0.0 15.50,0.0 16.00,0.0 16.50,0.0 17.00,0.0 17.50,0.0 18.00,0.0 18.50,0.0 19.00,0.0 19.50,0.0 20.00,0.0 20.50,0.0 21.00,0.0 21.50,0.0 22.00,0.0 22.50,0.0 23.00,0.0 23.50,0.0 24.00,0.0 24.50,0.0 25.00,0.0 25.50,0.0 26.00,0.0 26.50,0.0 27.00,0.0 27.50,0.0 28.00,0.0 28.50,0.0 29.00,0.0 29.50,0.0 30.00,0.0 30.50,0.0 31.00,0.0 31.50,0.0 32.00,0.0 32.50,0.0 33.00,0.0 33.50,0.0 34.00,0.0 34.50,0.0 35.00,0.0 35.50,0.0 36.00,0.0 36.50,0.0 37.00,0.0 37.50,0.0 38.00,0.0 38.50,0.0 39.00,0.0 39.50,0.0 40.00,0.0 40.50,0.0 41.00,0.0 41.50,0.0 42.00,0.0 42.50,0.0 43.00,0.0 43.50,0.0 44.00,0.0 44.50,0.0 45.00,0.0 45.50,0.0 46.00,0.0 46.50,0.0 47.00,0.0 47.50,0.0 48.00,0.0 48.50,0.0 49.00,0.0 49.50,0.0 50.00,0.0 50.50,0.0 51.00,0.0 51.50,0.0 52.00,0.0 52.50,0.0 53.00,0.0 53.50,0.0 54.00,0.0 54.50,0.0 55.00,0.0 55.50,0.0 56.00,0.0 56.50,0.0 57.00,0.0 57.50,0.0 58.00,0.0 58.50,0.0 59.00,0.0 59.50,0.0 60.00,0.0 60.50,0.0 61.00,0.0 61.50,0.0 62.00,0.0 62.50,0.0 63.00,0.0 63.50,0.0 64.00,0.0 64.50,0.0 65.00,0.0 65.50,0.0 66.00,0.0 66.50,0.0 67.00,0.0 67.50,0.0 68.00,0.0 68.50,0.0 69.00,0.0 69.50,0.0 70.00,0.0 70.50,0.0 71.00,0.0 71.50,0.0 72.00,0.0 72.50,0.2 73.00,0.4 73.50,0.6 74.00,1.0 74.50,1.4 75.00,1.9 75.50,2.5 76.00,3.1 76.50,3.9 77.00,4.7 77.50,5.5 78.00,6.5 78.50,7.5 79.00,8.5 79.50,9.7 80.00,10.9 80.50,12.2 81.00,13.5 81.50,14.9 82.00,16.4 82.50,18.0 83.00,19.6 83.50,21.2 84.00,22.9 84.50,24.7 85.00,26.6 85.50,28.5 86.00,30.4 86.50,32.4 87.00,34.5 87.50,36.6 88.00,38.7 88.50,40.9 89.00,43.1 89.50,45.4 90.00,47.8 90.50,50.1 91.00,52.5 91.50,55.0 92.00,57.4 92.50,59.9 93.00,62.5 93.50,65.0 94.00,67.6 94.50,70.2 95.00,72.9 95.50,75.5 96.00,78.2 96.50,80.9 97.00,83.6 97.50,86.3 98.00,89.0 98.50,91.8 99.00,94.5 99.50,97.3 100.00,100.0"
+                /></svg
+              ><span class="handle" style="left: calc(3.6% - 6px)"></span
+              ><span class="handle" style="left: calc(71.4% - 6px)"></span>
+            </div>
+            <div class="fades">
+              <label class="field">Fade in <input type="number" value="0.15" step="0.05" /> s</label
+              ><label class="field"
+                >Fade out <input type="number" value="1.2" step="0.05" /> s</label
+              ><label class="field"
+                >Shape
+                <select class="small">
+                  <option selected>Smooth</option>
+                  <option>Straight</option>
+                </select></label
+              >
+            </div>
+            <span class="faint small">Drag the handles or type a length; 0 is no fade.</span>
+            <div class="take-row">
+              <button class="btn btn-ghost btn-small">Remove fades</button><span class="grow"></span
+              ><button class="btn btn-small">Cancel</button
+              ><button class="btn btn-primary btn-small">Save fades</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statehead">10 · What stays</div>
+      <div class="faint small">
+        Saved fades belong to the take. They're still there after a reload, they go with the take
+        when it moves to another stinger, and they go when it's dropped. Lengths you haven't saved
+        are lost on a reload or when you leave the page. Un-choosing a faded take works as it does
+        today, and the take keeps its fades.
+      </div>
+      <div class="statehead">11 · How a take with fades plays</div>
+      <div class="faint small">
+        A take with fades of its own, whether on its card, in the editor or in the In the game
+        block, plays without the playback fade from Setup, exactly as the game will play it. A take
+        with no fades still gets the playback fade.
+      </div>
+    </main>
+  </body>
+</html>
