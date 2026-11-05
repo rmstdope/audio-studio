@@ -19,5 +19,5 @@
     "noUnusedParameters": true,
     "types": ["bun"]
   },
-  "include": ["bin", "src", "test"]
+  "include": ["bin", "scripts", "src", "test"]
 }

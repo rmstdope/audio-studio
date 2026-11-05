@@ -9,3 +9,6 @@ test/fixtures/**/*.json
 .github/agents
 .github/hooks
 .github/skills
+
+# Written by `bun run schema`, as JSON.stringify writes it; a test checks it is up to date.
+schema/

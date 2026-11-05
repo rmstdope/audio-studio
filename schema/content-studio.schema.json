@@ -1,0 +1,570 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmstdope/audio-studio/main/schema/content-studio.schema.json",
+  "title": "content-studio.json",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "number",
+      "const": 2
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "default": "",
+      "type": "string"
+    },
+    "env": {
+      "default": ".env",
+      "type": "string"
+    },
+    "partLabel": {
+      "default": "Part",
+      "type": "string",
+      "minLength": 1
+    },
+    "parts": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      }
+    },
+    "languages": {
+      "default": [
+        "en"
+      ],
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "refresh": {
+      "type": "object",
+      "properties": {
+        "part": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shared": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "narration": {
+      "type": "object",
+      "properties": {
+        "characters": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paths": {
+          "type": "object",
+          "properties": {
+            "dialog": {
+              "type": "string"
+            },
+            "cues": {
+              "type": "string"
+            },
+            "lock": {
+              "type": "string"
+            },
+            "clips": {
+              "type": "string"
+            },
+            "manifest": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "dialog",
+            "cues",
+            "lock",
+            "clips",
+            "manifest"
+          ]
+        },
+        "sceneCueSpeakers": {
+          "default": [
+            "narrator"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "models": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "audition": {
+              "default": "s2.1-pro-free",
+              "type": "string"
+            },
+            "draft": {
+              "default": "s2.1-pro-free",
+              "type": "string"
+            },
+            "final": {
+              "default": "s2.1-pro-free",
+              "type": "string"
+            }
+          }
+        },
+        "elevenlabs": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "models": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "audition": {
+                  "default": "eleven_v3",
+                  "type": "string"
+                },
+                "draft": {
+                  "default": "eleven_v3",
+                  "type": "string"
+                },
+                "final": {
+                  "default": "eleven_v3",
+                  "type": "string"
+                }
+              }
+            },
+            "tts": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "stability": {
+                  "default": 0.5,
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "const": 0
+                    },
+                    {
+                      "type": "number",
+                      "const": 0.5
+                    },
+                    {
+                      "type": "number",
+                      "const": 1
+                    }
+                  ]
+                },
+                "similarityBoost": {
+                  "default": 0.75,
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "style": {
+                  "default": 0,
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          }
+        },
+        "tts": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "temperature": {
+              "default": 0.7,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "topP": {
+              "default": 0.7,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "speed": {
+              "default": 1,
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "output": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "codec": {
+              "default": "mp3",
+              "type": "string",
+              "const": "mp3"
+            },
+            "bitrate": {
+              "default": "64k",
+              "type": "string"
+            },
+            "channels": {
+              "default": 1,
+              "anyOf": [
+                {
+                  "type": "number",
+                  "const": 1
+                },
+                {
+                  "type": "number",
+                  "const": 2
+                }
+              ]
+            },
+            "lufs": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": -70,
+                  "maximum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "quality": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "minHeard": {
+              "default": 0.9,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "takes": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "chunkLimit": {
+              "default": 400,
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 9007199254740991
+            },
+            "parallel": {
+              "default": 4,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "transcriber": {
+              "default": "mlx-whisper",
+              "type": "string",
+              "enum": [
+                "mlx-whisper",
+                "none"
+              ]
+            },
+            "whisperModel": {
+              "default": "mlx-community/whisper-large-v3-turbo",
+              "type": "string",
+              "minLength": 1
+            },
+            "soundAlike": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "minItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[^\\s,]*[\\p{L}\\p{N}][^\\s,]*(?: [^\\s,]*[\\p{L}\\p{N}][^\\s,]*)*$"
+                }
+              }
+            },
+            "soundAlikeByLanguage": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "minItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[^\\s,]*[\\p{L}\\p{N}][^\\s,]*(?: [^\\s,]*[\\p{L}\\p{N}][^\\s,]*)*$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "audition": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "phrase": {
+              "default": "Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.",
+              "type": "string",
+              "minLength": 1
+            },
+            "phrases": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "candidatesPerRound": {
+              "default": 5,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "language": {
+              "default": "en",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [
+        "characters",
+        "paths"
+      ]
+    },
+    "music": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": [
+            "balanced",
+            "quick",
+            "quickest",
+            "careful",
+            "short",
+            "shortest",
+            "eleven"
+          ]
+        },
+        "paths": {
+          "type": "object",
+          "properties": {
+            "loops": {
+              "type": "string",
+              "minLength": 1
+            },
+            "stingers": {
+              "type": "string",
+              "minLength": 1
+            },
+            "briefs": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lock": {
+              "type": "string",
+              "minLength": 1
+            },
+            "clips": {
+              "type": "string",
+              "minLength": 1
+            },
+            "manifest": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "loops",
+            "stingers",
+            "briefs",
+            "lock",
+            "clips",
+            "manifest"
+          ]
+        }
+      },
+      "required": [
+        "paths"
+      ]
+    },
+    "images": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": [
+            "klein",
+            "z-image-turbo"
+          ]
+        },
+        "paths": {
+          "type": "object",
+          "properties": {
+            "list": {
+              "type": "string",
+              "minLength": 1
+            },
+            "style": {
+              "type": "string",
+              "minLength": 1
+            },
+            "prompts": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lock": {
+              "type": "string",
+              "minLength": 1
+            },
+            "clips": {
+              "type": "string",
+              "minLength": 1
+            },
+            "manifest": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "list",
+            "style",
+            "prompts",
+            "lock",
+            "clips",
+            "manifest"
+          ]
+        }
+      },
+      "required": [
+        "paths"
+      ]
+    },
+    "effects": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": [
+            "small-sfx",
+            "open-1"
+          ]
+        },
+        "paths": {
+          "type": "object",
+          "properties": {
+            "list": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lock": {
+              "type": "string",
+              "minLength": 1
+            },
+            "clips": {
+              "type": "string",
+              "minLength": 1
+            },
+            "manifest": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "list",
+            "lock",
+            "clips",
+            "manifest"
+          ]
+        }
+      },
+      "required": [
+        "paths"
+      ]
+    },
+    "scenes": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "object",
+          "properties": {
+            "declarations": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mix": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "declarations",
+            "mix"
+          ]
+        },
+        "loudness": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "type": "number",
+              "minimum": -70,
+              "maximum": 0
+            },
+            "tolerance": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "target",
+            "tolerance"
+          ]
+        }
+      },
+      "required": [
+        "paths"
+      ]
+    }
+  },
+  "required": [
+    "version",
+    "name",
+    "parts",
+    "narration"
+  ]
+}
