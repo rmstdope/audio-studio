@@ -1,0 +1,79 @@
+import { dirname } from 'node:path'
+import {
+  LoudnessFileSchema,
+  type LoudnessFile,
+  type SceneKept,
+  type SceneMeasure,
+} from '../core/sceneLoudness'
+import { sameMix } from '../core/sceneEdit'
+import type { Problem } from '../core/project'
+import type { SceneMix } from '../core/scenes'
+import { readResource, writeAtomic } from './files'
+import { createSerial } from './serial'
+
+/** Where the measures of the scenes are kept, in the studio's own folder of the consumer. */
+export const LOUDNESS_FILE = '.content-studio/scene-loudness.json'
+
+/**
+ * The kept measures, act by act and scene by scene. A file that is not there is an empty one. One
+ * that cannot be read is reported and read as empty: it only holds figures that can be measured again.
+ */
+export async function readMeasures(root: string, problems: Problem[]): Promise<LoudnessFile> {
+  const read = await readResource(root, LOUDNESS_FILE, LoudnessFileSchema, problems)
+  return read === 'missing' || read === 'invalid' ? {} : read
+}
+
+/** One change at a time per project: each reads the file the one before wrote. */
+const writes = createSerial()
+
+/** Reads the file, lets `change` edit it, and writes it back. */
+function edit(projectFile: string, change: (file: LoudnessFile) => void): Promise<void> {
+  return writes.run(projectFile, async () => {
+    const root = dirname(projectFile)
+    const file = await readMeasures(root, [])
+    change(file)
+    await writeAtomic(root, LOUDNESS_FILE, `${JSON.stringify(file, null, 2)}\n`)
+  })
+}
+
+/**
+ * Keeps what measuring a scene found. The measure of the saved scene replaces the saved one and
+ * drops a draft; the measure of the open scene with unsaved changes (`draft`) is kept beside the
+ * saved one, so Discard can put the saved figures back.
+ */
+export function keepMeasure(
+  projectFile: string,
+  part: string,
+  sceneId: string,
+  measure: SceneMeasure,
+  draft: boolean,
+): Promise<void> {
+  return edit(projectFile, (file) => {
+    const act = (file[part] ??= {})
+    const was: SceneKept = act[sceneId] ?? { saved: null, draft: null }
+    act[sceneId] = draft ? { ...was, draft: measure } : { saved: measure, draft: null }
+  })
+}
+
+/**
+ * A scene was saved as `entry`: a draft measured from exactly that becomes the saved figures,
+ * any other draft is dropped (it was measured from something that is no longer on the page).
+ * Writes nothing when the scene has no draft.
+ */
+export async function sceneSaved(
+  projectFile: string,
+  part: string,
+  sceneId: string,
+  entry: SceneMix,
+): Promise<void> {
+  const has = await readMeasures(dirname(projectFile), [])
+  if (!has[part]?.[sceneId]?.draft) return
+  await edit(projectFile, (file) => {
+    const kept = file[part]?.[sceneId]
+    if (!kept?.draft) return
+    file[part]![sceneId] = {
+      saved: sameMix(kept.draft.entry, entry) ? kept.draft : kept.saved,
+      draft: null,
+    }
+  })
+}
