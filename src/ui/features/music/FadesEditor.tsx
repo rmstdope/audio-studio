@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import {
+  EMPTY_LINE,
   FADE_SHAPES,
   FADE_STEP,
   envelopePoints,
@@ -215,7 +216,8 @@ export function FadesEditor({
 
   const lengthBox = (label: string, text: string, onText: (value: string) => void) => {
     const value = lengthOf(text)
-    const bad = Number.isNaN(value) || value < 0 || (problem !== null && value >= 0)
+    // An empty or negative box is the offender; when the lengths are too long together, both are.
+    const bad = Number.isNaN(value) || value < 0 || (problem !== null && problem !== EMPTY_LINE)
     return (
       <label className="field">
         {label}

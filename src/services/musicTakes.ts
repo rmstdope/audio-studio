@@ -164,12 +164,12 @@ export function musicTakeHash(inputs: Inputs): string {
 /** A model as a take's line says it: "Balanced · XL turbo · 4B". */
 const lineOf = (model: MusicModelId) => modelLine(musicModel(model).recipe)
 
-/** A failure as a sentence for the page. */
 /** What a take sounds like in the game: the WAV as generated, with its fades if it has any. */
 function soundOf(take: BoardTake, wav: Uint8Array): Uint8Array {
   return take.fades && hasFades(take.fades) ? writeWav(applyFades(readWav(wav), take.fades)) : wav
 }
 
+/** A failure as a sentence for the page. */
 function describeFailure(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
   const prefix = 'The music generator: '
@@ -773,7 +773,7 @@ export function createMusicTakes({
           } catch {
             return { ok: false, message: 'That take’s sound is gone, so it cannot be faded.' }
           }
-          // The lock keeps the moment it was chosen: only the sound changes.
+          // Only the sound changes: the manifest and the lock (an accepted change too) stay as they are.
           const done = await commitChoice({
             root: found.root,
             projectFile,
@@ -783,7 +783,7 @@ export function createMusicTakes({
             take: next,
             wav: soundOf(next, wav),
             encode,
-            now: () => new Date(chosen.at),
+            soundOnly: true,
           })
           if (!done.ok) return done
         }

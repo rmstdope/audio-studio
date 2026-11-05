@@ -133,6 +133,18 @@ describe('the fades editor', () => {
     expect(e.button('Save fades')?.disabled).toBe(true)
   })
 
+  it('reddens only the box that is empty or negative, but both when together they are too long', () => {
+    const e = open()
+    e.type(e.box('Fade in'), '')
+    e.type(e.box('Fade out'), '1')
+    expect(e.box('Fade in').getAttribute('aria-invalid')).toBe('true')
+    expect(e.box('Fade out').getAttribute('aria-invalid')).toBeNull()
+    e.type(e.box('Fade in'), '3')
+    e.type(e.box('Fade out'), '3')
+    expect(e.box('Fade in').getAttribute('aria-invalid')).toBe('true')
+    expect(e.box('Fade out').getAttribute('aria-invalid')).toBe('true')
+  })
+
   it('saves the lengths and the shape, and closes', async () => {
     const e = open()
     e.type(e.box('Fade in'), '0.3')

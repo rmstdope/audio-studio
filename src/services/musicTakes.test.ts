@@ -1521,6 +1521,22 @@ describe('fading a stinger take', () => {
     expect((await takeOf(made)).fades).toBeUndefined()
   })
 
+  it('leaves an accepted change accepted: only the sound is written again', async () => {
+    const made = await stinger()
+    await made.takes.choose(made.file, 'victory', made.name)
+    await setTrackBrief(made.file, 'victory', { brief: 'a drum' })
+    expect(await made.takes.accept(made.file, 'victory')).toEqual({ ok: true })
+    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
+    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(await made.takes.setFades(made.file, 'victory', made.name, null)).toEqual({ ok: true })
+    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    const loaded = await loadProject(made.file)
+    if (!loaded.ok) throw new Error('project')
+    const row = loaded.summary.music!.lists.find((l) => l.kind === 'stingers')!.tracks[0]!
+    expect(row.status).toBe('chosen')
+  })
+
   it('changes nothing when the game file cannot be written', async () => {
     const made = await stinger()
     await made.takes.choose(made.file, 'victory', made.name)
@@ -1578,5 +1594,7 @@ describe('fading a stinger take', () => {
     if (!moved || !('ok' in moved) || !moved.ok) throw new Error('expected a view')
     expect(moved.takes[0]!.fades).toEqual(fades)
     expect(await made.takes.drop(made.file, 'defeat', moved.takes[0]!.file)).toEqual({ ok: true })
+    const board = readFileSync(join(made.root, '.content-studio/music/defeat.json'), 'utf8')
+    expect(board).not.toContain('fades')
   })
 })

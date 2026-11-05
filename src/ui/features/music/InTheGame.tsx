@@ -271,7 +271,9 @@ export function InTheGame({
                 : undefined
             }
             onClick={() => {
-              if (fading === null) onFades(take.n)
+              if (fading !== null) return
+              if (player.playing === `music-take-${track.id}-${take.n}`) player.stop()
+              onFades(take.n)
             }}
           >
             Fades…
