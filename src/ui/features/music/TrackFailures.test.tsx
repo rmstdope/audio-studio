@@ -217,6 +217,66 @@ describe('a track shows only the red line of the action pressed last', () => {
     expect(lines()[0]).toContain('The fades could not be saved.')
   })
 
+  it('hides a failed Drop’s line when a later action is pressed', async () => {
+    const { button, lines } = render(view([take(1), take(2)]))
+    refuse = ['.1.wav']
+    await click(button('Drop', 0))
+    expect(lines()).toHaveLength(1)
+    refuse = []
+    await click(button('Trim silence', 1))
+    expect(lines()).toEqual([])
+  })
+
+  it('hides a failed Un-choose’s line when a later action is pressed', async () => {
+    const { button, container, lines } = render(
+      view([take(9, { chosen: true }), take(1)]),
+      inGameRow,
+    )
+    refuse = ['/unchoose']
+    await click(button('Un-choose'))
+    await click(
+      [...container.querySelectorAll<HTMLButtonElement>('.btn-primary')].find(
+        (b) => b.textContent === 'Un-choose',
+      )!,
+    )
+    expect(lines()).toHaveLength(1)
+    refuse = []
+    await click(button('Choose', 0))
+    expect(lines()).toEqual([])
+  })
+
+  it('has dropped the old line while the new action is still working', async () => {
+    const { button, lines } = render(view([take(1), take(2)]))
+    refuse = ['/choose']
+    await click(button('Choose', 0))
+    expect(lines()).toHaveLength(1)
+    const ok = globalThis.fetch
+    let release: () => void = () => {}
+    globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+      await new Promise<void>((resolve) => (release = resolve))
+      return ok(...args)
+    }) as typeof fetch
+    refuse = []
+    await click(button('Trim silence', 1))
+    expect(button('Trimming…', 1)).toBeDefined()
+    expect(lines()).toEqual([])
+    await act(async () => {
+      release()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  })
+
+  it('leaves another track’s page alone', async () => {
+    const a = render(view([take(1)]))
+    const b = render(view([take(1)]))
+    refuse = ['/choose']
+    await click(a.button('Choose', 0))
+    refuse = []
+    await click(b.button('Choose', 0))
+    expect(a.lines()).toHaveLength(1)
+    expect(b.lines()).toEqual([])
+  })
+
   it('leaves no line on a track after a reload', async () => {
     const first = render(view([take(1)]))
     refuse = ['/choose']
