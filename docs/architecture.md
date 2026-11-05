@@ -2023,7 +2023,7 @@ one that cannot be read is reported and read as empty. The figures reach the pag
 a measure puts a scene off the target, one line under the Loudness table offers a single change for
 the whole scene (`suggestChange` in `core/sceneLoudness.ts`): the even dB that puts the middle of the
 measured states on the target, one decimal; the closest one when no change fits every state; only as
-much as keeps every level within 300%; nothing when the states disagree and the best change is under
+much as keeps every level within 300%, and the line then names each state ("The scene" when it has none) still too quiet, with its own figure; nothing when the states disagree and the best change is under
 0.5 dB. The press (`scaleDraft`) multiplies the music and every effect by the same factor, to a whole
 percent, **on the page only**: Save keeps it, Discard undoes it. The table then shows the expected
 figures (measured + dB). The page sends the move with Save (`moved: { db, measuredAt }`); if the

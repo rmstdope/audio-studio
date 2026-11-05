@@ -152,11 +152,15 @@ export function suggestionLine(
   const strong = changeWord(db)
   const button = `Make ${strong}`
   if (ceiling) {
-    const still = joined(ceiling.still.map((n) => n.toFixed(1)))
+    const still = joined(
+      ceiling.still.map(
+        (s, i) => `${s.name}${i === 0 ? ' would still be' : ''} ${s.db.toFixed(1)} dB`,
+      ),
+    )
     return {
       before: 'Make the whole scene ',
       strong,
-      after: ` — as far as it goes before ${ceiling.sound} passes 300%. ${ceiling.still.length === 1 ? 'That state would' : 'The states would'} still be ${still} dB too quiet; turn ${ceiling.sound} down or the others up by hand to go further.`,
+      after: ` — as far as it goes before ${ceiling.sound} passes 300%. ${still} too quiet; turn ${ceiling.sound} down or the others up by hand to go further.`,
       button,
     }
   }

@@ -227,7 +227,19 @@ describe('suggestChange', () => {
     const out = change([-23.4, -24.6], mixOf({ 'cat-purr': 2.6 }, 1))
     expect(out).toMatchObject({
       db: 1.2,
-      ceiling: { sound: 'cat-purr', still: [2.2, 3.4] },
+      ceiling: {
+        sound: 'cat-purr',
+        still: [
+          { name: 's0', db: 2.2 },
+          { name: 's1', db: 3.4 },
+        ],
+      },
+    })
+  })
+  it('names the scene itself when it has no states', () => {
+    const m = measure([-24.6], { states: [{ state: null, lufs: -24.6 }] })
+    expect(suggestChange(m, t2, mixOf({ 'cat-purr': 2.6 }, 1))).toMatchObject({
+      ceiling: { still: [{ name: 'The scene', db: 3.4 }] },
     })
   })
   it('is not a ceiling when the capped change still brings every state within the tolerance', () => {

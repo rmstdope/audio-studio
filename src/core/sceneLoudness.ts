@@ -265,8 +265,8 @@ export type Suggestion =
       states: number
       /** No single change fits every state: how far apart they are, and how far the best one leaves each outside the tolerance. */
       closest: { apart: number; leaving: number } | null
-      /** A level would pass 300%: which sound, and how far from the target (dB) each state still is. */
-      ceiling: { sound: string; still: number[] } | null
+      /** A level would pass 300%: which sound, and each state still too quiet with how far (dB) it is, in table order ('The scene' when it has none). */
+      ceiling: { sound: string; still: { name: string; db: number }[] } | null
     }
   /** States on both sides of the target and the best change under 0.5 dB: nothing to press. */
   | { kind: 'none'; loud: string[]; quiet: string[] }
@@ -304,7 +304,7 @@ export function suggestChange(
     ...mix.effects.map((e) => ({ id: e.id, level: e.level })),
   ]
   const top = sounds.reduce((a, b) => (b.level > a.level ? b : a), { id: '', level: 0 })
-  let ceiling: { sound: string; still: number[] } | null = null
+  let ceiling: Extract<Suggestion, { kind: 'change' }>['ceiling'] = null
   if (db > 0 && top.level > 0) {
     const room = Math.floor(20 * Math.log10(MAX_LEVEL / top.level) * 10) / 10
     if (room < db) {
@@ -312,7 +312,7 @@ export function suggestChange(
       db = room
       const still = read
         .filter((s) => s.off + db < -target.tolerance)
-        .map((s) => oneDecimal(-(s.off + db)))
+        .map((s) => ({ name: s.name, db: oneDecimal(-(s.off + db)) }))
       // Within the tolerance after all: an ordinary change, with nothing left to explain.
       if (still.length > 0) ceiling = { sound: top.id, still }
     }

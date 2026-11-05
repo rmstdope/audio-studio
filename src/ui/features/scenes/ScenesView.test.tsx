@@ -1957,7 +1957,7 @@ describe('the loudness suggestion', () => {
     )
     const capped = render(open, withMeasure(saved(2.5), 2.5))
     expect(line(capped)).toBe(
-      'Make the whole scene 1.5 dB louder — as far as it goes before shop-bell passes 300%. That state would still be 3.1 dB too quiet; turn shop-bell down or the others up by hand to go further.Make 1.5 dB louder',
+      'Make the whole scene 1.5 dB louder — as far as it goes before shop-bell passes 300%. cat-home would still be 3.1 dB too quiet; turn shop-bell down or the others up by hand to go further.Make 1.5 dB louder',
     )
     const nothing = render(
       open,
