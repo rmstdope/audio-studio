@@ -38,6 +38,19 @@ describe('CastSchema', () => {
     })
   })
 
+  it('reports pronunciations left in the old place, under languages', () => {
+    const old = CastSchema.safeParse({ speakers: {}, languages: { sv: { pronounce: {} } } })
+    if (old.success) throw new Error('expected a top-level languages to be refused')
+    expect(problemsFrom('content-studio/narration/cast.json', old.error)).toEqual([
+      {
+        file: 'content-studio/narration/cast.json',
+        path: 'languages',
+        message:
+          'pronunciations are now under pronounce.<language> (pronounce.sv), not under languages; move them there',
+      },
+    ])
+  })
+
   it('refuses a speed Fish cannot speak at', () => {
     const slow = CastSchema.safeParse({ speakers: { a: { speed: 0.2 } } })
     const fast = CastSchema.safeParse({ speakers: { a: { speed: 2.5 } } })
@@ -187,6 +200,13 @@ describe('the narration edits', () => {
     })
     expect(cuesOfEdits(edits)).toEqual({ a1: '[hushed]', [sceneKey('lantern-hall')]: '[slow]' })
     expect(cuesOfEdits(NarrationEditsSchema.parse({}))).toEqual({})
+  })
+
+  it('takes only line ids under cues, so a scene key written there is reported, not read as a scene', () => {
+    const wrong = NarrationEditsSchema.safeParse({ cues: { 'scene:hall': '[slow]' } })
+    if (wrong.success) throw new Error('expected a scene key under cues to be refused')
+    expect(problemsFrom('e.json', wrong.error).map((p) => p.path)).toEqual(['cues.scene:hall'])
+    expect(NarrationEditsSchema.safeParse({ cues: { 'a_1-B': '[x]' } }).success).toBe(true)
   })
 
   it('refuses a field it does not know, so an old flat file is reported', () => {

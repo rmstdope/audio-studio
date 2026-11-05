@@ -1,13 +1,18 @@
 import { z } from 'zod'
 
+/** What a line id may hold: it names the line's clip file, so safe file-name characters only. */
+const LINE_ID = /^[A-Za-z0-9_-]+$/
+
+/** What is wrong with a line id that does not fit `LINE_ID`. */
+const LINE_ID_MESSAGE = 'a line id may only hold letters, digits, - and _'
+
 /**
  * One voiced line of a part's dialog as the game lists it: its id, who says it, and the words
  * (`title` is the game's own and unused). The rest of the studio knows the id as the line's `key`.
  */
 export const LineSchema = z
   .object({
-    // The id names the line's clip file (`<id>.mp3`), so it may only hold safe file-name characters.
-    id: z.string().regex(/^[A-Za-z0-9_-]+$/, 'a line id may only hold letters, digits, - and _'),
+    id: z.string().regex(LINE_ID, LINE_ID_MESSAGE),
     title: z.string().optional(),
     speaker: z.string().min(1),
     text: z.string(),
@@ -95,10 +100,25 @@ const PronounceSchema = z
  * The cast (`content-studio/narration/cast.json`): every speaker by the name the dialog uses, and
  * how words are said, by language (the source language included).
  */
-export const CastSchema = z.looseObject({
-  speakers: z.record(z.string(), CharacterSchema).default({}),
-  pronounce: z.record(z.string(), PronounceSchema).default({}),
-})
+export const CastSchema = z
+  .looseObject({
+    speakers: z.record(z.string(), CharacterSchema).default({}),
+    pronounce: z.record(z.string(), PronounceSchema).default({}),
+  })
+  .superRefine((cast, context) => {
+    // Where each language's pronunciations were before format version 2: say where they go now.
+    if (!Object.hasOwn(cast, 'languages')) return
+    const old = cast.languages
+    const codes =
+      old !== null && typeof old === 'object' ? Object.keys(old).map((c) => `pronounce.${c}`) : []
+    context.addIssue({
+      code: 'custom',
+      path: ['languages'],
+      message: `pronunciations are now under pronounce.<language>${
+        codes.length ? ` (${codes.join(', ')})` : ''
+      }, not under languages; move them there`,
+    })
+  })
 
 /** A character's casting in one language: nulls where it has none. */
 export interface LanguageCasting {
@@ -221,7 +241,7 @@ export function editsPathOf(key: string): string {
  * lines by line id, and of scenes by the scene's name as the dialog gives it.
  */
 export const NarrationEditsSchema = z.strictObject({
-  cues: CuesSchema.default({}),
+  cues: z.record(z.string().regex(LINE_ID, LINE_ID_MESSAGE), z.string()).default({}),
   scenes: CuesSchema.default({}),
 })
 
