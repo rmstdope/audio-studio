@@ -52,13 +52,11 @@ retroquest/                      ← user runs `content-studio` here
 ├── content-studio/              ← the studio folder: its .gitignore (written at start if missing) keeps cache/ out
 │   └── cache/                   ← tool state: takes (narration's and music's), auditions, ruled-out voices, what was heard, settings
 │   └── narration/               ← cast.json (the cast), act1.edits.json (an act's cues), act1.lock.json (what its clips were made from)
+│   └── music/                   ← edits.json (the studio's changes to the tracks), lock.json (the chosen take of each track)
 ├── tts/act1/
 │   ├── script.json              ← dialog resource (read)
 │   └── music.json               ← the act's loops, from the game (read; built, §8.5)
 ├── tts/stingers.json            ← the game's stingers (read; built)
-├── music/
-│   ├── briefs.json              ← the studio's changes to the game's briefs (read + written)
-│   └── music.lock.json          ← the chosen take of each track (written, committed)
 └── web/public/audio/
     ├── narration/act1/
     │   ├── *.mp3                ← clips (written)
@@ -829,73 +827,56 @@ is made like a voice is cast: a brief, several generated takes to listen to, and
 The steps are in §12, step 12; the spike's findings (12.1) are in §13, decision 5. The screens are
 drawn in `docs/ui/music-workspace.html`.
 
-**Project file.** An optional `music` section beside `narration`, its acts the narration's parts.
-Only the paths and the model are settled; the number of takes and the output settings are fixed in
-the code until a project needs another value. `model` (optional; `balanced`, `quick`, `quickest`,
-`careful`, `short` or `shortest`, Balanced when absent) is the music model new takes are made with, saved from Setup's
-Models panel (the fifth place the studio writes the project file, with the same rules as the
-stages' models):
-
-```json
-"music": {
-  "model": "balanced",
-  "paths": {
-    "loops": "tts/{part}/music.json",
-    "stingers": "tts/stingers.json",
-    "briefs": "music/briefs.json",
-    "lock": "music/music.lock.json",
-    "clips": "web/public/audio/music/generated",
-    "manifest": "web/public/audio/music/generated/manifest.json"
-  }
-}
-```
+**Files.** The music files' format is in [docs/project-files.md](project-files.md): the `music`
+section of the project file (`from.part` for each act's loops, `from.shared` for the stingers, each
+optional with at least one, `model`, `clips`, `manifest`), the track lists, the studio's edits
+(`content-studio/music/edits.json`) and lock (`content-studio/music/lock.json`), and the manifest.
+This section says how the studio uses them. An act's pages exist only with `from.part`, the
+Stingers page only with `from.shared`. The number of takes and the output settings are fixed in the
+code until a project needs another value. `model` (Balanced when absent) is the music model new
+takes are made with, saved from Setup's Models panel (the fifth place the studio writes the project
+file, with the same rules as the stages' models).
 
 The clips folder is the studio's own: tracks that are not the studio's (RetroQuest's freetouse.com
-files) stay where they are, untouched. The music files (the game's lists, the studio's briefs, the
-lock, the clips and the manifest) join the Changes panel (§8.3); `briefs.json` is committed, the
+files) stay where they are, untouched. The music files (the game's lists, the studio's edits, the
+lock, the clips and the manifest) join the Changes panel (§8.3); the edits are committed, the
 studio's own changes to the game's music. No music path may hold `{language}`: music is the same in
 every language. The top-level `refresh.shared` (§5) is the game's command for what belongs to no
 act (the stingers, and the sound effects alike), run in the project root by Refresh from the game
 on the Stingers page, as `refresh.part` is for an act; without it the page has no such button.
 
-**Track lists** (read only, written by the game): an act's loops in `loops`, written by the game's
-own `refresh.part` command for that part alongside its dialog, and the stingers for the whole game
-in `stingers`, written by `refresh.shared`. Both are lists in the game's order. A list that is there
+**Track lists** (read only, written by the game): an act's loops in `from.part`, written by the
+game's own `refresh.part` command for that part alongside its dialog, and the stingers for the whole
+game in `from.shared`, written by `refresh.shared`. Both are lists in the game's order. A list that is there
 and empty means the game asks for none; a list that is not there yet means the game has not listed
 them ("The game has not listed the loops for Act IV yet."), and no track is taken for an orphan
 because of it.
 
-```json
-[
-  {
-    "id": "willowbrook-village",
-    "title": "Willowbrook village",
-    "plays": "Willowbrook, the village square",
-    "brief": "gentle medieval village, lute and recorder, warm, unhurried",
-    "seconds": 90,
-    "bpm": 84,
-    "key": "D major"
-  }
-]
-```
-
-The file says the kind: a track in `loops` is a loop, one in `stingers` a stinger. A track's id
+A track is `{ id, title, text, seconds, bpm?, key?, plays?, file? }` (project-files.md); its `text`
+is what the studio calls the track's **brief**, in its pages, its API and its code. The file says
+the kind: a track in the parts' lists is a loop, one in the shared list a stinger. A track's id
 names its file in the one clips folder, so it is a slug (`^[a-z0-9]+(-[a-z0-9]+)*$`) and unique
 across the game (a second use is a problem with both files and paths, and neither track is shown or
 made until it is resolved). `plays` (where the game plays
 it, shown under its name), `file` (the music file the game plays for the track now, a path inside the
 project root to an `.mp3`, `.ogg`, `.wav`, `.m4a` or `.flac`; read only, never moved, levelled,
-re-encoded or written, and never taken as a chosen take) and `bpm` and `key` are optional; `brief` and `seconds` are the game's
+re-encoded or written, and never taken as a chosen take) and `bpm` and `key` are optional; `text` and `seconds` are the game's
 starting point. Tracks are always instrumental (no lyrics). `bpm` and `key` ("D major") are passed
 to ACE-Step as its own fields; their allowed values are settled in 12.2. A stinger is at most 10
 seconds.
 
-**Briefs** (`music/briefs.json`, read and written by the studio): what the studio changed of a
-track's brief, length, tempo and key, `{ id: { brief?, seconds?, bpm?, key? } }`, like a line's
-cue over a character's style; `null` for `bpm` or `key` means none, over the game's. A field changed
-on the track's page is saved as the field is left and marked "changed here"; "use the game's", or a
-value typed back to the game's, removes it again. The game's lists are never written.
-Validated like every resource and written through `writeAtomic` in stable key order.
+**Edits** (`content-studio/music/edits.json`, read and written by the studio): what the studio
+changed of a track's brief, length, tempo and key, `{ id: { text?, gameWas?, seconds?, bpm?, key? } }`,
+like a line's cue over a character's style; `null` for `bpm` or `key` means none, over the game's. A
+field changed on the track's page is saved as the field is left and marked "changed here"; "use the
+game's", or a value typed back to the game's, removes it again. A reworded brief is saved as `text`
+with the game's brief it was written over (`gameWas`). When the game's brief later differs from
+`gameWas`, the track's page says "The game's brief changed since you changed yours." with the game's
+brief now, **Use the game's** (the studio's brief goes) and **Keep mine** (`POST
+/api/music/tracks/:id/keep-mine`: the studio's stays, `gameWas` becomes the game's brief now), and
+its list shows "game's changed" beside the brief, as sound effects and images do. The game's lists
+are never written. Validated like every resource and written through `writeAtomic`, one track per
+line in id order.
 
 **Pages.** The sidebar lists a workspace's acts only while one of its pages is open (Narration's
 acts the same way); on Setup and the project pages both are folded. Each act shows how far it is,
@@ -1022,8 +1003,9 @@ Setup**, and takes cannot be made.
 duration } }`, its layout fixed once written. The game decides where a track plays, so the kind is
 not in it.
 
-**Lock** (`music.lock.json`, committed, one entry per line, `{ fp, model, seed?, list, take, inputs,
-at }`): per track, the chosen take's model,
+**Lock** (`content-studio/music/lock.json`, committed, one entry per line, `{ fp, model, seed?, list,
+take, inputs, at }` as project-files.md gives it, `inputs.text` being the brief and `list` an act's
+id or `shared` for a stinger): per track, the chosen take's model,
 seed (when its model takes one), the number of the take on the board, a hash of what went into it (brief, kind, seconds, bpm, key; not the output settings,
 as narration leaves the loudness out; the chosen take's own inputs, so a take from an earlier brief
 leaves the track "changed since chosen"), which list it came from (an act or the stingers), and when
@@ -1038,10 +1020,10 @@ while its list is there, is an orphan, shown on the page of the list its lock en
 the lock keeps no title) with its file name under it, when it was chosen, and **Remove**. Remove
 asks first ("Remove the music for Castle gates?", saying what goes) and then deletes, in this
 order so a failure can be repeated, its manifest entry, its clip, its board and takes and its lock
-entry, then its briefs entry (which the next save of the briefs would drop anyway) (`POST /api/music/tracks/:id/remove`, 404 for a track that is not
+entry, then its edits entry (which the next save of the edits would drop anyway) (`POST /api/music/tracks/:id/remove`, 404 for a track that is not
 an orphan; a manifest or lock that cannot be read deletes nothing). A list that is missing or
-unreadable has no orphans, and one another list names is not one. The briefs and board of a track
-never chosen that no list names are dropped at the next save of the briefs, and only when every
+unreadable has no orphans, and one another list names is not one. The edits and board of a track
+never chosen that no list names are dropped at the next save of the edits, and only when every
 list is there (which list named a track never chosen is not known); while a list is missing,
 nothing is dropped.
 
@@ -1470,7 +1452,7 @@ file) names the act, and a missing, unlisted or style-less pick is the first lis
 it adds none). `PATCH /api/images/:id/act-style` takes `{ on }` or `{ from: <act id> | null }`. The
 screens are drawn in `docs/ui/as-94e-shared-images.html`.
 
-**The studio's own words** are `paths.prompts`, committed like `briefs.json` and joining the Changes
+**The studio's own words** are `paths.prompts`, committed like the music edits and joining the Changes
 panel: `{ images: { <id>: { words, gameWas } }, style: { look?, keepOut? }, actStyleOff?: [<id>], actStyleFrom?: { <id>: <act id> } }`. `gameWas` is the game's
 text when the words were written; a game description that differs from it raises the compare notice
 (**Keep mine** moves `gameWas`, **Use the game's** removes the words). Emptied words, or the game's
@@ -2078,6 +2060,7 @@ POST   /api/scene-loudness/:part                 measure every scene of an act i
 GET    /api/scene-loudness                       the acts being measured, scenes done out of all
 GET    /api/credit                               the Fish account's API credit (dollars)
 GET    /api/setup                                what the machine and project lack (ffmpeg, uv, key, Fish, ACE-Step)
+POST   /api/music/tracks/:id/keep-mine           keep the studio's brief over the game's changed one (404 for a track nobody lists)
 GET    /api/music/tracks/:id/takes               a track's takes, those being made, failures, and whether takes can be made
 POST   /api/music/tracks/:id/takes               { count } or { retry } queue takes (409 and why if the generator is not ready)
 POST   /api/music/tracks/:id/choose              { file } make a take the track's music: levelled, encoded, manifest and lock written (409 and why if it cannot)
@@ -2603,7 +2586,11 @@ Small, independently useful increments:
        and the cast, the cues (`{ cues, scenes }`) and the lock (`hashes`) at fixed places in
        `content-studio/narration/`. The fingerprint is unchanged, so a converted game's clips stay
        as they stood.
-    4. **Music and stingers** (as-6u9.4): the lists, the edits in place of the briefs, the lock.
+    4. **Music and stingers** (as-6u9.4, built): the `music` section (`from.part`, `from.shared`,
+       `model`, `clips`, `manifest`), tracks' words as `text`, the edits (`{ text, gameWas,
+seconds, bpm, key }`, the game's changed brief shown with Use the game's and Keep mine) and
+       the lock (`inputs.text`, `list: "shared"`) at fixed places in `content-studio/music/`. The
+       take hashes and the cache are unchanged, so a converted game's tracks stay as they stood.
     5. **Images** (as-6u9.5): the lists, the style and rewordings as edits, the lock.
     6. **Sound effects** (as-6u9.6): the list, the rewordings committed as edits, the lock.
     7. **Scenes** (as-6u9.7): the declarations, the mix and the kept loudness as the scenes lock.
