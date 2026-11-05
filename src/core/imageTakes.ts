@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ChosenEntrySchema, type MadeFrom } from './images'
+import type { MadeFrom } from './images'
 import { IMAGE_MODEL_IDS, MAX_IMAGE_SIDE, type ImageModelId } from './imageModels'
 
 /** The longer side of a take as the model makes it, in pixels. */
@@ -177,14 +177,6 @@ export const ImageManifestSchema = z.record(
 
 /** The images manifest. */
 export type ImageManifest = z.infer<typeof ImageManifestSchema>
-
-/** The lock file as the studio writes it: the chosen take of each image, and any other key kept as it was. */
-export const ImageLockFileSchema = z.looseObject({
-  images: z.record(z.string(), z.looseObject({ chosen: ChosenEntrySchema.optional() })).default({}),
-})
-
-/** The images lock file. */
-export type ImageLockFile = z.infer<typeof ImageLockFileSchema>
 
 /** Bringing the images and their takes to the game's new look, as the page polls it. */
 export interface LookRunView {

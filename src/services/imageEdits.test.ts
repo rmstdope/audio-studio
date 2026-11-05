@@ -80,7 +80,16 @@ describe('readImages', () => {
   it('reads what a chosen take was made from from the lock', async () => {
     const first = (await repo().summary()).images!.acts[0]!.rows[0]!
     const { summary } = repo({
-      'content-studio/images/lock.json': { images: { inn: { chosen: first.madeFrom } } },
+      'content-studio/images/lock.json': {
+        inn: {
+          inputs: {
+            text: first.madeFrom.words,
+            width: first.madeFrom.width,
+            height: first.madeFrom.height,
+            style: { look: 'pixel art', keepOut: 'text', part: 'lantern' },
+          },
+        },
+      },
     })
     expect((await summary()).images!.acts[0]!.rows[0]!.status).toBe('chosen')
   })

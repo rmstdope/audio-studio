@@ -257,15 +257,19 @@ describe('choosing', () => {
     })
     expect(read('web/images/manifest.json')).toContain('"width": 320,')
     const lock = JSON.parse(read(LOCK))
-    expect(lock.images.inn.chosen).toMatchObject({
-      words: 'a low inn',
-      width: 320,
-      height: 200,
-      take: 2,
-      seed: 101,
+    expect(lock.inn).toMatchObject({
       model: 'flux2-klein-4b',
+      seed: 101,
+      take: 2,
+      inputs: {
+        text: 'a low inn',
+        width: 320,
+        height: 200,
+        style: { look: 'pixel art', keepOut: 'text', part: null },
+        look: { palette: ['#000000'], dithering: 'patterned' },
+      },
     })
-    expect(read(LOCK)).toContain('\n "images"')
+    expect(read(LOCK)).toStartWith('{\n "inn": {"model":')
     const r = await row()
     expect(r).toMatchObject({ status: 'chosen', chosenTake: 2 })
     const view = await takes.view(file, 'inn')
@@ -294,24 +298,19 @@ describe('choosing', () => {
     expect(await takes.choose(file, 'inn', 2)).toEqual({ ok: true })
     expect(read('web/images/inn.png')).toBe(read('content-studio/cache/image-takes/inn/2.game.png'))
     expect((await row()).status).toBe('out of date')
-    expect(JSON.parse(read(LOCK)).images.inn.chosen.take).toBe(2)
+    expect(JSON.parse(read(LOCK)).inn.take).toBe(2)
   })
 
-  it('keeps the other images, the other manifest entries and the lock’s other keys', async () => {
+  it('keeps the other images and the other manifest entries, the lock in id order', async () => {
+    const hall = { take: 4, inputs: { text: 'w', width: 1, height: 2 } }
     const { takes, file, read } = await made({
-      [LOCK]: {
-        zeta: 1,
-        images: { hall: { chosen: { words: 'w', style: 's', width: 1, height: 2, take: 4 } } },
-        other: [1],
-      },
+      [LOCK]: { zeta: hall, hall },
       'web/images/manifest.json': { hall: { file: 'hall.png', width: 8, height: 8 } },
     })
     await takes.choose(file, 'inn', 1)
     const lock = JSON.parse(read(LOCK))
-    expect(Object.keys(lock.images)).toEqual(['hall', 'inn'])
-    expect(lock.other).toEqual([1])
-    // The top-level keys are sorted, whatever order the file had them in.
-    expect(Object.keys(lock)).toEqual(['images', 'other', 'zeta'])
+    expect(Object.keys(lock)).toEqual(['hall', 'inn', 'zeta'])
+    expect(lock.hall).toEqual(hall)
     expect(Object.keys(JSON.parse(read('web/images/manifest.json')))).toEqual(['hall', 'inn'])
   })
 
@@ -337,7 +336,7 @@ describe('choosing', () => {
     expect(await takes.unchoose(file, 'inn')).toEqual({ ok: true })
     expect(existsSync(join(root, 'web/images/inn.png'))).toBe(false)
     expect(JSON.parse(read('web/images/manifest.json'))).toEqual({})
-    expect(JSON.parse(read(LOCK)).images).toEqual({})
+    expect(JSON.parse(read(LOCK))).toEqual({})
     expect((await row()).status).toBe('none yet')
     expect(existsSync(join(root, 'content-studio/cache/image-takes/inn/1.png'))).toBe(true)
     expect(await takes.currentFile(file, 'inn')).toBeNull()
@@ -352,10 +351,10 @@ describe('choosing', () => {
     expect((await row()).reasons).toEqual(['the words', 'the style'])
     expect(await takes.accept(file, 'inn')).toEqual({ ok: true })
     expect((await row()).status).toBe('chosen')
-    const chosen = JSON.parse(read(LOCK)).images.inn.chosen
-    expect([chosen.words, chosen.style, chosen.take]).toEqual([
-      (await row()).madeFrom.words,
-      (await row()).madeFrom.style,
+    const chosen = JSON.parse(read(LOCK)).inn
+    expect([chosen.inputs.text, chosen.inputs.style, chosen.take]).toEqual([
+      'a high inn',
+      { look: 'oil paint', keepOut: 'text', part: null },
       1,
     ])
     expect(read('web/images/inn.png')).toBe(picture)
@@ -807,7 +806,10 @@ describe('the game’s look', () => {
       width: 320,
       height: 200,
     })
-    expect(JSON.parse(s.read(LOCK)).images.inn.chosen.look).toBe((await s.row()).look.key)
+    expect(JSON.parse(s.read(LOCK)).inn.inputs.look).toEqual({
+      palette: warm,
+      dithering: 'patterned',
+    })
     expect((await s.row()).looksOld).toBe(false)
   })
 
@@ -885,7 +887,10 @@ describe('bringing everything to a new look', () => {
     for (const c of colours(s, 'content-studio/cache/image-takes/hall/1.game.png')) {
       expect(['0,255,0', '0,0,255']).toContain(c)
     }
-    expect(JSON.parse(s.read(LOCK)).images.inn.chosen.look).toBe((await s.row('inn')).look.key)
+    expect(JSON.parse(s.read(LOCK)).inn.inputs.look).toEqual({
+      palette: ['#00ff00', '#0000ff'],
+      dithering: 'patterned',
+    })
     expect((await s.row('inn')).looksOld).toBe(false)
     expect((await s.row('hall')).looksOld).toBe(false)
     const after = await readImages(s.root, await openProjectOk(s.file), [])

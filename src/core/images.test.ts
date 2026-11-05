@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test'
 import { lookKey, lookOf } from './imageLook'
 import {
-  ChosenSchema,
   ImageEditsSchema,
+  ImageLockSchema,
   ImageListSchema,
   StyleSchema,
   applyActStyleChange,
@@ -12,11 +12,13 @@ import {
   assemblePrompt,
   effectiveStyle,
   formatImageEdits,
+  formatImageLock,
   acceptableReasons,
   imagesDone,
   outOfDateReasons,
   resolveCompare,
   summarizeImages,
+  type ChosenEntry,
   type ImageEdits,
   type ImageStyle,
   type MadeFrom,
@@ -74,11 +76,104 @@ describe('the game files', () => {
     expect(ImageEditsSchema.safeParse({ images: { inn: { text: 'cosy' } } }).success).toBe(false)
     expect(ImageEditsSchema.safeParse({ style: { keepOut: 'x' } }).success).toBe(false)
   })
-  it('reads the lock, with extra keys tolerated', () => {
-    const lock = {
-      images: { a: { chosen: { words: 'w', style: 's', width: 1, height: 2 }, takes: [] } },
+})
+
+describe('the images lock', () => {
+  const key = (look: Parameters<typeof lookOf>[0], width = 320, height = 200) =>
+    lookKey(lookOf(look), { width, height })
+  const entry = {
+    model: 'flux2-klein-4b',
+    seed: 7,
+    take: 3,
+    inputs: {
+      text: 'a low inn',
+      width: 320,
+      height: 200,
+      style: { look: 'pixel art', keepOut: 'text', part: 'warm light' },
+      look: { palette: ['#000000', '#ff8000'], dithering: 'flat' },
+    },
+    at: '2026-11-03T06:32:48.776Z',
+  }
+  const chosen: ChosenEntry = {
+    words: 'a low inn',
+    style: JSON.stringify(['pixel art', 'text', 'warm light']),
+    width: 320,
+    height: 200,
+    take: 3,
+    seed: 7,
+    model: 'flux2-klein-4b',
+    look: key({ palette: ['#000000', '#ff8000'], dithering: 'flat' }),
+    at: '2026-11-03T06:32:48.776Z',
+  }
+
+  it('reads an entry keyed by image id, its inputs in the clear, as what the take was made from', () => {
+    expect(ImageLockSchema.parse({ inn: entry })).toEqual({ inn: chosen })
+    expect(ImageLockSchema.parse({})).toEqual({})
+    const bare = { inputs: { text: 'w', width: 1, height: 2 } }
+    expect(ImageLockSchema.parse({ a: bare })).toEqual({
+      a: { words: 'w', style: '', width: 1, height: 2 },
+    })
+    expect(ImageLockSchema.safeParse({ a: { inputs: { width: 1, height: 2 } } }).success).toBe(
+      false,
+    )
+  })
+
+  it('writes one entry per line in id order, the inputs in the clear, and reads back the same', () => {
+    const text = formatImageLock({ well: { ...chosen, take: 1 }, inn: chosen })
+    expect(text).toBe(
+      `{\n "inn": ${JSON.stringify(entry)},\n "well": ${JSON.stringify({ ...entry, take: 1 })}\n}\n`,
+    )
+    expect(ImageLockSchema.parse(JSON.parse(text))).toEqual({
+      well: { ...chosen, take: 1 },
+      inn: chosen,
+    })
+    expect(formatImageLock({})).toBe('{}\n')
+  })
+
+  it('writes the look as the style’s own fields: the palette, else the colour depth, and no dithering for full colour', () => {
+    const lookOfEntry = (look: string) =>
+      JSON.parse(formatImageLock({ a: { ...chosen, look } })).a.inputs.look
+    expect(lookOfEntry(key({ palette: [], colourDepth: '8-bit', dithering: 'scattered' }))).toEqual(
+      { colourDepth: '8-bit', dithering: 'scattered' },
+    )
+    expect(lookOfEntry(key({ palette: [] }))).toEqual({ colourDepth: 'full' })
+    const { look: _look, ...unbrought } = chosen
+    expect(JSON.parse(formatImageLock({ a: unbrought })).a.inputs.look).toBeUndefined()
+  })
+
+  it('writes no style for a take made without one, part null for no addition, and reads old keys that held the palette', () => {
+    const inputs = (style: string) =>
+      JSON.parse(formatImageLock({ a: { ...chosen, style } })).a.inputs.style
+    expect(inputs('')).toBeUndefined()
+    expect(inputs(JSON.stringify(['p', 'k', null]))).toEqual({
+      look: 'p',
+      keepOut: 'k',
+      part: null,
+    })
+    expect(inputs(JSON.stringify(['p', 'k', ['#000000'], 'x']))).toEqual({
+      look: 'p',
+      keepOut: 'k',
+      part: 'x',
+    })
+  })
+
+  it('leaves every chosen image as up to date, and every look as current, as before it was written', () => {
+    const lookNow = lookOf(style)
+    const base = summarizeImages(input({ look: lookNow })).images.acts[0]!.rows[0]!
+    for (const made of [
+      { ...base.madeFrom, take: 1, look: base.look.key! },
+      { ...base.madeFrom, take: 1 },
+      { ...base.madeFrom, take: 2, words: 'older words', look: key({ palette: [] }) },
+    ]) {
+      const read = ImageLockSchema.parse(JSON.parse(formatImageLock({ [inn.id]: made })))
+      const before = summarizeImages(input({ look: lookNow, chosen: { [inn.id]: made } }))
+      const after = summarizeImages(input({ look: lookNow, chosen: read }))
+      expect(after.images).toEqual(before.images)
     }
-    expect(ChosenSchema.safeParse(lock).success).toBe(true)
+    const left = summarizeImages(input({ edits: { [inn.id]: { partStyle: null } } }))
+    const made = { ...left.images.acts[0]!.rows[0]!.madeFrom, take: 1 }
+    const read = ImageLockSchema.parse(JSON.parse(formatImageLock({ [inn.id]: made })))
+    expect(read[inn.id]).toEqual(made)
   })
 })
 

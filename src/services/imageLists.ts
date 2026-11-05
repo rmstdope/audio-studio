@@ -1,14 +1,13 @@
 import { explainStyleProblem, lookOf, type Look } from '../core/imageLook'
 import { ImageBoardSchema } from '../core/imageTakes'
 import {
-  ChosenSchema,
   ImageEditsSchema,
+  ImageLockSchema,
   ImageListSchema,
   summarizeImages,
   type ImageEdits,
   type ImageListState,
   type ImagesSummary,
-  type ChosenEntry,
 } from '../core/images'
 import {
   CACHE_DIR,
@@ -98,13 +97,8 @@ export async function readImages(
     })
   }
   const edits = await readImageEdits(root, problems)
-  const lock = await readResource(root, IMAGES_LOCK_FILE, ChosenSchema, problems)
-  const chosen: Record<string, ChosenEntry> = {}
-  if (lock !== 'missing' && lock !== 'invalid') {
-    for (const [id, entry] of Object.entries(lock.images)) {
-      if (entry.chosen) chosen[id] = entry.chosen
-    }
-  }
+  const lock = await readResource(root, IMAGES_LOCK_FILE, ImageLockSchema, problems)
+  const chosen = lock === 'missing' || lock === 'invalid' ? {} : lock
   const gameFiles: Record<string, boolean> = {}
   for (const list of lists) {
     if (list.state.status !== 'ok') continue

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { describeLook, lookChanges, lookKey, type Look } from './imageLook'
+import { describeLook, lookChanges, lookKey, lookOf, type Look } from './imageLook'
 import type { Problem } from './project'
 
 /** The path of the picture the game shows for an image now: inside the project root, and a picture. */
@@ -122,10 +122,109 @@ export const ChosenEntrySchema = MadeFromSchema.extend({
   at: z.string().optional(),
 })
 
-/** The lock: the chosen take of each image. Other keys are ignored here, and kept when it is written. */
-export const ChosenSchema = z.object({
-  images: z.record(z.string(), z.object({ chosen: ChosenEntrySchema.optional() })).default({}),
+/** What a chosen picture was brought to, as the style's own fields (the size is the entry's). */
+const LockLookSchema = z.object({
+  palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(),
+  colourDepth: z.enum(['full', '16-bit', '8-bit']).optional(),
+  dithering: z.enum(['flat', 'patterned', 'scattered']).optional(),
 })
+
+/** One entry of `content-studio/images/lock.json`: the chosen take, and what it was made from in the clear. */
+const LockEntrySchema = z.object({
+  model: z.string().optional(),
+  seed: z.number().optional(),
+  take: z.number().int().positive().optional(),
+  inputs: z.object({
+    text: z.string(),
+    width: z.number(),
+    height: z.number(),
+    /** The words the take was made with; absent for a take made without a style. */
+    style: z
+      .object({ look: z.string(), keepOut: z.string(), part: z.string().nullable() })
+      .optional(),
+    /** What the game's picture was brought to; absent for one never brought. */
+    look: LockLookSchema.optional(),
+  }),
+  at: z.string().optional(),
+})
+
+/**
+ * The images lock, keyed by image id, read as what each chosen take was made from: the style and
+ * the look turned back into the stable keys staleness compares (`styleKey`, `lookKey`).
+ */
+export const ImageLockSchema = z.record(
+  z.string(),
+  LockEntrySchema.transform(({ inputs, model, seed, take, at }): ChosenEntry => {
+    const { text, width, height, style, look } = inputs
+    const lookFields = look && { palette: look.palette ?? [], ...look }
+    return {
+      words: text,
+      style: style ? JSON.stringify([style.look, style.keepOut, style.part]) : '',
+      width,
+      height,
+      ...(take !== undefined && { take }),
+      ...(seed !== undefined && { seed }),
+      ...(model !== undefined && { model }),
+      ...(lookFields && { look: lookKey(lookOf(lookFields), { width, height }) }),
+      ...(at !== undefined && { at }),
+    }
+  }),
+)
+
+/** The images lock as the studio reads it: the chosen take of each image. */
+export type ImageLock = z.infer<typeof ImageLockSchema>
+
+/** A look key (`lookKey`) as the style's own fields; null for one that is not a key of ours. */
+function lookFields(key: string): z.infer<typeof LockLookSchema> | null {
+  try {
+    const { c, d } = JSON.parse(key) as { c: unknown; d: unknown }
+    const dithering = LockLookSchema.shape.dithering.safeParse(d).data
+    if (Array.isArray(c)) {
+      const hex = (rgb: unknown) =>
+        `#${String(rgb)
+          .split(',')
+          .map((n) => Number(n).toString(16).padStart(2, '0'))
+          .join('')}`
+      return { palette: c.map(hex), ...(dithering && { dithering }) }
+    }
+    if (c === 8 || c === 16) return { colourDepth: `${c}-bit`, ...(dithering && { dithering }) }
+    if (c === 'full') return { colourDepth: 'full' }
+  } catch {
+    // not a key of ours
+  }
+  return null
+}
+
+/**
+ * The images lock as text: one entry per line in id order, each `{ model, seed, take, inputs, at }`
+ * with what the take was made from in the clear, so choosing a take is a one-line change.
+ */
+export function formatImageLock(lock: ImageLock): string {
+  const ids = Object.keys(lock).sort()
+  if (!ids.length) return '{}\n'
+  const lines = ids.map((id) => {
+    const { words, style, width, height, take, seed, model, look, at } = lock[id]!
+    const parts = style ? styleParts(withoutPalette(style)) : null
+    const looked = look === undefined ? null : lookFields(look)
+    const entry = {
+      model,
+      seed,
+      take,
+      inputs: {
+        text: words,
+        width,
+        height,
+        ...(parts && {
+          style: { look: parts[0], keepOut: parts[1], part: parts[2] ?? null },
+        }),
+        ...(looked && { look: looked }),
+      },
+      at,
+    }
+    return ` ${JSON.stringify(id)}: ${JSON.stringify(entry)}`
+  })
+  return `{\n${lines.join(',\n')}\n}\n`
+}
 
 /** An image of a game-written list. */
 export type GameImage = z.infer<typeof ImageSchema>
