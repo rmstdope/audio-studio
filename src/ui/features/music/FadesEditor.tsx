@@ -13,6 +13,7 @@ import {
 } from '../../../core/fades'
 import type { TakeView } from '../../../core/musicTake'
 import { cutShares, playedSeconds, takeSoundUrl } from './trimSilence'
+import { useTrackActions } from './trackActions'
 import { useSetFades } from '../../api'
 import type { useClipPlayer } from '../../components/useClipPlayer'
 
@@ -161,6 +162,7 @@ export function FadesEditor({
   const [outText, setOutText] = useState(boxText(saved.out))
   const [shape, setShape] = useState<Fades['shape']>(saved.shape)
   const set = useSetFades(trackId)
+  const actions = useTrackActions()
   const inBox = useRef<HTMLInputElement>(null)
   useEffect(() => {
     inBox.current?.focus()
@@ -214,15 +216,18 @@ export function FadesEditor({
   }
   const save = () => {
     if (!canSave) return
+    actions.press(`fades:${take.n}`)
     set.mutate({ file: take.file, fades: typed }, { onSuccess: finish })
   }
-  const failure = set.isError
-    ? set.error.message
-    : set.data && !set.data.ok
-      ? 'message' in set.data
-        ? set.data.message
-        : `${set.data.file} could not be read.`
-      : null
+  const failure = !actions.shows(`fades:${take.n}`)
+    ? null
+    : set.isError
+      ? set.error.message
+      : set.data && !set.data.ok
+        ? 'message' in set.data
+          ? set.data.message
+          : `${set.data.file} could not be read.`
+        : null
 
   const lengthBox = (label: string, text: string, onText: (value: string) => void) => {
     const value = lengthOf(text)
@@ -317,7 +322,10 @@ export function FadesEditor({
             type="button"
             className="btn btn-ghost btn-small"
             disabled={saving}
-            onClick={() => set.mutate({ file: take.file, fades: null }, { onSuccess: finish })}
+            onClick={() => {
+              actions.press(`fades:${take.n}`)
+              set.mutate({ file: take.file, fades: null }, { onSuccess: finish })
+            }}
           >
             Remove fades
           </button>

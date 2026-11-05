@@ -11,6 +11,7 @@ import {
 import type { MakingSummary, TakeView } from '../../../core/musicTake'
 import type { MoveResult } from '../../../services/musicTakes'
 import { useMoveTake } from '../../api'
+import { useTrackActions } from './trackActions'
 
 /**
  * The dialog that moves a take to another track of the same kind: a search box (loops only), the
@@ -41,6 +42,7 @@ export function MoveTakeDialog({
   onMoved: (to: { id: string; n: number }) => void
 }) {
   const move = useMoveTake(trackId)
+  const actions = useTrackActions()
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -93,6 +95,7 @@ export function MoveTakeDialog({
   async function submit() {
     if (!selected || pending) return
     setFailure(null)
+    actions.press(`move:${take.n}`)
     onMoving()
     let answer: MoveResult
     try {

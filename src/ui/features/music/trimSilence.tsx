@@ -9,6 +9,7 @@ import {
 } from '../../../core/musicTrim'
 import { useTrimTake } from '../../api'
 import { clock } from '../../format'
+import { useTrackActions } from './trackActions'
 
 /** Where a take's sound is: for a trimmed take, only the part between its cuts. */
 export function takeSoundUrl(trackId: string, take: TakeView): string {
@@ -73,6 +74,7 @@ export function useTrimControl({
   onPress: () => void
 }): { button: ReactNode; note: ReactNode; failure: ReactNode } {
   const trim = useTrimTake(trackId)
+  const actions = useTrackActions()
   const noteId = useId()
   if (!take || (!take.trim && !take.trimmable)) return { button: null, note: null, failure: null }
   const undo = take.trim !== undefined
@@ -105,6 +107,7 @@ export function useTrimControl({
         onClick={() => {
           if (working) return
           onPress()
+          actions.press(`trim:${take.n}`)
           trim.mutate({ file: take.file, undo })
         }}
       >
@@ -117,7 +120,7 @@ export function useTrimControl({
       </span>
     ) : null,
     failure:
-      reason !== null ? (
+      reason !== null && actions.shows(`trim:${take.n}`) ? (
         <span className="adopt-error" role="alert">
           {trimFailure(take.n, reason, { inGame, undo: trim.variables?.undo ?? false })}
         </span>

@@ -57,6 +57,7 @@ import {
   wavePosition,
 } from './trimSilence'
 import { MoveTakeDialog } from './MoveTakeDialog'
+import { TrackActionsContext, useTrackActions, useTrackActionsState } from './trackActions'
 
 /**
  * A track's Takes panel: the takes made, played from the start and, for a loop, around their
@@ -76,6 +77,7 @@ export function TakesPanel({
   const make = useMakeTakes(trackId)
   const stop = useStopTakes(trackId)
   const accept = useAcceptTrackChange(trackId)
+  const actions = useTrackActionsState()
   const player = useClipPlayer()
   const view = takes.data
   const making = useMusicMaking().data ?? {}
@@ -203,7 +205,10 @@ export function TakesPanel({
     </select>
   )
   /** Starts the batch the menus say; the count stays as picked. */
-  const makeBatch = () => make.mutate({ count, model })
+  const makeBatch = () => {
+    actions.press('make')
+    make.mutate({ count, model })
+  }
   const result = make.data
   const movingTake = view.takes.find((take) => take.n === moving)
   const nowhere = hasNowhere(moveTargets(lists, { id: trackId, kind: view.kind }).groups)
@@ -211,7 +216,7 @@ export function TakesPanel({
     : null
   const destination = moved ? trackFor([...lists], moved.id) : undefined
   return (
-    <>
+    <TrackActionsContext.Provider value={actions}>
       {!generator.ok && (
         <div className="errbox" role="alert">
           <div className="errbox-text">
@@ -235,7 +240,10 @@ export function TakesPanel({
             type="button"
             className="btn"
             disabled={make.isPending || !generator.ok}
-            onClick={() => make.mutate({ retry: failed.n })}
+            onClick={() => {
+              actions.press('make')
+              make.mutate({ retry: failed.n })
+            }}
           >
             {takesButton('Try again', failed.modelId, length, 1)}
           </button>
@@ -257,18 +265,23 @@ export function TakesPanel({
                 type="button"
                 className="btn btn-small"
                 disabled={accept.isPending}
-                onClick={() => accept.mutate()}
+                onClick={() => {
+                  actions.press('accept')
+                  accept.mutate()
+                }}
               >
                 Accept
               </button>
-              {accept.data && !accept.data.ok && (
+              {accept.data && !accept.data.ok && actions.shows('accept') && (
                 <span className="adopt-error">
                   {'message' in accept.data
                     ? accept.data.message
                     : 'The project file could not be read, so nothing was changed.'}
                 </span>
               )}
-              {accept.error && <span className="adopt-error">{accept.error.message}</span>}
+              {accept.error && actions.shows('accept') && (
+                <span className="adopt-error">{accept.error.message}</span>
+              )}
             </div>
           )}
         </div>
@@ -297,7 +310,10 @@ export function TakesPanel({
                       ? 'ElevenLabs may still bill a take that is stopped while it is being made.'
                       : undefined
                   }
-                  onClick={() => stop.mutate()}
+                  onClick={() => {
+                    actions.press('stop')
+                    stop.mutate()
+                  }}
                 >
                   Stop
                 </button>
@@ -426,11 +442,15 @@ export function TakesPanel({
             }}
           />
         )}
-        <Failure title="The takes could not be made" result={result} />
-        {stop.isError && <span className="adopt-error">{stop.error.message}</span>}
-        {make.isError && <span className="adopt-error">{make.error.message}</span>}
+        {actions.shows('make') && <Failure title="The takes could not be made" result={result} />}
+        {stop.isError && actions.shows('stop') && (
+          <span className="adopt-error">{stop.error.message}</span>
+        )}
+        {make.isError && actions.shows('make') && (
+          <span className="adopt-error">{make.error.message}</span>
+        )}
       </section>
-    </>
+    </TrackActionsContext.Provider>
   )
 }
 
@@ -477,6 +497,7 @@ function TakeCard({
   const seamPlaying = player.playing === seamId
   const drop = useDropTake(trackId)
   const choose = useChooseTake(trackId)
+  const actions = useTrackActions()
   const trim = useTrimControl({
     trackId,
     take,
@@ -587,6 +608,7 @@ function TakeCard({
               disabled={locked || drop.isPending || choose.isPending}
               onClick={() => {
                 if (playing || seamPlaying) player.stop()
+                actions.press(`drop:${take.n}`)
                 drop.mutate(take.file)
               }}
             >
@@ -596,7 +618,10 @@ function TakeCard({
               type="button"
               className="btn btn-small"
               disabled={locked || choose.isPending}
-              onClick={() => choose.mutate(take.file)}
+              onClick={() => {
+                actions.press(`choose:${take.n}`)
+                choose.mutate(take.file)
+              }}
             >
               {choose.isPending ? 'Choosing…' : 'Choose'}
             </button>
@@ -604,16 +629,17 @@ function TakeCard({
         </>
       )}
       {trim.failure}
-      {(choose.isError || (choose.data && !choose.data.ok)) && (
-        <span className="adopt-error">
-          {choose.isError
-            ? choose.error.message
-            : choose.data && 'message' in choose.data
-              ? choose.data.message
-              : 'The take could not be chosen.'}
-        </span>
-      )}
-      {(drop.isError || (drop.data && !drop.data.ok)) && (
+      {actions.shows(`choose:${take.n}`) &&
+        (choose.isError || (choose.data && !choose.data.ok)) && (
+          <span className="adopt-error">
+            {choose.isError
+              ? choose.error.message
+              : choose.data && 'message' in choose.data
+                ? choose.data.message
+                : 'The take could not be chosen.'}
+          </span>
+        )}
+      {actions.shows(`drop:${take.n}`) && (drop.isError || (drop.data && !drop.data.ok)) && (
         <span className="adopt-error">
           {drop.isError
             ? drop.error.message

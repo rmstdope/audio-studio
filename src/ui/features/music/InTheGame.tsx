@@ -18,6 +18,7 @@ import {
 } from './trimSilence'
 import { movedFromLine } from '../../../core/musicMove'
 import { FadesEditor } from './FadesEditor'
+import { useTrackActions } from './trackActions'
 
 /** One clip at a time, shared with the takes below. */
 type Player = ReturnType<typeof useClipPlayer>
@@ -126,6 +127,7 @@ export function InTheGame({
   const take = view.takes.find((t) => t.chosen)
   const unchoose = useUnchooseTake(track.id)
   const choose = useChooseTake(track.id)
+  const actions = useTrackActions()
   const trimControl = useTrimControl({
     trackId: track.id,
     take,
@@ -177,7 +179,10 @@ export function InTheGame({
             type="button"
             autoFocus
             disabled={unchoose.isPending}
-            onClick={() =>
+            onClick={() => {
+              // Opening the question changed nothing; confirming it is the action.
+              actions.press('unchoose')
+              setAsked(state.take)
               unchoose.mutate(undefined, {
                 onSuccess: (result) => {
                   setAsking(false)
@@ -190,7 +195,7 @@ export function InTheGame({
                   refocus()
                 },
               })
-            }
+            }}
           >
             {unchoose.isPending ? 'Un-choosing…' : 'Un-choose'}
           </button>
@@ -203,7 +208,8 @@ export function InTheGame({
   const failedLine =
     asked !== null &&
     (state.kind === 'take' || state.kind === 'unknown') &&
-    (failed || unchoose.isError)
+    (failed || unchoose.isError) &&
+    actions.shows('unchoose')
       ? unchooseFailure(
           asked,
           !failed
@@ -340,8 +346,6 @@ export function InTheGame({
             ref={opener}
             disabled={unchoose.isPending}
             onClick={() => {
-              unchoose.reset()
-              setAsked(state.take)
               setAsking(true)
             }}
           >
@@ -352,7 +356,10 @@ export function InTheGame({
               type="button"
               className="btn btn-primary btn-small"
               disabled={choose.isPending}
-              onClick={() => choose.mutate(take.file)}
+              onClick={() => {
+                actions.press(`choose:${take.n}`)
+                choose.mutate(take.file)
+              }}
             >
               {choose.isPending ? 'Choosing…' : 'Choose again'}
             </button>
@@ -362,12 +369,14 @@ export function InTheGame({
       {hint}
       {trimControl.failure}
       {failedLine && <span className="adopt-error">{failedLine}</span>}
-      {choose.data && !choose.data.ok && (
+      {take && actions.shows(`choose:${take.n}`) && choose.data && !choose.data.ok && (
         <span className="adopt-error">
           {'message' in choose.data ? choose.data.message : 'The take could not be chosen.'}
         </span>
       )}
-      {choose.isError && <span className="adopt-error">{choose.error.message}</span>}
+      {take && actions.shows(`choose:${take.n}`) && choose.isError && (
+        <span className="adopt-error">{choose.error.message}</span>
+      )}
     </section>
   )
 }
