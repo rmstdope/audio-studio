@@ -12,6 +12,7 @@ import { resolveInRoot } from '../core/paths'
 import { problemsFrom, type Problem } from '../core/project'
 import {
   NarrationEditsSchema,
+  cuesOfEdits,
   editsPathOf,
   formatEdits,
   sceneKey,
@@ -221,12 +222,7 @@ async function changeCues(
     const raw = json.status === 'missing' ? {} : json.value
     const parsed = NarrationEditsSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(path, parsed.error) }
-    // The file's own keys, in its order: the lines' cues, then the scenes' under their scene key.
-    const { cues = {}, scenes = {} } = raw as Partial<Record<'cues' | 'scenes', object>>
-    const entries: Cue[] = [
-      ...Object.entries(cues as Record<string, string>),
-      ...Object.entries(scenes as Record<string, string>).map(([k, v]): Cue => [sceneKey(k), v]),
-    ]
+    const entries = Object.entries(cuesOfEdits(parsed.data))
 
     const outcome = change(entries, path, inDialog, textOf)
     if (outcome === null) return null

@@ -382,16 +382,16 @@ export const ProjectSchema = z
         })
       }
     }
-    const tables: [string, Record<string, unknown>][] = [
-      ['generate.soundAlike', narration.generate.soundAlike],
-      ['audition.phrase', narration.audition.phrase],
+    const tables: [string[], Record<string, unknown>][] = [
+      [['generate', 'soundAlike'], narration.generate.soundAlike],
+      [['audition', 'phrase'], narration.audition.phrase],
     ]
     for (const [where, table] of tables) {
       for (const language of Object.keys(table)) {
         if (languages.includes(language)) continue
         context.addIssue({
           code: 'custom',
-          path: ['narration', ...where.split('.'), language],
+          path: ['narration', ...where, language],
           message: `"${language}" is not one of the project’s languages`,
         })
       }
