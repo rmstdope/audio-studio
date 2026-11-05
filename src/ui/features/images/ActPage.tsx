@@ -73,7 +73,7 @@ export function ActPage({
       </header>
       {act.state === 'ok' && images.style.present && (
         <p className="muted images-style-line">
-          Every prompt ends with the game&apos;s style
+          Every prompt ends with the style
           {act.addition !== null && (
             <>
               , and for {name}: <em>{act.addition}</em>

@@ -11,7 +11,7 @@ import type { EffectModelId } from '../core/effectModels'
 import type { ImageDownload } from '../core/imageModels'
 import { holdGpu } from './gpu'
 import type { EffectHealthStore } from './effectHealth'
-import { createSerial } from './serial'
+import { createSerial, type Serial } from './serial'
 
 const effects = {
   paths: {
@@ -55,7 +55,12 @@ function fakeHealth(failed: EffectModelId[] = []) {
       >,
     record: async (_file, model, failure) =>
       void calls.push(`record ${model} ${failure.error} on ${failure.effect}`),
-    clear: async (_file, model) => void calls.push(`clear ${model}`),
+    // Slower than a poll of the view, as a store on a loaded disk can be: a take counts as
+    // made only once its model's failure is cleared.
+    clear: async (_file, model) => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      calls.push(`clear ${model}`)
+    },
   }
   return { health, calls }
 }
@@ -249,6 +254,74 @@ describe('createEffectTakes', () => {
     expect(signals).toHaveLength(1)
     // A stopped take is not a failure of the model.
     expect(calls).toEqual([])
+  })
+
+  /**
+   * A take of `coins` made up to the moment its WAV is written, with the effect's board turn held
+   * there; `release` lets the board be saved.
+   */
+  async function heldAtTheBoard() {
+    let open: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (open = resolve))
+    const inner = fakeGenerator()
+    const generator: EffectGenerator = {
+      ...inner.generator,
+      generate: async (request, signal) => {
+        await gate
+        return inner.generator.generate(request, signal)
+      },
+    }
+    const root = tempRepo({
+      'content-studio.json': projectJson({ effects }),
+      'tts/effects.json': [{ id: 'coins', description: 'Coins', seconds: 0.5 }],
+    })
+    const file = join(root, 'content-studio.json')
+    const { health, calls } = fakeHealth()
+    const takes = createEffectTakes({ generator, health, queue: createSerial(), newSeed: () => 1 })
+    await takes.make(file, 'coins', { count: 1 })
+    // The board turn is the studio's own, kept on globalThis; it is held while the take finishes.
+    const boards = (globalThis as unknown as { contentStudioEffectBoards: Serial })
+      .contentStudioEffectBoards
+    let release: () => void = () => {}
+    void boards.run(`${file}\0coins`, () => new Promise<void>((resolve) => (release = resolve)))
+    open()
+    const folder = join(root, 'content-studio/cache/effect-takes/coins')
+    for (let i = 0; i < 400; i++) {
+      if (existsSync(folder) && readdirSync(folder).some((name) => name.endsWith('.wav'))) break
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    expect(readdirSync(folder).some((name) => name.endsWith('.wav'))).toBe(true)
+    const done = async () => {
+      for (let i = 0; i < 400; i++) {
+        const view = await takes.view(file, 'coins')
+        if (view && 'ok' in view && view.ok && !view.making.length) return view
+        await new Promise((r) => setTimeout(r, 5))
+      }
+      throw new Error('the take never finished')
+    }
+    return { root, file, takes, calls, release: () => release(), done }
+  }
+
+  it('leaves the model’s last failure as it was when the take is stopped after its WAV is written', async () => {
+    const held = await heldAtTheBoard()
+    expect(await held.takes.stop(held.file, 'coins')).toEqual({ ok: true, stopped: 1 })
+    held.release()
+    await held.done()
+    await new Promise((r) => setTimeout(r, 40))
+    expect(held.calls).toEqual([])
+  })
+
+  it('records the model as failed when the board cannot be saved after the WAV is written', async () => {
+    const held = await heldAtTheBoard()
+    writeFileSync(join(held.root, 'content-studio/cache/effect-boards/coins.json'), '{ nope')
+    held.release()
+    for (let i = 0; i < 400 && !held.calls.some((c) => c.startsWith('record')); i++) {
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    await new Promise((r) => setTimeout(r, 40))
+    expect(held.calls.at(-1)).toBe(
+      'record small-sfx content-studio/cache/effect-boards/coins.json cannot be used. on coins',
+    )
   })
 
   it('chooses a take: the clip, the manifest and the lock are written, and the take is shown as chosen', async () => {

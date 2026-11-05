@@ -28,8 +28,7 @@ const ROLE: Record<FileRole | MusicFileRole | ImagesFileRole, string> = {
   list: 'Tracks from the game',
   briefs: 'Briefs',
   images: 'Images from the game',
-  style: 'Style from the game',
-  words: 'Words written here',
+  edits: 'Style and words written here',
 }
 
 /**

@@ -46,14 +46,7 @@ export function disagreeText(acts: string[], differs: ConflictKind[]): string {
 
 /** The palette's size, as the Style page shows it. */
 export function paletteText(count: number): string {
-  return `${count} ${count === 1 ? 'colour' : 'colours'} · set by the game`
-}
-
-/** What the notice for a changed game style says of the images it leaves out of date. */
-export function styleNoticeText(count: number): string {
-  return count === 1
-    ? '1 chosen image across all acts was made with the old style and is out of date. The game shows it until you choose a new one.'
-    : `${count} chosen images across all acts were made with the old style and are out of date. The game shows them until you choose new ones.`
+  return `${count} ${count === 1 ? 'colour' : 'colours'}`
 }
 
 /**

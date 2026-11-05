@@ -1,24 +1,25 @@
 import { explainStyleProblem, lookOf, type Look } from '../core/imageLook'
 import { ImageBoardSchema } from '../core/imageTakes'
 import {
-  ChosenSchema,
+  ImageLockSchema,
   ImageListSchema,
-  PromptsSchema,
-  StyleSchema,
+  readImageEditsValue,
   summarizeImages,
-  type GameStyle,
+  type ImageEditsRead,
   type ImageListState,
   type ImagesSummary,
-  type ChosenEntry,
-  type Prompts,
 } from '../core/images'
-import { CACHE_DIR, partPathFor, type Problem, type Project } from '../core/project'
+import {
+  CACHE_DIR,
+  IMAGES_EDITS_FILE,
+  IMAGES_LOCK_FILE,
+  partPathFor,
+  type Problem,
+  type Project,
+} from '../core/project'
 import { resolveInRoot } from '../core/paths'
-import { readJson, readResource, writeAtomic } from './files'
+import { readJson, readResource } from './files'
 import { gameFilePath } from './musicLists'
-
-/** Where the game's style as the user last saw it is kept, in the studio's own folder. */
-export const STYLE_SEEN_FILE = `${CACHE_DIR}/images-style-seen.json`
 
 /** Where an image's takes are cached, one folder per image, `<n>.png` the model's picture and `<n>.game.png` the game's version. */
 export const IMAGE_TAKES_DIR = `${CACHE_DIR}/image-takes`
@@ -26,22 +27,27 @@ export const IMAGE_TAKES_DIR = `${CACHE_DIR}/image-takes`
 /** Where an image's board is saved: one file per image (an id is a slug, so a safe file name). */
 export const IMAGE_BOARD_DIR = `${CACHE_DIR}/images`
 
-/** The look the game's style file asks for; none when it cannot be used, with the sentence saying why. */
+/** The images edits as read from disk, with the style as written, to say why it cannot be used. */
+export interface ImageEditsOnDisk extends ImageEditsRead {
+  rawStyle: unknown
+}
+
+/** The look the style of `read` asks for; none when it cannot be used, with the sentence saying why. */
+export function styleLookOf(
+  read: ImageEditsOnDisk,
+): { look: Look; error?: undefined } | { look: null; error: string } {
+  if (read.styleBroken) {
+    return { look: null, error: explainStyleProblem(read.rawStyle ?? null, IMAGES_EDITS_FILE) }
+  }
+  // A project with no style has no look to bring pictures to: full colour, only the size.
+  return { look: lookOf(read.edits.style ?? { palette: [] }) }
+}
+
+/** The look the style asks for, read from disk; none when it cannot be used, with the sentence saying why. */
 export async function readStyleLook(
   root: string,
-  styleFile: string,
 ): Promise<{ look: Look; error?: undefined } | { look: null; error: string }> {
-  const problems: Problem[] = []
-  const read = await readResource(root, styleFile, StyleSchema, problems)
-  if (read === 'invalid') {
-    const raw = await readJson(resolveInRoot(root, styleFile))
-    return {
-      look: null,
-      error: explainStyleProblem(raw.status === 'ok' ? raw.value : null, styleFile),
-    }
-  }
-  // A game with no style file has no look to bring pictures to: full colour, only the size.
-  return { look: lookOf(read === 'missing' ? { palette: [] } : read) }
+  return styleLookOf(await readImageEdits(root))
 }
 
 /** What each listed image's takes were brought to (null for never), counting only takes whose model picture is there. */
@@ -64,32 +70,30 @@ async function readTakeLooks(
   return looks
 }
 
-/** The studio's own words, or none when there is no file or it cannot be read (problems are added). */
-export async function readPrompts(
-  root: string,
-  file: string,
-  problems: Problem[],
-): Promise<Prompts | 'invalid'> {
-  const read = await readResource(root, file, PromptsSchema, problems)
-  return read === 'missing' ? { images: {}, style: {} } : read
-}
-
-/** The game's style as the user last saw it; null before the first sight. */
-export async function readStyleSeen(root: string): Promise<GameStyle | null> {
-  const read = await readResource(root, STYLE_SEEN_FILE, StyleSchema, [])
-  return read === 'missing' || read === 'invalid' ? null : read
-}
-
-/** Records the game's style as seen. */
-export function writeStyleSeen(root: string, style: GameStyle): Promise<void> {
-  return writeAtomic(root, STYLE_SEEN_FILE, `${JSON.stringify(style, null, 2)}\n`)
+/**
+ * The images edits (the style and the studio's changes), empty when there are none. A file that
+ * cannot be read holds nothing usable; otherwise the style and each image are read apart
+ * (`readImageEditsValue`), and the problems say what was left out.
+ */
+export async function readImageEdits(root: string): Promise<ImageEditsOnDisk> {
+  const json = await readJson(resolveInRoot(root, IMAGES_EDITS_FILE))
+  if (json.status === 'missing') {
+    return { edits: { images: {} }, styleBroken: false, problems: [], rawStyle: undefined }
+  }
+  if (json.status === 'invalid') {
+    const problems = [{ file: IMAGES_EDITS_FILE, path: '', message: json.message }]
+    return { edits: { images: {} }, styleBroken: true, problems, rawStyle: null }
+  }
+  const raw: unknown = json.value
+  const rawStyle =
+    typeof raw === 'object' && raw !== null ? (raw as { style?: unknown }).style : null
+  return { ...readImageEditsValue(raw, IMAGES_EDITS_FILE), rawStyle }
 }
 
 /**
  * The Images pages of a project, read fresh from disk. Null without an `images` section. Broken
- * files are added to `problems` and left out; a missing list or style file is not a problem, the
- * game has not written it yet. The first time a style is read it is recorded as seen, so a later
- * change to it can be told from it.
+ * files are added to `problems` and left out; a missing list is not a problem, the game has not
+ * written it yet, nor are missing edits or a missing style.
  */
 export async function readImages(
   root: string,
@@ -100,7 +104,7 @@ export async function readImages(
   if (!images) return null
   const lists = []
   for (const part of project.parts) {
-    const file = partPathFor(images.paths.list, part.id)
+    const file = partPathFor(images.from.part, part.id)
     const read = await readResource(root, file, ImageListSchema, problems)
     const state: ImageListState =
       read === 'missing' || read === 'invalid' ? { status: read } : { status: 'ok', images: read }
@@ -112,21 +116,10 @@ export async function readImages(
       canRefresh: Boolean(project.refresh?.part),
     })
   }
-  const styleRead = await readResource(root, images.paths.style, StyleSchema, problems)
-  const style = styleRead === 'missing' || styleRead === 'invalid' ? null : styleRead
-  const prompts = await readPrompts(root, images.paths.prompts, problems)
-  const lock = await readResource(root, images.paths.lock, ChosenSchema, problems)
-  const chosen: Record<string, ChosenEntry> = {}
-  if (lock !== 'missing' && lock !== 'invalid') {
-    for (const [id, entry] of Object.entries(lock.images)) {
-      if (entry.chosen) chosen[id] = entry.chosen
-    }
-  }
-  let seen = await readStyleSeen(root)
-  if (style && !seen) {
-    seen = style
-    await writeStyleSeen(root, style).catch(() => {})
-  }
+  const edits = await readImageEdits(root)
+  problems.push(...edits.problems)
+  const lock = await readResource(root, IMAGES_LOCK_FILE, ImageLockSchema, problems)
+  const chosen = lock === 'missing' || lock === 'invalid' ? {} : lock
   const gameFiles: Record<string, boolean> = {}
   for (const list of lists) {
     if (list.state.status !== 'ok') continue
@@ -134,7 +127,7 @@ export async function readImages(
       if (image.file) gameFiles[image.id] = (await gameFilePath(root, image.file)) !== null
     }
   }
-  const styleLook = await readStyleLook(root, images.paths.style)
+  const styleLook = styleLookOf(edits)
   const ids = lists.flatMap((list) =>
     list.state.status === 'ok' ? list.state.images.map((image) => image.id) : [],
   )
@@ -143,24 +136,14 @@ export async function readImages(
     look: styleLook.look,
     lookError: styleLook.error,
     takeLooks: await readTakeLooks(root, ids),
-    styleInvalid: styleRead === 'invalid',
+    editsInvalid: edits.styleBroken,
     parts: project.parts,
     lists,
-    styleFile: images.paths.style,
-    style,
-    prompts: prompts === 'invalid' ? { images: {}, style: {} } : prompts,
+    editsFile: IMAGES_EDITS_FILE,
+    style: edits.edits.style ?? null,
+    edits: edits.edits.images,
     chosen,
-    seen,
   })
   problems.push(...summary.problems)
-  // A change that leaves nothing out of date has no notice to put away, so it is seen at once.
-  if (
-    style &&
-    seen &&
-    !summary.images.styleNotice &&
-    JSON.stringify(seen) !== JSON.stringify(style)
-  ) {
-    await writeStyleSeen(root, style).catch(() => {})
-  }
   return summary.images
 }

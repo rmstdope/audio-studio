@@ -398,6 +398,19 @@
     "images": {
       "type": "object",
       "properties": {
+        "from": {
+          "type": "object",
+          "properties": {
+            "part": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "part"
+          ],
+          "additionalProperties": false
+        },
         "model": {
           "type": "string",
           "enum": [
@@ -405,47 +418,19 @@
             "z-image-turbo"
           ]
         },
-        "paths": {
-          "type": "object",
-          "properties": {
-            "list": {
-              "type": "string",
-              "minLength": 1
-            },
-            "style": {
-              "type": "string",
-              "minLength": 1
-            },
-            "prompts": {
-              "type": "string",
-              "minLength": 1
-            },
-            "lock": {
-              "type": "string",
-              "minLength": 1
-            },
-            "clips": {
-              "type": "string",
-              "minLength": 1
-            },
-            "manifest": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "list",
-            "style",
-            "prompts",
-            "lock",
-            "clips",
-            "manifest"
-          ],
-          "additionalProperties": false
+        "clips": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
-        "paths"
+        "from",
+        "clips",
+        "manifest"
       ],
       "additionalProperties": false
     },

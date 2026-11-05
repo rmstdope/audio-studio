@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { describeLook, lookChanges, lookKey, type Look } from './imageLook'
-import type { Problem } from './project'
+import { describeLook, lookChanges, lookKey, lookOf, type Look } from './imageLook'
+import { problemsFrom, type Problem } from './project'
 
 /** The path of the picture the game shows for an image now: inside the project root, and a picture. */
 const GameFile = z
@@ -14,20 +14,33 @@ const GameFile = z
   })
 
 /** An image as the game lists it. The id names the image everywhere, so it is a slug. */
-export const ImageSchema = z.object({
+const ImageShape = z.object({
   id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lower-case letters, digits and - only'),
   title: z.string().min(1),
-  description: z.string().min(1),
+  /** What the image shows, in the game's words. */
+  text: z.string().min(1),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   /** The picture the game shows for it now, when it is not one the studio made. Read only. */
   file: GameFile.optional(),
 })
 
+/**
+ * An image of a list the game writes. The game's words (`text`) are the image's description inside
+ * the studio, its pages and its API.
+ */
+export const ImageSchema = ImageShape.transform(({ text, ...image }) => ({
+  ...image,
+  description: text,
+}))
+
 /** An act's images, in the game's order (a list that is there and empty means the game asks for none). */
 export const ImageListSchema = z.array(ImageSchema)
 
-/** The game's style file: the look, what is kept out, the palette and an optional addition per act. */
+/**
+ * The style every image shares, the studio's own: the look, what is kept out, the palette, and an
+ * optional addition per part. It is in the images edits and edited directly.
+ */
 export const StyleSchema = z.object({
   look: z.string().min(1),
   keepOut: z.string().default(''),
@@ -36,21 +49,99 @@ export const StyleSchema = z.object({
   colourDepth: z.enum(['full', '16-bit', '8-bit']).optional(),
   /** How in-between shades are made when colours are reduced; absent means patterned. */
   dithering: z.enum(['flat', 'patterned', 'scattered']).optional(),
-  acts: z.record(z.string(), z.string().min(1)).default({}),
+  /** A part's addition to the look, by part id. */
+  parts: z.record(z.string(), z.string().min(1)).default({}),
 })
 
-/** One of the user's own words, with the game's words they were written over. */
-const OwnWords = z.object({ words: z.string().min(1), gameWas: z.string() })
+/**
+ * The studio's change to one image: its own words over the game's (`text`, with the game's words
+ * it was written over, `gameWas`), and which part's addition it uses (`partStyle`: a part id, or
+ * null for none; absent is the first part that lists it).
+ */
+const ImageEditSchema = z
+  .object({
+    text: z.string().min(1).optional(),
+    gameWas: z.string().optional(),
+    partStyle: z.string().nullable().optional(),
+  })
+  .refine((edit) => (edit.text === undefined) === (edit.gameWas === undefined), {
+    error: 'give text and gameWas together',
+  })
 
-/** The studio's own words for images and for the style, over the game's. */
-export const PromptsSchema = z.object({
-  images: z.record(z.string(), OwnWords).default({}),
-  style: z.object({ look: OwnWords.optional(), keepOut: OwnWords.optional() }).default({}),
-  /** Ids of the images that leave their act's style addition out of the prompt (kept while the act has none). */
-  actStyleOff: z.array(z.string()).optional(),
-  /** For an image several acts list: the act whose style addition it uses (absent: the first act that lists it). */
-  actStyleFrom: z.record(z.string(), z.string()).optional(),
+/** `content-studio/images/edits.json`: the style every image shares, and the studio's changes to images. */
+export const ImageEditsSchema = z.object({
+  style: StyleSchema.optional(),
+  images: z.record(z.string(), ImageEditSchema).default({}),
 })
+
+/** What reading the images edits gave: what could be used, whether the style could not, and why. */
+export interface ImageEditsRead {
+  edits: ImageEdits
+  /** There is a style, but it cannot be read (its problems are among `problems`). */
+  styleBroken: boolean
+  problems: Problem[]
+}
+
+/**
+ * The images edits from their JSON, the style and each image checked apart: a bad image is left
+ * out with a problem at its path, and a bad style is none (with `styleBroken`), so the rest stays
+ * usable. A file that is not an object holds nothing usable.
+ */
+export function readImageEditsValue(raw: unknown, file: string): ImageEditsRead {
+  const problems: Problem[] = []
+  const isObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+  if (!isObject(raw)) {
+    problems.push({ file, path: '', message: 'must be an object' })
+    return { edits: { images: {} }, styleBroken: true, problems }
+  }
+  const style = z.object({ style: StyleSchema.optional() }).safeParse({ style: raw.style })
+  if (!style.success) problems.push(...problemsFrom(file, style.error))
+  const images: ImageEdits['images'] = {}
+  if (raw.images !== undefined && !isObject(raw.images)) {
+    problems.push({ file, path: 'images', message: 'must be an object, by image id' })
+  } else {
+    for (const [id, entry] of Object.entries(raw.images ?? {})) {
+      const one = z.object({ images: z.record(z.string(), ImageEditSchema) })
+      const read = one.safeParse({ images: { [id]: entry } })
+      if (read.success) images[id] = read.data.images[id]!
+      else problems.push(...problemsFrom(file, read.error))
+    }
+  }
+  return {
+    edits: { ...(style.data?.style && { style: style.data.style }), images },
+    styleBroken: !style.success,
+    problems,
+  }
+}
+
+/**
+ * The images edits as text: the style first, its keys in a fixed order and those at their default
+ * left out, then the images by id, so changes make small diffs.
+ */
+export function formatImageEdits(edits: ImageEdits): string {
+  const out: Record<string, unknown> = {}
+  if (edits.style) {
+    const { look, keepOut, palette, colourDepth, dithering, parts } = edits.style
+    out.style = {
+      look,
+      ...(keepOut !== '' && { keepOut }),
+      ...(palette.length && { palette }),
+      ...(colourDepth && { colourDepth }),
+      ...(dithering && { dithering }),
+      ...(Object.keys(parts).length && { parts }),
+    }
+  }
+  out.images = Object.fromEntries(
+    Object.keys(edits.images)
+      .sort()
+      .map((id) => {
+        const { text, gameWas, partStyle } = edits.images[id]!
+        return [id, { text, gameWas, partStyle }]
+      }),
+  )
+  return `${JSON.stringify(out, null, 2)}\n`
+}
 
 /** What a chosen take was made from; the lock records it, and staleness compares it. */
 const MadeFromSchema = z.object({
@@ -72,17 +163,136 @@ export const ChosenEntrySchema = MadeFromSchema.extend({
   at: z.string().optional(),
 })
 
-/** The lock: the chosen take of each image. Other keys are ignored here, and kept when it is written. */
-export const ChosenSchema = z.object({
-  images: z.record(z.string(), z.object({ chosen: ChosenEntrySchema.optional() })).default({}),
+/**
+ * What a chosen picture was brought to, as the style's own fields, and the size it was brought to
+ * when that is not the entry's own (a take made before the game's list changed its size).
+ */
+const LockLookSchema = z.object({
+  palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(),
+  colourDepth: z.enum(['full', '16-bit', '8-bit']).optional(),
+  dithering: z.enum(['flat', 'patterned', 'scattered']).optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
 })
+
+/** One entry of `content-studio/images/lock.json`: the chosen take, and what it was made from in the clear. */
+const LockEntrySchema = z.object({
+  model: z.string().optional(),
+  seed: z.number().optional(),
+  take: z.number().int().positive().optional(),
+  inputs: z.object({
+    text: z.string(),
+    width: z.number(),
+    height: z.number(),
+    /** The words the take was made with; absent for a take made without a style. */
+    style: z
+      .object({ look: z.string(), keepOut: z.string(), part: z.string().nullable() })
+      .optional(),
+    /** What the game's picture was brought to; absent for one never brought. */
+    look: LockLookSchema.optional(),
+  }),
+  at: z.string().optional(),
+})
+
+/**
+ * The images lock, keyed by image id, read as what each chosen take was made from: the style and
+ * the look turned back into the stable keys staleness compares (`styleKey`, `lookKey`).
+ */
+export const ImageLockSchema = z.record(
+  z.string(),
+  LockEntrySchema.transform(({ inputs, model, seed, take, at }): ChosenEntry => {
+    const { text, width, height, style, look } = inputs
+    const lookFields = look && { palette: look.palette ?? [], ...look }
+    const lookSize = { width: look?.width ?? width, height: look?.height ?? height }
+    return {
+      words: text,
+      style: style ? JSON.stringify([style.look, style.keepOut, style.part]) : '',
+      width,
+      height,
+      ...(take !== undefined && { take }),
+      ...(seed !== undefined && { seed }),
+      ...(model !== undefined && { model }),
+      ...(lookFields && { look: lookKey(lookOf(lookFields), lookSize) }),
+      ...(at !== undefined && { at }),
+    }
+  }),
+)
+
+/** The images lock as the studio reads it: the chosen take of each image. */
+export type ImageLock = z.infer<typeof ImageLockSchema>
+
+/**
+ * A look key (`lookKey`) as the style's own fields, with its size when it is not `size` (the
+ * entry's); null for one that is not a key of ours.
+ */
+function lookFields(
+  key: string,
+  size: { width: number; height: number },
+): z.infer<typeof LockLookSchema> | null {
+  try {
+    const { w, h, c, d } = JSON.parse(key) as { w: unknown; h: unknown; c: unknown; d: unknown }
+    const dithering = LockLookSchema.shape.dithering.safeParse(d).data
+    const other =
+      typeof w === 'number' && typeof h === 'number' && (w !== size.width || h !== size.height)
+        ? { width: w, height: h }
+        : {}
+    if (Array.isArray(c)) {
+      const hex = (rgb: unknown) =>
+        `#${String(rgb)
+          .split(',')
+          .map((n) => Number(n).toString(16).padStart(2, '0'))
+          .join('')}`
+      return { palette: c.map(hex), ...(dithering && { dithering }), ...other }
+    }
+    if (c === 8 || c === 16) {
+      return { colourDepth: `${c}-bit`, ...(dithering && { dithering }), ...other }
+    }
+    if (c === 'full') return { colourDepth: 'full', ...other }
+  } catch {
+    // not a key of ours
+  }
+  return null
+}
+
+/**
+ * The images lock as text: one entry per line in id order, each `{ model, seed, take, inputs, at }`
+ * with what the take was made from in the clear, so choosing a take is a one-line change.
+ */
+export function formatImageLock(lock: ImageLock): string {
+  const ids = Object.keys(lock).sort()
+  if (!ids.length) return '{}\n'
+  const lines = ids.map((id) => {
+    const { words, style, width, height, take, seed, model, look, at } = lock[id]!
+    const parts = style ? styleParts(withoutPalette(style)) : null
+    const looked = look === undefined ? null : lookFields(look, { width, height })
+    const entry = {
+      model,
+      seed,
+      take,
+      inputs: {
+        text: words,
+        width,
+        height,
+        ...(parts && {
+          style: { look: parts[0], keepOut: parts[1], part: parts[2] ?? null },
+        }),
+        ...(looked && { look: looked }),
+      },
+      at,
+    }
+    return ` ${JSON.stringify(id)}: ${JSON.stringify(entry)}`
+  })
+  return `{\n${lines.join(',\n')}\n}\n`
+}
 
 /** An image of a game-written list. */
 export type GameImage = z.infer<typeof ImageSchema>
-/** The game's style. */
-export type GameStyle = z.infer<typeof StyleSchema>
-/** The studio's own words. */
-export type Prompts = z.infer<typeof PromptsSchema>
+/** The style every image shares. */
+export type ImageStyle = z.infer<typeof StyleSchema>
+/** The images edits: the style, and the studio's changes to images. */
+export type ImageEdits = z.infer<typeof ImageEditsSchema>
+/** The studio's change to one image. */
+export type ImageEdit = ImageEdits['images'][string]
 /** What a take was made from, or what a new one would be made from. */
 export type MadeFrom = z.infer<typeof MadeFromSchema>
 /** An image's chosen take in the lock. */
@@ -90,7 +300,7 @@ export type ChosenEntry = z.infer<typeof ChosenEntrySchema>
 /** A style field the user may write over. */
 export type StyleField = 'look' | 'keepOut'
 
-/** The style as an image of one act uses it: the user's words over the game's, plus the act's addition. */
+/** The style as an image of one part uses it: the look, what is kept out, the palette, plus the part's addition. */
 export interface EffectiveStyle {
   look: string
   keepOut: string
@@ -98,20 +308,18 @@ export interface EffectiveStyle {
   addition: string | null
 }
 
-/** The style an image of an act is made with (the act's own without an image); null when the game has no style file. */
+/** The style an image of a part is made with; `leaveOut` leaves the part's addition out. Null without a style. */
 export function effectiveStyle(
-  game: GameStyle | null,
-  prompts: Prompts,
+  style: ImageStyle | null,
   partId: string,
-  imageId?: string,
+  leaveOut = false,
 ): EffectiveStyle | null {
-  if (!game) return null
-  const left = imageId !== undefined && Boolean(prompts.actStyleOff?.includes(imageId))
+  if (!style) return null
   return {
-    look: prompts.style.look?.words ?? game.look,
-    keepOut: prompts.style.keepOut?.words ?? game.keepOut,
-    palette: game.palette,
-    addition: left ? null : (game.acts[partId] ?? null),
+    look: style.look,
+    keepOut: style.keepOut,
+    palette: style.palette,
+    addition: leaveOut ? null : (style.parts[partId] ?? null),
   }
 }
 
@@ -187,86 +395,69 @@ function styleParts(key: string): unknown[] | null {
   }
 }
 
-/** Prompts with an image's use of its act's style addition changed; ticked again removes the id. */
-export function applyActStyleChange(prompts: Prompts, id: string, on: boolean): Prompts {
-  const others = (prompts.actStyleOff ?? []).filter((other) => other !== id)
-  const off = (on ? others : [...others, id]).sort()
-  const { actStyleOff: _removed, ...rest } = prompts
-  return off.length ? { ...rest, actStyleOff: off } : rest
+/** The edits with one image's edit replaced; an edit left with nothing in it is removed. */
+function withImage(edits: ImageEdits, id: string, edit: ImageEdit): ImageEdits {
+  const { [id]: _removed, ...rest } = edits.images
+  const kept = Object.values(edit).some((value) => value !== undefined)
+  return { ...edits, images: kept ? { ...rest, [id]: edit } : rest }
 }
 
-/** Prompts with the act whose style a shared image uses changed: null leaves the style out, an act takes it from that act. */
-export function applyActStylePick(prompts: Prompts, id: string, from: string | null): Prompts {
-  const base = applyActStyleChange(prompts, id, from !== null)
-  const { [id]: _removed, ...others } = base.actStyleFrom ?? {}
-  const { actStyleFrom: _old, ...rest } = base
-  const kept = from === null ? others : { ...others, [id]: from }
-  return Object.keys(kept).length ? { ...rest, actStyleFrom: kept } : rest
+/** The edits with an image's use of its part's style addition changed: off is `partStyle: null`, ticked again removes it. */
+export function applyActStyleChange(edits: ImageEdits, id: string, on: boolean): ImageEdits {
+  const { partStyle: _old, ...edit } = edits.images[id] ?? {}
+  return withImage(edits, id, on ? edit : { ...edit, partStyle: null })
 }
 
-/** Prompts with the user's words for an image changed; empty text, or the game's own, removes them. */
+/** The edits with the part whose style a shared image uses changed: null leaves the style out, a part takes it from that part. */
+export function applyActStylePick(edits: ImageEdits, id: string, from: string | null): ImageEdits {
+  return withImage(edits, id, { ...edits.images[id], partStyle: from })
+}
+
+/** The edits with the user's words for an image changed; empty text, or the game's own, removes them. */
 export function applyWordsChange(
-  prompts: Prompts,
+  edits: ImageEdits,
   id: string,
   text: string | null,
   gameWords: string,
-): Prompts {
+): ImageEdits {
   const words = (text ?? '').trim()
-  const { [id]: _removed, ...rest } = prompts.images
-  return {
-    ...prompts,
-    images:
-      words === '' || words === gameWords.trim()
-        ? rest
-        : { ...rest, [id]: { words, gameWas: prompts.images[id]?.gameWas ?? gameWords } },
-  }
+  const { text: _text, gameWas, ...rest } = edits.images[id] ?? {}
+  return withImage(
+    edits,
+    id,
+    words === '' || words === gameWords.trim()
+      ? rest
+      : { text: words, gameWas: gameWas ?? gameWords, ...rest },
+  )
 }
 
-/** Prompts with the user's words for a style field changed, as for an image. */
+/**
+ * The edits with the style's look or what is kept out set; an empty kept-out is none. Refused,
+ * with why, without a style (`no style`) and for an empty look (`empty look`).
+ */
 export function applyStyleChange(
-  prompts: Prompts,
+  edits: ImageEdits,
   field: StyleField,
   text: string | null,
-  gameValue: string,
-): Prompts {
+): ImageEdits | 'no style' | 'empty look' {
   const words = (text ?? '').trim()
-  const { [field]: _removed, ...rest } = prompts.style
-  return {
-    ...prompts,
-    style:
-      words === '' || words === gameValue.trim()
-        ? rest
-        : { ...rest, [field]: { words, gameWas: gameValue } },
-  }
+  if (!edits.style) return 'no style'
+  if (field === 'look' && words === '') return 'empty look'
+  return { ...edits, style: { ...edits.style, [field]: words } }
 }
 
 /** Settles an image whose game description changed: keep the user's words (new baseline) or take the game's. */
 export function resolveCompare(
-  prompts: Prompts,
+  edits: ImageEdits,
   id: string,
   choice: 'keep' | 'game',
   gameWords: string,
-): Prompts {
-  const own = prompts.images[id]
-  if (choice === 'game' || !own) return applyWordsChange(prompts, id, null, gameWords)
-  return { ...prompts, images: { ...prompts.images, [id]: { ...own, gameWas: gameWords } } }
-}
-
-/** What differs between the style the user last saw and the game's now, named for the notice. */
-export function styleChanges(
-  seen: GameStyle,
-  now: GameStyle,
-  parts: { id: string; title: string }[],
-): string[] {
-  const changes: string[] = []
-  if (seen.look !== now.look) changes.push('the look')
-  if (seen.keepOut !== now.keepOut) changes.push('what is kept out')
-  for (const part of parts) {
-    if ((seen.acts[part.id] ?? null) !== (now.acts[part.id] ?? null)) {
-      changes.push(`the addition for ${part.title}`)
-    }
+): ImageEdits {
+  const own = edits.images[id]
+  if (choice === 'game' || own?.text === undefined) {
+    return applyWordsChange(edits, id, null, gameWords)
   }
-  return changes
+  return withImage(edits, id, { ...own, gameWas: gameWords })
 }
 
 /** What differs in the looks the pictures were brought to and the look now, each named once, in a fixed order. */
@@ -401,20 +592,14 @@ export interface ImagesAct {
   canRefresh: boolean
 }
 
-/** A style field as the Style page shows it. */
-export interface StyleFieldView {
-  words: string
-  changed: boolean
-  game: string
-}
-
 /** The Style page. */
 export interface StyleView {
+  /** The images edits hold a style. */
   present: boolean
-  /** The game's style file is there but cannot be read. */
+  /** The images edits are there but cannot be read. */
   invalid: boolean
-  look: StyleFieldView
-  keepOut: StyleFieldView
+  look: string
+  keepOut: string
   palette: string[]
   acts: { id: string; title: string; addition: string | null }[]
 }
@@ -423,8 +608,6 @@ export interface StyleView {
 export interface ImagesSummary {
   acts: ImagesAct[]
   style: StyleView
-  /** One notice for a change of the game's style; null when none is due. */
-  styleNotice: { count: number; changed: string[] } | null
   /** One notice for a change of the game's look; null when every picture is up to date. */
   lookNotice: { count: number; changed: string[] } | null
 }
@@ -433,17 +616,18 @@ export interface ImagesSummary {
 export interface ImagesInput {
   parts: { id: string; title: string }[]
   lists: { id: string; title: string; file: string; state: ImageListState; canRefresh: boolean }[]
-  styleFile: string
-  /** The style file is there but cannot be read. */
-  styleInvalid?: boolean
-  style: GameStyle | null
-  prompts: Prompts
+  /** The images edits, which hold the style, for problems. */
+  editsFile: string
+  /** The images edits are there but cannot be read. */
+  editsInvalid?: boolean
+  /** The style; null when the edits hold none. */
+  style: ImageStyle | null
+  /** The studio's changes to images, by image id. */
+  edits: ImageEdits['images']
   /** What each image's chosen take was made from, and which take it is. */
   chosen: Record<string, ChosenEntry>
   /** Whether the file each image names as the game's own is there, by image id. */
   gameFiles?: Record<string, boolean>
-  /** The game's style when the user last saw it; null before the first sight. */
-  seen: GameStyle | null
   /** The look the style asks for; null when it cannot be used (`lookError` says why). */
   look?: Look | null
   lookError?: string
@@ -456,7 +640,7 @@ export function summarizeImages(input: ImagesInput): {
   images: ImagesSummary
   problems: Problem[]
 } {
-  const { parts, lists, style, prompts, chosen } = input
+  const { parts, lists, style, edits, chosen } = input
   const problems: Problem[] = []
   type Listing = { list: ImagesInput['lists'][number]; index: number; image: GameImage }
   const listed = new Map<string, Listing[]>()
@@ -496,19 +680,17 @@ export function summarizeImages(input: ImagesInput): {
       })
     }
   }
-  for (const act of Object.keys(style?.acts ?? {})) {
-    if (parts.some((part) => part.id === act)) continue
+  for (const part of Object.keys(style?.parts ?? {})) {
+    if (parts.some((known) => known.id === part)) continue
     problems.push({
-      file: input.styleFile,
-      path: `acts.${act}`,
-      message: `"${act}" is not one of the project's parts`,
+      file: input.editsFile,
+      path: `style.parts.${part}`,
+      message: `"${part}" is not one of the project's parts`,
     })
   }
 
-  const changedIds = new Set<string>()
   const oldIds = new Set<string>()
   const lookPairs: [string | null, string][] = []
-  const changes = style && input.seen ? styleChanges(input.seen, style, parts) : []
   /** An image's row as first met; a shared image reuses it in every act. */
   const bases = new Map<string, ImageRow>()
   const baseRow = (list: ImagesInput['lists'][number], image: GameImage): ImageRow => {
@@ -516,22 +698,22 @@ export function summarizeImages(input: ImagesInput): {
     if (known) return known
     const group = (listed.get(image.id) ?? []).map((place) => place.list)
     const choices: ActStyleChoice[] = group.flatMap((g) => {
-      const text = style?.acts[g.id]
+      const text = style?.parts[g.id]
       return text ? [{ id: g.id, title: g.title, text }] : []
     })
     const shared = group.length > 1
-    const off = Boolean(prompts.actStyleOff?.includes(image.id))
-    const wanted = prompts.actStyleFrom?.[image.id]
+    const own = edits[image.id]
+    const off = own?.partStyle === null
+    const wanted = own?.partStyle ?? undefined
     const first = group[0]!.id
     const pick = off
       ? null
       : (choices.find((c) => c.id === wanted)?.id ??
         (choices.some((c) => c.id === first) ? first : null))
     const styleAct = shared ? (pick ?? first) : list.id
-    const actEff = effectiveStyle(style, prompts, styleAct)
-    const eff = effectiveStyle(style, prompts, styleAct, image.id)
-    const own = prompts.images[image.id]
-    const words = own?.words ?? image.description
+    const actEff = effectiveStyle(style, styleAct)
+    const eff = effectiveStyle(style, styleAct, off)
+    const words = own?.text ?? image.description
     const madeFrom = madeFromNow(words, image, eff)
     const made = chosen[image.id]
     const reasons = made ? outOfDateReasons(madeFrom, made) : []
@@ -547,7 +729,6 @@ export function summarizeImages(input: ImagesInput): {
     const stale = key === null ? [] : thens.filter((then) => then !== key)
     for (const then of stale) lookPairs.push([then, key!])
     if (stale.length) oldIds.add(image.id)
-    if (made && made.style !== madeFrom.style && changes.length) changedIds.add(image.id)
     const wasText = made ? styleParts(withoutPalette(made.style))?.[2] : null
     const row: ImageRow = {
       id: image.id,
@@ -557,8 +738,8 @@ export function summarizeImages(input: ImagesInput): {
       width: image.width,
       height: image.height,
       words,
-      changed: Boolean(own),
-      gameChanged: Boolean(own) && own!.gameWas !== image.description,
+      changed: own?.text !== undefined,
+      gameChanged: own?.text !== undefined && own.gameWas !== image.description,
       gameWas: own?.gameWas ?? null,
       prompt: assemblePrompt(words, eff),
       actStyle: shared
@@ -591,7 +772,7 @@ export function summarizeImages(input: ImagesInput): {
     return row
   }
   const acts: ImagesAct[] = lists.map((list) => {
-    const actEff = effectiveStyle(style, prompts, list.id)
+    const actEff = effectiveStyle(style, list.id)
     const images = list.state.status === 'ok' ? list.state.images : []
     const rows: ImageRow[] = []
     const conflicts: ImageConflict[] = []
@@ -627,27 +808,21 @@ export function summarizeImages(input: ImagesInput): {
       canRefresh: list.canRefresh,
     }
   })
-  const field = (name: StyleField): StyleFieldView => ({
-    words: prompts.style[name]?.words ?? style?.[name] ?? '',
-    changed: Boolean(prompts.style[name]),
-    game: style?.[name] ?? '',
-  })
   return {
     images: {
       acts,
       style: {
         present: style !== null,
-        invalid: input.styleInvalid ?? false,
-        look: field('look'),
-        keepOut: field('keepOut'),
+        invalid: input.editsInvalid ?? false,
+        look: style?.look ?? '',
+        keepOut: style?.keepOut ?? '',
         palette: style?.palette ?? [],
         acts: parts.map((part) => ({
           id: part.id,
           title: part.title,
-          addition: style?.acts[part.id] ?? null,
+          addition: style?.parts[part.id] ?? null,
         })),
       },
-      styleNotice: changedIds.size > 0 ? { count: changedIds.size, changed: changes } : null,
       lookNotice:
         oldIds.size > 0 ? { count: oldIds.size, changed: lookChangeNames(lookPairs) } : null,
     },
@@ -658,7 +833,7 @@ export function summarizeImages(input: ImagesInput): {
 /** The body of a change to an image's own words; null takes them back. */
 export const WordsBody = z.object({ words: z.string().nullable() }).strict()
 
-/** The body of a change to one style field; null takes the user's words back. */
+/** The body of a change to the style's look or what is kept out; null or empty is none (refused for the look). */
 export const StyleFieldBody = z.union([
   z.object({ look: z.string().nullable() }).strict(),
   z.object({ keepOut: z.string().nullable() }).strict(),

@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import type { Problem } from '../core/project'
 import { loadProject } from './workspace'
 import { readImages } from './imageLists'
 import {
-  markStyleSeen,
   resolveImageCompare,
   setImageActStyle,
   setImageActStylePick,
@@ -17,28 +16,24 @@ import {
 import { openProject } from './workspace'
 
 const images = {
-  paths: {
-    list: 'tts/{part}/images.json',
-    style: 'images/style.json',
-    prompts: 'images/prompts.json',
-    lock: 'images/images.lock.json',
-    clips: 'web/public/images/generated',
-    manifest: 'web/public/images/generated/manifest.json',
-  },
+  from: { part: 'tts/{part}/images.json' },
+  clips: 'web/public/images/generated',
+  manifest: 'web/public/images/generated/manifest.json',
 }
-const inn = { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 }
+const EDITS = 'content-studio/images/edits.json'
+const inn = { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 }
 const style = {
   look: 'pixel art',
   keepOut: 'text',
   palette: ['#000000'],
-  acts: { act1: 'lantern' },
+  parts: { act1: 'lantern' },
 }
 
 function repo(extra: Record<string, unknown> = {}) {
   const root = tempRepo({
     'content-studio.json': projectJson({ images }),
     'tts/act1/images.json': [inn],
-    'images/style.json': style,
+    [EDITS]: { style, images: {} },
     ...extra,
   })
   const file = join(root, 'content-studio.json')
@@ -62,10 +57,7 @@ describe('readImages', () => {
 
   it('reads the lists, the style and the studio’s words; a missing list is not a problem', async () => {
     const { summary } = repo({
-      'images/prompts.json': {
-        images: { inn: { words: 'cosy', gameWas: 'a low inn' } },
-        style: {},
-      },
+      [EDITS]: { style, images: { inn: { text: 'cosy', gameWas: 'a low inn' } } },
     })
     const { images: read, problems } = await summary()
     expect(problems).toEqual([])
@@ -75,6 +67,7 @@ describe('readImages', () => {
       changed: true,
       gameChanged: false,
     })
+    expect(read!.style).toMatchObject({ present: true, look: 'pixel art', keepOut: 'text' })
   })
 
   it('reports a broken list with its file and path, and leaves its images out', async () => {
@@ -87,65 +80,109 @@ describe('readImages', () => {
   it('reads what a chosen take was made from from the lock', async () => {
     const first = (await repo().summary()).images!.acts[0]!.rows[0]!
     const { summary } = repo({
-      'images/images.lock.json': { images: { inn: { chosen: first.madeFrom } } },
+      'content-studio/images/lock.json': {
+        inn: {
+          inputs: {
+            text: first.madeFrom.words,
+            width: first.madeFrom.width,
+            height: first.madeFrom.height,
+            style: { look: 'pixel art', keepOut: 'text', part: 'lantern' },
+          },
+        },
+      },
     })
     expect((await summary()).images!.acts[0]!.rows[0]!.status).toBe('chosen')
   })
 
-  it('remembers the style it first saw in the studio’s own folder', async () => {
-    const { summary, read } = repo()
+  it('keeps no copy of the style in the cache', async () => {
+    const { root, summary } = repo()
     await summary()
-    expect(JSON.parse(read('content-studio/cache/images-style-seen.json'))).toEqual(style)
+    expect(existsSync(join(root, 'content-studio/cache/images-style-seen.json'))).toBe(false)
   })
 
-  it('moves the remembered style along when a change leaves nothing out of date', async () => {
-    const { root, summary, read } = repo()
-    await summary()
-    writeFileSync(join(root, 'images/style.json'), JSON.stringify({ ...style, look: 'oil' }))
-    await summary()
-    expect(JSON.parse(read('content-studio/cache/images-style-seen.json')).look).toBe('oil')
+  it('leaves out only an image whose edit is bad, keeping the style and the others', async () => {
+    const two = [inn, { ...inn, id: 'well', title: 'Well' }]
+    const { summary } = repo({
+      'tts/act1/images.json': two,
+      [EDITS]: {
+        style,
+        images: { inn: { text: 'cosy', gameWas: 'a low inn' }, well: { text: 'deep' } },
+      },
+    })
+    const { images: read, problems } = await summary()
+    expect(problems.map((p) => [p.file, p.path])).toEqual([[EDITS, 'images.well']])
+    expect(read!.style).toMatchObject({ present: true, invalid: false, look: 'pixel art' })
+    const [cosy, well] = read!.acts[0]!.rows
+    expect(cosy).toMatchObject({ words: 'cosy', changed: true })
+    expect(well).toMatchObject({ words: 'a low inn', changed: false })
+    expect(well!.prompt).toContain('pixel art')
   })
 
-  it('tells a style the game could not be read from one it has not written yet', async () => {
-    const { summary } = repo({ 'images/style.json': '{nope' })
+  it('keeps the rewordings when the style is bad', async () => {
+    const { summary } = repo({
+      [EDITS]: { style: { keepOut: 'x' }, images: { inn: { text: 'cosy', gameWas: 'a low inn' } } },
+    })
+    const { images: read, problems } = await summary()
+    expect(problems.map((p) => p.path)).toEqual(['style.look'])
+    expect(read!.style).toMatchObject({ present: false, invalid: true })
+    expect(read!.acts[0]!.rows[0]).toMatchObject({ words: 'cosy', changed: true })
+  })
+
+  it('tells edits that cannot be read from a project with no style yet', async () => {
+    const { summary } = repo({ [EDITS]: '{nope' })
     const { images: read, problems } = await summary()
     expect(read!.style).toMatchObject({ present: false, invalid: true })
-    expect(problems[0]).toMatchObject({ file: 'images/style.json' })
-    expect((await repo({ 'images/style.json': undefined }).summary()).images!.style.invalid).toBe(
-      false,
-    )
+    expect(problems[0]).toMatchObject({ file: EDITS })
+    const none = (await repo({ [EDITS]: undefined }).summary()).images!.style
+    expect(none).toMatchObject({ present: false, invalid: false })
   })
 })
 
 describe('saving the studio’s own words', () => {
   it('keeps the words with the game’s words they were written over, and the game’s files as they were', async () => {
     const { root, file, read } = repo()
-    const before = [read('tts/act1/images.json'), read('images/style.json')]
+    const before = read('tts/act1/images.json')
     expect(await setImageWords(file, 'inn', ' a cosy inn ')).toEqual({ ok: true })
-    expect(JSON.parse(read('images/prompts.json'))).toEqual({
-      images: { inn: { words: 'a cosy inn', gameWas: 'a low inn' } },
-      style: {},
+    expect(JSON.parse(read(EDITS))).toEqual({
+      style,
+      images: { inn: { text: 'a cosy inn', gameWas: 'a low inn' } },
     })
-    expect([read('tts/act1/images.json'), read('images/style.json')]).toEqual(before)
+    expect(read('tts/act1/images.json')).toEqual(before)
     expect(existsSync(join(root, 'tts/act1/images.json.tmp'))).toBe(false)
   })
 
-  it('writes the style keys in a fixed order', async () => {
-    const { file, read } = repo()
-    await setStyleField(file, 'keepOut', 'nothing')
-    await setStyleField(file, 'look', 'oil paint')
-    expect(Object.keys(JSON.parse(read('images/prompts.json')).style)).toEqual(['look', 'keepOut'])
+  it('writes the style first, its keys in a fixed order, and the images by id', async () => {
+    const { file, read } = repo({
+      [EDITS]: { images: {}, style: { parts: { act1: 'lantern' }, keepOut: 'x', look: 'pixels' } },
+      'tts/act1/images.json': [{ ...inn, id: 'well' }, inn],
+    })
+    await setImageWords(file, 'well', 'deep')
+    await setImageWords(file, 'inn', 'cosy')
+    const saved = JSON.parse(read(EDITS))
+    expect(Object.keys(saved)).toEqual(['style', 'images'])
+    expect(Object.keys(saved.style)).toEqual(['look', 'keepOut', 'parts'])
+    expect(Object.keys(saved.images)).toEqual(['inn', 'well'])
   })
 
   it('takes them back with null', async () => {
     const { file, read } = repo()
     await setImageWords(file, 'inn', 'cosy')
     await setImageWords(file, 'inn', null)
-    expect(JSON.parse(read('images/prompts.json')).images).toEqual({})
+    expect(JSON.parse(read(EDITS)).images).toEqual({})
   })
 
-  it('is null for an image the game does not list, and refuses a broken prompts file', async () => {
-    const { file } = repo({ 'images/prompts.json': '{nope' })
+  it('refuses to save over edits with a bad part, leaving the file as it was', async () => {
+    const { file, read } = repo({
+      [EDITS]: { style, images: { well: { text: 'deep' } } },
+    })
+    const before = read(EDITS)
+    const refused = await setImageWords(file, 'inn', 'cosy')
+    expect(refused).toMatchObject({ ok: false, problems: [{ file: EDITS, path: 'images.well' }] })
+    expect(read(EDITS)).toBe(before)
+  })
+
+  it('is null for an image the game does not list, and refuses broken edits', async () => {
+    const { file } = repo({ [EDITS]: '{nope' })
     expect(await setImageWords(file, 'ghost', 'x')).toBeNull()
     const refused = await setImageWords(file, 'inn', 'x')
     expect(refused).toMatchObject({ ok: false })
@@ -153,100 +190,83 @@ describe('saving the studio’s own words', () => {
 
   it('keeps an image’s leaving out of its act’s style, and takes it back, touching no game file', async () => {
     const { file, read } = repo()
-    const before = [read('tts/act1/images.json'), read('images/style.json')]
+    const before = read('tts/act1/images.json')
     expect(await setImageActStyle(file, 'inn', false)).toEqual({ ok: true })
-    expect(JSON.parse(read('images/prompts.json'))).toEqual({
-      images: {},
-      style: {},
-      actStyleOff: ['inn'],
-    })
-    expect([read('tts/act1/images.json'), read('images/style.json')]).toEqual(before)
+    expect(JSON.parse(read(EDITS))).toEqual({ style, images: { inn: { partStyle: null } } })
+    expect(read('tts/act1/images.json')).toEqual(before)
     await setImageWords(file, 'inn', 'cosy')
-    expect(JSON.parse(read('images/prompts.json')).actStyleOff).toEqual(['inn'])
+    expect(JSON.parse(read(EDITS)).images.inn).toEqual({
+      text: 'cosy',
+      gameWas: 'a low inn',
+      partStyle: null,
+    })
     expect(await setImageActStyle(file, 'inn', true)).toEqual({ ok: true })
-    expect('actStyleOff' in JSON.parse(read('images/prompts.json'))).toBe(false)
+    expect(JSON.parse(read(EDITS)).images.inn).toEqual({ text: 'cosy', gameWas: 'a low inn' })
     expect(await setImageActStyle(file, 'ghost', false)).toBeNull()
   })
 
   it('keeps which act’s style a shared image uses, and None, in the studio’s own file', async () => {
     const two = {
       'tts/act2/images.json': [inn],
-      'images/style.json': { ...style, acts: { act1: 'lantern', act2: 'dawn' } },
+      [EDITS]: { style: { ...style, parts: { act1: 'lantern', act2: 'dawn' } }, images: {} },
     }
     const { file, read, summary } = repo(two)
     expect(await setImageActStylePick(file, 'inn', 'act2')).toEqual({ ok: true })
-    expect(JSON.parse(read('images/prompts.json')).actStyleFrom).toEqual({ inn: 'act2' })
+    expect(JSON.parse(read(EDITS)).images).toEqual({ inn: { partStyle: 'act2' } })
     expect(await setImageActStylePick(file, 'inn', null)).toEqual({ ok: true })
-    const saved = JSON.parse(read('images/prompts.json'))
-    expect(saved.actStyleOff).toEqual(['inn'])
-    expect('actStyleFrom' in saved).toBe(false)
+    expect(JSON.parse(read(EDITS)).images).toEqual({ inn: { partStyle: null } })
     expect(await setImageActStylePick(file, 'inn', 'act2')).toEqual({ ok: true })
-    expect('actStyleOff' in JSON.parse(read('images/prompts.json'))).toBe(false)
     expect((await summary()).images!.acts[1]!.rows[0]!.actStyle?.pick).toBe('act2')
   })
 
   it('refuses a pick of an act that does not list the image or adds no style', async () => {
-    const { file, root } = repo({ 'tts/act2/images.json': [inn] })
+    const { file, read } = repo({ 'tts/act2/images.json': [inn] })
+    const before = read(EDITS)
     expect(await setImageActStylePick(file, 'inn', 'act9')).toBeNull()
     expect(await setImageActStylePick(file, 'inn', 'act2')).toBeNull() // act2 adds no style
     expect(await setImageActStylePick(file, 'ghost', null)).toBeNull()
-    expect(existsSync(join(root, 'images/prompts.json'))).toBe(false)
+    expect(read(EDITS)).toBe(before)
   })
 
-  it('writes a hand-edited actStyleOff sorted and without repeats', async () => {
-    const { file, read } = repo({
-      'images/prompts.json': { images: {}, style: {}, actStyleOff: ['b', 'a', 'b'] },
-    })
-    await setImageWords(file, 'inn', 'cosy')
-    expect(JSON.parse(read('images/prompts.json')).actStyleOff).toEqual(['a', 'b'])
-  })
-
-  it('saves a style field over the game’s', async () => {
+  it('sets the style’s look and what is kept out directly', async () => {
     const { file, read } = repo()
-    expect(await setStyleField(file, 'look', 'oil paint')).toEqual({ ok: true })
-    expect(JSON.parse(read('images/prompts.json')).style).toEqual({
-      look: { words: 'oil paint', gameWas: 'pixel art' },
+    expect(await setStyleField(file, 'look', ' oil paint ')).toEqual({ ok: true })
+    expect(await setStyleField(file, 'keepOut', null)).toEqual({ ok: true })
+    expect(JSON.parse(read(EDITS)).style).toEqual({
+      look: 'oil paint',
+      palette: ['#000000'],
+      parts: { act1: 'lantern' },
     })
+  })
+
+  it('refuses an empty look, and is null without a style', async () => {
+    const { file, read } = repo()
+    const before = read(EDITS)
+    expect(await setStyleField(file, 'look', ' ')).toEqual({
+      ok: false,
+      problems: [{ file: EDITS, path: 'style.look', message: 'the look cannot be empty' }],
+    })
+    expect(read(EDITS)).toBe(before)
+    const bare = repo({ [EDITS]: undefined })
+    expect(await setStyleField(bare.file, 'look', 'oil')).toBeNull()
+    expect(existsSync(join(bare.root, EDITS))).toBe(false)
   })
 })
 
 describe('the game’s words changed under the user’s', () => {
   it('Keep mine accepts the new words as the baseline; Use the game’s drops the user’s', async () => {
     const { file, read, summary } = repo({
-      'images/prompts.json': { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} },
+      [EDITS]: { style, images: { inn: { text: 'cosy', gameWas: 'older' } } },
     })
     expect((await summary()).images!.acts[0]!.rows[0]!.gameChanged).toBe(true)
     await resolveImageCompare(file, 'inn', 'keep')
-    expect(JSON.parse(read('images/prompts.json')).images.inn).toEqual({
-      words: 'cosy',
+    expect(JSON.parse(read(EDITS)).images.inn).toEqual({
+      text: 'cosy',
       gameWas: 'a low inn',
     })
     expect((await summary()).images!.acts[0]!.rows[0]!.gameChanged).toBe(false)
     await resolveImageCompare(file, 'inn', 'game')
-    expect(JSON.parse(read('images/prompts.json')).images).toEqual({})
-  })
-})
-
-describe('the game’s style changed', () => {
-  it('shows one notice until Seen, remembered across reads, and back on the next change', async () => {
-    const { root, file, summary } = repo()
-    const first = (await summary()).images!.acts[0]!.rows[0]!
-    writeFileSync(
-      join(root, 'images/images.lock.json'),
-      JSON.stringify({ images: { inn: { chosen: first.madeFrom } } }),
-    )
-    writeFileSync(join(root, 'images/style.json'), JSON.stringify({ ...style, look: 'oil' }))
-    expect((await summary()).images!.styleNotice).toEqual({ count: 1, changed: ['the look'] })
-    expect((await summary()).images!.styleNotice).not.toBeNull()
-    expect(await markStyleSeen(file)).toEqual({ ok: true })
-    const after = (await summary()).images!
-    expect(after.styleNotice).toBeNull()
-    expect(after.acts[0]!.rows[0]!.status).toBe('out of date')
-    writeFileSync(
-      join(root, 'images/style.json'),
-      JSON.stringify({ ...style, look: 'oil', keepOut: 'x' }),
-    )
-    expect((await summary()).images!.styleNotice?.changed).toEqual(['what is kept out'])
+    expect(JSON.parse(read(EDITS)).images).toEqual({})
   })
 })
 
@@ -257,19 +277,21 @@ describe('through the project load', () => {
     expect(loaded.ok && loaded.summary.images?.acts[0]?.rows).toHaveLength(1)
   })
 
-  it('says why when the prompts file cannot be written, for the words and the act-style box', async () => {
-    const { root, file } = repo()
-    chmodSync(join(root, 'images'), 0o555)
+  it('says why when the edits cannot be written, for the words, the act-style box and the style', async () => {
+    const { root, file, read } = repo()
+    const before = read(EDITS)
+    chmodSync(join(root, 'content-studio/images'), 0o555)
     try {
       const failed: ImageEditResult = {
         ok: false,
-        problems: [{ file: 'images/prompts.json', path: '', message: 'permission denied' }],
+        problems: [{ file: EDITS, path: '', message: 'permission denied' }],
       }
       expect(await setImageWords(file, 'inn', 'a cosy inn')).toEqual(failed)
       expect(await setImageActStyle(file, 'inn', false)).toEqual(failed)
+      expect(await setStyleField(file, 'look', 'oil')).toEqual(failed)
     } finally {
-      chmodSync(join(root, 'images'), 0o755)
+      chmodSync(join(root, 'content-studio/images'), 0o755)
     }
-    expect(existsSync(join(root, 'images/prompts.json'))).toBe(false)
+    expect(read(EDITS)).toBe(before)
   })
 })

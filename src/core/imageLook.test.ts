@@ -70,14 +70,16 @@ describe("explaining a style that can't be used", () => {
     const raw = { ...base, palette: ['#000000', '#ffffff', '#7fb0e'] }
     const parsed = StyleSchema.safeParse(raw)
     expect(parsed.success).toBe(false)
-    expect(explainStyleProblem(raw, 'images/style.json')).toBe(
-      "Can't bring this take to the game's look: the style file's palette has a colour that isn't one: palette 3, “#7fb0e”.",
+    expect(explainStyleProblem(raw, 'content-studio/images/edits.json')).toBe(
+      "Can't bring this take to the game's look: the style's palette has a colour that isn't one: palette 3, “#7fb0e”.",
     )
   })
   it('falls back to the file and the place', () => {
-    expect(explainStyleProblem({ palette: [] }, 'images/style.json')).toContain(
-      "Can't bring this take to the game's look: images/style.json",
+    expect(explainStyleProblem({ palette: [] }, 'content-studio/images/edits.json')).toBe(
+      "Can't bring this take to the game's look: the style in content-studio/images/edits.json cannot be read.",
     )
-    expect(explainStyleProblem(null, 'images/style.json')).toContain('images/style.json')
+    expect(explainStyleProblem(null, 'content-studio/images/edits.json')).toContain(
+      'content-studio/images/edits.json',
+    )
   })
 })

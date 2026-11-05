@@ -254,16 +254,13 @@ describe('setMusicModel', () => {
 })
 
 describe('setImageModel', () => {
-  const imagePaths = {
-    list: 'tts/{part}/images.json',
-    style: 'images/style.json',
-    prompts: 'images/prompts.json',
-    lock: 'images/images.lock.json',
+  const imagesSection = {
+    from: { part: 'tts/{part}/images.json' },
     clips: 'web/images',
     manifest: 'web/images/manifest.json',
   }
   const withImages = (extra: Record<string, unknown> = {}) =>
-    projectJson({ images: { paths: imagePaths, ...extra } })
+    projectJson({ images: { ...imagesSection, ...extra } })
 
   it('writes images.model and nothing else, in the file’s own indentation', async () => {
     const { projectFile, read } = repo(withImages(), 4)

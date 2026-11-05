@@ -13,7 +13,6 @@ import {
   modelCaption,
   outOfDateText,
   paletteText,
-  styleNoticeText,
   takeCountText,
   unchooseNote,
 } from './imagesText'
@@ -46,16 +45,8 @@ describe('the images words', () => {
     )
   })
   it('counts the palette', () => {
-    expect(paletteText(16)).toBe('16 colours · set by the game')
-    expect(paletteText(1)).toBe('1 colour · set by the game')
-  })
-  it('words the style notice for one image and for several', () => {
-    expect(styleNoticeText(3)).toBe(
-      '3 chosen images across all acts were made with the old style and are out of date. The game shows them until you choose new ones.',
-    )
-    expect(styleNoticeText(1)).toBe(
-      '1 chosen image across all acts was made with the old style and is out of date. The game shows it until you choose a new one.',
-    )
+    expect(paletteText(16)).toBe('16 colours')
+    expect(paletteText(1)).toBe('1 colour')
   })
 })
 

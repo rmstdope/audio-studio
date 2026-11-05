@@ -2,14 +2,9 @@ import { useState } from 'react'
 
 /** The example `images` section the page shows under "How to set it up". */
 const EXAMPLE = `"images": {
-  "paths": {
-    "list": "tts/{part}/images.json",
-    "style": "images/style.json",
-    "prompts": "images/prompts.json",
-    "lock": "images/images.lock.json",
-    "clips": "web/public/images/generated",
-    "manifest": "web/public/images/generated/manifest.json"
-  }
+  "from": { "part": "tts/{part}/images.json" },
+  "clips": "web/public/images/generated",
+  "manifest": "web/public/images/generated/manifest.json"
 }`
 
 /** Images in a project whose file has no `images` section: what to add, with an example. */
@@ -26,8 +21,8 @@ export function NoImages() {
         <strong>This project has no images yet</strong>
         <span>
           Add an <span className="mono">images</span> section to{' '}
-          <span className="mono">content-studio.json</span> to say where the game lists its images
-          and its style, then reload.
+          <span className="mono">content-studio.json</span> to say where the game lists its images,
+          then reload.
         </span>
         <button className="btn" type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
           How to set it up

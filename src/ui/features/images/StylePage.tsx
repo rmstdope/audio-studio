@@ -4,7 +4,7 @@ import { useSetStyleField } from '../../api'
 import { paletteText } from '../../imagesText'
 import { WordsField } from './WordsField'
 
-/** The Style page: the look and what is kept out (editable here), the palette and the acts' additions (the game's). */
+/** The Style page: the look and what is kept out (editable here), the palette and the acts' additions (in the edits file). */
 export function StylePage({ images }: { images: ImagesSummary }) {
   const { style } = images
   const [saved, setSaved] = useState(false)
@@ -17,24 +17,26 @@ export function StylePage({ images }: { images: ImagesSummary }) {
           <span className="crumbs">Images</span>
           <h1 tabIndex={-1}>Style</h1>
           <span className="muted">
-            Added to every image&apos;s prompt. From the game&apos;s style file; your changes stay
-            in the studio.
+            Added to every image&apos;s prompt. The studio&apos;s own: change the look and what is
+            kept out here.
           </span>
         </div>
       </header>
       {style.invalid ? (
         <section className="panel no-music">
-          <strong>The game&apos;s style file cannot be read</strong>
+          <strong>The style cannot be read</strong>
           <span>
             See the problems above. Until it can be, each image&apos;s prompt is only its own words.
           </span>
         </section>
       ) : !style.present ? (
         <section className="panel no-music">
-          <strong>The game has no style file yet</strong>
+          <strong>There is no style yet</strong>
           <span>
-            Until it has one, each image&apos;s prompt is only its own words. Images made before the
-            style arrives go out of date when it does.
+            Add one under <span className="mono">style</span> in{' '}
+            <span className="mono">content-studio/images/edits.json</span>. Until then, each
+            image&apos;s prompt is only its own words. Images made before the style arrives go out
+            of date when it does.
           </span>
         </section>
       ) : (
@@ -50,16 +52,14 @@ export function StylePage({ images }: { images: ImagesSummary }) {
             </div>
             <WordsField
               label="The look"
-              words={style.look.words}
-              changed={style.look.changed}
+              words={style.look}
               save={look}
               onSaved={() => setSaved(true)}
               onEdit={() => setSaved(false)}
             />
             <WordsField
               label="Kept out of every image"
-              words={style.keepOut.words}
-              changed={style.keepOut.changed}
+              words={style.keepOut}
               save={keepOut}
               onSaved={() => setSaved(true)}
               onEdit={() => setSaved(false)}
@@ -99,7 +99,10 @@ export function StylePage({ images }: { images: ImagesSummary }) {
                 ))}
               </tbody>
             </table>
-            <p className="muted">Set by the game.</p>
+            <p className="muted">
+              The palette and the additions per act are changed in{' '}
+              <span className="mono">content-studio/images/edits.json</span>.
+            </p>
           </section>
         </>
       )}

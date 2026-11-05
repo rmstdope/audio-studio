@@ -854,11 +854,11 @@ describe('a take’s picture', () => {
 
   it('shows what to fix in place of the game’s version, and turns Choose off', async () => {
     const message =
-      "Can't bring this take to the game's look: the style file's palette has a colour that isn't one: palette 3, “#7fb0e”."
+      "Can't bring this take to the game's look: the style's palette has a colour that isn't one: palette 3, “#7fb0e”."
     const s = await show(view({ takes: [take(3, { look: 'old' })], lookError: message }))
     expect(s.container.querySelector('[role="alert"]')?.textContent).toBe(message)
     expect(imgs(s, 'right')).toHaveLength(0)
-    expect(s.text()).toContain("Fix the game's style file to choose this take.")
+    expect(s.text()).toContain('Fix the style to choose this take.')
     expect((s.button('Choose') as HTMLButtonElement).disabled).toBe(true)
   })
 

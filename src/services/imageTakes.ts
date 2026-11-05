@@ -13,14 +13,12 @@ import { planImagesMakeAll, TAKES_EACH } from '../core/imagesMakeAll'
 import { bringToLook, isCropped } from '../core/imagePixels'
 import {
   ImageBoardSchema,
-  ImageLockFileSchema,
   ImageManifestSchema,
   takeIsEarlier,
   takeSize,
   type ImageBoard,
   type ImageBoardTake,
   type ImageFailedView,
-  type ImageLockFile,
   type ImageMakingSummary,
   type ImageMakingView,
   type ImageManifest,
@@ -29,13 +27,16 @@ import {
   type ImageTakeView,
 } from '../core/imageTakes'
 import {
+  ImageLockSchema,
   acceptableReasons,
+  formatImageLock,
   outOfDateReasons,
   type ChosenEntry,
+  type ImageLock,
   type ImageRow,
 } from '../core/images'
 import { resolveInRoot } from '../core/paths'
-import type { Problem } from '../core/project'
+import { IMAGES_LOCK_FILE, type Problem } from '../core/project'
 import { readResource, writeAtomic } from './files'
 import { freeGpu, gpuQueue } from './gpu'
 import { IMAGE_BOARD_DIR, IMAGE_TAKES_DIR, readImages, readStyleLook } from './imageLists'
@@ -238,7 +239,7 @@ export function createImageTakes({
     const summary = await readImages(root, project, [])
     const row = summary?.acts.flatMap((act) => act.rows).find((r) => r.id === id)
     if (!row) return null
-    const style = await readStyleLook(root, project.images.paths.style)
+    const style = await readStyleLook(root)
     return {
       projectFile,
       look: style.look,
@@ -297,40 +298,19 @@ export function createImageTakes({
   }
 
   /** The lock as it is: empty if there is none; null (with the problems added) if broken. */
-  async function lockNow(found: Found, problems: Problem[]): Promise<ImageLockFile | null> {
-    const read = await readResource(
-      found.root,
-      found.config.paths.lock,
-      ImageLockFileSchema,
-      problems,
-    )
-    return read === 'invalid' ? null : read === 'missing' ? { images: {} } : read
+  async function lockNow(found: Found, problems: Problem[]): Promise<ImageLock | null> {
+    const read = await readResource(found.root, IMAGES_LOCK_FILE, ImageLockSchema, problems)
+    return read === 'invalid' ? null : read === 'missing' ? {} : read
   }
 
   async function manifestNow(found: Found, problems: Problem[]): Promise<ImageManifest | null> {
     const read = await readResource(
       found.root,
-      found.config.paths.manifest,
+      found.config.manifest,
       ImageManifestSchema,
       problems,
     )
     return read === 'invalid' ? null : read === 'missing' ? {} : read
-  }
-
-  /** The lock as text: its keys as they were, the images one per line. */
-  function formatLock(lock: ImageLockFile): string {
-    const parts = Object.keys(lock)
-      .sort()
-      .map((key) => [key, lock[key]] as const)
-      .map(([key, value]) => {
-        if (key !== 'images') return ` ${JSON.stringify(key)}: ${JSON.stringify(value)}`
-        const entries = sorted(lock.images)
-        const lines = Object.keys(entries).map(
-          (id) => `  ${JSON.stringify(id)}: ${JSON.stringify(entries[id])}`,
-        )
-        return ` "images": ${lines.length ? `{\n${lines.join(',\n')}\n }` : '{}'}`
-      })
-    return `{\n${parts.join(',\n')}\n}\n`
   }
 
   const entriesOf = (key: string) =>
@@ -359,18 +339,18 @@ export function createImageTakes({
           message: `The game's picture for ${id} could not be changed: the images ${unread} could not be read. Nothing was changed.`,
         }
       }
-      const next = entry(lock.images[id]?.chosen)
+      const next = entry(lock[id])
       if (!next) return { ok: true as const }
       const file = `${id}.png`
       manifest[id] = { file, width: found.row.width, height: found.row.height }
-      lock.images[id] = { ...lock.images[id], chosen: next }
-      await writeAtomic(found.root, join(found.config.paths.clips, file), png)
+      lock[id] = next
+      await writeAtomic(found.root, join(found.config.clips, file), png)
       await writeAtomic(
         found.root,
-        found.config.paths.manifest,
+        found.config.manifest,
         `${JSON.stringify(sorted(manifest), null, 2)}\n`,
       )
-      await writeAtomic(found.root, found.config.paths.lock, formatLock(lock))
+      await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
       return { ok: true as const }
     })
   }
@@ -499,7 +479,7 @@ export function createImageTakes({
       if ('ok' in board) return `${board.file} cannot be used`
       const problems: Problem[] = []
       const lock = await lockNow(found, problems)
-      const chosen = lock?.images[id]?.chosen
+      const chosen = lock?.[id]
       // A take that cannot be brought keeps the board's note of those before it, and the image
       // stays old (so is tried again) through its chosen picture or its unbrought take.
       let failure: string | null = null
@@ -634,7 +614,7 @@ export function createImageTakes({
       if ('ok' in board) return board
       const problems: Problem[] = []
       const lock = await lockNow(found, problems)
-      const chosen = lock?.images[id]?.chosen?.take
+      const chosen = lock?.[id]?.take
       const takes: ImageTakeView[] = []
       for (const take of board.takes) {
         if (!(await Bun.file(resolveInRoot(found.root, pictureOf(id, take.n))).exists())) continue
@@ -827,7 +807,7 @@ export function createImageTakes({
         choices().run(`image-choice\0${projectFile}`, async (): Promise<ImageTakesAnswer> => {
           const lock = await lockNow(found, [])
           if (!lock) return { ok: false, message: 'The images lock could not be read.' }
-          const chosen = lock.images[id]?.chosen
+          const chosen = lock[id]
           if (!chosen) return { ok: false, message: 'No take is chosen for this image.' }
           // The image's words and style read again in the turn: one saved since `found` was read
           // is what is accepted, never the one before it.
@@ -844,11 +824,8 @@ export function createImageTakes({
               message: 'A changed size cannot be accepted: the image needs a new take.',
             }
           }
-          lock.images[id] = {
-            ...lock.images[id],
-            chosen: { ...chosen, words: now.words, style: now.style },
-          }
-          await writeAtomic(found.root, found.config.paths.lock, formatLock(lock))
+          lock[id] = { ...chosen, words: now.words, style: now.style }
+          await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
           return { ok: true }
         }),
       )
@@ -864,23 +841,20 @@ export function createImageTakes({
           const lock = await lockNow(found, problems)
           if (!manifest) return { ok: false, message: 'The images manifest could not be read.' }
           if (!lock) return { ok: false, message: 'The images lock could not be read.' }
-          if (!lock.images[id]?.chosen)
-            return { ok: false, message: 'No take is chosen for this image.' }
+          if (!lock[id]) return { ok: false, message: 'No take is chosen for this image.' }
           if (id in manifest) {
             delete manifest[id]
             await writeAtomic(
               found.root,
-              found.config.paths.manifest,
+              found.config.manifest,
               `${JSON.stringify(sorted(manifest), null, 2)}\n`,
             )
           }
-          await rm(resolveInRoot(found.root, join(found.config.paths.clips, `${id}.png`)), {
+          await rm(resolveInRoot(found.root, join(found.config.clips, `${id}.png`)), {
             force: true,
           })
-          const { chosen: _chosen, ...rest } = lock.images[id]!
-          if (Object.keys(rest).length) lock.images[id] = rest
-          else delete lock.images[id]
-          await writeAtomic(found.root, found.config.paths.lock, formatLock(lock))
+          delete lock[id]
+          await writeAtomic(found.root, IMAGES_LOCK_FILE, formatImageLock(lock))
           return { ok: true }
         }),
       )
@@ -894,10 +868,10 @@ export function createImageTakes({
         async (board): Promise<ImageTakesAnswer | { dropped: ImageBoardTake }> => {
           const problems: Problem[] = []
           const lock = await lockNow(found, problems)
-          if (!lock) return { ok: false, file: found.config.paths.lock, problems }
+          if (!lock) return { ok: false, file: IMAGES_LOCK_FILE, problems }
           const take = board.takes.find((t) => t.n === n)
           if (!take) return { ok: false, message: 'That take is not on the board.' }
-          if (lock.images[id]?.chosen?.take === n) {
+          if (lock[id]?.take === n) {
             return { ok: false, message: 'That take is the one in the game; choose another first.' }
           }
           board.takes = board.takes.filter((t) => t !== take)
@@ -1025,8 +999,8 @@ export function createImageTakes({
       if (!found || !('row' in found)) return null
       const problems: Problem[] = []
       const lock = await lockNow(found, problems)
-      if (lock?.images[id]?.chosen) {
-        const clip = resolveInRoot(found.root, join(found.config.paths.clips, `${id}.png`))
+      if (lock?.[id]) {
+        const clip = resolveInRoot(found.root, join(found.config.clips, `${id}.png`))
         return (await Bun.file(clip).exists()) ? clip : null
       }
       // While the lock cannot be read, what the game shows is not known.

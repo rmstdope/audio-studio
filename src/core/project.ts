@@ -238,26 +238,25 @@ const imagesPath = z
     error: 'must not contain {language}: images are the same in every language',
   })
 
-/** The optional `images` section: where the game lists its images and style, and the studio's own files. */
+/**
+ * The optional `images` section: where the game lists each part's images, the model, and where the
+ * chosen pictures go. The style and the studio's changes are in its edits, the chosen takes in its
+ * lock, both at fixed places in the studio folder.
+ */
 const ImagesSchema = z.object({
-  /** The image model new takes are made with unless an image asks for the other; absent is FLUX.2 klein. */
-  model: z.enum(IMAGE_MODEL_IDS).optional(),
-  paths: z.object({
-    /** An act's images, written by the game. */
-    list: imagesPath.refine((path) => path.includes('{part}'), {
+  /** The game's lists. */
+  from: z.object({
+    /** A part's images, written by the game. */
+    part: imagesPath.refine((path) => path.includes('{part}'), {
       error: 'must contain {part}, or every part would share one file',
     }),
-    /** The game's style file, written by the game. */
-    style: imagesPath,
-    /** The studio's own words for images and style, over the game's. */
-    prompts: imagesPath,
-    /** Where the chosen take of each image is recorded (written by take-making). */
-    lock: imagesPath,
-    /** The folder the game's chosen images are written to, one `<id>.png` each. */
-    clips: imagesPath,
-    /** What the game reads: `{ image: { file, width, height } }`, in the clips folder. */
-    manifest: imagesPath,
   }),
+  /** The image model new takes are made with unless an image asks for the other; absent is FLUX.2 klein. */
+  model: z.enum(IMAGE_MODEL_IDS).optional(),
+  /** The folder the game's chosen images are written to, one `<id>.png` each. */
+  clips: imagesPath,
+  /** What the game reads: `{ image: { file, width, height } }`, in the clips folder. */
+  manifest: imagesPath,
 })
 
 /** The optional `effects` section: where the game lists its sound effects, and the command that writes the list. */
@@ -512,6 +511,15 @@ export const MUSIC_EDITS_FILE = `${MUSIC_DIR}/edits.json`
 
 /** The chosen take of each track, and what it was made from. */
 export const MUSIC_LOCK_FILE = `${MUSIC_DIR}/lock.json`
+
+/** Images' folder in the studio folder: the style, the edits and the lock of every image. */
+export const IMAGES_DIR = `${STUDIO_DIR}/images`
+
+/** The style every image shares, and the studio's changes to the game's images, by image id. */
+export const IMAGES_EDITS_FILE = `${IMAGES_DIR}/edits.json`
+
+/** The chosen take of each image, and what it was made from. */
+export const IMAGES_LOCK_FILE = `${IMAGES_DIR}/lock.json`
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */
 export interface Problem {

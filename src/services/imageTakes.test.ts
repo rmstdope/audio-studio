@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setImageWords } from './imageEdits'
@@ -14,18 +14,23 @@ import { createSerial } from './serial'
 import { openProject } from './workspace'
 
 const images = {
-  paths: {
-    list: 'tts/{part}/images.json',
-    style: 'images/style.json',
-    prompts: 'images/prompts.json',
-    lock: 'images/images.lock.json',
-    clips: 'web/images',
-    manifest: 'web/images/manifest.json',
-  },
+  from: { part: 'tts/{part}/images.json' },
+  clips: 'web/images',
+  manifest: 'web/images/manifest.json',
 }
 /** A picture's bytes as the text `readFileSync` gives. */
 const bytes = (png: Uint8Array) => Buffer.from(png).toString('utf8')
-const inn = { id: 'inn', title: 'Inn', description: 'a low inn', width: 320, height: 200 }
+const inn = { id: 'inn', title: 'Inn', text: 'a low inn', width: 320, height: 200 }
+const EDITS = 'content-studio/images/edits.json'
+const LOCK = 'content-studio/images/lock.json'
+const STYLE = { look: 'pixel art', keepOut: 'text', palette: ['#000000'] }
+
+/** Writes `style` over the style in the images edits of the project at `root`, keeping the rest. */
+function writeStyle(root: string, style: object) {
+  const file = join(root, EDITS)
+  const edits = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { images: {} }
+  writeFileSync(file, JSON.stringify({ ...edits, style }))
+}
 
 /** A generator that makes a patterned picture of the seed and fails for a prompt saying "fail"; `gate` holds it back. */
 function fakeGenerator(
@@ -64,7 +69,7 @@ function setup(
       images: options.model ? { ...images, model: options.model } : images,
     }),
     'tts/act1/images.json': [inn, { ...inn, id: 'hall', title: 'Hall' }],
-    'images/style.json': { look: 'pixel art', keepOut: 'text', palette: ['#000000'], acts: {} },
+    [EDITS]: { style: STYLE, images: {} },
     ...extra,
   })
   const file = join(root, 'content-studio.json')
@@ -143,10 +148,7 @@ describe('making takes', () => {
 
   it('keeps a take that failed with its reason, and Try again makes the same number', async () => {
     const { takes, file, settled } = setup(undefined, {
-      'images/prompts.json': {
-        images: { inn: { words: 'fail now', gameWas: 'a low inn' } },
-        style: {},
-      },
+      [EDITS]: { style: STYLE, images: { inn: { text: 'fail now', gameWas: 'a low inn' } } },
     })
     await takes.make(file, 'inn', { count: 1 })
     const failed = await settled('inn')
@@ -164,10 +166,7 @@ describe('making takes', () => {
 
   it('reports an image whose takes all failed with no takes being made and its failures counted', async () => {
     const { takes, file, settled } = setup(undefined, {
-      'images/prompts.json': {
-        images: { inn: { words: 'fail now', gameWas: 'a low inn' } },
-        style: {},
-      },
+      [EDITS]: { style: STYLE, images: { inn: { text: 'fail now', gameWas: 'a low inn' } } },
     })
     await takes.make(file, 'inn', { count: 2 })
     await settled('inn')
@@ -257,16 +256,20 @@ describe('choosing', () => {
       inn: { file: 'inn.png', width: 320, height: 200 },
     })
     expect(read('web/images/manifest.json')).toContain('"width": 320,')
-    const lock = JSON.parse(read('images/images.lock.json'))
-    expect(lock.images.inn.chosen).toMatchObject({
-      words: 'a low inn',
-      width: 320,
-      height: 200,
-      take: 2,
-      seed: 101,
+    const lock = JSON.parse(read(LOCK))
+    expect(lock.inn).toMatchObject({
       model: 'flux2-klein-4b',
+      seed: 101,
+      take: 2,
+      inputs: {
+        text: 'a low inn',
+        width: 320,
+        height: 200,
+        style: { look: 'pixel art', keepOut: 'text', part: null },
+        look: { palette: ['#000000'], dithering: 'patterned' },
+      },
     })
-    expect(read('images/images.lock.json')).toContain('\n "images"')
+    expect(read(LOCK)).toStartWith('{\n "inn": {"model":')
     const r = await row()
     expect(r).toMatchObject({ status: 'chosen', chosenTake: 2 })
     const view = await takes.view(file, 'inn')
@@ -281,10 +284,10 @@ describe('choosing', () => {
   it('choosing the take that is already chosen changes nothing', async () => {
     const { takes, file, read } = await made()
     await takes.choose(file, 'inn', 1)
-    const before = read('images/images.lock.json')
+    const before = read(LOCK)
     await new Promise((resolve) => setTimeout(resolve, 5))
     expect(await takes.choose(file, 'inn', 1)).toEqual({ ok: true })
-    expect(read('images/images.lock.json')).toBe(before)
+    expect(read(LOCK)).toBe(before)
   })
 
   it('goes out of date when the words change, and choosing another replaces the picture', async () => {
@@ -295,29 +298,24 @@ describe('choosing', () => {
     expect(await takes.choose(file, 'inn', 2)).toEqual({ ok: true })
     expect(read('web/images/inn.png')).toBe(read('content-studio/cache/image-takes/inn/2.game.png'))
     expect((await row()).status).toBe('out of date')
-    expect(JSON.parse(read('images/images.lock.json')).images.inn.chosen.take).toBe(2)
+    expect(JSON.parse(read(LOCK)).inn.take).toBe(2)
   })
 
-  it('keeps the other images, the other manifest entries and the lock’s other keys', async () => {
+  it('keeps the other images and the other manifest entries, the lock in id order', async () => {
+    const hall = { take: 4, inputs: { text: 'w', width: 1, height: 2 } }
     const { takes, file, read } = await made({
-      'images/images.lock.json': {
-        zeta: 1,
-        images: { hall: { chosen: { words: 'w', style: 's', width: 1, height: 2, take: 4 } } },
-        other: [1],
-      },
+      [LOCK]: { zeta: hall, hall },
       'web/images/manifest.json': { hall: { file: 'hall.png', width: 8, height: 8 } },
     })
     await takes.choose(file, 'inn', 1)
-    const lock = JSON.parse(read('images/images.lock.json'))
-    expect(Object.keys(lock.images)).toEqual(['hall', 'inn'])
-    expect(lock.other).toEqual([1])
-    // The top-level keys are sorted, whatever order the file had them in.
-    expect(Object.keys(lock)).toEqual(['images', 'other', 'zeta'])
+    const lock = JSON.parse(read(LOCK))
+    expect(Object.keys(lock)).toEqual(['hall', 'inn', 'zeta'])
+    expect(lock.hall).toEqual(hall)
     expect(Object.keys(JSON.parse(read('web/images/manifest.json')))).toEqual(['hall', 'inn'])
   })
 
   it('changes nothing when the lock or the manifest cannot be read', async () => {
-    const lockBroken = await made({ 'images/images.lock.json': '{ nope' })
+    const lockBroken = await made({ [LOCK]: '{ nope' })
     expect(await lockBroken.takes.choose(lockBroken.file, 'inn', 1)).toMatchObject({ ok: false })
     expect(existsSync(join(lockBroken.root, 'web/images/inn.png'))).toBe(false)
     const view = await lockBroken.takes.view(lockBroken.file, 'inn')
@@ -325,7 +323,7 @@ describe('choosing', () => {
     const manifestBroken = await made({ 'web/images/manifest.json': '[1' })
     const result = await manifestBroken.takes.choose(manifestBroken.file, 'inn', 1)
     expect(result).toMatchObject({ ok: false })
-    expect(existsSync(join(manifestBroken.root, 'images/images.lock.json'))).toBe(false)
+    expect(existsSync(join(manifestBroken.root, LOCK))).toBe(false)
     expect(await manifestBroken.takes.choose(manifestBroken.file, 'inn', 9)).toMatchObject({
       ok: false,
     })
@@ -338,7 +336,7 @@ describe('choosing', () => {
     expect(await takes.unchoose(file, 'inn')).toEqual({ ok: true })
     expect(existsSync(join(root, 'web/images/inn.png'))).toBe(false)
     expect(JSON.parse(read('web/images/manifest.json'))).toEqual({})
-    expect(JSON.parse(read('images/images.lock.json')).images).toEqual({})
+    expect(JSON.parse(read(LOCK))).toEqual({})
     expect((await row()).status).toBe('none yet')
     expect(existsSync(join(root, 'content-studio/cache/image-takes/inn/1.png'))).toBe(true)
     expect(await takes.currentFile(file, 'inn')).toBeNull()
@@ -349,17 +347,14 @@ describe('choosing', () => {
     await takes.choose(file, 'inn', 1)
     const picture = read('web/images/inn.png')
     await setImageWords(file, 'inn', 'a high inn')
-    writeFileSync(
-      join(root, 'images/style.json'),
-      JSON.stringify({ look: 'oil paint', keepOut: 'text', palette: ['#000000'], acts: {} }),
-    )
+    writeStyle(root, { look: 'oil paint', keepOut: 'text', palette: ['#000000'], parts: {} })
     expect((await row()).reasons).toEqual(['the words', 'the style'])
     expect(await takes.accept(file, 'inn')).toEqual({ ok: true })
     expect((await row()).status).toBe('chosen')
-    const chosen = JSON.parse(read('images/images.lock.json')).images.inn.chosen
-    expect([chosen.words, chosen.style, chosen.take]).toEqual([
-      (await row()).madeFrom.words,
-      (await row()).madeFrom.style,
+    const chosen = JSON.parse(read(LOCK)).inn
+    expect([chosen.inputs.text, chosen.inputs.style, chosen.take]).toEqual([
+      'a high inn',
+      { look: 'oil paint', keepOut: 'text', part: null },
       1,
     ])
     expect(read('web/images/inn.png')).toBe(picture)
@@ -369,12 +364,12 @@ describe('choosing', () => {
     const { takes, file, root, read } = await made()
     await takes.choose(file, 'inn', 1)
     await setImageWords(file, 'inn', 'a high inn')
-    writeFileSync(join(root, 'images/images.lock.json'), '{ broken')
+    writeFileSync(join(root, LOCK), '{ broken')
     expect(await takes.accept(file, 'inn')).toEqual({
       ok: false,
       message: 'The images lock could not be read.',
     })
-    expect(read('images/images.lock.json')).toBe('{ broken')
+    expect(read(LOCK)).toBe('{ broken')
   })
 
   it('refuses to accept a changed size, which needs a new take, or an image with nothing to accept', async () => {
@@ -391,16 +386,16 @@ describe('choosing', () => {
     writeFileSync(
       join(root, 'tts/act1/images.json'),
       JSON.stringify([
-        { ...inn, description: 'a high inn', width: 160 },
+        { ...inn, text: 'a high inn', width: 160 },
         { ...inn, id: 'hall', title: 'Hall' },
       ]),
     )
-    const before = read('images/images.lock.json')
+    const before = read(LOCK)
     expect(await takes.accept(file, 'inn')).toEqual({
       ok: false,
       message: 'A changed size cannot be accepted: the image needs a new take.',
     })
-    expect(read('images/images.lock.json')).toBe(before)
+    expect(read(LOCK)).toBe(before)
     expect((await row()).status).toBe('out of date')
   })
 
@@ -417,7 +412,7 @@ describe('choosing', () => {
   })
 
   it('refuses a drop while the lock cannot be read', async () => {
-    const { takes, file } = await made({ 'images/images.lock.json': '{ nope' })
+    const { takes, file } = await made({ [LOCK]: '{ nope' })
     expect(await takes.drop(file, 'inn', 1)).toMatchObject({ ok: false })
   })
 
@@ -500,10 +495,7 @@ describe('image models', () => {
 
   it('remakes a failed take with the model it was asked with', async () => {
     const s = setup(undefined, {
-      'images/prompts.json': {
-        images: { inn: { words: 'fail now', gameWas: 'a low inn' } },
-        style: {},
-      },
+      [EDITS]: { style: STYLE, images: { inn: { text: 'fail now', gameWas: 'a low inn' } } },
     })
     await s.takes.make(s.file, 'inn', { count: 1, model: 'z-image-turbo' })
     await s.settled('inn')
@@ -702,7 +694,10 @@ describe('the summary of a press on an act is kept by the studio', () => {
 describe('the game’s look', () => {
   const warm = ['#000000', '#ffffff', '#ff0000']
   const style = (extra: object = {}) => ({
-    'images/style.json': { look: 'pixel art', keepOut: 'text', palette: warm, acts: {}, ...extra },
+    [EDITS]: {
+      style: { look: 'pixel art', keepOut: 'text', palette: warm, parts: {}, ...extra },
+      images: {},
+    },
   })
   /** Two takes made under `files`' style. */
   async function made(files: Record<string, unknown> = style()) {
@@ -764,7 +759,7 @@ describe('the game’s look', () => {
     const view = await takesOf(s)
     expect(view.takes.map((t) => t.look)).toEqual(['missing', 'missing'])
     expect(view.lookError).toBe(
-      "Can't bring this take to the game's look: the style file's palette has a colour that isn't one: palette 2, “#7fb0e”.",
+      "Can't bring this take to the game's look: the style's palette has a colour that isn't one: palette 2, “#7fb0e”.",
     )
     expect(existsSync(join(s.root, 'content-studio/cache/image-takes/inn/1.png'))).toBe(true)
     expect(existsSync(join(s.root, 'content-studio/cache/image-takes/inn/1.game.png'))).toBe(false)
@@ -811,18 +806,16 @@ describe('the game’s look', () => {
       width: 320,
       height: 200,
     })
-    expect(JSON.parse(s.read('images/images.lock.json')).images.inn.chosen.look).toBe(
-      (await s.row()).look.key,
-    )
+    expect(JSON.parse(s.read(LOCK)).inn.inputs.look).toEqual({
+      palette: warm,
+      dithering: 'patterned',
+    })
     expect((await s.row()).looksOld).toBe(false)
   })
 
   it('brings a take with an old look to the look when it is chosen', async () => {
     const s = await made()
-    writeFileSync(
-      join(s.root, 'images/style.json'),
-      JSON.stringify({ look: 'pixel art', keepOut: 'text', palette: ['#ff0000'], acts: {} }),
-    )
+    writeStyle(s.root, { look: 'pixel art', keepOut: 'text', palette: ['#ff0000'], parts: {} })
     expect((await takesOf(s)).takes.map((t) => t.look)).toEqual(['old', 'old'])
     expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
     const clip = decode(s.root, 'web/images/inn.png')
@@ -836,10 +829,7 @@ async function takes_bringAll(
   s: { takes: ReturnType<typeof createImageTakes>; file: string; root: string },
   style: object,
 ) {
-  writeFileSync(
-    join(s.root, 'images/style.json'),
-    JSON.stringify({ look: 'pixel art', keepOut: 'text', acts: {}, ...style }),
-  )
+  writeStyle(s.root, { look: 'pixel art', keepOut: 'text', parts: {}, ...style })
   expect(await s.takes.bringAll(s.file)).toEqual({ ok: true })
   for (let i = 0; i < 400; i++) {
     const run = s.takes.lookRun(s.file)
@@ -853,7 +843,10 @@ describe('bringing everything to a new look', () => {
   const warm = ['#000000', '#ffffff', '#ff0000']
   async function chosenImages() {
     const s = setup(undefined, {
-      'images/style.json': { look: 'pixel art', keepOut: 'text', palette: warm, acts: {} },
+      [EDITS]: {
+        style: { look: 'pixel art', keepOut: 'text', palette: warm, parts: {} },
+        images: {},
+      },
     })
     await s.takes.make(s.file, 'inn', { count: 2 })
     await s.takes.make(s.file, 'hall', { count: 1 })
@@ -870,18 +863,62 @@ describe('bringing everything to a new look', () => {
     return seen
   }
 
+  /** The game lists the inn at another size from now on. */
+  const resizeInn = (root: string) =>
+    writeFileSync(
+      join(root, 'tts/act1/images.json'),
+      JSON.stringify([
+        { ...inn, width: 160 },
+        { ...inn, id: 'hall', title: 'Hall' },
+      ]),
+    )
+
+  it('brings a resized image to its new size once, and a second run leaves it as it is', async () => {
+    const s = await chosenImages()
+    resizeInn(s.root)
+    expect((await s.row('inn')).looksOld).toBe(true)
+    const run = await takes_bringAll(s, { palette: warm })
+    expect(run).toBeNull()
+    expect((await s.row('inn')).looksOld).toBe(false)
+    expect((await readImages(s.root, await openProjectOk(s.file), []))!.lookNotice).toBeNull()
+    expect(JSON.parse(s.read(LOCK)).inn.inputs.look).toEqual({
+      palette: warm,
+      dithering: 'patterned',
+      width: 160,
+      height: 200,
+    })
+    const clip = statSync(join(s.root, 'web/images/inn.png')).mtimeMs
+    const lock = s.read(LOCK)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    await takes_bringAll(s, { palette: warm })
+    expect(statSync(join(s.root, 'web/images/inn.png')).mtimeMs).toBe(clip)
+    expect(s.read(LOCK)).toBe(lock)
+  })
+
+  it('keeps a take made at the old size, chosen after a resize, at the look it was brought to', async () => {
+    const s = await chosenImages()
+    resizeInn(s.root)
+    expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
+    expect((await s.row('inn')).reasons).toEqual(['the size'])
+    expect(JSON.parse(s.read(LOCK)).inn.inputs).toMatchObject({
+      width: 320,
+      height: 200,
+      look: { width: 160, height: 200 },
+    })
+    // Take 2 is still at the old size; once it is brought, nothing looks old.
+    expect(await takes_bringAll(s, { palette: warm })).toBeNull()
+    expect((await s.row('inn')).looksOld).toBe(false)
+  })
+
   it('notices the change, then brings the takes and the chosen picture from the model’s pictures without making anything again', async () => {
     const s = await chosenImages()
     const made = s.requests.length
-    writeFileSync(
-      join(s.root, 'images/style.json'),
-      JSON.stringify({
-        look: 'pixel art',
-        keepOut: 'text',
-        palette: ['#00ff00', '#0000ff'],
-        acts: {},
-      }),
-    )
+    writeStyle(s.root, {
+      look: 'pixel art',
+      keepOut: 'text',
+      palette: ['#00ff00', '#0000ff'],
+      parts: {},
+    })
     const summary = await readImages(s.root, await openProjectOk(s.file), [])
     expect(summary!.lookNotice).toEqual({ count: 2, changed: ['its palette'] })
     expect((await s.row('inn')).looksOld).toBe(true)
@@ -897,9 +934,10 @@ describe('bringing everything to a new look', () => {
     for (const c of colours(s, 'content-studio/cache/image-takes/hall/1.game.png')) {
       expect(['0,255,0', '0,0,255']).toContain(c)
     }
-    expect(JSON.parse(s.read('images/images.lock.json')).images.inn.chosen.look).toBe(
-      (await s.row('inn')).look.key,
-    )
+    expect(JSON.parse(s.read(LOCK)).inn.inputs.look).toEqual({
+      palette: ['#00ff00', '#0000ff'],
+      dithering: 'patterned',
+    })
     expect((await s.row('inn')).looksOld).toBe(false)
     expect((await s.row('hall')).looksOld).toBe(false)
     const after = await readImages(s.root, await openProjectOk(s.file), [])
@@ -909,10 +947,7 @@ describe('bringing everything to a new look', () => {
   it('counts its progress, refuses a second run while one goes, and reports the images it could not bring', async () => {
     const s = await chosenImages()
     rmSync(join(s.root, 'content-studio/cache/image-takes/inn/2.png'))
-    writeFileSync(
-      join(s.root, 'images/style.json'),
-      JSON.stringify({ look: 'pixel art', keepOut: 'text', palette: ['#00ff00'], acts: {} }),
-    )
+    writeStyle(s.root, { look: 'pixel art', keepOut: 'text', palette: ['#00ff00'], parts: {} })
     const first = await s.takes.bringAll(s.file)
     expect(first).toEqual({ ok: true })
     expect(s.takes.lookRun(s.file)).toMatchObject({ running: true, total: 2 })
@@ -939,25 +974,22 @@ describe('bringing everything to a new look', () => {
   it('brings an image several acts list once', async () => {
     const s = setup(undefined, {
       'tts/act2/images.json': [inn],
-      'images/style.json': { look: 'pixel art', keepOut: 'text', palette: warm, acts: {} },
+      [EDITS]: {
+        style: { look: 'pixel art', keepOut: 'text', palette: warm, parts: {} },
+        images: {},
+      },
     })
     await s.takes.make(s.file, 'inn', { count: 1 })
     await s.settled('inn')
     await s.takes.choose(s.file, 'inn', 1)
-    writeFileSync(
-      join(s.root, 'images/style.json'),
-      JSON.stringify({ look: 'pixel art', keepOut: 'text', palette: ['#ff00ff'], acts: {} }),
-    )
+    writeStyle(s.root, { look: 'pixel art', keepOut: 'text', palette: ['#ff00ff'], parts: {} })
     expect(await s.takes.bringAll(s.file)).toEqual({ ok: true })
     expect(s.takes.lookRun(s.file)).toMatchObject({ total: 1 })
   })
 
   it('starts one run when it is pressed twice at once', async () => {
     const s = await chosenImages()
-    writeFileSync(
-      join(s.root, 'images/style.json'),
-      JSON.stringify({ look: 'pixel art', keepOut: 'text', palette: ['#00ff00'], acts: {} }),
-    )
+    writeStyle(s.root, { look: 'pixel art', keepOut: 'text', palette: ['#00ff00'], parts: {} })
     const [a, b] = await Promise.all([s.takes.bringAll(s.file), s.takes.bringAll(s.file)])
     expect([a, b].filter((r) => r && 'ok' in r && r.ok)).toHaveLength(1)
     let run = s.takes.lookRun(s.file)
@@ -985,7 +1017,7 @@ async function openProjectOk(file: string) {
 
 describe('the failure of a model’s last take', () => {
   const words = (w: string) => ({
-    'images/prompts.json': { images: { inn: { words: w, gameWas: 'a low inn' } }, style: {} },
+    [EDITS]: { style: STYLE, images: { inn: { text: w, gameWas: 'a low inn' } } },
   })
   const health = (file: string) => createImageHealth().read(file)
 

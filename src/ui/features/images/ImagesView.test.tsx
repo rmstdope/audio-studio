@@ -1,9 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import type { ImagesRoute } from '../../route'
-import type { MadeFrom, Prompts, GameStyle } from '../../../core/images'
+import type { ImageEdits, ImageStyle, MadeFrom } from '../../../core/images'
 import type { ProjectSummary } from '../../../core/summary'
 import { minWidthsInEveryWindow } from '../../../../test/stylesheet'
+import { projectJson } from '../../../../test/helpers'
+import { ProjectSchema } from '../../../core/project'
 
 // A DOM for this file only: React reads `window` when react-dom loads, so it is imported after.
 GlobalRegistrator.register()
@@ -37,20 +39,20 @@ beforeEach(() => {
   }) as unknown as typeof fetch
 })
 
-const style: GameStyle = {
+const style: ImageStyle = {
   look: 'flat pixel art',
   keepOut: 'text',
   palette: ['#000000', '#ffffff'],
-  acts: { act1: 'lantern light' },
+  parts: { act1: 'lantern light' },
 }
 const inn = { id: 'inn', title: 'The Inn', description: 'a low inn', width: 320, height: 200 }
 const barn = { id: 'barn', title: 'The Barn', description: 'a barn', width: 160, height: 100 }
 
 interface Options {
-  prompts?: Prompts
+  edits?: ImageEdits['images']
   chosen?: Record<string, MadeFrom>
-  seen?: GameStyle | null
-  style?: GameStyle | null
+  style?: ImageStyle | null
+  editsInvalid?: boolean
   actTwo?: 'missing' | 'empty'
   /** The images Act II lists (overrides `actTwo`). */
   actTwoImages?: (typeof inn)[]
@@ -84,9 +86,10 @@ function summary(options: Options = {}): ProjectSummary {
         canRefresh: false,
       },
     ],
-    styleFile: 'style.json',
+    editsFile: 'content-studio/images/edits.json',
+    editsInvalid: options.editsInvalid,
     style: options.style === undefined ? style : options.style,
-    prompts: options.prompts ?? { images: {}, style: {} },
+    edits: options.edits ?? {},
     chosen: Object.fromEntries(
       Object.entries(options.chosen ?? {}).map(([id, made]) => [
         id,
@@ -97,7 +100,6 @@ function summary(options: Options = {}): ProjectSummary {
       ]),
     ),
     look: lookOf(style),
-    seen: options.seen === undefined ? style : options.seen,
   })
   return { images } as unknown as ProjectSummary
 }
@@ -152,6 +154,16 @@ describe('no images section', () => {
     act(() => button(page, 'How to set it up').click())
     expect(page.querySelector('pre')?.textContent).toContain('"images": {')
   })
+
+  it('shows an images section the studio accepts', () => {
+    const page = render({ view: 'images', page: null }, {
+      images: null,
+    } as unknown as ProjectSummary)
+    act(() => button(page, 'How to set it up').click())
+    const example = JSON.parse(`{${page.querySelector('pre')!.textContent}}`)
+    const parsed = ProjectSchema.safeParse({ ...projectJson(), ...example })
+    expect(parsed.error?.issues ?? []).toEqual([])
+  })
 })
 
 describe('an act’s page', () => {
@@ -163,7 +175,7 @@ describe('an act’s page', () => {
       'The images the game asks for in Act I. 0 of 2 chosen.',
     )
     expect(text(page.querySelector('.images-style-line'))).toBe(
-      "Every prompt ends with the game's style, and for Act I: lantern light. Style ›",
+      'Every prompt ends with the style, and for Act I: lantern light. Style ›',
     )
     expect([...page.querySelectorAll('th')].map((th) => th.textContent)).toEqual([
       'Image',
@@ -181,13 +193,10 @@ describe('an act’s page', () => {
   it('stops the style line after the style when the act has no addition, and drops it without a style', () => {
     const page = render({ view: 'images', page: 'act', part: 'act2' }, summary({ actTwo: 'empty' }))
     expect(text(page.querySelector('.images-style-line'))).toBe(
-      "Every prompt ends with the game's style. Style ›",
+      'Every prompt ends with the style. Style ›',
     )
     expect(text(page)).toContain('The game asks for no images in Act II.')
-    const none = render(
-      { view: 'images', page: 'act', part: 'act1' },
-      summary({ style: null, seen: null }),
-    )
+    const none = render({ view: 'images', page: 'act', part: 'act1' }, summary({ style: null }))
     expect(none.querySelector('.images-style-line')).toBeNull()
   })
 
@@ -235,18 +244,14 @@ describe('an act’s page', () => {
   })
 
   it('marks the user’s words, and that the game’s changed too', () => {
-    const prompts: Prompts = {
-      images: {
-        inn: { words: 'cosy', gameWas: 'older' },
-        barn: { words: 'red barn', gameWas: 'a barn' },
-      },
-      style: {},
+    const edits = {
+      inn: { text: 'cosy', gameWas: 'older' },
+      barn: { text: 'red barn', gameWas: 'a barn' },
     }
     const rows = [
-      ...render(
-        { view: 'images', page: 'act', part: 'act1' },
-        summary({ prompts }),
-      ).querySelectorAll('tbody tr'),
+      ...render({ view: 'images', page: 'act', part: 'act1' }, summary({ edits })).querySelectorAll(
+        'tbody tr',
+      ),
     ]
     expect(text(rows[0])).toContain("changed here · the game's words changed too")
     expect(text(rows[1])).toContain('changed here')
@@ -309,8 +314,8 @@ describe('an image’s page', () => {
   })
 
   it('names the user’s own words, shows the game’s, and takes them back', async () => {
-    const prompts: Prompts = { images: { inn: { words: 'cosy', gameWas: 'a low inn' } }, style: {} }
-    const page = render(route, summary({ prompts }))
+    const edits = { inn: { text: 'cosy', gameWas: 'a low inn' } }
+    const page = render(route, summary({ edits }))
     expect(text(page.querySelector('.field-tag'))).toBe("changed here · use the game's")
     expect(text(page)).toContain("The game's words: a low inn")
     await act(async () => button(page, "use the game's").click())
@@ -343,24 +348,24 @@ describe('an image’s page', () => {
       expect(text(page.querySelector('.saved'))).toBe('Saved')
     })
     it('shows an image that leaves it out struck through, with no act line, and a note on the act page', () => {
-      const prompts: Prompts = { images: {}, style: {}, actStyleOff: ['inn'] }
-      const page = render(route, summary({ prompts }))
+      const edits = { inn: { partStyle: null } }
+      const page = render(route, summary({ edits }))
       expect(box(page).checked).toBe(false)
       expect(page.querySelector('.act-style-box .act-style-off')).not.toBeNull()
       expect(text(page.querySelector('.images-whole pre'))).not.toContain('lantern light')
-      const act = render({ view: 'images', page: 'act', part: 'act1' }, summary({ prompts }))
+      const act = render({ view: 'images', page: 'act', part: 'act1' }, summary({ edits }))
       const rows = [...act.querySelectorAll('tbody tr')]
       expect(text(rows[0])).toContain("Act I's style left out")
       expect(text(rows[1])).not.toContain('style left out')
     })
     it('is not there when the act adds no style', () => {
-      const page = render(route, summary({ style: { ...style, acts: {} } }))
+      const page = render(route, summary({ style: { ...style, parts: {} } }))
       expect(page.querySelector('.act-style-box')).toBeNull()
     })
     it('names the act’s style as the reason a picture is out of date', () => {
       const row = summary().images!.acts[0]!.rows[0]!
-      const prompts: Prompts = { images: {}, style: {}, actStyleOff: ['inn'] }
-      const page = render(route, summary({ prompts, chosen: { inn: row.madeFrom } }))
+      const edits = { inn: { partStyle: null } }
+      const page = render(route, summary({ edits, chosen: { inn: row.madeFrom } }))
       expect(text(page)).toContain("Out of date since it was chosen: Act I's style.")
     })
     it('ignores a second click while the first save is on its way, and keeps focus', async () => {
@@ -402,8 +407,8 @@ describe('an image’s page', () => {
   })
 
   it('compares the game’s new words with the user’s, and settles with either button', async () => {
-    const prompts: Prompts = { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} }
-    const page = render(route, summary({ prompts }))
+    const edits = { inn: { text: 'cosy', gameWas: 'older' } }
+    const page = render(route, summary({ edits }))
     const notice = page.querySelector('.images-compare')!
     expect(text(notice)).toContain(
       "The game changed this image's description since you wrote your own.",
@@ -424,8 +429,8 @@ describe('an image’s page', () => {
   })
 
   it('also moves focus to the field after Use the game’s', async () => {
-    const prompts: Prompts = { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} }
-    const page = render(route, summary({ prompts }))
+    const edits = { inn: { text: 'cosy', gameWas: 'older' } }
+    const page = render(route, summary({ edits }))
     await act(async () => button(page, "Use the game's").click())
     await flush()
     expect(sent[0]).toEqual({
@@ -438,8 +443,8 @@ describe('an image’s page', () => {
 
   it('says why when settling fails', async () => {
     globalThis.fetch = (async () => new Response('{}', { status: 500 })) as unknown as typeof fetch
-    const prompts: Prompts = { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} }
-    const page = render(route, summary({ prompts }))
+    const edits = { inn: { text: 'cosy', gameWas: 'older' } }
+    const page = render(route, summary({ edits }))
     await act(async () => button(page, 'Keep mine').click())
     // The failure arrives after the request and the mutation have both settled.
     await act(async () => {
@@ -456,16 +461,19 @@ describe('the Style page', () => {
     const page = render(route)
     expect(text(page.querySelector('h1'))).toBe('Style')
     expect(text(page.querySelector('.page-header .muted'))).toBe(
-      "Added to every image's prompt. From the game's style file; your changes stay in the studio.",
+      "Added to every image's prompt. The studio's own: change the look and what is kept out here.",
     )
     expect([...page.querySelectorAll('label')].map((l) => l.textContent)).toEqual([
       'The look',
       'Kept out of every image',
     ])
-    expect(text(page)).toContain('2 colours · set by the game')
+    expect(page.querySelector('.field-tag')).toBeNull()
+    expect(text(page)).toContain('2 colours')
     expect(page.querySelectorAll('.images-swatch')).toHaveLength(2)
     expect(text(page)).toContain('Added per act')
-    expect(text(page)).toContain('Set by the game.')
+    expect(text(page)).toContain(
+      'The palette and the additions per act are changed in content-studio/images/edits.json.',
+    )
     const rows = [...page.querySelectorAll('tbody tr')].map((r) => text(r))
     expect(rows).toEqual(['Act I: The Lanternlantern light', 'Act II: The Roadnothing'])
   })
@@ -496,87 +504,15 @@ describe('the Style page', () => {
     expect(minWidthsInEveryWindow(table)).toEqual([])
   })
 
-  it('says when the game has no style file yet', () => {
-    const page = render(route, summary({ style: null, seen: null }))
-    expect(text(page)).toContain('The game has no style file yet')
-    expect(text(page)).toContain("Until it has one, each image's prompt is only its own words.")
-  })
-})
-
-describe('the game’s style changed', () => {
-  const changed = (): ProjectSummary => {
-    const row = summary().images!.acts[0]!.rows[0]!
-    return summary({
-      style: { ...style, look: 'watercolour' },
-      seen: style,
-      chosen: { inn: row.madeFrom },
-    })
-  }
-
-  it('shows one notice on every Images page, with what changed', () => {
-    for (const route of [
-      { view: 'images', page: 'act', part: 'act1' },
-      { view: 'images', page: 'style' },
-      { view: 'images', page: 'image', image: 'inn' },
-    ] as const) {
-      const page = render(route, changed())
-      const notice = page.querySelector('.notice')!
-      expect(text(notice)).toContain("The game's style changed.")
-      expect(text(notice)).toContain(
-        '1 chosen image across all acts was made with the old style and is out of date.',
-      )
-      expect(text(notice)).toContain('Changed: the look.')
-    }
-  })
-
-  it('is put away by Seen, which moves focus to the heading', async () => {
-    const page = render({ view: 'images', page: 'act', part: 'act1' }, changed())
-    await act(async () => button(page, 'Seen').click())
-    await flush()
-    expect(sent[0]).toEqual({ method: 'POST', path: '/api/image-style/seen', body: {} })
-    expect(document.activeElement?.tagName).toBe('H1')
-  })
-
-  it('keeps focus on the heading when Seen takes the notice away with it', async () => {
-    // Earlier tests leave their pages (and focus) behind: start from this page alone.
-    document.body.replaceChildren()
-    const container = document.createElement('div')
-    document.body.append(container)
-    const root = createRoot(container)
-    cleanups.push(() => act(() => root.unmount()))
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, enabled: false } },
-    })
-    client.setQueryData(['image-making'], {})
-    client.setQueryData(['look-run'], null)
-    const show = (shown: ProjectSummary) =>
-      act(() =>
-        root.render(
-          createElement(
-            QueryClientProvider,
-            { client },
-            createElement(ImagesView, {
-              summary: shown,
-              route: { view: 'images', page: 'act', part: 'act1' },
-            }),
-          ),
-        ),
-      )
-    show(changed())
-    // The studio answers, and the page now shows the project without the notice.
-    globalThis.fetch = (async () => {
-      show(summary())
-      return Response.json({ ok: true })
-    }) as unknown as typeof fetch
-    expect(document.activeElement).toBe(document.body)
-    await act(async () => button(container, 'Seen').click())
-    await flush()
-    expect(container.querySelector('.notice')).toBeNull()
-    expect(document.activeElement).toBe(container.querySelector('h1'))
-  })
-
-  it('is not shown when nothing changed', () => {
-    expect(render({ view: 'images', page: 'style' }).querySelector('.notice')).toBeNull()
+  it('says when there is no style yet, and when the edits cannot be read', () => {
+    const page = render(route, summary({ style: null }))
+    expect(text(page)).toContain('There is no style yet')
+    expect(text(page)).toContain(
+      "Add one under style in content-studio/images/edits.json. Until then, each image's prompt is only its own words.",
+    )
+    expect(page.querySelector('textarea')).toBeNull()
+    const unread = render(route, summary({ style: null, editsInvalid: true }))
+    expect(text(unread)).toContain('The style cannot be read')
   })
 })
 
@@ -659,13 +595,12 @@ describe('the game’s look', () => {
           canRefresh: false,
         },
       ],
-      styleFile: 'style.json',
+      editsFile: 'content-studio/images/edits.json',
       style: null,
       look: null,
       lookError: 'no',
-      prompts: { images: {}, style: {} },
+      edits: {},
       chosen: {},
-      seen: null,
     })
     const page = render({ view: 'images', page: 'image', image: 'inn' }, {
       images,
@@ -677,7 +612,7 @@ describe('the game’s look', () => {
 })
 
 describe('an image the game lists in two acts', () => {
-  const both = { style: { ...style, acts: { act1: 'lantern light', act2: 'dawn' } } }
+  const both = { style: { ...style, parts: { act1: 'lantern light', act2: 'dawn' } } }
   const shared = (over: Options = {}) => summary({ ...both, actTwoImages: [inn], ...over })
   const links = (node: Element | null | undefined) =>
     [...(node?.querySelectorAll('a') ?? [])].map((a) => [a.textContent, a.getAttribute('href')])
@@ -735,32 +670,19 @@ describe('an image the game lists in two acts', () => {
       )
     })
     it('starts on None when the first act adds none, and leaves only the acts that add one', () => {
-      const page = render(
-        route,
-        shared({
-          style: { ...style, acts: { act2: 'dawn' } },
-          seen: { ...style, acts: { act2: 'dawn' } },
-        }),
-      )
+      const page = render(route, shared({ style: { ...style, parts: { act2: 'dawn' } } }))
       expect([...menu(page).options].map((o) => o.textContent)).toEqual(["Act II's — dawn", 'None'])
       expect(menu(page).value).toBe('')
     })
     it('says an act’s style is left out only on the list of an act that adds one', () => {
-      const only = { ...style, acts: { act2: 'dawn' } }
-      const one = render(
-        { view: 'images', page: 'act', part: 'act1' },
-        shared({ style: only, seen: only }),
-      )
+      const only = { ...style, parts: { act2: 'dawn' } }
+      const one = render({ view: 'images', page: 'act', part: 'act1' }, shared({ style: only }))
       expect(text(one.querySelector('tbody tr'))).not.toContain('style left out')
-      const two = render(
-        { view: 'images', page: 'act', part: 'act2' },
-        shared({ style: only, seen: only }),
-      )
+      const two = render({ view: 'images', page: 'act', part: 'act2' }, shared({ style: only }))
       expect(text(two.querySelector('tbody tr'))).toContain("Act II's style left out")
     })
     it('has no menu when no act adds a style', () => {
-      const bare = { ...style, acts: {} }
-      const page = render(route, shared({ style: bare, seen: bare }))
+      const page = render(route, shared({ style: { ...style, parts: {} } }))
       expect(page.querySelector('select.act-style-menu')).toBeNull()
       expect(page.querySelector('.act-style-box')).toBeNull()
     })
@@ -800,7 +722,7 @@ describe('an image the game lists in two acts', () => {
         ...both,
         actTwoImages: [inn],
         chosen,
-        prompts: { images: {}, style: {}, actStyleFrom: { inn: 'act2' } },
+        edits: { inn: { partStyle: 'act2' } },
       })
       expect(text(render(route, picked))).toContain(
         "Out of date since it was chosen: Act II's style instead of Act I's.",
@@ -809,7 +731,7 @@ describe('an image the game lists in two acts', () => {
         ...both,
         actTwoImages: [inn],
         chosen,
-        prompts: { images: {}, style: {}, actStyleOff: ['inn'] },
+        edits: { inn: { partStyle: null } },
       })
       expect(text(render(route, none))).toContain(
         "Out of date since it was chosen: Act I's style left out.",

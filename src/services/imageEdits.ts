@@ -1,55 +1,40 @@
 import { dirname } from 'node:path'
 import {
-  StyleSchema,
   applyActStyleChange,
   applyActStylePick,
   applyStyleChange,
   applyWordsChange,
+  formatImageEdits,
   resolveCompare,
-  type Prompts,
+  type ImageEdits,
   type StyleField,
 } from '../core/images'
-import type { Problem } from '../core/project'
-import { readResource, writeAtomic, writeFailure } from './files'
-import { readImages, readPrompts, writeStyleSeen } from './imageLists'
+import { IMAGES_EDITS_FILE, type Problem } from '../core/project'
+import { writeAtomic, writeFailure } from './files'
+import { readImageEdits, readImages } from './imageLists'
 import { createSerial } from './serial'
 import { openProject, type ProjectFailure } from './workspace'
 
-/** What saving a change to the studio's own image words answered; null for an image the game does not list. */
+/** What saving a change to the images edits answered; null for an image the game does not list, or a style that is not there. */
 export type ImageEditResult =
   { ok: true } | { ok: false; problems: Problem[] } | ProjectFailure | null
 
-/** One change at a time per project: each reads the prompts file the one before wrote. */
+/** One change at a time per project: each reads the edits the one before wrote. */
 const serial = createSerial()
 
-/** The prompts file as text: image ids in order, so changes make small diffs. */
-function formatPrompts(prompts: Prompts): string {
-  const images = Object.fromEntries(
-    Object.entries(prompts.images).sort(([a], [b]) => (a < b ? -1 : 1)),
-  )
-  const { look, keepOut } = prompts.style
-  const style = { ...(look && { look }), ...(keepOut && { keepOut }) }
-  const actStyleOff = [...new Set(prompts.actStyleOff)].sort()
-  const actStyleFrom = Object.fromEntries(
-    Object.entries(prompts.actStyleFrom ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)),
-  )
-  const out = {
-    images,
-    style,
-    ...(actStyleOff.length && { actStyleOff }),
-    ...(Object.keys(actStyleFrom).length && { actStyleFrom }),
-  }
-  return `${JSON.stringify(out, null, 2)}\n`
-}
+/** The Images pages as `readImages` gives them. */
+type Summary = NonNullable<Awaited<ReturnType<typeof readImages>>>
 
 /**
- * Runs `change` over the studio's own words and writes them back (the game's files are never
- * written). `gameWords` says the game's text for the change; null from `find` is an unknown image.
+ * Runs `change` over the images edits and writes them back (the game's files are never written).
+ * `find` gives what the change is about from the pages (an image's game words, the style); null
+ * from it, or from `change` (it is gone since), answers null. `change` may answer problems
+ * instead of edits, and nothing is written.
  */
-function edit(
+function edit<T>(
   projectFile: string,
-  find: (images: NonNullable<Awaited<ReturnType<typeof readImages>>>) => string | null,
-  change: (prompts: Prompts, gameWords: string) => Prompts,
+  find: (summary: Summary) => T | null,
+  change: (edits: ImageEdits, found: T) => ImageEdits | Problem[] | null,
 ): Promise<ImageEditResult> {
   return serial.run(projectFile, async () => {
     const opened = await openProject(projectFile)
@@ -58,14 +43,17 @@ function edit(
     const root = dirname(projectFile)
     if (!project.images) return null
     const summary = await readImages(root, project, [])
-    const gameWords = summary ? find(summary) : null
-    if (gameWords === null) return null
-    const file = project.images.paths.prompts
-    const problems: Problem[] = []
-    const prompts = await readPrompts(root, file, problems)
-    if (prompts === 'invalid') return { ok: false, problems }
+    const found = summary ? find(summary) : null
+    if (found === null) return null
+    const file = IMAGES_EDITS_FILE
+    const read = await readImageEdits(root)
+    // Saving over a part that cannot be read would lose it: nothing is written until it is fixed.
+    if (read.problems.length) return { ok: false, problems: read.problems }
+    const changed = change(read.edits, found)
+    if (changed === null) return null
+    if (Array.isArray(changed)) return { ok: false, problems: changed }
     try {
-      await writeAtomic(root, file, formatPrompts(change(prompts, gameWords)))
+      await writeAtomic(root, file, formatImageEdits(changed))
     } catch (error) {
       return { ok: false, problems: [{ file, path: '', message: writeFailure(error) }] }
     }
@@ -75,7 +63,7 @@ function edit(
 
 /** The game's description of an image, from the pages; null when it is not listed. */
 function descriptionOf(id: string) {
-  return (summary: NonNullable<Awaited<ReturnType<typeof readImages>>>) =>
+  return (summary: Summary) =>
     summary.acts.flatMap((act) => act.rows).find((row) => row.id === id)?.description ?? null
 }
 
@@ -85,8 +73,8 @@ export function setImageWords(
   id: string,
   text: string | null,
 ): Promise<ImageEditResult> {
-  return edit(projectFile, descriptionOf(id), (prompts, game) =>
-    applyWordsChange(prompts, id, text, game),
+  return edit(projectFile, descriptionOf(id), (edits, game) =>
+    applyWordsChange(edits, id, text, game),
   )
 }
 
@@ -96,7 +84,7 @@ export function setImageActStyle(
   id: string,
   on: boolean,
 ): Promise<ImageEditResult> {
-  return edit(projectFile, descriptionOf(id), (prompts) => applyActStyleChange(prompts, id, on))
+  return edit(projectFile, descriptionOf(id), (edits) => applyActStyleChange(edits, id, on))
 }
 
 /**
@@ -110,14 +98,14 @@ export function setImageActStylePick(
 ): Promise<ImageEditResult> {
   return edit(
     projectFile,
-    (summary) => {
+    (summary: Summary) => {
       const row = summary.acts.flatMap((act) => act.rows).find((r) => r.id === id)
       if (!row) return null
       return from === null || row.actStyle?.choices?.some((c) => c.id === from)
         ? row.description
         : null
     },
-    (prompts) => applyActStylePick(prompts, id, from),
+    (edits) => applyActStylePick(edits, id, from),
   )
 }
 
@@ -127,12 +115,15 @@ export function resolveImageCompare(
   id: string,
   choice: 'keep' | 'game',
 ): Promise<ImageEditResult> {
-  return edit(projectFile, descriptionOf(id), (prompts, game) =>
-    resolveCompare(prompts, id, choice, game),
+  return edit(projectFile, descriptionOf(id), (edits, game) =>
+    resolveCompare(edits, id, choice, game),
   )
 }
 
-/** Saves the user's own words for the look or what is kept out; null or empty takes them back. Null without a style file. */
+/**
+ * Sets the style's look or what is kept out; null or empty is none, which the look refuses. Null
+ * when there is no style.
+ */
 export function setStyleField(
   projectFile: string,
   field: StyleField,
@@ -140,24 +131,17 @@ export function setStyleField(
 ): Promise<ImageEditResult> {
   return edit(
     projectFile,
-    (summary) => (summary.style.present ? summary.style[field].game : null),
-    (prompts, game) => applyStyleChange(prompts, field, text, game),
+    (summary) => (summary.style.present ? summary.style : null),
+    (edits) => {
+      const changed = applyStyleChange(edits, field, text)
+      // The style was taken out of the file since the pages were read.
+      if (changed === 'no style') return null
+      if (changed === 'empty look') {
+        return [
+          { file: IMAGES_EDITS_FILE, path: 'style.look', message: 'the look cannot be empty' },
+        ]
+      }
+      return changed
+    },
   )
-}
-
-/** Puts the style notice away: the game's style as it is now becomes the one the user has seen. */
-export function markStyleSeen(projectFile: string): Promise<ImageEditResult> {
-  return serial.run(projectFile, async () => {
-    const opened = await openProject(projectFile)
-    if (!opened.ok) return opened
-    const { project } = opened
-    const root = dirname(projectFile)
-    if (!project.images) return null
-    const problems: Problem[] = []
-    const style = await readResource(root, project.images.paths.style, StyleSchema, problems)
-    if (style === 'missing') return null
-    if (style === 'invalid') return { ok: false, problems }
-    await writeStyleSeen(root, style)
-    return { ok: true }
-  })
 }

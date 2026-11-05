@@ -1,34 +1,38 @@
 import { describe, expect, it } from 'bun:test'
 import { lookKey, lookOf } from './imageLook'
 import {
-  ChosenSchema,
+  ImageEditsSchema,
+  ImageLockSchema,
   ImageListSchema,
-  PromptsSchema,
   StyleSchema,
   applyActStyleChange,
+  applyActStylePick,
   applyStyleChange,
   applyWordsChange,
   assemblePrompt,
   effectiveStyle,
+  formatImageEdits,
+  formatImageLock,
+  readImageEditsValue,
   acceptableReasons,
   imagesDone,
   outOfDateReasons,
   resolveCompare,
-  styleChanges,
   summarizeImages,
-  type GameStyle,
+  type ChosenEntry,
+  type ImageEdits,
+  type ImageStyle,
   type MadeFrom,
-  type Prompts,
   type ImagesInput,
 } from './images'
 
-const style: GameStyle = {
+const style: ImageStyle = {
   look: 'flat 16-colour pixel art',
   keepOut: 'text, modern things',
   palette: ['#000000', '#ffffff'],
-  acts: { act1: 'warm lantern light' },
+  parts: { act1: 'warm lantern light' },
 }
-const none: Prompts = { images: {}, style: {} }
+const none: ImageEdits = { images: {} }
 const inn = {
   id: 'silver-stag-inn',
   title: 'The Silver Stag Inn',
@@ -38,13 +42,19 @@ const inn = {
 }
 
 describe('the game files', () => {
+  const { description, ...listed } = inn
+  const game = { ...listed, text: description }
+  it('reads an image’s words from text, as its description inside the studio', () => {
+    expect(ImageListSchema.parse([game])).toEqual([inn])
+    expect(ImageListSchema.safeParse([inn]).error?.issues.map((i) => i.path)).toEqual([[0, 'text']])
+  })
   it('accepts an image list and refuses a bad or repeated-in-list id', () => {
-    expect(ImageListSchema.safeParse([inn]).success).toBe(true)
-    expect(ImageListSchema.safeParse([{ ...inn, id: 'Silver Stag' }]).success).toBe(false)
-    expect(ImageListSchema.safeParse([{ ...inn, width: 0 }]).success).toBe(false)
+    expect(ImageListSchema.safeParse([game]).success).toBe(true)
+    expect(ImageListSchema.safeParse([{ ...game, id: 'Silver Stag' }]).success).toBe(false)
+    expect(ImageListSchema.safeParse([{ ...game, width: 0 }]).success).toBe(false)
   })
   it('takes the game’s own image file, inside the project and a picture', () => {
-    const file = (f: string) => ImageListSchema.safeParse([{ ...inn, file: f }]).success
+    const file = (f: string) => ImageListSchema.safeParse([{ ...game, file: f }]).success
     expect(file('web/public/images/inn.png')).toBe(true)
     expect(file('../inn.png')).toBe(false)
     expect(file('/inn.png')).toBe(false)
@@ -54,64 +64,184 @@ describe('the game files', () => {
     expect(StyleSchema.safeParse(style).success).toBe(true)
     expect(StyleSchema.safeParse({ ...style, palette: ['red'] }).success).toBe(false)
   })
-  it('reads the studio files, with extra keys in the lock tolerated', () => {
-    expect(PromptsSchema.safeParse({ images: {}, style: {} }).success).toBe(true)
-    const lock = {
-      images: { a: { chosen: { words: 'w', style: 's', width: 1, height: 2 }, takes: [] } },
+  it('reads the images edits: the style, and text with gameWas, partStyle a part or null', () => {
+    expect(ImageEditsSchema.parse({})).toEqual({ images: {} })
+    const edits = {
+      style,
+      images: {
+        inn: { text: 'cosy', gameWas: 'low', partStyle: 'act2' },
+        map: { partStyle: null },
+      },
     }
-    expect(ChosenSchema.safeParse(lock).success).toBe(true)
+    expect(ImageEditsSchema.parse(edits)).toEqual(edits)
+    expect(ImageEditsSchema.safeParse({ images: { inn: { text: 'cosy' } } }).success).toBe(false)
+    expect(ImageEditsSchema.safeParse({ style: { keepOut: 'x' } }).success).toBe(false)
+  })
+})
+
+describe('the images lock', () => {
+  const key = (look: Parameters<typeof lookOf>[0], width = 320, height = 200) =>
+    lookKey(lookOf(look), { width, height })
+  const entry = {
+    model: 'flux2-klein-4b',
+    seed: 7,
+    take: 3,
+    inputs: {
+      text: 'a low inn',
+      width: 320,
+      height: 200,
+      style: { look: 'pixel art', keepOut: 'text', part: 'warm light' },
+      look: { palette: ['#000000', '#ff8000'], dithering: 'flat' },
+    },
+    at: '2026-11-03T06:32:48.776Z',
+  }
+  const chosen: ChosenEntry = {
+    words: 'a low inn',
+    style: JSON.stringify(['pixel art', 'text', 'warm light']),
+    width: 320,
+    height: 200,
+    take: 3,
+    seed: 7,
+    model: 'flux2-klein-4b',
+    look: key({ palette: ['#000000', '#ff8000'], dithering: 'flat' }),
+    at: '2026-11-03T06:32:48.776Z',
+  }
+
+  it('reads an entry keyed by image id, its inputs in the clear, as what the take was made from', () => {
+    expect(ImageLockSchema.parse({ inn: entry })).toEqual({ inn: chosen })
+    expect(ImageLockSchema.parse({})).toEqual({})
+    const bare = { inputs: { text: 'w', width: 1, height: 2 } }
+    expect(ImageLockSchema.parse({ a: bare })).toEqual({
+      a: { words: 'w', style: '', width: 1, height: 2 },
+    })
+    expect(ImageLockSchema.safeParse({ a: { inputs: { width: 1, height: 2 } } }).success).toBe(
+      false,
+    )
+  })
+
+  it('writes one entry per line in id order, the inputs in the clear, and reads back the same', () => {
+    const text = formatImageLock({ well: { ...chosen, take: 1 }, inn: chosen })
+    expect(text).toBe(
+      `{\n "inn": ${JSON.stringify(entry)},\n "well": ${JSON.stringify({ ...entry, take: 1 })}\n}\n`,
+    )
+    expect(ImageLockSchema.parse(JSON.parse(text))).toEqual({
+      well: { ...chosen, take: 1 },
+      inn: chosen,
+    })
+    expect(formatImageLock({})).toBe('{}\n')
+  })
+
+  it('writes the look as the style’s own fields: the palette, else the colour depth, and no dithering for full colour', () => {
+    const lookOfEntry = (look: string) =>
+      JSON.parse(formatImageLock({ a: { ...chosen, look } })).a.inputs.look
+    expect(lookOfEntry(key({ palette: [], colourDepth: '8-bit', dithering: 'scattered' }))).toEqual(
+      { colourDepth: '8-bit', dithering: 'scattered' },
+    )
+    expect(lookOfEntry(key({ palette: [] }))).toEqual({ colourDepth: 'full' })
+    const { look: _look, ...unbrought } = chosen
+    expect(JSON.parse(formatImageLock({ a: unbrought })).a.inputs.look).toBeUndefined()
+  })
+
+  it('keeps the size a picture was brought to when it is not the entry’s own, and reads it back', () => {
+    const resized = { ...chosen, look: key({ palette: [] }, 640, 400) }
+    const text = formatImageLock({ a: resized })
+    expect(JSON.parse(text).a.inputs.look).toEqual({ colourDepth: 'full', width: 640, height: 400 })
+    expect(ImageLockSchema.parse(JSON.parse(text))).toEqual({ a: resized })
+    const same = formatImageLock({ a: { ...chosen, look: key({ palette: [] }) } })
+    expect(JSON.parse(same).a.inputs.look).toEqual({ colourDepth: 'full' })
+  })
+
+  it('writes no style for a take made without one, part null for no addition, and reads old keys that held the palette', () => {
+    const inputs = (style: string) =>
+      JSON.parse(formatImageLock({ a: { ...chosen, style } })).a.inputs.style
+    expect(inputs('')).toBeUndefined()
+    expect(inputs(JSON.stringify(['p', 'k', null]))).toEqual({
+      look: 'p',
+      keepOut: 'k',
+      part: null,
+    })
+    expect(inputs(JSON.stringify(['p', 'k', ['#000000'], 'x']))).toEqual({
+      look: 'p',
+      keepOut: 'k',
+      part: 'x',
+    })
+  })
+
+  it('leaves every chosen image as up to date, and every look as current, as before it was written', () => {
+    const lookNow = lookOf(style)
+    const base = summarizeImages(input({ look: lookNow })).images.acts[0]!.rows[0]!
+    for (const made of [
+      { ...base.madeFrom, take: 1, look: base.look.key! },
+      { ...base.madeFrom, take: 1 },
+      { ...base.madeFrom, take: 2, words: 'older words', look: key({ palette: [] }) },
+    ]) {
+      const read = ImageLockSchema.parse(JSON.parse(formatImageLock({ [inn.id]: made })))
+      const before = summarizeImages(input({ look: lookNow, chosen: { [inn.id]: made } }))
+      const after = summarizeImages(input({ look: lookNow, chosen: read }))
+      expect(after.images).toEqual(before.images)
+    }
+    const left = summarizeImages(input({ edits: { [inn.id]: { partStyle: null } } }))
+    const made = { ...left.images.acts[0]!.rows[0]!.madeFrom, take: 1 }
+    const read = ImageLockSchema.parse(JSON.parse(formatImageLock({ [inn.id]: made })))
+    expect(read[inn.id]).toEqual(made)
   })
 })
 
 describe('the assembled prompt', () => {
-  const eff = effectiveStyle(style, none, 'act1')
+  const eff = effectiveStyle(style, 'act1')
   it('is the words, the act addition, the look, then what is kept out', () => {
     expect(assemblePrompt('a low inn', eff)).toBe(
       'a low inn\nwarm lantern light\nflat 16-colour pixel art\nKept out: text, modern things',
     )
   })
   it('leaves out what is empty, and is only the words without a style', () => {
-    expect(assemblePrompt('a low inn', effectiveStyle(style, none, 'act2'))).toBe(
+    expect(assemblePrompt('a low inn', effectiveStyle(style, 'act2'))).toBe(
       'a low inn\nflat 16-colour pixel art\nKept out: text, modern things',
     )
-    expect(assemblePrompt('a low inn', effectiveStyle(null, none, 'act1'))).toBe('a low inn')
-  })
-  it("uses the user's look over the game's", () => {
-    const mine: Prompts = {
-      images: {},
-      style: { look: { words: 'oil paint', gameWas: style.look } },
-    }
-    expect(effectiveStyle(style, mine, 'act2')?.look).toBe('oil paint')
+    expect(assemblePrompt('a low inn', effectiveStyle(null, 'act1'))).toBe('a low inn')
   })
 })
 
 describe('the studio’s own words', () => {
   it('keeps words that differ from the game’s, with the game’s words they were written over', () => {
     const next = applyWordsChange(none, 'inn', '  a cosy inn ', 'a low inn')
-    expect(next.images.inn).toEqual({ words: 'a cosy inn', gameWas: 'a low inn' })
+    expect(next.images.inn).toEqual({ text: 'a cosy inn', gameWas: 'a low inn' })
   })
   it('removes them when emptied or typed back as the game’s', () => {
     const mine = applyWordsChange(none, 'inn', 'a cosy inn', 'a low inn')
     expect(applyWordsChange(mine, 'inn', '', 'a low inn').images).toEqual({})
     expect(applyWordsChange(mine, 'inn', ' a low inn ', 'a low inn').images).toEqual({})
     expect(applyWordsChange(mine, 'inn', null, 'a low inn').images).toEqual({})
+    const picked = applyActStylePick(mine, 'inn', 'act2')
+    expect(applyWordsChange(picked, 'inn', null, 'a low inn').images).toEqual({
+      inn: { partStyle: 'act2' },
+    })
   })
   it('keeps the game’s words an existing override was written over, so editing does not settle a compare', () => {
-    const mine: Prompts = { images: { inn: { words: 'cosy', gameWas: 'older' } }, style: {} }
+    const mine: ImageEdits = { images: { inn: { text: 'cosy', gameWas: 'older' } } }
     expect(applyWordsChange(mine, 'inn', 'cosier', 'a low inn').images.inn).toEqual({
-      words: 'cosier',
+      text: 'cosier',
       gameWas: 'older',
     })
   })
-  it('does the same for the style fields', () => {
-    const mine = applyStyleChange(none, 'look', 'oil paint', style.look)
-    expect(mine.style.look).toEqual({ words: 'oil paint', gameWas: style.look })
-    expect(applyStyleChange(mine, 'look', null, style.look).style).toEqual({})
+  it('sets the style’s look and what is kept out directly, refusing an empty look', () => {
+    const styled: ImageEdits = { style, images: {} }
+    expect(applyStyleChange(styled, 'look', ' oil paint ')).toEqual({
+      style: { ...style, look: 'oil paint' },
+      images: {},
+    })
+    expect(applyStyleChange(styled, 'keepOut', null)).toEqual({
+      style: { ...style, keepOut: '' },
+      images: {},
+    })
+    expect(applyStyleChange(styled, 'look', ' ')).toBe('empty look')
+    expect(applyStyleChange(none, 'look', 'oil paint')).toBe('no style')
+    expect(applyStyleChange(none, 'keepOut', null)).toBe('no style')
   })
   it('settles a changed game description: keep mine moves the baseline, the game’s drops mine', () => {
-    const mine: Prompts = { images: { inn: { words: 'cosy', gameWas: 'old' } }, style: {} }
+    const mine: ImageEdits = { images: { inn: { text: 'cosy', gameWas: 'old' } } }
     expect(resolveCompare(mine, 'inn', 'keep', 'new').images.inn).toEqual({
-      words: 'cosy',
+      text: 'cosy',
       gameWas: 'new',
     })
     expect(resolveCompare(mine, 'inn', 'game', 'new').images).toEqual({})
@@ -130,26 +260,6 @@ describe('out of date', () => {
   })
 })
 
-describe('what changed in the game’s style', () => {
-  const parts = [
-    { id: 'act1', title: 'Act I' },
-    { id: 'act2', title: 'Act II' },
-  ]
-  it('is nothing when the same', () => {
-    expect(styleChanges(style, { ...style }, parts)).toEqual([])
-  })
-  it('names the look, what is kept out and an act’s addition, but not the palette (the look notice owns it)', () => {
-    const now = {
-      ...style,
-      look: 'x',
-      palette: ['#000000'],
-      acts: { act1: 'warm lantern light', act2: 'snow' },
-    }
-    expect(styleChanges(style, now, parts)).toEqual(['the look', 'the addition for Act II'])
-    expect(styleChanges(style, { ...style, keepOut: 'y' }, parts)).toEqual(['what is kept out'])
-  })
-})
-
 function input(over: Partial<ImagesInput> = {}): ImagesInput {
   return {
     parts: [{ id: 'act1', title: 'Act I' }],
@@ -162,11 +272,10 @@ function input(over: Partial<ImagesInput> = {}): ImagesInput {
         canRefresh: true,
       },
     ],
-    styleFile: 'images/style.json',
+    editsFile: 'content-studio/images/edits.json',
     style,
-    prompts: none,
+    edits: {},
     chosen: {},
-    seen: style,
     ...over,
   }
 }
@@ -207,11 +316,8 @@ describe('summarizeImages', () => {
     expect(summarizeImages(input()).images.acts[0]!.rows[0]!.gameFile).toBeNull()
   })
   it('marks changed words, and the game’s words changed under them', () => {
-    const prompts: Prompts = {
-      images: { [inn.id]: { words: 'cosy', gameWas: 'older' } },
-      style: {},
-    }
-    const row = summarizeImages(input({ prompts })).images.acts[0]!.rows[0]!
+    const edits = { [inn.id]: { text: 'cosy', gameWas: 'older' } }
+    const row = summarizeImages(input({ edits })).images.acts[0]!.rows[0]!
     expect(row).toMatchObject({ words: 'cosy', changed: true, gameChanged: true, gameWas: 'older' })
     expect(row.status).toBe('none yet')
   })
@@ -232,12 +338,9 @@ describe('summarizeImages', () => {
     expect(row.reasons).toEqual(['the size'])
   })
   it('does not call an image out of date when only the game’s words changed under the user’s', () => {
-    const prompts: Prompts = {
-      images: { [inn.id]: { words: 'cosy', gameWas: 'older' } },
-      style: {},
-    }
-    const first = summarizeImages(input({ prompts })).images.acts[0]!.rows[0]!
-    const row = summarizeImages(input({ prompts, chosen: { [inn.id]: first.madeFrom } })).images
+    const edits = { [inn.id]: { text: 'cosy', gameWas: 'older' } }
+    const first = summarizeImages(input({ edits })).images.acts[0]!.rows[0]!
+    const row = summarizeImages(input({ edits, chosen: { [inn.id]: first.madeFrom } })).images
       .acts[0]!.rows[0]!
     expect(row.status).toBe('chosen')
   })
@@ -246,7 +349,6 @@ describe('summarizeImages', () => {
       input({
         lists: [{ ...input().lists[0]!, state: { status: 'missing' } }],
         style: null,
-        seen: null,
       }),
     )
     expect(missing.images.acts[0]!.state).toBe('missing')
@@ -258,33 +360,35 @@ describe('summarizeImages', () => {
     expect(empty.images.acts[0]!.state).toBe('ok')
   })
   it('reports an act addition for a part the project does not have', () => {
-    const odd = { ...style, acts: { act9: 'x' } }
-    const result = summarizeImages(input({ style: odd, seen: odd }))
-    expect(result.problems.map((p) => p.path)).toEqual(['acts.act9'])
+    const odd = { ...style, parts: { act9: 'x' } }
+    const result = summarizeImages(input({ style: odd }))
+    expect(result.problems).toEqual([
+      {
+        file: 'content-studio/images/edits.json',
+        path: 'style.parts.act9',
+        message: '"act9" is not one of the project\'s parts',
+      },
+    ])
   })
-  it('raises the style notice with the chosen images made from the old style', () => {
+  it('makes a chosen image out of date for the style when the style changes', () => {
     const first = summarizeImages(input()).images.acts[0]!.rows[0]!
     const chosen = { [inn.id]: first.madeFrom }
     const changed = { ...style, look: 'watercolour' }
-    const result = summarizeImages(input({ style: changed, seen: style, chosen }))
-    expect(result.images.styleNotice).toEqual({ count: 1, changed: ['the look'] })
-    expect(result.images.acts[0]!.rows[0]!.reasons).toEqual(['the style'])
+    const row = summarizeImages(input({ style: changed, chosen })).images.acts[0]!.rows[0]!
+    expect(row.reasons).toEqual(['the style'])
   })
-  it('raises no notice for none chosen, for a first sight, or for the user’s own style change', () => {
-    const changed = { ...style, look: 'watercolour' }
-    expect(summarizeImages(input({ style: changed })).images.styleNotice).toBeNull()
-    const first = summarizeImages(input()).images.acts[0]!.rows[0]!
-    const chosen = { [inn.id]: first.madeFrom }
-    expect(
-      summarizeImages(input({ style: changed, seen: null, chosen })).images.styleNotice,
-    ).toBeNull()
-    const mine: Prompts = {
-      images: {},
-      style: { look: { words: 'oil paint', gameWas: style.look } },
-    }
-    const result = summarizeImages(input({ prompts: mine, chosen }))
-    expect(result.images.styleNotice).toBeNull()
-    expect(result.images.acts[0]!.rows[0]!.reasons).toEqual(['the style'])
+  it('shows the style as it is on the Style page, with each part’s addition', () => {
+    const { style: view } = summarizeImages(input()).images
+    expect(view).toEqual({
+      present: true,
+      invalid: false,
+      look: style.look,
+      keepOut: style.keepOut,
+      palette: style.palette,
+      acts: [{ id: 'act1', title: 'Act I', addition: 'warm lantern light' }],
+    })
+    const unread = summarizeImages(input({ style: null, editsInvalid: true })).images.style
+    expect(unread).toMatchObject({ present: false, invalid: true, look: '', keepOut: '' })
   })
 })
 
@@ -341,13 +445,13 @@ describe('the game’s look in the rows', () => {
     expect(looksOld).toBe(false)
     expect(images.lookNotice).toBeNull()
   })
-  it('is full colour when the game has no style file', () => {
-    const { look } = summarizeImages(input({ style: null, seen: null, look: undefined })).images
-      .acts[0]!.rows[0]!
+  it('is full colour when there is no style', () => {
+    const { look } = summarizeImages(input({ style: null, look: undefined })).images.acts[0]!
+      .rows[0]!
     expect(look.line).toBe('320 × 200 · full colour')
   })
   it('keeps an image chosen before looks existed up to date: its style key had the palette in it', () => {
-    const eff = effectiveStyle(style, none, 'act1')!
+    const eff = effectiveStyle(style, 'act1')!
     const first = summarizeImages(input()).images.acts[0]!.rows[0]!
     const legacy = {
       ...first.madeFrom,
@@ -367,60 +471,65 @@ describe('the game’s look in the rows', () => {
   it('does not make an image out of date when only the palette changes', () => {
     const chosen = chosenAs(nowKey)
     const changed = { ...style, palette: ['#ff0000'] }
-    const row2 = summarizeImages(input({ style: changed, seen: changed, chosen })).images.acts[0]!
-      .rows[0]!
+    const row2 = summarizeImages(input({ style: changed, chosen })).images.acts[0]!.rows[0]!
     expect(row2.status).toBe('chosen')
   })
 })
 
 describe('leaving the act’s style out of one image', () => {
-  const off: Prompts = { images: {}, style: {}, actStyleOff: [inn.id] }
-  const row = (prompts: Prompts, extra: Partial<ImagesInput> = {}) =>
-    summarizeImages(input({ prompts, ...extra })).images.acts[0]!.rows[0]!
+  const off: ImageEdits['images'] = { [inn.id]: { partStyle: null } }
+  const row = (edits: ImageEdits['images'], extra: Partial<ImagesInput> = {}) =>
+    summarizeImages(input({ edits, ...extra })).images.acts[0]!.rows[0]!
   it('keeps the act’s line out of that image’s prompt only', () => {
-    expect(assemblePrompt('w', effectiveStyle(style, off, 'act1', inn.id))).toBe(
+    expect(assemblePrompt('w', effectiveStyle(style, 'act1', true))).toBe(
       'w\nflat 16-colour pixel art\nKept out: text, modern things',
     )
-    expect(assemblePrompt('w', effectiveStyle(style, off, 'act1', 'other'))).toContain(
-      'warm lantern light',
-    )
+    expect(assemblePrompt('w', effectiveStyle(style, 'act1'))).toContain('warm lantern light')
     const left = row(off)
     expect(left.prompt).not.toContain('warm lantern light')
     expect(left.actStyle).toEqual({ text: 'warm lantern light', on: false })
-    expect(row(none).actStyle).toEqual({ text: 'warm lantern light', on: true })
-    expect(summarizeImages(input({ prompts: off })).images.acts[0]!.addition).toBe(
+    expect(row({}).actStyle).toEqual({ text: 'warm lantern light', on: true })
+    expect(summarizeImages(input({ edits: off })).images.acts[0]!.addition).toBe(
       'warm lantern light',
     )
   })
   it('has no choice to show when the act adds no style, and keeps it for when one returns', () => {
-    const plain = { ...style, acts: {} }
+    const plain = { ...style, parts: {} }
     expect(row(off, { style: plain }).actStyle).toBeNull()
-    expect(row(off, { style: { ...style, acts: { act1: 'new light' } } }).prompt).not.toContain(
+    expect(row(off, { style: { ...style, parts: { act1: 'new light' } } }).prompt).not.toContain(
       'new light',
     )
   })
-  it('toggles in the prompts, sorted, and removes the id when ticked again', () => {
+  it('toggles as partStyle null in the edits, and removes it when ticked again', () => {
     const one = applyActStyleChange(none, 'b', false)
-    expect(applyActStyleChange(one, 'a', false).actStyleOff).toEqual(['a', 'b'])
-    expect(applyActStyleChange(one, 'b', false).actStyleOff).toEqual(['b'])
-    expect(applyActStyleChange(one, 'b', true).actStyleOff).toBeUndefined()
+    expect(one.images).toEqual({ b: { partStyle: null } })
+    expect(applyActStyleChange(one, 'b', false).images).toEqual({ b: { partStyle: null } })
+    expect(applyActStyleChange(one, 'b', true).images).toEqual({})
+    const worded = applyWordsChange(one, 'b', 'mine', 'game')
+    expect(applyActStyleChange(worded, 'b', true).images).toEqual({
+      b: { text: 'mine', gameWas: 'game' },
+    })
+  })
+  it('picks a part, or none, as partStyle', () => {
+    expect(applyActStylePick(none, 'b', 'act2').images).toEqual({ b: { partStyle: 'act2' } })
+    expect(applyActStylePick(none, 'b', null).images).toEqual({ b: { partStyle: null } })
   })
   it('makes a picture out of date for the act’s style when the choice changes, and current again when undone', () => {
-    const made = row(none).madeFrom
+    const made = row({}).madeFrom
     expect(row(off, { chosen: { [inn.id]: made } })).toMatchObject({
       status: 'out of date',
       reasons: ['the act style'],
     })
     const madeLeftOut = row(off).madeFrom
-    expect(row(none, { chosen: { [inn.id]: madeLeftOut } }).reasons).toEqual(['the act style'])
+    expect(row({}, { chosen: { [inn.id]: madeLeftOut } }).reasons).toEqual(['the act style'])
     expect(row(off, { chosen: { [inn.id]: madeLeftOut } }).status).toBe('chosen')
   })
   it('does not make a left-out image out of date when the game changes the act’s style, but does the others', () => {
-    const changed = { ...style, acts: { act1: 'new light' } }
+    const changed = { ...style, parts: { act1: 'new light' } }
     const left = row(off).madeFrom
     expect(row(off, { style: changed, chosen: { [inn.id]: left } }).status).toBe('chosen')
-    const used = row(none).madeFrom
-    expect(row(none, { style: changed, chosen: { [inn.id]: used } }).reasons).toEqual([
+    const used = row({}).madeFrom
+    expect(row({}, { style: changed, chosen: { [inn.id]: used } }).reasons).toEqual([
       'the act style',
     ])
   })
@@ -451,8 +560,7 @@ describe('an image the game lists in several acts', () => {
           { id: 'act3', title: 'Act III: Title' },
         ],
         lists: lists([inn], [inn], [inn]),
-        style: { ...style, acts: { act1: 'warm lantern light', act3: 'cold dawn' } },
-        seen: { ...style, acts: { act1: 'warm lantern light', act3: 'cold dawn' } },
+        style: { ...style, parts: { act1: 'warm lantern light', act3: 'cold dawn' } },
         ...over,
       }),
     )
@@ -477,16 +585,10 @@ describe('an image the game lists in several acts', () => {
     expect(images.acts.map((a) => a.rows[0]!.status)).toEqual(['chosen', 'chosen', 'chosen'])
     expect(images.acts.map((a) => a.rows[0]!.chosenTake)).toEqual([2, 2, 2])
   })
-  it('counts once in the notices', () => {
+  it('counts once in the look notice', () => {
     const first = shared().images.acts[0]!.rows[0]!
     const chosen = { [inn.id]: { ...first.madeFrom, take: 1, look: 'old' } }
-    const changed = {
-      ...style,
-      look: 'new look',
-      acts: { act1: 'warm lantern light', act3: 'cold dawn' },
-    }
-    const { images } = shared({ chosen, style: changed, look: lookOf(style) })
-    expect(images.styleNotice?.count).toBe(1)
+    const { images } = shared({ chosen, look: lookOf(style) })
     expect(images.lookNotice?.count).toBe(1)
   })
 
@@ -509,42 +611,37 @@ describe('an image the game lists in several acts', () => {
       expect(row({}, 2).prompt).toBe(r.prompt)
     })
     it('uses the picked act’s addition', () => {
-      const prompts = { ...none, actStyleFrom: { [inn.id]: 'act3' } }
-      const r = row({ prompts })
+      const r = row({ edits: { [inn.id]: { partStyle: 'act3' } } })
       expect(r.actStyle?.pick).toBe('act3')
       expect(r.prompt).toContain('cold dawn')
       expect(r.prompt).not.toContain('warm lantern')
     })
     it('starts on None when the first act adds none, and shows no menu when no act adds one', () => {
-      const parts = { act3: 'cold dawn' }
-      const r = row({ style: { ...style, acts: parts }, seen: { ...style, acts: parts } })
+      const r = row({ style: { ...style, parts: { act3: 'cold dawn' } } })
       expect(r.actStyle?.pick).toBeNull()
       expect(r.actStyle?.on).toBe(false)
       expect(r.prompt).not.toContain('cold dawn')
-      const bare = { ...style, acts: {} }
-      expect(row({ style: bare, seen: bare }).actStyle).toBeNull()
+      expect(row({ style: { ...style, parts: {} } }).actStyle).toBeNull()
     })
-    it('is None when the image is on the list of those that leave it out', () => {
-      const r = row({
-        prompts: { ...none, actStyleOff: [inn.id], actStyleFrom: { [inn.id]: 'act3' } },
-      })
+    it('is None when the image leaves it out', () => {
+      const r = row({ edits: { [inn.id]: { partStyle: null } } })
       expect(r.actStyle?.pick).toBeNull()
       expect(r.prompt).not.toContain('cold dawn')
     })
     it('goes back to the first act when the picked act no longer lists the image', () => {
       const r = row({
         lists: lists([inn], [inn], []),
-        prompts: { ...none, actStyleFrom: { [inn.id]: 'act3' } },
+        edits: { [inn.id]: { partStyle: 'act3' } },
       })
       expect(r.actStyle?.pick).toBe('act1')
     })
     it('names the act style in the out-of-date reason', () => {
       const made = row().madeFrom
       const chosen = { [inn.id]: { ...made, take: 1 } }
-      const picked = row({ chosen, prompts: { ...none, actStyleFrom: { [inn.id]: 'act3' } } })
+      const picked = row({ chosen, edits: { [inn.id]: { partStyle: 'act3' } } })
       expect(picked.reasons).toEqual(['the act style'])
       expect(picked.actStyleChange).toEqual({ now: 'act3', was: 'act1' })
-      const left = row({ chosen, prompts: { ...none, actStyleOff: [inn.id] } })
+      const left = row({ chosen, edits: { [inn.id]: { partStyle: null } } })
       expect(left.actStyleChange).toEqual({ now: null, was: 'act1' })
       expect(row({ chosen }).actStyleChange).toBeNull()
     })
@@ -656,5 +753,72 @@ describe('imagesDone', () => {
       conflicts: [{ id: 'd' }],
     } as never
     expect(imagesDone(act)).toEqual({ done: 1, total: 4, needs: ['b', 'c', 'd'] })
+  })
+})
+
+describe('formatImageEdits', () => {
+  it('writes the style first in a fixed key order, leaving out what is at its default', () => {
+    const edits = ImageEditsSchema.parse({
+      images: { well: { partStyle: null }, inn: { gameWas: 'low', text: 'cosy' } },
+      style: { parts: { act1: 'warm' }, dithering: 'flat', keepOut: '', look: 'pixels' },
+    })
+    expect(formatImageEdits(edits)).toBe(
+      `${JSON.stringify(
+        {
+          style: { look: 'pixels', dithering: 'flat', parts: { act1: 'warm' } },
+          images: { inn: { text: 'cosy', gameWas: 'low' }, well: { partStyle: null } },
+        },
+        null,
+        2,
+      )}\n`,
+    )
+    expect(formatImageEdits({ images: {} })).toBe('{\n  "images": {}\n}\n')
+  })
+})
+
+describe('readImageEditsValue', () => {
+  const FILE = 'content-studio/images/edits.json'
+  const own = { text: 'cosy', gameWas: 'low' }
+
+  it('reads the style and every image, with no problems', () => {
+    expect(readImageEditsValue({ style, images: { inn: own } }, FILE)).toEqual({
+      edits: { style, images: { inn: own } },
+      styleBroken: false,
+      problems: [],
+    })
+    expect(readImageEditsValue({}, FILE)).toEqual({
+      edits: { images: {} },
+      styleBroken: false,
+      problems: [],
+    })
+  })
+
+  it('leaves out only a bad image, with a problem at its path', () => {
+    const read = readImageEditsValue(
+      { style, images: { inn: own, well: { text: 'deep' }, map: { partStyle: 3 } } },
+      FILE,
+    )
+    expect(read.edits).toEqual({ style, images: { inn: own } })
+    expect(read.styleBroken).toBe(false)
+    expect(read.problems.map((p) => [p.file, p.path])).toEqual([
+      [FILE, 'images.well'],
+      [FILE, 'images.map.partStyle'],
+    ])
+  })
+
+  it('keeps the rewordings when the style is bad, and says the style is broken', () => {
+    const read = readImageEditsValue({ style: { keepOut: 'x' }, images: { inn: own } }, FILE)
+    expect(read.edits).toEqual({ images: { inn: own } })
+    expect(read.styleBroken).toBe(true)
+    expect(read.problems.map((p) => p.path)).toEqual(['style.look'])
+  })
+
+  it('takes a file that is not an object, or images that are not one, as having none', () => {
+    const notObject = readImageEditsValue([1], FILE)
+    expect(notObject).toMatchObject({ edits: { images: {} }, styleBroken: true })
+    expect(notObject.problems.map((p) => p.path)).toEqual([''])
+    const images = readImageEditsValue({ style, images: [] }, FILE)
+    expect(images.edits).toEqual({ style, images: {} })
+    expect(images.problems.map((p) => p.path)).toEqual(['images'])
   })
 })
