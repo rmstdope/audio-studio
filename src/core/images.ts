@@ -122,11 +122,16 @@ export const ChosenEntrySchema = MadeFromSchema.extend({
   at: z.string().optional(),
 })
 
-/** What a chosen picture was brought to, as the style's own fields (the size is the entry's). */
+/**
+ * What a chosen picture was brought to, as the style's own fields, and the size it was brought to
+ * when that is not the entry's own (a take made before the game's list changed its size).
+ */
 const LockLookSchema = z.object({
   palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(),
   colourDepth: z.enum(['full', '16-bit', '8-bit']).optional(),
   dithering: z.enum(['flat', 'patterned', 'scattered']).optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
 })
 
 /** One entry of `content-studio/images/lock.json`: the chosen take, and what it was made from in the clear. */
@@ -157,6 +162,7 @@ export const ImageLockSchema = z.record(
   LockEntrySchema.transform(({ inputs, model, seed, take, at }): ChosenEntry => {
     const { text, width, height, style, look } = inputs
     const lookFields = look && { palette: look.palette ?? [], ...look }
+    const lookSize = { width: look?.width ?? width, height: look?.height ?? height }
     return {
       words: text,
       style: style ? JSON.stringify([style.look, style.keepOut, style.part]) : '',
@@ -165,7 +171,7 @@ export const ImageLockSchema = z.record(
       ...(take !== undefined && { take }),
       ...(seed !== undefined && { seed }),
       ...(model !== undefined && { model }),
-      ...(lookFields && { look: lookKey(lookOf(lookFields), { width, height }) }),
+      ...(lookFields && { look: lookKey(lookOf(lookFields), lookSize) }),
       ...(at !== undefined && { at }),
     }
   }),
@@ -174,21 +180,33 @@ export const ImageLockSchema = z.record(
 /** The images lock as the studio reads it: the chosen take of each image. */
 export type ImageLock = z.infer<typeof ImageLockSchema>
 
-/** A look key (`lookKey`) as the style's own fields; null for one that is not a key of ours. */
-function lookFields(key: string): z.infer<typeof LockLookSchema> | null {
+/**
+ * A look key (`lookKey`) as the style's own fields, with its size when it is not `size` (the
+ * entry's); null for one that is not a key of ours.
+ */
+function lookFields(
+  key: string,
+  size: { width: number; height: number },
+): z.infer<typeof LockLookSchema> | null {
   try {
-    const { c, d } = JSON.parse(key) as { c: unknown; d: unknown }
+    const { w, h, c, d } = JSON.parse(key) as { w: unknown; h: unknown; c: unknown; d: unknown }
     const dithering = LockLookSchema.shape.dithering.safeParse(d).data
+    const other =
+      typeof w === 'number' && typeof h === 'number' && (w !== size.width || h !== size.height)
+        ? { width: w, height: h }
+        : {}
     if (Array.isArray(c)) {
       const hex = (rgb: unknown) =>
         `#${String(rgb)
           .split(',')
           .map((n) => Number(n).toString(16).padStart(2, '0'))
           .join('')}`
-      return { palette: c.map(hex), ...(dithering && { dithering }) }
+      return { palette: c.map(hex), ...(dithering && { dithering }), ...other }
     }
-    if (c === 8 || c === 16) return { colourDepth: `${c}-bit`, ...(dithering && { dithering }) }
-    if (c === 'full') return { colourDepth: 'full' }
+    if (c === 8 || c === 16) {
+      return { colourDepth: `${c}-bit`, ...(dithering && { dithering }), ...other }
+    }
+    if (c === 'full') return { colourDepth: 'full', ...other }
   } catch {
     // not a key of ours
   }
@@ -205,7 +223,7 @@ export function formatImageLock(lock: ImageLock): string {
   const lines = ids.map((id) => {
     const { words, style, width, height, take, seed, model, look, at } = lock[id]!
     const parts = style ? styleParts(withoutPalette(style)) : null
-    const looked = look === undefined ? null : lookFields(look)
+    const looked = look === undefined ? null : lookFields(look, { width, height })
     const entry = {
       model,
       seed,

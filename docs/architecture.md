@@ -1502,7 +1502,7 @@ to fill (the middle kept) and a box average, in plain TypeScript over a small PN
 `node:zlib` (`Bun.Image` gives no pixel access), so nothing depends on the machine. `lookKey` (size,
 colours, dithering) is what a picture was brought to: it is noted on the board take (`look`) and in
 the lock's entry (`inputs.look`, as the style's own fields: the palette, else the colour depth, and
-the dithering unless full colour; the size is the entry's), and an image is "old" when its chosen picture, or any take whose
+the dithering unless full colour; the size only when it is not the entry's own), and an image is "old" when its chosen picture, or any take whose
 model picture is there, was brought to another key (one with no key was never brought). A take is
 brought as soon as it is on the board (the view says `bringing` meanwhile, and Choose is off); a
 style that cannot be read leaves the take as the model made it, with the sentence saying what to

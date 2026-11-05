@@ -141,6 +141,15 @@ describe('the images lock', () => {
     expect(JSON.parse(formatImageLock({ a: unbrought })).a.inputs.look).toBeUndefined()
   })
 
+  it('keeps the size a picture was brought to when it is not the entry’s own, and reads it back', () => {
+    const resized = { ...chosen, look: key({ palette: [] }, 640, 400) }
+    const text = formatImageLock({ a: resized })
+    expect(JSON.parse(text).a.inputs.look).toEqual({ colourDepth: 'full', width: 640, height: 400 })
+    expect(ImageLockSchema.parse(JSON.parse(text))).toEqual({ a: resized })
+    const same = formatImageLock({ a: { ...chosen, look: key({ palette: [] }) } })
+    expect(JSON.parse(same).a.inputs.look).toEqual({ colourDepth: 'full' })
+  })
+
   it('writes no style for a take made without one, part null for no addition, and reads old keys that held the palette', () => {
     const inputs = (style: string) =>
       JSON.parse(formatImageLock({ a: { ...chosen, style } })).a.inputs.style

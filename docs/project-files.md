@@ -534,10 +534,12 @@ What `inputs` holds is each kind's own:
   records `list`: the part whose list the track came from, or `shared` for a stinger.
 - **Images**: `text`, `width`, `height`, `style` (`{ look, keepOut, part }`: the words the take was
   made with, `part` being the part's addition as written, `null` for none; absent for a take made
-  without a style) and `look` (`{ palette, colourDepth, dithering }`, what the picture was brought
-  to at the entry's size: `palette` when there is one, else `colourDepth`, and `dithering` unless
-  full colour; absent for a picture never brought to a look). An image entry has no `fp`: the
-  inputs are compared as they are.
+  without a style) and `look` (`{ palette, colourDepth, dithering, width, height }`, what the
+  picture was brought to: `palette` when there is one, else `colourDepth`, and `dithering` unless
+  full colour; `width` and `height` only when the picture was brought to another size than the
+  entry's own, as when a take made before the game changed the image's size is chosen after it;
+  absent for a picture never brought to a look). An image entry has no `fp`: the inputs are
+  compared as they are.
 - **Effects**: `text`, `seconds`, `loops`.
 
 Two locks record something else, in the same layout:

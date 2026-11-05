@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
 import { setImageWords } from './imageEdits'
@@ -862,6 +862,53 @@ describe('bringing everything to a new look', () => {
       seen.add(`${p.data[i]},${p.data[i + 1]},${p.data[i + 2]}`)
     return seen
   }
+
+  /** The game lists the inn at another size from now on. */
+  const resizeInn = (root: string) =>
+    writeFileSync(
+      join(root, 'tts/act1/images.json'),
+      JSON.stringify([
+        { ...inn, width: 160 },
+        { ...inn, id: 'hall', title: 'Hall' },
+      ]),
+    )
+
+  it('brings a resized image to its new size once, and a second run leaves it as it is', async () => {
+    const s = await chosenImages()
+    resizeInn(s.root)
+    expect((await s.row('inn')).looksOld).toBe(true)
+    const run = await takes_bringAll(s, { palette: warm })
+    expect(run).toBeNull()
+    expect((await s.row('inn')).looksOld).toBe(false)
+    expect((await readImages(s.root, await openProjectOk(s.file), []))!.lookNotice).toBeNull()
+    expect(JSON.parse(s.read(LOCK)).inn.inputs.look).toEqual({
+      palette: warm,
+      dithering: 'patterned',
+      width: 160,
+      height: 200,
+    })
+    const clip = statSync(join(s.root, 'web/images/inn.png')).mtimeMs
+    const lock = s.read(LOCK)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    await takes_bringAll(s, { palette: warm })
+    expect(statSync(join(s.root, 'web/images/inn.png')).mtimeMs).toBe(clip)
+    expect(s.read(LOCK)).toBe(lock)
+  })
+
+  it('keeps a take made at the old size, chosen after a resize, at the look it was brought to', async () => {
+    const s = await chosenImages()
+    resizeInn(s.root)
+    expect(await s.takes.choose(s.file, 'inn', 1)).toEqual({ ok: true })
+    expect((await s.row('inn')).reasons).toEqual(['the size'])
+    expect(JSON.parse(s.read(LOCK)).inn.inputs).toMatchObject({
+      width: 320,
+      height: 200,
+      look: { width: 160, height: 200 },
+    })
+    // Take 2 is still at the old size; once it is brought, nothing looks old.
+    expect(await takes_bringAll(s, { palette: warm })).toBeNull()
+    expect((await s.row('inn')).looksOld).toBe(false)
+  })
 
   it('notices the change, then brings the takes and the chosen picture from the model’s pictures without making anything again', async () => {
     const s = await chosenImages()
