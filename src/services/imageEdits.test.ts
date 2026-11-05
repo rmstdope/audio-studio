@@ -100,6 +100,34 @@ describe('readImages', () => {
     expect(existsSync(join(root, 'content-studio/cache/images-style-seen.json'))).toBe(false)
   })
 
+  it('leaves out only an image whose edit is bad, keeping the style and the others', async () => {
+    const two = [inn, { ...inn, id: 'well', title: 'Well' }]
+    const { summary } = repo({
+      'tts/act1/images.json': two,
+      [EDITS]: {
+        style,
+        images: { inn: { text: 'cosy', gameWas: 'a low inn' }, well: { text: 'deep' } },
+      },
+    })
+    const { images: read, problems } = await summary()
+    expect(problems.map((p) => [p.file, p.path])).toEqual([[EDITS, 'images.well']])
+    expect(read!.style).toMatchObject({ present: true, invalid: false, look: 'pixel art' })
+    const [cosy, well] = read!.acts[0]!.rows
+    expect(cosy).toMatchObject({ words: 'cosy', changed: true })
+    expect(well).toMatchObject({ words: 'a low inn', changed: false })
+    expect(well!.prompt).toContain('pixel art')
+  })
+
+  it('keeps the rewordings when the style is bad', async () => {
+    const { summary } = repo({
+      [EDITS]: { style: { keepOut: 'x' }, images: { inn: { text: 'cosy', gameWas: 'a low inn' } } },
+    })
+    const { images: read, problems } = await summary()
+    expect(problems.map((p) => p.path)).toEqual(['style.look'])
+    expect(read!.style).toMatchObject({ present: false, invalid: true })
+    expect(read!.acts[0]!.rows[0]).toMatchObject({ words: 'cosy', changed: true })
+  })
+
   it('tells edits that cannot be read from a project with no style yet', async () => {
     const { summary } = repo({ [EDITS]: '{nope' })
     const { images: read, problems } = await summary()
@@ -141,6 +169,16 @@ describe('saving the studio’s own words', () => {
     await setImageWords(file, 'inn', 'cosy')
     await setImageWords(file, 'inn', null)
     expect(JSON.parse(read(EDITS)).images).toEqual({})
+  })
+
+  it('refuses to save over edits with a bad part, leaving the file as it was', async () => {
+    const { file, read } = repo({
+      [EDITS]: { style, images: { well: { text: 'deep' } } },
+    })
+    const before = read(EDITS)
+    const refused = await setImageWords(file, 'inn', 'cosy')
+    expect(refused).toMatchObject({ ok: false, problems: [{ file: EDITS, path: 'images.well' }] })
+    expect(read(EDITS)).toBe(before)
   })
 
   it('is null for an image the game does not list, and refuses broken edits', async () => {

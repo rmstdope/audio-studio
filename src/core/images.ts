@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { describeLook, lookChanges, lookKey, lookOf, type Look } from './imageLook'
-import type { Problem } from './project'
+import { problemsFrom, type Problem } from './project'
 
 /** The path of the picture the game shows for an image now: inside the project root, and a picture. */
 const GameFile = z
@@ -73,6 +73,47 @@ export const ImageEditsSchema = z.object({
   style: StyleSchema.optional(),
   images: z.record(z.string(), ImageEditSchema).default({}),
 })
+
+/** What reading the images edits gave: what could be used, whether the style could not, and why. */
+export interface ImageEditsRead {
+  edits: ImageEdits
+  /** There is a style, but it cannot be read (its problems are among `problems`). */
+  styleBroken: boolean
+  problems: Problem[]
+}
+
+/**
+ * The images edits from their JSON, the style and each image checked apart: a bad image is left
+ * out with a problem at its path, and a bad style is none (with `styleBroken`), so the rest stays
+ * usable. A file that is not an object holds nothing usable.
+ */
+export function readImageEditsValue(raw: unknown, file: string): ImageEditsRead {
+  const problems: Problem[] = []
+  const isObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+  if (!isObject(raw)) {
+    problems.push({ file, path: '', message: 'must be an object' })
+    return { edits: { images: {} }, styleBroken: true, problems }
+  }
+  const style = z.object({ style: StyleSchema.optional() }).safeParse({ style: raw.style })
+  if (!style.success) problems.push(...problemsFrom(file, style.error))
+  const images: ImageEdits['images'] = {}
+  if (raw.images !== undefined && !isObject(raw.images)) {
+    problems.push({ file, path: 'images', message: 'must be an object, by image id' })
+  } else {
+    for (const [id, entry] of Object.entries(raw.images ?? {})) {
+      const one = z.object({ images: z.record(z.string(), ImageEditSchema) })
+      const read = one.safeParse({ images: { [id]: entry } })
+      if (read.success) images[id] = read.data.images[id]!
+      else problems.push(...problemsFrom(file, read.error))
+    }
+  }
+  return {
+    edits: { ...(style.data?.style && { style: style.data.style }), images },
+    styleBroken: !style.success,
+    problems,
+  }
+}
 
 /**
  * The images edits as text: the style first, its keys in a fixed order and those at their default
@@ -391,16 +432,17 @@ export function applyWordsChange(
 }
 
 /**
- * The edits with the style's look or what is kept out set; an empty look is refused (null), an
- * empty kept-out is none. Null too without a style.
+ * The edits with the style's look or what is kept out set; an empty kept-out is none. Refused,
+ * with why, without a style (`no style`) and for an empty look (`empty look`).
  */
 export function applyStyleChange(
   edits: ImageEdits,
   field: StyleField,
   text: string | null,
-): ImageEdits | null {
+): ImageEdits | 'no style' | 'empty look' {
   const words = (text ?? '').trim()
-  if (!edits.style || (field === 'look' && words === '')) return null
+  if (!edits.style) return 'no style'
+  if (field === 'look' && words === '') return 'empty look'
   return { ...edits, style: { ...edits.style, [field]: words } }
 }
 

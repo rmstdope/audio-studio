@@ -13,6 +13,7 @@ import {
   effectiveStyle,
   formatImageEdits,
   formatImageLock,
+  readImageEditsValue,
   acceptableReasons,
   imagesDone,
   outOfDateReasons,
@@ -225,13 +226,17 @@ describe('the studio’s own words', () => {
   })
   it('sets the style’s look and what is kept out directly, refusing an empty look', () => {
     const styled: ImageEdits = { style, images: {} }
-    expect(applyStyleChange(styled, 'look', ' oil paint ')?.style).toEqual({
-      ...style,
-      look: 'oil paint',
+    expect(applyStyleChange(styled, 'look', ' oil paint ')).toEqual({
+      style: { ...style, look: 'oil paint' },
+      images: {},
     })
-    expect(applyStyleChange(styled, 'keepOut', null)?.style?.keepOut).toBe('')
-    expect(applyStyleChange(styled, 'look', ' ')).toBeNull()
-    expect(applyStyleChange(none, 'look', 'oil paint')).toBeNull()
+    expect(applyStyleChange(styled, 'keepOut', null)).toEqual({
+      style: { ...style, keepOut: '' },
+      images: {},
+    })
+    expect(applyStyleChange(styled, 'look', ' ')).toBe('empty look')
+    expect(applyStyleChange(none, 'look', 'oil paint')).toBe('no style')
+    expect(applyStyleChange(none, 'keepOut', null)).toBe('no style')
   })
   it('settles a changed game description: keep mine moves the baseline, the game’s drops mine', () => {
     const mine: ImageEdits = { images: { inn: { text: 'cosy', gameWas: 'old' } } }
@@ -768,5 +773,52 @@ describe('formatImageEdits', () => {
       )}\n`,
     )
     expect(formatImageEdits({ images: {} })).toBe('{\n  "images": {}\n}\n')
+  })
+})
+
+describe('readImageEditsValue', () => {
+  const FILE = 'content-studio/images/edits.json'
+  const own = { text: 'cosy', gameWas: 'low' }
+
+  it('reads the style and every image, with no problems', () => {
+    expect(readImageEditsValue({ style, images: { inn: own } }, FILE)).toEqual({
+      edits: { style, images: { inn: own } },
+      styleBroken: false,
+      problems: [],
+    })
+    expect(readImageEditsValue({}, FILE)).toEqual({
+      edits: { images: {} },
+      styleBroken: false,
+      problems: [],
+    })
+  })
+
+  it('leaves out only a bad image, with a problem at its path', () => {
+    const read = readImageEditsValue(
+      { style, images: { inn: own, well: { text: 'deep' }, map: { partStyle: 3 } } },
+      FILE,
+    )
+    expect(read.edits).toEqual({ style, images: { inn: own } })
+    expect(read.styleBroken).toBe(false)
+    expect(read.problems.map((p) => [p.file, p.path])).toEqual([
+      [FILE, 'images.well'],
+      [FILE, 'images.map.partStyle'],
+    ])
+  })
+
+  it('keeps the rewordings when the style is bad, and says the style is broken', () => {
+    const read = readImageEditsValue({ style: { keepOut: 'x' }, images: { inn: own } }, FILE)
+    expect(read.edits).toEqual({ images: { inn: own } })
+    expect(read.styleBroken).toBe(true)
+    expect(read.problems.map((p) => p.path)).toEqual(['style.look'])
+  })
+
+  it('takes a file that is not an object, or images that are not one, as having none', () => {
+    const notObject = readImageEditsValue([1], FILE)
+    expect(notObject).toMatchObject({ edits: { images: {} }, styleBroken: true })
+    expect(notObject.problems.map((p) => p.path)).toEqual([''])
+    const images = readImageEditsValue({ style, images: [] }, FILE)
+    expect(images.edits).toEqual({ style, images: {} })
+    expect(images.problems.map((p) => p.path)).toEqual(['images'])
   })
 })

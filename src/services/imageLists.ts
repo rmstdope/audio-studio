@@ -1,11 +1,11 @@
 import { explainStyleProblem, lookOf, type Look } from '../core/imageLook'
 import { ImageBoardSchema } from '../core/imageTakes'
 import {
-  ImageEditsSchema,
   ImageLockSchema,
   ImageListSchema,
+  readImageEditsValue,
   summarizeImages,
-  type ImageEdits,
+  type ImageEditsRead,
   type ImageListState,
   type ImagesSummary,
 } from '../core/images'
@@ -27,18 +27,27 @@ export const IMAGE_TAKES_DIR = `${CACHE_DIR}/image-takes`
 /** Where an image's board is saved: one file per image (an id is a slug, so a safe file name). */
 export const IMAGE_BOARD_DIR = `${CACHE_DIR}/images`
 
-/** The look the style asks for; none when it cannot be used, with the sentence saying why. */
+/** The images edits as read from disk, with the style as written, to say why it cannot be used. */
+export interface ImageEditsOnDisk extends ImageEditsRead {
+  rawStyle: unknown
+}
+
+/** The look the style of `read` asks for; none when it cannot be used, with the sentence saying why. */
+export function styleLookOf(
+  read: ImageEditsOnDisk,
+): { look: Look; error?: undefined } | { look: null; error: string } {
+  if (read.styleBroken) {
+    return { look: null, error: explainStyleProblem(read.rawStyle ?? null, IMAGES_EDITS_FILE) }
+  }
+  // A project with no style has no look to bring pictures to: full colour, only the size.
+  return { look: lookOf(read.edits.style ?? { palette: [] }) }
+}
+
+/** The look the style asks for, read from disk; none when it cannot be used, with the sentence saying why. */
 export async function readStyleLook(
   root: string,
 ): Promise<{ look: Look; error?: undefined } | { look: null; error: string }> {
-  const read = await readImageEdits(root, [])
-  if (read === 'invalid') {
-    const raw = await readJson(resolveInRoot(root, IMAGES_EDITS_FILE))
-    const style = raw.status === 'ok' ? (raw.value as { style?: unknown } | null)?.style : null
-    return { look: null, error: explainStyleProblem(style ?? null, IMAGES_EDITS_FILE) }
-  }
-  // A project with no style has no look to bring pictures to: full colour, only the size.
-  return { look: lookOf(read.style ?? { palette: [] }) }
+  return styleLookOf(await readImageEdits(root))
 }
 
 /** What each listed image's takes were brought to (null for never), counting only takes whose model picture is there. */
@@ -61,13 +70,24 @@ async function readTakeLooks(
   return looks
 }
 
-/** The images edits (the style and the studio's changes), empty when there are none; 'invalid' (with the problems added) when they cannot be read. */
-export async function readImageEdits(
-  root: string,
-  problems: Problem[],
-): Promise<ImageEdits | 'invalid'> {
-  const read = await readResource(root, IMAGES_EDITS_FILE, ImageEditsSchema, problems)
-  return read === 'missing' ? { images: {} } : read
+/**
+ * The images edits (the style and the studio's changes), empty when there are none. A file that
+ * cannot be read holds nothing usable; otherwise the style and each image are read apart
+ * (`readImageEditsValue`), and the problems say what was left out.
+ */
+export async function readImageEdits(root: string): Promise<ImageEditsOnDisk> {
+  const json = await readJson(resolveInRoot(root, IMAGES_EDITS_FILE))
+  if (json.status === 'missing') {
+    return { edits: { images: {} }, styleBroken: false, problems: [], rawStyle: undefined }
+  }
+  if (json.status === 'invalid') {
+    const problems = [{ file: IMAGES_EDITS_FILE, path: '', message: json.message }]
+    return { edits: { images: {} }, styleBroken: true, problems, rawStyle: null }
+  }
+  const raw: unknown = json.value
+  const rawStyle =
+    typeof raw === 'object' && raw !== null ? (raw as { style?: unknown }).style : null
+  return { ...readImageEditsValue(raw, IMAGES_EDITS_FILE), rawStyle }
 }
 
 /**
@@ -96,7 +116,8 @@ export async function readImages(
       canRefresh: Boolean(project.refresh?.part),
     })
   }
-  const edits = await readImageEdits(root, problems)
+  const edits = await readImageEdits(root)
+  problems.push(...edits.problems)
   const lock = await readResource(root, IMAGES_LOCK_FILE, ImageLockSchema, problems)
   const chosen = lock === 'missing' || lock === 'invalid' ? {} : lock
   const gameFiles: Record<string, boolean> = {}
@@ -106,7 +127,7 @@ export async function readImages(
       if (image.file) gameFiles[image.id] = (await gameFilePath(root, image.file)) !== null
     }
   }
-  const styleLook = await readStyleLook(root)
+  const styleLook = styleLookOf(edits)
   const ids = lists.flatMap((list) =>
     list.state.status === 'ok' ? list.state.images.map((image) => image.id) : [],
   )
@@ -115,12 +136,12 @@ export async function readImages(
     look: styleLook.look,
     lookError: styleLook.error,
     takeLooks: await readTakeLooks(root, ids),
-    editsInvalid: edits === 'invalid',
+    editsInvalid: edits.styleBroken,
     parts: project.parts,
     lists,
     editsFile: IMAGES_EDITS_FILE,
-    style: edits === 'invalid' ? null : (edits.style ?? null),
-    edits: edits === 'invalid' ? {} : edits.images,
+    style: edits.edits.style ?? null,
+    edits: edits.edits.images,
     chosen,
   })
   problems.push(...summary.problems)

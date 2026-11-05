@@ -22,15 +22,19 @@ export type ImageEditResult =
 /** One change at a time per project: each reads the edits the one before wrote. */
 const serial = createSerial()
 
+/** The Images pages as `readImages` gives them. */
+type Summary = NonNullable<Awaited<ReturnType<typeof readImages>>>
+
 /**
  * Runs `change` over the images edits and writes them back (the game's files are never written).
- * `gameWords` says the game's text for the change; null from `find` is an unknown image. `change`
- * may answer problems instead of edits, and nothing is written.
+ * `find` gives what the change is about from the pages (an image's game words, the style); null
+ * from it, or from `change` (it is gone since), answers null. `change` may answer problems
+ * instead of edits, and nothing is written.
  */
-function edit(
+function edit<T>(
   projectFile: string,
-  find: (images: NonNullable<Awaited<ReturnType<typeof readImages>>>) => string | null,
-  change: (edits: ImageEdits, gameWords: string) => ImageEdits | Problem[],
+  find: (summary: Summary) => T | null,
+  change: (edits: ImageEdits, found: T) => ImageEdits | Problem[] | null,
 ): Promise<ImageEditResult> {
   return serial.run(projectFile, async () => {
     const opened = await openProject(projectFile)
@@ -39,13 +43,14 @@ function edit(
     const root = dirname(projectFile)
     if (!project.images) return null
     const summary = await readImages(root, project, [])
-    const gameWords = summary ? find(summary) : null
-    if (gameWords === null) return null
+    const found = summary ? find(summary) : null
+    if (found === null) return null
     const file = IMAGES_EDITS_FILE
-    const problems: Problem[] = []
-    const edits = await readImageEdits(root, problems)
-    if (edits === 'invalid') return { ok: false, problems }
-    const changed = change(edits, gameWords)
+    const read = await readImageEdits(root)
+    // Saving over a part that cannot be read would lose it: nothing is written until it is fixed.
+    if (read.problems.length) return { ok: false, problems: read.problems }
+    const changed = change(read.edits, found)
+    if (changed === null) return null
     if (Array.isArray(changed)) return { ok: false, problems: changed }
     try {
       await writeAtomic(root, file, formatImageEdits(changed))
@@ -58,7 +63,7 @@ function edit(
 
 /** The game's description of an image, from the pages; null when it is not listed. */
 function descriptionOf(id: string) {
-  return (summary: NonNullable<Awaited<ReturnType<typeof readImages>>>) =>
+  return (summary: Summary) =>
     summary.acts.flatMap((act) => act.rows).find((row) => row.id === id)?.description ?? null
 }
 
@@ -93,7 +98,7 @@ export function setImageActStylePick(
 ): Promise<ImageEditResult> {
   return edit(
     projectFile,
-    (summary) => {
+    (summary: Summary) => {
       const row = summary.acts.flatMap((act) => act.rows).find((r) => r.id === id)
       if (!row) return null
       return from === null || row.actStyle?.choices?.some((c) => c.id === from)
@@ -126,10 +131,17 @@ export function setStyleField(
 ): Promise<ImageEditResult> {
   return edit(
     projectFile,
-    (summary) => (summary.style.present ? '' : null),
-    (edits) =>
-      applyStyleChange(edits, field, text) ?? [
-        { file: IMAGES_EDITS_FILE, path: `style.${field}`, message: 'the look cannot be empty' },
-      ],
+    (summary) => (summary.style.present ? summary.style : null),
+    (edits) => {
+      const changed = applyStyleChange(edits, field, text)
+      // The style was taken out of the file since the pages were read.
+      if (changed === 'no style') return null
+      if (changed === 'empty look') {
+        return [
+          { file: IMAGES_EDITS_FILE, path: 'style.look', message: 'the look cannot be empty' },
+        ]
+      }
+      return changed
+    },
   )
 }
