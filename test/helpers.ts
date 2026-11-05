@@ -8,6 +8,7 @@ import type { ElevenLabsClient, SpeechRequest } from '../src/services/elevenlabs
 /** A minimal valid project file; override any top-level key. */
 export function projectJson(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
+    version: 2,
     name: 'Test Game',
     narration: {
       partLabel: 'Act',

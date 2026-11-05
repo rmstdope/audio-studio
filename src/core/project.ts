@@ -369,9 +369,18 @@ const ScenesSchema = z.object({
     .optional(),
 })
 
+/** The project file format the studio reads; any other, or none, is refused. */
+export const PROJECT_VERSION = 2
+
+/** What the studio says of a project file without `"version": 2`. */
+const OLD_FORMAT =
+  'This project file is in the format before version 2. Add "version": 2 and move its fields as docs/project-files.md describes.'
+
 /** The project file, `content-studio.json`, in the consumer repository's root. */
 export const ProjectSchema = z.object({
   $schema: z.string().optional(),
+  /** The format's version: the studio reads version 2 only. */
+  version: z.literal(PROJECT_VERSION, { error: OLD_FORMAT }),
   name: z.string().min(1),
   description: z.string().default(''),
   env: z.string().default('.env'),
@@ -456,6 +465,28 @@ export interface Problem {
   file: string
   path: string
   message: string
+}
+
+/**
+ * The project file `file` read as JSON (`raw`), validated: the project, or what is wrong with it. A
+ * file of another version, or none, is one problem at `version`, since the rest of it is in another
+ * format and every other complaint would only be noise.
+ */
+export function parseProject(
+  file: string,
+  raw: unknown,
+): { ok: true; project: Project } | { ok: false; problems: Problem[] } {
+  const version =
+    typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>).version
+      : undefined
+  if (version !== PROJECT_VERSION) {
+    return { ok: false, problems: [{ file, path: 'version', message: OLD_FORMAT }] }
+  }
+  const parsed = ProjectSchema.safeParse(raw)
+  return parsed.success
+    ? { ok: true, project: parsed.data }
+    : { ok: false, problems: problemsFrom(file, parsed.error) }
 }
 
 /** Zod's issues as problems in `file`, each with its JSON path written out (`narration.parts[0].id`). */

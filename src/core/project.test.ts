@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
 import { projectJson } from '../../test/helpers'
-import { ProjectSchema, partPathFor, problemsFrom } from './project'
+import { ProjectSchema, parseProject, partPathFor, problemsFrom } from './project'
 
 function parse(value: unknown) {
   return ProjectSchema.safeParse(value)
@@ -12,6 +12,39 @@ function problems(value: unknown) {
   if (result.success) throw new Error('expected the project to be invalid')
   return problemsFrom('content-studio.json', result.error)
 }
+
+describe('the format version', () => {
+  const refusal = {
+    file: 'content-studio.json',
+    path: 'version',
+    message:
+      'This project file is in the format before version 2. Add "version": 2 and move its fields as docs/project-files.md describes.',
+  }
+
+  it('reads a project file of version 2', () => {
+    const read = parseProject('content-studio.json', projectJson())
+    expect(read.ok && read.project.version).toBe(2)
+  })
+
+  it('refuses an unversioned file with one problem, whatever else is wrong in it', () => {
+    const { version: _version, ...old } = projectJson()
+    expect(parseProject('content-studio.json', { ...old, narration: 'x' })).toEqual({
+      ok: false,
+      problems: [refusal],
+    })
+  })
+
+  it('refuses another version, or a file that is not an object', () => {
+    for (const raw of [projectJson({ version: 1 }), projectJson({ version: '2' }), [], null]) {
+      expect(parseProject('content-studio.json', raw)).toEqual({ ok: false, problems: [refusal] })
+    }
+  })
+
+  it('says what else is wrong in a file of version 2', () => {
+    const read = parseProject('content-studio.json', projectJson({ name: '' }))
+    expect(!read.ok && read.problems.map((p) => p.path)).toEqual(['name'])
+  })
+})
 
 describe('ProjectSchema', () => {
   it('fills in defaults for everything optional', () => {

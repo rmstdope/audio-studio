@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
-import { ProjectSchema, problemsFrom, type Problem, type Project } from '../core/project'
+import { parseProject, type Problem, type Project } from '../core/project'
 import { writeAtomic, writeFailure } from './files'
 import { createSerial } from './serial'
 import type { ProjectFailure } from './workspace'
@@ -40,9 +40,9 @@ export async function openProject(projectFile: string): Promise<OpenedProject | 
   } catch (error) {
     return failure(`not valid JSON: ${(error as Error).message}`)
   }
-  const current = ProjectSchema.safeParse(raw)
-  if (!current.success) return { ok: false, file, problems: problemsFrom(file, current.error) }
-  return { ok: true, text, raw, project: current.data }
+  const current = parseProject(file, raw)
+  if (!current.ok) return { ok: false, file, problems: current.problems }
+  return { ok: true, text, raw, project: current.project }
 }
 
 /** A written project file, or why the disk refused it. */

@@ -19,11 +19,10 @@ import {
   OLD_PROJECT_FILE,
   OLD_STATE_DIR,
   PROJECT_FILE,
-  ProjectSchema,
+  parseProject,
   declaredLanguage,
   partCacheName,
   partPathFor,
-  problemsFrom,
   soundAlikeOf,
   type Part,
   type Problem,
@@ -634,10 +633,10 @@ export async function openProject(
   if (json.status === 'invalid') {
     return { ok: false, file, problems: [{ file, path: '', message: json.message }] }
   }
-  const parsed = ProjectSchema.safeParse(json.value)
-  if (!parsed.success) return { ok: false, file, problems: problemsFrom(file, parsed.error) }
+  const parsed = parseProject(file, json.value)
+  if (!parsed.ok) return { ok: false, file, problems: parsed.problems }
 
-  const outside = projectPaths(parsed.data).flatMap(([path, value]) => {
+  const outside = projectPaths(parsed.project).flatMap(([path, value]) => {
     try {
       resolveInRoot(root, value)
       return []
@@ -646,7 +645,7 @@ export async function openProject(
     }
   })
   if (outside.length) return { ok: false, file, problems: outside }
-  return { ok: true, project: parsed.data }
+  return { ok: true, project: parsed.project }
 }
 
 /** Every path the project file names, with its JSON path, for the outside-the-root check. */

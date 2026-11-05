@@ -139,11 +139,26 @@ describe('loadProject', () => {
   })
 
   it('fails on an invalid project file, naming what is wrong', async () => {
-    const root = tempRepo({ 'content-studio.json': { name: '' } })
+    const root = tempRepo({ 'content-studio.json': { version: 2, name: '' } })
     const result = await loadProject(join(root, 'content-studio.json'))
     if (result.ok) throw new Error('expected the project file to be rejected')
     expect(result.file).toBe('content-studio.json')
     expect(result.problems.map((p) => p.path)).toEqual(['name', 'narration'])
+  })
+
+  it('refuses a project file in the format before version 2, saying what to do', async () => {
+    const { version: _version, ...old } = projectJson()
+    const root = tempRepo({ 'content-studio.json': old })
+    const result = await loadProject(join(root, 'content-studio.json'))
+    if (result.ok) throw new Error('expected the project file to be rejected')
+    expect(result.problems).toEqual([
+      {
+        file: 'content-studio.json',
+        path: 'version',
+        message:
+          'This project file is in the format before version 2. Add "version": 2 and move its fields as docs/project-files.md describes.',
+      },
+    ])
   })
 
   it('fails when the project file is not JSON', async () => {
