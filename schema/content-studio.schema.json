@@ -46,7 +46,8 @@
         "required": [
           "id",
           "title"
-        ]
+        ],
+        "additionalProperties": false
       }
     },
     "languages": {
@@ -70,7 +71,8 @@
           "type": "string",
           "minLength": 1
         }
-      }
+      },
+      "additionalProperties": false
     },
     "narration": {
       "type": "object",
@@ -104,7 +106,8 @@
             "lock",
             "clips",
             "manifest"
-          ]
+          ],
+          "additionalProperties": false
         },
         "sceneCueSpeakers": {
           "default": [
@@ -132,7 +135,8 @@
               "default": "s2.1-pro-free",
               "type": "string"
             }
-          }
+          },
+          "additionalProperties": false
         },
         "elevenlabs": {
           "default": {},
@@ -154,7 +158,8 @@
                   "default": "eleven_v3",
                   "type": "string"
                 }
-              }
+              },
+              "additionalProperties": false
             },
             "tts": {
               "default": {},
@@ -189,9 +194,11 @@
                   "minimum": 0,
                   "maximum": 1
                 }
-              }
+              },
+              "additionalProperties": false
             }
-          }
+          },
+          "additionalProperties": false
         },
         "tts": {
           "default": {},
@@ -214,7 +221,8 @@
               "type": "number",
               "exclusiveMinimum": 0
             }
-          }
+          },
+          "additionalProperties": false
         },
         "output": {
           "default": {},
@@ -255,7 +263,8 @@
                 }
               ]
             }
-          }
+          },
+          "additionalProperties": false
         },
         "quality": {
           "default": {},
@@ -327,7 +336,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         "audition": {
           "default": {},
@@ -358,13 +368,15 @@
               "default": "en",
               "type": "string"
             }
-          }
+          },
+          "additionalProperties": false
         }
       },
       "required": [
         "characters",
         "paths"
-      ]
+      ],
+      "additionalProperties": false
     },
     "music": {
       "type": "object",
@@ -416,12 +428,14 @@
             "lock",
             "clips",
             "manifest"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "paths"
-      ]
+      ],
+      "additionalProperties": false
     },
     "images": {
       "type": "object",
@@ -468,12 +482,14 @@
             "lock",
             "clips",
             "manifest"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "paths"
-      ]
+      ],
+      "additionalProperties": false
     },
     "effects": {
       "type": "object",
@@ -510,12 +526,14 @@
             "lock",
             "clips",
             "manifest"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "paths"
-      ]
+      ],
+      "additionalProperties": false
     },
     "scenes": {
       "type": "object",
@@ -535,7 +553,8 @@
           "required": [
             "declarations",
             "mix"
-          ]
+          ],
+          "additionalProperties": false
         },
         "loudness": {
           "type": "object",
@@ -553,12 +572,14 @@
           "required": [
             "target",
             "tolerance"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
         "paths"
-      ]
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -566,5 +587,6 @@
     "name",
     "parts",
     "narration"
-  ]
+  ],
+  "additionalProperties": false
 }
