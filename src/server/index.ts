@@ -15,7 +15,14 @@ import { costCeiling, creditCeiling, planGeneration } from '../core/generation'
 import type { LineState } from '../core/planner'
 import { ChooseImageTakeBody, MakeImageTakesBody } from '../core/imageTakes'
 import { BriefChangeBody } from '../core/music'
-import { ChooseTakeBody, MakeTakesBody, MoveTakeBody, seamWav } from '../core/musicTake'
+import {
+  ChooseTakeBody,
+  MakeTakesBody,
+  MoveTakeBody,
+  SetFadesBody,
+  seamWav,
+} from '../core/musicTake'
+import { FadesSchema, applyFades } from '../core/fades'
 import { readWav, writeWav } from '../core/wav'
 import { FishTierSchema } from '../core/project'
 import { FISH_VOICE_ID, providerOf, VOICE_ID } from '../core/voices'
@@ -518,12 +525,30 @@ export function allowedHosts(port: number): string[] {
 
 /**
  * A take's WAV; with `?seam=1`, its seam instead: the last seconds and then the first, to hear a
- * loop come round.
+ * loop come round; with `?fadeIn=&fadeOut=&shape=`, the take with those fades in the sound, which is
+ * what the game will play once they are saved.
  */
 async function takeResponse(request: Request, file: string): Promise<Response> {
-  if (new URL(request.url).searchParams.get('seam') !== '1') return new Response(Bun.file(file))
+  const params = new URL(request.url).searchParams
+  if (params.get('seam') === '1') {
+    const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
+    return new Response(writeWav(seamWav(wav)) as Uint8Array<ArrayBuffer>, {
+      headers: { 'content-type': 'audio/wav' },
+    })
+  }
+  if (!['fadeIn', 'fadeOut', 'shape'].some((name) => params.has(name))) {
+    return new Response(Bun.file(file))
+  }
+  const asked = FadesSchema.safeParse({
+    in: Number(params.get('fadeIn') ?? 0),
+    out: Number(params.get('fadeOut') ?? 0),
+    shape: params.get('shape') ?? 'smooth',
+  })
+  if (!asked.success) {
+    return Response.json({ error: 'expected fadeIn, fadeOut and shape' }, { status: 400 })
+  }
   const wav = readWav(new Uint8Array(await Bun.file(file).arrayBuffer()))
-  return new Response(writeWav(seamWav(wav)) as Uint8Array<ArrayBuffer>, {
+  return new Response(writeWav(applyFades(wav, asked.data)) as Uint8Array<ArrayBuffer>, {
     headers: { 'content-type': 'audio/wav' },
   })
 }
@@ -1917,6 +1942,32 @@ export function startServer({
         }),
         DELETE: fromOwnPage(async (request) => {
           const result = await musicTakes.drop(projectFile, request.params.id, request.params.file)
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+      },
+      '/api/music/tracks/:id/takes/:file/fades': {
+        PUT: fromOwnPage(async (request) => {
+          const body = SetFadesBody.safeParse(await request.json().catch(() => null))
+          if (!body.success) {
+            return Response.json({ error: 'expected { in, out, shape }' }, { status: 400 })
+          }
+          const result = await musicTakes.setFades(
+            projectFile,
+            request.params.id,
+            request.params.file,
+            body.data,
+          )
+          if (!result) return notFound()
+          return Response.json(result, { status: result.ok ? 200 : 409 })
+        }),
+        DELETE: fromOwnPage(async (request) => {
+          const result = await musicTakes.setFades(
+            projectFile,
+            request.params.id,
+            request.params.file,
+            null,
+          )
           if (!result) return notFound()
           return Response.json(result, { status: result.ok ? 200 : 409 })
         }),

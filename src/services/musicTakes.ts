@@ -32,7 +32,8 @@ import type { Problem } from '../core/project'
 import { resolveInRoot } from '../core/paths'
 import { movedBoardTake } from '../core/musicMove'
 import { TAKES_EACH, planMakeAll } from '../core/musicMakeAll'
-import { readWav } from '../core/wav'
+import { applyFades, fadesProblem, hasFades, type Fades } from '../core/fades'
+import { readWav, writeWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder } from './audio'
 import { readResource, writeAtomic } from './files'
 import { gpuQueue, holdGpu, GPU } from './gpu'
@@ -164,6 +165,11 @@ export function musicTakeHash(inputs: Inputs): string {
 const lineOf = (model: MusicModelId) => modelLine(musicModel(model).recipe)
 
 /** A failure as a sentence for the page. */
+/** What a take sounds like in the game: the WAV as generated, with its fades if it has any. */
+function soundOf(take: BoardTake, wav: Uint8Array): Uint8Array {
+  return take.fades && hasFades(take.fades) ? writeWav(applyFades(readWav(wav), take.fades)) : wav
+}
+
 function describeFailure(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error)
   const prefix = 'The music generator: '
@@ -205,6 +211,12 @@ export interface MusicTakes {
    * is up to date. A changed length is refused.
    */
   accept(projectFile: string, id: string): Promise<ChooseResult>
+  /**
+   * Saves the fades of a stinger take, or removes them (null). The take on the board stays as
+   * generated; if it is the chosen one, the game's file is written again with the faded sound first,
+   * and nothing changes if that fails.
+   */
+  setFades(projectFile: string, id: string, name: string, fades: Fades | null): Promise<DropResult>
   /** Takes a take off the board and deletes its file; the chosen take stays. */
   drop(projectFile: string, id: string, name: string): Promise<DropResult>
   /**
@@ -459,6 +471,7 @@ export function createMusicTakes({
           chosen: chosen?.take === take.n && chosen.fp === take.hash,
           model: modelLine(take.model),
           ...(take.movedFrom && { movedFrom: take.movedFrom }),
+          ...(take.fades && { fades: take.fades }),
         })
       }
       const making: MakingView[] = entries
@@ -734,6 +747,51 @@ export function createMusicTakes({
       return { ok: true }
     },
 
+    async setFades(projectFile, id, name, fades) {
+      const found = await resolve(projectFile, id)
+      if (!found || !('inputs' in found)) return found
+      return changeBoard(projectFile, found, async (board): Promise<DropResult> => {
+        const problems: Problem[] = []
+        const chosenTracks = await readChosen(found.root, found.music, problems)
+        // Which take the game plays is not known: nothing is changed.
+        if (!chosenTracks || problems.length)
+          return { ok: false, file: found.music.paths.lock, problems }
+        if (found.inputs.kind !== 'stinger')
+          return { ok: false, message: 'Only a stinger can fade.' }
+        const take = board.takes.find((t) => fileOf(t) === name)
+        if (!take) return { ok: false, message: 'That take is not on the board.' }
+        const wrong = fades && fadesProblem(fades, take.seconds)
+        if (wrong) return { ok: false, message: wrong }
+        const next: BoardTake = { ...take }
+        delete next.fades
+        if (fades && hasFades(fades)) next.fades = fades
+        const chosen = chosenTracks[id]?.lock
+        if (chosen?.take === take.n && chosen.fp === take.hash) {
+          let wav: Uint8Array
+          try {
+            wav = new Uint8Array(await Bun.file(join(found.root, found.folder, name)).arrayBuffer())
+          } catch {
+            return { ok: false, message: 'That take’s sound is gone, so it cannot be faded.' }
+          }
+          // The lock keeps the moment it was chosen: only the sound changes.
+          const done = await commitChoice({
+            root: found.root,
+            projectFile,
+            music: found.music,
+            id,
+            listId: chosen.list,
+            take: next,
+            wav: soundOf(next, wav),
+            encode,
+            now: () => new Date(chosen.at),
+          })
+          if (!done.ok) return done
+        }
+        board.takes = board.takes.map((t) => (t === take ? next : t))
+        return { ok: true }
+      })
+    },
+
     async choose(projectFile, id, name) {
       const found = await resolve(projectFile, id)
       if (!found || !('inputs' in found)) return found
@@ -756,7 +814,7 @@ export function createMusicTakes({
           id,
           listId: found.listId,
           take,
-          wav,
+          wav: soundOf(take, wav),
           encode,
         })
       })

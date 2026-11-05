@@ -7,6 +7,7 @@ import {
   musicModel,
   type MusicModelId,
 } from './musicModels'
+import { FadesSchema, type Fades } from './fades'
 import { readWav, writeWav, type Wav } from './wav'
 
 /** What a take made before models were chosen records, and what the take fingerprint begins with. */
@@ -172,6 +173,8 @@ export interface TakeView {
   model: string
   /** The track it was moved from and its number there; absent on a take made for this track. */
   movedFrom?: MovedFrom
+  /** The fades saved with a stinger take; absent when it has none. */
+  fades?: Fades
 }
 
 /** A take being made or waiting its turn. */
@@ -241,6 +244,8 @@ export const BoardTakeSchema = z.object({
   inputs: TakeInputsSchema,
   /** Set when the take was moved here from another track, for good. */
   movedFrom: MovedFromSchema.optional(),
+  /** The fades of a stinger take, applied when it is chosen; absent when it has none. */
+  fades: FadesSchema.optional(),
 })
 
 /** A track's board: the takes kept, and the number the next take gets (numbers are never reused). */
@@ -285,3 +290,6 @@ export const ChooseTakeBody = z.object({ file: z.string().min(1) }).strict()
 
 /** The body of a move: the take's file on this track's board, and the id of the track it moves to. */
 export const MoveTakeBody = z.object({ file: z.string().min(1), to: z.string().min(1) }).strict()
+
+/** The body of a save of fades: both lengths in seconds and the shape of both. */
+export const SetFadesBody = FadesSchema.strict()

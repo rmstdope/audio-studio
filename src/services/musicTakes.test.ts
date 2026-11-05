@@ -9,6 +9,7 @@ import {
   chmodSync,
 } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { tooLongLine } from '../core/fades'
 import { wavSeconds } from '../core/musicTake'
 import { readWav, writeWav } from '../core/wav'
 import { projectJson, tempRepo } from '../../test/helpers'
@@ -83,7 +84,11 @@ function setup(
   const file = join(root, 'content-studio.json')
   const { generator, requests } = fakeGenerator(ready, failOn, gate, missing, seedless)
   let seed = 100
-  const encode: Encoder = async (_wav, out) => {
+  /** What the encoder was given, and whether it should fail. */
+  const encoder = { wavs: [] as Uint8Array[], fail: false }
+  const encode: Encoder = async (wav, out) => {
+    if (encoder.fail) throw new Error('The disk is full.')
+    encoder.wavs.push(wav)
     mkdirSync(dirname(out), { recursive: true })
     writeFileSync(out, 'mp3')
   }
@@ -104,7 +109,7 @@ function setup(
     }
     throw new Error('takes never finished')
   }
-  return { root, file, takes, requests, settled }
+  return { root, file, takes, requests, settled, encoder }
 }
 
 describe('makeAll, stopAll and modelState', () => {
@@ -1451,5 +1456,127 @@ describe('moving a take', () => {
     await m.takes.move(m.file, 'hall', one!.file, 'hut')
     expect(readdirSync(m.root).sort()).toEqual(before)
     expect(existsSync(join(m.root, 'music/music.lock.json'))).toBe(false)
+  })
+})
+
+describe('fading a stinger take', () => {
+  const fades = { in: 0.3, out: 1.5, shape: 'smooth' } as const
+
+  /** A stinger with one take made, and the take's name. */
+  async function stinger(extra: Record<string, unknown> = {}) {
+    const made = setup(undefined, extra)
+    await made.takes.make(made.file, 'victory', { count: 1 })
+    const view = await made.settled('victory')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    return { ...made, name: view.takes[0]!.file, seconds: view.takes[0]!.seconds }
+  }
+
+  async function takeOf(made: Awaited<ReturnType<typeof stinger>>) {
+    const view = await made.takes.view(made.file, 'victory')
+    if (!view || !('ok' in view) || !view.ok) throw new Error('expected a view')
+    return view.takes[0]!
+  }
+
+  const firstAndLast = (bytes: Uint8Array) => {
+    const wav = readWav(bytes)
+    const samples = new Int16Array(wav.data.buffer, wav.data.byteOffset, wav.data.length / 2)
+    return [samples[0], samples[samples.length - 1]]
+  }
+
+  it('keeps the fades with a take that is not chosen, and writes nothing to the game', async () => {
+    const made = await stinger()
+    expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
+    expect((await takeOf(made)).fades).toEqual(fades)
+    expect(made.encoder.wavs).toHaveLength(0)
+    expect(existsSync(join(made.root, 'music/music.lock.json'))).toBe(false)
+  })
+
+  it('writes the faded sound at once when the take is the chosen one, leaving the lock alone', async () => {
+    const made = await stinger()
+    await made.takes.choose(made.file, 'victory', made.name)
+    const lock = readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')
+    expect(made.encoder.wavs).toHaveLength(1)
+    expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toEqual({ ok: true })
+    expect(made.encoder.wavs).toHaveLength(2)
+    expect(firstAndLast(made.encoder.wavs[1]!)).toEqual([0, 0])
+    expect(made.encoder.wavs[1]).not.toEqual(made.encoder.wavs[0]!)
+    expect(readFileSync(join(made.root, 'music/music.lock.json'), 'utf8')).toBe(lock)
+    expect(await takeOf(made)).toMatchObject({ chosen: true, fades })
+  })
+
+  it('chooses a take that has fades with the faded sound', async () => {
+    const made = await stinger()
+    await made.takes.setFades(made.file, 'victory', made.name, fades)
+    await made.takes.choose(made.file, 'victory', made.name)
+    expect(firstAndLast(made.encoder.wavs[0]!)).toEqual([0, 0])
+  })
+
+  it('removes the fades: the take is back as generated, in the game too', async () => {
+    const made = await stinger()
+    await made.takes.choose(made.file, 'victory', made.name)
+    await made.takes.setFades(made.file, 'victory', made.name, fades)
+    expect(await made.takes.setFades(made.file, 'victory', made.name, null)).toEqual({ ok: true })
+    expect(made.encoder.wavs).toHaveLength(3)
+    expect(made.encoder.wavs[2]).toEqual(made.encoder.wavs[0]!)
+    expect((await takeOf(made)).fades).toBeUndefined()
+  })
+
+  it('changes nothing when the game file cannot be written', async () => {
+    const made = await stinger()
+    await made.takes.choose(made.file, 'victory', made.name)
+    made.encoder.fail = true
+    const answer = await made.takes.setFades(made.file, 'victory', made.name, fades)
+    expect(answer).toMatchObject({
+      ok: false,
+      message: expect.stringContaining('The disk is full.'),
+    })
+    expect((await takeOf(made)).fades).toBeUndefined()
+  })
+
+  it('refuses a loop, a take that is not there, fades too long, and an unknown track', async () => {
+    const made = await stinger()
+    await made.takes.make(made.file, 'hall', { count: 1 })
+    const hall = await made.settled('hall')
+    if (!hall || !('ok' in hall) || !hall.ok) throw new Error('expected a view')
+    expect(await made.takes.setFades(made.file, 'hall', hall.takes[0]!.file, fades)).toMatchObject({
+      ok: false,
+    })
+    expect(
+      await made.takes.setFades(made.file, 'victory', '0123456789abcdef.9.wav', fades),
+    ).toMatchObject({ ok: false })
+    expect(
+      await made.takes.setFades(made.file, 'victory', made.name, {
+        in: 4,
+        out: 4,
+        shape: 'smooth',
+      }),
+    ).toEqual({ ok: false, message: tooLongLine(made.seconds) })
+    expect(await made.takes.setFades(made.file, 'nope', made.name, fades)).toBeNull()
+    expect((await takeOf(made)).fades).toBeUndefined()
+  })
+
+  it('refuses while the lock cannot be read', async () => {
+    const made = await stinger({ 'music/music.lock.json': '{ nope' })
+    expect(await made.takes.setFades(made.file, 'victory', made.name, fades)).toMatchObject({
+      ok: false,
+      file: 'music/music.lock.json',
+    })
+  })
+
+  it('keeps the fades through a move and loses them with a drop', async () => {
+    const made = await stinger({
+      'tts/stingers.json': [
+        { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 6 },
+        { id: 'defeat', title: 'Defeat', brief: 'doom', seconds: 6 },
+      ],
+    })
+    await made.takes.setFades(made.file, 'victory', made.name, fades)
+    expect(await made.takes.move(made.file, 'victory', made.name, 'defeat')).toMatchObject({
+      ok: true,
+    })
+    const moved = await made.takes.view(made.file, 'defeat')
+    if (!moved || !('ok' in moved) || !moved.ok) throw new Error('expected a view')
+    expect(moved.takes[0]!.fades).toEqual(fades)
+    expect(await made.takes.drop(made.file, 'defeat', moved.takes[0]!.file)).toEqual({ ok: true })
   })
 })

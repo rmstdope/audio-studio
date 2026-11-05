@@ -5821,3 +5821,97 @@ describe('server, measuring the loudness of scenes', () => {
     expect(body.summary.scenes.acts[0].scenes[0].loudness.draft.entry).toEqual({ effects: [] })
   })
 })
+
+describe('server, a stinger take’s fades', () => {
+  const root = tempRepo({
+    'content-studio.json': projectJson({
+      music: {
+        paths: {
+          loops: 'tts/{part}/music.json',
+          stingers: 'tts/stingers.json',
+          briefs: 'music/briefs.json',
+          lock: 'music/music.lock.json',
+          clips: 'audio/music',
+          manifest: 'audio/music/manifest.json',
+        },
+      },
+    }),
+    'tts/cast.json': { speakers: {} },
+    'tts/act1/music.json': [{ id: 'hall', title: 'Hall', brief: 'warm lute', seconds: 5 }],
+    'tts/stingers.json': [{ id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 4 }],
+  })
+  const studio = startServer({
+    projectFile: join(root, 'content-studio.json'),
+    port: 0,
+    fish,
+    encode,
+    transcriber: null,
+    music: {
+      ready: () => ({ ok: true }),
+      installed: () => true,
+      async generate(request) {
+        const samples = new Int16Array(request.seconds * 1000).fill(4000)
+        const format = { channels: 1, sampleRate: 1000, bitsPerSample: 16 }
+        return {
+          wav: writeWav({ format, data: new Uint8Array(samples.buffer) }),
+          seed: request.seed,
+        }
+      },
+      close() {},
+    },
+  })
+  afterAll(() => studio.stop(true))
+  const at = (path: string) => new URL(path, studio.url)
+  const send = (method: string, path: string, body?: unknown, origin = studio.url.origin) =>
+    fetch(at(path), {
+      method,
+      headers: { origin, 'content-type': 'application/json' },
+      ...(body !== undefined && { body: JSON.stringify(body) }),
+    })
+  const fades = { in: 0.5, out: 1, shape: 'straight' }
+
+  async function oneTake(id: string) {
+    await send('POST', `/api/music/tracks/${id}/takes`, { count: 1 })
+    let view = await (await fetch(at(`/api/music/tracks/${id}/takes`))).json()
+    for (let i = 0; i < 300 && (view.making.length || !view.takes.length); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      view = await (await fetch(at(`/api/music/tracks/${id}/takes`))).json()
+    }
+    return view.takes[0].file as string
+  }
+
+  it('saves and removes fades from the studio’s own page only, and shows them on the take', async () => {
+    const file = await oneTake('victory')
+    const path = `/api/music/tracks/victory/takes/${file}/fades`
+    expect((await send('PUT', path, fades, 'https://evil.example')).status).toBe(403)
+    expect((await send('PUT', path, { in: -1, out: 0, shape: 'smooth' })).status).toBe(400)
+    expect((await send('PUT', path, { in: 'x' })).status).toBe(400)
+    expect((await send('PUT', `/api/music/tracks/nobody/takes/${file}/fades`, fades)).status).toBe(
+      404,
+    )
+    expect((await send('PUT', path, { in: 3, out: 3, shape: 'smooth' })).status).toBe(409)
+    expect(await send('PUT', path, fades).then((r) => r.json())).toEqual({ ok: true })
+    const view = await (await fetch(at('/api/music/tracks/victory/takes'))).json()
+    expect(view.takes[0].fades).toEqual(fades)
+    expect((await send('DELETE', path, undefined, 'https://evil.example')).status).toBe(403)
+    expect(await send('DELETE', path).then((r) => r.json())).toEqual({ ok: true })
+    const after = await (await fetch(at('/api/music/tracks/victory/takes'))).json()
+    expect(after.takes[0].fades).toBeUndefined()
+  })
+
+  it('serves a take with the fades asked for in the address, to hear them before saving', async () => {
+    const file = await oneTake('victory')
+    const url = `/api/music/tracks/victory/takes/${file}`
+    const faded = readWav(
+      new Uint8Array(
+        await (await fetch(at(`${url}?fadeIn=0.5&fadeOut=1&shape=straight`))).arrayBuffer(),
+      ),
+    )
+    const samples = new Int16Array(faded.data.buffer, faded.data.byteOffset, faded.data.length / 2)
+    expect(samples[0]).toBe(0)
+    expect(samples[samples.length - 1]).toBe(0)
+    expect(samples[2000]).toBe(4000)
+    expect((await fetch(at(`${url}?fadeIn=-1&fadeOut=1&shape=straight`))).status).toBe(400)
+    expect((await fetch(at(`${url}?fadeIn=1&shape=wavy`))).status).toBe(400)
+  })
+})
