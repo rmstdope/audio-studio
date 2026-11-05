@@ -5,7 +5,7 @@ import { PROJECT_FILE } from '../src/core/project'
 import { startServer } from '../src/server/index'
 import { forgetLoadedKeys } from '../src/services/env'
 import { ensureStudioFolder } from '../src/services/studioFolder'
-import { locateProject, projectFileProblem } from '../src/services/workspace'
+import { locateProject, openProject, projectFileProblem } from '../src/services/workspace'
 
 const HELP = `content-studio: make a game's narration, music and images.
 
@@ -65,9 +65,12 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
 forgetLoadedKeys(process.cwd(), projectFile)
 
 // The studio folder's .gitignore keeps the cache out of git; without it the studio still works.
-await ensureStudioFolder(dirname(projectFile)).catch((error: unknown) => {
-  console.warn(`Note: could not write content-studio/.gitignore (${(error as Error).message}).`)
-})
+// Only for a project file that opens: a refused one (an older format) gets nothing written.
+if ((await openProject(projectFile)).ok) {
+  await ensureStudioFolder(dirname(projectFile)).catch((error: unknown) => {
+    console.warn(`Note: could not write content-studio/.gitignore (${(error as Error).message}).`)
+  })
+}
 
 const server = startServer({ projectFile, port, development: values.dev })
 
