@@ -1836,6 +1836,21 @@ describe('the loudness suggestion', () => {
     expect(panel(render(open, noTarget)).querySelector('.scene-suggest')).toBeNull()
   })
 
+  it('says why no louder change exists when a sound is at 300%, with no button', () => {
+    const page = render(open, withMeasure(saved(3), 3))
+    const p = panel(page)
+    expect(line(page)).toContain('No change can make the whole scene louder:')
+    expect(line(page)).toContain('is at 300%, as loud as it goes.')
+    expect(text(panel(page).querySelector('.scene-suggest strong'))).not.toBe('')
+    expect(p.querySelector('.scene-suggest-muted')).not.toBeNull()
+    expect(p.querySelector('.scene-suggest strong')).not.toBeNull()
+    expect(p.querySelector('.scene-suggest button')).toBeNull()
+    const order = [...p.children].map((c) => c.className)
+    expect(order.indexOf('scene-suggest scene-suggest-muted')).toBeLessThan(
+      order.indexOf('faint scene-loud-when'),
+    )
+  })
+
   it('moves the music and every effect on the page only, and shows the expected figures', async () => {
     const page = render(open, withMeasure(saved()))
     await press(page, 'Make 4.0 dB louder')
@@ -1991,6 +2006,28 @@ describe('the loudness suggestion', () => {
     await press(page, 'Make 4.0 dB louder')
     expect(text(panel(page).querySelector('h2'))).toContain('· expected after your change')
     expect(text(panel(page))).toContain('Made 4.0 dB louder. Save to keep it, Discard to undo.')
+  })
+
+  it('says the scene changed, not why nothing can go louder, after a level is moved by hand', async () => {
+    const page = render(open, withMeasure(saved(3), 3))
+    const slider = page.querySelector('input[type="range"]') as HTMLInputElement
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(slider, '50')
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      slider.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(panel(page).querySelector('.scene-suggest-muted')).toBeNull()
+    expect(text(panel(page))).toContain('The scene changed since it was measured.')
+  })
+
+  it('still offers the ordinary change to a too loud scene with a sound at 300%', () => {
+    const page = render(
+      open,
+      withMeasure({ ...saved(3), states: [{ state: 'plain', lufs: -16.2 }] }, 3),
+    )
+    expect(button(panel(page), 'Make 3.8 dB quieter')).toBeTruthy()
+    expect(panel(page).querySelector('.scene-suggest-muted')).toBeNull()
   })
 
   it('says it too when the scene was changed and saved since it was measured', () => {

@@ -3,6 +3,7 @@ import type { SceneRow } from '../core/scenes'
 import {
   changeWord,
   suggestionLine,
+  limitLine,
   howItPlays,
   levelText,
   listCount,
@@ -255,5 +256,69 @@ describe('the loudness suggestion line', () => {
       'No single change helps: plain is too loud and cat-home too quiet. Bring them closer in the scene’s levels.',
     )
     expect(none.button).toBeNull()
+  })
+})
+
+describe('limitLine', () => {
+  const head = 'No change can make the whole scene louder: '
+  const say = (sounds: { name: string; level: number }[], every = false) =>
+    limitLine({ kind: 'limit', sounds, every })
+  const plain = (l: ReturnType<typeof limitLine>) => l.map((p) => p.text).join('')
+  const bold = (l: ReturnType<typeof limitLine>) => l.filter((p) => p.strong).map((p) => p.text)
+
+  it('words one sound, with its real level', () => {
+    const l = say([{ name: 'door-creak', level: 299 }])
+    expect(plain(l)).toBe(
+      head +
+        'door-creak is at 299%, as loud as it goes. Turn door-creak down or the others up by hand.',
+    )
+    expect(bold(l)).toEqual(['door-creak'])
+  })
+  it('words several sounds at the same level', () => {
+    const l = say([
+      { name: 'door-creak', level: 300 },
+      { name: 'rain', level: 300 },
+      { name: 'wind-howl', level: 300 },
+    ])
+    expect(plain(l)).toBe(
+      head +
+        'door-creak, rain and wind-howl are at 300%, as loud as they go. Turn them down or the others up by hand.',
+    )
+    expect(bold(l)).toEqual(['door-creak', 'rain', 'wind-howl'])
+  })
+  it('gives each sound its level when they differ', () => {
+    expect(
+      plain(
+        say([
+          { name: 'door-creak', level: 299 },
+          { name: 'rain', level: 300 },
+        ]),
+      ),
+    ).toBe(
+      head +
+        'door-creak (299%) and rain (300%) are as loud as they go. Turn them down or the others up by hand.',
+    )
+  })
+  it('words the music', () => {
+    expect(plain(say([{ name: 'the music', level: 300 }]))).toBe(
+      head +
+        'the music is at 300%, as loud as it goes. Turn the music down or the others up by hand.',
+    )
+  })
+  it('words a scene where every sound is at the limit', () => {
+    expect(
+      plain(
+        say(
+          [
+            { name: 'a', level: 300 },
+            { name: 'b', level: 300 },
+          ],
+          true,
+        ),
+      ),
+    ).toBe(
+      head +
+        'every sound in it is at 300%, as loud as it goes. The sounds themselves are too quiet for the target.',
+    )
   })
 })
