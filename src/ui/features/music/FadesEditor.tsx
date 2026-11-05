@@ -159,7 +159,10 @@ export function FadesEditor({
   const [shape, setShape] = useState<Fades['shape']>(saved.shape)
   const set = useSetFades(trackId)
   const inBox = useRef<HTMLInputElement>(null)
-  useEffect(() => inBox.current?.focus(), [])
+  useEffect(() => {
+    inBox.current?.focus()
+    inBox.current?.select()
+  }, [])
 
   const typed: Fades = { in: lengthOf(inText), out: lengthOf(outText), shape }
   const problem = fadesProblem(typed, take.seconds)
