@@ -113,6 +113,19 @@ describe('words', () => {
     expect(chipFor(null, t)).toBeNull()
     expect(chipFor(-19, null)).toBeNull()
   })
+
+  it('judges the figure as shown, to one decimal', () => {
+    const t = { target: -20, tolerance: 2 }
+    expect(chipFor(-22.04, t)).toEqual({ kind: 'on', text: 'on target' })
+    expect(chipFor(-22.05, t)).toEqual({ kind: 'quiet', text: '2.1 dB too quiet' })
+    expect(chipFor(-17.96, t)).toEqual({ kind: 'on', text: 'on target' })
+    expect(chipFor(-17.94, t)).toEqual({ kind: 'loud', text: '2.1 dB too loud' })
+    // 0.1 apart is within a tolerance of 0.1, though the subtraction gives 0.10000000000000142.
+    expect(chipFor(-19.9, { target: -20, tolerance: 0.1 })).toEqual({
+      kind: 'on',
+      text: 'on target',
+    })
+  })
 })
 
 const measure = (states: (number | null)[], over: Partial<SceneMeasure> = {}): SceneMeasure => ({
@@ -138,6 +151,8 @@ describe('sceneVerdict', () => {
   })
   it('flags nothing for a measure that failed', () => {
     expect(sceneVerdict(measure([-40], { error: 'no' }), t)).toBeNull()
+    expect(sceneVerdict(measure([-22.04]), t)).toBeNull()
+    expect(sceneVerdict(measure([-22.05]), t)).toBe('too quiet')
   })
 })
 
@@ -222,6 +237,8 @@ describe('suggestChange', () => {
     expect(change([-19.4, -20.6])).toBeNull()
     expect(change([null as never])).toBeNull()
     expect(suggestChange(measure([-24], { error: 'x' }), t2, mix)).toBeNull()
+    expect(change([-22.04])).toBeNull()
+    expect(change([-22.05])).not.toBeNull()
   })
 })
 

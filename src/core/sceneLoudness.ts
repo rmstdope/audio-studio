@@ -151,13 +151,21 @@ export function targetLine(target: LoudnessTarget | null): string {
     : 'no target set'
 }
 
+/**
+ * How far a figure is from the target, judged on the figure as shown ("−22.0 LUFS", one decimal):
+ * the figure, the distance and the chip then always agree. Rounded again to shed float noise.
+ */
+function shownOff(lufs: number, target: LoudnessTarget): number {
+  return Number((Number(lufs.toFixed(1)) - target.target).toFixed(1))
+}
+
 /** A state's chip: on target, or how far off, one decimal. Null: nothing to say. */
 export function chipFor(
   lufs: number | null,
   target: LoudnessTarget | null,
 ): { kind: 'on' | 'quiet' | 'loud'; text: string } | null {
   if (lufs === null || !target) return null
-  const off = lufs - target.target
+  const off = shownOff(lufs, target)
   if (Math.abs(off) <= target.tolerance) return { kind: 'on', text: 'on target' }
   const by = Math.abs(off).toFixed(1)
   return off < 0
@@ -243,7 +251,7 @@ export function suggestChange(
 ): Suggestion | null {
   if (!target || measure.error !== null) return null
   const read = measure.states.flatMap((s) =>
-    s.lufs === null ? [] : [{ name: s.state ?? 'The scene', off: s.lufs - target.target }],
+    s.lufs === null ? [] : [{ name: s.state ?? 'The scene', off: shownOff(s.lufs, target) }],
   )
   if (read.length === 0 || read.every((s) => Math.abs(s.off) <= target.tolerance)) return null
   const low = Math.min(...read.map((s) => s.off))
