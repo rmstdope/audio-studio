@@ -38,8 +38,8 @@ describe('ElevenLabs’ speech models', () => {
 
 describe('the model a stage records with', () => {
   it('is the project’s Fish model for a Fish voice, and ElevenLabs’ for an ElevenLabs voice', () => {
-    expect(modelForStage(narration, 'e48a228e21a4', 'draft')).toBe(narration.models.draft)
-    expect(modelForStage(narration, 'e48a228e21a4', 'final')).toBe(narration.models.final)
+    expect(modelForStage(narration, 'e48a228e21a4', 'draft')).toBe(narration.models.fish.draft)
+    expect(modelForStage(narration, 'e48a228e21a4', 'final')).toBe(narration.models.fish.final)
     for (const stage of ['audition', 'draft', 'final'] as const)
       expect(modelForStage(narration, 'eleven:abc', stage)).toBe('eleven_v3')
   })
@@ -84,32 +84,32 @@ describe('ElevenLabs’ stages, from the project file', () => {
   const withEleven = (models: Record<string, string>) =>
     ProjectSchema.parse(
       projectJson({
-        narration: { ...(projectJson().narration as object), elevenlabs: { models } },
+        narration: { ...(projectJson().narration as object), models: { elevenlabs: models } },
       }),
     ).narration
 
-  it('take each stage’s ElevenLabs model from narration.elevenlabs.models, Eleven v3 when unnamed', () => {
+  it('take each stage’s ElevenLabs model from narration.models.elevenlabs, Eleven v3 when unnamed', () => {
     const named = withEleven({ draft: 'eleven_flash_v2_5', final: 'eleven_multilingual_v2' })
     expect(modelForStage(named, 'eleven:abc', 'draft')).toBe('eleven_flash_v2_5')
     expect(modelForStage(named, 'eleven:abc', 'final')).toBe('eleven_multilingual_v2')
     expect(modelForStage(named, 'eleven:abc', 'audition')).toBe('eleven_v3')
-    expect(narration.elevenlabs.models).toEqual({
+    expect(narration.models.elevenlabs).toEqual({
       audition: 'eleven_v3',
       draft: 'eleven_v3',
       final: 'eleven_v3',
     })
   })
 
-  it('take the voice settings from narration.elevenlabs.tts, ElevenLabs’ own defaults when unnamed', () => {
-    expect(narration.elevenlabs.tts).toEqual(ELEVEN_TTS)
+  it('take the voice settings from narration.generate.elevenlabs, ElevenLabs’ own defaults when unnamed', () => {
+    expect(narration.generate.elevenlabs).toEqual(ELEVEN_TTS)
     const tuned = ProjectSchema.parse(
       projectJson({
         narration: {
           ...(projectJson().narration as object),
-          elevenlabs: { tts: { stability: 1, style: 0.25 } },
+          generate: { elevenlabs: { stability: 1, style: 0.25 } },
         },
       }),
-    ).narration.elevenlabs.tts
+    ).narration.generate.elevenlabs
     expect(tuned).toEqual({ stability: 1, similarityBoost: 0.75, style: 0.25 })
   })
 
@@ -117,7 +117,7 @@ describe('ElevenLabs’ stages, from the project file', () => {
     for (const tts of [{ stability: 0.3 }, { similarityBoost: 1.2 }, { style: -0.1 }]) {
       const parsed = ProjectSchema.safeParse(
         projectJson({
-          narration: { ...(projectJson().narration as object), elevenlabs: { tts } },
+          narration: { ...(projectJson().narration as object), generate: { elevenlabs: tts } },
         }),
       )
       expect(parsed.success).toBe(false)
@@ -129,7 +129,7 @@ describe('ElevenLabs’ stages, from the project file', () => {
       projectJson({
         narration: {
           ...(projectJson().narration as object),
-          elevenlabs: { models: { draft: 's2-pro' } },
+          models: { elevenlabs: { draft: 's2-pro' } },
         },
       }),
     )
@@ -141,7 +141,10 @@ describe('ElevenLabs’ stages, from the project file', () => {
     expect(finalStepFor(elevenFinal, ['v-fish'])).toBe(false)
     expect(finalStepFor(elevenFinal, ['v-fish', 'eleven:abc'])).toBe(true)
     expect(finalStepFor(narration, ['eleven:abc'])).toBe(false)
-    const fishFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    const fishFinal = {
+      ...narration,
+      models: { ...narration.models, fish: { ...narration.models.fish, final: 's2-pro' } },
+    }
     expect(finalStepFor(fishFinal, ['eleven:abc'])).toBe(false)
     expect(finalStepFor(fishFinal, ['v-fish'])).toBe(true)
   })

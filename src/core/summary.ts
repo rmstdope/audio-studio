@@ -3,7 +3,14 @@ import type { ImagesSummary } from './images'
 import type { ScenesSummary } from './scenes'
 import type { EffectsSummary } from './effects'
 import type { MusicSummary } from './music'
-import { partPathFor, phraseProblem, soundAlikeOf, type Problem, type Project } from './project'
+import {
+  CAST_FILE,
+  partPathFor,
+  phraseProblem,
+  soundAlikeOf,
+  type Problem,
+  type Project,
+} from './project'
 import type { Pronunciation } from './pronounce'
 import type { Settings } from './settings'
 import { DEFAULT_TAKE_FADE } from './takeFade'
@@ -116,16 +123,16 @@ export interface ProjectSummary {
   canRefresh: boolean
   /** The pronunciation table in file order; null when the cast cannot be read. */
   pronounce: Pronunciation[] | null
-  /** The project's own words that sound the same, a group each (`quality.soundAlike`). */
+  /** The project's own words that sound the same, a group each (`generate.soundAlike` of the source language). */
   soundAlike: string[][]
   /**
    * What is kept per language, by code: its pronunciations (null when the cast cannot be read)
    * and its words that sound the same. The source language's are the two fields above.
    */
   perLanguage: Record<string, { pronounce: Pronunciation[] | null; soundAlike: string[][] }>
-  /** The draft and final recording models (`models.draft`, `models.final`). */
+  /** The draft and final recording models (`models.fish.draft`, `models.fish.final`). */
   models: { draft: string; final: string }
-  /** The project's speaking speed (`tts.speed`), which a character may have its own in place of. */
+  /** The project's speaking speed (`generate.fish.speed`), which a character may have its own in place of. */
   speed: number
   /** How long a take fades when played in the studio, in seconds (the setting `takeFade`, 0.2 if unset). */
   takeFade: number
@@ -203,7 +210,7 @@ export function summarize({
     return {
       id: part.id,
       title: part.title,
-      dialogPath: partPathFor(narration.paths.dialog, part.id, project.languages[0]),
+      dialogPath: partPathFor(narration.from.part, part.id, project.languages[0]),
       dialog: dialog.status,
       recorded: recordedOf(dialog),
       lineCount: lines.length,
@@ -231,7 +238,7 @@ export function summarize({
       for (const line of dialog.lines) {
         const entry = found.get(line.speaker)!
         // Only a line that fits one take can be a phrase.
-        const fits = phraseProblem(line.text, narration.quality.chunkLimit) === null
+        const fits = phraseProblem(line.text, narration.generate.chunkLimit) === null
         if (
           fits &&
           line.text.trim() &&
@@ -283,23 +290,23 @@ export function summarize({
     root,
     partLabel: project.partLabel,
     languages: project.languages.map((id) => ({ id, name: languageName(id) })),
-    charactersPath: narration.characters,
+    charactersPath: CAST_FILE,
     parts,
     characters: characters.sort((a, b) => b.totalLines - a.totalLines || a.id.localeCompare(b.id)),
     canRefresh: Boolean(project.refresh?.part),
-    pronounce: cast ? Object.entries(cast.pronounce) : null,
-    soundAlike: narration.quality.soundAlike,
+    pronounce: cast ? Object.entries(pronounceOf(cast, source)) : null,
+    soundAlike: soundAlikeOf(project, source),
     perLanguage: Object.fromEntries(
       project.languages.map((language) => [
         language,
         {
-          pronounce: cast ? Object.entries(pronounceOf(cast, language, source)) : null,
+          pronounce: cast ? Object.entries(pronounceOf(cast, language)) : null,
           soundAlike: soundAlikeOf(project, language),
         },
       ]),
     ),
-    models: { draft: narration.models.draft, final: narration.models.final },
-    speed: narration.tts.speed,
+    models: { draft: narration.models.fish.draft, final: narration.models.fish.final },
+    speed: narration.generate.fish.speed,
     takeFade: settings.takeFade ?? DEFAULT_TAKE_FADE,
     projectFile,
     music,

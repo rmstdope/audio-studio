@@ -8,8 +8,8 @@ const project = ProjectSchema.parse(projectJson())
 describe('parsePorcelain', () => {
   it('reads git status --porcelain -z, renames included', () => {
     const text = [
-      ' M tts/cast.json',
-      '?? tts/act1/cues.json',
+      ' M content-studio/narration/cast.json',
+      '?? content-studio/narration/act1.edits.json',
       'A  audio/act1/a.mp3',
       ' D audio/act1/old.mp3',
       'R  audio/act1/new.mp3',
@@ -18,8 +18,8 @@ describe('parsePorcelain', () => {
       '',
     ].join('\0')
     expect(parsePorcelain(text)).toEqual([
-      { path: 'tts/cast.json', change: 'modified' },
-      { path: 'tts/act1/cues.json', change: 'new' },
+      { path: 'content-studio/narration/cast.json', change: 'modified' },
+      { path: 'content-studio/narration/act1.edits.json', change: 'new' },
       { path: 'audio/act1/a.mp3', change: 'new' },
       { path: 'audio/act1/old.mp3', change: 'deleted' },
       { path: 'audio/act1/new.mp3', change: 'renamed', from: 'audio/act1/was.mp3' },
@@ -29,8 +29,8 @@ describe('parsePorcelain', () => {
 
   it('marks conflicts, and reads a file added then deleted as deleted', () => {
     const text = [
-      'UU tts/act1/narration.lock.json',
-      'AA tts/cast.json',
+      'UU content-studio/narration/act1.lock.json',
+      'AA content-studio/narration/cast.json',
       'AD audio/act1/a.mp3',
       '',
     ].join('\0')
@@ -41,12 +41,12 @@ describe('parsePorcelain', () => {
     const text = [
       'R  game/audio/act1/new.mp3',
       'game/audio/act1/was.mp3',
-      ' M game/tts/cast.json',
+      ' M game/content-studio/narration/cast.json',
       '',
     ].join('\0')
     expect(parsePorcelain(text, 'game/')).toEqual([
       { path: 'audio/act1/new.mp3', change: 'renamed', from: 'audio/act1/was.mp3' },
-      { path: 'tts/cast.json', change: 'modified' },
+      { path: 'content-studio/narration/cast.json', change: 'modified' },
     ])
   })
 
@@ -59,21 +59,24 @@ describe('groupChanges', () => {
   it('puts each changed file with the project, the cast or its part', () => {
     const groups = groupChanges(project, 'content-studio.json', [
       { path: 'content-studio.json', change: 'modified' },
-      { path: 'tts/cast.json', change: 'modified' },
-      { path: 'tts/act1/cues.json', change: 'new' },
-      { path: 'tts/act1/narration.lock.json', change: 'modified' },
+      { path: 'content-studio/narration/cast.json', change: 'modified' },
+      { path: 'content-studio/narration/act1.edits.json', change: 'new' },
+      { path: 'content-studio/narration/act1.lock.json', change: 'modified' },
       { path: 'audio/act1/manifest.json', change: 'modified' },
       { path: 'audio/act1/a.mp3', change: 'new' },
       { path: 'audio/act1/b.mp3', change: 'modified' },
       { path: 'audio/act2/c.mp3', change: 'deleted' },
     ])
     expect(groups.total).toBe(8)
-    expect(groups.project.map((c) => c.path)).toEqual(['content-studio.json', 'tts/cast.json'])
+    expect(groups.project.map((c) => c.path)).toEqual([
+      'content-studio.json',
+      'content-studio/narration/cast.json',
+    ])
     expect(groups.parts[0]).toMatchObject({
       id: 'act1',
       files: [
-        { path: 'tts/act1/cues.json', role: 'cues', change: 'new' },
-        { path: 'tts/act1/narration.lock.json', role: 'lock', change: 'modified' },
+        { path: 'content-studio/narration/act1.edits.json', role: 'cues', change: 'new' },
+        { path: 'content-studio/narration/act1.lock.json', role: 'lock', change: 'modified' },
         { path: 'audio/act1/manifest.json', role: 'manifest', change: 'modified' },
       ],
       clips: { new: 1, modified: 1, deleted: 0, renamed: 0 },
@@ -86,17 +89,13 @@ describe('groupChanges', () => {
       projectJson({
         narration: {
           ...(projectJson().narration as object),
-          characters: './tts/cast.json',
-          paths: {
-            ...(projectJson().narration as { paths: object }).paths,
-            cues: 'tts//{part}/cues.json',
-          },
+          from: { part: './tts//{part}/script.json' },
         },
       }),
     )
     const groups = groupChanges(odd, 'content-studio.json', [
-      { path: 'tts/cast.json', change: 'modified' },
-      { path: 'tts/act1/cues.json', change: 'new' },
+      { path: 'content-studio/narration/cast.json', change: 'modified' },
+      { path: 'tts/act1/script.json', change: 'new' },
     ])
     expect(groups.total).toBe(2)
   })
@@ -109,14 +108,14 @@ describe('groupChanges', () => {
 describe('projectPaths', () => {
   it('lists the project’s own paths, normalised, each part’s clips as a folder', () => {
     const paths = projectPaths(project, 'content-studio.json')
-    expect(paths.own).toEqual(['content-studio.json', 'tts/cast.json'])
+    expect(paths.own).toEqual(['content-studio.json', 'content-studio/narration/cast.json'])
     expect(paths.parts[0]).toEqual({
       id: 'act1',
       title: 'Act I',
       files: {
         'tts/act1/script.json': 'dialog',
-        'tts/act1/cues.json': 'cues',
-        'tts/act1/narration.lock.json': 'lock',
+        'content-studio/narration/act1.edits.json': 'cues',
+        'content-studio/narration/act1.lock.json': 'lock',
         'audio/act1/manifest.json': 'manifest',
       },
       clips: ['audio/act1/'],
@@ -131,13 +130,9 @@ describe('projectPaths with several languages', () => {
         languages: ['en', 'sv'],
         narration: {
           ...(projectJson().narration as object),
-          paths: {
-            dialog: 'tts/{part}/{language}/script.json',
-            cues: 'tts/{part}/{language}/cues.json',
-            lock: 'tts/{part}/{language}/lock.json',
-            clips: 'audio/{part}/{language}',
-            manifest: 'audio/{part}/{language}/manifest.json',
-          },
+          from: { part: 'tts/{part}/{language}/script.json' },
+          clips: 'audio/{part}/{language}',
+          manifest: 'audio/{part}/{language}/manifest.json',
         },
       }),
     )

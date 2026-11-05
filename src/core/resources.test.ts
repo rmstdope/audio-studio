@@ -1,27 +1,54 @@
 import { describe, expect, it } from 'bun:test'
 import { problemsFrom } from './project'
-import { CastSchema, pronounceOf, projectCast, ttsFor, voiceOf } from './resources'
+import {
+  CastSchema,
+  DialogSchema,
+  LockSchema,
+  NarrationEditsSchema,
+  cuesOfEdits,
+  formatEdits,
+  pronounceOf,
+  projectCast,
+  sceneKey,
+  ttsFor,
+  voiceOf,
+} from './resources'
 
 describe('CastSchema', () => {
   it('explains a pronunciation without the word it replaces', () => {
-    const result = CastSchema.safeParse({ speakers: {}, pronounce: { '': 'nothing' } })
+    const result = CastSchema.safeParse({ speakers: {}, pronounce: { en: { '': 'nothing' } } })
     if (result.success) throw new Error('expected an empty key to be refused')
-    expect(problemsFrom('tts/cast.json', result.error)).toEqual([
+    expect(problemsFrom('content-studio/narration/cast.json', result.error)).toEqual([
       {
-        file: 'tts/cast.json',
-        path: 'pronounce',
+        file: 'content-studio/narration/cast.json',
+        path: 'pronounce.en',
         message: 'a pronunciation needs the word it replaces; one has an empty word',
       },
     ])
   })
 
   it('reports a __proto__ pronunciation instead of losing it', () => {
-    const result = CastSchema.safeParse(JSON.parse('{"speakers":{},"pronounce":{"__proto__":"x"}}'))
+    const result = CastSchema.safeParse(
+      JSON.parse('{"speakers":{},"pronounce":{"en":{"__proto__":"x"}}}'),
+    )
     if (result.success) throw new Error('expected __proto__ to be refused')
-    expect(problemsFrom('tts/cast.json', result.error)[0]).toMatchObject({
-      path: 'pronounce',
+    expect(problemsFrom('content-studio/narration/cast.json', result.error)[0]).toMatchObject({
+      path: 'pronounce.en',
       message: expect.stringContaining('__proto__'),
     })
+  })
+
+  it('reports pronunciations left in the old place, under languages', () => {
+    const old = CastSchema.safeParse({ speakers: {}, languages: { sv: { pronounce: {} } } })
+    if (old.success) throw new Error('expected a top-level languages to be refused')
+    expect(problemsFrom('content-studio/narration/cast.json', old.error)).toEqual([
+      {
+        file: 'content-studio/narration/cast.json',
+        path: 'languages',
+        message:
+          'pronunciations are now under pronounce.<language> (pronounce.sv), not under languages; move them there',
+      },
+    ])
   })
 
   it('refuses a speed Fish cannot speak at', () => {
@@ -93,8 +120,12 @@ describe('a character per language', () => {
     })
   })
 
-  it('projects the cast: the source language is as it is', () => {
-    expect(projectCast(cast, 'en', 'en')).toBe(cast)
+  it('projects the cast: the source language’s speakers as they are, with its pronunciations', () => {
+    const withTable = { ...cast, pronounce: { en: { Elior: 'El-ee-or' } } }
+    expect(projectCast(withTable, 'en', 'en')).toEqual({
+      speakers: cast.speakers,
+      pronounce: { Elior: 'El-ee-or' },
+    })
   })
 
   it('projects the cast into a language: its voice, speed and phrase in the top-level places', () => {
@@ -114,21 +145,107 @@ describe('a character per language', () => {
   it('reads a language’s own pronunciations, and applies them to that language only', () => {
     const withTables = CastSchema.parse({
       speakers: {},
-      pronounce: { Elior: 'El-ee-or' },
-      languages: { sv: { pronounce: { Elior: 'Eli-or' } } },
+      pronounce: { en: { Elior: 'El-ee-or' }, sv: { Elior: 'Eli-or' } },
     })
-    expect(pronounceOf(withTables, 'en', 'en')).toEqual({ Elior: 'El-ee-or' })
-    expect(pronounceOf(withTables, 'sv', 'en')).toEqual({ Elior: 'Eli-or' })
-    expect(pronounceOf(withTables, 'de', 'en')).toEqual({})
+    expect(pronounceOf(withTables, 'en')).toEqual({ Elior: 'El-ee-or' })
+    expect(pronounceOf(withTables, 'sv')).toEqual({ Elior: 'Eli-or' })
+    expect(pronounceOf(withTables, 'de')).toEqual({})
     expect(projectCast(withTables, 'sv', 'en').pronounce).toEqual({ Elior: 'Eli-or' })
   })
 
   it('reports a bad pronunciation of a language with its path', () => {
     const result = CastSchema.safeParse({
       speakers: {},
-      languages: { sv: { pronounce: { '': 'nothing' } } },
+      pronounce: { sv: { '': 'nothing' } },
     })
     if (result.success) throw new Error('expected an empty key to be refused')
-    expect(problemsFrom('tts/cast.json', result.error)[0]?.path).toBe('languages.sv.pronounce')
+    expect(problemsFrom('content-studio/narration/cast.json', result.error)[0]?.path).toBe(
+      'pronounce.sv',
+    )
+  })
+})
+
+describe('DialogSchema', () => {
+  it('reads each line by its id, the rest as the game wrote it, and leaves an optional title out', () => {
+    const lines = DialogSchema.parse([
+      { id: 'a1', title: 'Opening', speaker: 'narrator', text: 'Hello.', scene: 'hall' },
+      { id: 'a2', speaker: 'mira', text: 'Hi.' },
+    ])
+    expect(lines).toEqual([
+      { key: 'a1', speaker: 'narrator', text: 'Hello.', scene: 'hall' },
+      { key: 'a2', speaker: 'mira', text: 'Hi.' },
+    ])
+  })
+
+  it('needs an id that is a safe file name, used once', () => {
+    const problems = (value: unknown) => {
+      const read = DialogSchema.safeParse(value)
+      return read.success ? [] : read.error.issues.map((issue) => issue.path.join('.'))
+    }
+    expect(problems([{ key: 'a1', speaker: 'n', text: 'x' }])).toEqual(['0.id'])
+    expect(problems([{ id: 'a 1', speaker: 'n', text: 'x' }])).toEqual(['0.id'])
+    const twice = DialogSchema.safeParse([
+      { id: 'a', speaker: 'n', text: 'x' },
+      { id: 'a', speaker: 'n', text: 'y' },
+    ])
+    expect(twice.success ? '' : twice.error.issues[0]!.message).toContain('used more than once: a')
+  })
+})
+
+describe('the narration edits', () => {
+  it('reads a part’s cues by line and by scene into one table, scenes under their scene key', () => {
+    const edits = NarrationEditsSchema.parse({
+      cues: { a1: '[hushed]' },
+      scenes: { 'lantern-hall': '[slow]' },
+    })
+    expect(cuesOfEdits(edits)).toEqual({ a1: '[hushed]', [sceneKey('lantern-hall')]: '[slow]' })
+    expect(cuesOfEdits(NarrationEditsSchema.parse({}))).toEqual({})
+  })
+
+  it('takes only line ids under cues, so a scene key written there is reported, not read as a scene', () => {
+    const wrong = NarrationEditsSchema.safeParse({ cues: { 'scene:hall': '[slow]' } })
+    if (wrong.success) throw new Error('expected a scene key under cues to be refused')
+    expect(problemsFrom('e.json', wrong.error).map((p) => p.path)).toEqual(['cues.scene:hall'])
+    expect(NarrationEditsSchema.safeParse({ cues: { 'a_1-B': '[x]' } }).success).toBe(true)
+  })
+
+  it('refuses a field it does not know, so an old flat file is reported', () => {
+    const old = NarrationEditsSchema.safeParse({ a1: '[hushed]' })
+    expect(old.success).toBe(false)
+  })
+
+  it('writes the cues and the scenes apart, one cue to a line, in the order given', () => {
+    expect(
+      formatEdits([
+        ['b', '[sad]'],
+        [sceneKey('Cave'), '[dark]'],
+        ['a', '[x]'],
+      ]),
+    ).toBe(
+      '{\n  "cues": {\n    "b": "[sad]",\n    "a": "[x]"\n  },\n' +
+        '  "scenes": {\n    "Cave": "[dark]"\n  }\n}\n',
+    )
+    expect(formatEdits([])).toBe('{\n  "cues": {},\n  "scenes": {}\n}\n')
+  })
+})
+
+describe('the narration lock', () => {
+  const entry = {
+    fp: '8c67d33efba8d9af',
+    voice: 'v1',
+    model: 's2.1-pro-free',
+    hashes: { cue: 'a', text: 'b', said: 'c', settings: 'd' },
+    heard: 1,
+    takes: 1,
+    at: '2026-11-04T09:56:41.790Z',
+  }
+
+  it('keeps each line’s short hashes under hashes', () => {
+    expect(LockSchema.parse({ a1: entry }).a1!.hashes).toEqual(entry.hashes)
+  })
+
+  it('refuses an entry without them', () => {
+    const { hashes, ...old } = entry
+    expect(LockSchema.safeParse({ a1: { ...old, parts: hashes } }).success).toBe(false)
   })
 })

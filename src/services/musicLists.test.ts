@@ -45,7 +45,7 @@ describe('a music lock that cannot be read', () => {
         },
       },
     }),
-    'tts/cast.json': { speakers: {} },
+    'content-studio/narration/cast.json': { speakers: {} },
     'tts/stingers.json': [
       { id: 'victory', title: 'Victory', brief: 'fanfare', seconds: 5, file: 'game/win.mp3' },
     ],

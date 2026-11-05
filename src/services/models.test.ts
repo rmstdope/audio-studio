@@ -15,7 +15,7 @@ import { setSoundAlike } from './soundAlike'
 
 function projectWith(models: Record<string, string>) {
   const project = projectJson()
-  ;(project.narration as { models?: unknown }).models = models
+  ;(project.narration as { models?: unknown }).models = { fish: models }
   return project
 }
 
@@ -51,7 +51,7 @@ describe('switchRetiredModels', () => {
   it('leaves a model that is not s1 alone', async () => {
     const { projectFile, read } = repo(projectWith({ draft: 's1', final: 's2-pro' }))
     expect(await switchRetiredModels(projectFile, ['draft'])).toEqual({ ok: true })
-    expect(JSON.parse(read()).narration.models).toEqual({ draft: 's2.1-pro', final: 's2-pro' })
+    expect(JSON.parse(read()).narration.models.fish).toEqual({ draft: 's2.1-pro', final: 's2-pro' })
   })
 
   it('keeps the line endings and a missing last newline', async () => {
@@ -65,7 +65,7 @@ describe('switchRetiredModels', () => {
       true,
     )
     expect(text.endsWith('}')).toBe(true)
-    expect(JSON.parse(text).narration.models.final).toBe('s2.1-pro')
+    expect(JSON.parse(text).narration.models.fish.final).toBe('s2.1-pro')
   })
 
   it('refuses when the models on s1 in the file are not the ones agreed to, writing nothing', async () => {
@@ -74,7 +74,7 @@ describe('switchRetiredModels', () => {
     for (const takes of [['draft'], ['final'], []] as const) {
       expect(await switchRetiredModels(projectFile, [...takes])).toMatchObject({
         ok: false,
-        problems: [{ file: 'content-studio.json', path: 'narration.models' }],
+        problems: [{ file: 'content-studio.json', path: 'narration.models.fish' }],
       })
     }
     expect(read()).toBe(before)
@@ -102,8 +102,8 @@ describe('switchRetiredModels', () => {
     ])
     expect(results).toEqual([{ ok: true }, { ok: true }])
     const narration = JSON.parse(read()).narration
-    expect(narration.models).toEqual({ draft: 's2.1-pro', final: 's2.1-pro' })
-    expect(narration.quality.soundAlike).toEqual([['inn', 'Inne']])
+    expect(narration.models.fish).toEqual({ draft: 's2.1-pro', final: 's2.1-pro' })
+    expect(narration.generate.soundAlike).toEqual({ en: [['inn', 'Inne']] })
   })
 
   it('says why the file could not be written when the switch is refused by the disk', async () => {
@@ -114,7 +114,11 @@ describe('switchRetiredModels', () => {
       expect(await switchRetiredModels(projectFile, ['draft', 'final'])).toEqual({
         ok: false,
         problems: [
-          { file: 'content-studio.json', path: 'narration.models', message: 'permission denied' },
+          {
+            file: 'content-studio.json',
+            path: 'narration.models.fish',
+            message: 'permission denied',
+          },
         ],
       })
     } finally {
@@ -146,20 +150,22 @@ describe('setStageModel', () => {
       true,
     )
     expect(text.endsWith('}')).toBe(true)
-    expect(JSON.parse(text).narration.models.final).toBe('drama-3')
+    expect(JSON.parse(text).narration.models.fish.final).toBe('drama-3')
   })
 
   it('writes all three models when the file named none', async () => {
     const { projectFile, read } = repo(projectJson())
     await setStageModel(projectFile, 'audition', 's2.1-pro', 's2.1-pro-free')
-    expect(JSON.parse(read()).narration.models).toEqual({ ...models, audition: 's2.1-pro' })
+    expect(JSON.parse(read()).narration.models).toEqual({
+      fish: { ...models, audition: 's2.1-pro' },
+    })
   })
 
   it('refuses, writing nothing, when the file changed since the page read it', async () => {
     const { projectFile, read } = repo(projectWith({ ...models, draft: 's2-pro' }))
     const before = read()
     const result = await setStageModel(projectFile, 'draft', 's2.1-pro', 's2.1-pro-free')
-    expect(result).toMatchObject({ ok: false, problems: [{ path: 'narration.models.draft' }] })
+    expect(result).toMatchObject({ ok: false, problems: [{ path: 'narration.models.fish.draft' }] })
     expect(read()).toBe(before)
   })
 
@@ -178,7 +184,7 @@ describe('setStageModel', () => {
   it('lets a stage on s1 move to s2.1-pro', async () => {
     const { projectFile, read } = repo(projectWith({ ...models, final: 's1' }))
     expect(await setStageModel(projectFile, 'final', 's2.1-pro', 's1')).toEqual({ ok: true })
-    expect(JSON.parse(read()).narration.models.final).toBe('s2.1-pro')
+    expect(JSON.parse(read()).narration.models.fish.final).toBe('s2.1-pro')
   })
 
   it('says why the file could not be written, not that something failed', async () => {
@@ -191,7 +197,7 @@ describe('setStageModel', () => {
         problems: [
           {
             file: 'content-studio.json',
-            path: 'narration.models.draft',
+            path: 'narration.models.fish.draft',
             message: 'permission denied',
           },
         ],
@@ -337,11 +343,11 @@ describe('setElevenModel', () => {
       ok: true,
     })
     const saved = JSON.parse(read())
-    expect(saved.narration.elevenlabs).toEqual({
-      models: { audition: 'eleven_v3', draft: 'eleven_flash_v2_5', final: 'eleven_v3' },
+    expect(saved.narration.models).toEqual({
+      elevenlabs: { audition: 'eleven_v3', draft: 'eleven_flash_v2_5', final: 'eleven_v3' },
     })
     expect(read()).toBe(
-      `${JSON.stringify({ ...projectJson(), narration: { ...(projectJson().narration as object), elevenlabs: saved.narration.elevenlabs } }, null, 4)}\n`,
+      `${JSON.stringify({ ...projectJson(), narration: { ...(projectJson().narration as object), models: saved.narration.models } }, null, 4)}\n`,
     )
   })
 
@@ -350,7 +356,7 @@ describe('setElevenModel', () => {
     const before = read()
     expect(await setElevenModel(projectFile, 'draft', 's2-pro', 'eleven_v3')).toMatchObject({
       ok: false,
-      problems: [{ path: 'narration.elevenlabs.models.draft' }],
+      problems: [{ path: 'narration.models.elevenlabs.draft' }],
     })
     expect(
       await setElevenModel(projectFile, 'final', 'eleven_flash_v2_5', 'eleven_multilingual_v2'),
@@ -358,7 +364,7 @@ describe('setElevenModel', () => {
       ok: false,
       problems: [
         {
-          path: 'narration.elevenlabs.models.final',
+          path: 'narration.models.elevenlabs.final',
           message: 'the model in the file changed since the page was read; reload the studio',
         },
       ],
@@ -374,7 +380,7 @@ describe('setElevenModel, a file written by hand', () => {
     const project = projectJson({
       narration: {
         ...(projectJson().narration as object),
-        elevenlabs: { note: 'kept', models: { final: 'eleven_multilingual_v2' } },
+        models: { note: 'kept', elevenlabs: { final: 'eleven_multilingual_v2' } },
       },
     })
     writeFileSync(projectFile, JSON.stringify(project, null, 2).replace(/\n/g, '\r\n'))
@@ -385,9 +391,9 @@ describe('setElevenModel, a file written by hand', () => {
     expect(text.split('\n').every((l, i, all) => i === all.length - 1 || l.endsWith('\r'))).toBe(
       true,
     )
-    expect(JSON.parse(text).narration.elevenlabs).toEqual({
+    expect(JSON.parse(text).narration.models).toEqual({
       note: 'kept',
-      models: {
+      elevenlabs: {
         audition: 'eleven_v3',
         draft: 'eleven_flash_v2_5',
         final: 'eleven_multilingual_v2',
@@ -404,9 +410,9 @@ describe('setElevenSettings', () => {
     const { projectFile, read } = repo(projectJson(), 4)
     expect(await setElevenSettings(projectFile, tuned, defaults)).toEqual({ ok: true })
     const saved = JSON.parse(read())
-    expect(saved.narration.elevenlabs).toEqual({ tts: tuned })
+    expect(saved.narration.generate).toEqual({ elevenlabs: tuned })
     expect(read()).toBe(
-      `${JSON.stringify({ ...projectJson(), narration: { ...(projectJson().narration as object), elevenlabs: { tts: tuned } } }, null, 4)}\n`,
+      `${JSON.stringify({ ...projectJson(), narration: { ...(projectJson().narration as object), generate: { elevenlabs: tuned } } }, null, 4)}\n`,
     )
   })
 
@@ -422,12 +428,12 @@ describe('setElevenSettings', () => {
     const before = read()
     expect(
       await setElevenSettings(projectFile, { ...tuned, stability: 0.3 }, defaults),
-    ).toMatchObject({ ok: false, problems: [{ path: 'narration.elevenlabs.tts.stability' }] })
+    ).toMatchObject({ ok: false, problems: [{ path: 'narration.generate.elevenlabs.stability' }] })
     expect(await setElevenSettings(projectFile, defaults, tuned)).toMatchObject({
       ok: false,
       problems: [
         {
-          path: 'narration.elevenlabs.tts',
+          path: 'narration.generate.elevenlabs',
           message: 'the settings in the file changed since the page was read; reload the studio',
         },
       ],

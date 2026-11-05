@@ -67,7 +67,7 @@ export interface SetupFacts {
   fish: FishAnswer
   /** The project file names a `refresh.part` command. */
   refreshPart: boolean
-  /** The project's `quality.parallel`: requests recording sends to Fish at a time. */
+  /** The project's `generate.parallel`: requests recording sends to Fish at a time. */
   parallel: number
   /** The tier the user told the studio (the setting `fishTier`), or none. */
   fishTier: FishTier | null
@@ -217,7 +217,7 @@ function whisper(facts: SetupFacts): SetupCheck {
       title,
       state: 'off',
       detail:
-        'The project sets quality.transcriber to "none": one take a line, not checked, with word timings spread evenly.',
+        'The project sets generate.transcriber to "none": one take a line, not checked, with word timings spread evenly.',
     }
   }
   if (!facts.appleSilicon) {
@@ -226,7 +226,7 @@ function whisper(facts: SetupFacts): SetupCheck {
       title,
       state: 'problem',
       detail: 'mlx-whisper runs on macOS with Apple silicon only; this is not such a machine.',
-      fix: 'Set quality.transcriber to "none" in the project file to record without checking.',
+      fix: 'Set generate.transcriber to "none" in the project file to record without checking.',
     }
   }
   if (!facts.uv) {
@@ -321,7 +321,7 @@ function requests(facts: SetupFacts): SetupCheck {
         title,
         state: 'problem',
         detail: `${sends}, but your account allows ${limit}. Fish will turn the extra requests away and recording will slow down while the studio waits and retries.`,
-        fix: `Set quality.parallel to ${limit} or less in the project file.`,
+        fix: `Set generate.parallel to ${limit} or less in the project file.`,
         tier,
       }
 }

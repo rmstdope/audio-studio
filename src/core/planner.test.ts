@@ -4,7 +4,7 @@ import { clipInputs, cueInputs, fingerprint } from './fingerprint'
 import { mergeCues } from './cued'
 import { adoptUntracked, planPart, type PlanInput } from './planner'
 import { ProjectSchema } from './project'
-import type { Cast, Line, LockEntry } from './resources'
+import type { Line, LockEntry, SpokenCast } from './resources'
 
 const narration = ProjectSchema.parse(projectJson()).narration
 
@@ -14,7 +14,7 @@ const lines: Line[] = [
   { key: 't1', speaker: 'tilda', text: 'Have you heard?' },
 ]
 
-const cast: Cast = {
+const cast: SpokenCast = {
   speakers: {
     narrator: { voice: 'v-narrator', style: '[warm]' },
     mira: { voice: 'v-mira', style: '[low, calm]' },
@@ -41,7 +41,7 @@ function input(overrides: Partial<PlanInput> = {}): PlanInput {
 /** The lock entry a clip of `line` made with today's inputs would have. */
 function entryFor(
   line: Line,
-  theCast: Cast = cast,
+  theCast: SpokenCast = cast,
   extra: Partial<LockEntry> = {},
   cues: Record<string, string> = {},
 ): LockEntry {
@@ -52,8 +52,8 @@ function entryFor(
     theCast.pronounce,
     narration,
   )!
-  const { fp, parts } = fingerprint(inputs)
-  return { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then', ...extra }
+  const { fp, hashes } = fingerprint(inputs)
+  return { fp, voice: inputs.voice, model: inputs.model, hashes, at: 'then', ...extra }
 }
 
 const trackedLock = { n1: entryFor(lines[0]!), m1: entryFor(lines[1]!) }
@@ -81,7 +81,7 @@ describe('planPart', () => {
   })
 
   it('names a changed voice', () => {
-    const recast: Cast = {
+    const recast: SpokenCast = {
       ...cast,
       speakers: { ...cast.speakers, mira: { voice: 'v-new', style: '[low, calm]' } },
     }
@@ -96,14 +96,14 @@ describe('planPart', () => {
   })
 
   it('makes a pronunciation stale only the lines that contain it', () => {
-    const said: Cast = { ...cast, pronounce: { Elior: 'El-ee-or' } }
+    const said: SpokenCast = { ...cast, pronounce: { Elior: 'El-ee-or' } }
     const state = planPart(input({ lock: trackedLock, cast: said }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['pronunciation'] })
     expect(state.lines[1]!.status).toBe('ok')
   })
 
   it('speaks a character at its own speed, a change of which is a settings change', () => {
-    const quick: Cast = {
+    const quick: SpokenCast = {
       ...cast,
       speakers: { ...cast.speakers, mira: { ...cast.speakers.mira, speed: 1.2 } },
     }
@@ -113,7 +113,10 @@ describe('planPart', () => {
   })
 
   it('names changed generation settings', () => {
-    const slower = { ...narration, tts: { ...narration.tts, speed: 0.9 } }
+    const slower = {
+      ...narration,
+      generate: { ...narration.generate, fish: { ...narration.generate.fish, speed: 0.9 } },
+    }
     const state = planPart(input({ lock: trackedLock, narration: slower }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['settings'] })
   })
@@ -133,7 +136,10 @@ describe('planPart', () => {
   })
 
   it('says a clip was accepted only while it is up to date', () => {
-    const slower = { ...narration, tts: { ...narration.tts, speed: 0.9 } }
+    const slower = {
+      ...narration,
+      generate: { ...narration.generate, fish: { ...narration.generate.fish, speed: 0.9 } },
+    }
     const lock = { ...trackedLock, n1: entryFor(lines[0]!, cast, { heard: 0.8, accepted: true }) }
     const state = planPart(input({ lock, narration: slower }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', accepted: false })
@@ -257,7 +263,10 @@ describe('planPart, cues in a language besides the source', () => {
 })
 
 describe('planPart, clips made with the final model', () => {
-  const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+  const withFinal = {
+    ...narration,
+    models: { ...narration.models, fish: { ...narration.models.fish, final: 's2-pro' } },
+  }
   /** A lock entry for `line` as made with `model`. */
   function madeWith(line: Line, model: string): LockEntry {
     const inputs = clipInputs(
@@ -268,8 +277,8 @@ describe('planPart, clips made with the final model', () => {
       withFinal,
       model,
     )!
-    const { fp, parts } = fingerprint(inputs)
-    return { fp, voice: inputs.voice, model, parts, at: 'then' }
+    const { fp, hashes } = fingerprint(inputs)
+    return { fp, voice: inputs.voice, model, hashes, at: 'then' }
   }
 
   it('counts a final clip as up to date, and says it is final', () => {
@@ -294,7 +303,10 @@ describe('planPart, clips made with the final model', () => {
 
 describe('planPart, a weak final clip', () => {
   it('is weak and final', () => {
-    const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    const withFinal = {
+      ...narration,
+      models: { ...narration.models, fish: { ...narration.models.fish, final: 's2-pro' } },
+    }
     const inputs = clipInputs(
       lines[0]!,
       cast.speakers.narrator,
@@ -303,8 +315,10 @@ describe('planPart, a weak final clip', () => {
       withFinal,
       's2-pro',
     )!
-    const { fp, parts } = fingerprint(inputs)
-    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', parts, at: 'then', heard: 0.5 } }
+    const { fp, hashes } = fingerprint(inputs)
+    const lock = {
+      n1: { fp, voice: inputs.voice, model: 's2-pro', hashes, at: 'then', heard: 0.5 },
+    }
     expect(planPart(input({ lock, narration: withFinal })).lines[0]).toMatchObject({
       status: 'weak',
       final: true,
@@ -373,15 +387,21 @@ describe('planPart, a blank source line', () => {
 })
 
 describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
-  const onS1 = { ...narration, models: { ...narration.models, draft: 's1', final: 's1' } }
+  const onS1 = {
+    ...narration,
+    models: { ...narration.models, fish: { ...narration.models.fish, draft: 's1', final: 's1' } },
+  }
   const onS21 = {
     ...narration,
-    models: { ...narration.models, draft: 's2.1-pro', final: 's2.1-pro' },
+    models: {
+      ...narration.models,
+      fish: { ...narration.models.fish, draft: 's2.1-pro', final: 's2.1-pro' },
+    },
   }
   function madeOnS1(line: Line): LockEntry {
     const inputs = clipInputs(line, cast.speakers[line.speaker], {}, cast.pronounce, onS1)!
-    const { fp, parts } = fingerprint(inputs)
-    return { fp, voice: inputs.voice, model: 's1', parts, at: 'then' }
+    const { fp, hashes } = fingerprint(inputs)
+    return { fp, voice: inputs.voice, model: 's1', hashes, at: 'then' }
   }
 
   it('keeps them up to date: Fish records s1 with s2.1-pro at the same price', () => {
@@ -399,11 +419,14 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
   it('finds a clip made with another model stale for the model', () => {
     const other = {
       ...narration,
-      models: { ...narration.models, draft: 's2-pro', final: 's2-pro' },
+      models: {
+        ...narration.models,
+        fish: { ...narration.models.fish, draft: 's2-pro', final: 's2-pro' },
+      },
     }
     const inputs = clipInputs(lines[0]!, cast.speakers.narrator, {}, cast.pronounce, other)!
-    const { fp, parts } = fingerprint(inputs)
-    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', parts, at: 'then' } }
+    const { fp, hashes } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's2-pro', hashes, at: 'then' } }
     const state = planPart(input({ lock, narration: onS21 }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['model'] })
   })
@@ -411,15 +434,21 @@ describe('planPart, clips made with s1 after the switch to s2.1-pro', () => {
   it('names no model reason for an s1 clip that was the final recording', () => {
     const split = {
       ...narration,
-      models: { ...narration.models, draft: 's2.1-pro-free', final: 's2.1-pro' },
+      models: {
+        ...narration.models,
+        fish: { ...narration.models.fish, draft: 's2.1-pro-free', final: 's2.1-pro' },
+      },
     }
     const wasS1 = {
       ...narration,
-      models: { ...narration.models, draft: 's2.1-pro-free', final: 's1' },
+      models: {
+        ...narration.models,
+        fish: { ...narration.models.fish, draft: 's2.1-pro-free', final: 's1' },
+      },
     }
     const inputs = clipInputs(lines[0]!, cast.speakers.narrator, {}, cast.pronounce, wasS1, 's1')!
-    const { fp, parts } = fingerprint(inputs)
-    const lock = { n1: { fp, voice: inputs.voice, model: 's1', parts, at: 'then' } }
+    const { fp, hashes } = fingerprint(inputs)
+    const lock = { n1: { fp, voice: inputs.voice, model: 's1', hashes, at: 'then' } }
     const state = planPart(input({ lock, narration: split, cues: { n1: '[sad]' } }))
     expect(state.lines[0]).toMatchObject({ status: 'stale', reasons: ['cue'] })
   })
@@ -462,7 +491,10 @@ describe('planPart, scene cues', () => {
   it('lets a line’s own cue win, and follows other named speakers', () => {
     const state = plan({
       cues: { 'scene:Cave': '[dark]', n2: '[hushed]', m1: '[sad]' },
-      narration: { ...narration, sceneCueSpeakers: ['narrator', 'mira'] },
+      narration: {
+        ...narration,
+        generate: { ...narration.generate, sceneCueSpeakers: ['narrator', 'mira'] },
+      },
     })
     const lines = by(state)
     expect(lines.n2).toMatchObject({ cue: '[hushed]', cueFrom: 'own', followsScene: false })
@@ -471,7 +503,10 @@ describe('planPart, scene cues', () => {
       by(
         plan({
           cues: { 'scene:Cave': '[dark]' },
-          narration: { ...narration, sceneCueSpeakers: ['mira'] },
+          narration: {
+            ...narration,
+            generate: { ...narration.generate, sceneCueSpeakers: ['mira'] },
+          },
         }),
       ).m1?.cue,
     ).toBe('[dark]')
@@ -596,8 +631,8 @@ describe('planPart, cues inside a line', () => {
   it('is stale again when the cue inside changes, and ok when a clip was made with it', () => {
     const entry = (cue: string) => {
       const inputs = clipInputs(lines[0]!, cast.speakers.narrator, { n1: cue }, {}, narration)!
-      const { fp, parts } = fingerprint(inputs)
-      return { fp, voice: inputs.voice, model: inputs.model, parts, at: 'then' }
+      const { fp, hashes } = fingerprint(inputs)
+      return { fp, voice: inputs.voice, model: inputs.model, hashes, at: 'then' }
     }
     const lock = { ...trackedLock, n1: entry(inside) }
     expect(planPart(input({ lock, cues: { n1: inside } })).lines[0]!.status).toBe('ok')
@@ -682,7 +717,7 @@ describe('mergeCues', () => {
 })
 
 describe('a line with an ElevenLabs voice', () => {
-  const elevenCast: Cast = {
+  const elevenCast: SpokenCast = {
     speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]', speed: 1.1 } },
     pronounce: {},
   }
@@ -692,13 +727,13 @@ describe('a line with an ElevenLabs voice', () => {
     const inputs = clipInputs(m1, elevenCast.speakers.mira, {}, {}, narration)!
     expect(inputs.model).toBe('eleven_v3')
     expect(inputs.voice).toBe('eleven:abc')
-    const { output, quality } = narration
+    const { output, generate } = narration
     expect(JSON.parse(inputs.settings)).toEqual([
       0.5,
       0.75,
       0,
       1.1,
-      quality.chunkLimit,
+      generate.chunkLimit,
       output.codec,
       output.bitrate,
       output.channels,
@@ -708,9 +743,9 @@ describe('a line with an ElevenLabs voice', () => {
   it('is spoken with the project’s ElevenLabs voice settings, and goes stale for them', () => {
     const tuned = {
       ...narration,
-      elevenlabs: {
-        ...narration.elevenlabs,
-        tts: { stability: 1 as const, similarityBoost: 0.4, style: 0.3 },
+      generate: {
+        ...narration.generate,
+        elevenlabs: { stability: 1 as const, similarityBoost: 0.4, style: 0.3 },
       },
     }
     const inputs = clipInputs(m1, elevenCast.speakers.mira, {}, {}, tuned)!
@@ -724,7 +759,10 @@ describe('a line with an ElevenLabs voice', () => {
   })
 
   it('is up to date as made, while Fish’s stages differ', () => {
-    const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    const withFinal = {
+      ...narration,
+      models: { ...narration.models, fish: { ...narration.models.fish, final: 's2-pro' } },
+    }
     const lock = { m1: entryFor(m1, elevenCast) }
     const state = planPart(input({ cast: elevenCast, lock, narration: withFinal }))
     expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'ok' })
@@ -778,15 +816,15 @@ describe('a line on an ElevenLabs model that reads no cues', () => {
 })
 
 describe('a final step on ElevenLabs’ side only', () => {
-  const elevenCast: Cast = {
+  const elevenCast: SpokenCast = {
     speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]' } },
     pronounce: {},
   }
   const withElevenFinal = {
     ...narration,
-    elevenlabs: {
-      ...narration.elevenlabs,
-      models: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_multilingual_v2' },
+    models: {
+      ...narration.models,
+      elevenlabs: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_multilingual_v2' },
     },
   }
 
@@ -810,7 +848,7 @@ describe('a final step on ElevenLabs’ side only', () => {
 })
 
 describe('which stages of a line are sent without its cues', () => {
-  const elevenCast: Cast = {
+  const elevenCast: SpokenCast = {
     speakers: { ...cast.speakers, mira: { voice: 'eleven:abc' } },
     pronounce: {},
   }
@@ -820,7 +858,7 @@ describe('which stages of a line are sent without its cues', () => {
         cast: elevenCast,
         narration: {
           ...narration,
-          elevenlabs: { ...narration.elevenlabs, models: { audition: 'eleven_v3', draft, final } },
+          models: { ...narration.models, elevenlabs: { audition: 'eleven_v3', draft, final } },
         },
       }),
     ).lines.map((l) => [l.key, l.unspokenCues])
@@ -848,18 +886,21 @@ describe('a Fish voice’s fingerprint', () => {
     )!
     expect(fingerprint(inputs)).toEqual({
       fp: '94f2174f922de996',
-      parts: { cue: '1e136cf1', text: '8cb63797', said: '8cb63797', settings: 'ab047dd6' },
+      hashes: { cue: '1e136cf1', text: '8cb63797', said: '8cb63797', settings: 'ab047dd6' },
     })
   })
 })
 
 describe('a final plan, with a line whose voice has no final step', () => {
   it('counts an up-to-date ElevenLabs line as final, so a final recording leaves it alone', () => {
-    const elevenCast: Cast = {
+    const elevenCast: SpokenCast = {
       speakers: { ...cast.speakers, mira: { voice: 'eleven:abc', style: '[low, calm]' } },
       pronounce: {},
     }
-    const withFinal = { ...narration, models: { ...narration.models, final: 's2-pro' } }
+    const withFinal = {
+      ...narration,
+      models: { ...narration.models, fish: { ...narration.models.fish, final: 's2-pro' } },
+    }
     const lock = { m1: entryFor(lines[1]!, elevenCast) }
     const state = planPart(input({ cast: elevenCast, lock, narration: withFinal }))
     expect(state.lines.find((l) => l.key === 'm1')).toMatchObject({ status: 'ok', final: true })

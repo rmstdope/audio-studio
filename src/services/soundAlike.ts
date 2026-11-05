@@ -14,14 +14,14 @@ import type { ProjectFailure } from './workspace'
 export type SoundAlikeChange = { ok: true } | { ok: false; problems: Problem[] } | ProjectFailure
 
 /**
- * Saves the project's own words that sound the same (`narration.quality.soundAlike` in the
- * project file), words trimmed and empty ones dropped. The file is read once, and the rest of it
- * kept as it was: its indentation, line endings and last newline (only a hand-compacted object
- * is written out, and numbers and escapes as JSON writes them). `was` is the list the editing
- * began from: if the file's differs, someone changed it meanwhile, and nothing is written. An
- * empty list leaves the key out. The source language's groups are `quality.soundAlike`, another
- * language's `quality.soundAlikeByLanguage.<code>`. Takes already recorded keep their heard share; the groups count
- * from the next take on.
+ * Saves the project's own words that sound the same in a language
+ * (`narration.generate.soundAlike.<code>` in the project file), words trimmed and empty ones
+ * dropped. The file is read once, and the rest of it kept as it was: its indentation, line endings
+ * and last newline (only a hand-compacted object is written out, and numbers and escapes as JSON
+ * writes them). `was` is the list the editing began from: if the file's differs, someone changed
+ * it meanwhile, and nothing is written. An empty list leaves the language out, and a table and
+ * `generate` left empty by it go too (one written empty by hand stays). Takes already recorded keep their heard share; the groups
+ * count from the next take on.
  */
 export function setSoundAlike(
   projectFile: string,
@@ -36,10 +36,7 @@ export function setSoundAlike(
     const { raw, project } = opened
     const file = basename(projectFile)
     const which = declaredLanguage(project, language)
-    const own = which !== project.languages[0]
-    const PATH = own
-      ? `narration.quality.soundAlikeByLanguage.${which}`
-      : 'narration.quality.soundAlike'
+    const PATH = `narration.generate.soundAlike.${which}`
 
     const problem = (message: string): SoundAlikeChange => ({
       ok: false,
@@ -54,23 +51,17 @@ export function setSoundAlike(
     if (wrong) return problem(wrong)
 
     const narration = (raw as { narration: Record<string, unknown> }).narration
-    const had = isObject(narration.quality) ? narration.quality : {}
-    const quality = { ...had }
-    if (!own) {
-      if (clean.length) quality.soundAlike = clean
-      else delete quality.soundAlike
-    } else {
-      const byLanguage = { ...(isObject(had.soundAlikeByLanguage) ? had.soundAlikeByLanguage : {}) }
-      if (clean.length) byLanguage[which] = clean
-      else delete byLanguage[which]
-      if (Object.keys(byLanguage).length) quality.soundAlikeByLanguage = byLanguage
-      else delete quality.soundAlikeByLanguage
-    }
-    // A quality left empty goes only when the groups were all it held, not when it was empty.
-    const emptied =
-      !Object.keys(quality).length && ('soundAlike' in had || 'soundAlikeByLanguage' in had)
-    if (emptied || !('quality' in narration || clean.length)) delete narration.quality
-    else narration.quality = quality
+    const had = isObject(narration.generate) ? narration.generate : null
+    const generate = { ...had }
+    const table = { ...(isObject(generate.soundAlike) ? generate.soundAlike : {}) }
+    if (clean.length) table[which] = clean
+    else delete table[which]
+    if (Object.keys(table).length) generate.soundAlike = table
+    else delete generate.soundAlike
+    // A section the groups were all of goes with them; one written empty by hand stays.
+    if (Object.keys(generate).length || (had !== null && !('soundAlike' in had))) {
+      narration.generate = generate
+    } else delete narration.generate
     const parsed = ProjectSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(file, parsed.error) }
 

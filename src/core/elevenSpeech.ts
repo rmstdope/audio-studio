@@ -64,7 +64,7 @@ export function takesLanguage(model: string): boolean {
 
 /**
  * The model a stage records a voice with: the project's Fish model for a Fish voice, its
- * ElevenLabs model (`narration.elevenlabs.models`) for an ElevenLabs one.
+ * ElevenLabs model (`narration.models.elevenlabs`) for an ElevenLabs one.
  */
 export function modelForStage(
   narration: Project['narration'],
@@ -72,8 +72,8 @@ export function modelForStage(
   stage: 'audition' | 'draft' | 'final',
 ): string {
   return providerOf(voice) === 'elevenlabs'
-    ? narration.elevenlabs.models[stage]
-    : narration.models[stage]
+    ? narration.models.elevenlabs[stage]
+    : narration.models.fish[stage]
 }
 
 /**
@@ -129,6 +129,6 @@ export function stageWords(
   stage: 'draft' | 'final',
   eleven: boolean,
 ): string {
-  const fish = narration.models[stage]
-  return eleven ? `${fish} · ${elevenModelName(narration.elevenlabs.models[stage])}` : fish
+  const fish = narration.models.fish[stage]
+  return eleven ? `${fish} · ${elevenModelName(narration.models.elevenlabs[stage])}` : fish
 }

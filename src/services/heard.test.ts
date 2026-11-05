@@ -8,14 +8,14 @@ import { inPartTurn } from './partFiles'
 const at = '2026-10-24T16:11:29.762Z'
 const files = {
   'content-studio.json': projectJson(),
-  'tts/cast.json': { speakers: { mira: { voice: 'v-m' } } },
-  'tts/act1/script.json': [{ key: 'k1', speaker: 'mira', text: 'Welcome home.' }],
-  'tts/act1/narration.lock.json': {
+  'content-studio/narration/cast.json': { speakers: { mira: { voice: 'v-m' } } },
+  'tts/act1/script.json': [{ id: 'k1', speaker: 'mira', text: 'Welcome home.' }],
+  'content-studio/narration/act1.lock.json': {
     k1: {
       fp: 'f',
       voice: 'v-m',
       model: 'm',
-      parts: { cue: 'c', text: 't', said: 's', settings: 'x' },
+      hashes: { cue: 'c', text: 't', said: 's', settings: 'x' },
       heard: 0.5,
       at,
     },
@@ -37,7 +37,7 @@ describe('what Whisper heard, kept', () => {
   it('gives the text the take was checked against, though the line changed since', async () => {
     const projectFile = project()
     await keepHeard(projectFile, 'act1', 'k1', line)
-    const script = [{ key: 'k1', speaker: 'mira', text: 'Welcome back home.' }]
+    const script = [{ id: 'k1', speaker: 'mira', text: 'Welcome back home.' }]
     writeFileSync(join(projectFile, '..', 'tts/act1/script.json'), JSON.stringify(script))
     expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({ ok: true, heard: line })
   })

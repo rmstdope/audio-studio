@@ -8,8 +8,8 @@ import { FishError, type CreateVoiceRequest, type FishClient } from './fish'
 const root = () =>
   tempRepo({
     'content-studio.json': projectJson(),
-    'tts/cast.json': { speakers: { mira: { voice: 'cur' } } },
-    'tts/act1/script.json': [{ key: 'a', speaker: 'mira', text: 'Hi.' }],
+    'content-studio/narration/cast.json': { speakers: { mira: { voice: 'cur' } } },
+    'tts/act1/script.json': [{ id: 'a', speaker: 'mira', text: 'Hi.' }],
   })
 
 const file = (name: string) => ({ name, type: 'audio/wav', bytes: new Uint8Array([1]) })
@@ -48,7 +48,7 @@ describe('cloneVoice', () => {
     expect(asked[0]?.title).toBe('Mira')
     expect(asked[0]?.files.length).toBe(2)
     // Nothing is written to the consumer.
-    expect(readdirSync(dir).sort()).toEqual(['content-studio.json', 'tts'])
+    expect(readdirSync(dir).sort()).toEqual(['content-studio', 'content-studio.json', 'tts'])
   })
 
   it('refuses no files, too many, and a blank name, without asking Fish', async () => {

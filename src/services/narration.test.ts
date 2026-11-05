@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { narrationInLanguages, projectJson, tempRepo } from '../../test/helpers'
 import { HEARD_DIR, heardFor } from './heard'
 import { readWav, writeWav } from '../core/wav'
 import type { Encoder } from './audio'
@@ -51,26 +51,26 @@ const keepWav: Encoder = async (wav, file) => {
 }
 
 const project = projectJson()
-;(project.narration as { quality?: unknown }).quality = { chunkLimit: 100 }
+;(project.narration as { generate?: unknown }).generate = { chunkLimit: 100 }
 
 const manifestText =
   '{\n "old": {\n  "file": "old.mp3",\n  "speaker": "mira",\n  "duration": 1.0,\n  "words": [\n   {\n    "word": "Gone\\u2026",\n    "start": 0.0,\n    "end": 1.0\n   }\n  ]\n }\n}\n'
 
 const files = {
   'content-studio.json': project,
-  'tts/cast.json': {
+  'content-studio/narration/cast.json': {
     speakers: { narrator: { voice: 'v-n', style: '[warm]' }, mira: { voice: 'v-m', speed: 1.15 } },
-    pronounce: { Elior: 'El-ee-or' },
+    pronounce: { en: { Elior: 'El-ee-or' } },
   },
   'tts/act1/script.json': [
-    { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
+    { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
     {
-      key: 'k2',
+      id: 'k2',
       speaker: 'narrator',
       text: `${'A long sentence that goes on. '.repeat(4)}The end.`,
     },
-    { key: 'k3', speaker: 'tilda', text: 'No voice.' },
-    { key: 'k4', speaker: 'mira', text: 'Welcome.' },
+    { id: 'k3', speaker: 'tilda', text: 'No voice.' },
+    { id: 'k4', speaker: 'mira', text: 'Welcome.' },
   ],
   'audio/act1/manifest.json': manifestText,
 }
@@ -135,8 +135,10 @@ describe('recordLine', () => {
     const text = files['tts/act1/script.json'][1]!.text
     const root = tempRepo({
       ...files,
-      'tts/act1/cues.json': {
-        k2: `[warm] ${text.replace('A long sentence that goes on. A long', 'A long sentence that goes on. A [hushed] long')}`,
+      'content-studio/narration/act1.edits.json': {
+        cues: {
+          k2: `[warm] ${text.replace('A long sentence that goes on. A long', 'A long sentence that goes on. A [hushed] long')}`,
+        },
       },
     })
     const { fish, requests } = fakeFish()
@@ -164,7 +166,9 @@ describe('recordLine', () => {
     const { fish } = fakeFish()
     await Promise.all([record(root, 'k1', fish), record(root, 'k4', fish)])
     const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8'))
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(Object.keys(manifest).sort()).toEqual(['k1', 'k4', 'old'])
     expect(Object.keys(lock).sort()).toEqual(['k1', 'k4'])
   })
@@ -191,7 +195,7 @@ describe('recordLine', () => {
     const held = inPartTurn(projectFile, 'act1', () => new Promise<void>((r) => (release = r)))
     const adopting = adoptPart(projectFile, 'act1')
     await new Promise((resolve) => setTimeout(resolve, 30))
-    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/narration/act1.lock.json'))).toBe(false)
     release()
     await held
     expect(await adopting).toMatchObject({ ok: true, adopted: 1 })
@@ -200,10 +204,10 @@ describe('recordLine', () => {
   it('answers a write that fails part-way, leaving no temporary file and the line stale', async () => {
     const root = tempRepo({
       ...files,
-      'tts/act1/narration.lock.json': {},
+      'content-studio/narration/act1.lock.json': {},
       'audio/act1/k1.mp3': 'old clip',
     })
-    const lockFolder = join(root, 'tts/act1')
+    const lockFolder = join(root, 'content-studio/narration')
     const lockDown: Encoder = async (wav, file, options) => {
       await keepWav(wav, file, options)
       chmodSync(lockFolder, 0o555)
@@ -255,14 +259,14 @@ describe('recordLine', () => {
       message: 'no ffmpeg',
     })
     expect(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8')).toBe(manifestText)
-    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/narration/act1.lock.json'))).toBe(false)
   })
 
   it('refuses while a file of the part is broken', async () => {
-    const root = tempRepo({ ...files, 'tts/act1/narration.lock.json': '{ broken' })
+    const root = tempRepo({ ...files, 'content-studio/narration/act1.lock.json': '{ broken' })
     const result = await record(root, 'k1', fakeFish().fish)
     expect(result && !result.ok && 'problems' in result && result.problems[0]!.file).toBe(
-      'tts/act1/narration.lock.json',
+      'content-studio/narration/act1.lock.json',
     )
   })
 })
@@ -289,12 +293,12 @@ describe('removeOrphans', () => {
     },
     'audio/act1/gone.mp3': 'old',
     'audio/act1/k4.mp3': 'current',
-    'tts/act1/narration.lock.json': {
+    'content-studio/narration/act1.lock.json': {
       gone: {
         fp: 'x',
         voice: 'v',
         model: 'm',
-        parts: { cue: '', text: '', said: '', settings: '' },
+        hashes: { cue: '', text: '', said: '', settings: '' },
         at: 't',
       },
     },
@@ -311,10 +315,12 @@ describe('removeOrphans', () => {
     expect(removed).toBe(1)
     expect(existsSync(join(root, 'audio/act1/gone.mp3'))).toBe(false)
     expect(existsSync(join(root, 'audio/act1/k4.mp3'))).toBe(true)
-    expect(existsSync(join(root, 'tts/cast.json'))).toBe(true)
+    expect(existsSync(join(root, 'content-studio/narration/cast.json'))).toBe(true)
     const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8'))
     expect(Object.keys(manifest)).toEqual(['k4', 'sneaky'])
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(lock).toEqual({})
   })
 })
@@ -379,7 +385,10 @@ describe('recordLine, only if needed, racing a hand recording', () => {
   })
 
   it('reports a line whose speaker lost its voice as uncast, not as up to date', async () => {
-    const root = tempRepo({ ...files, 'tts/cast.json': { speakers: {}, pronounce: {} } })
+    const root = tempRepo({
+      ...files,
+      'content-studio/narration/cast.json': { speakers: {}, pronounce: {} },
+    })
     const result = await recordLine(
       join(root, 'content-studio.json'),
       'act1',
@@ -434,7 +443,9 @@ describe('recordLine, checked with Whisper', () => {
       { word: 'wakes', start: 0.3, end: 0.55 },
       { word: 'up.', start: 0.6, end: 0.85 },
     ])
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(lock.k1).toMatchObject({ heard: 1, takes: 1 })
   })
 
@@ -450,7 +461,9 @@ describe('recordLine, checked with Whisper', () => {
     const root = tempRepo(files)
     const projectFile = join(root, 'content-studio.json')
     await recordChecked(root, hearing(['wakes'], ['wakes', 'up.'], ['up.']), fakeFish().fish)
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(await heardFor(projectFile, 'act1', 'k1')).toEqual({
       ok: true,
       heard: { at: lock.k1.at, text: 'Elior wakes up.', words: ['wakes', 'up.'], missed: [0] },
@@ -464,7 +477,9 @@ describe('recordLine, checked with Whisper', () => {
     const root = tempRepo({ ...files, [HEARD_DIR]: 'a file where the folder would go' })
     const result = await recordChecked(root, hearing(['wakes']), fakeFish().fish)
     expect(result).toMatchObject({ ok: true, key: 'k1', heard: 0.333 })
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(lock.k1.heard).toBe(0.333)
   })
 
@@ -495,12 +510,12 @@ describe('recordLine, checked with Whisper', () => {
     const result = await recordChecked(root, broken, fakeFish().fish)
     expect(result).toEqual({ ok: false, reason: 'transcribe', message: 'Whisper could not start' })
     expect(readFileSync(join(root, 'audio/act1/manifest.json'), 'utf8')).toBe(manifestText)
-    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/narration/act1.lock.json'))).toBe(false)
   })
 
   it('records one unchecked take when the project says so', async () => {
     const unchecked = projectJson()
-    ;(unchecked.narration as { quality?: unknown }).quality = {
+    ;(unchecked.narration as { generate?: unknown }).generate = {
       chunkLimit: 100,
       transcriber: 'none',
     }
@@ -586,15 +601,17 @@ describe('measureLine', () => {
       duration: 1.25,
       words: [{ word: 'Welcome.', start: 0.1, end: 0.6 }],
     })
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(lock.k4.heard).toBe(1)
   })
 
   it('records a take heard as a word the project says sounds the same as heard', async () => {
     const own = projectJson()
-    ;(own.narration as { quality?: unknown }).quality = {
+    ;(own.narration as { generate?: unknown }).generate = {
       chunkLimit: 100,
-      soundAlike: [['Welcome', 'Wellcum']],
+      soundAlike: { en: [['Welcome', 'Wellcum']] },
     }
     const root = tempRepo({ ...files, 'content-studio.json': own })
     const wellcum: Transcriber = {
@@ -614,9 +631,9 @@ describe('measureLine', () => {
 
   it('counts a word heard as one the project says sounds the same', async () => {
     const own = projectJson()
-    ;(own.narration as { quality?: unknown }).quality = {
+    ;(own.narration as { generate?: unknown }).generate = {
       chunkLimit: 100,
-      soundAlike: [['Welcome', 'Wellcum']],
+      soundAlike: { en: [['Welcome', 'Wellcum']] },
     }
     const root = tempRepo({ ...files, 'content-studio.json': own })
     const projectFile = join(root, 'content-studio.json')
@@ -646,7 +663,7 @@ describe('measureLine', () => {
     }
     const { root, projectFile } = await recorded(half)
     const lockOf = () =>
-      JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+      JSON.parse(readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'))
     const at = lockOf().k4.at
     expect(lockOf().k4.heard).toBe(0)
     // Without asking, a clip already checked is not measured again.
@@ -707,7 +724,9 @@ describe('measureLine', () => {
       close() {},
     }
     await measureLine(projectFile, 'act1', 'k4', { ...measureOptions, transcriber: half })
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(await heardFor(projectFile, 'act1', 'k4')).toEqual({
       ok: true,
       heard: { at: lock.k4.at, text: 'Welcome.', words: ['Welcom'], missed: [0] },
@@ -817,7 +836,7 @@ describe('measureLine, edge cases', () => {
 
   it('writes nothing when the clip was recorded again while it was measured', async () => {
     const { root, projectFile } = await unchecked()
-    const lockFile = join(root, 'tts/act1/narration.lock.json')
+    const lockFile = join(root, 'content-studio/narration/act1.lock.json')
     const result = await measureLine(projectFile, 'act1', 'k4', {
       transcriber: heardAll,
       decode: async () => {
@@ -872,7 +891,7 @@ describe('recordLine, a paid model', () => {
   /** The test project with a paid draft model. */
   function paidRepo() {
     const paid = JSON.parse(JSON.stringify(files['content-studio.json']))
-    paid.narration.models = { draft: 's2-pro' }
+    paid.narration.models = { fish: { draft: 's2-pro' } }
     return tempRepo({ ...files, 'content-studio.json': paid })
   }
 
@@ -938,7 +957,7 @@ describe('recordLine, the final recording', () => {
   /** The test project with a paid final model, the draft one free. */
   function finalRepo() {
     const withFinal = JSON.parse(JSON.stringify(files['content-studio.json']))
-    withFinal.narration.models = { final: 's2-pro' }
+    withFinal.narration.models = { fish: { final: 's2-pro' } }
     return tempRepo({ ...files, 'content-studio.json': withFinal })
   }
   const budget = () => createBudget({ model: 's2-pro', dollars: 1 })
@@ -1001,7 +1020,7 @@ describe('recordLine, stages kept apart', () => {
 
   it('does not take a weak final clip back to the draft model in a draft job', async () => {
     const withFinal = JSON.parse(JSON.stringify(files['content-studio.json']))
-    withFinal.narration.models = { final: 's2-pro' }
+    withFinal.narration.models = { fish: { final: 's2-pro' } }
     const root = tempRepo({ ...files, 'content-studio.json': withFinal })
     const projectFile = join(root, 'content-studio.json')
     const poor: Transcriber = { transcribe: async () => [], close() {} }
@@ -1024,7 +1043,7 @@ describe('recordLine, stages kept apart', () => {
 
   it('does not share a draft recording with a final one of the same line', async () => {
     const withFinal = JSON.parse(JSON.stringify(files['content-studio.json']))
-    withFinal.narration.models = { final: 's2-pro' }
+    withFinal.narration.models = { fish: { final: 's2-pro' } }
     const root = tempRepo({ ...files, 'content-studio.json': withFinal })
     const projectFile = join(root, 'content-studio.json')
     const { fish, requests } = fakeFish()
@@ -1047,7 +1066,7 @@ describe('recordLine, a draft finishing after a final recording', () => {
   const options = { encode: keepWav, limiter: createLimiter() }
   function finalRepo() {
     const withFinal = JSON.parse(JSON.stringify(files['content-studio.json']))
-    withFinal.narration.models = { final: 's2-pro' }
+    withFinal.narration.models = { fish: { final: 's2-pro' } }
     return tempRepo({ ...files, 'content-studio.json': withFinal })
   }
 
@@ -1106,7 +1125,7 @@ describe('acceptLine', () => {
     close() {},
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    JSON.parse(readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'))
 
   async function recordedWith(transcriber: Transcriber) {
     const root = tempRepo(files)
@@ -1148,33 +1167,27 @@ describe('recording in a language besides the source', () => {
   const several = projectJson()
   const narration = several.narration as Record<string, unknown>
   several.languages = ['en', 'sv']
-  narration.quality = { chunkLimit: 100 }
-  narration.paths = {
-    dialog: 'tts/{part}/{language}/script.json',
-    cues: 'tts/{part}/{language}/cues.json',
-    lock: 'tts/{part}/{language}/narration.lock.json',
-    clips: 'audio/{part}/{language}',
-    manifest: 'audio/{part}/{language}/manifest.json',
-  }
+  narration.generate = { chunkLimit: 100 }
+  Object.assign(narration, narrationInLanguages())
   const swedish = {
     'content-studio.json': several,
-    'tts/cast.json': {
+    'content-studio/narration/cast.json': {
       speakers: {
         narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-n-sv' } } },
         mira: { voice: 'v-m' },
       },
-      pronounce: { Elior: 'El-ee-or' },
+      pronounce: { en: { Elior: 'El-ee-or' } },
     },
     'tts/act1/en/script.json': [
-      { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
-      { key: 'k2', speaker: 'mira', text: 'Welcome.' },
-      { key: 'k3', speaker: 'narrator', text: 'Not translated.' },
+      { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
+      { id: 'k2', speaker: 'mira', text: 'Welcome.' },
+      { id: 'k3', speaker: 'narrator', text: 'Not translated.' },
     ],
     'tts/act1/sv/script.json': [
-      { key: 'k1', speaker: 'narrator', text: 'Elior vaknar.' },
-      { key: 'k2', speaker: 'mira', text: 'Välkommen.' },
+      { id: 'k1', speaker: 'narrator', text: 'Elior vaknar.' },
+      { id: 'k2', speaker: 'mira', text: 'Välkommen.' },
     ],
-    'tts/act1/en/cues.json': { k1: '[worried]' },
+    'content-studio/narration/act1.edits.json': { cues: { k1: '[worried]' } },
   }
   const projectFile = (root: string) => join(root, 'content-studio.json')
   const recordSv = (root: string, key: string, fish: FishClient) =>
@@ -1194,9 +1207,11 @@ describe('recording in a language besides the source', () => {
     expect(existsSync(join(root, 'audio/act1/en/k1.mp3'))).toBe(false)
     const manifest = JSON.parse(readFileSync(join(root, 'audio/act1/sv/manifest.json'), 'utf8'))
     expect(Object.keys(manifest)).toEqual(['k1'])
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/sv/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.sv.lock.json'), 'utf8'),
+    )
     expect(lock.k1.voice).toBe('v-n-sv')
-    expect(existsSync(join(root, 'tts/act1/en/narration.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/narration/act1.lock.json'))).toBe(false)
     const part = await loadPart(projectFile(root), 'act1', 'sv')
     expect(part?.ok && part.part.lines.find((l) => l.key === 'k1')?.status).toBe('ok')
   })
@@ -1222,7 +1237,7 @@ describe('recording in a language besides the source', () => {
     const { fish } = fakeFish()
     await recordSv(root, 'k1', fish)
     // A clip whose line left the Swedish dialog.
-    const lockFile = join(root, 'tts/act1/sv/narration.lock.json')
+    const lockFile = join(root, 'content-studio/narration/act1.sv.lock.json')
     const manifestFile = join(root, 'audio/act1/sv/manifest.json')
     const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'))
     const lock = JSON.parse(readFileSync(lockFile, 'utf8'))
@@ -1313,7 +1328,7 @@ describe('recordLine with an ElevenLabs voice', () => {
   const elevenRoot = (speed = 1.1) =>
     tempRepo({
       ...files,
-      'tts/cast.json': {
+      'content-studio/narration/cast.json': {
         speakers: {
           narrator: { voice: 'v-n', style: '[warm]' },
           mira: { voice: 'eleven:abc', speed },
@@ -1354,15 +1369,17 @@ describe('recordLine with an ElevenLabs voice', () => {
         language: 'en',
       },
     ])
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(lock.k4).toMatchObject({ voice: 'eleven:abc', model: 'eleven_v3' })
   })
 
   it('speaks with the project’s ElevenLabs voice settings when it names them', async () => {
     const root = elevenRoot()
     const tuned = structuredClone(project)
-    ;(tuned.narration as { elevenlabs?: unknown }).elevenlabs = {
-      tts: { stability: 1, similarityBoost: 0.4, style: 0.3 },
+    ;(tuned.narration as { generate?: unknown }).generate = {
+      elevenlabs: { stability: 1, similarityBoost: 0.4, style: 0.3 },
     }
     writeFileSync(join(root, 'content-studio.json'), JSON.stringify(tuned))
     const { client, requests } = fakeEleven()

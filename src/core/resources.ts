@@ -1,16 +1,27 @@
 import { z } from 'zod'
 
-/** One voiced line of a part's dialog: the game's stable key, who says it, and the words. */
-export const LineSchema = z.object({
-  // The key names the line's clip file (`<key>.mp3`), so it may only hold safe file-name characters.
-  key: z.string().regex(/^[A-Za-z0-9_-]+$/, 'a line key may only hold letters, digits, - and _'),
-  speaker: z.string().min(1),
-  text: z.string(),
-  /** The scene the line belongs to, as the game's dialog names it; lines without one are in none. */
-  scene: z.string().min(1).optional(),
-})
+/** What a line id may hold: it names the line's clip file, so safe file-name characters only. */
+const LINE_ID = /^[A-Za-z0-9_-]+$/
 
-/** A part's dialog resource (RetroQuest: `tts/<act>/script.json`). Read only. Keys are unique. */
+/** What is wrong with a line id that does not fit `LINE_ID`. */
+const LINE_ID_MESSAGE = 'a line id may only hold letters, digits, - and _'
+
+/**
+ * One voiced line of a part's dialog as the game lists it: its id, who says it, and the words
+ * (`title` is the game's own and unused). The rest of the studio knows the id as the line's `key`.
+ */
+export const LineSchema = z
+  .object({
+    id: z.string().regex(LINE_ID, LINE_ID_MESSAGE),
+    title: z.string().optional(),
+    speaker: z.string().min(1),
+    text: z.string(),
+    /** The scene the line belongs to, as the game's dialog names it; lines without one are in none. */
+    scene: z.string().min(1).optional(),
+  })
+  .transform(({ id, title: _title, ...line }) => ({ key: id, ...line }))
+
+/** A part's dialog list (RetroQuest: `tts/<act>/script.json`). Read only. Ids are unique. */
 export const DialogSchema = z.array(LineSchema).superRefine((lines, context) => {
   const seen = new Set<string>()
   const twice = new Set<string>()
@@ -18,7 +29,7 @@ export const DialogSchema = z.array(LineSchema).superRefine((lines, context) => 
   if (twice.size) {
     context.addIssue({
       code: 'custom',
-      message: `line keys must be unique; used more than once: ${[...twice].join(', ')}`,
+      message: `line ids must be unique; used more than once: ${[...twice].join(', ')}`,
     })
   }
 })
@@ -43,7 +54,7 @@ export const CharacterSchema = z.looseObject({
   voice: z.string().min(1).optional(),
   voiceName: z.string().optional(),
   style: z.string().optional(),
-  /** The character's own speaking speed, in place of the project's `tts.speed`. */
+  /** The character's own speaking speed, in place of the project's `generate.fish.speed`. */
   speed: z.number().min(SPEED.min).max(SPEED.max).optional(),
   audition: z
     .looseObject({
@@ -85,18 +96,29 @@ const PronounceSchema = z
     }),
   )
 
-/** The character resource: every character by name, and how words are said. */
-export const CastSchema = z.looseObject({
-  speakers: z.record(z.string(), CharacterSchema).default({}),
-  pronounce: PronounceSchema.default({}),
-  /**
-   * What is kept per language besides the source: its own pronunciations (the source language's
-   * are `pronounce`), by language code.
-   */
-  languages: z
-    .record(z.string(), z.looseObject({ pronounce: PronounceSchema.optional() }))
-    .optional(),
-})
+/**
+ * The cast (`content-studio/narration/cast.json`): every speaker by the name the dialog uses, and
+ * how words are said, by language (the source language included).
+ */
+export const CastSchema = z
+  .looseObject({
+    speakers: z.record(z.string(), CharacterSchema).default({}),
+    pronounce: z.record(z.string(), PronounceSchema).default({}),
+  })
+  .superRefine((cast, context) => {
+    // Where each language's pronunciations were before format version 2: say where they go now.
+    if (!Object.hasOwn(cast, 'languages')) return
+    const old = cast.languages
+    const codes =
+      old !== null && typeof old === 'object' ? Object.keys(old).map((c) => `pronounce.${c}`) : []
+    context.addIssue({
+      code: 'custom',
+      path: ['languages'],
+      message: `pronunciations are now under pronounce.<language>${
+        codes.length ? ` (${codes.join(', ')})` : ''
+      }, not under languages; move them there`,
+    })
+  })
 
 /** A character's casting in one language: nulls where it has none. */
 export interface LanguageCasting {
@@ -132,18 +154,27 @@ export function voiceOf(
   }
 }
 
-/** How words are said in `language`: the source language's table is `pronounce`, another's is its own. */
-export function pronounceOf(cast: Cast, language: string, source: string): Record<string, string> {
-  return language === source ? cast.pronounce : (cast.languages?.[language]?.pronounce ?? {})
+/** How words are said in `language`: its own table, none when it has none. */
+export function pronounceOf(cast: Cast, language: string): Record<string, string> {
+  return Object.hasOwn(cast.pronounce, language) ? cast.pronounce[language]! : {}
 }
 
 /**
- * The cast as `language` sees it: every character with that language's voice, speed and phrase,
- * and the language's own pronunciations, in the fields the planner and the takes read. The source
- * language sees the cast as it is.
+ * The cast as one language speaks it: every character with that language's voice, speed and
+ * phrase, and the language's pronunciations, in the fields the planner and the takes read.
  */
-export function projectCast(cast: Cast, language: string, source: string): Cast {
-  if (language === source) return cast
+export interface SpokenCast {
+  speakers: Record<string, Character>
+  pronounce: Record<string, string>
+}
+
+/**
+ * The cast as `language` sees it (see `SpokenCast`). The source language's characters are as they
+ * are; another language's have its casting in the source language's places.
+ */
+export function projectCast(cast: Cast, language: string, source: string): SpokenCast {
+  const pronounce = pronounceOf(cast, language)
+  if (language === source) return { speakers: cast.speakers, pronounce }
   const speakers = Object.fromEntries(
     Object.entries(cast.speakers).map(([id, entry]) => {
       const { voice, voiceName, speed, phrase } = voiceOf(entry, language, source)
@@ -157,7 +188,7 @@ export function projectCast(cast: Cast, language: string, source: string): Cast 
       return [id, projected]
     }),
   )
-  return { ...cast, speakers, pronounce: pronounceOf(cast, language, source) }
+  return { speakers, pronounce }
 }
 
 /**
@@ -172,7 +203,10 @@ export function ttsFor(
   return character?.speed === undefined ? tts : { ...tts, speed: character.speed }
 }
 
-/** A part's delivery cues: line key → a cue that replaces the character's style for that line. */
+/**
+ * A part's delivery cues as the studio uses them: line key → a cue that replaces the character's
+ * style for that line, and a scene's cue under its scene key (`sceneKey`).
+ */
 export const CuesSchema = z.record(z.string(), z.string())
 
 /** A line's own cue, if it has one (only the file's own keys: never `toString` and the like). */
@@ -181,19 +215,63 @@ export function cueFor(cues: Record<string, string>, key: string): string | unde
 }
 
 /**
- * What a scene's cue is kept under in the cues file: a line key never holds a colon, so it cannot
- * be one, and the game, which looks up its lines' keys, never reads it.
+ * What a scene's cue is kept under in the studio's cue table: a line key never holds a colon, so
+ * it cannot be one.
  */
 const SCENE_PREFIX = 'scene:'
 
-/** The cues file's key for a scene's cue. */
+/** The cue table's key for a scene's cue. */
 export function sceneKey(scene: string): string {
   return `${SCENE_PREFIX}${scene}`
 }
 
-/** The scene a cues file key names, or null for a line's key. */
+/** The scene a cue table key names, or null for a line's key. */
 export function sceneOfKey(key: string): string | null {
   return key.startsWith(SCENE_PREFIX) ? key.slice(SCENE_PREFIX.length) : null
+}
+
+/** Where a cue table key's cue is in the edits file, as a problem path (`cues.a1`, `scenes.hall`). */
+export function editsPathOf(key: string): string {
+  const scene = sceneOfKey(key)
+  return scene === null ? `cues.${key}` : `scenes.${scene}`
+}
+
+/**
+ * A part's narration edits (`content-studio/narration/<part>[.<lang>].edits.json`): the cues of
+ * lines by line id, and of scenes by the scene's name as the dialog gives it.
+ */
+export const NarrationEditsSchema = z.strictObject({
+  cues: z.record(z.string().regex(LINE_ID, LINE_ID_MESSAGE), z.string()).default({}),
+  scenes: CuesSchema.default({}),
+})
+
+/** A part's narration edits, as read. */
+export type NarrationEdits = z.infer<typeof NarrationEditsSchema>
+
+/** The edits as one cue table: the lines' cues, then the scenes' under their scene keys. */
+export function cuesOfEdits(edits: NarrationEdits): Cues {
+  const scenes = Object.entries(edits.scenes).map(([scene, cue]) => [sceneKey(scene), cue])
+  return Object.fromEntries([...Object.entries(edits.cues), ...scenes])
+}
+
+/** The edits file read straight into the studio's cue table. */
+export const EditsCuesSchema = NarrationEditsSchema.transform(cuesOfEdits)
+
+/**
+ * The edits file's text for a cue table's entries, in their order: the lines' cues under `cues`,
+ * the scenes' under `scenes`, two-space indent and one cue per line.
+ */
+export function formatEdits(entries: [key: string, cue: string][]): string {
+  const lines = entries.filter(([key]) => sceneOfKey(key) === null)
+  const scenes = entries.flatMap(([key, cue]): [string, string][] => {
+    const scene = sceneOfKey(key)
+    return scene === null ? [] : [[scene, cue]]
+  })
+  const section = (name: string, of: [string, string][]) =>
+    of.length
+      ? `  "${name}": {\n${of.map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n')}\n  }`
+      : `  "${name}": {}`
+  return `{\n${section('cues', lines)},\n${section('scenes', scenes)}\n}\n`
 }
 
 /** One clip in the game's manifest. Only what the studio needs is checked; the rest is kept. */
@@ -214,7 +292,7 @@ export const LockEntrySchema = z.looseObject({
   fp: z.string(),
   voice: z.string(),
   model: z.string(),
-  parts: z.object({ cue: z.string(), text: z.string(), said: z.string(), settings: z.string() }),
+  hashes: z.object({ cue: z.string(), text: z.string(), said: z.string(), settings: z.string() }),
   /** Share of the words Whisper heard in the kept take; absent for adopted clips. */
   heard: z.number().min(0).max(1).optional(),
   takes: z.number().int().min(1).optional(),
@@ -225,11 +303,11 @@ export const LockEntrySchema = z.looseObject({
   at: z.string(),
 })
 
-/** A part's lock (`narration.lock.json`): line key → what its clip was made from. */
+/** A part's narration lock (`content-studio/narration/<part>[.<lang>].lock.json`): line key → what its clip was made from. */
 export const LockSchema = z.record(z.string(), LockEntrySchema)
 
 /** A voiced line of dialog. */
-export type Line = z.infer<typeof LineSchema>
+export type Line = z.output<typeof LineSchema>
 
 /** A character's entry in the cast. */
 export type Character = z.infer<typeof CharacterSchema>

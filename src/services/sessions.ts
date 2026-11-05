@@ -333,7 +333,7 @@ async function moreFromLibrary(
   if (!loaded.ok) return loaded
   const { project, cast, summary } = loaded
   if (!summary.characters.some((c) => c.id === characterId)) return null
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
   const language = auditionIn(project, cast, summary, characterId, asked).language
   const snapshot = await readSession(projectFile, characterId, asked)
   if (!snapshot) {
@@ -782,11 +782,11 @@ export async function auditionMoney(
   if (!loaded.ok) return loaded
   if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
   const { project, cast, summary } = loaded
-  const model = project.narration.models.audition
+  const model = project.narration.models.fish.audition
   const session = await readSession(projectFile, characterId, language)
   const spentBefore = session?.spent ?? 0
   const going = session !== null
-  const elevenModel = project.narration.elevenlabs.models.audition
+  const elevenModel = project.narration.models.elevenlabs.audition
   if (!cast) {
     const eleven = { model: elevenModel, perTake: 0 }
     return { ok: true, model, perTake: 0, spentBefore, going, eleven }

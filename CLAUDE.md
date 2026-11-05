@@ -68,8 +68,9 @@ bundle breaks.
 
 ## Rules for the consumer repository
 
-- Read and write only the files the project file names, through `resolveInRoot` and `writeAtomic`;
-  nothing outside the project root. Clips are the one exception to `writeAtomic`: the encoder
+- Read and write only the files the project file names and the studio's own files in
+  `content-studio/` (narration's cast, edits and locks in `content-studio/narration/`), through
+  `resolveInRoot` and `writeAtomic`; nothing outside the project root. Clips are the one exception to `writeAtomic`: the encoder
   writes a hidden temporary file in the clips folder (through `resolveInRoot`), renamed into place
   only together with the manifest and lock update.
 - Another exception, to reading and writing only the named files: the project's own
@@ -82,12 +83,11 @@ bundle breaks.
   The studio runs nothing else of the consumer's. The Scenes page writes one file of an act, the
   mix (`scenes.paths.mix`, §8.11), and never the declarations the game writes.
 - The project file itself is read, and changed in seven kinds of places only: the words that sound
-  the same (`narration.quality.soundAlike`, and `narration.quality.soundAlikeByLanguage` for the
-  other languages), saved from the Words that sound the same panel, `narration.models.draft` /
-  `final`, moved from `s1` to `s2.1-pro` when the user confirms the retirement banner,
-  `narration.models.audition` / `draft` / `final`, saved from the Models panel on Setup,
-  `narration.elevenlabs.models.audition` / `draft` / `final` and `narration.elevenlabs.tts`,
-  saved from that panel's ElevenLabs rows,
+  the same (`narration.generate.soundAlike.<language>`), saved from the Words that sound the same
+  panel, `narration.models.fish.draft` / `final`, moved from `s1` to `s2.1-pro` when the user
+  confirms the retirement banner, `narration.models.fish.audition` / `draft` / `final`, saved from
+  the Models panel on Setup, `narration.models.elevenlabs.audition` / `draft` / `final` and
+  `narration.generate.elevenlabs`, saved from that panel's ElevenLabs rows,
   `music.model`, saved from the Music row of the same panel,
   `images.model`, saved from the Images row of the same panel,
   and `effects.model`, saved from the Sound effects row of the same panel. Each save

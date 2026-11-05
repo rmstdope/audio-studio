@@ -17,8 +17,8 @@ function git(cwd: string, ...args: string[]) {
 
 const files = {
   'content-studio.json': projectJson(),
-  'tts/cast.json': { speakers: {}, pronounce: {} },
-  'tts/act1/script.json': [{ key: 'a', speaker: 'mira', text: 'Hi.' }],
+  'content-studio/narration/cast.json': { speakers: {}, pronounce: {} },
+  'tts/act1/script.json': [{ id: 'a', speaker: 'mira', text: 'Hi.' }],
   'audio/act1/a.mp3': 'clip',
   'notes.txt': 'not the studio’s',
 }
@@ -29,8 +29,11 @@ describe('gitChanges', () => {
     git(root, 'init', '-q')
     git(root, 'add', '.')
     git(root, 'commit', '-q', '-m', 'start')
-    writeFileSync(join(root, 'tts/cast.json'), '{"speakers":{},"pronounce":{"a":"b"}}')
-    writeFileSync(join(root, 'tts/act1/cues.json'), '{}')
+    writeFileSync(
+      join(root, 'content-studio/narration/cast.json'),
+      '{"speakers":{},"pronounce":{"en":{"a":"b"}}}',
+    )
+    writeFileSync(join(root, 'content-studio/narration/act1.edits.json'), '{}')
     writeFileSync(join(root, 'audio/act1/b.mp3'), 'new clip')
     rmSync(join(root, 'audio/act1/a.mp3'))
     writeFileSync(join(root, 'notes.txt'), 'changed, but not the studio’s')
@@ -38,12 +41,14 @@ describe('gitChanges', () => {
     const result = await gitChanges(join(root, 'content-studio.json'))
     if (!result?.ok) throw new Error(JSON.stringify(result))
     expect(result.groups.total).toBe(4)
-    expect(result.groups.project).toEqual([{ path: 'tts/cast.json', change: 'modified' }])
+    expect(result.groups.project).toEqual([
+      { path: 'content-studio/narration/cast.json', change: 'modified' },
+    ])
     expect(result.groups.parts).toEqual([
       {
         id: 'act1',
         title: 'Act I',
-        files: [{ path: 'tts/act1/cues.json', change: 'new', role: 'cues' }],
+        files: [{ path: 'content-studio/narration/act1.edits.json', change: 'new', role: 'cues' }],
         clips: { new: 1, modified: 0, deleted: 1, renamed: 0, conflict: 0 },
       },
     ])
@@ -126,7 +131,7 @@ describe('gitChanges', () => {
     if (!result?.ok) throw new Error(JSON.stringify(result))
     expect(result.groups.project.map((c) => c.path)).toEqual([
       'content-studio.json',
-      'tts/cast.json',
+      'content-studio/narration/cast.json',
     ])
   })
 

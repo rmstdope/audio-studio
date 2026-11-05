@@ -22,10 +22,13 @@ export function SoundAlikePanel({
   groups,
   projectFile,
   language = null,
+  code,
   builtIn = true,
 }: {
   groups: string[][]
   projectFile: string
+  /** The code of the language whose groups these are, the source included. */
+  code: string
   /** A language besides the source, whose own groups these are; null: the source language's. */
   language?: { id: string; name: string } | null
   /** Whether the studio's built-in English groups apply here, so the panel says so. */
@@ -137,9 +140,7 @@ export function SoundAlikePanel({
           problems={[
             {
               file: projectFile,
-              path: language
-                ? `narration.quality.soundAlikeByLanguage.${language.id}`
-                : 'narration.quality.soundAlike',
+              path: `narration.generate.soundAlike.${code}`,
               message: problem,
             },
           ]}

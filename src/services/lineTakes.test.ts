@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { mkdir } from 'node:fs/promises'
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { narrationInLanguages, projectJson, tempRepo } from '../../test/helpers'
 import { clipInputs, fingerprint } from '../core/fingerprint'
 import { ProjectSchema } from '../core/project'
 import { createBudget, type Budget } from '../core/spend'
@@ -17,13 +17,13 @@ import { loadPart } from './workspace'
 
 const files = {
   'content-studio.json': projectJson(),
-  'tts/cast.json': {
+  'content-studio/narration/cast.json': {
     speakers: { narrator: { voice: 'v-n', style: '[warm]' } },
-    pronounce: { Elior: 'El-ee-or' },
+    pronounce: { en: { Elior: 'El-ee-or' } },
   },
   'tts/act1/script.json': [
-    { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
-    { key: 'k3', speaker: 'tilda', text: 'No voice.' },
+    { id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' },
+    { id: 'k3', speaker: 'tilda', text: 'No voice.' },
   ],
 }
 
@@ -109,7 +109,7 @@ describe('takeLine', () => {
     expect(listed).toEqual({ ok: true, takes: [result.take] })
     // Nothing of the game's.
     expect(existsSync(join(root, 'audio/act1'))).toBe(false)
-    expect(existsSync(join(root, 'tts/act1/narration.lock.json'))).toBe(false)
+    expect(existsSync(join(root, 'content-studio/narration/act1.lock.json'))).toBe(false)
   })
 
   it('records an unchecked take when the project does not check, and lists newest first', async () => {
@@ -167,7 +167,7 @@ describe('takeLine, a paid draft model', () => {
         ...projectJson(),
         narration: {
           ...(projectJson().narration as Record<string, unknown>),
-          models: { draft: 's1', final: 's1' },
+          models: { fish: { draft: 's1', final: 's1' } },
         },
       },
     })
@@ -214,7 +214,9 @@ describe('useLineTake', () => {
         { word: 'up.', start: 0.6, end: 0.85 },
       ],
     })
-    const lock = JSON.parse(readFileSync(join(root, 'tts/act1/narration.lock.json'), 'utf8'))
+    const lock = JSON.parse(
+      readFileSync(join(root, 'content-studio/narration/act1.lock.json'), 'utf8'),
+    )
     expect(lock.k1).toMatchObject({ heard: 1, takes: 1, voice: 'v-n', model: 's2.1-pro-free' })
     const part = await loadPart(projectFileOf(root), 'act1')
     expect(part?.ok && part.part.lines[0]?.status).toBe('ok')
@@ -230,7 +232,10 @@ describe('useLineTake', () => {
     const { fish } = fakeFish()
     const made = await take(root, fish)
     if (!made?.ok) throw new Error('expected a take')
-    writeFileSync(join(root, 'tts/act1/cues.json'), JSON.stringify({ k1: '[hushed]' }))
+    writeFileSync(
+      join(root, 'content-studio/narration/act1.edits.json'),
+      JSON.stringify({ cues: { k1: '[hushed]' } }),
+    )
     const listed = await listLineTakes(projectFileOf(root), 'act1', 'k1')
     expect(listed?.ok && listed.takes[0]?.current).toBe(false)
     const used = await useLineTake(projectFileOf(root), 'act1', 'k1', made.take.id, {
@@ -245,30 +250,32 @@ describe('useLineTake', () => {
       ...projectJson(),
       narration: {
         ...(projectJson().narration as Record<string, unknown>),
-        models: { draft: 's2.1-pro-free', final: 's1' },
+        models: { fish: { draft: 's2.1-pro-free', final: 's1' } },
       },
     }
     const parsed = ProjectSchema.parse(project)
     const cast = {
       speakers: { narrator: { voice: 'v-n', style: '[warm]' } },
-      pronounce: { Elior: 'El-ee-or' },
+      pronounce: { en: { Elior: 'El-ee-or' } },
     }
     const line = { key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }
     const finalInputs = clipInputs(
       line,
       cast.speakers.narrator,
       {},
-      cast.pronounce,
+      cast.pronounce.en,
       parsed.narration,
       's1',
     )!
-    const { fp, parts } = fingerprint(finalInputs)
+    const { fp, hashes } = fingerprint(finalInputs)
     const root = tempRepo({
       ...files,
       'content-studio.json': project,
       'audio/act1/manifest.json': { k1: { file: 'k1.mp3', speaker: 'narrator', duration: 1 } },
       'audio/act1/k1.mp3': 'paid',
-      'tts/act1/narration.lock.json': { k1: { fp, voice: 'v-n', model: 's1', parts, at: 'then' } },
+      'content-studio/narration/act1.lock.json': {
+        k1: { fp, voice: 'v-n', model: 's1', hashes, at: 'then' },
+      },
     })
     const { fish } = fakeFish()
     const made = await take(root, fish)
@@ -281,11 +288,11 @@ describe('useLineTake', () => {
   })
 
   it('reports a broken file of the part with its path, as a recording does', async () => {
-    const root = tempRepo({ ...files, 'tts/act1/narration.lock.json': 'not json' })
+    const root = tempRepo({ ...files, 'content-studio/narration/act1.lock.json': 'not json' })
     const { fish } = fakeFish()
     expect(await take(root, fish)).toMatchObject({
       ok: false,
-      problems: [{ file: 'tts/act1/narration.lock.json' }],
+      problems: [{ file: 'content-studio/narration/act1.lock.json' }],
     })
   })
 
@@ -329,23 +336,17 @@ describe('takes of a line in a language besides the source', () => {
   const several = projectJson()
   const narration = several.narration as Record<string, unknown>
   several.languages = ['en', 'sv']
-  narration.paths = {
-    dialog: 'tts/{part}/{language}/script.json',
-    cues: 'tts/{part}/{language}/cues.json',
-    lock: 'tts/{part}/{language}/narration.lock.json',
-    clips: 'audio/{part}/{language}',
-    manifest: 'audio/{part}/{language}/manifest.json',
-  }
+  Object.assign(narration, narrationInLanguages())
   const swedish = {
     'content-studio.json': several,
-    'tts/cast.json': {
+    'content-studio/narration/cast.json': {
       speakers: {
         narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-sv' } } },
       },
     },
-    'tts/act1/en/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }],
-    'tts/act1/sv/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Elior vaknar.' }],
-    'tts/act1/en/cues.json': { k1: '[worried]' },
+    'tts/act1/en/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }],
+    'tts/act1/sv/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Elior vaknar.' }],
+    'content-studio/narration/act1.edits.json': { cues: { k1: '[worried]' } },
   }
 
   it('keeps a language’s takes apart, makes one the clip of that language only, and drops it', async () => {
@@ -388,7 +389,10 @@ describe('takes of a line in a language besides the source', () => {
 describe('takeLine, with an ElevenLabs voice', () => {
   const elevenFiles = {
     ...files,
-    'tts/cast.json': { speakers: { narrator: { voice: 'eleven:abc', speed: 1.5 } }, pronounce: {} },
+    'content-studio/narration/cast.json': {
+      speakers: { narrator: { voice: 'eleven:abc', speed: 1.5 } },
+      pronounce: {},
+    },
   }
   it('is spoken by ElevenLabs, refused without its key or at a speed it does not take', async () => {
     const asked: string[] = []
@@ -416,7 +420,10 @@ describe('takeLine, with an ElevenLabs voice', () => {
     expect(await run(tempRepo(elevenFiles), eleven)).toMatchObject({ ok: false, reason: 'speed' })
     const calm = tempRepo({
       ...elevenFiles,
-      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:abc' } }, pronounce: {} },
+      'content-studio/narration/cast.json': {
+        speakers: { narrator: { voice: 'eleven:abc' } },
+        pronounce: {},
+      },
     })
     expect(await run(calm, null)).toMatchObject({ ok: false, reason: 'no-key' })
     expect(await run(calm, eleven)).toMatchObject({ ok: true })
@@ -428,7 +435,10 @@ describe('takeLine, its provider’s budget and slots', () => {
   it('charges an ElevenLabs line to the credits and waits for ElevenLabs’ slots, never Fish’s', async () => {
     const root = tempRepo({
       ...files,
-      'tts/cast.json': { speakers: { narrator: { voice: 'eleven:abc' } }, pronounce: {} },
+      'content-studio/narration/cast.json': {
+        speakers: { narrator: { voice: 'eleven:abc' } },
+        pronounce: {},
+      },
     })
     const used: string[] = []
     const watched = (name: string): Limiter => ({

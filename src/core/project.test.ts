@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'bun:test'
 import { z } from 'zod'
-import { projectJson } from '../../test/helpers'
-import { ProjectSchema, parseProject, partPathFor, problemsFrom } from './project'
+import { narrationInLanguages, projectJson } from '../../test/helpers'
+import {
+  CAST_FILE,
+  DEFAULT_PHRASE,
+  ProjectSchema,
+  narrationFile,
+  parseProject,
+  partPathFor,
+  problemsFrom,
+  soundAlikeOf,
+  standardPhrase,
+} from './project'
 
 function parse(value: unknown) {
   return ProjectSchema.safeParse(value)
@@ -47,155 +57,154 @@ describe('the format version', () => {
 })
 
 describe('ProjectSchema', () => {
+  /** The test project with its narration section changed by `change`. */
+  const withNarration = (change: Record<string, unknown>) => {
+    const base = projectJson()
+    return { ...base, narration: { ...(base.narration as object), ...change } }
+  }
+  /** The same in English and Swedish, every narration path with `{language}`. */
+  const inSwedishToo = (change: Record<string, unknown>) => ({
+    ...projectJson({ languages: ['en', 'sv'] }),
+    narration: narrationInLanguages(change),
+  })
+
   it('fills in defaults for everything optional', () => {
     const result = parse(projectJson())
     expect(result.success).toBe(true)
     const project = result.data!
     expect(project.env).toBe('.env')
     expect(project.narration.models).toEqual({
-      audition: 's2.1-pro-free',
-      draft: 's2.1-pro-free',
-      final: 's2.1-pro-free',
+      fish: { audition: 's2.1-pro-free', draft: 's2.1-pro-free', final: 's2.1-pro-free' },
+      elevenlabs: { audition: 'eleven_v3', draft: 'eleven_v3', final: 'eleven_v3' },
     })
-    expect(project.narration.quality.minHeard).toBe(0.9)
-    expect(project.narration.quality.soundAlike).toEqual([])
+    expect(project.narration.generate).toMatchObject({
+      fish: { temperature: 0.7, topP: 0.7, speed: 1 },
+      elevenlabs: { stability: 0.5, similarityBoost: 0.75, style: 0 },
+      minHeard: 0.9,
+      takes: 3,
+      chunkLimit: 400,
+      parallel: 4,
+      transcriber: 'mlx-whisper',
+      soundAlike: {},
+      sceneCueSpeakers: ['narrator'],
+    })
     expect(project.narration.output).toEqual({
       codec: 'mp3',
       bitrate: '64k',
       channels: 1,
       lufs: null,
     })
-    expect(project.narration.audition.candidatesPerRound).toBe(5)
+    expect(project.narration.audition).toEqual({
+      phrase: {},
+      candidatesPerRound: 5,
+      searchLanguage: 'en',
+    })
+  })
+
+  it('reads the dialog, clips and manifest from the narration section', () => {
+    const narration = parse(projectJson()).data!.narration
+    expect(narration.from).toEqual({ part: 'tts/{part}/script.json' })
+    expect(narration.clips).toBe('audio/{part}')
+    expect(narration.manifest).toBe('audio/{part}/manifest.json')
   })
 
   it('accepts a paid audition model whose price is known', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const parsed = parse({ ...base, narration: { ...narration, models: { audition: 's2.1-pro' } } })
-    expect(parsed.success && parsed.data.narration.models.audition).toBe('s2.1-pro')
+    const parsed = parse(withNarration({ models: { fish: { audition: 's2.1-pro' } } }))
+    expect(parsed.success && parsed.data.narration.models.fish.audition).toBe('s2.1-pro')
   })
 
   it('rejects an audition model without a known price, naming the stage', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const found = problems({
-      ...base,
-      narration: { ...narration, models: { audition: 'mystery-9' } },
-    })
+    const found = problems(withNarration({ models: { fish: { audition: 'mystery-9' } } }))
     expect(found).toEqual([
       {
         file: 'content-studio.json',
-        path: 'narration.models.audition',
+        path: 'narration.models.fish.audition',
         message: '"mystery-9" has no known price, so its cost cannot be shown',
       },
     ])
   })
 
-  it('refuses a standard audition phrase too long for one take', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const found = problems({
-      ...base,
-      narration: { ...narration, audition: { phrase: 'x'.repeat(401) } },
+  it('takes ElevenLabs’ stage models and voice settings', () => {
+    const parsed = parse(
+      withNarration({
+        models: { elevenlabs: { final: 'eleven_multilingual_v2' } },
+        generate: { elevenlabs: { stability: 1 } },
+      }),
+    ).data!
+    expect(parsed.narration.models.elevenlabs.final).toBe('eleven_multilingual_v2')
+    expect(parsed.narration.generate.elevenlabs.stability).toBe(1)
+    expect(
+      problems(withNarration({ models: { elevenlabs: { draft: 's2-pro' } } })).map((p) => p.path),
+    ).toEqual(['narration.models.elevenlabs.draft'])
+  })
+
+  it('gives the source language the built-in audition phrase, and another language none', () => {
+    const project = parse(inSwedishToo({})).data!
+    expect(standardPhrase(project, 'en')).toBe(DEFAULT_PHRASE)
+    expect(standardPhrase(project, 'sv')).toBeNull()
+    const own = parse(inSwedishToo({ audition: { phrase: { en: 'Come in.', sv: 'Kom in.' } } }))
+    expect(standardPhrase(own.data!, 'en')).toBe('Come in.')
+    expect(standardPhrase(own.data!, 'sv')).toBe('Kom in.')
+  })
+
+  it('takes a standard audition phrase per declared language, each short enough for one take', () => {
+    const withPhrases = (phrase: Record<string, string>) => inSwedishToo({ audition: { phrase } })
+    expect(parse(withPhrases({ sv: 'Kom in.' })).data?.narration.audition.phrase).toEqual({
+      sv: 'Kom in.',
     })
-    expect(found.map((p) => [p.path, p.message])).toEqual([
+    expect(problems(withPhrases({ de: 'Komm herein.' })).map((p) => [p.path, p.message])).toEqual([
+      ['narration.audition.phrase.de', '"de" is not one of the project’s languages'],
+    ])
+    expect(problems(withPhrases({ en: 'x'.repeat(401) })).map((p) => [p.path, p.message])).toEqual([
       [
-        'narration.audition.phrase',
-        'is 401 characters; a take is one piece of at most 400 (quality.chunkLimit)',
+        'narration.audition.phrase.en',
+        'is 401 characters; a take is one piece of at most 400 (generate.chunkLimit)',
       ],
     ])
   })
 
-  it('takes a standard audition phrase per declared language, each short enough for one take', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const withPhrases = (phrases: Record<string, string>) => ({
-      ...base,
-      languages: ['en', 'sv'],
-      narration: {
-        ...narration,
-        paths: {
-          dialog: 'tts/{part}/{language}/script.json',
-          cues: 'tts/{part}/{language}/cues.json',
-          lock: 'tts/{part}/{language}/narration.lock.json',
-          clips: 'audio/{part}/{language}',
-          manifest: 'audio/{part}/{language}/manifest.json',
-        },
-        audition: { phrases },
-      },
-    })
-    const ok = parse(withPhrases({ sv: 'Kom in.' }))
-    expect(ok.data?.narration.audition.phrases).toEqual({ sv: 'Kom in.' })
-    expect(problems(withPhrases({ de: 'Komm herein.' })).map((p) => [p.path, p.message])).toEqual([
-      ['narration.audition.phrases.de', '"de" is not one of the project’s languages'],
-    ])
-    expect(problems(withPhrases({ sv: 'x'.repeat(401) }))[0]?.path).toBe(
-      'narration.audition.phrases.sv',
-    )
-  })
-
   it('never refuses a project for the built-in phrase, whatever chunk limit it allows', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    expect(
-      parse({ ...base, narration: { ...narration, quality: { chunkLimit: 100 } } }).success,
-    ).toBe(true)
+    expect(parse(withNarration({ generate: { chunkLimit: 100 } })).success).toBe(true)
   })
 
   it('reports only the chunk limit when the limit itself is wrong', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const found = problems({ ...base, narration: { ...narration, quality: { chunkLimit: 10 } } })
-    expect(found.map((p) => p.path)).toEqual(['narration.quality.chunkLimit'])
+    const found = problems(
+      withNarration({ generate: { chunkLimit: 10 }, audition: { phrase: { en: 'x'.repeat(50) } } }),
+    )
+    expect(found.map((p) => p.path)).toEqual(['narration.generate.chunkLimit'])
   })
 
-  it('takes groups of two words or more that sound the same', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const alike = (soundAlike: unknown) => ({
-      ...base,
-      narration: { ...narration, quality: { soundAlike } },
-    })
+  it('takes groups of two words or more that sound the same, by language', () => {
+    const alike = (groups: unknown) => withNarration({ generate: { soundAlike: { en: groups } } })
     expect(parse(alike([['Lyria', 'Leer-ia']])).success).toBe(true)
     expect(problems(alike([['alone']])).map((p) => p.path)).toEqual([
-      'narration.quality.soundAlike[0]',
+      'narration.generate.soundAlike.en[0]',
     ])
     // Words or phrases, each word with a letter or digit: punctuation alone could never match.
     expect(parse(alike([['all right', 'alright']])).success).toBe(true)
     expect(problems(alike([['Lyria', 'Leer !!']])).map((p) => p.path)).toEqual([
-      'narration.quality.soundAlike[0][1]',
+      'narration.generate.soundAlike.en[0][1]',
     ])
     expect(problems(alike([['Lyria', '!!']])).map((p) => p.path)).toEqual([
-      'narration.quality.soundAlike[0][1]',
+      'narration.generate.soundAlike.en[0][1]',
     ])
   })
 
-  it('takes the words that sound the same of the languages besides the source, and no others', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
-    const paths = {
-      dialog: 'tts/{part}/{language}/script.json',
-      cues: 'tts/{part}/{language}/cues.json',
-      lock: 'tts/{part}/{language}/lock.json',
-      clips: 'audio/{part}/{language}',
-      manifest: 'audio/{part}/{language}/manifest.json',
-    }
-    const by = (soundAlikeByLanguage: unknown) => ({
-      ...base,
-      languages: ['en', 'sv'],
-      narration: { ...narration, paths, quality: { soundAlikeByLanguage } },
-    })
-    expect(parse(by({ sv: [['Lyria', 'Liria']] })).success).toBe(true)
-    expect(problems(by({ sv: [['alone']] })).map((p) => p.path)).toEqual([
-      'narration.quality.soundAlikeByLanguage.sv[0]',
-    ])
+  it('takes the words that sound the same of the project’s languages, and no others', () => {
+    const by = (soundAlike: unknown) => inSwedishToo({ generate: { soundAlike } })
+    const project = parse(by({ en: [['inn', 'in']], sv: [['Lyria', 'Liria']] })).data!
+    expect(soundAlikeOf(project, 'en')).toEqual([['inn', 'in']])
+    expect(soundAlikeOf(project, 'sv')).toEqual([['Lyria', 'Liria']])
+    expect(soundAlikeOf(parse(by({})).data!, 'sv')).toEqual([])
     expect(problems(by({ de: [['a', 'b']] })).map((p) => p.path)).toEqual([
-      'narration.quality.soundAlikeByLanguage.de',
+      'narration.generate.soundAlike.de',
     ])
-    // The source language's own groups are `soundAlike`.
-    expect(problems(by({ en: [['a', 'b']] })).map((p) => p.path)).toEqual([
-      'narration.quality.soundAlikeByLanguage.en',
-    ])
+  })
+
+  it('names the speakers that follow their scene’s cue under generate', () => {
+    expect(parse(projectJson()).data!.narration.generate.sceneCueSpeakers).toEqual(['narrator'])
+    const named = parse(withNarration({ generate: { sceneCueSpeakers: ['narrator', 'mira'] } }))
+    expect(named.data!.narration.generate.sceneCueSpeakers).toEqual(['narrator', 'mira'])
   })
 
   it('holds no setting of the person’s own: those are in the cache', () => {
@@ -205,12 +214,13 @@ describe('ProjectSchema', () => {
 
   it('requires {part} in part paths', () => {
     const base = projectJson()
-    const narration = base.narration as { paths: Record<string, string> }
-    const found = problems({
-      ...base,
-      narration: { ...narration, paths: { ...narration.paths, clips: 'audio' } },
-    })
-    expect(found.map((p) => p.path)).toEqual(['narration.paths.clips'])
+    const narration = {
+      ...(base.narration as object),
+      clips: 'audio',
+      from: { part: 'tts/x.json' },
+    }
+    const found = problems({ ...base, narration })
+    expect(found.map((p) => p.path)).toEqual(['narration.from.part', 'narration.clips'])
   })
 
   it('takes the parts and what the game calls them at the top level', () => {
@@ -285,14 +295,14 @@ describe('ProjectSchema, loudness', () => {
 })
 
 describe('ProjectSchema, paid models', () => {
-  const withModels = (models: Record<string, string>) =>
+  const withModels = (fish: Record<string, string>) =>
     ProjectSchema.safeParse(
-      projectJson({ narration: { ...(projectJson().narration as object), models } }),
+      projectJson({ narration: { ...(projectJson().narration as object), models: { fish } } }),
     )
 
   it('takes a priced model for drafts and the final recording', () => {
     const parsed = withModels({ draft: 's2-pro', final: 'drama-3' })
-    expect(parsed.success && parsed.data.narration.models).toEqual({
+    expect(parsed.success && parsed.data.narration.models.fish).toEqual({
       audition: 's2.1-pro-free',
       draft: 's2-pro',
       final: 'drama-3',
@@ -306,19 +316,12 @@ describe('ProjectSchema, paid models', () => {
 })
 
 describe('languages', () => {
-  function withLanguages(languages: unknown, paths: Record<string, string> = {}) {
+  function withLanguages(languages: unknown, paths: Record<string, unknown> = {}) {
     const base = projectJson()
-    const narration = base.narration as { paths: Record<string, string> }
-    return {
-      ...base,
-      languages,
-      narration: { ...narration, paths: { ...narration.paths, ...paths } },
-    }
+    return { ...base, languages, narration: { ...(base.narration as object), ...paths } }
   }
   const everyPath = {
-    dialog: 'tts/{part}/{language}/script.json',
-    cues: 'tts/{part}/{language}/cues.json',
-    lock: 'tts/{part}/{language}/narration.lock.json',
+    from: { part: 'tts/{part}/{language}/script.json' },
     clips: 'audio/{part}/{language}',
     manifest: 'audio/{part}/{language}/manifest.json',
   }
@@ -340,10 +343,10 @@ describe('languages', () => {
     const found = problems(
       withLanguages(['en', 'sv'], {
         ...everyPath,
-        lock: 'tts/{part}/narration.lock.json',
+        manifest: 'audio/{part}/manifest.json',
       }),
     )
-    expect(found.map((p) => p.path)).toEqual(['narration.paths.lock'])
+    expect(found.map((p) => p.path)).toEqual(['narration.manifest'])
     expect(found[0]!.message).toContain('{language}')
   })
 
@@ -469,12 +472,29 @@ describe('the images section', () => {
   })
 })
 
-describe('narration.sceneCueSpeakers', () => {
-  it('is the narrator alone unless the project names speakers', () => {
-    expect(parse(projectJson()).data!.narration.sceneCueSpeakers).toEqual(['narrator'])
-    const base = projectJson().narration as Record<string, unknown>
-    const named = projectJson({ narration: { ...base, sceneCueSpeakers: ['narrator', 'mira'] } })
-    expect(parse(named).data!.narration.sceneCueSpeakers).toEqual(['narrator', 'mira'])
+describe('narrationFile', () => {
+  const project = { languages: ['en', 'sv'] }
+
+  it('names a part’s edits and lock in the source language by the part alone', () => {
+    expect(narrationFile(project, 'act1', 'en', 'edits')).toBe(
+      'content-studio/narration/act1.edits.json',
+    )
+    expect(narrationFile(project, 'act1', 'en', 'lock')).toBe(
+      'content-studio/narration/act1.lock.json',
+    )
+  })
+
+  it('names another language’s with its code', () => {
+    expect(narrationFile(project, 'act2', 'sv', 'edits')).toBe(
+      'content-studio/narration/act2.sv.edits.json',
+    )
+    expect(narrationFile(project, 'act2', 'sv', 'lock')).toBe(
+      'content-studio/narration/act2.sv.lock.json',
+    )
+  })
+
+  it('keeps the cast at one fixed place', () => {
+    expect(CAST_FILE).toBe('content-studio/narration/cast.json')
   })
 })
 
@@ -485,18 +505,18 @@ describe('problemsFrom wording', () => {
   const narration = base.narration as Record<string, unknown>
   const quality = (value: Record<string, unknown>) => ({
     ...base,
-    narration: { ...narration, quality: value },
+    narration: { ...narration, generate: value },
   })
 
   it('says a number that is too small in plain words', () => {
     expect(messages(quality({ parallel: 0 }))).toEqual([
-      'narration.quality.parallel must be 1 or more',
+      'narration.generate.parallel must be 1 or more',
     ])
   })
 
   it('says a wrong type in plain words', () => {
     expect(messages(quality({ minHeard: 'long' }))).toEqual([
-      'narration.quality.minHeard must be a number (it is text)',
+      'narration.generate.minHeard must be a number (it is text)',
     ])
   })
 

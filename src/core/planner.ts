@@ -15,7 +15,7 @@ import {
   cueFor,
   sceneKey,
   sceneOfKey,
-  type Cast,
+  type SpokenCast,
   type Cues,
   type Line,
   type Lock,
@@ -144,7 +144,7 @@ export interface PlanInput {
    * source line missing from `lines` (or blank there) is listed as untranslated.
    */
   source?: Line[]
-  cast: Cast
+  cast: SpokenCast
   /**
    * The cues the lines are spoken with. In a language besides the source, the source's cues under
    * the language's own, so a line follows the source's cue until it has one of its own.
@@ -181,7 +181,7 @@ export function planPart(input: PlanInput): PartState {
     const scene = line.scene ?? null
     const followsScene =
       scene !== null &&
-      narration.sceneCueSpeakers.includes(line.speaker) &&
+      narration.generate.sceneCueSpeakers.includes(line.speaker) &&
       openingFor(cues, line.key, line.text) === undefined
     if (line.text.trim() === '' && english !== null) {
       counts.untranslated++
@@ -247,7 +247,7 @@ export function planPart(input: PlanInput): PartState {
       )
     } else if (
       entry.heard !== undefined &&
-      entry.heard < narration.quality.minHeard &&
+      entry.heard < narration.generate.minHeard &&
       !entry.accepted
     )
       status = 'weak'
@@ -402,8 +402,15 @@ export function adoptUntracked(input: PlanInput, now: string): { lock: Lock; ado
     if (!untracked.has(line.key)) continue
     // An untracked line has a voice, so it has inputs.
     const inputs = clipInputs(line, cast.speakers[line.speaker], cues, cast.pronounce, narration)!
-    const { fp, parts } = fingerprint(inputs)
-    lock[line.key] = { fp, voice: inputs.voice, model: inputs.model, parts, adopted: true, at: now }
+    const { fp, hashes } = fingerprint(inputs)
+    lock[line.key] = {
+      fp,
+      voice: inputs.voice,
+      model: inputs.model,
+      hashes,
+      adopted: true,
+      at: now,
+    }
   }
   return { lock, adopted: untracked.size }
 }

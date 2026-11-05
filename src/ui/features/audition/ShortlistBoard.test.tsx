@@ -783,12 +783,14 @@ describe('ShortlistBoard', () => {
     const asked = studio({
       credits: { dollars: 2100, left: 2100 },
       noKey: true,
-      freeRefused: 'tts/cast.json or a saved audition can’t be read.',
+      freeRefused: 'content-studio/narration/cast.json or a saved audition can’t be read.',
     })
     const { container, page } = await boardOf(gravel)
     await until(() => asked.some((a) => a.path.includes('/takes')))
     await until(() =>
-      container.textContent!.includes('tts/cast.json or a saved audition can’t be read.'),
+      container.textContent!.includes(
+        'content-studio/narration/cast.json or a saved audition can’t be read.',
+      ),
     )
     expect(container.textContent).not.toContain('Take waits for a free voice slot')
     await act(() => page.unmount())

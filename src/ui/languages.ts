@@ -156,7 +156,10 @@ export function dialogGonePanel({
   const words = recordedWords(recorded)
   const one = recorded.clips + recorded.cues === 1
   const were = one ? 'was' : 'were'
-  const dropped = `If the game no longer has ${language ? `${language} lines for ` : ''}this ${partLabel.toLowerCase()}, delete ${recorded.clips ? 'the clips and their manifest' : 'the cues file'} yourself.`
+  const part = partLabel.toLowerCase()
+  const own = `the ${part}’s ${language ? `${language} ` : ''}edits and lock in content-studio/narration/`
+  const files = recorded.clips ? `the clips and their manifest, and ${own},` : own
+  const dropped = `If the game no longer has ${language ? `${language} lines for ` : ''}this ${part}, delete ${files} yourself.`
   return {
     heading: `${partTitle}’s ${language ? `${language} ` : ''}dialog is gone`,
     before: ` is not there, but ${words} ${were} recorded for ${partTitle}${

@@ -281,7 +281,7 @@ export function StyleEditor({ characterId, style }: { characterId: string; style
 
 /**
  * A character's own speaking speed, saved in the cast: its lines and takes are spoken at it
- * instead of the project's `tts.speed`.
+ * instead of the project's `generate.fish.speed`.
  */
 export function SpeedEditor(props: SpeedEditorProps) {
   // Keyed by language: what is typed, and a save's answer, belong to the language they were for,

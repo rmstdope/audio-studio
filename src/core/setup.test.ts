@@ -176,12 +176,12 @@ describe('the requests-at-once check', () => {
       state: 'problem',
       detail:
         'Recording sends 8 at a time, but your account allows 5. Fish will turn the extra requests away and recording will slow down while the studio waits and retries.',
-      fix: 'Set quality.parallel to 5 or less in the project file.',
+      fix: 'Set generate.parallel to 5 or less in the project file.',
       tier: { chosen: 'under-100' },
     })
     expect(requests({ parallel: 60, fishTier: '1000' })).toMatchObject({
       state: 'problem',
-      fix: 'Set quality.parallel to 50 or less in the project file.',
+      fix: 'Set generate.parallel to 50 or less in the project file.',
     })
   })
 

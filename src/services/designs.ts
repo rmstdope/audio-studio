@@ -77,7 +77,7 @@ export async function designVoices(
   if (!loaded.ok) return loaded
   const { project, summary, cast } = loaded
   if (!summary.characters.some((c) => c.id === characterId)) return null
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
   const text = description.trim()
   const state = descriptionState(text)
   if (!state.canSend) {
@@ -169,7 +169,7 @@ export async function elevenDesignFor(
   const { project, summary, cast } = loaded
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
   const seen = auditionIn(project, cast, summary, characterId, asked)
   if (seen.audition.phrase === null) {
     return {

@@ -2,6 +2,7 @@ import { dirname } from 'node:path'
 import { formatCast } from '../core/castFormat'
 import { resolveInRoot } from '../core/paths'
 import {
+  CAST_FILE,
   declaredLanguage,
   FREE_MODELS,
   phraseProblem,
@@ -92,7 +93,7 @@ export async function findCandidates(
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
   // Without the cast the phrase, style and pronunciations are unknown: say so, don't guess.
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
   const fish = await fishFor(dirname(projectFile), project)
   const keywords = options.keywords ?? character.keywords
   const searching = keywords.length > 0 && options.search !== false
@@ -132,7 +133,7 @@ export async function findCandidates(
         ? await searchVoices(fish, keywords, {
             language,
             exclude,
-            parallel: project.narration.quality.parallel,
+            parallel: project.narration.generate.parallel,
           })
         : []
     const candidates = found.slice(0, CANDIDATE_LIMIT)
@@ -182,7 +183,7 @@ export function unknownVoice(id: string, name: string | null): Voice {
 
 /** The language a library is searched in for voices of `language`: the source language as the project says, another by its code. */
 export function searchLanguage(project: Project, language: string): string {
-  return language === project.languages[0] ? project.narration.audition.language : language
+  return language === project.languages[0] ? project.narration.audition.searchLanguage : language
 }
 
 /**
@@ -246,7 +247,7 @@ export async function characterVoice(
   const { project, summary, cast } = loaded
   const character = summary.characters.find((c) => c.id === characterId)
   if (!character) return null
-  if (!cast) return { ok: false, problems: castProblems(project, summary.problems) }
+  if (!cast) return { ok: false, problems: castProblems(summary.problems) }
   const seen = auditionIn(project, cast, summary, characterId, asked)
   const { audition } = seen
   const language = searchLanguage(project, seen.language)
@@ -352,7 +353,7 @@ export function setStyle(
 
 /**
  * Saves a character's own speaking speed in the cast (its lines and takes are spoken at it instead
- * of the project's `tts.speed`); null removes it. Its recorded lines go stale. For a language other
+ * of the project's `generate.fish.speed`); null removes it. Its recorded lines go stale. For a language other
  * than the source language it is that language's own speed.
  */
 export function setSpeed(
@@ -392,10 +393,10 @@ export async function setPhrase(
   const { project } = loaded
   const { narration } = project
   const which = declaredLanguage(project, language)
-  const tooLong = own ? phraseProblem(own, narration.quality.chunkLimit) : null
+  const tooLong = own ? phraseProblem(own, narration.generate.chunkLimit) : null
   if (tooLong) {
     const path = phrasePath(characterId, which === project.languages[0] ? undefined : which)
-    return { ok: false, problems: [{ file: narration.characters, path, message: tooLong }] }
+    return { ok: false, problems: [{ file: CAST_FILE, path, message: tooLong }] }
   }
   return updateCharacter(
     projectFile,
@@ -552,13 +553,10 @@ async function writeCharacter(
  * being saved, which is checked on its own); null when none would be.
  */
 function reorderedTable(parsed: Cast, path: string, except?: string): Problem[] | null {
-  const tables: [string, string[]][] = [
-    ['pronounce', Object.keys(parsed.pronounce)],
-    ...Object.entries(parsed.languages ?? {}).map(([language, own]): [string, string[]] => [
-      `languages.${language}.pronounce`,
-      Object.keys(own.pronounce ?? {}),
-    ]),
-  ]
+  const tables = Object.entries(parsed.pronounce).map(([language, table]): [string, string[]] => [
+    `pronounce.${language}`,
+    Object.keys(table),
+  ])
   for (const [where, keys] of tables) {
     if (where === except) continue
     const numbers = keys.filter((k) => INTEGER_LIKE.test(k))
@@ -589,7 +587,7 @@ async function writeCast(
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
   const root = dirname(projectFile)
-  const path = opened.project.narration.characters
+  const path = CAST_FILE
 
   const json = await readJson(resolveInRoot(root, path))
   if (json.status === 'invalid') {
@@ -622,12 +620,10 @@ export function setPronunciations(
     if (!opened.ok) return opened
     const { project } = opened
     const which = declaredLanguage(project, language)
-    // The source language's table is `pronounce`; another's is `languages.<code>.pronounce`.
-    const own = which !== project.languages[0]
-    const where = own ? `languages.${which}.pronounce` : 'pronounce'
+    const where = `pronounce.${which}`
     return writeCast(projectFile, (raw, parsed, path) => {
       const problem = (message: string): Problem[] => [{ file: path, path: where, message }]
-      if (!sameTable(Object.entries(pronounceOf(parsed, which, project.languages[0]!)), was)) {
+      if (!sameTable(Object.entries(pronounceOf(parsed, which)), was)) {
         return problem(
           'the pronunciations in the file changed since editing began; discard your changes to see them',
         )
@@ -637,15 +633,12 @@ export function setPronunciations(
       // The other tables are written back as parsed: none may be reordered by it.
       const reordered = reorderedTable(parsed, path, where)
       if (reordered) return reordered
-      if (!own) return { ...raw, pronounce: Object.fromEntries(clean) }
-      const { languages: had = {} } = raw as { languages?: Record<string, Record<string, unknown>> }
-      const { pronounce: _was, ...rest } = had[which] ?? {}
-      const entry = clean.length ? { ...rest, pronounce: Object.fromEntries(clean) } : rest
-      // A language left with nothing goes, and so does the key when no language is left.
-      const { [which]: _gone, ...others } = had
-      const kept = Object.keys(entry).length ? { ...others, [which]: entry } : others
-      const { languages: _languages, ...withoutLanguages } = raw
-      return Object.keys(kept).length ? { ...withoutLanguages, languages: kept } : withoutLanguages
+      // A language left with no pronunciations goes from the table.
+      const { [which]: _was, ...others } = parsed.pronounce
+      const pronounce = clean.length
+        ? { ...parsed.pronounce, [which]: Object.fromEntries(clean) }
+        : others
+      return { ...raw, pronounce }
     })
   })
 }

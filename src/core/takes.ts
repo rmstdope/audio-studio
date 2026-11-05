@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { ElevenTts, Project } from './project'
+import { standardPhrase, type ElevenTts, type Project } from './project'
 import type { Character } from './resources'
 import { spokenText } from './spoken'
 
@@ -34,9 +34,7 @@ export function auditionText(
   longest: string | null = null,
 ): AuditionText {
   const own = character.audition?.phrase?.trim()
-  const { audition } = project.narration
-  const standard =
-    language === project.languages[0] ? audition.phrase : audition.phrases?.[language]
+  const standard = standardPhrase(project, language)
   const [phrase, from]: [string | null, PhraseSource] = own
     ? [own, 'own']
     : standard
@@ -57,8 +55,8 @@ export interface TakeInputs {
   model: string
   voice: string
   spoken: string
-  tts: Project['narration']['tts']
-  /** An ElevenLabs take's voice settings (its speed is `tts.speed`); none for a Fish take. */
+  tts: Project['narration']['generate']['fish']
+  /** An ElevenLabs take's voice settings (its speed is `generate.fish.speed`); none for a Fish take. */
   eleven?: ElevenTts
   /** The language an ElevenLabs model was told, for one that is told it. */
   language?: string

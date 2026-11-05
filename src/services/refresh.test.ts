@@ -6,12 +6,12 @@ import { isRefreshing, refreshDialog, refreshEffects, refreshShared } from './re
 import { stopAll } from './stopWithStudio'
 
 const before = [
-  { key: 'a', speaker: 'mira', text: 'Hello.' },
-  { key: 'b', speaker: 'mira', text: 'Goodbye.' },
+  { id: 'a', speaker: 'mira', text: 'Hello.' },
+  { id: 'b', speaker: 'mira', text: 'Goodbye.' },
 ]
 const after = JSON.stringify([
-  { key: 'a', speaker: 'mira', text: 'Hello.' },
-  { key: 'c', speaker: 'mira', text: 'Farewell.' },
+  { id: 'a', speaker: 'mira', text: 'Hello.' },
+  { id: 'c', speaker: 'mira', text: 'Farewell.' },
 ])
 
 /** `command` as a part's refresh command, which names `{part}` (here in a comment if it has no use for it). */
@@ -23,7 +23,7 @@ function project(part?: string) {
   const json = projectJson(part === undefined ? {} : { refresh: { part: forPart(part) } })
   return {
     'content-studio.json': json,
-    'tts/cast.json': { speakers: {}, pronounce: {} },
+    'content-studio/narration/cast.json': { speakers: {}, pronounce: {} },
     'tts/act1/script.json': before,
   }
 }
@@ -51,11 +51,11 @@ describe('refreshDialog', () => {
   })
 
   it('reports a dialog the command left broken', async () => {
-    const root = tempRepo(project('printf \'[{"key": 1}]\' > tts/{part}/script.json'))
+    const root = tempRepo(project('printf \'[{"id": 1}]\' > tts/{part}/script.json'))
     expect(await refreshDialog(join(root, 'content-studio.json'), 'act1')).toMatchObject({
       ok: false,
       problems: expect.arrayContaining([
-        expect.objectContaining({ file: 'tts/act1/script.json', path: '[0].key' }),
+        expect.objectContaining({ file: 'tts/act1/script.json', path: '[0].id' }),
       ]),
     })
   })
@@ -176,7 +176,7 @@ describe('refreshing the music lists', () => {
     const json = projectJson({ music: music(), refresh: { part: forPart(command), shared } })
     return {
       'content-studio.json': json,
-      'tts/cast.json': { speakers: {}, pronounce: {} },
+      'content-studio/narration/cast.json': { speakers: {}, pronounce: {} },
       'tts/act1/script.json': before,
       ...files,
     }

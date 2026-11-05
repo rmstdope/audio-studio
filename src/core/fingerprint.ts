@@ -24,7 +24,7 @@ export interface ClipInputs {
 }
 
 /** Short hashes of a clip's inputs, kept in the lock so a changed input can be named. */
-export type InputHashes = LockEntry['parts']
+export type InputHashes = LockEntry['hashes']
 
 /** Why a clip no longer matches its inputs. */
 export type StaleReason = 'voice' | 'model' | 'cue' | 'text' | 'pronunciation' | 'settings'
@@ -45,11 +45,11 @@ export interface CueLine {
 export function sceneCueFor(
   line: CueLine,
   cues: Record<string, string>,
-  narration: Pick<Project['narration'], 'sceneCueSpeakers'>,
+  narration: { generate: Pick<Project['narration']['generate'], 'sceneCueSpeakers'> },
 ): string | undefined {
   if (!line.scene || !line.speaker || openingFor(cues, line.key, line.text ?? '') !== undefined)
     return undefined
-  if (!narration.sceneCueSpeakers.includes(line.speaker)) return undefined
+  if (!narration.generate.sceneCueSpeakers.includes(line.speaker)) return undefined
   return cueFor(cues, sceneKey(line.scene))
 }
 
@@ -85,10 +85,10 @@ export function clipInputs(
   model?: string,
 ): ClipInputs | null {
   if (!character?.voice) return null
-  const { output, quality } = narration
-  const tts = ttsFor(narration.tts, character)
+  const { output, generate } = narration
+  const tts = ttsFor(narration.generate.fish, character)
   const voice = character.voice
-  const eleven = narration.elevenlabs.tts
+  const eleven = narration.generate.elevenlabs
   const delivery =
     providerOf(voice) === 'elevenlabs'
       ? [eleven.stability, eleven.similarityBoost, eleven.style, tts.speed]
@@ -107,7 +107,7 @@ export function clipInputs(
     said: saidText(line.text, pronounce),
     settings: JSON.stringify([
       ...delivery,
-      quality.chunkLimit,
+      generate.chunkLimit,
       output.codec,
       output.bitrate,
       output.channels,
@@ -116,7 +116,7 @@ export function clipInputs(
 }
 
 /** The clip's fingerprint, and the short hashes of the inputs that are not kept in the clear. */
-export function fingerprint(inputs: ClipInputs): { fp: string; parts: InputHashes } {
+export function fingerprint(inputs: ClipInputs): { fp: string; hashes: InputHashes } {
   return {
     fp: hash(
       JSON.stringify([
@@ -130,7 +130,7 @@ export function fingerprint(inputs: ClipInputs): { fp: string; parts: InputHashe
       ]),
       16,
     ),
-    parts: {
+    hashes: {
       cue: hash(inputs.inside.length ? JSON.stringify([inputs.cue, inputs.inside]) : inputs.cue, 8),
       text: hash(inputs.text, 8),
       said: hash(inputs.said, 8),
@@ -153,14 +153,14 @@ export function fingerprintMatches(entry: LockEntry, inputs: ClipInputs): boolea
  * only when the words themselves are the same, since new words change how they are said too.
  */
 export function staleReasons(entry: LockEntry, inputs: ClipInputs): StaleReason[] {
-  const { parts } = fingerprint(inputs)
+  const { hashes } = fingerprint(inputs)
   const reasons: StaleReason[] = []
   if (entry.voice !== inputs.voice) reasons.push('voice')
   if (!sameModel(entry.model, inputs.model)) reasons.push('model')
-  if (entry.parts.cue !== parts.cue) reasons.push('cue')
-  if (entry.parts.text !== parts.text) reasons.push('text')
-  else if (entry.parts.said !== parts.said) reasons.push('pronunciation')
-  if (entry.parts.settings !== parts.settings) reasons.push('settings')
+  if (entry.hashes.cue !== hashes.cue) reasons.push('cue')
+  if (entry.hashes.text !== hashes.text) reasons.push('text')
+  else if (entry.hashes.said !== hashes.said) reasons.push('pronunciation')
+  if (entry.hashes.settings !== hashes.settings) reasons.push('settings')
   return reasons
 }
 

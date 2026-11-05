@@ -10,7 +10,7 @@ describe('the problems on a part’s page', () => {
     const root = tempRepo({})
     cpSync(join(import.meta.dir, '../../test/fixtures/sample'), root, { recursive: true })
     // The cast broken as when the bug was seen: a voice that is a number.
-    const castFile = join(root, 'tts/cast.json')
+    const castFile = join(root, 'content-studio/narration/cast.json')
     const cast = JSON.parse(readFileSync(castFile, 'utf8')) as {
       speakers: Record<string, Record<string, unknown>>
     }
@@ -23,14 +23,18 @@ describe('the problems on a part’s page', () => {
 
     const top = project.summary.problems
     const own = notShown(part.part.problems, top)
-    const castProblems = [...top, ...own].filter((p) => p.file === 'tts/cast.json')
+    const castProblems = [...top, ...own].filter(
+      (p) => p.file === 'content-studio/narration/cast.json',
+    )
     expect(castProblems.length).toBeGreaterThan(0)
     const said = castProblems.map((p) => `${p.path}: ${p.message}`)
     expect(said).toEqual([...new Set(said)])
   })
 
   it('keeps a problem only the part has', () => {
-    const shown = [{ file: 'tts/cast.json', path: 'speakers', message: 'is wrong' }]
+    const shown = [
+      { file: 'content-studio/narration/cast.json', path: 'speakers', message: 'is wrong' },
+    ]
     const notes = { file: 'tts/act1/notes.json', path: '', message: 'is not JSON' }
     expect(notShown([...shown, notes], shown)).toEqual([notes])
   })

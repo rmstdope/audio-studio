@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { elevenVoiceOf, fakeEleven, projectJson, tempRepo } from '../../test/helpers'
+import {
+  elevenVoiceOf,
+  fakeEleven,
+  narrationInLanguages,
+  projectJson,
+  tempRepo,
+} from '../../test/helpers'
 import { characterVoice } from './auditions'
 import { NO_ELEVENLABS_KEY } from './elevenlabs'
 import type { FishClient, TtsRequest } from './fish'
@@ -11,7 +17,7 @@ import { auditionTakes, recordTake, takeFile, tryLine } from './takes'
 
 const files = {
   'content-studio.json': projectJson(),
-  'tts/cast.json': {
+  'content-studio/narration/cast.json': {
     speakers: {
       grandmother: {
         voice: 'cur',
@@ -20,9 +26,9 @@ const files = {
         audition: { phrase: 'Elior, dear.' },
       },
     },
-    pronounce: { Elior: 'El-ee-or' },
+    pronounce: { en: { Elior: 'El-ee-or' } },
   },
-  'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Hello.' }],
+  'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Hello.' }],
 }
 
 function fakeFish() {
@@ -158,7 +164,9 @@ describe('recordTake', () => {
     const long = 'x'.repeat(401)
     const root = tempRepo({
       ...files,
-      'tts/cast.json': { speakers: { grandmother: { voice: 'cur', audition: { phrase: long } } } },
+      'content-studio/narration/cast.json': {
+        speakers: { grandmother: { voice: 'cur', audition: { phrase: long } } },
+      },
     })
     const { fish, requests } = fakeFish()
     const result = await recordTake(
@@ -177,7 +185,7 @@ describe('recordTake', () => {
   it('lists only the cast’s problems when the cast is broken', async () => {
     const root = tempRepo({
       ...files,
-      'tts/cast.json': '{ broken',
+      'content-studio/narration/cast.json': '{ broken',
       'tts/act2/script.json': '[ broken',
     })
     const { fish } = fakeFish()
@@ -190,7 +198,7 @@ describe('recordTake', () => {
     )
     expect(
       result && !result.ok && 'problems' in result && result.problems.map((p) => p.file),
-    ).toEqual(['tts/cast.json'])
+    ).toEqual(['content-studio/narration/cast.json'])
   })
 
   it('says so when there is no API key, or Fish fails', async () => {
@@ -264,9 +272,11 @@ describe('tryLine', () => {
     const root = tempRepo({
       ...files,
       'tts/act1/script.json': [
-        { key: 'a', speaker: 'grandmother', text: 'Elior, dear. Come here. Sit down now.' },
+        { id: 'a', speaker: 'grandmother', text: 'Elior, dear. Come here. Sit down now.' },
       ],
-      'tts/act1/cues.json': { a: '[soft] Elior, dear. Come [low] here. Sit down now.' },
+      'content-studio/narration/act1.edits.json': {
+        cues: { a: '[soft] Elior, dear. Come [low] here. Sit down now.' },
+      },
     })
     const { fish, requests } = fakeFish()
     const result = await tryLine(
@@ -287,8 +297,8 @@ describe('tryLine', () => {
   it('keeps the saved cues inside when only the opening cue is tried', async () => {
     const root = tempRepo({
       ...files,
-      'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
-      'tts/act1/cues.json': { a: 'Come [low] here now.' },
+      'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+      'content-studio/narration/act1.edits.json': { cues: { a: 'Come [low] here now.' } },
     })
     const { fish } = fakeFish()
     const result = await tryLine(
@@ -347,9 +357,9 @@ describe('tryLine', () => {
     )
     // Nothing of the game's: no cue saved, no manifest or lock made.
     for (const file of [
-      'tts/act1/cues.json',
+      'content-studio/narration/act1.edits.json',
       'audio/act1/manifest.json',
-      'tts/act1/narration.lock.json',
+      'content-studio/narration/act1.lock.json',
     ]) {
       expect(existsSync(join(root, file))).toBe(false)
     }
@@ -359,7 +369,7 @@ describe('tryLine', () => {
     const root = tempRepo({
       ...files,
       'audio/act1/manifest.json': { a: { file: 3 } },
-      'tts/act1/narration.lock.json': 'not json',
+      'content-studio/narration/act1.lock.json': 'not json',
     })
     const { fish } = fakeFish()
     const result = await tryLine(
@@ -371,7 +381,7 @@ describe('tryLine', () => {
       createLimiter(),
     )
     expect(result).toMatchObject({ ok: true })
-    const broken = tempRepo({ ...files, 'tts/cast.json': { speakers: 'no' } })
+    const broken = tempRepo({ ...files, 'content-studio/narration/cast.json': { speakers: 'no' } })
     const refused = await tryLine(
       projectFileOf(broken),
       'act1',
@@ -380,7 +390,10 @@ describe('tryLine', () => {
       async () => fish,
       createLimiter(),
     )
-    expect(refused).toMatchObject({ ok: false, problems: [{ file: 'tts/cast.json' }] })
+    expect(refused).toMatchObject({
+      ok: false,
+      problems: [{ file: 'content-studio/narration/cast.json' }],
+    })
   })
 
   it('tries the character’s style for an empty cue, and records a cue once', async () => {
@@ -400,14 +413,17 @@ describe('tryLine', () => {
       'content-studio.json': projectJson({
         narration: {
           ...(projectJson().narration as Record<string, unknown>),
-          sceneCueSpeakers: ['grandmother'],
+          generate: { sceneCueSpeakers: ['grandmother'] },
         },
       }),
       'tts/act1/script.json': [
-        { key: 'a', speaker: 'grandmother', text: 'Hello.', scene: 'Cave' },
-        { key: 'b', speaker: 'grandmother', text: 'Bye.', scene: 'Cave' },
+        { id: 'a', speaker: 'grandmother', text: 'Hello.', scene: 'Cave' },
+        { id: 'b', speaker: 'grandmother', text: 'Bye.', scene: 'Cave' },
       ],
-      'tts/act1/cues.json': { 'scene:Cave': '[dark]', b: '[own]' },
+      'content-studio/narration/act1.edits.json': {
+        cues: { b: '[own]' },
+        scenes: { Cave: '[dark]' },
+      },
     })
     const { fish } = fakeFish()
     const limiter = createLimiter()
@@ -422,8 +438,8 @@ describe('tryLine', () => {
     const root = tempRepo({
       ...files,
       'tts/act1/script.json': [
-        { key: 'a', speaker: 'grandmother', text: 'Hello.' },
-        { key: 'b', speaker: 'stranger', text: 'Who?' },
+        { id: 'a', speaker: 'grandmother', text: 'Hello.' },
+        { id: 'b', speaker: 'stranger', text: 'Who?' },
       ],
     })
     const { fish, requests } = fakeFish()
@@ -465,10 +481,10 @@ describe('takes and tries with an ElevenLabs voice', () => {
     'content-studio.json': projectJson({
       narration: {
         ...(projectJson().narration as object),
-        ...(model && { elevenlabs: { models: { audition: model } } }),
+        ...(model && { models: { elevenlabs: { audition: model } } }),
       },
     }),
-    'tts/cast.json': {
+    'content-studio/narration/cast.json': {
       speakers: {
         grandmother: {
           voice: 'eleven:g1',
@@ -477,9 +493,9 @@ describe('takes and tries with an ElevenLabs voice', () => {
           audition: { phrase: 'Elior, dear.' },
         },
       },
-      pronounce: { Elior: 'El-ee-or' },
+      pronounce: { en: { Elior: 'El-ee-or' } },
     },
-    'tts/act1/script.json': [{ key: 'a', speaker: 'grandmother', text: 'Come here now.' }],
+    'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Come here now.' }],
   })
   const spending = (root: string) => {
     const file = join(root, 'content-studio/cache/spending.json')
@@ -872,23 +888,17 @@ describe('tryLine in a language besides the source', () => {
   const several = projectJson()
   const narration = several.narration as Record<string, unknown>
   several.languages = ['en', 'sv']
-  narration.paths = {
-    dialog: 'tts/{part}/{language}/script.json',
-    cues: 'tts/{part}/{language}/cues.json',
-    lock: 'tts/{part}/{language}/narration.lock.json',
-    clips: 'audio/{part}/{language}',
-    manifest: 'audio/{part}/{language}/manifest.json',
-  }
+  Object.assign(narration, narrationInLanguages())
   const swedish = {
     'content-studio.json': several,
-    'tts/cast.json': {
+    'content-studio/narration/cast.json': {
       speakers: {
         narrator: { voice: 'v-n', style: '[warm]', languages: { sv: { voice: 'v-sv' } } },
       },
     },
-    'tts/act1/en/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Hello.' }],
-    'tts/act1/sv/script.json': [{ key: 'k1', speaker: 'narrator', text: 'Hej.' }],
-    'tts/act1/en/cues.json': { k1: '[worried]' },
+    'tts/act1/en/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Hello.' }],
+    'tts/act1/sv/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Hej.' }],
+    'content-studio/narration/act1.edits.json': { cues: { k1: '[worried]' } },
   }
   const tryIt = async (cue: string) => {
     const root = tempRepo(swedish)
@@ -915,7 +925,10 @@ describe('takes on a paid audition model', () => {
   const paid = {
     ...files,
     'content-studio.json': projectJson({
-      narration: { ...(projectJson().narration as object), models: { audition: 's2.1-pro' } },
+      narration: {
+        ...(projectJson().narration as object),
+        models: { fish: { audition: 's2.1-pro' } },
+      },
     }),
   }
   // '[warm] El-ee-or, dear.' is 22 bytes: $0.00033 at $15 per million.
@@ -1068,8 +1081,8 @@ describe('takes on a paid audition model', () => {
     const projectFile = join(
       tempRepo({
         ...paid,
-        'tts/cast.json': {
-          ...(files['tts/cast.json'] as object),
+        'content-studio/narration/cast.json': {
+          ...(files['content-studio/narration/cast.json'] as object),
           speakers: { grandmother: { voice: 'cur', style: '[warm]' } },
         },
       }),

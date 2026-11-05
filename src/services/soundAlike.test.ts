@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { projectJson, tempRepo } from '../../test/helpers'
+import { narrationInLanguages, projectJson, tempRepo } from '../../test/helpers'
 import { setSoundAlike } from './soundAlike'
 
 function repo(project: Record<string, unknown> = projectJson(), indent = 2) {
@@ -14,12 +14,12 @@ function repo(project: Record<string, unknown> = projectJson(), indent = 2) {
 describe('setSoundAlike', () => {
   it('saves the groups in the project file, the rest of it as it was', async () => {
     const project = projectJson()
-    ;(project.narration as { quality?: unknown }).quality = { minHeard: 0.8 }
+    ;(project.narration as { generate?: unknown }).generate = { minHeard: 0.8 }
     const { projectFile, read } = repo(project, 4)
     const result = await setSoundAlike(projectFile, [[' Lyria ', 'Liria', ''], []], [])
     expect(result).toEqual({ ok: true })
-    const quality = { minHeard: 0.8, soundAlike: ['GROUP'] }
-    const narration = { ...(project.narration as object), quality }
+    const generate = { minHeard: 0.8, soundAlike: { en: ['GROUP'] } }
+    const narration = { ...(project.narration as object), generate }
     // The file in its own indentation, each group on one line.
     const expected = JSON.stringify({ ...project, narration }, null, 4).replace(
       '"GROUP"',
@@ -32,28 +32,20 @@ describe('setSoundAlike', () => {
     const project = projectJson()
     const narration = project.narration as Record<string, unknown>
     project.languages = ['en', 'sv']
-    narration.paths = {
-      dialog: 'tts/{part}/{language}/script.json',
-      cues: 'tts/{part}/{language}/cues.json',
-      lock: 'tts/{part}/{language}/lock.json',
-      clips: 'audio/{part}/{language}',
-      manifest: 'audio/{part}/{language}/manifest.json',
-    }
-    narration.quality = { soundAlike: [['inn', 'Inne']] }
+    Object.assign(narration, narrationInLanguages())
+    narration.generate = { soundAlike: { en: [['inn', 'Inne']] } }
     const { projectFile, read } = repo(project)
     expect(await setSoundAlike(projectFile, [['Lyria', 'Liria']], [], 'sv')).toEqual({ ok: true })
-    const quality = JSON.parse(read()).narration.quality
-    expect(quality).toEqual({
-      soundAlike: [['inn', 'Inne']],
-      soundAlikeByLanguage: { sv: [['Lyria', 'Liria']] },
+    expect(JSON.parse(read()).narration.generate).toEqual({
+      soundAlike: { en: [['inn', 'Inne']], sv: [['Lyria', 'Liria']] },
     })
     // The groups are compared with that language's own.
     expect(await setSoundAlike(projectFile, [['a', 'b']], [], 'sv')).toMatchObject({ ok: false })
     expect(await setSoundAlike(projectFile, [], [['Lyria', 'Liria']], 'sv')).toEqual({ ok: true })
-    expect(JSON.parse(read()).narration.quality).toEqual({ soundAlike: [['inn', 'Inne']] })
+    expect(JSON.parse(read()).narration.generate).toEqual({ soundAlike: { en: [['inn', 'Inne']] } })
   })
 
-  it('leaves the key out when no group is left, and quality out if nothing else is in it', async () => {
+  it('leaves the language out when no group is left, and generate out if nothing else is in it', async () => {
     const project = projectJson()
     const { projectFile, read } = repo(project)
     await setSoundAlike(projectFile, [['inn', 'Inne']], [])
@@ -68,7 +60,7 @@ describe('setSoundAlike', () => {
     const result = await setSoundAlike(projectFile, [['a', 'b']], [])
     expect(result).toMatchObject({
       ok: false,
-      problems: [{ file: 'content-studio.json', path: 'narration.quality.soundAlike' }],
+      problems: [{ file: 'content-studio.json', path: 'narration.generate.soundAlike.en' }],
     })
     expect(read()).toBe(before)
   })
@@ -91,29 +83,29 @@ describe('setSoundAlike', () => {
     expect(read()).toBe(before)
   })
 
-  it('adds quality at the end of narration, and keeps a quality written empty by hand', async () => {
+  it('adds generate at the end of narration, and keeps a generate written empty by hand', async () => {
     const project = projectJson()
     const { projectFile, read } = repo(project)
     await setSoundAlike(projectFile, [['inn', 'Inne']], [])
-    const quality =
-      '"quality": {\n      "soundAlike": [\n        ["inn", "Inne"]\n      ]\n    }\n  }\n}\n'
-    expect(read().endsWith(quality)).toBe(true)
-    ;(project.narration as { quality?: unknown }).quality = {}
+    const generate =
+      '"generate": {\n      "soundAlike": {\n        "en": [\n          ["inn", "Inne"]\n        ]\n      }\n    }\n  }\n}\n'
+    expect(read().endsWith(generate)).toBe(true)
+    ;(project.narration as { generate?: unknown }).generate = {}
     const empty = repo(project)
     expect(await setSoundAlike(empty.projectFile, [], [])).toEqual({ ok: true })
-    expect(JSON.parse(empty.read()).narration.quality).toEqual({})
+    expect(JSON.parse(empty.read()).narration.generate).toEqual({})
   })
 
   it('saves a phrase, its spaces made one', async () => {
     const { projectFile, read } = repo()
     await setSoundAlike(projectFile, [['all  right', 'alright']], [])
-    expect(JSON.parse(read()).narration.quality.soundAlike).toEqual([['all right', 'alright']])
+    expect(JSON.parse(read()).narration.generate.soundAlike.en).toEqual([['all right', 'alright']])
   })
 
   it('writes words with $ in them as they are', async () => {
     const { projectFile, read } = repo()
     expect(await setSoundAlike(projectFile, [["a$'", 'b$&', 'c$$']], [])).toEqual({ ok: true })
-    expect(JSON.parse(read()).narration.quality.soundAlike).toEqual([["a$'", 'b$&', 'c$$']])
+    expect(JSON.parse(read()).narration.generate.soundAlike.en).toEqual([["a$'", 'b$&', 'c$$']])
   })
 
   it('keeps the line endings, and a missing last newline', async () => {
@@ -145,7 +137,7 @@ describe('setSoundAlike', () => {
         problems: [
           {
             file: 'content-studio.json',
-            path: 'narration.quality.soundAlike',
+            path: 'narration.generate.soundAlike.en',
             message: 'permission denied',
           },
         ],

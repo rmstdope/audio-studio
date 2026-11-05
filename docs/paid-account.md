@@ -22,7 +22,7 @@ so takes on two models do not mix.
 Fish retires `s1` on 31 December 2026; after that, requests for it are served and billed as
 `s2.1-pro` at the same price. `core/prices.ts` lists `s1` with no end date. The studio should warn
 when the project file names `s1` for `draft` or `final`, and offer to switch it. The project file
-is changed in one place only today (`narration.quality.soundAlike`, see `CLAUDE.md`), so changing
+is changed in one place only today (`narration.generate.soundAlike.<language>`, see `CLAUDE.md`), so changing
 `models` there was a new rule for the consumer repository; it is built (bead as-5gk.3) and written
 into `CLAUDE.md` and `docs/architecture.md`.
 
@@ -55,7 +55,7 @@ to a budget before it spends.
 ## Rate tier in the UI (built)
 
 The 429 backoff is built (§10), and so is showing the account's concurrency limit next to
-`quality.parallel`, so a 429 is explained before it happens (as-5gk.7). Fish sets the limit by total
+`narration.generate.parallel`, so a 429 is explained before it happens (as-5gk.7). Fish sets the limit by total
 prepaid spend: 5 requests at a time under $100, 15 from $100, 50 from $1,000. Fish's docs name no
 way to ask for the tier, so the user enters it once in a menu on Setup's Requests at once row,
 saved as `fishTier` in the person's own settings, `content-studio/cache/settings.json`, never in the

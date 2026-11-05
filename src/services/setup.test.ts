@@ -199,7 +199,7 @@ describe('checkSetup', () => {
 describe('checkSetup, requests at once', () => {
   it('reads parallel from the project file and the tier from the person’s settings', async () => {
     const project = projectJson({
-      narration: { ...(projectJson().narration as object), quality: { parallel: 8 } },
+      narration: { ...(projectJson().narration as object), generate: { parallel: 8 } },
     })
     const states = async (fishTier?: string) => {
       const root = tempRepo({
@@ -214,7 +214,7 @@ describe('checkSetup, requests at once', () => {
     expect(await states()).toMatchObject({ state: 'problem', tier: { chosen: null } })
     expect(await states('100')).toMatchObject({ state: 'ok', tier: { chosen: '100' } })
     expect(await states('under-100').then((c) => c.fix)).toBe(
-      'Set quality.parallel to 5 or less in the project file.',
+      'Set generate.parallel to 5 or less in the project file.',
     )
   })
 

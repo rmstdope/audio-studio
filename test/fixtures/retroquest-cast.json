@@ -13,5 +13,7 @@
     "father": { "voice": "12a41b18606d4aff82e253bc293ea5e9", "style": "[warm, quiet, hopeful]" },
     "elior": { "voice": "ad1e8d0c166e464789c6c9d1c003bedd", "style": "[young, breathless, remembering the night]" }
   },
-  "pronounce": { "Act I:": "Act One:" }
+  "pronounce": {
+    "en": { "Act I:": "Act One:" }
+  }
 }

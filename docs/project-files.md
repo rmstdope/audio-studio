@@ -10,11 +10,12 @@ default, so that every field is shown.
 
 > **Status.** This is version 2 of the format, which the studio is moving to one section at a time
 > (epic as-6u9). In effect now: the project file's top level (`$schema`, `version`, `partLabel`,
-> `parts`, `languages`, `refresh`), the studio folder `content-studio/` with its `.gitignore`, and
-> the cache with your own settings. The sections (`narration`, `music`, `images`, `effects`,
-> `scenes`) and the studio's edits and locks have not moved yet: until a section has, the studio
-> reads that section as `docs/architecture.md` §5 and §6 describe it, and this document is the plan
-> for it.
+> `parts`, `languages`, `refresh`), the studio folder `content-studio/` with its `.gitignore`, the
+> cache with your own settings, and narration: the `narration` section, the dialog list, and
+> `narration/cast.json` with each part's edits and lock. The other sections (`music`, `images`,
+> `effects`, `scenes`) and their edits and locks have not moved yet: until a section has, the
+> studio reads that section as `docs/architecture.md` §5 and §6 describe it, and this document is
+> the plan for it.
 
 ## The four kinds of file
 

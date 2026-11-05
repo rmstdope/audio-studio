@@ -20,11 +20,11 @@ import { discardSession, moveVoice, sessionFor, startAudition, viewOf } from './
 
 const files = {
   'content-studio.json': projectJson(),
-  'tts/cast.json': {
+  'content-studio/narration/cast.json': {
     speakers: { mira: { voice: 'cur', style: '[low]', audition: { keywords: ['warm'] } } },
     pronounce: {},
   },
-  'tts/act1/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
+  'tts/act1/script.json': [{ id: 'a1', speaker: 'mira', text: 'Welcome.' }],
 }
 
 function voice(id: string, title = id): Voice {
@@ -233,9 +233,10 @@ describe('castDesign', () => {
     expect(result).toMatchObject({ ok: true, voice: { id: 'saved1', name: 'Mira (designed)' } })
     expect(fish.created[0]?.title).toBe('Mira (designed)')
     expect(fish.created[0]?.files[0]).toMatchObject({ type: 'audio/mpeg' })
-    expect(JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).speakers.mira.voice).toBe(
-      'saved1',
-    )
+    expect(
+      JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).speakers
+        .mira.voice,
+    ).toBe('saved1')
     // The audition is over; the cast design is no longer kept, the others are.
     expect(await sessionFor(projectFile, 'mira')).toEqual({ ok: true, session: null })
     const kept = Object.keys((await readDesigns(projectFile, 'mira')).voices)
@@ -260,9 +261,10 @@ describe('castDesign', () => {
       voice: first,
       message: 'Audio too short',
     })
-    expect(JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).speakers.mira.voice).toBe(
-      'cur',
-    )
+    expect(
+      JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).speakers
+        .mira.voice,
+    ).toBe('cur')
     const found = await sessionFor(projectFile, 'mira')
     expect(found?.ok && found.session?.shortlist).toContain(first)
     expect(Object.keys((await readDesigns(projectFile, 'mira')).voices)).toContain(first)
@@ -278,7 +280,7 @@ describe('castDesign', () => {
 
   it('reuses the voice already saved when casting it failed, instead of saving another', async () => {
     const { root, projectFile, fish, first } = await shortlisted()
-    const cast = join(root, 'tts/cast.json')
+    const cast = join(root, 'content-studio/narration/cast.json')
     const good = readFileSync(cast, 'utf8')
     // The save works, but the cast file cannot be read right after it.
     const original = fish.created.push.bind(fish.created)
@@ -321,18 +323,14 @@ describe('designs per language', () => {
       languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        paths: {
-          dialog: 'tts/{part}/{language}/script.json',
-          cues: 'tts/{part}/{language}/cues.json',
-          lock: 'tts/{part}/{language}/narration.lock.json',
-          clips: 'audio/{part}/{language}',
-          manifest: 'audio/{part}/{language}/manifest.json',
-        },
+        from: { part: 'tts/{part}/{language}/script.json' },
+        clips: 'audio/{part}/{language}',
+        manifest: 'audio/{part}/{language}/manifest.json',
       },
     },
     'tts/act1/script.json': undefined,
-    'tts/act1/en/script.json': [{ key: 'a1', speaker: 'mira', text: 'Welcome.' }],
-    'tts/act1/sv/script.json': [{ key: 'a1', speaker: 'mira', text: 'Välkommen.' }],
+    'tts/act1/en/script.json': [{ id: 'a1', speaker: 'mira', text: 'Welcome.' }],
+    'tts/act1/sv/script.json': [{ id: 'a1', speaker: 'mira', text: 'Välkommen.' }],
   }
 
   it('keeps the designs and the last description of each language apart', async () => {
@@ -357,8 +355,8 @@ describe('designs per language', () => {
 
 describe('designs with ElevenLabs', () => {
   const lines = [
-    { key: 'a1', speaker: 'mira', text: 'Welcome to the lighthouse, where the lamps never sleep.' },
-    { key: 'a2', speaker: 'mira', text: 'Sit by the fire and I will tell you of the sea.' },
+    { id: 'a1', speaker: 'mira', text: 'Welcome to the lighthouse, where the lamps never sleep.' },
+    { id: 'a2', speaker: 'mira', text: 'Sit by the fire and I will tell you of the sea.' },
   ]
   function elevenSetup(script = lines) {
     const root = tempRepo({ ...files, 'tts/act1/script.json': script })
@@ -390,7 +388,7 @@ describe('designs with ElevenLabs', () => {
     const text = (plan as { text: string }).text
     expect(text).toContain('Welcome to the lighthouse')
     expect(plan).toMatchObject({ credits: [...text].length })
-    const short = elevenSetup([{ key: 'a1', speaker: 'mira', text: 'Hi.' }])
+    const short = elevenSetup([{ id: 'a1', speaker: 'mira', text: 'Hi.' }])
     expect(await elevenDesignFor(short.projectFile, 'mira')).toEqual({
       ok: true,
       text: null,
@@ -480,9 +478,10 @@ describe('designs with ElevenLabs', () => {
     expect(eleven.saved).toEqual([
       { generated: 'g1', name: 'Mira (designed)', description: 'An old wizard, gruff and slow' },
     ])
-    expect(JSON.parse(readFileSync(join(root, 'tts/cast.json'), 'utf8')).speakers.mira.voice).toBe(
-      'eleven:v-g1',
-    )
+    expect(
+      JSON.parse(readFileSync(join(root, 'content-studio/narration/cast.json'), 'utf8')).speakers
+        .mira.voice,
+    ).toBe('eleven:v-g1')
   })
 
   it('says the text confirmed, not one made again since', async () => {

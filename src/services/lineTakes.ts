@@ -140,7 +140,7 @@ export async function takeLine(
     limiterKey: `line-take\n${projectFile}\n${partId}\n${read.language}\n${key}\n${id}`,
   })
   if (!spoken.ok) return spoken
-  const checker = narration.quality.transcriber === 'none' ? null : transcriber
+  const checker = narration.generate.transcriber === 'none' ? null : transcriber
   let checked
   try {
     checked = await checkTake(checker, spoken.clip, line, read.input.cast, narration, read.ears)

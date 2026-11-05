@@ -182,7 +182,7 @@ async function refresh(
     }
   }
   const root = dirname(projectFile)
-  const dialogPath = partPathFor(narration.paths.dialog, part.id, project.languages[0])
+  const dialogPath = partPathFor(narration.from.part, part.id, project.languages[0])
   const before = await readLines(root, dialogPath)
   const loopsFile = opened.project.music
     ? partPathFor(opened.project.music.paths.loops, part.id)

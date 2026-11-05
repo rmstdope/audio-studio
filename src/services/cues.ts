@@ -10,7 +10,14 @@ import {
 } from '../core/cued'
 import { resolveInRoot } from '../core/paths'
 import { problemsFrom, type Problem } from '../core/project'
-import { CuesSchema, sceneKey } from '../core/resources'
+import {
+  NarrationEditsSchema,
+  cuesOfEdits,
+  editsPathOf,
+  formatEdits,
+  sceneKey,
+  sceneOfKey,
+} from '../core/resources'
 import { readJson, writeAtomic } from './files'
 import { inPartTurn } from './partFiles'
 import { readPart, type ProjectFailure } from './workspace'
@@ -68,7 +75,9 @@ export async function setInsideCue(
 ): Promise<CueChange> {
   const cue = normalizeCue(change.cue)
   return changeCues(projectFile, partId, [key], language, (entries, path, _inDialog, text) => {
-    const refuse = (message: string) => ({ problems: [{ file: path, path: key, message }] })
+    const refuse = (message: string) => ({
+      problems: [{ file: path, path: editsPathOf(key), message }],
+    })
     const words = text(key)
     if (wordsOf(change.text).join(' ') !== wordsOf(words).join(' ')) {
       return refuse(WORDS_CHANGED)
@@ -115,7 +124,7 @@ export async function moveCue(
     language,
     (entries, path, inDialog) => {
       const problem = (key: string, message: string) => ({
-        problems: [{ file: path, path: key, message }],
+        problems: [{ file: path, path: editsPathOf(key), message }],
       })
       if (!entries.some(([k]) => k === from)) return null
       if (inDialog.has(from)) return problem(from, 'this cue’s line is still in the dialog')
@@ -129,7 +138,7 @@ export async function moveCue(
 }
 
 /**
- * Saves a scene's cue in the part's cues file, under `scene:<name>`, as `setCue` saves a line's:
+ * Saves a scene's cue in the part's edits, under `scenes`, as `setCue` saves a line's:
  * the language's own, and an empty cue removes it. Null for a scene the dialog does not name.
  */
 export async function setSceneCue(
@@ -211,34 +220,35 @@ async function changeCues(
       return { ok: false, problems: [{ file: path, path: '', message: json.message }] }
     }
     const raw = json.status === 'missing' ? {} : json.value
-    const parsed = CuesSchema.safeParse(raw)
+    const parsed = NarrationEditsSchema.safeParse(raw)
     if (!parsed.success) return { ok: false, problems: problemsFrom(path, parsed.error) }
-    const entries = Object.entries(raw as Record<string, string>)
+    const entries = Object.entries(cuesOfEdits(parsed.data))
 
     const outcome = change(entries, path, inDialog, textOf)
     if (outcome === null) return null
     if ('problems' in outcome) return { ok: false, problems: outcome.problems }
     const changed = outcome.entries
     if (sameEntries(changed, entries)) return { ok: true }
-    const moved = changed.map(([k]) => k).filter((k) => INTEGER_LIKE.test(k))
-    if (moved.length && changed.length > 1) {
+    // A number-like key among others in its section would move to the top of it.
+    const sections = changed.map(([k]) => {
+      const scene = sceneOfKey(k)
+      return scene === null ? { at: 'cues', name: k } : { at: 'scenes', name: scene }
+    })
+    const moved = sections.filter(
+      ({ at, name }) => INTEGER_LIKE.test(name) && sections.filter((o) => o.at === at).length > 1,
+    )
+    if (moved.length) {
       const message =
-        `the cue of ${moved.map((k) => `"${k}"`).join(', ')} would move to the top if the studio ` +
-        'wrote this file; edit the file by hand.'
-      return { ok: false, problems: [{ file: path, path: moved[0]!, message }] }
+        `the cue of ${moved.map(({ name }) => `"${name}"`).join(', ')} would move to the top if ` +
+        'the studio wrote this file; edit the file by hand.'
+      const first = moved[0]!
+      return { ok: false, problems: [{ file: path, path: `${first.at}.${first.name}`, message }] }
     }
-    await writeAtomic(root, path, formatCues(changed))
+    await writeAtomic(root, path, formatEdits(changed))
     return { ok: true }
   })
 }
 
 function sameEntries(a: Cue[], b: Cue[]): boolean {
   return a.length === b.length && a.every(([k, v], i) => k === b[i]![0] && v === b[i]![1])
-}
-
-/** The cues file's text: two-space indent, one cue per line, in the order given. */
-function formatCues(entries: [string, string][]): string {
-  if (!entries.length) return '{}\n'
-  const lines = entries.map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`)
-  return `{\n${lines.join(',\n')}\n}\n`
 }

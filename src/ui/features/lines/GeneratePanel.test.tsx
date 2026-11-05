@@ -162,11 +162,15 @@ describe('GeneratePanel, when generation cannot be planned', () => {
   })
 
   const cast = {
-    file: 'tts/cast.json',
+    file: 'content-studio/narration/cast.json',
     path: 'speakers.narrator.voice',
     message: 'speakers.narrator.voice must be text (it is a number)',
   }
-  const cues = { file: 'tts/act1/en/cues.json', path: '', message: 'is not JSON' }
+  const cues = {
+    file: 'content-studio/narration/act1.edits.json',
+    path: '',
+    message: 'is not JSON',
+  }
 
   /** Renders the panel over a plan that fails with `problems`, the page having shown `shown`. */
   async function failedPlan(problems: Problem[], shown: Problem[]) {

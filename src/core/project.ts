@@ -13,7 +13,7 @@ export const FREE_MODELS = ['s2.1-pro-free'] as const
 /** What the user has paid Fish in total, as the settings name it (sets its limit at once). */
 export const FishTierSchema = z.enum(['under-100', '100', '1000'])
 
-/** The smallest `quality.chunkLimit` allowed. */
+/** The smallest `generate.chunkLimit` allowed. */
 const MIN_CHUNK = 100
 
 /**
@@ -23,7 +23,7 @@ const MIN_CHUNK = 100
 export function phraseProblem(phrase: string, chunkLimit: number): string | null {
   const length = [...phrase].length
   return length > chunkLimit
-    ? `is ${length} characters; a take is one piece of at most ${chunkLimit} (quality.chunkLimit)`
+    ? `is ${length} characters; a take is one piece of at most ${chunkLimit} (generate.chunkLimit)`
     : null
 }
 
@@ -93,51 +93,21 @@ const PartSchema = z.object({
   title: z.string().min(1),
 })
 
+/** The standard audition phrase of the source language when the project gives none. */
+export const DEFAULT_PHRASE =
+  'Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.'
+
+/** Each stage's model of one provider. */
+const stagesOf = (model: typeof recordingModel | typeof elevenModel) =>
+  z.object({ audition: model, draft: model, final: model }).prefault({})
+
 const NarrationSchema = z
   .object({
-    characters: z.string().min(1),
-    paths: z.object({
-      dialog: partPath,
-      cues: partPath,
-      lock: partPath,
-      clips: partPath,
-      manifest: partPath,
-    }),
-    /**
-     * The speakers (cast ids) whose lines follow their scene's cue unless they have a cue of
-     * their own; the others keep their own cue or their style. Edited by hand in this file.
-     */
-    sceneCueSpeakers: z.array(z.string().min(1)).default(['narrator']),
+    /** The game's lists: each part's dialog, per language. */
+    from: z.object({ part: partPath }),
+    /** Each stage's model, per provider: Fish's, and ElevenLabs' for an ElevenLabs voice. */
     models: z
-      .object({ audition: recordingModel, draft: recordingModel, final: recordingModel })
-      .prefault({}),
-    /**
-     * ElevenLabs' side of the stages, for characters cast with an ElevenLabs voice: each stage's
-     * model, and the voice settings every stage speaks with, saved from the Models panel.
-     */
-    elevenlabs: z
-      .object({
-        models: z
-          .object({ audition: elevenModel, draft: elevenModel, final: elevenModel })
-          .prefault({}),
-        tts: z
-          .object({
-            // Eleven v3 takes only these three (Creative, Natural, Robust).
-            stability: z
-              .union([z.literal(0), z.literal(0.5), z.literal(1)])
-              .default(ELEVEN_TTS.stability),
-            similarityBoost: z.number().min(0).max(1).default(ELEVEN_TTS.similarityBoost),
-            style: z.number().min(0).max(1).default(ELEVEN_TTS.style),
-          })
-          .prefault({}),
-      })
-      .prefault({}),
-    tts: z
-      .object({
-        temperature: z.number().min(0).max(1).default(0.7),
-        topP: z.number().min(0).max(1).default(0.7),
-        speed: z.number().positive().default(1),
-      })
+      .object({ fish: stagesOf(recordingModel), elevenlabs: stagesOf(elevenModel) })
       .prefault({}),
     output: z
       .object({
@@ -148,8 +118,28 @@ const NarrationSchema = z
         lufs: z.number().min(-70).max(0).nullable().default(null),
       })
       .prefault({}),
-    quality: z
+    /** How takes are made and checked. */
+    generate: z
       .object({
+        /** Fish's voice settings. */
+        fish: z
+          .object({
+            temperature: z.number().min(0).max(1).default(0.7),
+            topP: z.number().min(0).max(1).default(0.7),
+            speed: z.number().positive().default(1),
+          })
+          .prefault({}),
+        /** The voice settings every ElevenLabs voice speaks with, saved from the Models panel. */
+        elevenlabs: z
+          .object({
+            // Eleven v3 takes only these three (Creative, Natural, Robust).
+            stability: z
+              .union([z.literal(0), z.literal(0.5), z.literal(1)])
+              .default(ELEVEN_TTS.stability),
+            similarityBoost: z.number().min(0).max(1).default(ELEVEN_TTS.similarityBoost),
+            style: z.number().min(0).max(1).default(ELEVEN_TTS.style),
+          })
+          .prefault({}),
         minHeard: z.number().min(0).max(1).default(0.9),
         takes: z.number().int().min(1).default(3),
         // At least 100, so the built-in audition phrase always fits in one take.
@@ -162,48 +152,45 @@ const NarrationSchema = z
         transcriber: z.enum(['mlx-whisper', 'none']).default('mlx-whisper'),
         whisperModel: z.string().min(1).default('mlx-community/whisper-large-v3-turbo'),
         /**
-         * The game's own words that sound the same ("Lyria" and "Liria"), a group each, added to
-         * the built-in ones: Whisper writing one for another still counts as heard.
+         * The game's own words that sound the same ("Lyria" and "Liria"), by language, a group
+         * each, added to the built-in ones (English): Whisper writing one for another still
+         * counts as heard.
          */
-        soundAlike: soundAlikeGroups.default([]),
+        soundAlike: z.record(z.string(), soundAlikeGroups).default({}),
         /**
-         * The same for the languages besides the source (by code), whose own groups are
-         * `soundAlike`. The built-in groups are English and apply to `en` only.
+         * The speakers (cast ids) whose lines follow their scene's cue unless they have a cue of
+         * their own; the others keep their own cue or their style. Edited by hand in this file.
          */
-        soundAlikeByLanguage: z.record(z.string(), soundAlikeGroups).optional(),
+        sceneCueSpeakers: z.array(z.string().min(1)).default(['narrator']),
       })
       .prefault({}),
     audition: z
       .object({
-        phrase: z
-          .string()
-          .min(1)
-          .default(
-            'Come in out of the rain, child. Sit by the fire, and I will tell you how it all began.',
-          ),
         /**
-         * The standard phrase of the other languages, by language code: the source language's is
-         * `phrase`. A language without one has no standard phrase.
+         * The standard audition phrase, by language. The source language without one has the
+         * built-in one (`standardPhrase`); another language without one has none.
          */
-        phrases: z.record(z.string(), z.string().min(1)).optional(),
+        phrase: z.record(z.string(), z.string().min(1)).default({}),
         candidatesPerRound: z.number().int().min(1).default(5),
-        language: z.string().default('en'),
+        /** The language the voice library is searched in for the source language's voices. */
+        searchLanguage: z.string().default('en'),
       })
       .prefault({}),
+    /** The folder of a part's clips, per language. */
+    clips: partPath,
+    /** That folder's manifest, which the game reads. */
+    manifest: partPath,
   })
   .superRefine((narration, context) => {
-    const limit = narration.quality.chunkLimit
+    const limit = narration.generate.chunkLimit
     // A wrong limit is reported on its own; measuring against it would only add noise.
     if (!Number.isInteger(limit) || limit < MIN_CHUNK) return
-    const problem = phraseProblem(narration.audition.phrase, limit)
-    if (problem)
-      context.addIssue({ code: 'custom', path: ['audition', 'phrase'], message: problem })
-    for (const [language, phrase] of Object.entries(narration.audition.phrases ?? {})) {
+    for (const [language, phrase] of Object.entries(narration.audition.phrase)) {
       const tooLong = phraseProblem(phrase, limit)
       if (tooLong) {
         context.addIssue({
           code: 'custom',
-          path: ['audition', 'phrases', language],
+          path: ['audition', 'phrase', language],
           message: tooLong,
         })
       }
@@ -380,42 +367,42 @@ export const ProjectSchema = z
   })
   .superRefine(({ languages, narration }, context) => {
     if (languages.length > 1) {
-      for (const [name, template] of Object.entries(narration.paths)) {
+      const paths: [string[], string][] = [
+        [['from', 'part'], narration.from.part],
+        [['clips'], narration.clips],
+        [['manifest'], narration.manifest],
+      ]
+      for (const [at, template] of paths) {
         if (template.includes('{language}')) continue
         context.addIssue({
           code: 'custom',
-          path: ['narration', 'paths', name],
+          path: ['narration', ...at],
           message:
             'must contain {language} when the project has several languages, or they would share one file',
         })
       }
     }
-    for (const language of Object.keys(narration.quality.soundAlikeByLanguage ?? {})) {
-      if (languages.slice(1).includes(language)) continue
-      context.addIssue({
-        code: 'custom',
-        path: ['narration', 'quality', 'soundAlikeByLanguage', language],
-        message:
-          languages[0] === language
-            ? `the groups of the source language “${language}” are quality.soundAlike`
-            : `"${language}" is not one of the project’s languages`,
-      })
-    }
-    for (const language of Object.keys(narration.audition.phrases ?? {})) {
-      if (languages.includes(language)) continue
-      context.addIssue({
-        code: 'custom',
-        path: ['narration', 'audition', 'phrases', language],
-        message: `"${language}" is not one of the project’s languages`,
-      })
+    const tables: [string[], Record<string, unknown>][] = [
+      [['generate', 'soundAlike'], narration.generate.soundAlike],
+      [['audition', 'phrase'], narration.audition.phrase],
+    ]
+    for (const [where, table] of tables) {
+      for (const language of Object.keys(table)) {
+        if (languages.includes(language)) continue
+        context.addIssue({
+          code: 'custom',
+          path: ['narration', ...where, language],
+          message: `"${language}" is not one of the project’s languages`,
+        })
+      }
     }
   })
 
 /** A validated project file, with defaults filled in. */
 export type Project = z.infer<typeof ProjectSchema>
 
-/** The voice settings every ElevenLabs voice speaks with (`narration.elevenlabs.tts`). */
-export type ElevenTts = Project['narration']['elevenlabs']['tts']
+/** The voice settings every ElevenLabs voice speaks with (`narration.generate.elevenlabs`). */
+export type ElevenTts = Project['narration']['generate']['elevenlabs']
 
 /** The validated `music` section of a project file. */
 export type MusicConfig = z.infer<typeof MusicSchema>
@@ -431,9 +418,6 @@ export type ImagesConfig = z.infer<typeof ImagesSchema>
 
 /** One part of the game (RetroQuest: an act). */
 export type Part = z.infer<typeof PartSchema>
-
-/** The part-dependent paths of the narration workspace. */
-export type PartPaths = Project['narration']['paths']
 
 /** A path template with `{part}` replaced by the part's id and, if given, `{language}` by the language. */
 export function partPathFor(template: string, partId: string, language?: string): string {
@@ -463,15 +447,42 @@ export function partCacheName(
   return language === project.languages[0] ? partId : `${partId}\0${language}`
 }
 
-/** The groups of words that sound the same the project gives `language`: the source's are `soundAlike`. */
-export function soundAlikeOf(
+/** The groups of words that sound the same the project gives `language` (`generate.soundAlike`). */
+export function soundAlikeOf(project: Pick<Project, 'narration'>, language: string): string[][] {
+  return project.narration.generate.soundAlike[language] ?? []
+}
+
+/**
+ * The standard audition phrase of `language`: the project's, else the built-in one for the source
+ * language; null for another language without one.
+ */
+export function standardPhrase(
   project: Pick<Project, 'languages' | 'narration'>,
   language: string,
-): string[][] {
-  const { quality } = project.narration
-  return language === project.languages[0]
-    ? quality.soundAlike
-    : (quality.soundAlikeByLanguage?.[language] ?? [])
+): string | null {
+  const own = project.narration.audition.phrase[language]
+  if (own !== undefined) return own
+  return language === project.languages[0] ? DEFAULT_PHRASE : null
+}
+
+/** Narration's folder in the studio folder: the cast, and each part's edits and lock. */
+export const NARRATION_DIR = `${STUDIO_DIR}/narration`
+
+/** The cast: every speaker, and how words are said. */
+export const CAST_FILE = `${NARRATION_DIR}/cast.json`
+
+/**
+ * A part's narration edits (its cues) or lock in `language`: `<part>.edits.json` in the source
+ * language, `<part>.<language>.edits.json` in another, so adding a language renames nothing.
+ */
+export function narrationFile(
+  project: Pick<Project, 'languages'>,
+  partId: string,
+  language: string,
+  kind: 'edits' | 'lock',
+): string {
+  const suffix = language === project.languages[0] ? '' : `.${language}`
+  return `${NARRATION_DIR}/${partId}${suffix}.${kind}.json`
 }
 
 /** Something wrong with a file the studio reads: which file, where in it, and what. */

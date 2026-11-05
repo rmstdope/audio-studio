@@ -8,7 +8,6 @@ import {
   knownNames,
   pyRound,
   saidWords,
-  soundAlikes,
   type HeardSegment,
   type TimedWord,
 } from '../core/align'
@@ -22,7 +21,7 @@ import {
   LockSchema,
   ManifestSchema,
   ttsFor,
-  type Cast,
+  type SpokenCast,
   type Character,
   type Line,
   type Lock,
@@ -120,7 +119,7 @@ export interface RecordOptions {
   credits?: Budget
   /** The limiter ElevenLabs' requests wait in (the Fish one, `limiter`, when absent). */
   elevenLimiter?: Limiter
-  /** Checks each take (unless the project's `quality.transcriber` is "none"); none: unchecked. */
+  /** Checks each take (unless the project's `generate.transcriber` is "none"); none: unchecked. */
   transcriber?: Transcriber | null
   /** The language to record (the source language when absent or not declared). */
   language?: string
@@ -155,13 +154,13 @@ export async function speakerFor({
 }): Promise<
   { ok: true; speak: Speak } | { ok: false; reason: 'no-key' | 'speed'; message: string }
 > {
-  const tts = ttsFor(project.narration.tts, character)
+  const tts = ttsFor(project.narration.generate.fish, character)
   if (providerOf(inputs.voice) === 'elevenlabs') {
     const slow = speedProblem(tts.speed)
     if (slow) return { ok: false, reason: 'speed', message: slow }
     const client = await elevenlabs(root, project)
     if (!client) return { ok: false, reason: 'no-key', message: NO_ELEVENLABS_KEY }
-    const settings = { ...project.narration.elevenlabs.tts, speed: tts.speed }
+    const settings = { ...project.narration.generate.elevenlabs, speed: tts.speed }
     return {
       ok: true,
       speak: (text) =>
@@ -204,7 +203,7 @@ export interface Take {
  * lock entry are written. Nothing is written unless the clip was made and the manifest and lock
  * could be read; the clip, then the manifest, then the lock are written last of all, so a failure
  * part-way leaves the line stale or untracked, never passing as up to date. At most
- * `quality.parallel` lines are spoken by Fish at once, and a line already being recorded is not
+ * `generate.parallel` lines are spoken by Fish at once, and a line already being recorded is not
  * recorded twice.
  */
 export async function recordLine(
@@ -333,11 +332,11 @@ export async function recordLine(
         return { ok: true, key, skipped: true }
       }
     }
-    // Takes until one is heard well enough (up to quality.takes), keeping the best: as narrate.py.
-    const checker = narration.quality.transcriber === 'none' ? null : transcriber
+    // Takes until one is heard well enough (up to generate.takes), keeping the best: as narrate.py.
+    const checker = narration.generate.transcriber === 'none' ? null : transcriber
     let best: Take | null = null
     let takes = 0
-    for (let take = 1; take <= (checker ? narration.quality.takes : 1); take++) {
+    for (let take = 1; take <= (checker ? narration.generate.takes : 1); take++) {
       const made = await makeTake(take)
       // A later take that cannot be made keeps the best one already paid for.
       if (!made.ok) {
@@ -353,7 +352,7 @@ export async function recordLine(
       }
       takes = take
       if (!best || (attempt.heard ?? 0) > (best.heard ?? 0)) best = attempt
-      if (attempt.heard === null || attempt.heard >= narration.quality.minHeard) break
+      if (attempt.heard === null || attempt.heard >= narration.generate.minHeard) break
     }
     if (!best) return null
     return commitClip({
@@ -384,7 +383,7 @@ export type Spoken =
  */
 export function finalFingerprint(
   line: Line,
-  cast: Cast,
+  cast: SpokenCast,
   cues: Record<string, string>,
   narration: Project['narration'],
 ): string | null {
@@ -422,7 +421,7 @@ export async function speakLine({
   speak: Speak
   line: Line
   inputs: ClipInputs
-  cast: Cast
+  cast: SpokenCast
   narration: Project['narration']
   budget: Budget
   limiter: Limiter
@@ -430,7 +429,7 @@ export async function speakLine({
 }): Promise<Spoken> {
   let pieces: Uint8Array[]
   try {
-    const atOnce = requestsAtOnce(narration.quality.parallel, inputs.voice)
+    const atOnce = requestsAtOnce(narration.generate.parallel, inputs.voice)
     pieces = await limiter.run(limiterKey, atOnce, async () => {
       const spoken: Uint8Array[] = []
       // As a plan prices it: with the cues the model reads, none for one that would speak them.
@@ -438,7 +437,7 @@ export async function speakLine({
         { text: line.text, cue: inputs.cue, inside: inputs.inside },
         inputs.model,
         cast.pronounce,
-        narration.quality.chunkLimit,
+        narration.generate.chunkLimit,
       )
       for (const text of texts) {
         // Charged before it is sent: nothing beyond what was confirmed reaches the provider.
@@ -470,13 +469,9 @@ export async function checkTake(
   checker: Transcriber | null,
   clip: { wav: Uint8Array; seconds: number },
   line: Line,
-  cast: Cast,
+  cast: SpokenCast,
   narration: Project['narration'],
-  ears: Ears = {
-    language: undefined,
-    alike: soundAlikes(narration.quality.soundAlike),
-    capitalNouns: false,
-  },
+  ears: Ears,
 ): Promise<Take> {
   const tokens = line.text.split(' ')
   if (!checker) {
@@ -485,7 +480,7 @@ export async function checkTake(
   }
   const segments = await transcribeWav(
     checker,
-    narration.quality.whisperModel,
+    narration.generate.whisperModel,
     clip.wav,
     ears.language,
   )
@@ -557,7 +552,7 @@ export async function commitClip({
   }
 
   const duration = pyRound(clip.seconds)
-  const { fp, parts } = fingerprint(inputs)
+  const { fp, hashes } = fingerprint(inputs)
   try {
     const problems = await inPartTurn(
       projectFile,
@@ -581,7 +576,7 @@ export async function commitClip({
           fp,
           voice: inputs.voice,
           model: inputs.model,
-          parts,
+          hashes,
           takes,
           ...(take.heard === null ? {} : { heard: take.heard }),
           at,
@@ -798,11 +793,11 @@ export async function measureLine(
   const line = read.input.lines.find((l) => l.key === key)
   if (!line) return null
   const { narration } = read.project
-  if (narration.quality.transcriber === 'none' || !transcriber) {
+  if (narration.generate.transcriber === 'none' || !transcriber) {
     return {
       ok: false,
       reason: 'unchecked',
-      message: 'Clips are not checked (quality.transcriber is "none").',
+      message: 'Clips are not checked (generate.transcriber is "none").',
     }
   }
   const state = planPart(read.input).lines.find((l) => l.key === key)
@@ -839,7 +834,7 @@ export async function measureLine(
     // The decoded WAV, as narrate.py --retime transcribes it, so the timings come out the same.
     const segments = await transcribeWav(
       transcriber,
-      narration.quality.whisperModel,
+      narration.generate.whisperModel,
       decoded.wav,
       read.ears.language,
     )
