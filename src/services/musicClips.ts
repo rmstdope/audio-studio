@@ -6,6 +6,7 @@ import type { ChosenState } from '../core/music'
 import {
   MusicLockSchema,
   MusicManifestSchema,
+  formatMusicLock,
   acceptable,
   changedFields,
   type LockEntry,
@@ -17,7 +18,7 @@ import { resolveInRoot } from '../core/paths'
 import { MUSIC_LOCK_FILE, type MusicConfig, type Problem } from '../core/project'
 import { pythonJson } from '../core/pyjson'
 import { FileNotWritten, type Encoder } from './audio'
-import { formatEntriesPerLine, isWriteFailure, listFiles, readResource, writeAtomic } from './files'
+import { isWriteFailure, listFiles, readResource, writeAtomic } from './files'
 import { createSerial, type Serial } from './serial'
 import type { ProjectFailure } from './workspace'
 
@@ -142,7 +143,7 @@ export async function commitChoice({
       lock[id] = entry
       await rename(temporary, target)
       await writeAtomic(root, music.manifest, `${pythonJson(sorted(manifest))}\n`)
-      await writeAtomic(root, MUSIC_LOCK_FILE, formatEntriesPerLine(lock))
+      await writeAtomic(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
       return { ok: true }
     })
   } catch (error) {
@@ -185,7 +186,7 @@ export async function uncommitChoice({
       }
       await rm(resolveInRoot(root, join(music.clips, `${id}.mp3`)), { force: true })
       delete lock[id]
-      await writeAtomic(root, MUSIC_LOCK_FILE, formatEntriesPerLine(lock))
+      await writeAtomic(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
       return { ok: true }
     })
   } catch (error) {
@@ -233,7 +234,7 @@ export async function acceptChange({
         ...entry,
         inputs: { ...entry.inputs, brief: now.brief, bpm: now.bpm, key: now.key },
       }
-      await writeAtomic(root, MUSIC_LOCK_FILE, formatEntriesPerLine(lock))
+      await writeAtomic(root, MUSIC_LOCK_FILE, formatMusicLock(lock))
       return { ok: true }
     })
   } catch (error) {

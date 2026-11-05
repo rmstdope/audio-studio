@@ -1100,8 +1100,8 @@ describe('choosing a take', () => {
     expect(after.takes.map((t) => t.chosen)).toEqual([false, true])
   })
 
-  it('makes the track chosen in the project summary, and a stinger’s list is stingers', async () => {
-    const { file, takes } = setup()
+  it('makes the track chosen in the project summary, a stinger’s list written shared', async () => {
+    const { root, file, takes } = setup()
     await takes.make(file, 'victory', { count: 1 })
     for (let i = 0; i < 100; i++) {
       const v = await takes.view(file, 'victory')
@@ -1115,6 +1115,7 @@ describe('choosing a take', () => {
     if (!loaded.ok) throw new Error('project')
     const stingers = loaded.summary.music!.lists.find((l) => l.kind === 'stingers')!
     expect(stingers.tracks[0]).toMatchObject({ id: 'victory', status: 'chosen' })
+    expect(lockOf(root).victory.list).toBe('shared')
   })
 
   it('chooses another take over the first; the first stays on the board', async () => {
@@ -1185,7 +1186,7 @@ describe('choosing a take', () => {
     if (!loaded.ok) throw new Error('project')
     const row = loaded.summary.music!.lists[0]!.tracks[0]!
     expect(row).toMatchObject({ status: 'changed', changed: ['brief'] })
-    expect(lockOf(root).hall.inputs.brief).toBe('warm lute')
+    expect(lockOf(root).hall.inputs.text).toBe('warm lute')
   })
 
   it('never lets a drop of the take being chosen slip between the choice and the board', async () => {
@@ -1288,7 +1289,7 @@ describe('moving a take', () => {
     expect(await m.takes.move(m.file, 'hall', one!.file, 'hut')).toEqual({ ok: true, n: 1 })
     const hut = await viewOf(m, 'hut')
     expect(await m.takes.choose(m.file, 'hut', hut.takes[0]!.file)).toEqual({ ok: true })
-    expect(lockOf(m.root).hut.inputs).toMatchObject({ brief: 'eerie', seconds: 20 })
+    expect(lockOf(m.root).hut.inputs).toMatchObject({ text: 'eerie', seconds: 20 })
     const loaded = await loadProject(m.file)
     if (!loaded.ok) throw new Error('project')
     const row = loaded.summary.music!.lists.flatMap((l) => l.tracks).find((t) => t.id === 'hut')!
@@ -1883,7 +1884,7 @@ describe('trimming a stinger take', () => {
     await setTrackBrief(m.file, 'victory', { brief: 'a louder fanfare' })
     expect(await m.takes.accept(m.file, 'victory')).toEqual({ ok: true })
     const accepted = lockOf(m.root).victory
-    expect(accepted.inputs.brief).toBe('a louder fanfare')
+    expect(accepted.inputs.text).toBe('a louder fanfare')
     expect(await m.takes.trim(m.file, 'victory', one!.file, false)).toEqual({ ok: true })
     expect(lockOf(m.root).victory.inputs).toEqual(accepted.inputs)
     expect(lockOf(m.root).victory.at).toBe(before.at)

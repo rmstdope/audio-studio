@@ -155,7 +155,7 @@ describe('setTrackBrief and tracks the game dropped', () => {
         seed: 1,
         list: 'act1',
         take: 1,
-        inputs: { brief: 'x', kind: 'loop', seconds: 80, bpm: null, key: null },
+        inputs: { text: 'x', kind: 'loop', seconds: 80, bpm: null, key: null },
         at: '2026-11-02T10:00:00.000Z',
       },
     },

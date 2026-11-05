@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import {
   MusicLockSchema,
   MusicManifestSchema,
+  formatMusicLock,
   changedFields,
   acceptable,
   tracksDone,
@@ -96,14 +97,41 @@ describe('chosenLine', () => {
 })
 
 describe('the lock and the manifest', () => {
-  it('reads a lock entry and a manifest entry', () => {
-    expect(MusicLockSchema.safeParse({ a: entry() }).success).toBe(true)
+  /** An entry as the lock file holds it: the brief as `text`. */
+  const written = (over: Record<string, unknown> = {}) => ({
+    fp: '0123456789abcdef',
+    model: MUSIC_MODEL,
+    seed: 7,
+    list: 'act1',
+    take: 2,
+    inputs: { text: 'calm', kind: 'loop', seconds: 80, bpm: 84, key: 'D major' },
+    at: '2026-11-02T10:00:00.000Z',
+    ...over,
+  })
+
+  it('reads a lock entry, its text as the brief, and a manifest entry', () => {
+    expect(MusicLockSchema.parse({ a: written() })).toEqual({ a: entry() })
     expect(MusicManifestSchema.safeParse({ a: { file: 'a.mp3', duration: 80 } }).success).toBe(true)
   })
 
-  it('rejects a lock entry without its take', () => {
-    const { take: _take, ...broken } = entry()
+  it('reads a stinger’s list, `shared`, as the stingers', () => {
+    expect(MusicLockSchema.parse({ a: written({ list: 'shared' }) }).a!.list).toBe('stingers')
+  })
+
+  it('rejects a lock entry without its take, or with a brief in place of its text', () => {
+    const { take: _take, ...broken } = written()
     expect(MusicLockSchema.safeParse({ a: broken }).success).toBe(false)
+    const brief = written({ inputs: { ...inputs } })
+    expect(MusicLockSchema.safeParse({ a: brief }).success).toBe(false)
+  })
+
+  it('writes one entry per line in id order, the brief as text and a stinger’s list as shared', () => {
+    const { seed: _seed, ...unseeded } = entry({ list: 'stingers' })
+    const text = formatMusicLock({ b: entry(), a: unseeded })
+    expect(text).toBe(
+      `{\n "a": ${JSON.stringify({ ...written({ list: 'shared' }), seed: undefined })},\n "b": ${JSON.stringify(written())}\n}\n`,
+    )
+    expect(MusicLockSchema.parse(JSON.parse(text))).toEqual({ a: unseeded, b: entry() })
   })
 })
 

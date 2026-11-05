@@ -3672,7 +3672,7 @@ describe('server, playing what a track plays now', () => {
     seed: 1,
     list: 'act1',
     take: 3,
-    inputs: { brief: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
+    inputs: { text: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
     at: '2026-11-02T10:00:00.000Z',
   }
   const musicRoot = tempRepo({
@@ -3755,7 +3755,7 @@ describe('server, removing music the game no longer asks for', () => {
         seed: 1,
         list: 'act1',
         take: 1,
-        inputs: { brief: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
+        inputs: { text: 'x', kind: 'loop', seconds: 5, bpm: null, key: null },
         at: '2026-11-02T10:00:00.000Z',
       },
     },

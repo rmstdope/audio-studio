@@ -10,7 +10,7 @@ const music = {
   clips: 'audio/music',
   manifest: 'audio/music/manifest.json',
 }
-const inputs = { brief: 'x', kind: 'loop', seconds: 30, bpm: null, key: null }
+const inputs = { text: 'x', kind: 'loop', seconds: 30, bpm: null, key: null }
 const entry = (list: string) => ({
   fp: '0123456789abcdef',
   model: MUSIC_MODEL,
@@ -130,7 +130,7 @@ describe('removeOrphan', () => {
 
   it('removes the orphan of the stingers from their page too', async () => {
     const { root, file } = repo({
-      'content-studio/music/lock.json': { fanfare: entry('stingers') },
+      'content-studio/music/lock.json': { fanfare: entry('shared') },
       'audio/music/manifest.json': { fanfare: { file: 'fanfare.mp3', duration: 5 } },
       'audio/music/fanfare.mp3': 'mp3',
     })

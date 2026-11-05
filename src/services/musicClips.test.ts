@@ -10,7 +10,8 @@ import {
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { projectJson, tempRepo } from '../../test/helpers'
-import { MUSIC_MODEL, type BoardTake, type TakeInputs } from '../core/musicTake'
+import { MusicLockSchema } from '../core/musicChoose'
+import { MUSIC_MODEL, type BoardTake } from '../core/musicTake'
 import { ProjectSchema } from '../core/project'
 import { writeWav } from '../core/wav'
 import { ffmpegEncoder, type Encoder, type EncodeOptions } from './audio'
@@ -24,6 +25,8 @@ const music = {
 const config = ProjectSchema.parse(projectJson({ music })).music!
 
 const inputs = { brief: 'warm lute', kind: 'loop' as const, seconds: 30, bpm: null, key: null }
+/** `inputs` as the lock file holds them. */
+const written = { text: 'warm lute', kind: 'loop', seconds: 30, bpm: null, key: null }
 const take = (n: number, over: Partial<BoardTake> = {}): BoardTake => ({
   n,
   hash: '0123456789abcdef',
@@ -76,7 +79,7 @@ describe('commitChoice', () => {
       seed: 102,
       list: 'act1',
       take: 2,
-      inputs,
+      inputs: written,
       at: at.toISOString(),
     })
     // The encoder wrote to a hidden file beside the clip, which is gone.
@@ -259,7 +262,7 @@ describe('readChosen', () => {
           seed: 1,
           list: 'act1',
           take: 1,
-          inputs,
+          inputs: written,
           at: at.toISOString(),
         },
         cave: {
@@ -268,7 +271,7 @@ describe('readChosen', () => {
           seed: 1,
           list: 'act1',
           take: 1,
-          inputs,
+          inputs: written,
           at: at.toISOString(),
         },
       },
@@ -404,10 +407,9 @@ describe('acceptChange', () => {
     return root
   }
   const lockOf = (root: string) =>
-    JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')) as Record<
-      string,
-      { inputs: TakeInputs; fp: string; take: number }
-    >
+    MusicLockSchema.parse(
+      JSON.parse(readFileSync(join(root, 'content-studio/music/lock.json'), 'utf8')),
+    )
 
   it('counts the chosen take as made from the brief, tempo and key now, and changes nothing else', async () => {
     const root = await chosen()

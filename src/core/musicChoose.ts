@@ -1,6 +1,23 @@
 import { z } from 'zod'
-import { TakeInputsSchema, type TakeInputs } from './musicTake'
+import type { TakeInputs } from './musicTake'
 import type { TrackRow } from './music'
+
+/**
+ * What a chosen take was made from, as the lock file holds it: the brief as `text`. Read as the
+ * take's `TakeInputs`.
+ */
+const LockInputsSchema = z
+  .object({
+    text: z.string(),
+    kind: z.enum(['loop', 'stinger']),
+    seconds: z.number(),
+    bpm: z.number().nullable(),
+    key: z.string().nullable(),
+  })
+  .transform(({ text, ...rest }): TakeInputs => ({ brief: text, ...rest }))
+
+/** The list a lock entry names for a stinger; inside the studio that list is `stingers`. */
+const SHARED_LIST = 'shared'
 
 /** One track in the music lock: the take the game plays, and what it was made from. */
 export const LockEntrySchema = z.object({
@@ -9,21 +26,45 @@ export const LockEntrySchema = z.object({
   model: z.string(),
   /** The seed the take was made from; absent when its model takes none. */
   seed: z.number().optional(),
-  /** Which list the track came from: an act's id, or `stingers`. */
-  list: z.string(),
+  /** Which list the track came from: an act's id, or `stingers` (`shared` in the file). */
+  list: z.string().transform((list) => (list === SHARED_LIST ? 'stingers' : list)),
   /** The number of the take on the track's board. */
   take: z.number().int().positive(),
   /**
    * What the chosen take counts as made from, which the track's inputs are compared with: its own
    * inputs, with a brief, tempo or key accepted since (Accept) in place of what it was made from.
    */
-  inputs: TakeInputsSchema,
+  inputs: LockInputsSchema,
   /** When it was chosen (ISO time). */
   at: z.string(),
 })
 
-/** `music.lock.json`: the chosen take of each track, by track id. */
+/** `content-studio/music/lock.json`: the chosen take of each track, by track id. */
 export const MusicLockSchema = z.record(z.string(), LockEntrySchema)
+
+/**
+ * The lock file's text: one entry per line in id order, each entry's brief written as `text` and a
+ * stinger's list as `shared`.
+ */
+export function formatMusicLock(lock: MusicLock): string {
+  const ids = Object.keys(lock).sort()
+  if (!ids.length) return '{}\n'
+  const lines = ids.map((id) => {
+    const { fp, model, seed, list, take, inputs, at } = lock[id]!
+    const { brief, ...rest } = inputs
+    const entry = {
+      fp,
+      model,
+      seed,
+      list: list === 'stingers' ? SHARED_LIST : list,
+      take,
+      inputs: { text: brief, ...rest },
+      at,
+    }
+    return ` ${JSON.stringify(id)}: ${JSON.stringify(entry)}`
+  })
+  return `{\n${lines.join(',\n')}\n}\n`
+}
 
 /** `manifest.json` of the music clips folder, which the game reads: `{ track: { file, duration } }`. */
 export const MusicManifestSchema = z.record(
