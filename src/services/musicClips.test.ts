@@ -370,6 +370,24 @@ describe('uncommitChoice', () => {
     expect(readFileSync(join(root, 'audio/music/manifest.json'), 'utf8')).toBe('{ nope')
     expect(readFileSync(join(root, 'music/music.lock.json'), 'utf8')).toBe('{ nope')
   })
+
+  it.skipIf(process.getuid?.() === 0)(
+    'says plainly that the game’s file could not be written when the music folder is read-only',
+    async () => {
+      const root = await chosen()
+      const clips = join(root, 'audio/music')
+      chmodSync(clips, 0o555)
+      try {
+        const result = await uncommitChoice({ root, music: config, id: 'hall' })
+        expect(result).toEqual({ ok: false, message: 'The game’s file could not be written.' })
+      } finally {
+        chmodSync(clips, 0o755)
+      }
+      expect(existsSync(join(root, 'audio/music/hall.mp3'))).toBe(true)
+      expect(Object.keys(readJson(root, 'audio/music/manifest.json'))).toEqual(['cave', 'hall'])
+      expect(Object.keys(readJson(root, 'music/music.lock.json'))).toEqual(['cave', 'hall'])
+    },
+  )
 })
 
 describe('acceptChange', () => {
