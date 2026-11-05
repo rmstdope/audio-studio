@@ -136,7 +136,9 @@ describe('recordLine', () => {
     const root = tempRepo({
       ...files,
       'content-studio/narration/act1.edits.json': {
-        k2: `[warm] ${text.replace('A long sentence that goes on. A long', 'A long sentence that goes on. A [hushed] long')}`,
+        cues: {
+          k2: `[warm] ${text.replace('A long sentence that goes on. A long', 'A long sentence that goes on. A [hushed] long')}`,
+        },
       },
     })
     const { fish, requests } = fakeFish()
@@ -1185,7 +1187,7 @@ describe('recording in a language besides the source', () => {
       { id: 'k1', speaker: 'narrator', text: 'Elior vaknar.' },
       { id: 'k2', speaker: 'mira', text: 'Välkommen.' },
     ],
-    'content-studio/narration/act1.edits.json': { k1: '[worried]' },
+    'content-studio/narration/act1.edits.json': { cues: { k1: '[worried]' } },
   }
   const projectFile = (root: string) => join(root, 'content-studio.json')
   const recordSv = (root: string, key: string, fish: FishClient) =>

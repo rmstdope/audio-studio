@@ -34,7 +34,7 @@ import {
 } from '../core/project'
 import {
   CastSchema,
-  CuesSchema,
+  EditsCuesSchema,
   DialogSchema,
   LockSchema,
   ManifestSchema,
@@ -528,7 +528,7 @@ export async function readPart(
     })
   }
   const cast = await readCast(root, problems)
-  const ownCues = usable(await readResource(root, editsPath, CuesSchema, problems)) ?? {}
+  const ownCues = usable(await readResource(root, editsPath, EditsCuesSchema, problems)) ?? {}
   // Another language follows the source language's opening cue for a line until it has one of its
   // own; the cues inside a source line stay with it.
   const sourceEntries =
@@ -538,7 +538,7 @@ export async function readPart(
           await readResource(
             root,
             narrationFile(project, part.id, sourceLanguage, 'edits'),
-            CuesSchema,
+            EditsCuesSchema,
             problems,
           ),
         ) ?? {})
@@ -625,7 +625,7 @@ async function readDialog(
   const manifest = partPathFor(project.narration.manifest, part.id, language)
   const clips = usable(await readResource(root, manifest, ManifestSchema, quiet))
   const edits = narrationFile(project, part.id, language, 'edits')
-  const cues = usable(await readResource(root, edits, CuesSchema, quiet))
+  const cues = usable(await readResource(root, edits, EditsCuesSchema, quiet))
   const recorded = { clips: Object.keys(clips ?? {}).length, cues: Object.keys(cues ?? {}).length }
   return recorded.clips || recorded.cues ? { status: 'gone', ...recorded } : { status: 'missing' }
 }

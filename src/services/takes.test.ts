@@ -275,7 +275,7 @@ describe('tryLine', () => {
         { id: 'a', speaker: 'grandmother', text: 'Elior, dear. Come here. Sit down now.' },
       ],
       'content-studio/narration/act1.edits.json': {
-        a: '[soft] Elior, dear. Come [low] here. Sit down now.',
+        cues: { a: '[soft] Elior, dear. Come [low] here. Sit down now.' },
       },
     })
     const { fish, requests } = fakeFish()
@@ -298,7 +298,7 @@ describe('tryLine', () => {
     const root = tempRepo({
       ...files,
       'tts/act1/script.json': [{ id: 'a', speaker: 'grandmother', text: 'Come here now.' }],
-      'content-studio/narration/act1.edits.json': { a: 'Come [low] here now.' },
+      'content-studio/narration/act1.edits.json': { cues: { a: 'Come [low] here now.' } },
     })
     const { fish } = fakeFish()
     const result = await tryLine(
@@ -420,7 +420,10 @@ describe('tryLine', () => {
         { id: 'a', speaker: 'grandmother', text: 'Hello.', scene: 'Cave' },
         { id: 'b', speaker: 'grandmother', text: 'Bye.', scene: 'Cave' },
       ],
-      'content-studio/narration/act1.edits.json': { 'scene:Cave': '[dark]', b: '[own]' },
+      'content-studio/narration/act1.edits.json': {
+        cues: { b: '[own]' },
+        scenes: { Cave: '[dark]' },
+      },
     })
     const { fish } = fakeFish()
     const limiter = createLimiter()
@@ -895,7 +898,7 @@ describe('tryLine in a language besides the source', () => {
     },
     'tts/act1/en/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Hello.' }],
     'tts/act1/sv/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Hej.' }],
-    'content-studio/narration/act1.edits.json': { k1: '[worried]' },
+    'content-studio/narration/act1.edits.json': { cues: { k1: '[worried]' } },
   }
   const tryIt = async (cue: string) => {
     const root = tempRepo(swedish)

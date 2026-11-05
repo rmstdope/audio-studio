@@ -183,7 +183,10 @@ export function ttsFor(
   return character?.speed === undefined ? tts : { ...tts, speed: character.speed }
 }
 
-/** A part's delivery cues: line key → a cue that replaces the character's style for that line. */
+/**
+ * A part's delivery cues as the studio uses them: line key → a cue that replaces the character's
+ * style for that line, and a scene's cue under its scene key (`sceneKey`).
+ */
 export const CuesSchema = z.record(z.string(), z.string())
 
 /** A line's own cue, if it has one (only the file's own keys: never `toString` and the like). */
@@ -192,19 +195,63 @@ export function cueFor(cues: Record<string, string>, key: string): string | unde
 }
 
 /**
- * What a scene's cue is kept under in the cues file: a line key never holds a colon, so it cannot
- * be one, and the game, which looks up its lines' keys, never reads it.
+ * What a scene's cue is kept under in the studio's cue table: a line key never holds a colon, so
+ * it cannot be one.
  */
 const SCENE_PREFIX = 'scene:'
 
-/** The cues file's key for a scene's cue. */
+/** The cue table's key for a scene's cue. */
 export function sceneKey(scene: string): string {
   return `${SCENE_PREFIX}${scene}`
 }
 
-/** The scene a cues file key names, or null for a line's key. */
+/** The scene a cue table key names, or null for a line's key. */
 export function sceneOfKey(key: string): string | null {
   return key.startsWith(SCENE_PREFIX) ? key.slice(SCENE_PREFIX.length) : null
+}
+
+/** Where a cue table key's cue is in the edits file, as a problem path (`cues.a1`, `scenes.hall`). */
+export function editsPathOf(key: string): string {
+  const scene = sceneOfKey(key)
+  return scene === null ? `cues.${key}` : `scenes.${scene}`
+}
+
+/**
+ * A part's narration edits (`content-studio/narration/<part>[.<lang>].edits.json`): the cues of
+ * lines by line id, and of scenes by the scene's name as the dialog gives it.
+ */
+export const NarrationEditsSchema = z.strictObject({
+  cues: CuesSchema.default({}),
+  scenes: CuesSchema.default({}),
+})
+
+/** A part's narration edits, as read. */
+export type NarrationEdits = z.infer<typeof NarrationEditsSchema>
+
+/** The edits as one cue table: the lines' cues, then the scenes' under their scene keys. */
+export function cuesOfEdits(edits: NarrationEdits): Cues {
+  const scenes = Object.entries(edits.scenes).map(([scene, cue]) => [sceneKey(scene), cue])
+  return Object.fromEntries([...Object.entries(edits.cues), ...scenes])
+}
+
+/** The edits file read straight into the studio's cue table. */
+export const EditsCuesSchema = NarrationEditsSchema.transform(cuesOfEdits)
+
+/**
+ * The edits file's text for a cue table's entries, in their order: the lines' cues under `cues`,
+ * the scenes' under `scenes`, two-space indent and one cue per line.
+ */
+export function formatEdits(entries: [key: string, cue: string][]): string {
+  const lines = entries.filter(([key]) => sceneOfKey(key) === null)
+  const scenes = entries.flatMap(([key, cue]): [string, string][] => {
+    const scene = sceneOfKey(key)
+    return scene === null ? [] : [[scene, cue]]
+  })
+  const section = (name: string, of: [string, string][]) =>
+    of.length
+      ? `  "${name}": {\n${of.map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n')}\n  }`
+      : `  "${name}": {}`
+  return `{\n${section('cues', lines)},\n${section('scenes', scenes)}\n}\n`
 }
 
 /** One clip in the game's manifest. Only what the studio needs is checked; the rest is kept. */

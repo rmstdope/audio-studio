@@ -54,7 +54,7 @@ describe('modelsView', () => {
         speakers: { narrator: { voice: 'v1', style: '[warm]' } },
       },
       'tts/act1/script.json': [{ id: 'a', speaker: 'narrator', text: 'Once upon a time.' }],
-      'content-studio/narration/act1.edits.json': cues,
+      'content-studio/narration/act1.edits.json': { cues },
     })
     const bytes = async (cues: object) => {
       const view = await modelsView(join(tempRepo(files(cues)), 'content-studio.json'))

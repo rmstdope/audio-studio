@@ -240,7 +240,7 @@ describe('server', () => {
   it('moves or removes an orphaned cue, from the studio’s own page only', async () => {
     writeFileSync(
       join(root, 'content-studio/narration/act1.edits.json'),
-      '{\n  "gone": "[sad]"\n}\n',
+      '{\n  "cues": {\n    "gone": "[sad]"\n  },\n  "scenes": {}\n}\n',
     )
     const move = (to: string | null, origin = server.url.origin) =>
       fetch(url('/api/parts/act1/cues/gone/move'), {
@@ -253,10 +253,13 @@ describe('server', () => {
     expect(part.part.orphanCues).toEqual([{ key: 'gone', cue: '[sad]' }])
     expect((await move('a')).status).toBe(200)
     expect(readFileSync(join(root, 'content-studio/narration/act1.edits.json'), 'utf8')).toBe(
-      '{\n  "a": "[sad]"\n}\n',
+      '{\n  "cues": {\n    "a": "[sad]"\n  },\n  "scenes": {}\n}\n',
     )
     expect((await move(null)).status).toBe(404)
-    writeFileSync(join(root, 'content-studio/narration/act1.edits.json'), '{}\n')
+    writeFileSync(
+      join(root, 'content-studio/narration/act1.edits.json'),
+      '{\n  "cues": {},\n  "scenes": {}\n}\n',
+    )
   })
 
   it('checks the setup', async () => {
@@ -370,10 +373,13 @@ describe('server', () => {
     expect((await move('Cave')).status).toBe(200)
     expect((await move(null)).status).toBe(404)
     expect(readFileSync(join(root, 'content-studio/narration/act1.edits.json'), 'utf8')).toBe(
-      '{\n  "scene:Cave": "[dark]"\n}\n',
+      '{\n  "cues": {},\n  "scenes": {\n    "Cave": "[dark]"\n  }\n}\n',
     )
     writeFileSync(join(root, 'tts/act1/script.json'), script)
-    writeFileSync(join(root, 'content-studio/narration/act1.edits.json'), '{}\n')
+    writeFileSync(
+      join(root, 'content-studio/narration/act1.edits.json'),
+      '{\n  "cues": {},\n  "scenes": {}\n}\n',
+    )
   })
 
   it('tries a cue on a line, from the studio’s own page only, and serves the take', async () => {
@@ -3111,9 +3117,7 @@ describe('server, generating per language', () => {
       JSON.parse(
         readFileSync(join(languageRoot, 'content-studio/narration/act1.sv.edits.json'), 'utf8'),
       ),
-    ).toEqual({
-      a: 'En [mjukt] gång.',
-    })
+    ).toEqual({ cues: { a: 'En [mjukt] gång.' }, scenes: {} })
     expect(await place({ at: 1, cue: 'x', text: 'Ett annat.' })).toMatchObject({ ok: false })
     expect(await place({ at: 'one', cue: 'x', text: 'En gång.' })).toEqual({
       error: 'expected { at, cue, text }',
@@ -3131,9 +3135,7 @@ describe('server, generating per language', () => {
       JSON.parse(
         readFileSync(join(languageRoot, 'content-studio/narration/act1.sv.edits.json'), 'utf8'),
       ),
-    ).toEqual({
-      a: '[mjukt]',
-    })
+    ).toEqual({ cues: { a: '[mjukt]' }, scenes: {} })
     expect(existsSync(join(languageRoot, 'content-studio/narration/act1.edits.json'))).toBe(false)
     expect(
       await send('PATCH', '/api/pronounce?language=sv', { table: [['Kom', 'Komm']], was: [] }),

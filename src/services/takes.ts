@@ -232,7 +232,11 @@ export async function tryLine(
       return {
         ok: false,
         problems: [
-          { file: read.paths.cuesPath, path: key, message: 'a cue goes between two words' },
+          {
+            file: read.paths.cuesPath,
+            path: `cues.${key}`,
+            message: 'a cue goes between two words',
+          },
         ],
       }
     }

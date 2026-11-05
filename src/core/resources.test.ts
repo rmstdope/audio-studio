@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'bun:test'
 import { problemsFrom } from './project'
-import { CastSchema, DialogSchema, pronounceOf, projectCast, ttsFor, voiceOf } from './resources'
+import {
+  CastSchema,
+  DialogSchema,
+  NarrationEditsSchema,
+  cuesOfEdits,
+  formatEdits,
+  pronounceOf,
+  projectCast,
+  sceneKey,
+  ttsFor,
+  voiceOf,
+} from './resources'
 
 describe('CastSchema', () => {
   it('explains a pronunciation without the word it replaces', () => {
@@ -164,5 +175,35 @@ describe('DialogSchema', () => {
       { id: 'a', speaker: 'n', text: 'y' },
     ])
     expect(twice.success ? '' : twice.error.issues[0]!.message).toContain('used more than once: a')
+  })
+})
+
+describe('the narration edits', () => {
+  it('reads a part’s cues by line and by scene into one table, scenes under their scene key', () => {
+    const edits = NarrationEditsSchema.parse({
+      cues: { a1: '[hushed]' },
+      scenes: { 'lantern-hall': '[slow]' },
+    })
+    expect(cuesOfEdits(edits)).toEqual({ a1: '[hushed]', [sceneKey('lantern-hall')]: '[slow]' })
+    expect(cuesOfEdits(NarrationEditsSchema.parse({}))).toEqual({})
+  })
+
+  it('refuses a field it does not know, so an old flat file is reported', () => {
+    const old = NarrationEditsSchema.safeParse({ a1: '[hushed]' })
+    expect(old.success).toBe(false)
+  })
+
+  it('writes the cues and the scenes apart, one cue to a line, in the order given', () => {
+    expect(
+      formatEdits([
+        ['b', '[sad]'],
+        [sceneKey('Cave'), '[dark]'],
+        ['a', '[x]'],
+      ]),
+    ).toBe(
+      '{\n  "cues": {\n    "b": "[sad]",\n    "a": "[x]"\n  },\n' +
+        '  "scenes": {\n    "Cave": "[dark]"\n  }\n}\n',
+    )
+    expect(formatEdits([])).toBe('{\n  "cues": {},\n  "scenes": {}\n}\n')
   })
 })

@@ -301,7 +301,7 @@ describe('loadPart', () => {
     const root = tempRepo({
       ...files,
       'tts/act1/script.json': '[not json',
-      'content-studio/narration/act1.edits.json': { a: '[softly]' },
+      'content-studio/narration/act1.edits.json': { cues: { a: '[softly]' } },
     })
     const result = await loadPart(join(root, 'content-studio.json'), 'act1')
     if (!result?.ok) throw new Error('expected the part to load')
@@ -329,7 +329,7 @@ describe('loadPart, a dialog that is gone', () => {
     const part = await load({
       ...base,
       'audio/act1/manifest.json': { a: entry, b: entry },
-      'content-studio/narration/act1.edits.json': { a: '[softly]' },
+      'content-studio/narration/act1.edits.json': { cues: { a: '[softly]' } },
     })
     expect([part.dialog, part.recorded]).toEqual(['gone', { clips: 2, cues: 1 }])
     expect([part.orphans, part.orphanCues, part.lines]).toEqual([[], [], []])
@@ -341,7 +341,8 @@ describe('loadPart, a dialog that is gone', () => {
       cues: 0,
     })
     expect(
-      (await load({ ...base, 'content-studio/narration/act1.edits.json': { a: 'x' } })).recorded,
+      (await load({ ...base, 'content-studio/narration/act1.edits.json': { cues: { a: 'x' } } }))
+        .recorded,
     ).toEqual({
       clips: 0,
       cues: 1,
@@ -682,8 +683,8 @@ describe('a part in several languages', () => {
           narrator: { voice: 'v1', style: '[warm]', languages: { sv: { voice: 'v1-sv' } } },
         },
       },
-      'content-studio/narration/act1.edits.json': { a: '[worried]', b: '[soft]' },
-      'content-studio/narration/act1.sv.edits.json': { b: '[mjukt]', gone: '[x]' },
+      'content-studio/narration/act1.edits.json': { cues: { a: '[worried]', b: '[soft]' } },
+      'content-studio/narration/act1.sv.edits.json': { cues: { b: '[mjukt]', gone: '[x]' } },
     })
     const by = Object.fromEntries(part.lines.map((l) => [l.key, [l.cue, l.cueFrom]]))
     expect(by.a).toEqual(['[worried]', 'source'])
@@ -709,7 +710,7 @@ describe('a part in several languages', () => {
         speakers: { narrator: { voice: 'v1', languages: { sv: { voice: 'v1-sv' } } } },
       },
       'content-studio/narration/act1.sv.lock.json': made,
-      'content-studio/narration/act1.edits.json': { a: '[worried]' },
+      'content-studio/narration/act1.edits.json': { cues: { a: '[worried]' } },
     })
     expect(part.lines.find((l) => l.key === 'a')).toMatchObject({
       status: 'stale',

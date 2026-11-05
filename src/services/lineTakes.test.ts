@@ -234,7 +234,7 @@ describe('useLineTake', () => {
     if (!made?.ok) throw new Error('expected a take')
     writeFileSync(
       join(root, 'content-studio/narration/act1.edits.json'),
-      JSON.stringify({ k1: '[hushed]' }),
+      JSON.stringify({ cues: { k1: '[hushed]' } }),
     )
     const listed = await listLineTakes(projectFileOf(root), 'act1', 'k1')
     expect(listed?.ok && listed.takes[0]?.current).toBe(false)
@@ -346,7 +346,7 @@ describe('takes of a line in a language besides the source', () => {
     },
     'tts/act1/en/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Elior wakes up.' }],
     'tts/act1/sv/script.json': [{ id: 'k1', speaker: 'narrator', text: 'Elior vaknar.' }],
-    'content-studio/narration/act1.edits.json': { k1: '[worried]' },
+    'content-studio/narration/act1.edits.json': { cues: { k1: '[worried]' } },
   }
 
   it('keeps a language’s takes apart, makes one the clip of that language only, and drops it', async () => {
