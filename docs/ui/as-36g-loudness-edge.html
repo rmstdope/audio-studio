@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Loudness edge — agreed (as-36g)</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --line: rgb(255 255 255/7%);
+        --ls: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --warn: #ffc24b;
+        --warnbg: #2d2412;
+        --ok: #3ddc97;
+        --okbg: #10291f;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .w {
+        max-width: 620px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 12px 14px;
+        margin: 14px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        text-align: left;
+        font-weight: 500;
+        color: var(--faint);
+        font-size: 12px;
+        padding: 4px 6px;
+      }
+      td {
+        padding: 6px;
+        border-top: 1px solid var(--line);
+      }
+      .lu {
+        font-variant-numeric: tabular-nums;
+      }
+      .chip {
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 12px;
+      }
+      .co {
+        background: var(--okbg);
+        color: var(--ok);
+      }
+      .cw {
+        background: var(--warnbg);
+        color: var(--warn);
+      }
+      .note {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .cap {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        margin-top: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="w">
+      <h1>A — Judged on the figure you read</h1>
+      <p class="muted">
+        The figure is rounded to one decimal first, then judged. What you read is what is judged:
+        −22.0 is exactly 2.0 off, so it is on target. Just past the edge, −22.05 reads −22.1 and 2.1
+        dB too quiet. The scene list’s count column and the one-press suggestion to bring a scene
+        back in line follow the same judgement: a state on target here is never counted as off
+        target or offered a change.
+      </p>
+      <div class="cap">Scenes page — Lantern hall, Loudness panel</div>
+      <div class="panel">
+        <div>
+          <b>Loudness</b>
+          <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span>
+        </div>
+        <table>
+          <tr>
+            <th>State</th>
+            <th>Loudness</th>
+            <th></th>
+            <th class="note">(true figure, not shown)</th>
+          </tr>
+          <tr>
+            <td>plain</td>
+            <td class="lu">−22.0 LUFS</td>
+            <td><span class="chip co">on target</span></td>
+            <td class="note">−22.04</td>
+          </tr>
+          <tr>
+            <td>cat-home</td>
+            <td class="lu">−22.1 LUFS</td>
+            <td><span class="chip cw">2.1 dB too quiet</span></td>
+            <td class="note">−22.05</td>
+          </tr>
+          <tr>
+            <td>night</td>
+            <td class="lu">−18.0 LUFS</td>
+            <td><span class="chip co">on target</span></td>
+            <td class="note">−17.96</td>
+          </tr>
+          <tr>
+            <td>storm</td>
+            <td class="lu">−23.8 LUFS</td>
+            <td><span class="chip cw">3.8 dB too quiet</span></td>
+            <td class="note">−23.80</td>
+          </tr>
+        </table>
+        <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 14:02</p>
+      </div>
+      <div class="cap">Scene list — Lantern hall's count column</div>
+      <div class="panel">Lantern hall &nbsp; <span style="color: var(--warn)">too quiet</span></div>
+    </div>
+  </body>
+</html>
