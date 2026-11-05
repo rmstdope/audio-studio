@@ -1611,6 +1611,9 @@ describe('the Loudness panel', () => {
     })
     const page = render(open, summary('ok', true, { target, loudness: loudness(failed) }))
     const box = panel(page).querySelector('.scene-problem')
+    // The box is a flex column: the sentence must stay one item, or it stacks a line per piece.
+    expect(box!.children.length).toBe(1)
+    expect(box!.children[0]!.querySelectorAll('code.scene-clip-path').length).toBe(2)
     expect([...box!.querySelectorAll('code.scene-clip-path')].map((c) => text(c))).toEqual([
       'audio/a.mp3',
       '.content-studio/effect-takes/x/3.mp3',

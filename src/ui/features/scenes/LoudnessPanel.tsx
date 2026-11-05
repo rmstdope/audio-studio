@@ -219,17 +219,19 @@ export function LoudnessPanel({
       )}
       {measure?.error != null && (
         <div className="panel scene-problem">
-          Couldn’t measure {scene.name}:{' '}
-          {splitClipPaths(measure.error.replace(/\.+$/, '')).map((piece, i) =>
-            piece.path ? (
-              <code key={i} className="scene-clip-path">
-                {piece.text}
-              </code>
-            ) : (
-              piece.text
-            ),
-          )}
-          . The other scenes were measured.
+          <span>
+            Couldn’t measure {scene.name}:{' '}
+            {splitClipPaths(measure.error.replace(/\.+$/, '')).map((piece, i) =>
+              piece.path ? (
+                <code key={i} className="scene-clip-path">
+                  {piece.text}
+                </code>
+              ) : (
+                piece.text
+              ),
+            )}
+            . The other scenes were measured.
+          </span>
         </div>
       )}
       {refused && <div className="panel scene-problem">{refused}</div>}
