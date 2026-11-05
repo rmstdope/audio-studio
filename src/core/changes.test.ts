@@ -128,9 +128,9 @@ describe('projectPaths with several languages', () => {
   it('lists every language’s files and clips folder', () => {
     const many = ProjectSchema.parse(
       projectJson({
+        languages: ['en', 'sv'],
         narration: {
           ...(projectJson().narration as object),
-          languages: ['en', 'sv'],
           paths: {
             dialog: 'tts/{part}/{language}/script.json',
             cues: 'tts/{part}/{language}/cues.json',

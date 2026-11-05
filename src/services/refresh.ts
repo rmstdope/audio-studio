@@ -171,8 +171,9 @@ async function refresh(
 ): Promise<RefreshResult> {
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
-  const { narration } = opened.project
-  const part = narration.parts.find((p) => p.id === partId)
+  const { project } = opened
+  const { narration } = project
+  const part = project.parts.find((p) => p.id === partId)
   if (!part) return null
   if (!narration.refreshDialog) {
     return {
@@ -182,7 +183,7 @@ async function refresh(
     }
   }
   const root = dirname(projectFile)
-  const dialogPath = partPathFor(narration.paths.dialog, part.id, narration.languages[0])
+  const dialogPath = partPathFor(narration.paths.dialog, part.id, project.languages[0])
   const before = await readLines(root, dialogPath)
   const loopsFile = opened.project.music
     ? partPathFor(opened.project.music.paths.loops, part.id)

@@ -65,7 +65,7 @@ export async function readScenes(
   if (!scenes) return null
   const acts = []
   const measures = await readMeasures(root, problems)
-  for (const part of project.narration.parts) {
+  for (const part of project.parts) {
     const mixFile = partPathFor(scenes.paths.mix, part.id)
     acts.push({
       mixFile,
@@ -166,7 +166,7 @@ export function saveScene(
     const opened = await openProject(projectFile)
     if (!opened.ok) return refuse('unknown', opened.problems[0]?.message ?? 'the project is broken')
     const { project } = opened
-    const act = project.narration.parts.find((p) => p.id === part)
+    const act = project.parts.find((p) => p.id === part)
     if (!project.scenes || !act) return refuse('unknown', `${part} has no scenes`)
     const root = dirname(projectFile)
     const problems: Problem[] = []

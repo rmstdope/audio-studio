@@ -111,9 +111,9 @@ describe('ProjectSchema', () => {
     const narration = base.narration as Record<string, unknown>
     const withPhrases = (phrases: Record<string, string>) => ({
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...narration,
-        languages: ['en', 'sv'],
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
           cues: 'tts/{part}/{language}/cues.json',
@@ -173,19 +173,17 @@ describe('ProjectSchema', () => {
   it('takes the words that sound the same of the languages besides the source, and no others', () => {
     const base = projectJson()
     const narration = base.narration as Record<string, unknown>
-    const languages = {
-      languages: ['en', 'sv'],
-      paths: {
-        dialog: 'tts/{part}/{language}/script.json',
-        cues: 'tts/{part}/{language}/cues.json',
-        lock: 'tts/{part}/{language}/lock.json',
-        clips: 'audio/{part}/{language}',
-        manifest: 'audio/{part}/{language}/manifest.json',
-      },
+    const paths = {
+      dialog: 'tts/{part}/{language}/script.json',
+      cues: 'tts/{part}/{language}/cues.json',
+      lock: 'tts/{part}/{language}/lock.json',
+      clips: 'audio/{part}/{language}',
+      manifest: 'audio/{part}/{language}/manifest.json',
     }
     const by = (soundAlikeByLanguage: unknown) => ({
       ...base,
-      narration: { ...narration, ...languages, quality: { soundAlikeByLanguage } },
+      languages: ['en', 'sv'],
+      narration: { ...narration, paths, quality: { soundAlikeByLanguage } },
     })
     expect(parse(by({ sv: [['Lyria', 'Liria']] })).success).toBe(true)
     expect(problems(by({ sv: [['alone']] })).map((p) => p.path)).toEqual([
@@ -233,25 +231,30 @@ describe('ProjectSchema', () => {
     expect(found.map((p) => p.path)).toEqual(['narration.paths.clips'])
   })
 
+  it('takes the parts and what the game calls them at the top level', () => {
+    const project = parse(projectJson({ partLabel: 'Chapter' })).data!
+    expect(project.parts.map((part) => part.id)).toEqual(['act1', 'act2'])
+    expect(project.partLabel).toBe('Chapter')
+    const { partLabel: _label, ...unlabelled } = projectJson()
+    expect(parse(unlabelled).data!.partLabel).toBe('Part')
+  })
+
+  it('needs the parts', () => {
+    const { parts: _parts, ...rest } = projectJson()
+    expect(problems(rest).map((p) => p.path)).toEqual(['parts'])
+  })
+
   it('rejects duplicate part ids', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
     const parts = [
       { id: 'act1', title: 'A' },
       { id: 'act1', title: 'B' },
     ]
-    expect(problems({ ...base, narration: { ...narration, parts } })[0]!.message).toBe(
-      'part ids must be unique',
-    )
+    expect(problems(projectJson({ parts }))[0]!.message).toBe('part ids must be unique')
   })
 
   it('writes array indexes in problem paths', () => {
-    const base = projectJson()
-    const narration = base.narration as Record<string, unknown>
     const parts = [{ id: 'act 1', title: 'A' }]
-    expect(problems({ ...base, narration: { ...narration, parts } })[0]!.path).toBe(
-      'narration.parts[0].id',
-    )
+    expect(problems(projectJson({ parts }))[0]!.path).toBe('parts[0].id')
   })
 })
 
@@ -292,13 +295,14 @@ describe('ProjectSchema, paid models', () => {
   })
 })
 
-describe('narration.languages', () => {
+describe('languages', () => {
   function withLanguages(languages: unknown, paths: Record<string, string> = {}) {
     const base = projectJson()
     const narration = base.narration as { paths: Record<string, string> }
     return {
       ...base,
-      narration: { ...narration, languages, paths: { ...narration.paths, ...paths } },
+      languages,
+      narration: { ...narration, paths: { ...narration.paths, ...paths } },
     }
   }
   const everyPath = {
@@ -310,12 +314,12 @@ describe('narration.languages', () => {
   }
 
   it('is English alone by default', () => {
-    expect(parse(projectJson()).data!.narration.languages).toEqual(['en'])
+    expect(parse(projectJson()).data!.languages).toEqual(['en'])
   })
 
   it('takes several languages when every path has {language}', () => {
     const result = parse(withLanguages(['en', 'sv', 'de'], everyPath))
-    expect(result.data!.narration.languages).toEqual(['en', 'sv', 'de'])
+    expect(result.data!.languages).toEqual(['en', 'sv', 'de'])
   })
 
   it('accepts {language} with one language', () => {
@@ -336,9 +340,7 @@ describe('narration.languages', () => {
   it('rejects an empty list, repeats and unknown codes', () => {
     expect(problems(withLanguages([])).length).toBeGreaterThan(0)
     expect(problems(withLanguages(['en', 'en'], everyPath))[0]!.message).toContain('unique')
-    expect(problems(withLanguages(['en', 'Swedish'], everyPath))[0]!.path).toBe(
-      'narration.languages[1]',
-    )
+    expect(problems(withLanguages(['en', 'Swedish'], everyPath))[0]!.path).toBe('languages[1]')
   })
 })
 
@@ -486,9 +488,8 @@ describe('problemsFrom wording', () => {
   })
 
   it('says a text or list that is too short in plain words', () => {
-    const narration = base.narration as Record<string, unknown>
-    const all = messages({ ...base, narration: { ...narration, languages: [] } })
-    expect(all).toEqual(['narration.languages must be 1 or more items'])
+    const all = messages({ ...base, languages: [] })
+    expect(all).toEqual(['languages must be 1 or more items'])
   })
 
   it('says too big, exclusive bounds, whole numbers and choices in plain words', () => {

@@ -180,7 +180,7 @@ describe('moveCue', () => {
 describe('cues in a language besides the source', () => {
   const several = projectJson()
   const narration = several.narration as Record<string, unknown>
-  narration.languages = ['en', 'sv']
+  several.languages = ['en', 'sv']
   narration.paths = {
     dialog: 'tts/{part}/{language}/script.json',
     cues: 'tts/{part}/{language}/cues.json',
@@ -294,7 +294,7 @@ describe('scene cues', () => {
   it('follows the source language’s scene name, and writes the language’s own cue only', async () => {
     const several = projectJson()
     const narration = several.narration as Record<string, unknown>
-    narration.languages = ['en', 'sv']
+    several.languages = ['en', 'sv']
     narration.paths = {
       dialog: 'tts/{part}/{language}/script.json',
       cues: 'tts/{part}/{language}/cues.json',

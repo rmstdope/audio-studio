@@ -10,12 +10,12 @@ export function projectJson(overrides: Record<string, unknown> = {}): Record<str
   return {
     version: 2,
     name: 'Test Game',
+    partLabel: 'Act',
+    parts: [
+      { id: 'act1', title: 'Act I' },
+      { id: 'act2', title: 'Act II' },
+    ],
     narration: {
-      partLabel: 'Act',
-      parts: [
-        { id: 'act1', title: 'Act I' },
-        { id: 'act2', title: 'Act II' },
-      ],
       characters: 'tts/cast.json',
       paths: {
         dialog: 'tts/{part}/script.json',

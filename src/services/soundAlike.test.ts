@@ -31,7 +31,7 @@ describe('setSoundAlike', () => {
   it('saves a language’s groups under its own key, the source language’s untouched', async () => {
     const project = projectJson()
     const narration = project.narration as Record<string, unknown>
-    narration.languages = ['en', 'sv']
+    project.languages = ['en', 'sv']
     narration.paths = {
       dialog: 'tts/{part}/{language}/script.json',
       cues: 'tts/{part}/{language}/cues.json',

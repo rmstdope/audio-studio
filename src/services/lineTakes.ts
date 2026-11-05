@@ -114,7 +114,8 @@ export async function takeLine(
       message: `${line.speaker} has no voice yet; cast one first.`,
     }
   }
-  const { narration } = read.project
+  const { project } = read
+  const { narration } = project
   const root = dirname(projectFile)
   const speaker = await speakerFor({
     root,
@@ -252,7 +253,7 @@ export async function dropLineTake(
   // The name comes from the project file alone: the part's own files may be broken.
   const opened = await openProject(projectFile)
   if (!opened.ok) return opened
-  const name = partCacheName(opened.project.narration, partId, language)
+  const name = partCacheName(opened.project, partId, language)
   const takes = await readTakes(root, name, key)
   if (!takes.some((t) => t.id === id)) return null
   const folder = takesFolder(name, key)
@@ -273,7 +274,7 @@ export async function lineTakeFile(
   const root = dirname(projectFile)
   const opened = await openProject(projectFile)
   if (!opened.ok) return null
-  const name = partCacheName(opened.project.narration, partId, language)
+  const name = partCacheName(opened.project, partId, language)
   const file = resolveInRoot(root, `${takesFolder(name, key)}/${id}.wav`)
   return (await Bun.file(file).exists()) ? file : null
 }

@@ -894,9 +894,9 @@ describe('an audition per language', () => {
     ...files,
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         audition: { candidatesPerRound: 3 },
         paths: {
           dialog: 'tts/{part}/{language}/script.json',

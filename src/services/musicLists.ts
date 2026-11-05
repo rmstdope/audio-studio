@@ -34,7 +34,7 @@ export async function readMusic(
   const { music, narration } = project
   if (!music) return null
   const lists: MusicListInput[] = []
-  for (const part of narration.parts) {
+  for (const part of project.parts) {
     const file = partPathFor(music.paths.loops, part.id)
     lists.push({
       id: part.id,

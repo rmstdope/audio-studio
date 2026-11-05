@@ -99,7 +99,7 @@ export async function readImages(
   const { images, narration } = project
   if (!images) return null
   const lists = []
-  for (const part of narration.parts) {
+  for (const part of project.parts) {
     const file = partPathFor(images.paths.list, part.id)
     const read = await readResource(root, file, ImageListSchema, problems)
     const state: ImageListState =
@@ -144,7 +144,7 @@ export async function readImages(
     lookError: styleLook.error,
     takeLooks: await readTakeLooks(root, ids),
     styleInvalid: styleRead === 'invalid',
-    parts: narration.parts,
+    parts: project.parts,
     lists,
     styleFile: images.paths.style,
     style,

@@ -696,9 +696,9 @@ describe('server, a character per language', () => {
   const languageRoot = tempRepo({
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
           cues: 'tts/{part}/{language}/cues.json',
@@ -1039,9 +1039,9 @@ describe('server, paid auditions in two languages', () => {
   const root = tempRepo({
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         models: { audition: 's2.1-pro' },
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
@@ -2500,9 +2500,9 @@ describe('server, a part in another language', () => {
   const many = tempRepo({
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
           cues: 'tts/{part}/{language}/cues.json',
@@ -2986,9 +2986,9 @@ describe('server, generating per language', () => {
   const languageRoot = tempRepo({
     'content-studio.json': {
       ...base,
+      languages: ['en', 'sv'],
       narration: {
         ...(base.narration as object),
-        languages: ['en', 'sv'],
         quality: { transcriber: 'none' },
         paths: {
           dialog: 'tts/{part}/{language}/script.json',

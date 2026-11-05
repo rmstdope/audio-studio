@@ -438,7 +438,7 @@ export async function recordedLines(
 ): Promise<Appearance[]> {
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return []
-  const language = declaredLanguage(loaded.project.narration, asked)
+  const language = declaredLanguage(loaded.project, asked)
   const character = loaded.summary.characters.find((c) => c.id === characterId)
   const recorded: Appearance[] = []
   for (const { part } of character?.languages[language]?.appearances ?? []) {
@@ -484,7 +484,7 @@ export async function castVoice(
     if (!loaded.ok) return loaded
     const character = loaded.summary.characters.find((c) => c.id === characterId)
     if (!character) return null
-    const language = declaredLanguage(loaded.project.narration, asked)
+    const language = declaredLanguage(loaded.project, asked)
     const session = await readSession(projectFile, characterId, language)
     if (!session) {
       return { ok: false, reason: 'no-session', message: 'There is no audition to cast from.' }
@@ -533,7 +533,7 @@ export async function castOwnVoice(
     if (!loaded.ok) return loaded
     const character = loaded.summary.characters.find((c) => c.id === characterId)
     if (!character) return null
-    const language = declaredLanguage(loaded.project.narration, asked)
+    const language = declaredLanguage(loaded.project, asked)
     return writeCast(
       projectFile,
       characterId,
@@ -652,7 +652,7 @@ export async function voicesRemoved(projectFile: string, voices: string[]): Prom
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return
   for (const character of loaded.summary.characters) {
-    for (const language of loaded.project.narration.languages) {
+    for (const language of loaded.project.languages) {
       await changeSession(
         projectFile,
         character.id,
@@ -688,7 +688,7 @@ export async function voicesInUse(projectFile: string): Promise<Set<string> | nu
     for (const casting of Object.values(character.languages)) {
       if (casting.voice) used.add(casting.voice)
     }
-    for (const language of loaded.project.narration.languages) {
+    for (const language of loaded.project.languages) {
       const json = await readJson(await sessionPath(projectFile, character.id, language))
       if (json.status === 'missing') continue
       // One of an earlier version is no longer an audition in progress (see the schema).

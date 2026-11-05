@@ -188,9 +188,9 @@ describe('a character per language', () => {
   const languages = ['en', 'sv']
   const several: typeof project = {
     ...project,
+    languages,
     narration: {
       ...project.narration,
-      languages,
       paths: {
         dialog: 'tts/{part}/{language}/script.json',
         cues: 'c/{language}/{part}',

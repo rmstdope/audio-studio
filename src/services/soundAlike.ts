@@ -35,8 +35,8 @@ export function setSoundAlike(
     if (!opened.ok) return opened
     const { raw, project } = opened
     const file = basename(projectFile)
-    const which = declaredLanguage(project.narration, language)
-    const own = which !== project.narration.languages[0]
+    const which = declaredLanguage(project, language)
+    const own = which !== project.languages[0]
     const PATH = own
       ? `narration.quality.soundAlikeByLanguage.${which}`
       : 'narration.quality.soundAlike'
@@ -45,7 +45,7 @@ export function setSoundAlike(
       ok: false,
       problems: [{ file, path: PATH, message }],
     })
-    if (!sameGroups(soundAlikeOf(project.narration, which), was)) {
+    if (!sameGroups(soundAlikeOf(project, which), was)) {
       return problem(
         'the words that sound the same in the file changed since editing began; discard your changes to see them',
       )

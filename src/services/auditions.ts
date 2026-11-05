@@ -182,9 +182,7 @@ export function unknownVoice(id: string, name: string | null): Voice {
 
 /** The language a library is searched in for voices of `language`: the source language as the project says, another by its code. */
 export function searchLanguage(project: Project, language: string): string {
-  return language === project.narration.languages[0]
-    ? project.narration.audition.language
-    : language
+  return language === project.languages[0] ? project.narration.audition.language : language
 }
 
 /**
@@ -391,11 +389,12 @@ export async function setPhrase(
   const loaded = await loadWorkspace(projectFile)
   if (!loaded.ok) return loaded
   if (!loaded.summary.characters.some((c) => c.id === characterId)) return null
-  const { narration } = loaded.project
-  const which = declaredLanguage(narration, language)
+  const { project } = loaded
+  const { narration } = project
+  const which = declaredLanguage(project, language)
   const tooLong = own ? phraseProblem(own, narration.quality.chunkLimit) : null
   if (tooLong) {
-    const path = phrasePath(characterId, which === narration.languages[0] ? undefined : which)
+    const path = phrasePath(characterId, which === project.languages[0] ? undefined : which)
     return { ok: false, problems: [{ file: narration.characters, path, message: tooLong }] }
   }
   return updateCharacter(
@@ -540,8 +539,8 @@ async function writeCharacter(
     const reordered = reorderedTable(parsed, path)
     if (reordered) return reordered
     const speakers = { ...cast.speakers }
-    const { narration } = loaded.project
-    const which = { language: declaredLanguage(narration, asked), source: narration.languages[0]! }
+    const { project } = loaded
+    const which = { language: declaredLanguage(project, asked), source: project.languages[0]! }
     speakers[characterId] = change(speakers[characterId] ?? {}, which)
     return { ...cast, speakers }
   })
@@ -621,14 +620,14 @@ export function setPronunciations(
   return castWrites.run(projectFile, async () => {
     const opened = await openProject(projectFile)
     if (!opened.ok) return opened
-    const { narration } = opened.project
-    const which = declaredLanguage(narration, language)
+    const { project } = opened
+    const which = declaredLanguage(project, language)
     // The source language's table is `pronounce`; another's is `languages.<code>.pronounce`.
-    const own = which !== narration.languages[0]
+    const own = which !== project.languages[0]
     const where = own ? `languages.${which}.pronounce` : 'pronounce'
     return writeCast(projectFile, (raw, parsed, path) => {
       const problem = (message: string): Problem[] => [{ file: path, path: where, message }]
-      if (!sameTable(Object.entries(pronounceOf(parsed, which, narration.languages[0]!)), was)) {
+      if (!sameTable(Object.entries(pronounceOf(parsed, which, project.languages[0]!)), was)) {
         return problem(
           'the pronunciations in the file changed since editing began; discard your changes to see them',
         )

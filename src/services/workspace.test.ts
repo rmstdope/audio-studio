@@ -143,7 +143,7 @@ describe('loadProject', () => {
     const result = await loadProject(join(root, 'content-studio.json'))
     if (result.ok) throw new Error('expected the project file to be rejected')
     expect(result.file).toBe('content-studio.json')
-    expect(result.problems.map((p) => p.path)).toEqual(['name', 'narration'])
+    expect(result.problems.map((p) => p.path)).toEqual(['name', 'parts', 'narration'])
   })
 
   it('refuses a project file in the format before version 2, saying what to do', async () => {
@@ -319,9 +319,9 @@ describe('loadPart, a dialog that is gone', () => {
   it('carries a gone language into the progress and the project summary', async () => {
     const project = {
       ...projectJson(),
+      languages: ['en', 'sv'],
       narration: {
         ...(projectJson().narration as object),
-        languages: ['en', 'sv'],
         paths: {
           dialog: 'tts/{part}/{language}/script.json',
           cues: 'tts/{part}/{language}/cues.json',
@@ -540,7 +540,7 @@ describe('a part in several languages', () => {
   }
   function project(languages: string[]) {
     const base = projectJson()
-    return { ...base, narration: { ...(base.narration as object), languages, paths } }
+    return { ...base, languages, narration: { ...(base.narration as object), paths } }
   }
   const files = {
     'content-studio.json': project(['en', 'sv', 'de']),

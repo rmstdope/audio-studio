@@ -534,9 +534,9 @@ function languageProject() {
   const base = projectJson()
   return {
     ...base,
+    languages: ['en', 'sv'],
     narration: {
       ...(base.narration as object),
-      languages: ['en', 'sv'],
       paths: {
         dialog: 'tts/{part}/{language}/script.json',
         cues: 'tts/{part}/{language}/cues.json',
@@ -713,9 +713,9 @@ describe('casting per language', () => {
       ...files,
       'content-studio.json': {
         ...base,
+        languages: ['en', 'sv'],
         narration: {
           ...(base.narration as object),
-          languages: ['en', 'sv'],
           paths: {
             dialog: 'tts/{part}/{language}/script.json',
             cues: 'tts/{part}/{language}/cues.json',

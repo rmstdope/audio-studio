@@ -328,7 +328,7 @@ describe('dropLineTake', () => {
 describe('takes of a line in a language besides the source', () => {
   const several = projectJson()
   const narration = several.narration as Record<string, unknown>
-  narration.languages = ['en', 'sv']
+  several.languages = ['en', 'sv']
   narration.paths = {
     dialog: 'tts/{part}/{language}/script.json',
     cues: 'tts/{part}/{language}/cues.json',

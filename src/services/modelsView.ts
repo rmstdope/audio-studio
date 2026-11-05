@@ -88,8 +88,8 @@ export async function modelsView(
   const dialog: Dialog = { lines: 0, bytes: 0 }
   const recorded: Recorded = {}
   let castsEleven = false
-  for (const part of project.narration.parts) {
-    for (const language of project.narration.languages) {
+  for (const part of project.parts) {
+    for (const language of project.languages) {
       const read = await readPart(projectFile, part.id, language)
       if (!read?.ok || read.dialog.status !== 'ok') continue
       const { input } = read

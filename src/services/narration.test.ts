@@ -1147,7 +1147,7 @@ describe('acceptLine', () => {
 describe('recording in a language besides the source', () => {
   const several = projectJson()
   const narration = several.narration as Record<string, unknown>
-  narration.languages = ['en', 'sv']
+  several.languages = ['en', 'sv']
   narration.quality = { chunkLimit: 100 }
   narration.paths = {
     dialog: 'tts/{part}/{language}/script.json',
