@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Scene loudness — agreed (as-gdf.1)</title>
+    <style>
+      :root {
+        --bg: #06070c;
+        --panel: #10121a;
+        --raised: #191c24;
+        --line: rgb(255 255 255/7%);
+        --ls: rgb(255 255 255/14%);
+        --text: #eceef3;
+        --muted: #a9b0bd;
+        --faint: #8a91a0;
+        --accent: #ff6b2c;
+        --warn: #ffc24b;
+        --warnbg: #2d2412;
+        --ok: #3ddc97;
+        --okbg: #10291f;
+        --dang: #ff94a8;
+        --dangbg: #2e1720;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #030407;
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+      }
+      .intro {
+        max-width: 1180px;
+        margin: 0 auto 18px;
+        color: var(--muted);
+      }
+      .intro h1 {
+        color: var(--text);
+        font-size: 20px;
+        margin: 0 0 6px;
+      }
+      .intro b {
+        color: var(--text);
+      }
+      .page {
+        max-width: 1180px;
+        margin: 0 auto 30px;
+        border: 1px solid var(--ls);
+        border-radius: 12px;
+        background: var(--bg);
+        padding: 18px;
+      }
+      .cap {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--faint);
+        margin: 0 auto 6px;
+        max-width: 1180px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .crumbs {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      h2 {
+        margin: 2px 0;
+        font-size: 22px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .btn {
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        padding: 5px 12px;
+        font-size: 13px;
+        display: inline-block;
+        background: var(--raised);
+      }
+      .btn.pri {
+        background: var(--accent);
+        color: #1a0a02;
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .btn.dis {
+        opacity: 0.45;
+      }
+      .acts {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .body {
+        display: grid;
+        grid-template-columns: 270px 1fr;
+        gap: 16px;
+      }
+      .list {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 8px;
+      }
+      .list .lbl {
+        font-size: 12px;
+        color: var(--faint);
+        padding: 4px 8px;
+        display: block;
+      }
+      .li {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 7px 8px;
+        border-radius: 7px;
+        align-items: baseline;
+      }
+      .li.cur {
+        background: var(--raised);
+      }
+      .cnt {
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .red {
+        color: var(--dang);
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+      .rowx {
+        display: grid;
+        grid-template-columns: 1fr 150px 90px;
+        gap: 8px;
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--line);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .chip {
+        font-size: 12px;
+        border-radius: 6px;
+        padding: 1px 8px;
+        display: inline-block;
+        white-space: nowrap;
+      }
+      .cw {
+        color: var(--warn);
+        background: var(--warnbg);
+      }
+      .co {
+        color: var(--ok);
+        background: var(--okbg);
+      }
+      .cd {
+        color: var(--dang);
+        background: var(--dangbg);
+      }
+      .cn {
+        color: var(--muted);
+        background: rgb(255 255 255/7%);
+      }
+      .lu {
+        font-variant-numeric: tabular-nums;
+        font-size: 12.5px;
+      }
+      .bar {
+        border: 1px solid var(--ls);
+        border-radius: 10px;
+        background: var(--bg);
+        padding: 10px 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--ls);
+        border-radius: 8px;
+        overflow: hidden;
+        font-size: 12.5px;
+      }
+      .seg span {
+        padding: 4px 10px;
+      }
+      .seg span.on {
+        background: #3a2416;
+        color: #ffb48a;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td,
+      th {
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        font-size: 13px;
+      }
+      th {
+        font-weight: 500;
+        color: var(--faint);
+        font-size: 12px;
+      }
+      .strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        align-items: center;
+        margin-top: 6px;
+        font-size: 13px;
+      }
+      .note {
+        max-width: 1180px;
+        margin: -18px auto 30px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .spin {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border: 2px solid var(--faint);
+        border-top-color: transparent;
+        border-radius: 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="intro">
+      <h1>Scene loudness — agreed (as-gdf.1)</h1>
+      <p>
+        Chosen: the figures live in a <b>Loudness</b> panel in the open scene, above Music; the
+        list's count column says <b>too loud</b> / <b>too quiet</b> / <b>off target</b> in amber (a
+        red problem wins). <b>Measure loudness</b> measures every scene of the act, what is on the
+        page included; the figures are kept until measured again, carry on measuring when you leave
+        the page, and a scene with a silent effect is measured without it and says so.
+      </p>
+    </div>
+    <p class="cap">
+      The page — Act 1, General store open (unsaved changes), target −20 LUFS ± 2 dB
+    </p>
+    <div class="page">
+      <header>
+        <div>
+          <span class="crumbs">Scenes · Act 1</span>
+          <h2>General store</h2>
+          <span class="muted">States: plain, cat-home · Triggers: door-opens</span>
+        </div>
+        <div class="acts">
+          <span class="btn dis">Discard</span><span class="btn pri dis">Save</span
+          ><span class="btn">Refresh from the game</span>
+        </div>
+      </header>
+      <div class="body">
+        <div class="list">
+          <span class="lbl">5 scenes</span>
+          <div class="li cur">
+            <span>General store <span style="color: var(--muted)">●</span></span
+            ><span class="cnt"><span style="color: var(--warn)">too quiet</span></span>
+          </div>
+          <div class="li"><span>Forest path</span><span class="cnt">2 effects</span></div>
+          <div class="li">
+            <span>Old well</span
+            ><span class="cnt"><span style="color: var(--warn)">too loud</span></span>
+          </div>
+          <div class="li"><span>Cellar</span><span class="cnt">none</span></div>
+          <div class="li">
+            <span>Village square</span><span class="cnt"><span class="red">1 silent</span></span>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+            >
+              <span
+                ><b>Loudness</b>
+                <span class="faint" style="font-size: 12px"
+                  >&nbsp;target −20 LUFS ± 2 dB</span
+                ></span
+              ><span class="btn">Measure loudness</span>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>plain</td>
+                <td class="lu">−19.4 LUFS</td>
+                <td><span class="chip co">on target</span></td>
+              </tr>
+              <tr>
+                <td>cat-home</td>
+                <td class="lu">−23.8 LUFS</td>
+                <td><span class="chip cw">3.8 dB too quiet</span></td>
+              </tr>
+            </table>
+            <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 14:02</p>
+          </div>
+          <div class="panel">
+            <div class="faint" style="font-size: 12px; margin-bottom: 6px">Music</div>
+            <div class="rowx">
+              <span class="mono">act1-general-store</span><span>100%</span
+              ><span class="faint">▶</span>
+            </div>
+            <div class="faint" style="font-size: 12px; margin: 10px 0 6px">Effects</div>
+            <div class="rowx">
+              <span class="mono">shop-bell</span
+              ><span class="muted">Once, 1.5 s after entering</span><span>60%</span>
+            </div>
+            <div class="rowx">
+              <span class="mono">glass-clink</span
+              ><span class="muted">Now and then, every 15–30 s</span><span>50%</span>
+            </div>
+            <div class="rowx">
+              <span class="mono">cat-purr</span><span class="muted">Round and round · cat-home</span
+              ><span>100%</span>
+            </div>
+            <div class="rowx">
+              <span class="mono">door-creak</span><span class="muted">On a trigger: door-opens</span
+              ><span>100%</span>
+            </div>
+          </div>
+          <div class="bar">
+            <span class="btn">▶</span><span class="muted">0:00</span
+            ><span class="faint" style="font-size: 12px">State</span
+            ><span class="seg"><span class="on">plain</span><span>cat-home</span></span
+            ><span class="faint" style="font-size: 12px">Triggers</span
+            ><span class="btn dis">door-opens ⚡</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="cap">Every state of the panel and the list</p>
+    <div style="max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 18px">
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">1 · Never measured</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">
+            Not measured yet. Measure loudness measures every scene in Act 1.
+          </p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">2 · Measuring (you can keep working)</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn dis">Measuring 2 of 5…</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu">−19.4 LUFS</td>
+              <td><span class="chip co">on target</span></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu">−23.8 LUFS</td>
+              <td><span class="chip cw">3.8 dB too quiet</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">
+            Measured today 14:02 · being measured again
+          </p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">3 · Measured, one state off</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu">−19.4 LUFS</td>
+              <td><span class="chip co">on target</span></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu">−23.8 LUFS</td>
+              <td><span class="chip cw">3.8 dB too quiet</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 14:02</p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">
+          2b · Back on the page after leaving it while measuring
+        </p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn dis">Measuring 4 of 5…</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu">−19.4 LUFS</td>
+              <td><span class="chip co">on target</span></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu">−23.8 LUFS</td>
+              <td><span class="chip cw">3.8 dB too quiet</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">
+            Measured today 14:02 · being measured again
+          </p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">4 · Measured, a scene with no states</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>The scene</td>
+              <td class="lu">−20.6 LUFS</td>
+              <td><span class="chip co">on target</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 14:02</p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">5 · No target in the project file</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;no target set</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu">−19.4 LUFS</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu">−23.8 LUFS</td>
+              <td></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">
+            Measured today 14:02 · Set a loudness target and tolerance in the project file to be
+            told which scenes are off.
+          </p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">6 · Nothing plays in the scene</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu"><span class="faint">nothing plays</span></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu">−31.2 LUFS</td>
+              <td><span class="chip cw">11.2 dB too quiet</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 14:02</p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">
+          7 · Changed since measured (Saved, or a take chosen on another page)
+        </p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px"
+                >&nbsp;target −20 LUFS ± 2 dB ·
+                <span style="color: var(--warn)">changed since measured</span></span
+              ></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu">−19.4 LUFS</td>
+              <td><span class="chip co">on target</span></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu">−23.8 LUFS</td>
+              <td><span class="chip cw">3.8 dB too quiet</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured yesterday 16:40</p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">
+          7b · Measured without a silent effect or missing music
+        </p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu">−19.4 LUFS</td>
+              <td><span class="chip co">on target</span></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu">−23.8 LUFS</td>
+              <td><span class="chip cw">3.8 dB too quiet</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">
+            Measured today 14:02 · without <span class="mono">glass-clink</span>, which has no take
+            chosen
+          </p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">
+          8 · With unsaved changes (measured what's on the page)
+        </p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px"
+                >&nbsp;target −20 LUFS ± 2 dB ·
+                <span style="color: var(--warn)">with your unsaved changes</span></span
+              ></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu">−19.4 LUFS</td>
+              <td><span class="chip co">on target</span></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu">−20.9 LUFS</td>
+              <td><span class="chip co">on target</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 14:20</p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">9 · This scene couldn't be measured</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>plain</td>
+              <td class="lu"><span class="red">couldn't measure</span></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>cat-home</td>
+              <td class="lu"><span class="red">couldn't measure</span></td>
+              <td></td>
+            </tr>
+          </table>
+          <div
+            class="chip cd"
+            style="margin-top: 8px; white-space: normal; display: block; padding: 6px 8px"
+          >
+            Couldn't measure General store:
+            <span class="mono">shop-bell take 3 could not be decoded</span>. The other scenes were
+            measured.
+          </div>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">10 · Both a state too loud and one too quiet</p>
+        <div class="panel">
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; gap: 10px"
+          >
+            <span
+              ><b>Loudness</b>
+              <span class="faint" style="font-size: 12px">&nbsp;target −20 LUFS ± 2 dB</span></span
+            ><span class="btn">Measure loudness</span>
+          </div>
+          <table>
+            <tr>
+              <th>State</th>
+              <th>Loudness</th>
+              <th></th>
+            </tr>
+            <tr>
+              <td>dim</td>
+              <td class="lu">−15.9 LUFS</td>
+              <td><span class="chip cw">4.1 dB too loud</span></td>
+            </tr>
+            <tr>
+              <td>lit</td>
+              <td class="lu">−23.8 LUFS</td>
+              <td><span class="chip cw">3.8 dB too quiet</span></td>
+            </tr>
+          </table>
+          <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 14:02</p>
+        </div>
+      </div>
+      <div style="flex: 0 0 560px">
+        <p class="cap" style="margin: 0 0 6px">11 · The list (whole act, from the last measure)</p>
+        <div class="list">
+          <span class="lbl">5 scenes</span>
+          <div class="li cur">
+            <span>General store</span
+            ><span class="cnt"><span style="color: var(--warn)">too quiet</span></span>
+          </div>
+          <div class="li">
+            <span>Lighthouse</span
+            ><span class="cnt"><span style="color: var(--warn)">off target</span></span>
+          </div>
+          <div class="li">
+            <span>Old well</span
+            ><span class="cnt"><span style="color: var(--warn)">too loud</span></span>
+          </div>
+          <div class="li"><span>Cellar</span><span class="cnt">none</span></div>
+          <div class="li">
+            <span>Village square</span><span class="cnt"><span class="red">1 silent</span></span>
+          </div>
+        </div>
+        <p class="faint" style="font-size: 12px; margin: 8px 0 0">
+          Lighthouse has one state too loud and one too quiet. A red problem wins the column. With
+          no target set, the list is as today.
+        </p>
+      </div>
+      <div style="flex: 0 0 380px">
+        <p class="cap" style="margin: 0 0 6px">12 · Narrow window (520 px)</p>
+        <div style="width: 340px">
+          <div class="panel">
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px">
+              <span
+                ><b>Loudness</b>
+                <span class="faint" style="font-size: 12px"
+                  >&nbsp;target −20 LUFS ± 2 dB</span
+                ></span
+              ><span class="btn" style="margin-top: 6px">Measure loudness</span>
+            </div>
+            <table>
+              <tr>
+                <th>State</th>
+                <th>Loudness</th>
+                <th></th>
+              </tr>
+              <tr>
+                <td>plain</td>
+                <td class="lu">−19.4 LUFS</td>
+                <td><span class="chip co">on target</span></td>
+              </tr>
+              <tr>
+                <td>cat-home</td>
+                <td class="lu">−23.8 LUFS</td>
+                <td><span class="chip cw">3.8 dB too quiet</span></td>
+              </tr>
+            </table>
+            <p class="faint" style="font-size: 12px; margin: 8px 0 0">Measured today 14:02</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
